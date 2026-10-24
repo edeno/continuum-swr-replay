@@ -1,67 +1,61 @@
 """Prefrontal cortex (mPFC/OFC) neural activity analysis.
 
-This module provides tools for analyzing neural activity from prefrontal cortex
-regions (medial PFC and orbitofrontal cortex) using generalized linear models (GLM).
-The analysis focuses on relating single-unit spiking activity to task variables,
-behavioral states, and hippocampal replay events.
+Poisson GLMs relate each sorted mPFC/OFC unit's spiking during immobility to
+the peri-event kernels of hippocampal events: all SWRs, all non-local (replay)
+events, and the replay events split by SWR overlap, plus a duration-matched
+non-event control. Each kernel is a B-spline over +/-250 ms of the event onset
+(reported over +/-200 ms), fit under a Gaussian prior on the basis
+coefficients, and the models are compared by blocked held-out Poisson deviance
+read against redraws of the matched control.
 
-Primary use case is modeling PFC unit activity during immobility periods to identify
-neurons that modulate their firing during hippocampal replay events, particularly
-during sharp-wave ripples (SWR).
-
-Main Functions
---------------
-build_session_event_sets
-    Build the four event sets (SWR, replay, and the two replay/SWR classes) a
-    session's design matrices are keyed on, restricted to the shared stop cohort.
-build_session_fit_mask
-    The time bins one session's GLMs are fit on: immobility, inside the cohort.
-make_matched_control_times
-    Draw the duration-matched non-event control windows the engagement test
-    compares replay against, from those same fitted bins. Returns a
-    ``MatchedControlDraw``: the windows, and the two counts of events that
-    could not be given one.
+Entry points
+------------
+run_session
+    One session end to end: load and align the data, build the fit mask and
+    the canonical event sets, draw the matched control, build the design
+    matrices, bin every unit's spikes, fit every unit against every design at
+    once (``fitter="jax"``, penalised by ``penalty_sigma``), and return the
+    per-unit statistics and peri-event curves. With ``scoring_out`` it also
+    hands back the fit material the held-out scoring needs. The batch runner
+    is ``scripts/pfc/run_pfc_analysis_bandit.py``.
 process_neuron
-    Fit GLM to relate single neuron activity to task/behavioral covariates.
-    Primary entry point for single-unit analysis.
+    One unit's statistics and curves from its fits (prefitted by
+    ``run_session``, or fit here).
+build_session_fit_mask, build_session_event_sets
+    The bins a session is fit on (immobility inside the stop cohort) and the
+    event classes its designs are keyed on (``event_sets``).
+make_matched_control_times, matched_control_seed
+    The duration-matched non-event control windows (``matched_control``).
+make_design_matrices, fit_immobility_models
+    The model ladder's designs (``design``) and the per-unit fits (``fit``).
 
-Internal Functions
-------------------
-_make_design_matrices
-    Create design matrices for GLM from task variables and behavioral data.
-_fit_immobility_models
-    Fit GLM models specifically during immobility periods.
+Held-out scoring (``heldout``)
+------------------------------
+``assign_blocked_folds``, ``control_draw_null`` and ``empirical_pvalue`` are
+the blocked folds, the matched-control null and its plus-one Monte Carlo
+p-value; ``ENGAGEMENT_PAIR`` and ``BEST_MODEL_CANDIDATES`` name the engagement
+comparison and the best-model candidate sets. The runner's ``score_session``
+assembles them into a session's held-out statistics.
 
-Analysis Workflow
------------------
-1. Load neural data (sorted units from mPFC/OFC)
-2. Bin spike times at desired temporal resolution
-   (``continuum_swr_replay.intervals.get_spikecount_per_time_bin``)
-3. Create design matrices with task variables as predictors
-4. Fit GLMs to identify neurons modulated by:
-   - Hippocampal replay events
-   - Sharp-wave ripples
-   - Task variables (position, reward, etc.)
-   - Behavioral state (movement vs. immobility)
-5. Evaluate model fit and extract coefficients
+Population (``load_population``)
+--------------------------------
+``load_population_data`` reads the per-session bundles back, refuses bundles
+from another estimator or inference setting, applies the firing-rate gate, and
+returns the unit table and the stacked curves Figure 4 draws;
+``significant_fraction`` is the descriptive raw-p fraction; and
+``penalty_sigma_suffix`` names a bundle fit at a non-canonical prior.
 
 See Also
 --------
 continuum_swr_replay.analysis.pfc.session : Per-neuron and per-session GLM fits
 continuum_swr_replay.analysis.pfc.design : Event bases and design matrices
 continuum_swr_replay.analysis.pfc.fit : Fitters, penalties and fit diagnostics
+continuum_swr_replay.analysis.pfc.batched_glm : The batched penalised IRLS
+continuum_swr_replay.analysis.pfc.heldout : Held-out deviance and its null
 continuum_swr_replay.analysis.pfc.modulation : Deviance and modulation statistics
 continuum_swr_replay.analysis.pfc.event_sets : Fit masks and event sets
 continuum_swr_replay.analysis.pfc.matched_control : Matched non-event controls
-continuum_swr_replay.data_loaders.spikes : Spike data loading for sorted units
-continuum_swr_replay.analysis.hippocampus : Hippocampal replay analysis
-
-Examples
---------
->>> from continuum_swr_replay.analysis.pfc import process_neuron
->>> # Fit GLM for a single neuron
->>> results = process_neuron(spike_times, design_matrix, time_bins)
-
+continuum_swr_replay.analysis.pfc.load_population : Population bundles
 """
 
 from __future__ import annotations

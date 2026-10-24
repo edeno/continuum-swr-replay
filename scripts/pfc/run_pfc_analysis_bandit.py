@@ -94,10 +94,12 @@ from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
+    BEST_MODEL_CANDIDATES,
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     EMPIRICAL_PVALUE_METHOD,
+    ENGAGEMENT_PAIR,
     MIN_USABLE_NULL_DRAWS,
     assign_blocked_folds,
     control_draw_null,
@@ -105,10 +107,12 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     null_draw_seeds,
     required_usable_null_draws,
 )
+from continuum_swr_replay.analysis.pfc.load_population import penalty_sigma_suffix
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_PLACEMENT_METHOD,
 )
 from continuum_swr_replay.analysis.pfc.modulation import (
+    CURVE_SOURCES,
     NESTED_MODEL_PAIRS,
     REPORT_HALF_WINDOW_S,
     is_separated,
@@ -162,43 +166,6 @@ CANONICAL_PENALTY_SIGMA = DEFAULT_PENALTY_SIGMA
 #: likelihood and tested by a likelihood ratio is not this runner's bundle.
 ESTIMATOR = "ridge_poisson_glm"
 INFERENCE = "blocked_heldout_deviance"
-#: The engagement comparison: does non-SWR replay predict held-out spikes
-#: beyond a duration-matched non-event baseline drawn from the same bouts?
-ENGAGEMENT_PAIR = ("matched_control + non_local_no_SWR", "matched_control")
-
-#: Best model per unit, by held-out deviance, within each decomposition. Only
-#: comparable models compete, as they did under AIC.
-BEST_MODEL_CANDIDATES = {
-    "min_heldout_model": (
-        "constant",
-        "SWR",
-        "non_local",
-        "SWR + non_local_no_SWR",
-    ),
-    "min_heldout_model_replay_split": (
-        "constant",
-        "non_local",
-        "non_local_SWR + non_local_no_SWR",
-    ),
-}
-
-#: The five peri-event curves a bundle ships, and where each comes from: the
-#: model whose fit it is read off, and which basis block of that model's
-#: parameters. The block order is the *design's* own, which is what the shipped
-#: curves are built from, so the maximum-likelihood peak reported beside a
-#: curve is the peak of the same block.
-#:
-#: For the replay-split model that order is ``[constant, non_local_no_SWR,
-#: non_local_SWR]`` -- the reverse of the order the model's name lists the
-#: classes in. Reading it by the name is the swap that mislabelled both of that
-#: model's curves in every bundle written before 2026-09-15.
-CURVE_SOURCES = {
-    "SWR": ("SWR + non_local_no_SWR", 0),
-    "no_SWR": ("SWR + non_local_no_SWR", 1),
-    "non_local_SWR": ("non_local_SWR + non_local_no_SWR", 1),
-    "non_local_no_SWR": ("non_local_SWR + non_local_no_SWR", 0),
-    "matched_control": ("matched_control + non_local_no_SWR", 0),
-}
 
 #: Columns the maximum-likelihood ladder wrote that this estimator cannot
 #: produce. A penalised fit has no likelihood-ratio reference distribution and
@@ -212,30 +179,6 @@ RETIRED_STATISTIC_COLUMNS = ("min_aic_model", "min_aic_model_replay_split")
 def pair_name(full: str, reduced: str) -> str:
     """Column stem for one nested comparison, as the statistics table spells it."""
     return f"{full} vs. {reduced}"
-
-
-def penalty_sigma_suffix(penalty_sigma: float) -> str:
-    """Artifact-name suffix naming the prior a sensitivity bundle was fit at.
-
-    The canonical prior publishes the unsuffixed name every reader hard-codes,
-    so a bundle fit at another sigma can never be mistaken for it.
-
-    Parameters
-    ----------
-    penalty_sigma : float
-        Prior standard deviation of an event-basis coefficient, on the log-rate
-        scale.
-
-    Returns
-    -------
-    str
-        ``""`` at the canonical prior, else ``"_sigma<value>"`` with any
-        decimal point written ``p`` -- the bundle's companion arrays are named
-        by suffixing the stem, so a dot in the stem would truncate them.
-    """
-    if float(penalty_sigma) == CANONICAL_PENALTY_SIGMA:
-        return ""
-    return "_sigma" + f"{float(penalty_sigma):g}".replace(".", "p")
 
 
 def session_seed(stream: str, nwb_file_name: str, epoch_name: str) -> int:
@@ -462,6 +405,11 @@ def score_session(
     If an event has no legal within-bout match, the empirical test uses one
     fixed matchable subset on both its observed and null sides; the all-event
     held-out difference remains separately reported.
+
+    The model sets it reads -- :data:`ENGAGEMENT_PAIR`,
+    :data:`BEST_MODEL_CANDIDATES` and :data:`CURVE_SOURCES` -- are defined in
+    ``continuum_swr_replay.analysis.pfc.heldout`` and ``.modulation``, beside
+    the folds, the null and the p-value it is built from.
 
     Parameters
     ----------

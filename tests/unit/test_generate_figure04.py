@@ -63,12 +63,14 @@ def _synthetic_inputs(non_swr_peak=1.6, n_units=150):
     rng = np.random.default_rng(0)
     lag_time = np.arange(-100, 101) / 500
     basis = np.exp(-((lag_time[:, None] - _BASIS_CENTERS[None]) ** 2) / (2 * 0.05**2))
-    swr_params = np.array([0.0, 0.1, 0.2, 0.0, -0.1, 0.2, 0.3])
-    non_swr_params = np.array([0.0, -0.1, -0.1, 0.1, 0.3, non_swr_peak, 0.6])
-    bse = np.array([0.0, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2])
+    swr_params = np.array([0.1, 0.2, 0.0, -0.1, 0.2, 0.3])
+    non_swr_params = np.array([-0.1, -0.1, 0.1, 0.3, non_swr_peak, 0.6])
+    # The joint ``SWR + non_local_no_SWR`` fit panel a reads both curves off:
+    # ``[intercept, SWR block, non_local_no_SWR block]``, the design's order.
+    params = np.concatenate([[0.0], swr_params, non_swr_params])
+    covariance = np.diag(np.r_[0.0, np.full(2 * _BASIS_CENTERS.size, 0.2**2)])
     glm_results = {
-        "SWR": SimpleNamespace(params=swr_params, bse=bse),
-        "non_local_no_SWR": SimpleNamespace(params=non_swr_params, bse=bse),
+        "SWR + non_local_no_SWR": SimpleNamespace(params=params, covariance=covariance),
     }
     starts = np.arange(20) * 5.0
     events = pd.DataFrame({"start_time": starts, "end_time": starts + 0.1})
@@ -239,9 +241,9 @@ def _draw_overlay(inputs):
     """Panel a drawn on its own axes, for the limits and legend of the curves."""
     fig, (ax_mod, ax_psth) = plt.subplots(2, 1, sharex=True)
     configs = [
-        {"model": "SWR", "label": "SWR", "color": "C1", "event_key": "SWR"},
+        {"curve": "SWR", "label": "SWR", "color": "C1", "event_key": "SWR"},
         {
-            "model": "non_local_no_SWR",
+            "curve": "no_SWR",
             "label": "non-SWR replay",
             "color": "C2",
             "event_key": "non_local_no_SWR",
@@ -311,7 +313,7 @@ def test_the_modulation_axis_keeps_its_half_to_double_range_for_a_flat_neuron(
     inputs = _synthetic_inputs()
     for result in inputs["glm_results"].values():
         result.params = 0.1 * result.params
-        result.bse = 0.1 * result.bse
+        result.covariance = 0.01 * result.covariance
     fig, ax_mod = _draw_overlay(inputs)
     try:
         assert ax_mod.get_ylim() == (np.log(0.5), np.log(2.0))
@@ -370,3 +372,55 @@ def test_the_panel_a_legend_is_clear_of_every_other_text(drawn_figure):
     assert [
         text.get_text() for text in others if _touching(drawn_figure, legend, text)
     ] == []
+
+
+def test_panel_a_draws_the_joint_models_two_blocks_in_design_order(paper_style):
+    """Panel a is the population's quantity: the SWR and non-SWR replay kernels
+    of the joint ``SWR + non_local_no_SWR`` fit, block 0 and block 1 in the
+    design's order, each with its pointwise standard error from the joint
+    fit's covariance (off-diagonal terms included)."""
+    inputs = _synthetic_inputs(non_swr_peak=1.6)
+    rng = np.random.default_rng(1)
+    n_params = inputs["glm_results"]["SWR + non_local_no_SWR"].params.size
+    root = 0.1 * rng.normal(size=(n_params, n_params))
+    covariance = root @ root.T
+    inputs["glm_results"]["SWR + non_local_no_SWR"].covariance = covariance
+    basis = inputs["spline_basis"]
+    n_basis = basis.shape[1]
+    params = inputs["glm_results"]["SWR + non_local_no_SWR"].params
+
+    fig, ax_mod = _draw_overlay(inputs)
+    try:
+        lines = _curve_lines(ax_mod, inputs["lag_time"].size)
+        bands = [
+            collection.get_paths()[0].vertices for collection in ax_mod.collections
+        ]
+        for line, band, block in zip(lines, bands, (0, 1), strict=True):
+            block_slice = slice(1 + block * n_basis, 1 + (block + 1) * n_basis)
+            expected = basis @ params[block_slice]
+            np.testing.assert_allclose(line.get_ydata(), expected)
+            block_covariance = covariance[block_slice, block_slice]
+            standard_error = np.sqrt(
+                np.einsum("lp,pq,lq->l", basis, block_covariance, basis)
+            )
+            np.testing.assert_allclose(
+                band[:, 1].max(), (expected + standard_error).max()
+            )
+            np.testing.assert_allclose(
+                band[:, 1].min(), (expected - standard_error).min()
+            )
+    finally:
+        plt.close(fig)
+
+
+def test_a_non_canonical_prior_is_refused_before_anything_is_loaded(monkeypatch):
+    """The runner writes a sensitivity bundle without the null panel d draws,
+    so the figure refuses it up front instead of reading the sigma=3 bundle
+    under a sigma=1 panel a."""
+
+    def _must_not_load(*args, **kwargs):
+        raise AssertionError("loaded data for a refused prior")
+
+    monkeypatch.setattr(figure04, "load_results", _must_not_load)
+    with pytest.raises(ValueError, match="_sigma1"):
+        figure04.generate_figure(penalty_sigma=1.0)

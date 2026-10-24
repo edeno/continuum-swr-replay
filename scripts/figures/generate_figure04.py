@@ -7,6 +7,9 @@ Composite figure with 4 panels in 3 rows:
         Single-neuron example — overlaid GLM modulation curves and PSTHs
         for SWR and non-SWR replay events on the same mPFC neuron. Shows
         that the neuron responds to both event types with similar shape.
+        The curves are the two kernel blocks of the joint
+        ``SWR + non_local_no_SWR`` model, the same quantity panels b and c
+        draw for the population.
 
     Row 2 (panel b):
         Population heatmaps — SWR and non-SWR replay modulation with the
@@ -25,7 +28,8 @@ Every fitted quantity in the figure comes from the same estimator the
 bundles were fit with: a Poisson GLM with a Gaussian prior on the
 event-basis coefficients, and a peri-event kernel that returns to
 baseline at both ends of the ±250 ms fit window. The example neuron's
-band is the penalised posterior-mode standard error, and the population
+band is the pointwise penalised posterior-mode standard error of each
+curve, from the joint fit's coefficient covariance, and the population
 significance is an empirical p-value from repeated matched-control
 draws (R = 1,000, with the finite-sample plus-one correction, so its minimum is
 1/(R+1) ≈ 0.001). Panel d's unit fraction is a descriptive raw-p preview;
@@ -48,7 +52,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
-from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
 
 import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.constants import (
@@ -84,21 +87,28 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     session_data_over_time_path,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
 from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
+    penalty_sigma_suffix,
     significant_fraction,
 )
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
+from continuum_swr_replay.analysis.pfc.modulation import (
+    CURVE_SOURCES,
+    REPORT_HALF_WINDOW_S,
+)
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,
     label_panels,
     save_figure,
 )
+from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.palettes import COLORS
 
@@ -163,9 +173,13 @@ def plot_single_neuron_overlay(
 ):
     """Plot overlaid GLM modulation curves for one neuron + per-event PSTHs.
 
-    Sub-row 1 : one modulation-curve axis with a curve per model config
+    Sub-row 1 : one modulation-curve axis with a curve per config
                 (typically SWR and non-SWR replay on the same axes).
     Sub-row 2 : overlaid PSTHs — one line per event type.
+
+    Each curve is read off its model's basis block exactly as the bundle's
+    shipped curves are (:data:`~continuum_swr_replay.analysis.pfc.modulation.CURVE_SOURCES`),
+    so the example neuron shows the quantity the population panels draw.
 
     Parameters
     ----------
@@ -173,34 +187,47 @@ def plot_single_neuron_overlay(
         [ax_modulation, ax_psth]
     lag_time : np.ndarray
         Time lags in seconds (covers both positive and negative lags).
-    spline_basis : np.ndarray
-        Spline basis matching ``glm_result.params[1:]``.
+    spline_basis : np.ndarray, shape (n_lags, n_basis)
+        Spline basis one event block of the parameters multiplies.
     neuron_spike_times : np.ndarray
         Spike times for the example neuron (seconds).
     glm_results : dict[str, fitted GLM result]
-        Full dict of fitted GLMs; only the models in ``model_configs`` are
-        plotted. ``bse`` is read as the penalised posterior-mode standard
-        error the fit reports, so the band is the one the shipped estimator
-        gives -- not a maximum-likelihood interval drawn around a penalised
-        point estimate.
+        Full dict of fitted GLMs; only the models the configs' curves are read
+        off are plotted. Each needs ``params`` and ``covariance``, the
+        penalised posterior covariance of the parameters. The band is
+        ``curve +/- sqrt(b(lag)' cov b(lag))`` over the curve's own block, off
+        diagonal terms included, so it is the pointwise standard error the
+        shipped estimator gives -- not a maximum-likelihood interval drawn
+        around a penalised point estimate.
     event_times : dict[str, pd.DataFrame]
         Event interval tables keyed by name (columns: start_time, end_time).
     model_configs : list of dict
-        Each entry: ``{"model": str, "label": str, "color": str,
-        "event_key": str}``. ``model`` is a key into ``glm_results``,
-        ``event_key`` is a key into ``event_times`` (used for the PSTH).
+        Each entry: ``{"curve": str, "label": str, "color": str,
+        "event_key": str}``. ``curve`` is a key into ``CURVE_SOURCES`` (e.g.
+        ``"SWR"`` or ``"no_SWR"``, the two blocks of the joint
+        ``SWR + non_local_no_SWR`` model), ``event_key`` is a key into
+        ``event_times`` (used for the PSTH).
 
     """
     ax_mod, ax_psth = axes
     lag_bounds = lag_time[0], lag_time[-1]
 
     # ── Sub-row 1: overlaid modulation curves ──
+    # The block is the design's own order (``CURVE_SOURCES``), not the order
+    # the model's name lists its classes in.
+    n_basis = spline_basis.shape[1]
     drawn = []
     for cfg in model_configs:
-        result = glm_results[cfg["model"]]
-        modulation = result.params[1:] @ spline_basis.T
-        upper = (result.params[1:] + result.bse[1:]) @ spline_basis.T
-        lower = (result.params[1:] - result.bse[1:]) @ spline_basis.T
+        model, block = CURVE_SOURCES[cfg["curve"]]
+        result = glm_results[model]
+        coefficients = slice(1 + block * n_basis, 1 + (block + 1) * n_basis)
+        params = np.asarray(result.params)[coefficients]
+        covariance = np.asarray(result.covariance)[coefficients, coefficients]
+        modulation = spline_basis @ params
+        variance = np.einsum("lp,pq,lq->l", spline_basis, covariance, spline_basis)
+        standard_error = np.sqrt(np.clip(variance, 0.0, None))
+        upper = modulation + standard_error
+        lower = modulation - standard_error
         drawn += [modulation, upper, lower]
 
         ax_mod.plot(
@@ -284,7 +311,7 @@ def plot_single_neuron_overlay(
 
 
 # ---------------------------------------------------------------------------
-# Panel d — Population heatmaps (accepts axes)
+# Panel b — Population heatmaps (accepts axes)
 # ---------------------------------------------------------------------------
 
 
@@ -331,7 +358,7 @@ def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
 
 
 # ---------------------------------------------------------------------------
-# Panel e — Population average (accepts ax)
+# Panel c — Population average (accepts ax)
 # ---------------------------------------------------------------------------
 
 
@@ -360,7 +387,7 @@ def plot_population_average(modulations, lag_time, ax):
 
 
 # ---------------------------------------------------------------------------
-# Panel f — Significance + AIC (accepts axes)
+# Panel d — Held-out significance + best model (accepts axes)
 # ---------------------------------------------------------------------------
 
 #: Panel d's bars: which held-out test each one reads, and how it is labelled.
@@ -460,8 +487,8 @@ def plot_best_model_selection(df, ax):
 #: curves are reported on (+/-200 ms). The bundle is fit on the wider window so
 #: the spline's boundary behaviour falls outside the reported one; the example
 #: neuron is fit the same way and its curve trimmed to match.
-FIT_LAGS = np.arange(-125, 126, 1)
-REPORT_LAGS = np.arange(-100, 101, 1)
+FIT_LAGS = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
+REPORT_LAGS = symmetric_lags(REPORT_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
 
 
 def generate_figure(
@@ -494,14 +521,31 @@ def generate_figure(
         population bundle was fit with, and the only one with a penalised path.
     penalty_sigma : float
         Prior standard deviation of an event-basis coefficient, on the log-rate
-        scale. The panel is refit here, so it must carry the prior the
-        population bundle in ``data_dir`` was fit under; a sensitivity bundle's
-        panel is generated by naming its sigma.
+        scale. Panel a is refit under it, and panels b-d read the bundle fit
+        under it (``penalty_sigma_suffix``) and check its provenance records
+        it. Only the canonical prior's bundle carries the matched-control null
+        panel d draws: the runner writes a sensitivity bundle with
+        ``n_control_draws = 0``.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
+
+    Raises
+    ------
+    ValueError
+        If ``penalty_sigma`` is not the canonical prior, before anything is
+        loaded or fit: that bundle has no held-out p-values for panel d.
     """
+    sigma_suffix = penalty_sigma_suffix(penalty_sigma)
+    if sigma_suffix:
+        raise ValueError(
+            f"penalty_sigma={penalty_sigma} names the '{sigma_suffix}' "
+            "sensitivity bundle, which run_pfc_analysis_bandit.py writes without "
+            "the matched-control null (n_control_draws=0), so panel d has no "
+            f"held-out p-values to draw. Figure 4 is drawn at the canonical "
+            f"prior ({DEFAULT_PENALTY_SIGMA})."
+        )
     # --- Load single-neuron data ---
     print(f"Loading data for {nwb_file_name}, {epoch_name}...")
     results_hpc, _, _ = load_results(
@@ -648,7 +692,8 @@ def generate_figure(
     pop_df, modulations, pop_lag_time = load_population_data(
         data_dir,
         min_firing_rate=1.0,
-        artifact_suffix=stop_cohort_suffix(stop_cohort),
+        artifact_suffix=stop_cohort_suffix(stop_cohort) + sigma_suffix,
+        expected_penalty_sigma=penalty_sigma,
     )
 
     return assemble_figure(
@@ -683,11 +728,12 @@ def assemble_figure(
     lag_time : np.ndarray, shape (n_report_lags,)
         Reported lags of the example neuron's curves, in seconds.
     spline_basis : np.ndarray, shape (n_report_lags, n_basis)
-        Spline basis matching ``glm_results[...].params[1:]``.
+        Spline basis one event block of the parameters multiplies.
     neuron_spike_times : np.ndarray
         Spike times of the example neuron (seconds).
     glm_results : dict[str, fitted GLM result]
-        The example neuron's fits; ``SWR`` and ``non_local_no_SWR`` are drawn.
+        The example neuron's fits; the two kernel blocks of
+        ``SWR + non_local_no_SWR`` are drawn, with its ``covariance``.
     event_times : dict[str, pd.DataFrame]
         Event interval tables for the example neuron's PSTHs.
     pop_df : pd.DataFrame
@@ -703,9 +749,9 @@ def assemble_figure(
     """
     # --- Create figure ---
     # 4-panel layout (was 6): the standalone single-neuron AIC was dropped
-    # because it duplicated the population AIC in the stats panel, and
-    # the two side-by-side single-neuron columns were collapsed into one
-    # overlay panel.
+    # because it duplicated the population model selection in the stats
+    # panel, and the two side-by-side single-neuron columns were collapsed
+    # into one overlay panel.
     #
     #     Row 1: panel a — single neuron overlay (modulation + PSTH,
     #                      overlaid SWR and non-SWR replay)
@@ -726,15 +772,17 @@ def assemble_figure(
     ax_a_mod = fig.add_subplot(gs_a[0])
     ax_a_psth = fig.add_subplot(gs_a[1], sharex=ax_a_mod)
 
+    # The joint model's two kernels, as panels b and c draw them for the
+    # population: the bundle's ``SWR`` and ``no_SWR`` curves.
     model_configs = [
         {
-            "model": "SWR",
+            "curve": "SWR",
             "label": "SWR",
             "color": COLORS["SWR"],
             "event_key": "SWR",
         },
         {
-            "model": "non_local_no_SWR",
+            "curve": "no_SWR",
             "label": "non-SWR replay",
             "color": COLORS["Non-Local"],
             "event_key": "non_local_no_SWR",
@@ -839,8 +887,9 @@ def main():
         help=(
             "Prior standard deviation of an event-basis coefficient, on the "
             f"log-rate scale (default: {DEFAULT_PENALTY_SIGMA}). The example "
-            "neuron is refit here, so this must be the prior the population "
-            "bundle in --data-dir was fit under."
+            "neuron is refit under it and the population bundle fit under it "
+            "is read. Only the canonical prior's bundle carries the null panel "
+            "d needs, so another value is refused."
         ),
     )
     parser.add_argument(

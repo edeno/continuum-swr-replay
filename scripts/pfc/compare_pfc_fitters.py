@@ -1,6 +1,19 @@
 #!/usr/bin/env python
 """Write the equivalence audit of the batched JAX fitter against statsmodels.
 
+**Retired-generation bundles only.** This audit compares two runs of the
+unpenalised maximum-likelihood ladder, whose statistics tables carry the
+``: lr`` / ``: pval`` / ``: aic`` columns and ``min_aic_model``. Current
+bundles are ridge fits scored out of fold (sidecar ``estimator =
+"ridge_poisson_glm"``): ``run_pfc_analysis_bandit.py`` drops those columns
+(``drop_retired_statistics``) and no longer offers ``--fitter statsmodels``,
+which has no penalised path, so there is no statsmodels-side bundle of the
+current estimator to compare. Renaming the columns to ``: p_heldout`` /
+``min_heldout_model`` would not make this audit apply; ``main`` refuses a
+ridge bundle. The batched fitter's equivalence to statsmodels on the
+unpenalised fit is pinned by ``tests/analysis/pfc/test_batched_glm.py`` and
+``test_glm_pipeline.py::TestFitterEquivalence``.
+
 The mPFC unit GLMs are now fit by a batched IRLS in JAX rather than one
 statsmodels fit per neuron. The two are meant to be the same estimator -- same
 log link, same starting mean ``(y + mean(y)) / 2``, same IRLS step, same
@@ -679,6 +692,17 @@ def main() -> int:
             args.statsmodels_dir, session, args.artifact_suffix
         )
         jax_bundle = load_bundle(args.jax_dir, session, args.artifact_suffix)
+        for side, bundle in (
+            ("statsmodels", statsmodels_bundle),
+            ("jax", jax_bundle),
+        ):
+            if bundle["sidecar"].get("estimator") == "ridge_poisson_glm":
+                raise SystemExit(
+                    f"{session} on the {side} side is a current ridge bundle "
+                    "(estimator='ridge_poisson_glm'). This audit compares the "
+                    "retired unpenalised ladder's bundles only; see the module "
+                    "docstring."
+                )
 
         statistics, failures = compare_statistics(
             statsmodels_bundle["stats"], jax_bundle["stats"]

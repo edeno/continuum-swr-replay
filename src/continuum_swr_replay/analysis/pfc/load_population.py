@@ -23,7 +23,9 @@ import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control
 
+from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
+from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -33,6 +35,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_PLACEMENT_METHOD,
 )
+from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
 from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 
@@ -111,6 +114,31 @@ LEGACY_FDR_TESTS = (
     "SWR + non_local_no_SWR vs. non_local_no_SWR",
     "non_local_SWR + non_local_no_SWR vs. non_local",
 )
+
+
+def penalty_sigma_suffix(penalty_sigma: float) -> str:
+    """Artifact-name suffix naming the prior a sensitivity bundle was fit at.
+
+    The canonical prior publishes the unsuffixed name every reader hard-codes,
+    so a bundle fit at another sigma can never be mistaken for it. The runner
+    writes bundles under this suffix and the readers look them up by it.
+
+    Parameters
+    ----------
+    penalty_sigma : float
+        Prior standard deviation of an event-basis coefficient, on the log-rate
+        scale.
+
+    Returns
+    -------
+    str
+        ``""`` at the canonical prior, else ``"_sigma<value>"`` with any
+        decimal point written ``p`` -- the bundle's companion arrays are named
+        by suffixing the stem, so a dot in the stem would truncate them.
+    """
+    if float(penalty_sigma) == DEFAULT_PENALTY_SIGMA:
+        return ""
+    return "_sigma" + f"{float(penalty_sigma):g}".replace(".", "p")
 
 
 def _refuse_stale_bundle(df: pd.DataFrame, inference: str, data_dir: Path) -> None:
@@ -270,9 +298,10 @@ def load_population_data(
         the unrestricted rate alongside it.
     artifact_suffix : str
         Suffix naming the stop cohort the bundle was fit on ("" for the
-        canonical at-well bundle, "_allstops" for the sensitivity one). Only
-        bundles carrying this suffix are read, so two cohorts can never be
-        pooled into one population.
+        canonical at-well bundle, "_allstops" for the sensitivity one),
+        followed by :func:`penalty_sigma_suffix` for a bundle fit at another
+        prior. Only bundles carrying this suffix are read, so two cohorts can
+        never be pooled into one population.
     inference : {"heldout", "legacy"}
         Which generation of bundle is being read. ``"heldout"`` (the shipped
         one) requires the out-of-fold columns and refuses a directory still
@@ -312,7 +341,10 @@ def load_population_data(
         than ``inference`` names.
 
     """
-    lag_time = np.arange(-100, 101) / 500.0
+    lag_time = (
+        symmetric_lags(REPORT_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
+        / DEFAULT_SAMPLING_FREQUENCY_HZ
+    )
 
     stem = f"_mPFC_modulation{artifact_suffix}"
     pkls = sorted(data_dir.glob(f"*{stem}.pkl"))

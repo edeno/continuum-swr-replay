@@ -225,7 +225,9 @@ def _fit_immobility_models(
     neuron_spike_count : NDArray, shape (n_time,)
         Spike counts per time bin.
     fitter : {"statsmodels", "jax"}
-        Backend. Ignored when ``prefitted`` is given.
+        Backend. Ignored when ``prefitted`` is given. The default is the
+        unpenalised control; the canonical path fits with ``fitter="jax"`` and
+        ``penalties=model_penalties(design_matrices, sigma)``.
     prefitted : Mapping[str, Any], optional
         This unit's already-fitted results keyed by model name, as
         :func:`run_session` produces by fitting the whole session at once.

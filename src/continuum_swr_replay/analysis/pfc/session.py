@@ -22,6 +22,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.pfc.design import (
     _make_design_matrices,
     build_theta_design,
+    symmetric_lags,
 )
 from continuum_swr_replay.analysis.pfc.event_sets import (
     DEFAULT_BASIS_HALF_WINDOW_S,
@@ -47,6 +48,7 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
 )
 from continuum_swr_replay.analysis.pfc.modulation import (
     NESTED_MODEL_PAIRS,
+    REPORT_HALF_WINDOW_S,
     get_frac_explained_deviance,
     get_frac_null_deviance,
 )
@@ -195,7 +197,9 @@ def process_neuron(
         must not be counted as such.
     fitter : {"statsmodels", "jax"}, optional
         Backend for the IRLS fits. Ignored for any model whose results are
-        supplied prefitted.
+        supplied prefitted. The default is the unpenalised control; the
+        canonical bundles are fit through :func:`run_session` with
+        ``fitter="jax"`` under the prior ``model_penalties(designs, sigma)``.
     prefitted_immobility : Mapping[str, Any] | None, optional
         This neuron's immobility-model results, keyed by model name, already
         fit on ``fit_mask``. :func:`run_session` fits every neuron of a session
@@ -1024,8 +1028,8 @@ def run_session(
     # Fit with wider lag window (±250ms) so spline boundary artifacts
     # fall outside the reported window (±200ms). The returned modulation
     # arrays are trimmed to the reporting window after fitting.
-    fit_lags = np.arange(-125, 126, 1)
-    report_lags = np.arange(-100, 101, 1)
+    fit_lags = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, sampling_frequency)
+    report_lags = symmetric_lags(REPORT_HALF_WINDOW_S, sampling_frequency)
 
     data, excluded, is_immobile, fit_mask, bin_counts = _session_fit_population(
         data,

@@ -130,6 +130,30 @@ def build_theta_design(
 KNOT_SPACING_S = 0.050
 
 
+def symmetric_lags(half_window_s: float, sampling_frequency: float) -> NDArray:
+    """Integer sample lags covering ``-half_window_s`` to ``+half_window_s``.
+
+    Parameters
+    ----------
+    half_window_s : float
+        Half-width of the window in seconds, e.g.
+        :data:`~continuum_swr_replay.analysis.pfc.event_sets.DEFAULT_BASIS_HALF_WINDOW_S`
+        (the fit window) or
+        :data:`~continuum_swr_replay.analysis.pfc.modulation.REPORT_HALF_WINDOW_S`
+        (the reported one).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+
+    Returns
+    -------
+    NDArray of int, shape (2 * n_half + 1,)
+        ``-n_half .. n_half`` with ``n_half = round(half_window_s *
+        sampling_frequency)``, ascending by one sample.
+    """
+    n_half = int(round(half_window_s * sampling_frequency))
+    return np.arange(-n_half, n_half + 1, 1)
+
+
 def event_basis_functions(
     lags: NDArray, sampling_frequency: float
 ) -> tuple[NDArray, NDArray, NDArray]:
@@ -250,6 +274,10 @@ def _make_conv_spline_basis(
     sampling_frequency: float = 500,
     lags: NDArray | None = None,
 ) -> tuple[dict[str, NDArray], NDArray, NDArray]:
+    # Every production caller (``run_session`` and Figure 4) passes ``lags``
+    # explicitly -- the +/-250 ms fit window, ``symmetric_lags(
+    # DEFAULT_BASIS_HALF_WINDOW_S, ...)``. This +/-200 ms default is the
+    # older window, kept because the unit tests build designs without lags.
     if lags is None:
         lags = np.arange(-100, 101, 1)
     if not times:

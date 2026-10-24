@@ -104,6 +104,29 @@ EMPIRICAL_PVALUE_METHOD = "plus_one"
 #: them with the corrected fixed-subset estimand.
 CONTROL_NULL_EVENT_POLICY = "fixed_jointly_matchable_subset"
 
+#: The engagement comparison: does non-SWR replay predict held-out spikes
+#: beyond a duration-matched non-event baseline drawn from the same bouts?
+#: The session scoring that reads it (``score_session``) lives in
+#: ``scripts/pfc/run_pfc_analysis_bandit.py``.
+ENGAGEMENT_PAIR = ("matched_control + non_local_no_SWR", "matched_control")
+
+#: Best model per unit, by held-out deviance, within each decomposition. Only
+#: comparable models compete, as they did under AIC. Read by ``score_session``
+#: in ``scripts/pfc/run_pfc_analysis_bandit.py``.
+BEST_MODEL_CANDIDATES = {
+    "min_heldout_model": (
+        "constant",
+        "SWR",
+        "non_local",
+        "SWR + non_local_no_SWR",
+    ),
+    "min_heldout_model_replay_split": (
+        "constant",
+        "non_local",
+        "non_local_SWR + non_local_no_SWR",
+    ),
+}
+
 
 def required_usable_null_draws(n_requested: int) -> int:
     """Finite draws required to report a p-value from a requested null.
