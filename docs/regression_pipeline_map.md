@@ -460,7 +460,7 @@ Run the replay-content analysis suite on one event source and save fits.
 
 ### `scripts/content/fit_replay_content_models.py`
 
-Fit the replay content model hierarchy (M0-M6) on pre-computed data.
+Fit the replay content model hierarchy on pre-computed data.
 
 `fit_n_categories`, `content_fit_inputs`, `prepare_canonical_fit_request`, `fit_model_per_session`, `print_model_results`, `format_comparison_table`, `run_content_fit`, `main`
 
@@ -646,7 +646,7 @@ Per-model cohort / drop-profile audit records.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `std_factor`, `separated_for_term`, `unidentified_for_term`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
+`load_per_sd_scale`, `std_factor`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/replay/learning.py`
 
@@ -866,7 +866,7 @@ Compute decoding quality metrics across all sessions.
 
 Rerun the CPU model fits and the figures that read them, in dependency order.
 
-`Run`, `select`, `run_env`, `schedule`, `sidecar_times`, `written_artifacts`, `fit_roots`, `check_provenance`, `print_plan`, `main`
+`Run`, `select`, `missing_prerequisites`, `run_env`, `schedule`, `sidecar_times`, `written_artifacts`, `fit_roots`, `check_provenance`, `print_plan`, `main`
 
 ### `scripts/qa/summarize_cohort_audits.py`
 
@@ -938,7 +938,7 @@ Sidecar records tying a fitted artifact to the tables it was fit on.
 
 The one naming rule for a decode's files.
 
-`non_local_threshold_percent`, `data_over_time_suffix`, `DecodePaths`, `decode_paths`, `results_exist`
+`non_local_threshold_percent`, `data_over_time_suffix`, `decode_identifier`, `DecodePaths`, `decode_paths`, `results_exist`
 
 ### `src/continuum_swr_replay/decoding/results.py`
 
