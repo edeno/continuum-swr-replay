@@ -124,10 +124,16 @@ event."""
 
 NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
-"""The project's non-local event definition, as in
-``analysis/events/nonlocal_detection.get_confident_times``: non-local
-probability above 0.8 for at least 15 ms. The state-space detector is held to
-its own published rule here, as the sliding window is held to its."""
+"""The project's non-local event threshold and nominal minimum, applied with a
+timestamp-span test (:func:`non_local_intervals`): non-local probability above
+0.8 with a first-to-last span of at least 15 ms. That is not
+``analysis/events/nonlocal_detection.get_confident_times``' rule, which counts
+samples (``ripple_detection.core.minimum_sample_count``, round half up of
+15 ms over the median step). On the sweep's 2 ms grid (the 1500 Hz simulation
+strided by 3) the span test needs 9 samples (a 16 ms span), where the sample
+count would need 8; on the real decode grid get_confident_times keeps 7 (see
+``docs/known_issues/nonlocal_minimum_duration_rounding.md``). The span test
+is kept so the published sweep numbers do not change."""
 
 SAME_PLACE_CM = 15.0
 
@@ -489,7 +495,9 @@ def non_local_intervals(
     time: np.ndarray, probability: np.ndarray
 ) -> list[tuple[int, int]]:
     """The state-space detector's events: index bounds of every stretch above
-    threshold that lasts the project's minimum duration."""
+    threshold whose first-to-last timestamp span is at least
+    ``NON_LOCAL_MINIMUM_DURATION_S`` (a span test, not get_confident_times'
+    sample count; see that constant)."""
     above = probability > NON_LOCAL_PROB_THRESHOLD
     edges = np.diff(above.astype(np.int8), prepend=0, append=0)
     starts, stops = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1

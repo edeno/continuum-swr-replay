@@ -159,7 +159,9 @@ T_SPK_FRAC = 0.40
 """Fraction of tetrodes in one bin. Off rule P: reference-set SWRs reach 0.364
 in bins with OOD marks (a thin 1.10x margin), and the spike-only lines sit at
 0.50-0.55, so no value has a 1.5x margin and still catches them. It rests on 3
-model-reviewed lines; R9 reviews every spike-only core (C2 §2.1)."""
+model-reviewed lines; every spike-only core of the full 255-epoch run
+(``swr_source.ARTIFACT_INTERVALS_RUN_ID``) was inspected when the run was
+accepted (C2 §2.1)."""
 T_SPK_MIN_TETRODES = 3
 """A line needs at least 3 tetrodes: the prototype's line table kept bins with
 >= max(3, 25 %) of tetrodes (artdet_detector.spike_lines); with 8 or more
@@ -167,8 +169,9 @@ tetrodes only the 40 % rule binds."""
 T_SPK_OOD = 0.20
 """OOD fraction of the bin's spikes. Off rule P: the calibration SWR set's
 maximum is 0, so it sits 1.35x below the smallest model-reviewed spike-only
-line (0.27). It rests on those 3 lines; R9 reviews every spike-only core
-(C2 §2.1)."""
+line (0.27). It rests on those 3 lines; every spike-only core of the full
+255-epoch run (``swr_source.ARTIFACT_INTERVALS_RUN_ID``) was inspected when the
+run was accepted (C2 §2.1)."""
 T_SPK_OOD_NN = 4.0
 """A mark is OOD when its nearest reference mark is more than 4 x the decoder's
 waveform_std away: there the decoder's mark kernel has no support (§2.4)."""
@@ -179,8 +182,9 @@ within its absolute refractory period (about 1 ms), so two detections that close
 on one tetrode are two units, whose marks differ and are not each other's
 nearest neighbour, or one waveform detected twice. Leaving them out stops an
 artifact's twin detections from holding each other in distribution; on the 23
-acceptance epochs it made 20 other spikes OOD and changed no other core. R9 missed the chimi20200227_02_r1 line at 8.614 s
-this way (3 of 17 spikes OOD, 0.176; 9 of 17 with 1 ms left out). A definition,
+acceptance epochs it made 20 other spikes OOD and changed no other core. The
+first full run, made before this rule (run ``a1083731940b``), missed the
+chimi20200227_02_r1 line at 8.614 s this way (3 of 17 spikes OOD, 0.176; 9 of 17 with 1 ms left out). A definition,
 off rule P. SpikeInterface 0.99.1's default refractory period is 1 ms
 (``qualitymetrics`` ``rp_violation``, ``curation.get_potential_auto_merge``),
 and it treats one unit's spikes within 0.3 ms as one spike detected twice

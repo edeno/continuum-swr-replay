@@ -19,6 +19,7 @@ from scipy.stats import sem
 from continuum_swr_replay.analysis.constants import (
     BINS_DURATION_MS,
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.events.analysed_time import analysed_bins
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
@@ -37,7 +38,7 @@ from continuum_swr_replay.figure_utilities import (
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, SAMPLING_FREQUENCY
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
     plot_acausal_probabilities,
@@ -314,7 +315,11 @@ def plot_triggered_averages(
         elif signal_type == "Non-Local_prob":
             ax.set_ylabel("Non-Local\nProb.")
             ax.axhline(
-                0.8, color="lightgrey", linestyle="--", alpha=0.5, linewidth=0.75
+                DEFAULT_NON_LOCAL_THRESHOLD,
+                color="lightgrey",
+                linestyle="--",
+                alpha=0.5,
+                linewidth=0.75,
             )
             ax.set_ylim(0.0, 1.0)
 
@@ -366,7 +371,9 @@ def plot_swr_zscore_by_state(
         data_over_time.head_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     ) & analysed_bins(data_over_time)
 
-    local_mask = is_immobile & (data_over_time["Local_prob"] > 0.8)
+    local_mask = is_immobile & (
+        data_over_time["Local_prob"] > DEFAULT_NON_LOCAL_THRESHOLD
+    )
     ax.hist(
         data_over_time.loc[local_mask, "SWR_zscore"],
         bins=np.arange(-5, 11),
@@ -376,7 +383,9 @@ def plot_swr_zscore_by_state(
         color=COLORS["Local"],
     )
 
-    nonlocal_mask = is_immobile & (data_over_time["Non-Local_prob"] > 0.8)
+    nonlocal_mask = is_immobile & (
+        data_over_time["Non-Local_prob"] > DEFAULT_NON_LOCAL_THRESHOLD
+    )
     ax.hist(
         data_over_time.loc[nonlocal_mask, "SWR_zscore"],
         bins=np.arange(-5, 11),
@@ -499,14 +508,17 @@ def plot_replay_position_by_swr(
     if standalone:
         fig, ax = plt.subplots(figsize=PANEL_SINGLE)
 
+    # About one histogram bin per 2 cm (the 1D place-bin size) of the median
+    # session's track length; the positions are then normalized to [0, 1].
     unique_positions = data_over_time["max_linear_position"].unique()
-    bins = int(np.nanmedian(unique_positions[~np.isnan(unique_positions)]) / 2)
+    median_track_length_cm = np.nanmedian(unique_positions[~np.isnan(unique_positions)])
+    n_position_bins = int(median_track_length_cm / PLACE_BIN_SIZE_1D)
 
     swr_mask, no_swr_mask = _nonlocal_swr_event_bin_masks(data_over_time)
     ax.hist(
         data_over_time.loc[swr_mask, "map_estimate"]
         / data_over_time.loc[swr_mask, "max_linear_position"],
-        bins=bins,
+        bins=n_position_bins,
         density=True,
         alpha=0.7,
         color=COLORS["SWR"],
@@ -516,7 +528,7 @@ def plot_replay_position_by_swr(
     ax.hist(
         data_over_time.loc[no_swr_mask, "map_estimate"]
         / data_over_time.loc[no_swr_mask, "max_linear_position"],
-        bins=bins,
+        bins=n_position_bins,
         density=True,
         alpha=0.7,
         color=COLORS["Non-Local"],

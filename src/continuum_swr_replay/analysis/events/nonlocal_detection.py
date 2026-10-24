@@ -20,7 +20,7 @@ Detect non-local events from decoding results:
 ...     speed=position_info.head_speed.to_numpy(),
 ...     time=position_info.index.to_numpy(),
 ...     prob_threshold=0.8,
-...     minimum_duration=0.015  # 15 ms minimum
+...     minimum_duration=0.015  # 7 samples on the decode grid (see below)
 ... )
 >>> print(f"Detected {len(non_local_times)} non-local events")
 
@@ -40,6 +40,7 @@ import pandas as pd
 import xarray as xr
 from ripple_detection.core import segment_boolean_series
 
+from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
 )
@@ -55,7 +56,7 @@ def get_confident_times(
     prob: xr.DataArray,
     speed: np.ndarray | None = None,
     time: np.ndarray | None = None,
-    prob_threshold: float = 0.8,
+    prob_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     minimum_duration: float = 0.015,
 ) -> pd.DataFrame:
     """Extract time intervals where probability exceeds threshold.
@@ -69,15 +70,32 @@ def get_confident_times(
     time : np.ndarray, shape (n_time,), optional
         Time values in seconds, by default None.
     prob_threshold : float, optional
-        Threshold for confident state classification, by default 0.8.
+        Threshold for confident state classification (strictly above), by
+        default ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8).
     minimum_duration : float, optional
         Minimum duration (seconds) for confident state, by default 0.015.
+        Converted to a sample count, not compared with a timestamp span; see
+        Notes.
 
     Returns
     -------
     pd.DataFrame, shape (n_events, 4)
-        Columns: ``start_time``, ``end_time``, ``duration``, ``max_speed``.
-        Indexed by event_number (1-based).
+        Columns: ``start_time``, ``end_time``, ``duration``,
+        ``animal_max_speed_cm_s``. Indexed by event_number (1-based).
+        ``start_time`` / ``end_time`` are the first and last above-threshold
+        samples, so ``duration`` is the first-to-last span.
+
+    Notes
+    -----
+    The run-length test is ``ripple_detection.core.segment_boolean_series``: a
+    run qualifies when it holds at least
+    ``minimum_sample_count(time, minimum_duration)`` consecutive samples, i.e.
+    ``floor(minimum_duration / median_step + 0.5 + 1e-6)`` (round half up).
+    On the 500 Hz decode grid the median step reads 2.0000935 ms (the
+    timestamps are quantized at a ~1.6e9 s clock), so 0.015 s is 7.49965
+    samples and rounds to 7, not 8. The effective minimum is therefore 7
+    samples: a 12 ms ``duration`` (first-to-last span). See
+    ``docs/known_issues/nonlocal_minimum_duration_rounding.md``.
 
     """
     confident_times = np.asarray(
@@ -313,7 +331,8 @@ def get_overlap_times(
     ----------
     non_local_times : pd.DataFrame
         Non-local event intervals with ``start_time``, ``end_time``,
-        ``duration``, ``max_speed`` columns. From ``get_confident_times``.
+        ``duration``, ``animal_max_speed_cm_s`` columns. From
+        ``get_confident_times``.
     ripple_times : pd.DataFrame
         Ripple event intervals with ``start_time`` and ``end_time`` columns.
 

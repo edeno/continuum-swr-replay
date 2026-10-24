@@ -14,8 +14,9 @@ takes a time-indexed ``data_over_time`` slice and emits, per event:
 - **Timing** — ``event_start``, ``event_end``, ``event_duration``,
   ``event_midpoint_time`` over the *full* set of timebins carrying the
   event label.
-- **Per-event speed summaries** — ``max_speed``, ``mean_speed``,
-  ``start_speed``, ``end_speed``, the canonical
+- **Per-event speed summaries** — ``animal_max_speed_cm_s``,
+  ``animal_mean_speed_cm_s``, ``animal_start_speed_cm_s``,
+  ``animal_end_speed_cm_s``, the canonical
   ``whole_event_speed_eligible`` flag, and the legacy endpoint diagnostic
   ``endpoints_speed_below_thresh``.
 - **Peak content** — ``peak_nonlocal_prob`` (max of the summed
@@ -204,7 +205,8 @@ def build_classified_nonlocal_event_table(
     pd.DataFrame
         Columns: ``animal, day, epoch, non_local_event, event_id,
         event_start, event_end, event_duration, event_midpoint_time,
-        max_speed, mean_speed, start_speed, end_speed,
+        animal_max_speed_cm_s, animal_mean_speed_cm_s,
+        animal_start_speed_cm_s, animal_end_speed_cm_s,
         whole_event_speed_eligible, endpoints_speed_below_thresh,
         peak_nonlocal_prob, is_swr,
         overlap_class, overlap_subclass, n_swrs_overlapping,
@@ -227,8 +229,8 @@ def build_classified_nonlocal_event_table(
     leakage is impossible by construction.
 
     Units: all ``*_start`` / ``*_end`` / ``*_time`` columns and
-    ``event_duration`` are in seconds; the four ``*_speed`` columns are in
-    cm/s.
+    ``event_duration`` are in seconds; the four ``animal_*_speed_cm_s``
+    columns are in cm/s.
     """
     require_canonical_speed_threshold(
         speed_threshold, "build_classified_nonlocal_event_table"
@@ -237,8 +239,9 @@ def build_classified_nonlocal_event_table(
     if missing:
         raise KeyError(
             f"build_classified_nonlocal_event_table: dot is missing required "
-            f"columns {missing}. Pass a data_over_time frame produced by "
-            f"get_data_over_time()."
+            f"columns {missing}. Pass a data_over_time frame read through the "
+            f"SWR source (analysed_time.read_dot_with_swr_source, or "
+            f"analysed_time.with_swr_source on a decode's frame)."
         )
 
     validate_nonlocal_event_probability_contract(
@@ -364,8 +367,9 @@ def assert_drawn_class_matches_ripples(
 ) -> None:
     """Raise if a chosen example's class disagrees with the SWR spans drawn for it.
 
-    Figure 2 panel a labels each example column by its ``overlap_class`` and
-    shades the SWR spans of the same session. Both must come from one SWR
+    Figure 2 panel a labels each example column by its ``overlap_class`` (and
+    Figure 3 panel a shows a ``non_swr`` example) and shades the SWR spans of
+    the same session. Both must come from one SWR
     population: the shading is the session's SWR source intervals, the sampled
     bounds of the source-read ``SWR_event`` labels
     (``analysed_time.swr_intervals``), which are the intervals the class was

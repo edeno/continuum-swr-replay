@@ -43,7 +43,9 @@ the rows in excluded time (a per-bin summary keeps the rows
 analysed-time rule, and the frame's two epoch normalizers
 (``theta_power_zscore``, ``run_speed_baseline``) leave the artifact mask out,
 as the other inputs do. An HPC decode made by the
-decoders since Task 17a already holds the source's SWR labels: its
+decoders since 2026-10-09 (commit ``b66f9d28``, the code of the October 2026
+full re-decode; ``docs/design/2026-10-09-swr-source.md``) already holds the
+source's SWR labels: its
 ``organize_results`` reads the frame through :func:`with_swr_source` (keeping
 every event it decoded, ``drop_masked_events=False``), so the decode's
 provenance is this source, and its encoding leaves out every event of this

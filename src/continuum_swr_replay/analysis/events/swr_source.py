@@ -2,8 +2,8 @@
 
 The project lead decided on 2026-10-05 that every SWR label of the paper
 (``is_swr``, ``SWR_event``, ``is_swr_stop`` and every SWR-aligned analysis)
-comes from the Kay inventory that the SWR runner (``run_swr_detection.py``,
-refresh stage R3) writes, not from Spyglass's stored ``RippleTimesV1``. The
+comes from the Kay inventory that the SWR runner
+(``scripts/detection/run_swr_detection.py``) writes, not from Spyglass's stored ``RippleTimesV1``. The
 2.0 rule is the published Kay et al. (2016) definition: at least 15 ms
 continuously above z = 2. Design note: ``docs/design/2026-10-09-swr-source.md``.
 
@@ -15,12 +15,12 @@ What this module fixes
 ----------------------
 - **Which inventory**: :data:`SWR_INVENTORY_RUN_ID`, the run folder, and
   :data:`SWR_DETECTOR`, the detector, under ``paths.SWR_INVENTORY_ROOT``. They are
-  the only place either is written; rerunning R3 is a change of
+  the only place either is written; rerunning the SWR runner is a change of
   :data:`SWR_INVENTORY_RUN_ID` and nothing else.
 - **Which artifacts**: :data:`ARTIFACT_INTERVALS_RUN_ID` under
   ``paths.ARTIFACT_INTERVALS_DIR``, the artifact detector's run
-  (``scripts/detection/run_artifact_detection.py``). It is set (runbook R9's
-  run); None would mean no artifact is masked. Every function here resolves an
+  (``scripts/detection/run_artifact_detection.py``). It is set (the pinned
+  run of 2026-10-10); None would mean no artifact is masked. Every function here resolves an
   epoch's artifact intervals itself (:func:`artifact_intervals`), so no caller
   passes them and every caller gets the same ones: the one artifact mask, the
   detector's cores padded by ``artifact_masks.PADDING_S``. The SWR runner, MUA
@@ -104,12 +104,17 @@ __all__ = [
 SWR_INVENTORY_RUN_ID = "056eee0dcb5a"
 """The SWR runner's run folder every analysis reads its SWRs from.
 
-Runbook R10's run of 2026-10-10 at commit ``056eee0dcb5a``: all 255 epochs
-``ok`` (the register's 242 analysed and its 13 ``SUSTAINED_NOISE``), with the
-artifact mask of :data:`ARTIFACT_INTERVALS_RUN_ID` and rule R-T for all four
-detectors (gate report
-``.claude/research/refresh_artifact_detector/r10_gate/r10_gate_report.md``).
-Changing this constant is the whole switch to another run.
+The run of ``scripts/detection/run_swr_detection.py`` made on 2026-10-10 at
+commit ``056eee0dcb5a`` (the runner names a run by its commit's first 12
+characters): all 255 epochs ``ok`` (the register's 242 analysed and its 13
+``SUSTAINED_NOISE``), masked by the artifact run
+:data:`ARTIFACT_INTERVALS_RUN_ID`, with each detector's pinned
+``swr_detectors.DETECTOR_SETTINGS`` and, for all four detectors, the CA1
+tetrodes kept by rule R-T (``ripple_tetrodes.select_ripple_tetrodes``). The
+run's ``manifest.json`` records its settings and each epoch's provenance. To
+replace it, rerun the runner (``python scripts/detection/run_swr_detection.py
+--n-workers 8``) and set this constant to the new run's id; changing this
+constant is the whole switch to another run.
 """
 
 
@@ -123,9 +128,14 @@ ARTIFACT_INTERVALS_RUN_ID: str | None = "fbbff144a123"
 """The artifact detector's run whose intervals drop overlapping SWRs and leave
 the coverage.
 
-Runbook R9's run (2026-10-10, commit fbbff14, all 255 epochs, gate report
-``.claude/research/refresh_artifact_detector/r9_gate/rerun/r9_regate_report.md``).
-None would mean no artifact is masked (``artifacts@none``). The folder,
+The run of ``scripts/detection/run_artifact_detection.py`` made on 2026-10-10
+at commit ``fbbff144a123`` over all 255 epochs (the run id is the commit's first
+12 characters), with the detector's constants in
+``analysis/hippocampus/artifacts/detect.py`` at that commit; the run's
+``manifest.json`` records them. To replace it, rerun that script, set this
+constant to the new run's id, then rerun the SWR runner (which reads this
+constant when it starts) and set :data:`SWR_INVENTORY_RUN_ID` to its run, so
+the SWRs are masked by the same artifact run. None would mean no artifact is masked (``artifacts@none``). The folder,
 ``paths.ARTIFACT_INTERVALS_DIR / <run id>``, holds ``manifest.json`` and one
 ``{epoch_id}_artifact_intervals.parquet`` per epoch: the epoch's unpadded
 cores (``artifact_intervals.CORE_COLUMNS``), no rows when it has none. A missing

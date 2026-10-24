@@ -9,13 +9,12 @@ Composite figure with 4 panels:
         non-local posterior (shows clear replay), state probabilities.
 
     Row 2 (panels b, c, d):
-        b: SWR z-score density for Local vs Non-Local timepoints —
-           shows non-local activity lives at low SWR power, not just
-           barely below the SWR threshold.
-        c: Replay speed by SWR status — low-SWR replay moves more
-           slowly.
-        d: Replay position by SWR status — non-SWR replay represents
-           reward zones.
+        b: SWR z-score density of immobile time bins confidently in the
+           Local vs the Non-Local state (probability > 0.8).
+        c: Replay (MAP) speed density of non-local event bins, split by
+           whether the event overlaps an SWR.
+        d: Replayed position (MAP estimate over track length) density of
+           non-local event bins, split the same way.
 
 Usage:
     python scripts/figures/generate_figure03.py
@@ -41,6 +40,9 @@ from continuum_swr_replay.analysis.events.analysed_time import (
     dropped_for_excluded_time,
     read_artifact_event_drops,
     swr_intervals,
+)
+from continuum_swr_replay.analysis.events.classified_table import (
+    assert_drawn_class_matches_ripples,
 )
 from continuum_swr_replay.analysis.events.eligibility import artifact_drop_reasons
 from continuum_swr_replay.analysis.events.immobility import (
@@ -145,8 +147,9 @@ def find_non_swr_example_event(
 ):
     """Find a representative non-local event NOT co-occurring with SWR.
 
-    Selects the event with highest peak non-local probability that does
-    not overlap with any detected SWR. The events are re-detected from the
+    Selects the longest event that does not overlap with any SWR of the
+    session's SWR source (``data["ripple_times"]``, which the caller sets
+    from the source). The events are re-detected from the
     posterior, so the one analysed-time rule is applied here: an event in
     excluded time (`artifacts`, the mask, widened by 0.3 s), or overlapping an
     SWR or MUA event dropped for it (`dropped`), is never chosen.
@@ -200,6 +203,9 @@ def find_non_swr_example_event(
     # Pick longest event (likely the clearest example)
     best_idx = non_swr_events["duration"].idxmax()
     event = non_swr_events.loc[best_idx]
+    # Panel a shades data["ripple_times"]; fail if the example would be drawn
+    # with an SWR span that contradicts its "non-SWR" label.
+    assert_drawn_class_matches_ripples({"non_swr": event}, ripple_times)
 
     center = (event.start_time + event.end_time) / 2
     return slice(center - window_sec, center + window_sec)
