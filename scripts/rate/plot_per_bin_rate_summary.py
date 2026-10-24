@@ -51,7 +51,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     covered_seconds,
 )
-from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.paths import (
     REPLAY_CONTENT_DIR,  # noqa: E402
     model_dir,
@@ -71,7 +71,10 @@ ALL_MODELS_INPUTS = {
     "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
     "event_table": table_path("event_table", RC, fmt="pkl"),
 }
-FIGS = FIGURE_DIR / "rate"
+# Beside the data root, not parameters.FIGURE_DIR: by default the two are the
+# same folder, but a run on another root (CSR_PROCESSED_DATA_DIR, e.g. a
+# run_refits sensitivity run) must not overwrite the paper's rate figures.
+FIGS = PROCESSED_DATA_DIR.parent / "paper" / "figures" / "rate"
 STYLE = {  # outcome -> (label, color)
     "swr": ("detected SWR", "k"),
     "non_local": ("non-local (all)", "C2"),

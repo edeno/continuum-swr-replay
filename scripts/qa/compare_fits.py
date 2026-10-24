@@ -2554,16 +2554,18 @@ def _read_optional(path: Path) -> pd.DataFrame:
     return pd.read_pickle(path) if path.exists() else pd.DataFrame()
 
 
-def _swr_contrast_dir(root: Path) -> Path:
-    """Where `root` keeps the content is_swr-contrast fits.
+def _swr_contrast_path(root: Path, name: str) -> Path:
+    """Where `root` keeps the content is_swr-contrast artifact `name`.
 
-    They moved out of ``content_arm`` (``models/``) into their own directory
-    on 2026-10-24, because the arm ladder replaces ``models/`` whole; a root
-    with no such directory (a backup taken before the move) keeps them in
-    ``models/``.
+    The fits moved out of ``content_arm`` (``models/``) into their own
+    directory on 2026-10-24, because the arm ladder replaces ``models/``
+    whole. A root from before the move (a backup) keeps them in ``models/``;
+    the fallback is per file, so a root holding only some artifacts in the
+    new directory still finds the rest where they were written.
     """
-    current = model_dir("swr_contrast", root)
-    return current if current.is_dir() else model_dir("content_arm", root)
+    current = model_dir("swr_contrast", root) / name
+    legacy = model_dir("content_arm", root) / name
+    return legacy if not current.exists() and legacy.exists() else current
 
 
 def collect_content_inputs(
@@ -2606,7 +2608,7 @@ def collect_content_inputs(
     contrast: dict[str, pd.DataFrame] = {}
     audited = "swr_contrast_content_audited.pkl"
     for root, label in ((old_root, "before"), (new_root, "after")):
-        path = _swr_contrast_dir(root) / audited
+        path = _swr_contrast_path(root, audited)
         contrast[f"audited_{label}"] = _read_optional(path)
         if path.exists():
             inputs[f"swr-content audited ({label})"] = path
@@ -2615,13 +2617,13 @@ def collect_content_inputs(
         # The per-session fits, for the design-delta check: the audited
         # aggregate carries one row per term and cannot say which terms a rung
         # was fit with.
-        fits = _swr_contrast_dir(root) / "swr_contrast_content_arm.pkl"
+        fits = _swr_contrast_path(root, "swr_contrast_content_arm.pkl")
         contrast[f"fits_{label}"] = _read_optional(fits)
         if fits.exists():
             inputs[f"swr-content arm fits ({label})"] = fits
     for stratum in CONTRAST_OUTCOME_STRATA:
         sfx = "" if stratum == "all" else f"_{stratum}"
-        path = _swr_contrast_dir(new_root) / f"swr_contrast_content_audited{sfx}.pkl"
+        path = _swr_contrast_path(new_root, f"swr_contrast_content_audited{sfx}.pkl")
         if path.exists():
             contrast[f"stratum_{stratum}"] = pd.read_pickle(path)
             inputs[f"swr-content audited ({stratum})"] = path

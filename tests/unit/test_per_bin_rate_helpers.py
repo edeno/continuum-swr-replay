@@ -829,7 +829,7 @@ _DESIGN_LOGGER = "continuum_swr_replay.analysis.replay.per_bin_design"
 def test_aggregate_logs_the_optional_branches_it_applied(arrival_clock_stops, caplog):
     """A stop table carrying the clock and shift inputs reports both as applied."""
     stops, onsets = arrival_clock_stops
-    with caplog.at_level("INFO", logger=_DESIGN_LOGGER):
+    with caplog.at_level("DEBUG", logger=_DESIGN_LOGGER):
         _aggregate_with_clocks(stops, onsets)
     messages = [r.getMessage() for r in caplog.records if r.name == _DESIGN_LOGGER]
     assert messages == [
@@ -841,7 +841,7 @@ def test_aggregate_logs_the_optional_branches_it_applied(arrival_clock_stops, ca
 def test_aggregate_logs_the_optional_branches_it_skipped(two_stop_design, caplog):
     """Without their inputs the branches are named as skipped, not left silent."""
     stops, onsets = two_stop_design
-    with caplog.at_level("INFO", logger=_DESIGN_LOGGER):
+    with caplog.at_level("DEBUG", logger=_DESIGN_LOGGER):
         aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True)
         aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
     messages = [r.getMessage() for r in caplog.records if r.name == _DESIGN_LOGGER]

@@ -243,7 +243,7 @@ def forest(ax, df, rows, title, sd):
         labels.append(label + {"per_category": " †", "per_unit": " ‡"}.get(unit, ""))
         s = sessions(df, mod, pop, term, sd)
         if not s:
-            labels[-1] += " (not identified)"
+            labels[-1] += " (not reported)"
             continue
         amed = []
         for a in ANIM:

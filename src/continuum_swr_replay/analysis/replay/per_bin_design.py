@@ -679,7 +679,7 @@ def aggregate_to_timebins(
         )
         if c not in stop_table.columns
     ]
-    logger.info(
+    logger.debug(
         "aggregate_to_timebins: per-bin arrival/outcome clocks %s; "
         "outcome-boundary reward-history shift %s",
         "applied" if emit_clocks else f"skipped (stop table lacks {missing_clock})",
