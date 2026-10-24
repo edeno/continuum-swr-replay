@@ -121,6 +121,7 @@ if TYPE_CHECKING:
     from matplotlib.lines import Line2D
     from numpy.typing import NDArray
 
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.visualization.palettes import COLORS
 
 
@@ -235,7 +236,7 @@ def make_non_local_movie(
     MUA_firing_rate: pd.Series,
     SWR_zscore: pd.Series,
     movie_name: str = "video_name.mp4",
-    sampling_frequency: int = 500,
+    sampling_frequency: int = SAMPLING_FREQUENCY,
     video_slowdown: int = 8,
     position_name: list[str] | None = None,
     direction_name: str = "head_orientation",

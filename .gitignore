@@ -224,3 +224,10 @@ logs/
 
 # External reference materials (paper PDFs)
 references/
+
+# Agent and editor working folders (local, not committed)
+scratchpad/
+.agents/
+.superpowers/
+.remember/
+.vscode/

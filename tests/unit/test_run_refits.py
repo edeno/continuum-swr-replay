@@ -175,3 +175,85 @@ def test_optional_runs_are_left_out_unless_asked_for():
     # Named in full, an optional run comes with the optional runs that need it.
     named = {r.name for r in rr.select(["behavior.stay_leave.all_stops"])}
     assert named == optional - {"rate.per_bin.in_transit"}
+
+
+TABLE_RUNS = {
+    "tables.stop_bootstrap": (),
+    "tables.qvals": ("tables.stop_bootstrap",),
+    "tables.replay_content": ("tables.qvals",),
+    "tables.timebin": (),
+    "tables.contfrag.swr": ("tables.qvals",),
+    "tables.contfrag.mua": ("tables.qvals",),
+}
+
+
+def test_the_table_runs_come_first_in_the_order_their_code_requires():
+    tables = [r for r in rr.RUNS if r.question == rr.TABLES]
+    assert {r.name: r.deps for r in tables} == TABLE_RUNS
+    assert rr.RUNS[: len(tables)] == tuple(tables)
+    assert [r.argv[1:] for r in tables[:3]] == [("--stop-only",), ("--write",), ()]
+
+
+def test_every_run_needs_a_table_run_directly_or_through_another():
+    def needs_tables(name):
+        return any(
+            rr.BY_NAME[d].question == rr.TABLES or needs_tables(d)
+            for d in rr.BY_NAME[name].deps
+        )
+
+    for run in rr.RUNS:
+        if run.question != rr.TABLES:
+            assert needs_tables(run.name), run.name
+
+
+def test_the_table_runs_are_left_out_unless_asked_for():
+    default = [r.name for r in rr.select(None)]
+    assert not set(default) & set(TABLE_RUNS)
+    assert set(TABLE_RUNS) <= {r.name for r in rr.select(None, with_tables=True)}
+    # With tables, the default selection is the same fits, after the tables.
+    with_tables = [r.name for r in rr.select(None, with_tables=True)]
+    assert with_tables == [*TABLE_RUNS, *default]
+
+
+def test_with_tables_adds_only_the_table_runs_a_selection_needs():
+    names = [
+        r.name for r in rr.select(["rate.per_stop.at_well"], False, with_tables=True)
+    ]
+    assert names == [
+        "tables.stop_bootstrap",
+        "tables.qvals",
+        "tables.replay_content",
+        "rate.per_stop.at_well",
+    ]
+    names = [
+        r.name
+        for r in rr.select(["content.event_source.mua_arm"], False, with_tables=True)
+    ]
+    assert names == [
+        "tables.stop_bootstrap",
+        "tables.qvals",
+        "tables.contfrag.mua",
+        "content.event_source.mua_arm",
+    ]
+
+
+def test_naming_a_table_run_selects_the_runs_that_read_it():
+    names = {r.name for r in rr.select(["tables.timebin"])}
+    assert "rate.per_bin.at_well" in names and "rate.fig.per_bin_ladder" in names
+    assert not names & {"tables.replay_content", "rate.per_stop.at_well"}
+
+
+def test_no_preflight_without_a_table_run():
+    assert rr.missing_prerequisites(rr.select(None)) == []
+
+
+def test_the_plan_lists_the_prerequisites_then_the_tables(capsys):
+    rr.print_plan(rr.select(None, with_tables=True))
+    out = capsys.readouterr().out
+    steps = [step for step, _ in rr.PREREQUISITES]
+    assert [out.index(s) for s in steps] == sorted(out.index(s) for s in steps)
+    assert out.index(steps[-1]) < out.index("tables.stop_bootstrap")
+    assert out.index("tables.contfrag.mua") < out.index("rate.per_bin.at_well")
+    # Without the table runs, the fits do not name them.
+    rr.print_plan(rr.select(None))
+    assert "after tables." not in capsys.readouterr().out

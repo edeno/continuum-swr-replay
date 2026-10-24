@@ -243,8 +243,15 @@ them importable.
   are opt-in (`--include-optional`, or name them in full). One log and JSON record
   per run (a "blocked" record when a dependency failed) go under `logs/refits_<time>/`, then
   `check_fit_provenance.py` checks every artifact the runs wrote. Set
-  `CSR_PROCESSED_DATA_DIR` to read and write another data root. It does not run the
-  decodes, the tables, the Q1 checks or the PFC unit GLM. See `docs/analysis_map.md`.
+  `CSR_PROCESSED_DATA_DIR` to read and write another data root. `--with-tables` first
+  rebuilds the tables the selected runs read, as `tables.*` runs in the order their code
+  requires: `prepare_replay_content_data.py --stop-only` → `build_qvals_table.py --write` →
+  `prepare_replay_content_data.py`, with `build_timebin_tables.py` and the two ContFrag
+  table builds beside them. The stop-only bootstrap refuses to replace a complete stop
+  table, so use it on a data root without one. It does not run the artifact and SWR
+  detection or the decodes (`--dry-run` lists them in order as prerequisites, and a
+  preflight checks they are on disk before a table run), the Q1 checks or the PFC unit
+  GLM. See `docs/analysis_map.md`.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`.
 - `compare_memoryless_to_reference.py` — runs the memoryless port beside

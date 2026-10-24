@@ -99,9 +99,8 @@ from continuum_swr_replay.intervals import (  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
-NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 # the data_over_time file the threshold names (``_80_``)
-THRESHOLD_PERCENT = non_local_threshold_percent(NON_LOCAL_THRESHOLD)
+THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
 NON_EVENT_THRESHOLD = 0.2  # non-local prob below this = clearly local (baseline)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 CLOSE_CM = 40.0  # mean |ahead-behind| below this = "close" subset
@@ -356,7 +355,7 @@ def analyze_session(
         decode_paths(
             epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
         ).data_over_time,
-        non_local_threshold=NON_LOCAL_THRESHOLD,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
     )
     # Validate before loading encoding data so a missing/corrupt auxiliary
     # artifact cannot mask malformed event labels as an ordinary session skip.

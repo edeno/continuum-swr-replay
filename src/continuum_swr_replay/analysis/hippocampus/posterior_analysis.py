@@ -83,6 +83,7 @@ from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_H
 
 from ...data_types import SessionData
 from ...decoding.results import open_results
+from ...parameters import SAMPLING_FREQUENCY
 
 
 def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
@@ -103,10 +104,9 @@ def get_conditional_non_local_posterior(results: xr.Dataset) -> xr.DataArray:
         from the nearest valid time point.
 
     """
-    acausal_posterior = (
-        results.acausal_posterior.sel(state="Non-Local Continuous")
-        + results.acausal_posterior.sel(state="Non-Local Fragmented")
-    )
+    acausal_posterior = results.acausal_posterior.sel(
+        state="Non-Local Continuous"
+    ) + results.acausal_posterior.sel(state="Non-Local Fragmented")
 
     non_local_prob = acausal_posterior.sum("position")
 
@@ -203,9 +203,7 @@ def _forward_step_distances(
     distance ``node[i] -> node[i + 1]``.
     """
     shortest_path_lengths = dict(
-        nx.shortest_path_length(
-            track_graph_with_bin_centers_edges, weight="distance"
-        )
+        nx.shortest_path_length(track_graph_with_bin_centers_edges, weight="distance")
     )
     try:
         return np.array(
@@ -347,9 +345,9 @@ def map_estimate_to_map_nodes(
     # match never returns a node that is absent from the track graph
     # (junction-bin rule). The MAP itself never lands on these bins.
     real = np.asarray(place_bin_centers_nodes_df["node_id"]) != -1
-    bin_lin = np.asarray(
-        place_bin_centers_nodes_df["linear_position"], dtype=float
-    )[real]
+    bin_lin = np.asarray(place_bin_centers_nodes_df["linear_position"], dtype=float)[
+        real
+    ]
     bin_node = np.asarray(place_bin_centers_nodes_df["node_id"])[real]
     order = np.argsort(bin_lin, kind="stable")
     sorted_lin = bin_lin[order]
@@ -492,7 +490,7 @@ def get_posterior_stats(
     data: SessionData,
     env: Environment,
     results: xr.Dataset | None = None,
-    sampling_frequency: int = 500,
+    sampling_frequency: int = SAMPLING_FREQUENCY,
     orientation_variable: Literal[
         "head_orientation", "body_orientation"
     ] = "head_orientation",

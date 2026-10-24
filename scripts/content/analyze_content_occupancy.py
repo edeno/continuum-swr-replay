@@ -81,9 +81,8 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
 from continuum_swr_replay.tables.io import read_table, table_exists  # noqa: E402
 
 # --- Parameters ---------------------------------------------------------------
-NON_LOCAL_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 # the data_over_time file the threshold names (``_80_``)
-THRESHOLD_PERCENT = non_local_threshold_percent(NON_LOCAL_THRESHOLD)
+THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 FAR_CM = 20.0  # content track-distance from animal above this = "far/remote"
 AT_WELL_CM = 20.0  # content track-distance to nearest well below this = "at a well"
@@ -168,7 +167,7 @@ def session_content_distances(
     # The read refuses labels that break the speed rule or the probability
     # contract.
     dot = read_dot_with_swr_source(
-        paths.data_over_time, non_local_threshold=NON_LOCAL_THRESHOLD
+        paths.data_over_time, non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD
     )
     # Validate the persisted cohort before any auxiliary load or early-return
     # path can turn corruption into an ordinary missing-data skip.

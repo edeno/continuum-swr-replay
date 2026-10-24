@@ -133,6 +133,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy.typing import NDArray
 
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.visualization.palettes import COLORS
 
 
@@ -145,7 +146,7 @@ def plot_peri_event_probability(
     relative_time_range: tuple[float, float] = (-0.4, 0.4),
     sort_by: str = "TIME",
     show_end_times: bool = False,
-    sampling_frequency: int = 500,
+    sampling_frequency: int = SAMPLING_FREQUENCY,
 ) -> None:
     """Plot peri-event time histogram of non-local probability.
 
