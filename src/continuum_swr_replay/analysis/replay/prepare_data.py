@@ -535,7 +535,8 @@ def _assert_value_block_matches_source(
     if mismatched.any():
         bad_stops = joined.loc[mismatched, "stop_id"].nunique()
         raise ValueError(
-            f"event_arm q_arm disagrees with qvals_table on "
+            f"event_arm reward_belief_mean_candidate_arm_preoutcome disagrees "
+            f"with qvals_table on "
             f"{int(mismatched.sum())} leaf row(s) across {bad_stops} stop(s). "
             "The value block is stale: rebuild qvals_table.pkl first, then "
             "rerun this script."

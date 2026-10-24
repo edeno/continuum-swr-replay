@@ -21,8 +21,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.replay import contrast_aggregation
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    MAX_UNIDENTIFIED_SHARE,
+    MIN_SESSIONS_PER_TERM,
     aggregate_contrast,
+    gate_term_sessions,
     load_per_sd_scale,
     session_se,
     std_factor,
@@ -619,3 +623,116 @@ def test_dm_rows_report_the_model_se_they_actually_carry() -> None:
     assert row["std_unit"] == "per_category"
     assert row["std_factor"] == 1.0
     assert row["std_coef_session_median"] == pytest.approx(row["coef_session_median"])
+
+
+# --- The per-term session gate, shared by the aggregation and the figure -------
+
+
+def _gate_fits(n_kept: int, n_separated: int) -> pd.DataFrame:
+    """``n_kept`` identified sessions and ``n_separated`` flagged as separated."""
+    n = n_kept + n_separated
+    return pd.DataFrame(
+        {
+            "model": "CS1_current",
+            "population": "all",
+            "animal": [f"a{i % 5}" for i in range(n)],
+            "coef_swr_x_is_current_arm": [0.1 * (i + 1) for i in range(n)],
+            "separated_terms": [""] * n_kept + ["swr_x_is_current_arm"] * n_separated,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("n_kept", "n_separated", "refusal"),
+    [
+        (8, 2, None),  # 20 % lost: at the limit, emitted
+        (8, 3, "unidentified_share"),  # 27 % lost
+        (MIN_SESSIONS_PER_TERM - 1, 0, "too_few_sessions"),
+    ],
+)
+def test_the_gate_refuses_exactly_what_the_audited_table_omits(
+    n_kept, n_separated, refusal
+) -> None:
+    fits = _gate_fits(n_kept, n_separated)
+    gate = gate_term_sessions(fits, "swr_x_is_current_arm")
+    audited = aggregate_contrast(
+        fits, [("CS1_current", "all", "swr_x_is_current_arm")], "candidate_arm"
+    )
+
+    assert gate.refusal == refusal
+    assert gate.n_kept == n_kept and gate.n_dropped == n_separated
+    assert (gate.drop_share > MAX_UNIDENTIFIED_SHARE) == (
+        refusal == "unidentified_share"
+    )
+    assert audited.empty == (refusal is not None)
+    if refusal is None:
+        assert audited.loc[0, "n_sessions"] == gate.n_kept
+
+
+def _assembly_tables(duplicated: str) -> dict[str, pd.DataFrame]:
+    ev = pd.DataFrame({"event_id": [1, 2], "stop_id": [10, 11]})
+    stop = pd.DataFrame(
+        {
+            "stop_id": [10, 11],
+            "known_reward_outcome_lag_1": [1.0, 0.0],
+            "patch_switch_fraction_last5_completed_trips": [0.1, 0.2],
+        }
+    )
+    q = pd.DataFrame(
+        {
+            "stop_id": [10, 11],
+            **{
+                c: [0.0, 1.0]
+                for c in (
+                    "rpe_postoutcome",
+                    "relative_value_switch_minus_stay_preoutcome",
+                    "reward_belief_differential_entropy_leaf_mean_preoutcome",
+                    "reward_belief_mean_update_l1_all_ports_postoutcome",
+                    "periswitch_index_trials",
+                    "is_periswitch_post",
+                    "trials_since_block_change",
+                )
+            },
+        }
+    )
+    tables = {"event_arm": ev, "stop": stop, "qvals": q}
+    if duplicated:
+        frame = tables[duplicated]
+        tables[duplicated] = pd.concat([frame, frame.iloc[:1]], ignore_index=True)
+    return tables
+
+
+@pytest.mark.parametrize("duplicated", ["", "stop", "qvals"])
+def test_arm_assembly_refuses_a_duplicated_stop_id(
+    duplicated, tmp_path: Path, monkeypatch
+) -> None:
+    """A duplicated stop would silently duplicate the event-arm rows it joins."""
+    tables = _assembly_tables(duplicated)
+    ca = contrast_aggregation
+    monkeypatch.setattr(ca, "read_table", lambda key: tables[key].copy())
+    for name in (
+        "require_covariate_schema",
+        "require_swr_source",
+        "assert_standardized_matches_reference",
+        "load_reference",
+        "add_arm_fixed_effects",
+        "validate_uncertainty_inputs",
+        "_cohort_log",
+    ):
+        monkeypatch.setattr(ca, name, lambda *a, **k: None)
+    monkeypatch.setattr(ca, "select_event_cohort", lambda f, cohort: (f, {}))
+    monkeypatch.setattr(ca, "_attach_arm_design_columns", lambda f: (f, {}))
+    reference = tmp_path / "standardization_reference.json"
+    reference.write_text("{}")
+    fit_inputs = {
+        "event_arm_table": "event_arm",
+        "stop_table": "stop",
+        "qvals_table": "qvals",
+    }
+
+    if duplicated:
+        with pytest.raises(pd.errors.MergeError, match="many-to-one"):
+            ca.assemble_arm(fit_inputs, reference)
+    else:
+        ev, _ = ca.assemble_arm(fit_inputs, reference)
+        assert len(ev) == 2

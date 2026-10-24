@@ -70,8 +70,14 @@ MODEL_SUBDIRS: dict[str, str] = {
     "per_bin_rate": "models_per_bin_rate",
     "per_event_swr_power": "models_per_event_swr_power",
     "per_stop_rate": "models_per_stop_rate",
+    "swr_contrast": "models_swr_contrast",
 }
 """The fitted-model directories, by contents, relative to a replay-content root.
+
+``swr_contrast`` holds the content is_swr-contrast fits (arm and patch) and
+their audit tables. They have their own directory because the arm content
+ladder publishes ``content_arm`` by replacing the whole directory, which would
+delete anything else written there.
 
 :func:`model_dir` joins one to a root; use it rather than joining by hand.
 """

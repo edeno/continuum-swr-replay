@@ -46,11 +46,13 @@ RC = REPLAY_CONTENT_DIR
 # The Dirichlet-multinomial ``models_dm`` directory is deliberately absent: it
 # is a non-primary estimator kept for the content-estimator comparison, not part
 # of the shipped result the baseline exists to protect, and freezing it would
-# make every DM experiment a baseline diff. NB the ``*_dm`` / ``*_dm_len``
-# artifacts that live INSIDE ``models`` are copied along with that directory
-# (``copytree`` has no ignore filter); add one here if that ever matters.
+# make every DM experiment a baseline diff. NB the content is_swr-contrast
+# ``*_dm`` / ``*_dm_len`` artifacts that live INSIDE ``models_swr_contrast`` are
+# copied along with that directory (``copytree`` ignores only symlinks); add a
+# filter here if that ever matters.
 _MODEL_DIRS = (
     MODEL_SUBDIRS["content_arm"],
+    MODEL_SUBDIRS["swr_contrast"],
     "models_swr_T",
     "models_swr_F",
     MODEL_SUBDIRS["content_patch"],

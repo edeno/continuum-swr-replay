@@ -1,8 +1,14 @@
 #!/usr/bin/env python
 """Generate all figures for the replay content analysis.
 
-Loads pre-computed results from fit_replay_content_models.py and
-run_behavior_prediction.py, generates publication-quality figures.
+Loads pre-computed results from fit_replay_content_models.py and generates
+publication-quality figures.
+
+Figures 4 and 5 read inputs that nothing in this repository produces any more:
+``behavior_prediction.pkl`` and ``bout_data.pkl`` under the replay-content root
+(written by a ``run_behavior_prediction.py`` that no longer exists) and the
+``mixed_effects/`` directory under the arm bundle. Each is drawn only when its
+input is already on disk, so on a current checkout those figures are skipped.
 
 Usage:
     uv run python scripts/content/generate_replay_content_figures.py
@@ -121,6 +127,10 @@ def main():
     key_models = ["M2", "M4", "M6", "M7"]
     for model_name in key_models:
         if model_name not in MODEL_HIERARCHY:
+            logging.warning(
+                "Skipping coefficient forest for %s: not in MODEL_HIERARCHY",
+                model_name,
+            )
             continue
         mdf = all_results[all_results["model"] == model_name]
         if len(mdf) == 0:

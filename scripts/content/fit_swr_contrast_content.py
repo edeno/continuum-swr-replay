@@ -5,6 +5,7 @@ The content analog of ``scripts/rate/fit_swr_contrast_rate.py``. Where the rate 
 models HOW OFTEN non-local events occur (Poisson count per time bin), this models
 WHICH ARM / PATCH an event represents: a conditional Poisson over the 9 arms (or 3
 patches) within each event (``strata(event_id)`` ≡ clogit). Design spec:
+``docs/design/content_model_design.md``.
 
 Structural rule: in a conditional-over-arms likelihood a covariate CONSTANT within
 an event cancels, so all event-level scalars (reward, rpe, value, entropy, context,
@@ -14,12 +15,18 @@ SWR status) enter ONLY as interactions with arm features. Per-arm covariates
 ``is_last_rewarded_noncurrent_arm``)
 enter as main effects.
 
-Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}):
+Ladders (arm; fit per session, per is_swr split {all, SWR, non-SWR}); the rungs
+are defined in ``model_specs.SWR_CONTRAST_CONTENT_ARM_LADDER`` /
+``SWR_CONTRAST_CONTENT_PATCH_LADDER``:
   C0..C2  spatial baseline (ARMFE -> is_current -> +autocorrelation controls)
   C3..C5  per-arm value/reward CONTENT (main effects)
   C6..C9  state modulation of current-bias (rpe/value/uncert/update : is_current)
   C10..C12 CONTEXT split (periswitch/block/switchrate : is_current)
-  CS1..CS5 is_swr:feature contrasts (pooled, 2-way; the dissociation)
+  C13     per-arm belief uncertainty (split)
+  CS1..CS6 is_swr:feature contrasts (pooled, 2-way; the dissociation): CS1-CS5,
+          CS5b (value net of the previous goal), CS6 (belief uncertainty), and the
+          ``nt`` twins CS1nt / CS4nt / CS5nt / CS6nt
+  patch   CP0..CP4 dimension rungs; CPS1 / CPS1nt / CPS2 contrasts
 Event-scalar dissociations (C6-C12) come from comparing the split, not a pooled 3-way.
 
 Every rung built on the base (``BASEc`` / ``BASEc_PATCH``) carries a within-stop-time
@@ -697,6 +704,8 @@ def _provenance(
         # fraction response). Read off the rows that were fitted, so a rung that
         # produced none is not named here.
         "response_renormalized_rungs": list(renormalized_rungs or []),
+        # Legacy key name, kept because existing sidecars use it; the value is
+        # the arm-value construct (reward_belief_mean_candidate_arm_preoutcome).
         "q_arm_source": (
             "beta-bernoulli per-arm value (reward_belief_mean_candidate_arm_preoutcome)"
         ),
@@ -849,7 +858,9 @@ def main() -> None:
             )
 
     sfx = _artifact_suffix(args, response)
-    (model_dir("content_arm", RC)).mkdir(parents=True, exist_ok=True)
+    # Not ``content_arm``: the arm content ladder publishes that directory by
+    # replacing it whole, which would delete these fits.
+    (model_dir("swr_contrast", RC)).mkdir(parents=True, exist_ok=True)
     # The standardization references are taken over the FULL assembled cohorts,
     # before the outcome stratum and the smoke subset, so every stratum's
     # coefficients are stated in the same per-SD unit.
@@ -894,7 +905,7 @@ def main() -> None:
     arm, arm_audit = _run(
         ev, ARM_LADDER, response_col=arm_response, n_categories=9, **fit_kwargs
     )
-    arm_path = model_dir("content_arm", RC) / f"swr_contrast_content_arm{sfx}.pkl"
+    arm_path = model_dir("swr_contrast", RC) / f"swr_contrast_content_arm{sfx}.pkl"
     arm.to_pickle(arm_path)
     write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(arm_z_reference, z_reference_path(arm_path))
@@ -908,7 +919,7 @@ def main() -> None:
     patch, patch_audit = _run(
         pt, PATCH_LADDER, response_col=patch_response, n_categories=3, **fit_kwargs
     )
-    patch_path = model_dir("content_arm", RC) / f"swr_contrast_content_patch{sfx}.pkl"
+    patch_path = model_dir("swr_contrast", RC) / f"swr_contrast_content_patch{sfx}.pkl"
     patch.to_pickle(patch_path)
     write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(patch_z_reference, z_reference_path(patch_path))
@@ -917,7 +928,7 @@ def main() -> None:
     # n_modeled at the event grain) + term-level quasi-separation diagnostics.
     write_cohort_audit(
         arm_audit + patch_audit,
-        model_dir("content_arm", RC) / f"swr_contrast_content_cohort_audit{sfx}.csv",
+        model_dir("swr_contrast", RC) / f"swr_contrast_content_cohort_audit{sfx}.csv",
     )
     term_diag = pd.concat(
         [
@@ -927,7 +938,7 @@ def main() -> None:
         ignore_index=True,
     )
     term_diag.to_csv(
-        model_dir("content_arm", RC)
+        model_dir("swr_contrast", RC)
         / f"swr_contrast_content_term_diagnostics{sfx}.csv",
         index=False,
     )
@@ -936,7 +947,7 @@ def main() -> None:
         "saved arm=%d patch=%d rows -> %s",
         len(arm),
         len(patch),
-        model_dir("content_arm", RC),
+        model_dir("swr_contrast", RC),
     )
     print("\n########## ARM ##########")
     _summ(arm, ARM_LADDER, ARM_KEY_TERM)
@@ -974,7 +985,7 @@ def main() -> None:
         ignore_index=True,
     )
     audited_path = (
-        model_dir("content_arm", RC) / f"swr_contrast_content_audited{sfx}.pkl"
+        model_dir("swr_contrast", RC) / f"swr_contrast_content_audited{sfx}.pkl"
     )
     agg.to_pickle(audited_path)
     write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
@@ -988,12 +999,12 @@ def main() -> None:
         concentration_cols,
     )
     (
-        model_dir("content_arm", RC) / f"swr_contrast_content_provenance{sfx}.json"
+        model_dir("swr_contrast", RC) / f"swr_contrast_content_provenance{sfx}.json"
     ).write_text(json.dumps(prov, indent=2))
     logger.info(
         "saved audited table (%d rows) + provenance -> %s",
         len(agg),
-        model_dir("content_arm", RC),
+        model_dir("swr_contrast", RC),
     )
     print(
         "\n########## AUDITED  (animal-level = primary; session signed-rank = descriptive) ##########"

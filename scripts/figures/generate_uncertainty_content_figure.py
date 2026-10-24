@@ -13,10 +13,7 @@ uv run python scripts/figures/generate_uncertainty_content_figure.py
 from __future__ import annotations
 
 import argparse
-import glob
 import json
-import os
-import sys
 import warnings
 from pathlib import Path
 
@@ -30,56 +27,13 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.figure_utilities import (
+    WONG,
+    label_panels,
+    save_figure,
+    set_figure_defaults,
+)
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
-
-
-def _load_paper_figure_tools():
-    """Load the scientific-figures-paper utilities with a repo fallback."""
-    candidates = [
-        os.path.expanduser("~/.claude/skills/scientific-figures-paper/scripts"),
-        *glob.glob(
-            os.path.expanduser(
-                "~/.claude/plugins/cache/*/scientific-figures-paper/scripts"
-            )
-        ),
-        *glob.glob(
-            os.path.expanduser(
-                "~/.claude/plugins/cache/*/skills/scientific-figures-paper/scripts"
-            )
-        ),
-        "/home/edeno/Documents/Github/claude-skills/scientific-figures-paper/scripts",
-        "/mnt/skills/user/scientific-figures-paper/scripts",
-        "/mnt/skills/scientific-figures-paper/scripts",
-    ]
-    for candidate in candidates:
-        if os.path.isdir(candidate) and candidate not in sys.path:
-            sys.path.insert(0, candidate)
-            break
-
-    try:
-        from color_palettes import WONG
-        from figure_utilities import save_figure, set_figure_defaults
-        from label_panels import label_panels
-
-        def save(name: str, output_dir: Path) -> None:
-            save_figure(name, output_dir=str(output_dir))
-
-        return set_figure_defaults, save, label_panels, WONG
-    except ImportError:
-        from continuum_swr_replay.figure_utilities import (
-            WONG,
-            label_panels,
-            save_figure,
-            set_figure_defaults,
-        )
-
-        def save(name: str, output_dir: Path) -> None:
-            save_figure(name, base_dir=output_dir)
-
-        return set_figure_defaults, save, label_panels, WONG
-
-
-SET_FIGURE_DEFAULTS, SAVE_FIGURE, LABEL_PANELS, WONG = _load_paper_figure_tools()
 
 DEFAULT_RESULTS_DIR = REPLAY_CONTENT_DIR / "uncertainty_content"
 DEFAULT_OUTPUT_DIR = Path("paper/figures/uncertainty_content")
@@ -176,10 +130,14 @@ def _example_matrices(
     if selected.empty:
         raise ValueError("representative session is absent from trial_leaf_table")
     uncertainty = selected.pivot(
-        index="candidate_arm", columns="trial_number_by_epoch", values="reward_belief_variance_candidate_arm_preoutcome"
+        index="candidate_arm",
+        columns="trial_number_by_epoch",
+        values="reward_belief_variance_candidate_arm_preoutcome",
     ).sort_index()
     content = selected.pivot(
-        index="candidate_arm", columns="trial_number_by_epoch", values="posterior_event_share"
+        index="candidate_arm",
+        columns="trial_number_by_epoch",
+        values="posterior_event_share",
     ).reindex(index=uncertainty.index, columns=uncertainty.columns)
     context = selected.drop_duplicates("trial_number_by_epoch").set_index(
         "trial_number_by_epoch"
@@ -607,7 +565,7 @@ def _validate_and_save(fig: plt.Figure, name: str, output_dir: Path) -> None:
         messages = "; ".join(str(item.message) for item in caught)
         raise RuntimeError(f"figure layout emitted warnings: {messages}")
     plt.figure(fig.number)
-    SAVE_FIGURE(name, output_dir)
+    save_figure(name, base_dir=output_dir)
 
 
 def make_main_figure(results: dict, output_dir: Path) -> plt.Figure:
@@ -668,7 +626,7 @@ def make_main_figure(results: dict, output_dir: Path) -> plt.Figure:
     _add_replay_availability_legend(axes["LB"])
     _add_curve_legend(axes["LC"])
     _add_model_legend(axes["LF"], results["mu_overall"])
-    LABEL_PANELS(
+    label_panels(
         [axes[label] for label in ["A", "B", "C", "D", "E", "F"]],
         xpos=-0.07,
         ypos=1.06,
@@ -815,7 +773,11 @@ def _plot_horserace(ax: plt.Axes, horserace_summary: pd.DataFrame) -> None:
         if predictor not in table.index:
             continue
         row = table.loc[predictor]
-        color = "#CC6677" if predictor == "reward_belief_variance_candidate_arm_preoutcome_z" else "#999999"
+        color = (
+            "#CC6677"
+            if predictor == "reward_belief_variance_candidate_arm_preoutcome_z"
+            else "#999999"
+        )
         ax.barh(yi, row["median"], color=color, height=0.62, zorder=2)
         stars = (
             "***"
@@ -935,7 +897,7 @@ def make_diagnostic_figure(results: dict, output_dir: Path) -> plt.Figure:
 
     _add_scope_legend(axes["LS"])
     _add_diagnostic_curve_legend(axes["LC"])
-    LABEL_PANELS(
+    label_panels(
         [axes[label] for label in ["A", "B", "C", "D", "E"]],
         xpos=-0.08,
         ypos=1.06,
@@ -978,7 +940,7 @@ are correlational.
 
 def main() -> None:
     args = _parse_args()
-    SET_FIGURE_DEFAULTS(context="paper")
+    set_figure_defaults(context="paper")
     results = _load_results(args.results_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     main_figure = make_main_figure(results, args.output_dir)

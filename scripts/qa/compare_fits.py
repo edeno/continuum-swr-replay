@@ -2554,6 +2554,18 @@ def _read_optional(path: Path) -> pd.DataFrame:
     return pd.read_pickle(path) if path.exists() else pd.DataFrame()
 
 
+def _swr_contrast_dir(root: Path) -> Path:
+    """Where `root` keeps the content is_swr-contrast fits.
+
+    They moved out of ``content_arm`` (``models/``) into their own directory
+    on 2026-10-24, because the arm ladder replaces ``models/`` whole; a root
+    with no such directory (a backup taken before the move) keeps them in
+    ``models/``.
+    """
+    current = model_dir("swr_contrast", root)
+    return current if current.is_dir() else model_dir("content_arm", root)
+
+
 def collect_content_inputs(
     old_root: Path, new_root: Path, bundle_names: Sequence[str]
 ) -> tuple[dict, dict, dict, list[str]]:
@@ -2594,7 +2606,7 @@ def collect_content_inputs(
     contrast: dict[str, pd.DataFrame] = {}
     audited = "swr_contrast_content_audited.pkl"
     for root, label in ((old_root, "before"), (new_root, "after")):
-        path = model_dir("content_arm", root) / audited
+        path = _swr_contrast_dir(root) / audited
         contrast[f"audited_{label}"] = _read_optional(path)
         if path.exists():
             inputs[f"swr-content audited ({label})"] = path
@@ -2603,16 +2615,13 @@ def collect_content_inputs(
         # The per-session fits, for the design-delta check: the audited
         # aggregate carries one row per term and cannot say which terms a rung
         # was fit with.
-        fits = model_dir("content_arm", root) / "swr_contrast_content_arm.pkl"
+        fits = _swr_contrast_dir(root) / "swr_contrast_content_arm.pkl"
         contrast[f"fits_{label}"] = _read_optional(fits)
         if fits.exists():
             inputs[f"swr-content arm fits ({label})"] = fits
     for stratum in CONTRAST_OUTCOME_STRATA:
         sfx = "" if stratum == "all" else f"_{stratum}"
-        path = (
-            model_dir("content_arm", new_root)
-            / f"swr_contrast_content_audited{sfx}.pkl"
-        )
+        path = _swr_contrast_dir(new_root) / f"swr_contrast_content_audited{sfx}.pkl"
         if path.exists():
             contrast[f"stratum_{stratum}"] = pd.read_pickle(path)
             inputs[f"swr-content audited ({stratum})"] = path
@@ -2834,8 +2843,13 @@ def cohort_reward_rr_table(fits: dict[str, pd.DataFrame]) -> pd.DataFrame:
       session-pooled and animal-balanced because the rate docs report the first
       and the audited aggregates the second.
 
-    Medians commute with ``exp``, so exponentiating the median kernel is the
-    same number as the median of the exponentiated kernels.
+    Every rate ratio here is ``exp`` of a median taken on the log scale. That
+    equals the median of the exponentiated values only when the median is one
+    observed value (an odd count, or a lower / upper median). For an even count
+    ``np.median`` averages the two middle log values, so the result is their
+    geometric mean in RR, never above the median of the RRs (equal only when the
+    two middle values tie). The per-animal medians that feed the animal-balanced
+    numbers are such averages whenever an animal has an even number of sessions.
     """
     rows = []
     for outcome in OUTCOME_ORDER:

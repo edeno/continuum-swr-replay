@@ -297,6 +297,43 @@ def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(
     assert cache_name(["02_r1"]) == one
 
 
+def test_the_figure02_cache_is_keyed_on_the_decode_files(
+    offline, tmp_path, monkeypatch
+):
+    """A rewritten decode (data_over_time or the example's results.nc) makes a
+    new cache without a code change; untouched files keep the old one."""
+    import os
+
+    from continuum_swr_replay.data_loaders import epoch_register
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    monkeypatch.setattr(
+        epoch_register,
+        "REGISTER_PATH",
+        _register(tmp_path / "register.csv", ["02_r1", "04_r2"]),
+    )
+    dot = tmp_path / "wilbur20210329_04_r2_HPC_80_data_over_time.pkl"
+    results = tmp_path / "wilbur20210329_02_r1_HPC_results.nc"
+    for path in (dot, results):
+        path.write_bytes(b"a")
+        os.utime(path, ns=(1_000_000_000, 1_000_000_000))
+
+    def cache_name() -> str:
+        return figure02._figure02_cache_path(
+            "wilbur20210329_.nwb", "02_r1", tmp_path
+        ).name
+
+    before = cache_name()
+    assert cache_name() == before
+
+    dot.write_bytes(b"ab")
+    after_dot = cache_name()
+    assert after_dot != before
+
+    os.utime(results, ns=(2_000_000_000, 2_000_000_000))
+    assert cache_name() not in (before, after_dot)
+
+
 # --------------------------------------------------------------------------
 # Figure 3 panel a: relative-time ticks (task 26c)
 # --------------------------------------------------------------------------
@@ -611,9 +648,8 @@ def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
 
 CONTRAST_SCRIPT = REPO / "scripts" / "figures" / "plot_swr_contrast_coefs.py"
 # The statements of the script's top level the test keeps: the plotting
-# functions and the row lists they draw. The script has no
-# ``main()`` and gates on ``Processed-Data`` when imported, so it cannot be
-# imported here; its other top-level statements read the fits and are left out.
+# functions and the row lists they draw. Its other top-level statements (and
+# ``main()``, which gates on ``Processed-Data`` and reads the fits) are left out.
 _CONTRAST_FUNCTIONS = {
     "forest",
     "animal_ci",
@@ -663,7 +699,7 @@ def _contrast_plotting_namespace() -> dict:
                 kept.append(node)
     module = ast.Module(body=kept, type_ignores=[])
 
-    def std_factor(term):
+    def std_factor(term, sd):
         if term.startswith("swr_x_is_") or term.startswith("is_"):
             return 1.0, "per_category"
         if "reward_history_rcos" in term:
@@ -672,7 +708,7 @@ def _contrast_plotting_namespace() -> dict:
 
     rng = np.random.default_rng(1)
 
-    def sessions(df, mod, pop, term):
+    def sessions(df, mod, pop, term, sd):
         return {a: rng.normal(0.0, 1.0, 30) for a in namespace["ANIM"]}
 
     namespace = {
@@ -698,7 +734,7 @@ def test_the_contrast_figures_keep_titles_and_x_labels_inside_the_figure(
     right-hand x label was cut off, as saved (no ``bbox_inches="tight"``)."""
     import matplotlib.pyplot as plt
 
-    fig = _contrast_plotting_namespace()[figure_function](None)
+    fig = _contrast_plotting_namespace()[figure_function](None, {})
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     figure = fig.bbox
@@ -715,6 +751,33 @@ def test_the_contrast_figures_keep_titles_and_x_labels_inside_the_figure(
         assert box.x1 <= figure.x1 + 0.5, f"{name} runs off the right edge"
         assert box.y0 >= figure.y0 - 0.5, f"{name} runs off the bottom"
         assert box.y1 <= figure.y1 + 0.5, f"{name} runs off the top"
+
+
+@pytest.mark.parametrize(("n_separated", "drawn"), [(2, True), (3, False)])
+def test_the_contrast_figure_draws_no_term_the_audited_table_refuses(
+    n_separated, drawn
+):
+    """The figure used to apply only the separation filter, so it drew terms the
+    audited aggregation refuses for too large an unidentified share."""
+    from scripts.figures import plot_swr_contrast_coefs as figure
+
+    n = 10
+    term = "swr_x_is_current_arm"
+    fits = pd.DataFrame(
+        {
+            "model": "CS1_current",
+            "population": "all",
+            "animal": [figure.ANIM[i % len(figure.ANIM)] for i in range(n)],
+            f"coef_{term}": np.linspace(0.1, 1.0, n),
+            "separated_terms": [""] * (n - n_separated) + [term] * n_separated,
+        }
+    )
+
+    per_animal = figure.sessions(fits, "CS1_current", "all", term, {})
+
+    assert bool(per_animal) == drawn
+    if drawn:
+        assert sum(len(v) for v in per_animal.values()) == n - n_separated
 
 
 # --------------------------------------------------------------------------

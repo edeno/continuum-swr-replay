@@ -39,14 +39,28 @@ FLAG_FIELDS = ("n_sessions_flagged_nonconverged", "n_sessions_flagged_separated"
 
 # Full column order for the emitted CSV.
 COHORT_COLUMNS = (
-    "model", "population", "grain", "cohort_mode", "n_in",
-    *DROP_FIELDS, "n_modeled", *FLAG_FIELDS,
-    "n_sessions_in", "n_sessions_modeled", "n_animals_modeled", "drop_notes",
+    "model",
+    "population",
+    "grain",
+    "cohort_mode",
+    "n_in",
+    *DROP_FIELDS,
+    "n_modeled",
+    *FLAG_FIELDS,
+    "n_sessions_in",
+    "n_sessions_modeled",
+    "n_animals_modeled",
+    "drop_notes",
 )
 
 TERM_DIAGNOSTICS_COLUMNS = (
-    "model", "population", "term",
-    "n_sessions_fit", "n_sessions_quasiseparated", "n_sessions_used", "n_animals_used",
+    "model",
+    "population",
+    "term",
+    "n_sessions_fit",
+    "n_sessions_quasiseparated",
+    "n_sessions_used",
+    "n_animals_used",
 )
 
 # Matches contrast_aggregation.py's quasi-separation filter and _fit_diagnostics.
@@ -57,22 +71,31 @@ _QUASI_SEP_ABS = 10.0
 # required predictor, an event/stop it drops is attributed to ``n_drop_qvals_gap`` (with
 # priority over generic own-predictor missingness), keeping mechanism B distinguishable
 # from mechanism A (e.g. candidate-arm reward history's early-session NaN).
-# Candidate-arm belief mean, variance, and task probability share one identical missingness mask
-# (verified: 8064 event-arm rows / 896 events); the stop-level beta scalars and their
+# Candidate-arm belief mean, variance (raw and ``_z``), and task probability share one
+# identical missingness mask (verified 2026-10-24 on the canonical event_arm table:
+# 8676 event-arm rows / 964 events); the stop-level beta scalars and their
 # current-arm interactions come off the same qvals table and share the tail.
-QVALS_GAP_COLS = frozenset({
-    # per-arm value / contingency (identical missingness)
-    "reward_belief_mean_candidate_arm_preoutcome", "task_reward_probability_candidate_arm",
-    "swr_x_reward_belief_mean_candidate_arm_preoutcome",
-    # stop-level beta scalars from qvals_table (same trailing tail)
-    "rpe_postoutcome", "relative_value_switch_minus_stay_preoutcome", "reward_belief_differential_entropy_leaf_mean_preoutcome",
-    "reward_belief_mean_update_l1_all_ports_postoutcome",
-    # content current-arm interactions built from those scalars
-    "rpe_postoutcome_z_x_is_current_arm",
-    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
-    "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
-    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
-})
+QVALS_GAP_COLS = frozenset(
+    {
+        # per-arm value / uncertainty / contingency (identical missingness)
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "task_reward_probability_candidate_arm",
+        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+        "reward_belief_variance_candidate_arm_preoutcome",
+        "reward_belief_variance_candidate_arm_preoutcome_z",
+        "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+        # stop-level beta scalars from qvals_table (same trailing tail)
+        "rpe_postoutcome",
+        "relative_value_switch_minus_stay_preoutcome",
+        "reward_belief_differential_entropy_leaf_mean_preoutcome",
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
+        # content current-arm interactions built from those scalars
+        "rpe_postoutcome_z_x_is_current_arm",
+        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+    }
+)
 
 
 def cohort_record(
@@ -96,10 +119,16 @@ def cohort_record(
     ``stop`` / ``stop_bin``).
     """
     rec = {
-        "model": model, "population": population, "grain": grain,
-        "cohort_mode": cohort_mode, "n_in": int(n_in), "n_modeled": int(n_modeled),
-        "n_sessions_in": int(sessions_in), "n_sessions_modeled": int(sessions_modeled),
-        "n_animals_modeled": int(animals_modeled), "drop_notes": str(drop_notes),
+        "model": model,
+        "population": population,
+        "grain": grain,
+        "cohort_mode": cohort_mode,
+        "n_in": int(n_in),
+        "n_modeled": int(n_modeled),
+        "n_sessions_in": int(sessions_in),
+        "n_sessions_modeled": int(sessions_modeled),
+        "n_animals_modeled": int(animals_modeled),
+        "drop_notes": str(drop_notes),
     }
     for f in DROP_FIELDS:
         rec[f] = int(counts.get(f, 0))
@@ -174,16 +203,16 @@ def event_drop_buckets(
     nonfinite_by_col = {}
     for column in present_union:
         numeric = pd.to_numeric(long_df[column], errors="coerce")
-        invalid = long_df[column].notna() & ~np.isfinite(
-            numeric.to_numpy(dtype=float)
-        )
+        invalid = long_df[column].notna() & ~np.isfinite(numeric.to_numpy(dtype=float))
         nonfinite_by_col[column] = set(long_df.loc[invalid, event_col])
     # qvals gap is attributed only when THIS rung's own value covariate is missing.
     own_qvals_cols = [
         c for c in own_predictors if c in QVALS_GAP_COLS and c in nan_by_col
     ]
     qvals_events = (
-        set().union(*(nan_by_col[c] for c in own_qvals_cols)) if own_qvals_cols else set()
+        set().union(*(nan_by_col[c] for c in own_qvals_cols))
+        if own_qvals_cols
+        else set()
     )
     own_cols = [
         c for c in own_predictors if c in nan_by_col and c not in QVALS_GAP_COLS
@@ -191,17 +220,13 @@ def event_drop_buckets(
     own_events = (
         set().union(*(nan_by_col[c] for c in own_cols)) if own_cols else set()
     ) - qvals_events
-    all_nan_events = (
-        set().union(*nan_by_col.values()) if nan_by_col else set()
-    )
+    all_nan_events = set().union(*nan_by_col.values()) if nan_by_col else set()
     common_events = all_nan_events - qvals_events - own_events
     all_nonfinite_events = (
         set().union(*nonfinite_by_col.values()) if nonfinite_by_col else set()
     )
     nonfinite_events = all_nonfinite_events - all_nan_events
-    survivors = long_df[
-        ~long_df[event_col].isin(all_nan_events | nonfinite_events)
-    ]
+    survivors = long_df[~long_df[event_col].isin(all_nan_events | nonfinite_events)]
     totals = survivors.groupby(event_col)[response_col].sum()
     zero_events = set(totals[totals == 0].index)
     return {
@@ -211,11 +236,7 @@ def event_drop_buckets(
         "n_drop_common_cohort_other": len(common_events),
         "n_drop_zero_response": len(zero_events),
         "dropped_event_ids": (
-            qvals_events
-            | own_events
-            | nonfinite_events
-            | common_events
-            | zero_events
+            qvals_events | own_events | nonfinite_events | common_events | zero_events
         ),
     }
 
@@ -232,7 +253,8 @@ def stop_own_missing(stop_df, required_cols, *, immobility_col="immobility_durat
     present = [c for c in required_cols if c in stop_df.columns]
     mask = (
         stop_df[present].isna().any(axis=1)
-        if present else pd.Series(False, index=stop_df.index)
+        if present
+        else pd.Series(False, index=stop_df.index)
     )
     if immobility_col in stop_df.columns:
         mask = mask | (stop_df[immobility_col] <= 0)
@@ -252,10 +274,11 @@ def drop_profile(dropped: pd.DataFrame) -> str:
     if "time_since_stop_start_s" in dropped:
         parts.append(f"median_tss={dropped['time_since_stop_start_s'].median():.2f}")
     if "is_rewarded_outcome" in dropped:
-        parts.append(
-            f"rewarded_frac={dropped['is_rewarded_outcome'].mean():.3f}"
-        )
-    for vcol in ("reward_belief_mean_candidate_arm_preoutcome", "relative_value_switch_minus_stay_preoutcome"):
+        parts.append(f"rewarded_frac={dropped['is_rewarded_outcome'].mean():.3f}")
+    for vcol in (
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "relative_value_switch_minus_stay_preoutcome",
+    ):
         if vcol in dropped:
             parts.append(f"{vcol}_median={dropped[vcol].median():.3f}")
     return "; ".join(parts) if parts else f"n_dropped={len(dropped)}"
@@ -337,7 +360,9 @@ def estimator_skip_note(
     return "; ".join(parts)
 
 
-def records_from_common_cohort_provenance(prov, model: str, population: str, *, grain="stop"):
+def records_from_common_cohort_provenance(
+    prov, model: str, population: str, *, grain="stop"
+):
     """Standardized cohort record from a ``_freeze_common_cohort`` provenance frame.
 
     ``compare_event_source_models.py`` fits its patch/rate/**choice** blocks on a frozen
@@ -358,21 +383,34 @@ def records_from_common_cohort_provenance(prov, model: str, population: str, *, 
 
     n_in = int(_col("n_units_before").sum())
     n_own = int(
-        (_col("n_missing_units") + _col("n_invalid_choice_units")
-         + _col("n_nonpositive_offset_units")).sum()
+        (
+            _col("n_missing_units")
+            + _col("n_invalid_choice_units")
+            + _col("n_nonpositive_offset_units")
+        ).sum()
     )
     n_nonfinite = int(_col("n_nonfinite_units").sum())
     n_zero = int(_col("n_zero_response_units").sum())
-    fit_mask = prov["status"] == "fit" if "status" in prov.columns else pd.Series(False, index=prov.index)
+    fit_mask = (
+        prov["status"] == "fit"
+        if "status" in prov.columns
+        else pd.Series(False, index=prov.index)
+    )
     n_modeled = int(prov.loc[fit_mask, "n_units_after"].sum()) if fit_mask.any() else 0
     animals = (
         int(prov.loc[fit_mask, "animal"].nunique())
-        if fit_mask.any() and "animal" in prov.columns else 0
+        if fit_mask.any() and "animal" in prov.columns
+        else 0
     )
     return cohort_record(
-        model, population, grain, cohort_mode="common",
-        n_in=n_in, n_modeled=n_modeled,
-        sessions_in=len(prov), sessions_modeled=int(fit_mask.sum()),
+        model,
+        population,
+        grain,
+        cohort_mode="common",
+        n_in=n_in,
+        n_modeled=n_modeled,
+        sessions_in=len(prov),
+        sessions_modeled=int(fit_mask.sum()),
         animals_modeled=animals,
         drop_notes=(
             "block common-cohort; up-front selection is definitional (n_in = "
@@ -422,11 +460,17 @@ def term_diagnostics(
         ccol = f"coef_{term}"
         sub = res[(res.model == model) & (res.population == pop)]
         if ccol not in sub.columns:
-            rows.append({
-                "model": model, "population": pop, "term": term,
-                "n_sessions_fit": 0, "n_sessions_quasiseparated": 0,
-                "n_sessions_used": 0, "n_animals_used": 0,
-            })
+            rows.append(
+                {
+                    "model": model,
+                    "population": pop,
+                    "term": term,
+                    "n_sessions_fit": 0,
+                    "n_sessions_quasiseparated": 0,
+                    "n_sessions_used": 0,
+                    "n_animals_used": 0,
+                }
+            )
             continue
         present = sub[sub[ccol].notna()]
         quasi = present[ccol].abs() >= _QUASI_SEP_ABS
@@ -434,11 +478,15 @@ def term_diagnostics(
         n_animals_used = (
             int(used["animal"].nunique()) if "animal" in used.columns else 0
         )
-        rows.append({
-            "model": model, "population": pop, "term": term,
-            "n_sessions_fit": int(len(present)),
-            "n_sessions_quasiseparated": int(quasi.sum()),
-            "n_sessions_used": int(len(used)),
-            "n_animals_used": n_animals_used,
-        })
+        rows.append(
+            {
+                "model": model,
+                "population": pop,
+                "term": term,
+                "n_sessions_fit": int(len(present)),
+                "n_sessions_quasiseparated": int(quasi.sum()),
+                "n_sessions_used": int(len(used)),
+                "n_animals_used": n_animals_used,
+            }
+        )
     return pd.DataFrame(rows, columns=list(TERM_DIAGNOSTICS_COLUMNS))

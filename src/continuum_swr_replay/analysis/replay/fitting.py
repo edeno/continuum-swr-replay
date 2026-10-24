@@ -685,11 +685,12 @@ def fit_conditional_poisson(
     predictors : list[str]
         Column names for category-varying predictors.
     response_col : str
-        Column with non-negative per-category response values. Integer
-        timebin counts (``arm_count_hard`` / ``patch_count_hard``) are
-        the primary use; fractional responses (``arm_count_soft``,
-        ``arm_posterior_mass``) are also supported for robustness
-        analyses.
+        Column with non-negative per-category response values. The shipped
+        fits use the per-event allocation fraction (``arm_fraction`` /
+        ``patch_fraction``); integer timebin counts (``arm_count_hard`` /
+        ``patch_count_hard``, the ``--response hard_count`` refits) and the
+        other fractional responses (``arm_count_soft``,
+        ``arm_posterior_mass``) are also supported.
     event_col : str
         Column with globally unique event IDs (grouping variable).
     n_categories : int, optional

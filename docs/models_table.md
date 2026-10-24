@@ -92,12 +92,12 @@ So the documented belief chain — `--leaf-only --models
 M0,M0a,M1,M2,M3,M4,Mv,Mu,Mvu` — is both leaf-only and partial and lands in
 `models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu/`, **not** a bare `models_leaf/`.
 
-The `is_swr`-contrast runners write flat artifacts into `models/` instead:
-`swr_contrast_content_{arm,patch,audited}{,_dm,_dm_len}{,_rewarded,_omitted}.pkl`
-and `swr_contrast_rate_*`, each with its `_cohort_audit*.csv`,
+The `is_swr` content-contrast runner writes flat artifacts into `models_swr_contrast/` instead (outside `models/`, which the arm ladder replaces whole):
+`swr_contrast_content_{arm,patch,audited}{,_dm,_dm_len}{,_rewarded,_omitted}.pkl`,
+each with its `_cohort_audit*.csv`,
 `_term_diagnostics*.csv` and `_provenance*.json` sidecars. The estimator suffix
-precedes the outcome-stratum suffix. The two rate families write to
-`models_per_bin_rate/` and `models_per_stop_rate/`.
+precedes the outcome-stratum suffix. The rate contrast (`swr_contrast_rate_*`) and the per-bin family write to
+`models_per_bin_rate/`; the per-stop family to `models_per_stop_rate/`.
 
 **Stop-cohort suffixes (rate artifacts).** Every rate runner takes
 `--stop-cohort {at_well,all_stops,in_transit}`, and the cohort it was given

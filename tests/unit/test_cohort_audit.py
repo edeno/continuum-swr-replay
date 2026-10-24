@@ -21,10 +21,17 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 
 def test_reconciles():
     rec = cohort_record(
-        "M3_armreward", "all", "event",
-        n_in=100, n_modeled=80,
-        sessions_in=10, sessions_modeled=9, animals_modeled=5,
-        n_drop_qvals_gap=5, n_drop_own_predictor_missing=12, n_drop_zero_response=3,
+        "M3_armreward",
+        "all",
+        "event",
+        n_in=100,
+        n_modeled=80,
+        sessions_in=10,
+        sessions_modeled=9,
+        animals_modeled=5,
+        n_drop_qvals_gap=5,
+        n_drop_own_predictor_missing=12,
+        n_drop_zero_response=3,
     )
     assert rec["n_modeled"] == 80
     assert rec["n_drop_qvals_gap"] == 5
@@ -33,9 +40,14 @@ def test_reconciles():
 def test_mismatch_raises():
     with pytest.raises(AssertionError, match="does not reconcile"):
         cohort_record(
-            "M3", "all", "event",
-            n_in=100, n_modeled=80,  # 100 - 10 != 80
-            sessions_in=10, sessions_modeled=9, animals_modeled=5,
+            "M3",
+            "all",
+            "event",
+            n_in=100,
+            n_modeled=80,  # 100 - 10 != 80
+            sessions_in=10,
+            sessions_modeled=9,
+            animals_modeled=5,
             n_drop_own_predictor_missing=10,
         )
 
@@ -46,11 +58,13 @@ def test_classify_drops_mutually_exclusive():
     qvals = np.array([True, False, False, False])
     own = np.array([True, True, False, False])
     zero = np.array([False, False, True, False])
-    counts = classify_drops({
-        "n_drop_qvals_gap": qvals,
-        "n_drop_own_predictor_missing": own,
-        "n_drop_zero_response": zero,
-    })
+    counts = classify_drops(
+        {
+            "n_drop_qvals_gap": qvals,
+            "n_drop_own_predictor_missing": own,
+            "n_drop_zero_response": zero,
+        }
+    )
     assert counts["n_drop_qvals_gap"] == 1
     assert counts["n_drop_own_predictor_missing"] == 1  # unit 1 only (unit 0 taken)
     assert counts["n_drop_zero_response"] == 1
@@ -59,14 +73,22 @@ def test_classify_drops_mutually_exclusive():
 
 
 def test_classify_then_reconcile_closes():
-    counts = classify_drops({
-        "n_drop_qvals_gap": np.array([True, False, False, False, False]),
-        "n_drop_own_predictor_missing": np.array([True, True, False, False, False]),
-    })
+    counts = classify_drops(
+        {
+            "n_drop_qvals_gap": np.array([True, False, False, False, False]),
+            "n_drop_own_predictor_missing": np.array([True, True, False, False, False]),
+        }
+    )
     rec = cohort_record(
-        "M4", "all", "event",
-        n_in=5, n_modeled=5 - sum(counts.values()),
-        sessions_in=2, sessions_modeled=2, animals_modeled=2, **counts,
+        "M4",
+        "all",
+        "event",
+        n_in=5,
+        n_modeled=5 - sum(counts.values()),
+        sessions_in=2,
+        sessions_modeled=2,
+        animals_modeled=2,
+        **counts,
     )
     assert rec["n_modeled"] == 3
 
@@ -75,9 +97,15 @@ def test_common_cohort_bucket():
     # In common mode an event whose OWN predictors are present but a later rung's
     # predictor is NaN must land in n_drop_common_cohort_other, not own-missing.
     rec = cohort_record(
-        "M0_null", "all", "event", cohort_mode="common",
-        n_in=50, n_modeled=44,
-        sessions_in=5, sessions_modeled=5, animals_modeled=3,
+        "M0_null",
+        "all",
+        "event",
+        cohort_mode="common",
+        n_in=50,
+        n_modeled=44,
+        sessions_in=5,
+        sessions_modeled=5,
+        animals_modeled=3,
         n_drop_common_cohort_other=6,
     )
     assert rec["n_drop_common_cohort_other"] == 6
@@ -88,11 +116,17 @@ def test_flags_do_not_reconcile():
     # Nonzero convergence/separation flags must NOT enter the reconciliation: the row
     # still closes on the drop buckets alone.
     rec = cohort_record(
-        "M3", "swr", "event",
-        n_in=40, n_modeled=35,
-        sessions_in=8, sessions_modeled=8, animals_modeled=5,
+        "M3",
+        "swr",
+        "event",
+        n_in=40,
+        n_modeled=35,
+        sessions_in=8,
+        sessions_modeled=8,
+        animals_modeled=5,
         n_drop_own_predictor_missing=5,
-        n_sessions_flagged_nonconverged=2, n_sessions_flagged_separated=3,
+        n_sessions_flagged_nonconverged=2,
+        n_sessions_flagged_separated=3,
     )
     assert rec["n_sessions_flagged_nonconverged"] == 2
     assert rec["n_sessions_flagged_separated"] == 3
@@ -100,10 +134,12 @@ def test_flags_do_not_reconcile():
 
 
 def test_drop_profile_early_session():
-    dropped = pd.DataFrame({
-        "time_since_stop_start_s": [0.1, 0.2, 0.15, 0.3],
-        "is_rewarded_outcome": [0, 0, 0, 1],
-    })
+    dropped = pd.DataFrame(
+        {
+            "time_since_stop_start_s": [0.1, 0.2, 0.15, 0.3],
+            "is_rewarded_outcome": [0, 0, 0, 1],
+        }
+    )
     prof = drop_profile(dropped)
     assert "median_tss=0.17" in prof or "median_tss=0.18" in prof
     assert "rewarded_frac=0.250" in prof
@@ -116,15 +152,27 @@ def test_drop_profile_empty():
 def test_write_cohort_audit_column_order(tmp_path):
     recs = [
         cohort_record(
-            "M0", "all", "event", n_in=10, n_modeled=10,
-            sessions_in=1, sessions_modeled=1, animals_modeled=1,
+            "M0",
+            "all",
+            "event",
+            n_in=10,
+            n_modeled=10,
+            sessions_in=1,
+            sessions_modeled=1,
+            animals_modeled=1,
         )
     ]
     out = tmp_path / "run_cohort_audit.csv"
     df = write_cohort_audit(recs, out)
     assert out.exists()
     reread = pd.read_csv(out)
-    assert list(reread.columns)[:5] == ["model", "population", "grain", "cohort_mode", "n_in"]
+    assert list(reread.columns)[:5] == [
+        "model",
+        "population",
+        "grain",
+        "cohort_mode",
+        "n_in",
+    ]
     assert "n_sessions_flagged_separated" in reread.columns
     assert df["n_modeled"].iloc[0] == 10
 
@@ -150,32 +198,72 @@ def test_event_drop_buckets_common_cohort_and_qvals():
     # event 3: only the OTHER rung's predictor 'other' NaN -> common_cohort_other
     # event 4: complete but response all zero -> zero_response
     # event 5: clean -> modeled
-    df = _long({
-        1: {"y": [1, 0, 0], "own": [float("nan"), 1.0, 1.0], "other": [1, 1, 1],
-            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
-        2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3]},
-        3: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [float("nan"), 1, 1],
-            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
-        4: {"y": [0, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
-        5: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "other": [1, 1, 1],
-            "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
-    })
+    df = _long(
+        {
+            1: {
+                "y": [1, 0, 0],
+                "own": [float("nan"), 1.0, 1.0],
+                "other": [1, 1, 1],
+                "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
+            },
+            2: {
+                "y": [1, 0, 0],
+                "own": [1.0, 1.0, 1.0],
+                "other": [1, 1, 1],
+                "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3],
+            },
+            3: {
+                "y": [1, 0, 0],
+                "own": [1.0, 1.0, 1.0],
+                "other": [float("nan"), 1, 1],
+                "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
+            },
+            4: {
+                "y": [0, 0, 0],
+                "own": [1.0, 1.0, 1.0],
+                "other": [1, 1, 1],
+                "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
+            },
+            5: {
+                "y": [1, 0, 0],
+                "own": [1.0, 1.0, 1.0],
+                "other": [1, 1, 1],
+                "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
+            },
+        }
+    )
     buckets = event_drop_buckets(
-        df, event_col="event_id", response_col="y",
-        own_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],  # this rung uses own + value
-        union_predictors=["own", "other", "reward_belief_mean_candidate_arm_preoutcome"],
+        df,
+        event_col="event_id",
+        response_col="y",
+        own_predictors=[
+            "own",
+            "reward_belief_mean_candidate_arm_preoutcome",
+        ],  # this rung uses own + value
+        union_predictors=[
+            "own",
+            "other",
+            "reward_belief_mean_candidate_arm_preoutcome",
+        ],
     )
     assert buckets["n_drop_qvals_gap"] == 1  # event 2
     assert buckets["n_drop_own_predictor_missing"] == 1  # event 1
-    assert buckets["n_drop_common_cohort_other"] == 1  # event 3 (other rung's predictor)
+    assert (
+        buckets["n_drop_common_cohort_other"] == 1
+    )  # event 3 (other rung's predictor)
     assert buckets["n_drop_zero_response"] == 1  # event 4
     # Reconciliation for this rung: 5 events in, 4 dropped, 1 modeled.
     n_in = 5
     rec = cohort_record(
-        "M_own_value", "all", "event", cohort_mode="common",
-        n_in=n_in, n_modeled=1, sessions_in=1, sessions_modeled=1, animals_modeled=1,
+        "M_own_value",
+        "all",
+        "event",
+        cohort_mode="common",
+        n_in=n_in,
+        n_modeled=1,
+        sessions_in=1,
+        sessions_modeled=1,
+        animals_modeled=1,
         n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
         n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
         n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
@@ -187,13 +275,18 @@ def test_event_drop_buckets_common_cohort_and_qvals():
 def test_event_drop_buckets_null_rung_uses_common_bucket():
     """For a rung with NO own predictors (e.g. M0), a non-qvals union drop is
     attributed to common_cohort_other, never own_predictor_missing."""
-    df = _long({
-        1: {"y": [1, 0, 0], "other": [float("nan"), 1, 1]},
-        2: {"y": [1, 0, 0], "other": [1, 1, 1]},
-    })
+    df = _long(
+        {
+            1: {"y": [1, 0, 0], "other": [float("nan"), 1, 1]},
+            2: {"y": [1, 0, 0], "other": [1, 1, 1]},
+        }
+    )
     buckets = event_drop_buckets(
-        df, event_col="event_id", response_col="y",
-        own_predictors=[], union_predictors=["other"],
+        df,
+        event_col="event_id",
+        response_col="y",
+        own_predictors=[],
+        union_predictors=["other"],
     )
     assert buckets["n_drop_own_predictor_missing"] == 0
     assert buckets["n_drop_common_cohort_other"] == 1
@@ -202,39 +295,95 @@ def test_event_drop_buckets_null_rung_uses_common_bucket():
 def test_event_drop_buckets_qvals_gap_only_for_own_value_covariate():
     """C2 regression: a base rung that does NOT use q_arm must NOT report a
     qvals_gap when a *later* rung's q_arm is the NaN cause — it is common-cohort."""
-    df = _long({
-        1: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3]},
-        2: {"y": [1, 0, 0], "own": [1.0, 1.0, 1.0], "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3]},
-    })
+    df = _long(
+        {
+            1: {
+                "y": [1, 0, 0],
+                "own": [1.0, 1.0, 1.0],
+                "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3],
+            },
+            2: {
+                "y": [1, 0, 0],
+                "own": [1.0, 1.0, 1.0],
+                "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
+            },
+        }
+    )
     # Base rung uses only 'own'; q_arm belongs to another rung in the union.
     base = event_drop_buckets(
-        df, event_col="event_id", response_col="y",
-        own_predictors=["own"], union_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
+        df,
+        event_col="event_id",
+        response_col="y",
+        own_predictors=["own"],
+        union_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
     )
     assert base["n_drop_qvals_gap"] == 0  # not this rung's value covariate
-    assert base["n_drop_common_cohort_other"] == 1  # event 1, dropped for the value rung
+    assert (
+        base["n_drop_common_cohort_other"] == 1
+    )  # event 1, dropped for the value rung
 
     # The value rung that DOES use q_arm attributes the same event to qvals_gap.
     value = event_drop_buckets(
-        df, event_col="event_id", response_col="y",
-        own_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"], union_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
+        df,
+        event_col="event_id",
+        response_col="y",
+        own_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
+        union_predictors=["own", "reward_belief_mean_candidate_arm_preoutcome"],
     )
     assert value["n_drop_qvals_gap"] == 1
     assert value["n_drop_common_cohort_other"] == 0
 
 
+def test_every_contrast_belief_predictor_is_booked_to_the_qvals_gap():
+    """The per-arm belief mean and variance share the qvals tail's NaN mask, so a
+    CS6 / C13 drop of a tail event is a qvals gap, not own-predictor missingness."""
+    from continuum_swr_replay.analysis.replay.cohort_audit import QVALS_GAP_COLS
+    from continuum_swr_replay.analysis.replay.model_specs import (
+        SWR_CONTRAST_CONTENT_ARM_LADDER,
+    )
+
+    belief = {
+        predictor
+        for predictors, _scope in SWR_CONTRAST_CONTENT_ARM_LADDER.values()
+        for predictor in predictors
+        if "reward_belief" in predictor and "candidate_arm" in predictor
+    }
+
+    assert "swr_x_reward_belief_variance_candidate_arm_preoutcome_z" in belief
+    assert belief <= QVALS_GAP_COLS
+
+
 def test_records_from_common_cohort_provenance():
     """The choice/comparison native provenance maps to a reconciling standardized row."""
-    prov = pd.DataFrame([
-        {"animal": "a", "day": 1, "epoch": "e", "n_units_before": 50,
-         "n_units_after": 40, "n_missing_units": 5, "n_invalid_choice_units": 3,
-         "n_nonfinite_units": 1, "n_nonpositive_offset_units": 0,
-         "n_zero_response_units": 1, "status": "fit"},
-        {"animal": "b", "day": 2, "epoch": "e", "n_units_before": 30,
-         "n_units_after": 0, "n_missing_units": 0, "n_invalid_choice_units": 0,
-         "n_nonpositive_offset_units": 0, "n_zero_response_units": 0,
-         "status": "too_few_units"},
-    ])
+    prov = pd.DataFrame(
+        [
+            {
+                "animal": "a",
+                "day": 1,
+                "epoch": "e",
+                "n_units_before": 50,
+                "n_units_after": 40,
+                "n_missing_units": 5,
+                "n_invalid_choice_units": 3,
+                "n_nonfinite_units": 1,
+                "n_nonpositive_offset_units": 0,
+                "n_zero_response_units": 1,
+                "status": "fit",
+            },
+            {
+                "animal": "b",
+                "day": 2,
+                "epoch": "e",
+                "n_units_before": 30,
+                "n_units_after": 0,
+                "n_missing_units": 0,
+                "n_invalid_choice_units": 0,
+                "n_nonpositive_offset_units": 0,
+                "n_zero_response_units": 0,
+                "status": "too_few_units",
+            },
+        ]
+    )
     rec = records_from_common_cohort_provenance(prov, "choice", "all")
     assert rec["n_in"] == 80
     assert rec["n_drop_own_predictor_missing"] == 8  # missing 5 + invalid-choice 3
@@ -267,18 +416,22 @@ def test_event_drop_buckets_attributes_infinity_explicitly():
 
 
 def test_records_from_provenance_empty_returns_none():
-    assert records_from_common_cohort_provenance(pd.DataFrame(), "choice", "all") is None
+    assert (
+        records_from_common_cohort_provenance(pd.DataFrame(), "choice", "all") is None
+    )
 
 
 def test_term_diagnostics_counts_quasiseparation():
     # Two terms; term "a" has one quasi-separated session (|coef|>=10).
-    res = pd.DataFrame({
-        "model": ["C1"] * 6,
-        "population": ["all"] * 6,
-        "animal": ["x", "x", "y", "x", "y", "y"],
-        "coef_a": [0.5, 12.0, -0.3, np.nan, 0.1, 0.2],
-        "coef_b": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
-    })
+    res = pd.DataFrame(
+        {
+            "model": ["C1"] * 6,
+            "population": ["all"] * 6,
+            "animal": ["x", "x", "y", "x", "y", "y"],
+            "coef_a": [0.5, 12.0, -0.3, np.nan, 0.1, 0.2],
+            "coef_b": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+        }
+    )
     td = term_diagnostics(res, [("C1", "all", "a"), ("C1", "all", "b")])
     a = td[td.term == "a"].iloc[0]
     assert a["n_sessions_fit"] == 5  # one NaN excluded

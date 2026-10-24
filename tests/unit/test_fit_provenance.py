@@ -423,8 +423,8 @@ def _load_script(path: Path) -> ModuleType:
 def _module_constants(path: Path) -> dict[str, object]:
     """Evaluate a script's module-level constants from source, without importing.
 
-    For scripts that do their work at import time (the swr-contrast coefficient
-    figure has no ``main``), so importing them would draw the figures. Only
+    For scripts whose import is unwanted here (the swr-contrast coefficient
+    figure drew its figures at import until it gained a ``main``). Only
     assignments are evaluated, in order, against a namespace seeded with the
     data-directory constants; anything that needs a name the namespace does not
     carry (a dataframe read, a plot handle) is skipped.
@@ -485,8 +485,8 @@ FITTERS = [
 ]
 # (reader, name of its input mapping, the fitter that writes what it reads: a
 # script, whose ``FIT_INPUTS`` it records, or the recorded mapping itself).
-# ``plot_swr_contrast_coefs`` draws its figures at import, so its constants are
-# read from source rather than imported.
+# ``plot_swr_contrast_coefs``'s constants are read from source rather than
+# imported (it used to draw its figures at import; the source read still works).
 READERS = [
     (
         RATE / "summarize_per_bin_rate_models.py",
@@ -589,11 +589,22 @@ def test_contrast_figure_gates_both_content_artifacts():
     fitter = _load_script(CONTENT / "fit_swr_contrast_content.py")
 
     assert constants["SWR_CONTRAST_CONTENT_ARM"] == (
-        fitter.RC / "models" / "swr_contrast_content_arm.pkl"
+        fitter.RC / "models_swr_contrast" / "swr_contrast_content_arm.pkl"
     )
     assert constants["SWR_CONTRAST_CONTENT_PATCH"] == (
-        fitter.RC / "models" / "swr_contrast_content_patch.pkl"
+        fitter.RC / "models_swr_contrast" / "swr_contrast_content_patch.pkl"
     )
+
+
+def test_content_contrast_fits_live_outside_the_arm_ladder_bundle():
+    """The arm ladder publishes ``content_arm`` by replacing the directory whole,
+    so a contrast fit written there was deleted by the next ladder refit."""
+    source = (CONTENT / "fit_swr_contrast_content.py").read_text()
+    contrast, arm = model_dir("swr_contrast"), model_dir("content_arm")
+
+    assert 'model_dir("content_arm"' not in source
+    assert 'model_dir("swr_contrast", RC)' in source
+    assert not contrast.is_relative_to(arm) and not arm.is_relative_to(contrast)
 
 
 def test_content_ladder_readers_check_the_table_the_ladder_records():

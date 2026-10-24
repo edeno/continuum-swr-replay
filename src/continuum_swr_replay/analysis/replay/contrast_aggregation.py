@@ -36,6 +36,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -75,6 +76,9 @@ from .model_specs import LEAF_ONLY_N_CATEGORIES, REWARD_HISTORY_COLUMNS
 # counts both kinds: separated or runaway sessions (``n_dropped``) and sessions
 # that cannot inform the term at all (``n_unidentified``).
 MAX_UNIDENTIFIED_SHARE = 0.20
+
+# Fewest kept sessions a term needs before its aggregate is emitted.
+MIN_SESSIONS_PER_TERM = 5
 
 # Two-sided normal critical value at alpha = 0.05, for the per-session Wald test.
 _WALD_Z_TWO_SIDED_05 = 1.959963984540054
@@ -278,6 +282,119 @@ def unidentified_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
     )
 
 
+@dataclass(frozen=True)
+class TermSessionGate:
+    """Which session fits a term's aggregate keeps, and whether it is emitted.
+
+    Attributes
+    ----------
+    kept : pandas.Series of bool
+        Indexed like the fits; True for a session whose coefficient enters the
+        aggregate.
+    n_dropped : int
+        Sessions with a coefficient that was excluded as separated or runaway.
+    n_unidentified : int
+        Sessions the fitter reports cannot inform the term (NaN coefficient).
+    """
+
+    kept: pd.Series
+    n_dropped: int
+    n_unidentified: int
+
+    @property
+    def n_kept(self) -> int:
+        """Sessions whose coefficient enters the aggregate."""
+        return int(self.kept.sum())
+
+    @property
+    def n_fitted(self) -> int:
+        """Sessions fit for the term: kept, dropped, or not informed."""
+        return self.n_kept + self.n_dropped + self.n_unidentified
+
+    @property
+    def drop_share(self) -> float:
+        """Share of the fitted sessions that are dropped or not informed."""
+        return (self.n_dropped + self.n_unidentified) / max(self.n_fitted, 1)
+
+    @property
+    def refusal(self) -> str | None:
+        """Why the term's aggregate is not emitted, or None when it is.
+
+        ``"too_few_sessions"`` below :data:`MIN_SESSIONS_PER_TERM` kept sessions;
+        ``"unidentified_share"`` when :attr:`drop_share` exceeds
+        :data:`MAX_UNIDENTIFIED_SHARE` -- the surviving median would describe
+        the identified minority, not the corpus.
+        """
+        if self.n_kept < MIN_SESSIONS_PER_TERM:
+            return "too_few_sessions"
+        if self.drop_share > MAX_UNIDENTIFIED_SHARE:
+            return "unidentified_share"
+        return None
+
+
+def gate_term_sessions(fits: pd.DataFrame, term: str) -> TermSessionGate:
+    """Apply the per-term identifiability filter and the emission gates.
+
+    A session is excluded from a term's aggregate when the fitters named that
+    term in ``separated_terms``, or when its coefficient ran away past the
+    magnitude backstop without tripping that flag (``n_dropped``). The
+    backstop is read on the effect scale, ``|coef_<term>| * sd_<term> >=
+    SEPARATION_COEF_ABS``, using the fit's own persisted predictor SD; frames
+    with no ``sd_<term>`` column (legacy artifacts) fall back to
+    ``|coef_<term>| >= SEPARATION_COEF_ABS``. A session whose fit names the
+    term in ``unidentified_terms`` (NaN coefficient) is counted in
+    ``n_unidentified``. Both counts enter the :data:`MAX_UNIDENTIFIED_SHARE`
+    gate (:attr:`TermSessionGate.refusal`).
+
+    Parameters
+    ----------
+    fits : pandas.DataFrame
+        Per-session fits for one (model, population), carrying ``coef_<term>``.
+    term : str
+        The aggregated term.
+
+    Returns
+    -------
+    TermSessionGate
+    """
+    ccol = f"coef_{term}"
+    present = fits[ccol].notna()
+    # Identifiability filter, applied PER TERM. Separation is measured on the
+    # effect scale (SE times the predictor's own SD), which is what
+    # non-identification actually shows up in, and the fitters name the terms
+    # it holds for. The magnitude backstop catches an estimate that ran away
+    # without tripping that flag, and it is read on the SAME effect scale:
+    # ``|coef| * sd`` is the log-rate swing the predictor actually produces
+    # over one SD of itself, so a large coefficient on a tiny-SD covariate --
+    # identified, just steep per unit -- is kept, while a genuinely runaway
+    # fit is dropped. Judging ``|coef|`` alone was selection ON the estimate:
+    # it dropped identified sessions for having small-SD predictors, and it
+    # kept whichever unidentified fits happened to land under the threshold,
+    # which is how CS3_lastrew came to report -2.72 next to a typical session
+    # SE of 2,428 (the identified sessions give -0.77). Precision is
+    # deliberately NOT a criterion: the retired ``SE > 10 * |coef|`` rule
+    # dropped identified sessions whose effect was near zero, biasing the
+    # surviving median away from zero.
+    flagged = separated_for_term(fits, term)
+    sdcol = f"sd_{term}"
+    if sdcol in fits.columns:
+        runaway = fits[ccol].abs() * fits[sdcol] >= SEPARATION_COEF_ABS
+    else:
+        # Legacy artifacts predate the persisted per-fit predictor SDs; the
+        # raw coefficient is the only scale available for them.
+        runaway = fits[ccol].abs() >= SEPARATION_COEF_ABS
+    kept = present & ~runaway & ~flagged
+    # A session that cannot inform the term at all (the fitter reports it in
+    # ``unidentified_terms``, with a NaN coefficient) is fitted but not
+    # present. It is counted apart from the separation drops, and both enter
+    # the refusal gate.
+    return TermSessionGate(
+        kept=kept,
+        n_dropped=int((present & ~kept).sum()),
+        n_unidentified=int((unidentified_for_term(fits, term) & ~present).sum()),
+    )
+
+
 def session_se(fits: pd.DataFrame, term: str) -> tuple[pd.Series | None, str]:
     """Per-session SE for ``term``, and which SE it is made of.
 
@@ -375,18 +492,13 @@ def aggregate_contrast(
     res : pd.DataFrame
         Per-session fits: columns ``model``, ``population``, ``animal`` and
         ``coef_<term>`` (optionally ``bse_<term>``, ``pval_<term>``,
-        ``sd_<term>``). A session is excluded from a term's aggregate when the
-        fitters named that term in ``separated_terms``, or when its coefficient
-        ran away past the magnitude backstop without tripping that flag. The
-        backstop is read on the effect scale, ``|coef_<term>| * sd_<term> >=
-        SEPARATION_COEF_ABS``, using the fit's own persisted predictor SD --
+        ``sd_<term>``). Which sessions a term keeps, and whether its row is
+        emitted at all, is :func:`gate_term_sessions` (separated / runaway
+        sessions counted in ``n_dropped``, sessions that cannot inform the term
+        in ``n_unidentified``, both entering the ``MAX_UNIDENTIFIED_SHARE``
+        gate). The runaway backstop uses the fit's own ``sd_<term>`` --
         including for an ``is_swr:<covariate>`` product, which carries its own
-        ``sd_`` column. Frames with no ``sd_<term>`` column (legacy artifacts)
-        fall back to ``|coef_<term>| >= SEPARATION_COEF_ABS``. Those exclusions
-        are counted in ``n_dropped``. A session whose fit names the term in
-        ``unidentified_terms`` (NaN coefficient: the session cannot inform the
-        term) is excluded too and counted in ``n_unidentified``. Both counts
-        enter the ``MAX_UNIDENTIFIED_SHARE`` gate.
+        ``sd_`` column.
     specs : list of (model, population, term)
         One aggregated row per spec (in order).
     level : str
@@ -402,48 +514,12 @@ def aggregate_contrast(
         s_all = res[(res.model == model) & (res.population == pop)]
         if ccol not in s_all.columns:
             continue
-        present = s_all[ccol].notna()
-        # Identifiability filter, applied PER TERM. Separation is measured on the
-        # effect scale (SE times the predictor's own SD), which is what
-        # non-identification actually shows up in, and the fitters name the terms
-        # it holds for. The magnitude backstop catches an estimate that ran away
-        # without tripping that flag, and it is read on the SAME effect scale:
-        # ``|coef| * sd`` is the log-rate swing the predictor actually produces
-        # over one SD of itself, so a large coefficient on a tiny-SD covariate --
-        # identified, just steep per unit -- is kept, while a genuinely runaway
-        # fit is dropped. Judging ``|coef|`` alone was selection ON the estimate:
-        # it dropped identified sessions for having small-SD predictors, and it
-        # kept whichever unidentified fits happened to land under the threshold,
-        # which is how CS3_lastrew came to report -2.72 next to a typical session
-        # SE of 2,428 (the identified sessions give -0.77). Precision is
-        # deliberately NOT a criterion: the retired ``SE > 10 * |coef|`` rule
-        # dropped identified sessions whose effect was near zero, biasing the
-        # surviving median away from zero.
-        flagged = separated_for_term(s_all, term)
-        sdcol = f"sd_{term}"
-        if sdcol in s_all.columns:
-            runaway = s_all[ccol].abs() * s_all[sdcol] >= SEPARATION_COEF_ABS
-        else:
-            # Legacy artifacts predate the persisted per-fit predictor SDs; the
-            # raw coefficient is the only scale available for them.
-            runaway = s_all[ccol].abs() >= SEPARATION_COEF_ABS
-        kept = present & ~runaway & ~flagged
-        n_dropped = int((present & ~kept).sum())
-        # A session that cannot inform the term at all (the fitter reports it in
-        # ``unidentified_terms``, with a NaN coefficient) is fitted but not
-        # present. It is counted apart from the separation drops, and both enter
-        # the refusal gate below.
-        n_unidentified = int((unidentified_for_term(s_all, term) & ~present).sum())
-        s = s_all[kept]
-        if len(s) < 5:
+        gate = gate_term_sessions(s_all, term)
+        if gate.refusal == "too_few_sessions":
             continue
-        # Refuse to publish a term that is unidentified in a large share of the
-        # sessions that were fit: the surviving median describes the identified
-        # minority, not the corpus, and reads as if it described the corpus.
-        n_fitted = int(present.sum()) + n_unidentified
-        n_lost = n_dropped + n_unidentified
-        drop_share = n_lost / max(n_fitted, 1)
-        if drop_share > MAX_UNIDENTIFIED_SHARE:
+        if gate.refusal == "unidentified_share":
+            # The surviving median describes the identified minority, not the
+            # corpus, and would read as if it described the corpus.
             logging.warning(
                 "%s/%s/%s: %.0f%% of fitted sessions unidentified (%d of %d: %d "
                 "separated or runaway, %d not informed); not emitting an "
@@ -451,13 +527,15 @@ def aggregate_contrast(
                 model,
                 pop,
                 term,
-                100 * drop_share,
-                n_lost,
-                n_fitted,
-                n_dropped,
-                n_unidentified,
+                100 * gate.drop_share,
+                gate.n_dropped + gate.n_unidentified,
+                gate.n_fitted,
+                gate.n_dropped,
+                gate.n_unidentified,
             )
             continue
+        n_dropped, n_unidentified = gate.n_dropped, gate.n_unidentified
+        s = s_all[gate.kept]
         coef = s[ccol]
         se_per_session, se_source = session_se(s, term)
         session_se_median = (
@@ -862,6 +940,9 @@ def assemble_arm(
         ],
         on="stop_id",
         how="left",
+        # One row per stop on the right: a duplicated stop_id would silently
+        # duplicate the event-arm rows it joins to.
+        validate="many_to_one",
     )
     ev = ev.merge(
         q[
@@ -878,6 +959,7 @@ def assemble_arm(
         ],
         on="stop_id",
         how="left",
+        validate="many_to_one",
     )
     return _attach_arm_design_columns(ev)
 
@@ -994,8 +1076,14 @@ def assemble_patch(
         stop[["stop_id", "patch_switch_fraction_last5_completed_trips"]],
         on="stop_id",
         how="left",
+        validate="many_to_one",
     )
-    pt = pt.merge(q[["stop_id", "periswitch_index_trials"]], on="stop_id", how="left")
+    pt = pt.merge(
+        q[["stop_id", "periswitch_index_trials"]],
+        on="stop_id",
+        how="left",
+        validate="many_to_one",
+    )
     return _attach_patch_design_columns(pt)
 
 

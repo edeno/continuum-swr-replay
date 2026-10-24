@@ -24,18 +24,21 @@ of every ``_z`` covariate.
 
 The output root must look like ``replay_content`` to the runner, which reads its
 input tables and ``standardization_reference.json`` from the same root it writes
-to. Symlinking every entry except ``models`` is enough::
+to. Symlinking every entry except the output directory ``models_swr_contrast``
+is enough (a symlinked one would send the run's output into the canonical
+directory)::
 
     ROOT=/tmp/content_cohort_control
-    mkdir -p "$ROOT/models"
+    mkdir -p "$ROOT/models_swr_contrast"
     for entry in Processed-Data/replay_content/*; do
-        [ "$(basename "$entry")" = models ] && continue
+        [ "$(basename "$entry")" = models_swr_contrast ] && continue
         ln -sfn "$(realpath "$entry")" "$ROOT/$(basename "$entry")"
     done
     uv run python scripts/exploratory/_content_cohort_control.py "$ROOT" omitted
 
-Then compare ``$ROOT/models/swr_contrast_content_arm_omitted.pkl`` against the
-shipped bundle and against the archived one.
+Then compare ``$ROOT/models_swr_contrast/swr_contrast_content_arm_omitted.pkl``
+against the shipped bundle and against the archived one. (Before 2026-10-24 the
+runner wrote into ``models/``, where the 2026-09-12 run above put its output.)
 
 Unsupported one-off (leading underscore, per ``scripts/README.md``): it monkey-
 patches a runner's module globals and is not part of any pipeline.
@@ -83,9 +86,10 @@ def main() -> None:
             "[extra runner args...]"
         )
     out_root = Path(sys.argv[1]).resolve()
-    if not (model_dir("content_arm", out_root)).is_dir():
+    out_dir = model_dir("swr_contrast", out_root)
+    if not out_dir.is_dir() or out_dir.is_symlink():
         raise SystemExit(
-            f"{out_root}/models must exist and {out_root} must mirror "
+            f"{out_dir} must be a real directory and {out_root} must mirror "
             "replay_content (see this module's docstring)"
         )
     runner_argv = ["fit_swr_contrast_content.py", "--outcome-stratum", *sys.argv[2:]]

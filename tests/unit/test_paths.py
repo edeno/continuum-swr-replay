@@ -37,6 +37,7 @@ MODEL_LITERALS = {
     "per_bin_rate": "models_per_bin_rate",
     "per_event_swr_power": "models_per_event_swr_power",
     "per_stop_rate": "models_per_stop_rate",
+    "swr_contrast": "models_swr_contrast",
 }
 
 

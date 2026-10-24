@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-"""Fit the replay content model hierarchy (M0-M6) on pre-computed data.
+"""Fit the replay content model hierarchy on pre-computed data.
+
+The arm ladder is ``M0``, ``M0a``, ``M1``-``M6`` by default, with the opt-in
+value/uncertainty rungs ``Mv``, ``Mu``, ``Mvu``; the patch ladder is ``P0``-``P3``
+with the opt-in ``Pv`` (``--hierarchy patch``). The rungs are defined in
+``analysis/replay/model_specs.py``.
 
 Primary model: Conditional Poisson regression (multinomial-count softmax).
 Robustness check: Conditional Logit on dominant arm.
@@ -35,7 +40,9 @@ six-category likelihood and so gets its own ``_leaf`` bundle; the belief rungs'
 parents must be requested in the same run to keep the AIC comparisons nested.
 Every pickle in a published bundle carries a ``.provenance.json`` sidecar naming
 the table it was fit on and that table's SHA-256 as of the read, which the
-figure and summary scripts check before reading the fit.
+figure and summary scripts check before reading the fit. A bundle is published
+by replacing its directory whole, so nothing else may write into one: the
+is_swr-contrast fits live in ``models_swr_contrast/`` for that reason.
 
 ``--estimator dirichlet_multinomial`` replaces the conditional Poisson with a
 softmax whose within-event concentration is estimated rather than assumed, so an

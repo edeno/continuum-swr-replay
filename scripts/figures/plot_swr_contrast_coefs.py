@@ -34,10 +34,11 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
-    PER_UNIT_TERMS,
-    SEPARATION_COEF_ABS,
+    gate_term_sessions,
     load_per_sd_scale,
-    separated_for_term,
+)
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    std_factor as audited_std_factor,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
@@ -54,7 +55,6 @@ from continuum_swr_replay.tables.io import read_table
 
 RC = REPLAY_CONTENT_DIR
 OUT = Path("paper/figures/swr_contrast")
-OUT.mkdir(parents=True, exist_ok=True)
 
 SWR_CONTRAST_RATE = model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl"
 # The tables fit_swr_contrast_rate.py fit that artifact on; checked against its
@@ -72,10 +72,16 @@ SWR_CONTRAST_RATE_INPUTS = {
 # here: the same covariates measured over all nine candidates have a 2.1x larger
 # SD (the trunks are structural zeros), which would shrink every per-SD arm
 # effect in this figure by that factor relative to the audited table.
-SWR_CONTRAST_CONTENT_PROVENANCE = model_dir("content_arm", RC) / "swr_contrast_content_provenance.json"
+SWR_CONTRAST_CONTENT_PROVENANCE = (
+    model_dir("swr_contrast", RC) / "swr_contrast_content_provenance.json"
+)
 
-SWR_CONTRAST_CONTENT_ARM = model_dir("content_arm", RC) / "swr_contrast_content_arm.pkl"
-SWR_CONTRAST_CONTENT_PATCH = model_dir("content_arm", RC) / "swr_contrast_content_patch.pkl"
+SWR_CONTRAST_CONTENT_ARM = (
+    model_dir("swr_contrast", RC) / "swr_contrast_content_arm.pkl"
+)
+SWR_CONTRAST_CONTENT_PATCH = (
+    model_dir("swr_contrast", RC) / "swr_contrast_content_patch.pkl"
+)
 # The tables fit_swr_contrast_content.py fit those two artifacts on, gated the
 # same way as the rate half.
 SWR_CONTRAST_CONTENT_INPUTS = {
@@ -98,18 +104,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     return parser
-
-
-# This script runs top to bottom at import; the gate has to fire here, ahead of
-# the first table read, rather than inside a main() it does not have.
-_ALLOW_STALE = build_parser().parse_args().allow_stale
-require_fresh_inputs(
-    SWR_CONTRAST_RATE, SWR_CONTRAST_RATE_INPUTS, allow_stale=_ALLOW_STALE
-)
-for _content_fit in (SWR_CONTRAST_CONTENT_ARM, SWR_CONTRAST_CONTENT_PATCH):
-    require_fresh_inputs(
-        _content_fit, SWR_CONTRAST_CONTENT_INPUTS, allow_stale=_ALLOW_STALE
-    )
 
 
 def _global_sd(covariates):
@@ -136,63 +130,55 @@ def _global_sd(covariates):
     return sd
 
 
-# Rate-ladder covariates: per-stop quantities with no candidate-arm support
-# question, so their pooled SD is computed here from the source tables. The
-# per-arm covariates come from the fit's own frozen units instead.
-SD = {
-    **_global_sd(
-        [
-            "relative_value_switch_minus_stay_preoutcome",
-            "rpe_postoutcome",
-            "reward_belief_differential_entropy_leaf_mean_preoutcome",
-            "reward_belief_mean_update_l1_all_ports_postoutcome",
-            "periswitch_index_trials",
-            "trials_since_block_change",
-            "patch_switch_fraction_last5_completed_trips",
-        ]
-    ),
-    **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
-}
+def _per_sd_units():
+    """Covariate -> SD the figure states its per-SD effects in.
+
+    Rate-ladder covariates are per-stop quantities with no candidate-arm support
+    question, so their pooled SD is computed here from the source tables. The
+    per-arm covariates come from the fit's own frozen units instead.
+    """
+    return {
+        **_global_sd(
+            [
+                "relative_value_switch_minus_stay_preoutcome",
+                "rpe_postoutcome",
+                "reward_belief_differential_entropy_leaf_mean_preoutcome",
+                "reward_belief_mean_update_l1_all_ports_postoutcome",
+                "periswitch_index_trials",
+                "trials_since_block_change",
+                "patch_switch_fraction_last5_completed_trips",
+            ]
+        ),
+        **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
+    }
+
+
 ANIM = list(analysed_animals())
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
 RNG = np.random.default_rng(0)
 
 
-def std_factor(term):
+def std_factor(term, sd):
     """Scaling to standardized units; ``(factor, unit)``.
 
-    Mirrors the three-way labelling of
-    ``analysis.replay.contrast_aggregation.std_factor`` -- ``"per_category"`` for
-    binary predictors, ``"per_unit"`` for the reward-history basis features
-    (weighted reward fractions, so a per-SD rescaling would misstate their unit),
-    ``"per_SD"`` otherwise -- but keeps this module's fail-loud behaviour: an
-    unresolved continuous term raises rather than rendering at raw scale under a
-    "per 1 SD" axis.
+    The audited table's own rule
+    (``analysis.replay.contrast_aggregation.std_factor``: ``"per_category"``
+    for its binary terms, ``"per_unit"`` for the reward-history basis features,
+    ``"per_SD"`` otherwise), with one addition: a continuous term that resolves
+    to no entry of `sd` and is not a ``*_x_*`` interaction raises rather than
+    rendering at raw scale under a "per 1 SD" axis.
     """
-    BIN = {
-        "is_current_arm",
-        "swr_x_is_current_arm",
-        "swr_x_is_prev_arm",
-        "swr_x_is_last_rewarded_noncurrent_arm",
-        "is_current_patch",
-        "is_last_rewarded_noncurrent_patch",
-        "swr_x_is_current_patch",
-        "swr_x_is_last_rewarded_noncurrent_patch",
-    }
-    if term in BIN:
-        return 1.0, "per_category"
-    if term in PER_UNIT_TERMS:
-        return 1.0, "per_unit"
-    # per-arm / rate continuous covariates scaled by their global SD
-    for cov, s in SD.items():
-        if term == cov or term == f"swr_x_{cov}":
-            return s, "per_SD"
+    factor, unit = audited_std_factor(term, sd)
+    if unit != "per_SD" or any(
+        term in (cov, f"swr_x_{cov}", f"is_swr:{cov}") for cov in sd
+    ):
+        return factor, unit
     # Interaction terms (content/patch `*_x_*`) are built from z-scored scalars at
     # fit time, so factor 1.0 is correct. Continuous MAIN-effect terms, by contrast,
     # must be in SD — so a renamed main effect (not an interaction) raises here rather
     # than silently plotting at raw scale under a "per 1 SD" axis.
     if "_x_" in term:
-        return 1.0, "per_SD"
+        return factor, unit
     raise KeyError(
         f"plot term {term!r} resolves to no SD entry and is not a binary, a "
         f"reward-history basis feature, or a z-scored-at-fit interaction (`*_x_*`) — "
@@ -201,15 +187,19 @@ def std_factor(term):
     )
 
 
-def sessions(df, mod, pop, term):
+def sessions(df, mod, pop, term, sd):
+    """Per-animal standardized session coefficients the audited table aggregates.
+
+    Returns an empty dict when the audited aggregation refuses the term (too few
+    kept sessions, or too large an unidentified share), so the row is drawn
+    empty instead of showing an effect the audited table does not report.
+    """
     g = df[(df.model == mod) & (df.population == pop)]
     # The rate ladder fits its post-outcome rungs on their own cohort and refits
     # the ladder null beside them, so a rung name alone can match two rows per
     # session. Keep the cohort the rung's coefficients are reported from.
     if "cohort" in g.columns:
-        home = (
-            POST_OUTCOME_COHORT if mod in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
-        )
+        home = POST_OUTCOME_COHORT if mod in POST_OUTCOME_RATE_RUNGS else PRIMARY_COHORT
         g = g[g.cohort == home]
     c = f"coef_{term}"
     if c not in g.columns:
@@ -218,22 +208,22 @@ def sessions(df, mod, pop, term):
             f"spec references a term the fit did not produce (likely a rename). "
             f"Row would render blank."
         )
-    g = g.dropna(subset=[c])
-    # Identifiability filter, matching contrast_aggregation.aggregate_contrast so
-    # the figure shows exactly the sessions the audited table aggregates. A term
-    # the fitter named as separated is dropped; so is a coefficient whose effect
-    # over one SD of its own predictor runs away. Judging the raw coefficient
-    # instead dropped identified sessions whose predictor has a small SD and kept
-    # unidentified ones whose predictor has a large one.
-    sdcol = f"sd_{term}"
-    runaway = (
-        g[c].abs() * g[sdcol] >= SEPARATION_COEF_ABS
-        if sdcol in g.columns
-        else g[c].abs() >= SEPARATION_COEF_ABS
-    )
-    g = g[~runaway & ~separated_for_term(g, term)]
-    f, _ = std_factor(term)
-    return {a: g.loc[g.animal == a, c].to_numpy() * f for a in ANIM if (g.animal == a).any()}
+    # The audited aggregation's own session filter and emission gates, so the
+    # figure shows exactly the sessions -- and only the terms -- the audited
+    # table reports.
+    gate = gate_term_sessions(g, term)
+    if gate.refusal is not None:
+        print(
+            f"  {mod}/{pop}/{term}: not drawn, refused by the audited aggregation "
+            f"({gate.refusal}: {gate.n_kept} kept, {gate.n_dropped} separated or "
+            f"runaway, {gate.n_unidentified} not informed, of {gate.n_fitted})"
+        )
+        return {}
+    g = g[gate.kept]
+    f, _ = std_factor(term, sd)
+    return {
+        a: g.loc[g.animal == a, c].to_numpy() * f for a in ANIM if (g.animal == a).any()
+    }
 
 
 def animal_ci(medians, n_boot=4000):
@@ -244,14 +234,17 @@ def animal_ci(medians, n_boot=4000):
     return np.percentile(boot, [2.5, 97.5])
 
 
-def forest(ax, df, rows, title):
+def forest(ax, df, rows, title, sd):
     y = np.arange(len(rows))[::-1]
     allv = []
     labels = []
     for yi, (label, mod, pop, term) in zip(y, rows, strict=True):
-        _, unit = std_factor(term)
+        _, unit = std_factor(term, sd)
         labels.append(label + {"per_category": " †", "per_unit": " ‡"}.get(unit, ""))
-        s = sessions(df, mod, pop, term)
+        s = sessions(df, mod, pop, term, sd)
+        if not s:
+            labels[-1] += " (not identified)"
+            continue
         amed = []
         for a in ANIM:
             v = s.get(a, np.empty(0))
@@ -259,8 +252,15 @@ def forest(ax, df, rows, title):
                 amed.append(np.nan)
                 continue
             allv.append(v)
-            ax.scatter(v, yi + RNG.uniform(-0.28, 0.28, len(v)), s=6, color=CMAP[a],
-                       alpha=0.20, edgecolors="none", zorder=2)
+            ax.scatter(
+                v,
+                yi + RNG.uniform(-0.28, 0.28, len(v)),
+                s=6,
+                color=CMAP[a],
+                alpha=0.20,
+                edgecolors="none",
+                zorder=2,
+            )
             m = np.median(v)
             amed.append(m)
             ax.plot(m, yi, "o", ms=7, color=CMAP[a], mec="k", mew=0.6, zorder=5)
@@ -295,24 +295,65 @@ rate_rows = [
     ("immediate reward history · nonSWR", "G0_base", NON, "reward_history_rcos_0"),
     ("RPE (beta) · SWR", "G5_rpe", SWR, "rpe_postoutcome"),
     ("RPE (beta) · nonSWR", "G5_rpe", NON, "rpe_postoutcome"),
-    ("rel. value (beta) · SWR", "G4_value", SWR, "relative_value_switch_minus_stay_preoutcome"),
-    ("rel. value (beta) · nonSWR", "G4_value", NON, "relative_value_switch_minus_stay_preoutcome"),
-    ("belief-entropy (beta) · SWR", "G6_uncert", SWR, "reward_belief_differential_entropy_leaf_mean_preoutcome"),
-    ("belief-entropy (beta) · nonSWR", "G6_uncert", NON, "reward_belief_differential_entropy_leaf_mean_preoutcome"),
-    ("value-update (beta) · SWR", "G7_update", SWR, "reward_belief_mean_update_l1_all_ports_postoutcome"),
-    ("value-update (beta) · nonSWR", "G7_update", NON, "reward_belief_mean_update_l1_all_ports_postoutcome"),
-    ("switch-rate · SWR", "G3_switchrate", SWR, "patch_switch_fraction_last5_completed_trips"),
-    ("switch-rate · nonSWR", "G3_switchrate", NON, "patch_switch_fraction_last5_completed_trips"),
+    (
+        "rel. value (beta) · SWR",
+        "G4_value",
+        SWR,
+        "relative_value_switch_minus_stay_preoutcome",
+    ),
+    (
+        "rel. value (beta) · nonSWR",
+        "G4_value",
+        NON,
+        "relative_value_switch_minus_stay_preoutcome",
+    ),
+    (
+        "belief-entropy (beta) · SWR",
+        "G6_uncert",
+        SWR,
+        "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    ),
+    (
+        "belief-entropy (beta) · nonSWR",
+        "G6_uncert",
+        NON,
+        "reward_belief_differential_entropy_leaf_mean_preoutcome",
+    ),
+    (
+        "value-update (beta) · SWR",
+        "G7_update",
+        SWR,
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
+    ),
+    (
+        "value-update (beta) · nonSWR",
+        "G7_update",
+        NON,
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
+    ),
+    (
+        "switch-rate · SWR",
+        "G3_switchrate",
+        SWR,
+        "patch_switch_fraction_last5_completed_trips",
+    ),
+    (
+        "switch-rate · nonSWR",
+        "G3_switchrate",
+        NON,
+        "patch_switch_fraction_last5_completed_trips",
+    ),
 ]
 
 
-def rate_figure(R):
+def rate_figure(R, sd):
     fig, ax = plt.subplots(figsize=(8.5, 6.6))
     forest(
         ax,
         R,
         rate_rows,
         "Rate ladder — is_swr contrast\n(standardized; all sessions + animal 95% CI)",
+        sd,
     )
     ax.legend(
         handles=handles, fontsize=8, loc="lower right", title="animal", framealpha=0.95
@@ -321,22 +362,58 @@ def rate_figure(R):
     return fig
 
 
-rate_figure(pd.read_pickle(SWR_CONTRAST_RATE)).savefig(
-    OUT / "rate_swr_contrast_coefs.png", dpi=150
-)
-
 # ---- CONTENT ----
 mod_rows = [
     ("current-arm (C1)", "C1_current", "all", "is_current_arm"),
-    ("reward_rate_arm (C3)", "C3_armreward", "all", "reward_fraction_candidate_arm_last10_visits"),
-    ("value q_arm (C4)", "C4_armvalue", "all", "reward_belief_mean_candidate_arm_preoutcome"),
+    (
+        "reward_rate_arm (C3)",
+        "C3_armreward",
+        "all",
+        "reward_fraction_candidate_arm_last10_visits",
+    ),
+    (
+        "arm belief value (C4)",
+        "C4_armvalue",
+        "all",
+        "reward_belief_mean_candidate_arm_preoutcome",
+    ),
     ("RPE×current (C6)", "C6_rpe", "all", "rpe_postoutcome_z_x_is_current_arm"),
-    ("rel.value×current (C7)", "C7_value", "all", "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"),
-    ("entropy×current (C8)", "C8_uncert", "all", "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"),
-    ("update×current (C9)", "C9_update", "all", "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"),
-    ("periswitch×current (C10)", "C10_periswitch", "all", "periswitch_index_trials_z_x_is_current_arm"),
-    ("block×current (C11)", "C11_block", "all", "trials_since_block_change_z_x_is_current_arm"),
-    ("switch fraction×current (C12)", "C12_switchrate", "all", "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"),
+    (
+        "rel.value×current (C7)",
+        "C7_value",
+        "all",
+        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    ),
+    (
+        "entropy×current (C8)",
+        "C8_uncert",
+        "all",
+        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+    ),
+    (
+        "update×current (C9)",
+        "C9_update",
+        "all",
+        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+    ),
+    (
+        "periswitch×current (C10)",
+        "C10_periswitch",
+        "all",
+        "periswitch_index_trials_z_x_is_current_arm",
+    ),
+    (
+        "block×current (C11)",
+        "C11_block",
+        "all",
+        "trials_since_block_change_z_x_is_current_arm",
+    ),
+    (
+        "switch fraction×current (C12)",
+        "C12_switchrate",
+        "all",
+        "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
+    ),
 ]
 con_rows = [
     ("swr × current (CS1)", "CS1_current", "all", "swr_x_is_current_arm"),
@@ -362,16 +439,21 @@ con_rows = [
 ]
 
 
-def content_arm_figure(C):
+def content_arm_figure(C, sd):
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.4))
     forest(
         axes[0],
         C,
         mod_rows,
         "Content (arm) — dimension effects (all events, standardized)",
+        sd,
     )
     forest(
-        axes[1], C, con_rows, "Content (arm) — SWR contrasts (swr_x_*, standardized)"
+        axes[1],
+        C,
+        con_rows,
+        "Content (arm) — SWR contrasts (swr_x_*, standardized)",
+        sd,
     )
     axes[1].legend(
         handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95
@@ -380,32 +462,50 @@ def content_arm_figure(C):
     return fig
 
 
-content_arm_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_ARM)).savefig(
-    OUT / "content_swr_contrast_coefs.png", dpi=150
-)
-
 # ---- CONTENT: PATCH ladder ----
 patch_mod_rows = [
     ("current-patch (CP0)", "CP0_base", "all", "is_current_patch"),
     ("last-rew-patch (CP1)", "CP1_lastrew", "all", "is_last_rewarded_noncurrent_patch"),
-    ("current patch×peri-switch (CP3)", "CP3_newgrowth", "all", "periswitch_index_trials_z_x_is_current_patch"),
-    ("current patch×switch fraction (CP4)", "CP4_switchrate", "all", "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"),
+    (
+        "current patch×peri-switch (CP3)",
+        "CP3_newgrowth",
+        "all",
+        "periswitch_index_trials_z_x_is_current_patch",
+    ),
+    (
+        "current patch×switch fraction (CP4)",
+        "CP4_switchrate",
+        "all",
+        "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
+    ),
 ]
 patch_con_rows = [
     ("swr × current-patch (CPS1)", "CPS1_current", "all", "swr_x_is_current_patch"),
-    ("swr × lastrew-patch (CPS2)", "CPS2_lastrew", "all", "swr_x_is_last_rewarded_noncurrent_patch"),
+    (
+        "swr × lastrew-patch (CPS2)",
+        "CPS2_lastrew",
+        "all",
+        "swr_x_is_last_rewarded_noncurrent_patch",
+    ),
 ]
 
 
-def content_patch_figure(P):
+def content_patch_figure(P, sd):
     fig, axes = plt.subplots(1, 2, figsize=(14, 3.6))
     forest(
         axes[0],
         P,
         patch_mod_rows,
         "Content (patch) — dimension effects (all events, standardized)",
+        sd,
     )
-    forest(axes[1], P, patch_con_rows, "Content (patch) — SWR contrasts (standardized)")
+    forest(
+        axes[1],
+        P,
+        patch_con_rows,
+        "Content (patch) — SWR contrasts (standardized)",
+        sd,
+    )
     axes[1].legend(
         handles=handles, fontsize=8, loc="lower left", title="animal", framealpha=0.95
     )
@@ -413,10 +513,31 @@ def content_patch_figure(P):
     return fig
 
 
-content_patch_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH)).savefig(
-    OUT / "content_patch_swr_contrast_coefs.png", dpi=150
-)
+def main() -> None:
+    allow_stale = build_parser().parse_args().allow_stale
+    # The provenance gate fires ahead of the first table read.
+    require_fresh_inputs(
+        SWR_CONTRAST_RATE, SWR_CONTRAST_RATE_INPUTS, allow_stale=allow_stale
+    )
+    for content_fit in (SWR_CONTRAST_CONTENT_ARM, SWR_CONTRAST_CONTENT_PATCH):
+        require_fresh_inputs(
+            content_fit, SWR_CONTRAST_CONTENT_INPUTS, allow_stale=allow_stale
+        )
+    sd = _per_sd_units()
+    OUT.mkdir(parents=True, exist_ok=True)
+    rate_figure(pd.read_pickle(SWR_CONTRAST_RATE), sd).savefig(
+        OUT / "rate_swr_contrast_coefs.png", dpi=150
+    )
+    content_arm_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_ARM), sd).savefig(
+        OUT / "content_swr_contrast_coefs.png", dpi=150
+    )
+    content_patch_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH), sd).savefig(
+        OUT / "content_patch_swr_contrast_coefs.png", dpi=150
+    )
+    print("wrote:")
+    for p in sorted(OUT.glob("*.png")):
+        print("  ", p)
 
-print("wrote:")
-for p in sorted(OUT.glob("*.png")):
-    print("  ", p)
+
+if __name__ == "__main__":
+    main()
