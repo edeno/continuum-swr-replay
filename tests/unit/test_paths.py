@@ -89,13 +89,26 @@ def test_the_upper_case_names_resolve_when_read(monkeypatch, tmp_path):
         assert parameters.PROCESSED_DATA_DIR == root
         for name, accessor in names.items():
             assert getattr(paths, name) == getattr(paths, accessor)(), name
+    from continuum_swr_replay.analysis.events import swr_source
+
+    for root in (DATA_ROOT, tmp_path):
+        monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(root))
+        assert (
+            swr_source.SWR_INVENTORY_ROOT == root / ROOT_LITERALS["swr_inventory_root"]
+        )
+        assert swr_source.ARTIFACT_INTERVALS_DIR == (
+            root / ROOT_LITERALS["artifact_intervals_root"]
+        )
+    with pytest.raises(AttributeError):
+        swr_source.NOT_A_ROOT  # noqa: B018
     with pytest.raises(AttributeError):
         paths.NOT_A_ROOT  # noqa: B018
     with pytest.raises(AttributeError):
         parameters.NOT_A_PARAMETER  # noqa: B018
 
 
-# The modules that may name the upper-case roots: their definitions, and the
+# The modules that may name the upper-case roots (``paths``', ``parameters``' and
+# ``swr_source``'s ``SWR_INVENTORY_ROOT`` / ``ARTIFACT_INTERVALS_DIR``): their definitions, and the
 # unsupported one-off scripts (``scripts/exploratory``), which notebooks resemble.
 _ROOT_NAME = re.compile(
     r"\b(PROCESSED_DATA_DIR|REPLAY_CONTENT_DIR|CONTFRAG_REPLAY_CONTENT_DIR|"
@@ -110,6 +123,7 @@ def test_no_supported_module_binds_a_root_by_its_upper_case_name():
     allowed = {
         ROOT_DIR / "src/continuum_swr_replay/paths.py",
         ROOT_DIR / "src/continuum_swr_replay/parameters.py",
+        ROOT_DIR / "src/continuum_swr_replay/analysis/events/swr_source.py",
     }
     offenders = []
     for folder in ("src", "scripts"):

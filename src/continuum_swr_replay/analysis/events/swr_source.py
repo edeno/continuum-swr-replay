@@ -163,6 +163,22 @@ class SwrSourceError(ValueError):
     SWR source."""
 
 
+_LEGACY_ROOTS = {
+    "SWR_INVENTORY_ROOT": swr_inventory_root,
+    "ARTIFACT_INTERVALS_DIR": artifact_intervals_root,
+}
+"""The roots this module once bound at import, by the ``paths`` function now
+behind each. Kept for notebooks and research scripts: resolved at each read
+(``from ... import`` binds the value at that import). Library code and the
+supported scripts call ``paths``; ``tests/unit/test_paths.py`` keeps them out."""
+
+
+def __getattr__(name: str) -> Path:
+    if name in _LEGACY_ROOTS:
+        return _LEGACY_ROOTS[name]()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def swr_inventory_dir() -> Path:
     """The run folder of :data:`SWR_INVENTORY_RUN_ID` under
     ``paths.swr_inventory_root()``, both read when called."""
