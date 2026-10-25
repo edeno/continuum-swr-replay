@@ -469,6 +469,6 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 - Not all sessions have recordings from all brain areas (check keys in `spike_times` dict)
 - Coincident spike detection removes likely artifacts (>33% of tetrodes firing within 40μs)
 - Position data uses DLC tracking when available, falls back to older tracking methods
-- Some sessions may lack certain interval types (wrapped in try/except in data loading)
+- Some sessions may lack certain interval types or brain areas: the loaders count rows and skip the step when there are none, and an absent area raises `spikes.AreaNotRecordedError`, which `get_spike_data` skips
 - Check for empty spike data before running decoding (`if not data["spike_times"]`)
 - Artifacts: one detector (`analysis/hippocampus/artifacts/`, run `analysis/events/swr_source.py:ARTIFACT_INTERVALS_RUN_ID`) masks sustained ripple-band noise (S blocks), step artifacts and synchronous spike lines; see `docs/design/2026-10-09-artifact-detection.md`. An epoch with an S block is left out whole (epoch register reason `SUSTAINED_NOISE`).
