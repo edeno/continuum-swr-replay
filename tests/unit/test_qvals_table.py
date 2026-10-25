@@ -627,8 +627,7 @@ def test_experienced_value_picks_chosen_arm(reward, exp_rpe):
     out = add_experienced_value_columns(_toy_vals([3], [reward], [q]))
     assert out["arm"].iloc[0] == 2  # native realized arm: leaf 3 -> arm 2
     assert out["q_chosen"].iloc[0] == pytest.approx(0.33)  # Q3, not Q2/Q4
-    assert out["q_port0"].iloc[0] == pytest.approx(0.11)
-    assert out["q_port5"].iloc[0] == pytest.approx(0.66)
+    assert not any(c.startswith("q_port") for c in out.columns)
     assert out["rpe"].iloc[0] == pytest.approx(exp_rpe)
     assert out["rpe_abs"].iloc[0] == pytest.approx(abs(exp_rpe))
 
@@ -650,6 +649,88 @@ def test_behavior_model_adapter_translates_native_realized_arm_and_beliefs():
     assert canonical.loc[0, "reward_belief_mean_port_2"] == pytest.approx(0.33)
     assert "candidate_arm" not in canonical
     assert not {"arm", "q_chosen", "Q3", "q_port2", "betadist_mu3"} & set(canonical)
+
+
+def test_native_qvals_vocabulary_canonicalizes_end_to_end():
+    """Native spellings become the canonical schema; values are untouched."""
+    native = pd.DataFrame(
+        {
+            "stop_id": [1, 2],
+            # numerical-path family: two spellings of one quantity
+            "Q1": [0.5, 0.6],
+            "betadist_mu1": [0.5 + 1e-16, 0.6 - 1e-16],
+            "prev_global_variance": [0.1, 0.2],
+            "global_leaf_var_sum_preoutcome_sess": [0.1, 0.2],
+            # plain renames
+            "betadist_var1": [0.01, 0.02],
+            "Qstem1": [0.4, 0.7],
+            "rpe": [-0.1, 0.3],
+            "arm": [2, 5],
+            "p_reward_current": [0.2, 0.8],
+            "chosen_leaf_mu_update_abs_postoutcome_sess": [np.nan, 0.125],
+            # dead outputs of the withleaf fit
+            "depletion_leaf_1": [1.0, 1.0],
+            "depletion_mean_stem_3": [1.0, 1.0],
+        }
+    )
+
+    out = canonicalize_behavior_model_columns(native)
+
+    assert list(out.columns) == [
+        "stop_id",
+        "reward_belief_mean_port_0",
+        "reward_belief_variance_leaf_sum_preoutcome",
+        "reward_belief_variance_port_0",
+        "decision_value_patch_1",
+        "rpe_postoutcome",
+        "chosen_arm",
+        "task_reward_probability_chosen_arm",
+        "reward_belief_mean_update_chosen_arm_postoutcome_abs",
+    ]
+    for canonical, source in [
+        ("reward_belief_mean_port_0", "Q1"),
+        ("reward_belief_variance_leaf_sum_preoutcome", "prev_global_variance"),
+        ("rpe_postoutcome", "rpe"),
+        ("chosen_arm", "arm"),
+        (
+            "reward_belief_mean_update_chosen_arm_postoutcome_abs",
+            "chosen_leaf_mu_update_abs_postoutcome_sess",
+        ),
+    ]:
+        np.testing.assert_array_equal(
+            out[canonical].to_numpy(), native[source].to_numpy()
+        )
+
+
+def test_qvals_ingestion_leaves_canonical_columns_alone():
+    frame = pd.DataFrame({"stop_id": [1], "rpe_postoutcome_z": [0.3]})
+    pd.testing.assert_frame_equal(canonicalize_behavior_model_columns(frame), frame)
+
+
+@pytest.mark.parametrize(
+    "q1, mu1, match",
+    [
+        ([0.5, 0.6], [0.5, 0.61], "exceed tolerance"),
+        ([0.5, np.nan], [0.5, 0.6], "missingness"),
+        ([np.nan, np.nan], [np.nan, np.nan], "unverifiable"),
+        ([0.5, np.inf], [0.5, np.inf], "infinity"),
+    ],
+)
+def test_qvals_ingestion_rejects_disagreeing_numerical_paths(q1, mu1, match):
+    native = pd.DataFrame({"Q1": q1, "betadist_mu1": mu1})
+    with pytest.raises(ValueError, match=match):
+        canonicalize_behavior_model_columns(native)
+
+
+def test_qvals_ingestion_rejects_an_incomplete_numerical_path_family():
+    with pytest.raises(ValueError, match="incomplete"):
+        canonicalize_behavior_model_columns(pd.DataFrame({"Q1": [0.5]}))
+
+
+def test_qvals_ingestion_rejects_a_name_collision():
+    native = pd.DataFrame({"arm": [2], "chosen_arm": [2]})
+    with pytest.raises(ValueError, match="collides"):
+        canonicalize_behavior_model_columns(native)
 
 
 def test_rpe_is_surprise_relative_to_model_belief():

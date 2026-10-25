@@ -212,7 +212,7 @@ def test_digit_boundary_rule() -> None:
 def test_indexed_qvals_families_are_complete_and_correctly_based() -> None:
     qvals = _qvals_rename_map()
     for i in range(6):
-        assert qvals[f"q_port{i}"] == f"reward_belief_mean_port_{i}"
+        assert qvals[f"Q{i + 1}"] == f"reward_belief_mean_port_{i}"
         assert qvals[f"betadist_mu{i + 1}"] == f"reward_belief_mean_port_{i}"
         assert qvals[f"betadist_var{i + 1}"] == f"reward_belief_variance_port_{i}"
         assert qvals[f"p_reward_port{i}"] == f"task_reward_probability_port_{i}"
@@ -223,7 +223,7 @@ def test_indexed_qvals_families_are_complete_and_correctly_based() -> None:
 def test_alias_vs_canonicalize_use_correct_actions() -> None:
     """Numerical-path pairs are 'canonicalize' (declared tolerance)."""
     by_current = {n: e for e in reg.REGISTRY for n in e.current}
-    assert by_current["q_port0"].action == "canonicalize"
+    assert by_current["Q1"].action == "canonicalize"
     assert by_current["prev_global_variance"].action == "canonicalize"
 
 
@@ -245,179 +245,6 @@ def test_depletion_drop_family_is_complete() -> None:
     for i in range(1, 4):
         assert f"depletion_mean_stem_{i}" in dropped
     assert len(dropped) == 9
-
-
-# ---------------------------------------------------------------------------
-# qvals ingestion
-# ---------------------------------------------------------------------------
-def test_plan_rename_on_a_synthetic_qvals_frame() -> None:
-    plan = reg.plan_rename(["arm", "depletion_leaf_1", "stop_id"], table="qvals")
-    assert plan.rename["arm"] == "chosen_arm"
-    assert "depletion_leaf_1" in plan.drop
-    assert "stop_id" not in plan.drop and "stop_id" not in plan.rename
-
-
-def test_renames_are_scoped_to_the_grain_that_declares_them() -> None:
-    """``arm`` is the realized destination in qvals and nothing anywhere else."""
-    pd = pytest.importorskip("pandas")
-
-    frame = pd.DataFrame({"arm": [2], "trial_reward": [1]})
-    assert list(reg.apply_rename(frame, table="qvals")) == [
-        "chosen_arm",
-        "trial_reward",
-    ]
-    assert list(reg.apply_rename(frame, table="event_arm")) == ["arm", "trial_reward"]
-
-
-def test_plan_rename_detects_a_collision() -> None:
-    """If a canonical name would land on an existing keep column, fail loud."""
-    with pytest.raises(reg.RegistryError):
-        reg.plan_rename(["arm", "chosen_arm"], table="qvals")
-
-
-def test_native_qvals_vocabulary_canonicalizes_end_to_end() -> None:
-    """The vendored model's native spellings become the canonical schema."""
-    pd = pytest.importorskip("pandas")
-    import numpy as np
-
-    native = pd.DataFrame(
-        {
-            "stop_id": [1, 2],
-            # numerical-path family: three spellings of one quantity
-            "Q1": [0.5, 0.6],
-            "q_port0": [0.5, 0.6],
-            "betadist_mu1": [0.5 + 1e-16, 0.6 - 1e-16],
-            # plain renames
-            "betadist_var1": [0.01, 0.02],
-            "Qstem1": [0.4, 0.7],
-            "rpe": [-0.1, 0.3],
-            "arm": [2, 5],
-            # a dead output that the pruning step removes
-            "depletion_leaf_1": [1.0, 1.0],
-        }
-    )
-
-    out = reg.canonicalize_numerical_paths(native, table="qvals")
-    out = reg.apply_rename(out, table="qvals")
-    out = reg.rename_dynamic_columns(out, table="qvals")
-    out = out.drop(columns=list(reg.plan_rename(out.columns, table="qvals").drop))
-    stamped = reg.stamp_covariate_schema(out, table="qvals")
-
-    assert set(stamped.columns) == {
-        "stop_id",
-        "reward_belief_mean_port_0",
-        "reward_belief_variance_port_0",
-        "decision_value_patch_1",
-        "rpe_postoutcome",
-        "chosen_arm",
-    }
-    np.testing.assert_array_equal(
-        stamped["reward_belief_mean_port_0"].to_numpy(), native["Q1"].to_numpy()
-    )
-    np.testing.assert_array_equal(
-        stamped["rpe_postoutcome"].to_numpy(), native["rpe"].to_numpy()
-    )
-    reg.require_covariate_schema(stamped, table="qvals")
-
-
-def test_qvals_renames_preserve_values_exactly() -> None:
-    pd = pytest.importorskip("pandas")
-    import numpy as np
-
-    qvals = pd.DataFrame(
-        {
-            "stop_id": [1, 2],
-            "p_reward_current": [0.2, 0.8],
-            "chosen_leaf_mu_update_abs_postoutcome_sess": [np.nan, 0.125],
-        }
-    )
-    out = reg.apply_rename(qvals, table="qvals")
-    np.testing.assert_array_equal(
-        out["task_reward_probability_chosen_arm"].to_numpy(),
-        qvals["p_reward_current"].to_numpy(),
-    )
-    np.testing.assert_array_equal(
-        out["reward_belief_mean_update_chosen_arm_postoutcome_abs"].to_numpy(),
-        qvals["chosen_leaf_mu_update_abs_postoutcome_sess"].to_numpy(),
-    )
-
-
-def test_apply_rename_leaves_canonicalize_and_prune_columns_alone() -> None:
-    """The mechanical rename must not touch numerical-path or dropped columns."""
-    pd = pytest.importorskip("pandas")
-
-    df = pd.DataFrame(
-        {
-            "q_port0": [0.5, 0.6],  # canonicalize -> left for the other step
-            "betadist_mu1": [0.5, 0.6],
-            "depletion_leaf_1": [1.0, 1.0],  # drop -> left (pruning step)
-        }
-    )
-    out = reg.apply_rename(df, table="qvals")
-    assert set(out.columns) == set(df.columns), "apply_rename touched non-rename cols"
-
-
-def test_canonicalize_numerical_paths_within_tolerance() -> None:
-    pd = pytest.importorskip("pandas")
-    import numpy as np
-
-    df = pd.DataFrame(
-        {
-            "Q1": [0.5, 0.6, np.nan],
-            "q_port0": [0.5, 0.6, np.nan],
-            "betadist_mu1": [0.5 + 1e-16, 0.6 - 1e-16, np.nan],  # fp-identical
-            "stop_id": [1, 2, 3],
-        }
-    )
-    out = reg.canonicalize_numerical_paths(df, table="qvals")
-    assert "reward_belief_mean_port_0" in out.columns
-    assert not {"Q1", "q_port0", "betadist_mu1"} & set(out.columns)
-    assert "stop_id" in out.columns
-
-
-def test_canonicalize_rejects_paths_beyond_tolerance() -> None:
-    pd = pytest.importorskip("pandas")
-
-    df = pd.DataFrame(
-        {
-            "Q1": [0.5, 0.6],
-            "q_port0": [0.5, 0.6],
-            "betadist_mu1": [0.5, 0.61],
-        }
-    )
-    with pytest.raises(reg.RegistryError, match="exceed tolerance"):
-        reg.canonicalize_numerical_paths(df, table="qvals")
-
-
-def test_canonicalize_rejects_all_nan_family_as_unverifiable() -> None:
-    """An all-NaN family cannot be verified equal -> refuse, don't collapse."""
-    pd = pytest.importorskip("pandas")
-    import numpy as np
-
-    df = pd.DataFrame(
-        {
-            "Q1": [np.nan, np.nan],
-            "q_port0": [np.nan, np.nan],
-            "betadist_mu1": [np.nan, np.nan],
-        }
-    )
-    with pytest.raises(reg.RegistryError, match="unverifiable"):
-        reg.canonicalize_numerical_paths(df, table="qvals")
-
-
-def test_canonicalize_rejects_mismatched_missingness() -> None:
-    pd = pytest.importorskip("pandas")
-    import numpy as np
-
-    df = pd.DataFrame(
-        {
-            "Q1": [0.5, np.nan],
-            "q_port0": [0.5, np.nan],
-            "betadist_mu1": [0.5, 0.6],
-        }
-    )
-    with pytest.raises(reg.RegistryError, match="missingness"):
-        reg.canonicalize_numerical_paths(df, table="qvals")
 
 
 # ---------------------------------------------------------------------------

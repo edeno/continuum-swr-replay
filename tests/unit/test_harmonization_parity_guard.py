@@ -4,18 +4,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from continuum_swr_replay.tables.covariate_registry import (
-    finalize_covariate_schema,
-)
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from scripts.exploratory import _verify_harmonization_parity as parity
 
 
 def _stop_frame(stop_indices: list[int], n_events: list[int]) -> pd.DataFrame:
-    """A canonical stop frame.
-
-    ``finalize_covariate_schema`` translates the ``qvals`` grain only, so a
-    stop-grain fixture has to be spelled canonically to reach the stamp.
-    """
+    """A canonical stop frame (the parity gate translates no legacy names)."""
     return pd.DataFrame(
         {
             "animal": "rat",
@@ -36,7 +30,7 @@ def _write_pair(
     baseline_path = tmp_path / "baseline.pkl"
     regenerated_path = tmp_path / "regenerated.pkl"
     baseline.to_pickle(baseline_path)
-    finalize_covariate_schema(regenerated, table="stop").to_pickle(regenerated_path)
+    stamp_covariate_schema(regenerated, table="stop").to_pickle(regenerated_path)
     return baseline_path, regenerated_path
 
 

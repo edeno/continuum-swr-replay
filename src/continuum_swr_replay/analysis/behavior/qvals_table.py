@@ -30,10 +30,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (
-    apply_rename,
-    canonicalize_numerical_paths,
-    plan_rename,
-    rename_dynamic_columns,
+    REGISTRY,
     require_covariate_schema,
     stamp_covariate_schema,
 )
@@ -282,8 +279,7 @@ def add_experienced_value_columns(vals: pd.DataFrame) -> pd.DataFrame:
 
     Before the canonical ingestion boundary, adds native ``q_chosen`` (belief
     mean of the chosen arm = ``Q{leaf}``), ``arm`` (``leaf - 1``, 0-indexed),
-    ``q_port{0..5}`` (per-port copies of ``Q{i+1}``), ``rpe``
-    (``reward - q_chosen``), and ``rpe_abs``. These become the explicit
+    ``rpe`` (``reward - q_chosen``), and ``rpe_abs``. These become the explicit
     ``reward_belief_*`` / ``rpe_postoutcome*`` columns in
     :func:`canonicalize_behavior_model_columns`.
 
@@ -297,8 +293,6 @@ def add_experienced_value_columns(vals: pd.DataFrame) -> pd.DataFrame:
     arm = vals["leaf"].to_numpy() - 1
     vals["q_chosen"] = qmat[np.arange(len(vals)), arm]
     vals["arm"] = arm
-    for i in range(6):
-        vals[f"q_port{i}"] = qmat[:, i]  # native copy checked at ingestion
     vals["rpe"] = vals["reward"].to_numpy() - vals["q_chosen"].to_numpy()
     vals["rpe_abs"] = vals["rpe"].abs()
     return vals
@@ -352,19 +346,102 @@ def add_beta_belief_entropy(vals: pd.DataFrame) -> pd.DataFrame:
     return vals
 
 
+# The qvals rows of the covariate registry, as the plain lists the ingestion
+# function applies. A numerical-path family is one quantity computed twice by
+# the behavioral model: its first column survives and the others are checked
+# against it, then dropped.
+_QVALS_ENTRIES = tuple(e for e in REGISTRY if e.table == "qvals")
+_NUMERICAL_PATH_FAMILIES = tuple(
+    e.current for e in _QVALS_ENTRIES if e.action == "canonicalize"
+)
+_DEAD_MODEL_COLUMNS = tuple(
+    c for e in _QVALS_ENTRIES if e.action == "drop" for c in e.current
+)
+_NATIVE_TO_CANONICAL = {
+    e.current[0]: e.canonical for e in _QVALS_ENTRIES if e.canonical is not None
+}
+# Two numerical paths to one quantity agree to floating point, not bit for bit.
+_NUMERICAL_PATH_ATOL = 1e-15
+_NUMERICAL_PATH_RTOL = 1e-12
+
+
+def _check_numerical_paths_agree(vals: pd.DataFrame, survivor: str, twin: str) -> None:
+    """Raise unless two model columns hold the same quantity to floating point.
+
+    They must share their missing rows, hold no infinity, have at least one
+    finite row to compare (an all-missing pair is unverifiable, not equal), and
+    agree within ``atol=1e-15, rtol=1e-12`` on the finite rows.
+    """
+    a = vals[survivor].to_numpy(dtype=float)
+    b = vals[twin].to_numpy(dtype=float)
+    if not np.array_equal(np.isnan(a), np.isnan(b)):
+        raise ValueError(
+            f"numerical-path twins differ in missingness: {survivor!r} vs {twin!r}"
+        )
+    if np.isinf(a).any() or np.isinf(b).any():
+        raise ValueError(
+            f"numerical-path twins contain infinity: {survivor!r} vs {twin!r}"
+        )
+    finite = np.isfinite(a)
+    if len(vals) and not finite.any():
+        raise ValueError(
+            f"numerical-path agreement unverifiable: {survivor!r} vs {twin!r} "
+            "are all-NaN in this frame"
+        )
+    if not np.allclose(
+        a[finite],
+        b[finite],
+        atol=_NUMERICAL_PATH_ATOL,
+        rtol=_NUMERICAL_PATH_RTOL,
+    ):
+        worst = float(np.max(np.abs(a[finite] - b[finite])))
+        raise ValueError(
+            f"numerical-path twins exceed tolerance: {survivor!r} vs {twin!r} "
+            f"(max abs diff {worst:.2e})"
+        )
+
+
 def canonicalize_behavior_model_columns(vals: pd.DataFrame) -> pd.DataFrame:
     """Translate native Alison-model outputs into the canonical qvals schema.
 
     The vendored computation deliberately retains its upstream column names.
-    This is the single ownership boundary where those native names become
-    repository-owned names. Numerical-path duplicates are verified before
-    collapsing; dead outputs are removed only after the value checks pass.
+    This is the single ingestion boundary where those native names become
+    repository-owned names, using the ``qvals`` rows of the covariate registry.
+
+    The model exposes each port's belief mean twice: as its fitted value
+    ``Q{i+1}`` and as the Beta posterior mean ``betadist_mu{i+1}`` (computed
+    from ``betadist_α``/``betadist_β`` by the vendored pipeline). It likewise
+    exposes the leaf-summed belief variance twice (``prev_global_variance`` and
+    ``global_leaf_var_sum_preoutcome_sess``). Each such pair is checked to agree
+    to floating point (see :func:`_check_numerical_paths_agree`) and only its
+    first column is kept, so a divergence between the value fit and the Beta
+    posterior is caught here. The constant depletion outputs of the withleaf fit
+    are dropped, and every surviving native column is renamed to its canonical
+    name (``Q{i+1}`` -> ``reward_belief_mean_port_{i}``, ``Qstem*`` ->
+    ``decision_value_patch_*``, ``rpe`` -> ``rpe_postoutcome`` ...).
+
+    Raises ``ValueError`` if a family is only partly present, a pair disagrees,
+    or two columns would get one name.
     """
-    out = canonicalize_numerical_paths(vals, table="qvals", atol=1e-15, rtol=1e-12)
-    out = apply_rename(out, table="qvals")
-    prune = plan_rename(out.columns, table="qvals")
-    if prune.drop:
-        out = out.drop(columns=list(prune.drop))
+    present = set(vals.columns)
+    drop = [c for c in _DEAD_MODEL_COLUMNS if c in present]
+    for family in _NUMERICAL_PATH_FAMILIES:
+        here = [c for c in family if c in present]
+        if not here:
+            continue
+        if len(here) != len(family):
+            raise ValueError(
+                f"numerical-path family {family} is incomplete; missing "
+                f"{sorted(set(family) - present)}"
+            )
+        survivor, *twins = family
+        for twin in twins:
+            _check_numerical_paths_agree(vals, survivor, twin)
+        drop.extend(twins)
+    out = vals.drop(columns=drop).rename(columns=_NATIVE_TO_CANONICAL)
+    if out.columns.duplicated().any():
+        dupes = sorted(set(out.columns[out.columns.duplicated()]))
+        raise ValueError(f"qvals ingestion collides columns onto: {dupes}")
     return out
 
 
@@ -673,7 +750,7 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     vals = _fetch_model_df(rl, subject, MODEL_KEY)
     _validate_trial_keys(vals, source="model", require_consecutive=False)
     vals = make_full_beta_bernoulli_dv_df(vals)
-    vals = add_experienced_value_columns(vals)  # q_chosen / arm / q_port / rpe
+    vals = add_experienced_value_columns(vals)  # q_chosen / arm / rpe
     vals = add_beta_belief_entropy(vals)  # beta_reward_entropy (from betadist_α/β)
     vals = canonicalize_behavior_model_columns(vals)
     model_cols = _model_covariate_columns(vals)
@@ -912,33 +989,6 @@ def _validate_qvals_output(tab: pd.DataFrame) -> None:
         raise ValueError("rpe_postoutcome_abs != abs(rpe_postoutcome)")
 
 
-def _to_canonical_qvals(tab: pd.DataFrame) -> pd.DataFrame:
-    """Translate the behavioral model's native columns into the canonical
-    reward-belief schema and stamp the frame.
-
-    The behavioral model exposes each port's belief mean through ``Q{i+1}``
-    (copied to ``q_port{i}`` by this adapter) and independently through the Beta
-    posterior mean ``betadist_mu{i+1}``; it also exposes the leaf-summed belief
-    variance by two paths. :func:`canonicalize_numerical_paths` checks that each
-    family agrees to floating point (atol=1e-15, rtol=1e-12) before collapsing
-    it to one canonical column, so a silent divergence between the
-    value fit and the Beta posterior is caught here rather than propagating
-    downstream. The remaining vendored names (``Qstem*``, ``betadist_var*``,
-    ``rpe`` ...) are one-to-one renames; the constant depletion outputs of the
-    withleaf fit are dropped. This is the single ingestion boundary where the
-    external model's vocabulary becomes the repository's canonical schema.
-    """
-    attrs = dict(tab.attrs)
-    tab = canonicalize_numerical_paths(tab, table="qvals", atol=1e-15, rtol=1e-12)
-    tab = apply_rename(tab, table="qvals")
-    tab = rename_dynamic_columns(tab, table="qvals")
-    plan = plan_rename(tab.columns, table="qvals")
-    if plan.drop:
-        tab = tab.drop(columns=list(plan.drop))
-    tab.attrs.update(attrs)
-    return stamp_covariate_schema(tab, table="qvals")
-
-
 def write_qvals_outputs(
     tab: pd.DataFrame, reference: Reference, replay_content_dir: Path
 ) -> Path:
@@ -1016,7 +1066,7 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
                 f"{t.attrs['timing_trials_without_model_by_session']}"
             )
         # beta_reward_entropy is computed in-process from betadist_α/β (same MODEL_KEY
-        # pull as q_port), so coverage should be ~100% — anything materially below flags
+        # pull as Q1..Q6), so coverage should be ~100% — anything materially below flags
         # a partial-fit/join regression (the old 0.5 HMM-merge floor is too loose now).
         if (
             len(t) / len(st) < 0.90
@@ -1049,7 +1099,7 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
     # Computed over the full concatenated table; reference persisted for reproducibility.
     tab, qv_reference = attach_standardized(tab, QVALS_STANDARDIZED_COLS)
     assert_standardized_present(tab, QVALS_STANDARDIZED_COLS)
-    tab = _to_canonical_qvals(tab)
+    tab = stamp_covariate_schema(tab, table="qvals")
     z_cols = [f"{c}_z" for c in QVALS_STANDARDIZED_COLS if c in tab.columns]
 
     if args.write:

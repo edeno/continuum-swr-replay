@@ -41,20 +41,22 @@ they must be regenerated before analyses or figures are rerun.
   fitting or plotting when that stamp, the naming vocabulary, or registered
   row identity is absent or mismatched. Table-specific scientific validators
   separately own candidate support, dtypes, ranges, and estimand eligibility.
-- `plan_rename`, `apply_rename`, and numerical-path canonicalization require
-  an explicit `table=` argument. The qvals realized destination is
-  `chosen_arm`; only an `event_arm` choice-set row becomes `candidate_arm`.
-  Only the qvals grain still has executable ledger rows; the rest of the
-  ledger is the appendix at the end of this document.
+- The qvals realized destination is `chosen_arm`; only an `event_arm`
+  choice-set row becomes `candidate_arm`. Only the qvals grain still has
+  executable ledger rows; the rest of the ledger is the appendix at the end of
+  this document.
 - External behavioral-model code retains its native vocabulary. One qvals
-  ingestion adapter validates numerical duplicates and translates them into
-  repository-owned names.
+  ingestion function (`canonicalize_behavior_model_columns` in
+  `analysis/behavior/qvals_table.py`) checks the numerical duplicates
+  (`Q{i+1}` vs `betadist_mu{i+1}`, and the global-variance pair) and renames
+  the native columns to repository-owned names. Since 2026-10-25 the adapter no
+  longer writes `q_port{i}` copies of `Q{i+1}`.
 - The parity gate at
-  `scripts/exploratory/_verify_harmonization_parity.py` normalizes only the
-  frozen legacy side, then requires exact row/session keys, column order,
+  `scripts/exploratory/_verify_harmonization_parity.py` stamps the frozen
+  legacy side, then requires exact row/session keys, column order,
   dtypes, missing masks, and values. Missing pairs and zero executed
-  comparisons fail. That normalization now translates the qvals grain only;
-  a baseline at any other grain must already carry canonical names.
+  comparisons fail. It no longer translates any grain, so a baseline must
+  already carry canonical names.
 - Offline real-session smoke evidence on 2026-08-22 used the cached
   `chimi20200213_02_r1_HPC` decoder/trial inputs. Relative to the frozen
   immediate pre-rename artifacts, regenerated output preserved exactly 1,714

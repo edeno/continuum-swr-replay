@@ -17,22 +17,17 @@ read by people, not by code. Two roles keep *this* module live and permanent:
   vocabulary (``Q``/``betadist_mu``/``Qstem`` ...) into the canonical
   reward-belief schema. That translation still runs on every build, so the
   ``qvals`` rows of the ledger -- and only those -- stay here as executable
-  :class:`Entry` records feeding :func:`canonicalize_numerical_paths` /
-  :func:`apply_rename` / :func:`rename_dynamic_columns` / :func:`plan_rename`,
-  the one ingestion boundary.
+  :class:`Entry` records, read by that adapter's one ingestion function
+  (``canonicalize_behavior_model_columns``).
 
 Nothing in this module reads or writes a persisted table; it is a pure naming
-contract. :func:`finalize_covariate_schema` (the full transform) is retained
-only for the migration-parity checking tools and is not part of the production
-pipeline; with the non-``qvals`` rows now in the design doc it renames nothing
-outside ``qvals`` and reduces to the stamp there.
+contract.
 """
 
 from __future__ import annotations
 
 import keyword
 import re
-from collections.abc import Iterable
 from dataclasses import dataclass
 
 from continuum_swr_replay.data_loaders.constants import N_PORTS
@@ -184,7 +179,7 @@ REGISTRY: tuple[Entry, ...] = (
     ),
     *[
         Entry(
-            (f"Q{i + 1}", f"q_port{i}", f"betadist_mu{i + 1}"),
+            (f"Q{i + 1}", f"betadist_mu{i + 1}"),
             "canonicalize",
             "qvals",
             canonical=f"reward_belief_mean_port_{i}",
@@ -527,201 +522,6 @@ def validate() -> None:
         )
 
 
-@dataclass(frozen=True)
-class RenamePlan:
-    """A concrete plan to migrate one frame's columns.
-
-    ``rename`` maps a surviving legacy column to its canonical name.
-    ``drop`` lists columns removed from this frame: redundant canonicalize
-    twins (the survivor is renamed instead) and dead columns.
-    """
-
-    rename: dict[str, str]
-    drop: tuple[str, ...]
-
-
-def plan_rename(columns: Iterable[str], *, table: str) -> RenamePlan:
-    """Compute the migration plan for a frame with these columns.
-
-    Pure and pandas-free: it decides names, not values. For a canonicalize
-    group it keeps the first present member and drops the rest.
-    Raises :class:`RegistryError` if applying the plan would collide two
-    columns onto one name.
-    """
-    present = list(columns)
-    pset = set(present)
-    rename: dict[str, str] = {}
-    drop: list[str] = []
-    for e in _entries_for(table):
-        here = [c for c in e.current if c in pset]
-        if not here:
-            continue
-        if e.action in _RENAMING:
-            assert e.canonical is not None
-            rename[here[0]] = e.canonical
-            drop.extend(here[1:])  # collapse redundant canonicalize twins
-        else:  # drop
-            drop.extend(here)
-
-    dropset = set(drop)
-    outputs = [rename.get(c, c) for c in present if c not in dropset]
-    if len(outputs) != len(set(outputs)):
-        dupes = sorted({o for o in outputs if outputs.count(o) > 1})
-        raise RegistryError(f"rename plan collides columns onto: {dupes}")
-    return RenamePlan(rename, tuple(drop))
-
-
-# ---------------------------------------------------------------------------
-# Frame transforms (in-memory; no disk I/O)
-# ---------------------------------------------------------------------------
-# These apply the ledger to a pandas frame. They are separated by migration
-# step so each carries the correct comparison policy: the mechanical rename is
-# bit-for-bit invariant, the numerical-path canonicalization uses a declared
-# tolerance, and schema pruning is a distinct step.
-
-
-def apply_rename(df, *, table: str):  # type: ignore[no-untyped-def]
-    """Apply the mechanical rename to a frame: 1:1 renames only.
-
-    Numerically invariant: every output column holds exactly the input values.
-    Does NOT touch numerical-path ``canonicalize`` families or ``drop``
-    columns -- those are separate steps (:func:`canonicalize_numerical_paths`,
-    :func:`plan_rename`'s ``drop``). Raises :class:`RegistryError` on a
-    resulting name collision.
-    """
-    validate()
-    present = set(df.columns)
-    rename: dict[str, str] = {}
-    for e in _entries_for(table):
-        here = [c for c in e.current if c in present]
-        if here and e.action == "rename":
-            rename[here[0]] = e.canonical  # type: ignore[assignment]
-    out = df.rename(columns=rename)
-    if out.columns.duplicated().any():
-        dupes = sorted(out.columns[out.columns.duplicated()])
-        raise RegistryError(f"rename collides output columns onto: {dupes}")
-    return out
-
-
-def canonicalize_numerical_paths(  # type: ignore[no-untyped-def]
-    df, *, table: str, atol=1e-15, rtol=1e-12
-):
-    """Collapse ``canonicalize`` duplicate families under a declared tolerance.
-
-    A distinct migration step from :func:`apply_rename`: these families are the
-    same quantity by two numerical paths, agreeing to floating point but not
-    bit-for-bit. Each group is checked -- identical NaN masks, and finite values
-    within ``(atol, rtol)`` -- before the twins are dropped and the survivor is
-    renamed to the canonical family name. The tolerance must be declared before
-    the migration result is inspected. Raises :class:`RegistryError` on a
-    mismatch beyond tolerance or a differing missingness pattern.
-    """
-    import numpy as np
-
-    validate()
-    present = set(df.columns)
-    rename: dict[str, str] = {}
-    drop: list[str] = []
-    for e in _entries_for(table):
-        if e.action != "canonicalize":
-            continue
-        here = [c for c in e.current if c in present]
-        if not here:
-            continue
-        if len(here) != len(e.current):
-            missing = sorted(set(e.current) - set(here))
-            raise RegistryError(
-                f"canonicalize family for {e.canonical!r} is incomplete in "
-                f"{table!r}; missing {missing}"
-            )
-        survivor = here[0]
-        a = df[survivor].to_numpy(dtype=float)
-        for twin in here[1:]:
-            b = df[twin].to_numpy(dtype=float)
-            if not np.array_equal(np.isnan(a), np.isnan(b)):
-                raise RegistryError(
-                    f"canonicalize twins differ in missingness: {survivor!r} "
-                    f"vs {twin!r} (canonical {e.canonical!r})"
-                )
-            finite = np.isfinite(a) & np.isfinite(b)
-            if not np.array_equal(np.isfinite(a), np.isfinite(b)):
-                raise RegistryError(
-                    f"canonicalize twins differ in finiteness: {survivor!r} "
-                    f"vs {twin!r} (canonical {e.canonical!r})"
-                )
-            if np.isinf(a).any() or np.isinf(b).any():
-                raise RegistryError(
-                    f"canonicalize family {e.canonical!r} contains infinity"
-                )
-            if len(df) and not finite.any():
-                # No finite values to compare -> agreement is unverifiable, not
-                # confirmed. Refuse rather than collapse two quantities vacuously.
-                raise RegistryError(
-                    f"canonicalize agreement unverifiable: {survivor!r} vs "
-                    f"{twin!r} are all-NaN in this frame (canonical {e.canonical!r})"
-                )
-            if not np.allclose(a[finite], b[finite], atol=atol, rtol=rtol):
-                worst = (
-                    float(np.max(np.abs(a[finite] - b[finite])))
-                    if finite.any()
-                    else 0.0
-                )
-                raise RegistryError(
-                    f"canonicalize twins exceed tolerance: {survivor!r} vs "
-                    f"{twin!r} (max abs diff {worst:.2e}, canonical {e.canonical!r})"
-                )
-        rename[survivor] = e.canonical  # type: ignore[assignment]
-        drop.extend(here[1:])
-    out = df.drop(columns=drop).rename(columns=rename)
-    if out.columns.duplicated().any():
-        dupes = sorted(out.columns[out.columns.duplicated()])
-        raise RegistryError(f"canonicalize collides output columns onto: {dupes}")
-    return out
-
-
-def canonical_output_name(name: str, *, table: str) -> str:
-    """Return the canonical spelling for a raw or derived result column.
-
-    Besides direct registry entries, fitted artifacts deterministically prefix
-    predictors with ``coef_`` / ``bse_`` and standardized tables suffix them
-    with ``_z``. Keeping this rule here prevents a second hand-maintained rename
-    map for model outputs.
-    """
-    direct: dict[str, str] = {}
-    for entry in _entries_for(table):
-        if entry.canonical is None:
-            continue
-        direct.update(dict.fromkeys(entry.current, entry.canonical))
-    if name in direct:
-        return direct[name]
-    for prefix in ("coef_", "bse_"):
-        if name.startswith(prefix):
-            base = name[len(prefix) :]
-            canonical = canonical_output_name(base, table=table)
-            return f"{prefix}{canonical}" if canonical != base else name
-    if name.endswith("_z"):
-        base = name[:-2]
-        canonical = canonical_output_name(base, table=table)
-        return f"{canonical}_z" if canonical != base else name
-    return name
-
-
-def rename_dynamic_columns(df, *, table: str):  # type: ignore[no-untyped-def]
-    """Rename deterministic standardized/coefficient derivatives."""
-    rename = {
-        column: canonical_output_name(column, table=table)
-        for column in df.columns
-        if canonical_output_name(column, table=table) != column
-    }
-    outputs = [rename.get(column, column) for column in df.columns]
-    if len(outputs) != len(set(outputs)):
-        duplicates = sorted({column for column in outputs if outputs.count(column) > 1})
-        raise RegistryError(
-            f"dynamic canonicalization collides columns in {table!r}: {duplicates}"
-        )
-    return df.rename(columns=rename)
-
-
 def _undecorate(name: str) -> frozenset[str]:
     """Every stem a deterministic result decoration could have been built from.
 
@@ -830,16 +630,3 @@ def require_covariate_schema(df, *, table: str) -> None:  # type: ignore[no-unty
     assert_versions_compatible(covariate_schema_version=version)
     assert_canonical_vocabulary(df, table=table)
     assert_unique_scientific_rows(df, table=table)
-
-
-def finalize_covariate_schema(df, *, table: str):  # type: ignore[no-untyped-def]
-    """Apply the full migration contract to one producer-owned dataframe."""
-    attrs = dict(df.attrs)
-    out = canonicalize_numerical_paths(df, table=table, atol=1e-15, rtol=1e-12)
-    out = apply_rename(out, table=table)
-    out = rename_dynamic_columns(out, table=table)
-    plan = plan_rename(out.columns, table=table)
-    if plan.drop:
-        out = out.drop(columns=list(plan.drop))
-    out.attrs.update(attrs)
-    return stamp_covariate_schema(out, table=table)

@@ -330,7 +330,7 @@ Model-light estimands for reward-belief uncertainty and replay content.
 
 Covariate naming contract -- the runtime half of the 2026-08-21 rename.
 
-`row_keys`, `Entry`, `canonical_names`, `RegistryError`, `validate`, `RenamePlan`, `plan_rename`, `apply_rename`, `canonicalize_numerical_paths`, `canonical_output_name`, `rename_dynamic_columns`, `assert_canonical_vocabulary`, `assert_unique_scientific_rows`, `stamp_covariate_schema`, `require_covariate_schema`, `finalize_covariate_schema`
+`row_keys`, `Entry`, `canonical_names`, `RegistryError`, `validate`, `assert_canonical_vocabulary`, `assert_unique_scientific_rows`, `stamp_covariate_schema`, `require_covariate_schema`
 
 ### `src/continuum_swr_replay/tables/standardization.py`
 

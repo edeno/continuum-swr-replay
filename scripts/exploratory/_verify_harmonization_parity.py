@@ -2,19 +2,21 @@
 """Fail-closed parity gate for the atomic covariate-name migration.
 
 The baseline must be the immediate post-harmonization, pre-rename artifact set,
-not an older scientific-definition backup.  Each baseline frame is normalized
-exactly once through the table-scoped registry; the regenerated frame must
+not an older scientific-definition backup.  Each baseline frame is stamped
+once at its registered grain; the regenerated frame must
 already carry the current covariate contract stamp. The checker then requires identical row
 and session keys, columns, dtypes, missingness, and values.
 
-No scientific change is allowlisted here.  Alias collapse and qvals numerical-
-path consolidation are themselves validated by ``finalize_covariate_schema``.
-Any remaining difference is a rename-migration failure.
+No scientific change is allowlisted here. Any difference is a rename-migration
+failure.
 
-``finalize_covariate_schema`` translates the ``qvals`` grain only -- the rest of
-the rename ledger is the appendix of
-``docs/design/2026-08-21-covariate-naming-scheme.md``, not executable code -- so
-a baseline at any other grain must already carry canonical names.
+The baseline is only stamped (``stamp_covariate_schema``), not translated, so it
+must already carry canonical names at every grain. The legacy translation is
+gone: the rename ledger is the appendix of
+``docs/design/2026-08-21-covariate-naming-scheme.md``, and the one surviving
+translation, the behavioral model's native ``qvals`` vocabulary, runs inside the
+qvals builder (``canonicalize_behavior_model_columns``). A native-vocabulary
+``qvals`` baseline therefore fails here.
 """
 
 from __future__ import annotations
@@ -32,9 +34,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (
-    finalize_covariate_schema,
     require_covariate_schema,
     row_keys,
+    stamp_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table, table_exists
 
@@ -145,7 +147,7 @@ def verify_table(
 ) -> bool:
     """Compare one baseline/regenerated pair on exact canonical row keys."""
     table = table or _infer_table(label)
-    baseline = finalize_covariate_schema(read_table(baseline_path), table=table)
+    baseline = stamp_covariate_schema(read_table(baseline_path), table=table)
     regenerated = read_table(regenerated_path)
     try:
         require_covariate_schema(regenerated, table=table)
