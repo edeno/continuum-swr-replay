@@ -54,116 +54,82 @@ Examples
 ...     data, results, env, "chimi20200212_.nwb", "02_r1",
 ...     non_local_threshold=0.80,
 ... )
-
-Note: public names are exposed through PEP 562 ``__getattr__`` so that
-importing a leaf submodule
-(e.g. ``continuum_swr_replay.analysis.hippocampus.event_analysis``) does
-not eagerly drag in ``data_aggregation``, which itself imports
-``continuum_swr_replay.data_loaders.get_labels`` and would open a
-DataJoint connection at import time.
 """
 
-from __future__ import annotations
+from .data_aggregation import (
+    compute_swr_nl_event_counts,
+    compute_swr_overlap_class_counts,
+    get_data_over_time,
+    get_event_types,
+    load_data_over_time,
+)
+from .event_analysis import (
+    get_event_durations_ms,
+    get_event_start_end_times,
+    get_immobile_events,
+)
+from .hpc_raw_stats import (
+    DISCRETE_STATE_ORDER,
+    RAW_STAT_COLUMNS,
+    TRANSITION_MATRIX_COLUMNS,
+    apply_raw_stats_flags,
+    check_transition_matrix_flags,
+    compute_hpc_raw_stats_single,
+    extract_discrete_transition_matrix,
+)
+from .posterior_analysis import (
+    get_conditional_non_local_posterior,
+    get_map_speed,
+    get_posterior_stats,
+)
+from .quality_metrics import (
+    compute_behavior_state_breakdown,
+    compute_bout_nonlocal_dominance,
+    compute_calibration_curve,
+    compute_error_by_track_segment,
+    compute_local_decoding_error,
+    compute_local_state_collapse_details,
+    compute_no_spike_firing_correspondence,
+    compute_non_local_during_movement,
+    compute_non_local_event_context,
+    compute_running_error_tail,
+    compute_session_quality_summary,
+    compute_state_fraction_during_movement,
+)
+from .result_loading import load_results
+from .triggered_analysis import get_signal_windows
 
-import importlib
-from typing import TYPE_CHECKING
-
-_LAZY_EXPORTS = {
-    # data_aggregation — pulls in data_loaders.get_labels (Spyglass).
-    "compute_swr_nl_event_counts": "data_aggregation",
-    "compute_swr_overlap_class_counts": "data_aggregation",
-    "get_data_over_time": "data_aggregation",
-    "get_event_types": "data_aggregation",
-    "load_data_over_time": "data_aggregation",
-    # event_analysis — pure pandas/numpy.
-    "get_event_durations_ms": "event_analysis",
-    "get_event_start_end_times": "event_analysis",
-    "get_immobile_events": "event_analysis",
-    # hpc_raw_stats.
-    "DISCRETE_STATE_ORDER": "hpc_raw_stats",
-    "RAW_STAT_COLUMNS": "hpc_raw_stats",
-    "TRANSITION_MATRIX_COLUMNS": "hpc_raw_stats",
-    "apply_raw_stats_flags": "hpc_raw_stats",
-    "check_transition_matrix_flags": "hpc_raw_stats",
-    "compute_hpc_raw_stats_single": "hpc_raw_stats",
-    "extract_discrete_transition_matrix": "hpc_raw_stats",
-    # posterior_analysis.
-    "get_conditional_non_local_posterior": "posterior_analysis",
-    "get_map_speed": "posterior_analysis",
-    "get_posterior_stats": "posterior_analysis",
-    # quality_metrics.
-    "compute_behavior_state_breakdown": "quality_metrics",
-    "compute_bout_nonlocal_dominance": "quality_metrics",
-    "compute_calibration_curve": "quality_metrics",
-    "compute_error_by_track_segment": "quality_metrics",
-    "compute_local_decoding_error": "quality_metrics",
-    "compute_local_state_collapse_details": "quality_metrics",
-    "compute_no_spike_firing_correspondence": "quality_metrics",
-    "compute_non_local_during_movement": "quality_metrics",
-    "compute_non_local_event_context": "quality_metrics",
-    "compute_running_error_tail": "quality_metrics",
-    "compute_session_quality_summary": "quality_metrics",
-    "compute_state_fraction_during_movement": "quality_metrics",
-    # result_loading.
-    "load_results": "result_loading",
-    # triggered_analysis.
-    "get_signal_windows": "triggered_analysis",
-}
-
-
-def __getattr__(name: str):
-    target = _LAZY_EXPORTS.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    module = importlib.import_module(f"{__name__}.{target}")
-    attr = getattr(module, name)
-    globals()[name] = attr
-    return attr
-
-
-__all__ = sorted(_LAZY_EXPORTS.keys())
-
-
-if TYPE_CHECKING:  # pragma: no cover - types only
-    from .data_aggregation import (  # noqa: F401
-        compute_swr_nl_event_counts,
-        compute_swr_overlap_class_counts,
-        get_data_over_time,
-        get_event_types,
-        load_data_over_time,
-    )
-    from .event_analysis import (  # noqa: F401
-        get_event_durations_ms,
-        get_event_start_end_times,
-        get_immobile_events,
-    )
-    from .hpc_raw_stats import (  # noqa: F401
-        DISCRETE_STATE_ORDER,
-        RAW_STAT_COLUMNS,
-        TRANSITION_MATRIX_COLUMNS,
-        apply_raw_stats_flags,
-        check_transition_matrix_flags,
-        compute_hpc_raw_stats_single,
-        extract_discrete_transition_matrix,
-    )
-    from .posterior_analysis import (  # noqa: F401
-        get_conditional_non_local_posterior,
-        get_map_speed,
-        get_posterior_stats,
-    )
-    from .quality_metrics import (  # noqa: F401
-        compute_behavior_state_breakdown,
-        compute_bout_nonlocal_dominance,
-        compute_calibration_curve,
-        compute_error_by_track_segment,
-        compute_local_decoding_error,
-        compute_local_state_collapse_details,
-        compute_no_spike_firing_correspondence,
-        compute_non_local_during_movement,
-        compute_non_local_event_context,
-        compute_running_error_tail,
-        compute_session_quality_summary,
-        compute_state_fraction_during_movement,
-    )
-    from .result_loading import load_results  # noqa: F401
-    from .triggered_analysis import get_signal_windows  # noqa: F401
+__all__ = [
+    "DISCRETE_STATE_ORDER",
+    "RAW_STAT_COLUMNS",
+    "TRANSITION_MATRIX_COLUMNS",
+    "apply_raw_stats_flags",
+    "check_transition_matrix_flags",
+    "compute_behavior_state_breakdown",
+    "compute_bout_nonlocal_dominance",
+    "compute_calibration_curve",
+    "compute_error_by_track_segment",
+    "compute_hpc_raw_stats_single",
+    "compute_local_decoding_error",
+    "compute_local_state_collapse_details",
+    "compute_no_spike_firing_correspondence",
+    "compute_non_local_during_movement",
+    "compute_non_local_event_context",
+    "compute_running_error_tail",
+    "compute_session_quality_summary",
+    "compute_state_fraction_during_movement",
+    "compute_swr_nl_event_counts",
+    "compute_swr_overlap_class_counts",
+    "extract_discrete_transition_matrix",
+    "get_conditional_non_local_posterior",
+    "get_data_over_time",
+    "get_event_durations_ms",
+    "get_event_start_end_times",
+    "get_event_types",
+    "get_immobile_events",
+    "get_map_speed",
+    "get_posterior_stats",
+    "get_signal_windows",
+    "load_data_over_time",
+    "load_results",
+]

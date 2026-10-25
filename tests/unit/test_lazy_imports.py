@@ -104,10 +104,10 @@ _LAZY_IMPORTS: list[str] = [
     "from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier",
     # The one decode-file naming rule, read by the same offline readers.
     "from continuum_swr_replay.decoding.files import decode_paths",
-    # ``analysis/*`` leaf modules. The hippocampus leaves used to drag
-    # ``data_aggregation`` (which imports ``get_labels`` → spyglass);
-    # the PFC leaves used to be poisoned by the eager re-export from
-    # ``analysis/pfc/__init__.py``.
+    # ``analysis/*`` leaf modules. A hippocampus leaf loads the package
+    # ``__init__``, which imports every exported submodule eagerly (none
+    # loads spyglass); the PFC leaves used to be poisoned by the eager
+    # re-export from ``analysis/pfc/__init__.py``.
     "from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson",
     "from continuum_swr_replay.analysis.hippocampus.event_analysis import get_event_start_end_times",
     "from continuum_swr_replay.analysis.events.nonlocal_detection import get_confident_times",

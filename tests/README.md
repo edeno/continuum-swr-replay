@@ -49,8 +49,8 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
 Markers combine as usual: `-m "real_data and not slow"`.
 
 The package roots (`continuum_swr_replay/__init__.py`,
-`continuum_swr_replay/data_loaders/__init__.py` and the `analysis` package
-`__init__`s) re-export through PEP 562 `__getattr__`, and modules with Spyglass
+`continuum_swr_replay/data_loaders/__init__.py` and the `analysis.replay` and
+`analysis.pfc` `__init__`s) re-export through PEP 562 `__getattr__`, and modules with Spyglass
 dependencies defer those imports into the functions that need them. The lazy
 contract is pinned by [`tests/unit/test_lazy_imports.py`](unit/test_lazy_imports.py).
 A regression there brings back the import-time DataJoint hang on machines
