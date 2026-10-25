@@ -47,8 +47,10 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
     matched_control_seed,
 )
 from continuum_swr_replay.analysis.pfc.modulation import (
+    CURVE_SOURCES,
     NESTED_MODEL_PAIRS,
     REPORT_HALF_WINDOW_S,
+    curve_coefficients,
     get_frac_explained_deviance,
     get_frac_null_deviance,
 )
@@ -575,6 +577,17 @@ def _deviance_fractions(
     return neuron_stats
 
 
+#: The ``<name>_max_mod`` / ``<name>_max_mod_time`` statistic each curve's
+#: peak is reported under.
+_MAX_MOD_STAT = {
+    "SWR": "SWR",
+    "no_SWR": "non_local_no_SWR",
+    "non_local_SWR": "non_local_SWR",
+    "non_local_no_SWR": "non_local_no_SWR_split",
+    "matched_control": "matched_control",
+}
+
+
 def _modulation_curves(
     results: Mapping[str, Any],
     non_estimable_models: set[str],
@@ -602,8 +615,6 @@ def _modulation_curves(
 non_local_no_swr_modulation, matched_control_modulation : NDArray, shape (n_lags,)
         As :func:`process_neuron` returns them.
     """
-    neuron_stats: dict[str, float] = {}
-    ## Modulation time courses
     # Share fits with the deviance-fraction path so neuron_stats and
     # the modulation arrays can never disagree due to divergent
     # IRLS convergence. When the source model is non-estimable
@@ -612,95 +623,35 @@ non_local_no_swr_modulation, matched_control_modulation : NDArray, shape (n_lags
     # zero curve from statsmodels' degenerate fit; route those
     # to NaN so consumers can tell "absent event class" from
     # "estimated zero modulation".
+    #
+    # Each curve's block is read by ``curve_coefficients``, in the design's
+    # own order. For the replay-split model that is ``[constant,
+    # non_local_no_SWR, non_local_SWR]`` -- NOT the order the model's name
+    # lists them in. Reading them by the name's order is the bug that, between
+    # 2026-04-24 and 2026-09-15, gave each curve the other class's kernel.
     n_basis_functions = spline_basis.shape[1]
     nan_modulation = np.full(spline_basis.shape[0], np.nan)
-
-    # SWR-controlled model: SWR and non-SWR replay modulation
-    # controlling for all whole-event-speed-eligible ripples
-    if "SWR + non_local_no_SWR" in non_estimable_models:
-        swr_modulation = nan_modulation
-        no_swr_modulation = nan_modulation
-        neuron_stats["SWR_max_mod"] = np.nan
-        neuron_stats["SWR_max_mod_time"] = np.nan
-        neuron_stats["non_local_no_SWR_max_mod"] = np.nan
-        neuron_stats["non_local_no_SWR_max_mod_time"] = np.nan
-    else:
-        swr_ctrl_params = results["SWR + non_local_no_SWR"].params
-        swr_modulation = spline_basis @ swr_ctrl_params[1 : n_basis_functions + 1]
-        no_swr_modulation = spline_basis @ swr_ctrl_params[n_basis_functions + 1 :]
-
-        swr_max_mod_ind = np.argmax(np.abs(swr_modulation))
-        neuron_stats["SWR_max_mod"] = swr_modulation[swr_max_mod_ind]
-        neuron_stats["SWR_max_mod_time"] = lag_time[swr_max_mod_ind]
-
-        no_swr_max_mod_ind = np.argmax(np.abs(no_swr_modulation))
-        neuron_stats["non_local_no_SWR_max_mod"] = no_swr_modulation[no_swr_max_mod_ind]
-        neuron_stats["non_local_no_SWR_max_mod_time"] = lag_time[no_swr_max_mod_ind]
-
-    # Replay-split model: SWR-replay and non-SWR replay modulation
-    # controlling for replay-coincident ripples only. The blocks are read
-    # in the order ``_make_design_matrices`` concatenates them --
-    # ``[constant, non_local_no_SWR, non_local_SWR]`` -- which is NOT the
-    # order the model's name lists them in. Reading them by the name's
-    # order is exactly the bug this comment exists to prevent: between
-    # 2026-04-24 and 2026-09-15 each curve carried the other class's
-    # kernel, and so did ``non_local_SWR_max_mod`` and
-    # ``non_local_no_SWR_split_max_mod``.
-    if "non_local_SWR + non_local_no_SWR" in non_estimable_models:
-        non_local_swr_modulation = nan_modulation
-        non_local_no_swr_modulation = nan_modulation
-        neuron_stats["non_local_SWR_max_mod"] = np.nan
-        neuron_stats["non_local_SWR_max_mod_time"] = np.nan
-        neuron_stats["non_local_no_SWR_split_max_mod"] = np.nan
-        neuron_stats["non_local_no_SWR_split_max_mod_time"] = np.nan
-    else:
-        replay_split_params = results["non_local_SWR + non_local_no_SWR"].params
-        non_local_no_swr_modulation = (
-            spline_basis @ replay_split_params[1 : n_basis_functions + 1]
-        )
-        non_local_swr_modulation = (
-            spline_basis @ replay_split_params[n_basis_functions + 1 :]
-        )
-
-        non_local_swr_max_ind = np.argmax(np.abs(non_local_swr_modulation))
-        neuron_stats["non_local_SWR_max_mod"] = non_local_swr_modulation[
-            non_local_swr_max_ind
-        ]
-        neuron_stats["non_local_SWR_max_mod_time"] = lag_time[non_local_swr_max_ind]
-
-        non_local_no_swr_max_ind = np.argmax(np.abs(non_local_no_swr_modulation))
-        neuron_stats["non_local_no_SWR_split_max_mod"] = non_local_no_swr_modulation[
-            non_local_no_swr_max_ind
-        ]
-        neuron_stats["non_local_no_SWR_split_max_mod_time"] = lag_time[
-            non_local_no_swr_max_ind
-        ]
-
-    # Matched-control model: the non-event baseline's own peri-window
-    # modulation, taken from the joint engagement model so it is the
-    # baseline response after accounting for real non-SWR replay --
-    # the same model the engagement comparison is run on.
-    if "matched_control + non_local_no_SWR" in non_estimable_models:
-        matched_control_modulation = nan_modulation
-        neuron_stats["matched_control_max_mod"] = np.nan
-        neuron_stats["matched_control_max_mod_time"] = np.nan
-    else:
-        engagement_params = results["matched_control + non_local_no_SWR"].params
-        matched_control_modulation = (
-            spline_basis @ engagement_params[1 : n_basis_functions + 1]
-        )
-        matched_control_max_ind = np.argmax(np.abs(matched_control_modulation))
-        neuron_stats["matched_control_max_mod"] = matched_control_modulation[
-            matched_control_max_ind
-        ]
-        neuron_stats["matched_control_max_mod_time"] = lag_time[matched_control_max_ind]
+    neuron_stats: dict[str, float] = {}
+    curves: dict[str, NDArray] = {}
+    for curve in CURVE_SOURCES:
+        model, block = curve_coefficients(curve, n_basis_functions)
+        stat = _MAX_MOD_STAT[curve]
+        if model in non_estimable_models:
+            curves[curve] = nan_modulation
+            neuron_stats[f"{stat}_max_mod"] = np.nan
+            neuron_stats[f"{stat}_max_mod_time"] = np.nan
+            continue
+        curves[curve] = spline_basis @ results[model].params[block]
+        peak = np.argmax(np.abs(curves[curve]))
+        neuron_stats[f"{stat}_max_mod"] = curves[curve][peak]
+        neuron_stats[f"{stat}_max_mod_time"] = lag_time[peak]
     return (
         neuron_stats,
-        swr_modulation,
-        no_swr_modulation,
-        non_local_swr_modulation,
-        non_local_no_swr_modulation,
-        matched_control_modulation,
+        curves["SWR"],
+        curves["no_SWR"],
+        curves["non_local_SWR"],
+        curves["non_local_no_SWR"],
+        curves["matched_control"],
     )
 
 

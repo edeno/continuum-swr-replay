@@ -236,8 +236,7 @@ def prior_binds(
 #: classes in. Reading it by the name is the swap that mislabelled both of that
 #: model's curves in every bundle written before 2026-09-15.
 #:
-#: Read through :func:`curve_coefficients`; ``session._modulation_curves``
-#: slices the same blocks.
+#: Read through :func:`curve_coefficients`.
 CURVE_SOURCES = {
     "SWR": ("SWR + non_local_no_SWR", 0),
     "no_SWR": ("SWR + non_local_no_SWR", 1),
