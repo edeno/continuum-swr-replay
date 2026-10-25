@@ -107,8 +107,10 @@ shapes and a bounded large-array working set.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
+from typing import ParamSpec, TypeVar
 
 import jax
 import jax.numpy as jnp
@@ -117,11 +119,32 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc.gpu import require_configured_device
 
-# Float64 is a correctness requirement, not a preference: the IRLS stops on an
-# absolute deviance change of 1e-8 against deviances of order 1e5, which is
-# below float32's resolution there -- in float32 the loop would either never
-# converge or stop at an arbitrary iteration.
-jax.config.update("jax_enable_x64", True)
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Run `function` with JAX's 64-bit types on, for that call only.
+
+    Float64 is a correctness requirement, not a preference: the IRLS stops on an
+    absolute deviance change of 1e-8 against deviances of order 1e5, which is
+    below float32's resolution there -- in float32 the loop would either never
+    converge or stop at an arbitrary iteration. Every public function here that
+    puts data on the device or runs a jitted kernel carries this, so float64 is
+    on wherever their arrays are made and their kernels traced (the jit caches
+    are keyed on it), and the process default is left as it was.
+
+    ``jax.enable_x64`` is thread-local, and a fresh one is entered per call: a
+    single instance shared as a decorator keeps the previous value on itself,
+    which nested or concurrent calls would overwrite.
+    """
+
+    @wraps(function)
+    def run(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with jax.enable_x64(True):
+            return function(*args, **kwargs)
+
+    return run
 
 #: statsmodels' ``GLM.fit`` defaults, mirrored so both fitters stop at the
 #: same point (``statsmodels.genmod.generalized_linear_model.GLM.fit``:
@@ -335,6 +358,7 @@ class BatchedHeldoutResults:
     rank: NDArray
 
 
+@_in_float64
 def prepare_heldout_response(
     counts: NDArray, folds: NDArray
 ) -> PreparedHeldoutResponse:
@@ -773,6 +797,7 @@ def _poisson_deviance_from_params(
     return 2.0 * terms.sum(axis=0)
 
 
+@_in_float64
 def poisson_deviance_from_params(
     design: NDArray, counts: NDArray, params: NDArray
 ) -> NDArray:
@@ -1127,6 +1152,7 @@ def _heldout_prediction_batch(
     )
 
 
+@_in_float64
 def score_poisson_designs_heldout(
     designs: NDArray,
     response: PreparedHeldoutResponse,
@@ -1224,6 +1250,7 @@ def score_poisson_designs_heldout(
     )
 
 
+@_in_float64
 def fit_poisson_glms(
     design: NDArray,
     counts: NDArray,

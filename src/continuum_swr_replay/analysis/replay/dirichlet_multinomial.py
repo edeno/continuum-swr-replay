@@ -58,8 +58,11 @@ from .fitting import within_group_full_rank
 # Float64 is required, not a nicety: the log-likelihood differences the optimizer
 # chases are O(1e-6) against an objective of order 1e4, and the Hessian that
 # supplies the standard errors is differenced from the same quantity. In float32
-# the gradient is noise at the optimum and the SEs come back garbage.
-jax.config.update("jax_enable_x64", True)
+# the gradient is noise at the optimum and the SEs come back garbage. So every
+# JAX call here (event_loglik, _optimize, _standard_errors) runs inside
+# ``jax.enable_x64(True)``, which is scoped to the call and to the calling thread,
+# rather than switching float64 on for the whole process at import. The jitted
+# functions are keyed on that setting, so they are traced in float64.
 
 logger = logging.getLogger(__name__)
 
@@ -175,11 +178,12 @@ def event_loglik(
             f"shape mismatch: X {X.shape}, Y {Y.shape}, Z {Z.shape} must share "
             "the event axis (and X/Y the category axis)"
         )
-    return np.asarray(
-        _event_loglik_jit(
-            jnp.asarray(theta), jnp.asarray(X), jnp.asarray(Y), jnp.asarray(Z)
+    with jax.enable_x64(True):
+        return np.asarray(
+            _event_loglik_jit(
+                jnp.asarray(theta), jnp.asarray(X), jnp.asarray(Y), jnp.asarray(Z)
+            )
         )
-    )
 
 
 def multinomial_log_constant(y, groups) -> float:
@@ -393,12 +397,6 @@ def _optimize(
     """
     n_beta = X.shape[2]
     n_theta = n_beta + 1 + Z.shape[1]
-    Xj, Yj, Zj = jnp.asarray(X), jnp.asarray(Y), jnp.asarray(Z)
-
-    def fun(theta):
-        value, grad = _value_and_grad_jit(jnp.asarray(theta), Xj, Yj, Zj)
-        return float(value), np.asarray(grad, dtype=float)
-
     if theta0 is None:
         theta0 = np.zeros(n_theta)
     theta0 = np.asarray(theta0, dtype=float).copy()
@@ -408,14 +406,21 @@ def _optimize(
         bounds = [(None, None)] * n_theta
         bounds[n_beta] = (float(fixed_log_phi), float(fixed_log_phi))
 
-    return minimize(
-        fun,
-        theta0,
-        jac=True,
-        method="L-BFGS-B",
-        bounds=bounds,
-        options={"maxiter": _MAXITER},
-    )
+    with jax.enable_x64(True):
+        Xj, Yj, Zj = jnp.asarray(X), jnp.asarray(Y), jnp.asarray(Z)
+
+        def fun(theta):
+            value, grad = _value_and_grad_jit(jnp.asarray(theta), Xj, Yj, Zj)
+            return float(value), np.asarray(grad, dtype=float)
+
+        return minimize(
+            fun,
+            theta0,
+            jac=True,
+            method="L-BFGS-B",
+            bounds=bounds,
+            options={"maxiter": _MAXITER},
+        )
 
 
 def _standard_errors(
@@ -439,12 +444,13 @@ def _standard_errors(
     is what an unidentified parameter's standard error means, and it is what
     :func:`~._fit_diagnostics.separated_terms` flags.
     """
-    hess = np.asarray(
-        _hessian_jit(
-            jnp.asarray(theta), jnp.asarray(X), jnp.asarray(Y), jnp.asarray(Z)
-        ),
-        dtype=float,
-    )
+    with jax.enable_x64(True):
+        hess = np.asarray(
+            _hessian_jit(
+                jnp.asarray(theta), jnp.asarray(X), jnp.asarray(Y), jnp.asarray(Z)
+            ),
+            dtype=float,
+        )
     se = np.full(theta.shape[0], np.nan)
     keep = np.arange(theta.shape[0])
     if pinned_index is not None:

@@ -11,6 +11,9 @@ modifier recovers a planted ``is_swr`` effect.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
+import jax
 import numpy as np
 import pandas as pd
 import pytest
@@ -264,6 +267,28 @@ def test_event_loglik_sums_to_llf():
     per_event = event_loglik(theta, X, Y, Z)
     assert per_event.shape == (n_events,)
     assert per_event.sum() == pytest.approx(fit["llf"], rel=1e-9)
+
+
+def test_float64_is_scoped_to_each_call():
+    """Each fit and likelihood runs in float64 in whichever thread calls it (JAX's
+    x64 switch is thread-local), and JAX's process-wide setting is left as it
+    was found."""
+    df = _simulate(3.0, seed=6, n_events=80)
+    default = jax.config.read("jax_enable_x64")
+    here = fit_dirichlet_multinomial(df, PREDICTORS)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        there = pool.submit(fit_dirichlet_multinomial, df, PREDICTORS).result()
+        per_event = pool.submit(
+            event_loglik,
+            np.zeros(4),
+            np.zeros((2, 9, 2)),
+            np.ones((2, 9)),
+            np.zeros((2, 1)),
+        ).result()
+
+    assert jax.config.read("jax_enable_x64") == default
+    assert per_event.dtype == np.float64
+    assert there["llf"] == here["llf"]
 
 
 def test_cv_folds_over_events():

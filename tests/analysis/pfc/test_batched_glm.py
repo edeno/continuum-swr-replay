@@ -8,6 +8,7 @@ equivalence audit is gated on.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import jax
@@ -827,10 +828,19 @@ class TestBackend:
             rtol=0,
         )
 
-    def test_float64_is_enabled(self, planted):
+    def test_float64_is_scoped_to_the_fit(self, planted):
+        """The fit runs in float64 in whichever thread calls it -- it matches
+        statsmodels to ATOL, which float32 cannot reach -- and leaves JAX's
+        process-wide setting as it found it."""
         design, counts, _ = planted
-        assert jax.config.read("jax_enable_x64")
-        assert fit_poisson_glms(design, counts).params.dtype == np.float64
+        default = jax.config.read("jax_enable_x64")
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            params = pool.submit(fit_poisson_glms, design, counts).result().params
+
+        assert jax.config.read("jax_enable_x64") == default
+        np.testing.assert_allclose(
+            params[0], statsmodels_fit(design, counts[:, 0]).params, atol=ATOL, rtol=0
+        )
 
 
 class TestImpliedPriorSd:

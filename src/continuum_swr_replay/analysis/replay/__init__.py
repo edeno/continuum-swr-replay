@@ -34,9 +34,8 @@ _LAZY_EXPORTS = {
     "trial_arrival_times": "covariates",
     "trial_context_at_times": "covariates",
     "trial_outcome_times": "covariates",
-    # dirichlet_multinomial. It switches JAX to float64 at import, a
-    # process-wide effect paid only by callers that use the estimator (a GPU
-    # decoding run in the same process would otherwise inherit float64).
+    # dirichlet_multinomial. Its JAX calls run in float64 inside
+    # ``jax.enable_x64``, scoped to each call; the process default is untouched.
     "cross_validate_dirichlet_multinomial": "dirichlet_multinomial",
     "event_loglik": "dirichlet_multinomial",
     "fit_dirichlet_multinomial": "dirichlet_multinomial",
