@@ -415,7 +415,7 @@ def test_cross_history_recovers_planted_excitation():
 
     design = aggregate_to_timebins(
         stops, resp, bin_s=bin_s, tmax=nbin * bin_s,
-        cross_onset_times=cross, cross_history_lags=4,
+        cross_onset_times=cross, cross_history_lags=4, arrival_clocks=False,
     )
     spec = PerBinRateModelSpec(
         "Mx", False, 0, False, 0, False, False, "", None, cross_history_lags=4,

@@ -522,6 +522,8 @@ def aggregate_to_timebins(
     stop_covariates: tuple[str, ...] = (),
     excluded_intervals: pd.DataFrame | None = None,
     history_window_s: float = 0.0,
+    arrival_clocks: bool = True,
+    outcome_shift: bool = True,
 ) -> pd.DataFrame:
     """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
 
@@ -581,6 +583,20 @@ def aggregate_to_timebins(
         Seconds the ladder's longest history covariate looks back
         (``model_specs.longest_history_window_s``); 0 drops only the bins that
         touch the mask.
+    arrival_clocks : bool
+        Emit the per-bin clocks ``time_since_last_well_arrival_s`` and
+        ``time_since_outcome_known_s``. Requires ``stop_start``,
+        ``last_well_arrival_time_s`` and ``outcome_known_time_s`` in
+        ``stop_table``. False builds the design without them, for a stop table
+        that predates the arrival clocks.
+    outcome_shift : bool
+        With ``reward_basis``, shift each bin's reward history at the outcome
+        boundary (see the notes below). Requires ``stop_start``, ``stop_end``,
+        ``last_well_arrival_time_s``, ``outcome_known_time_s``,
+        ``completed_trial_reward`` and ``known_reward_outcome_lag_{1..10}`` in
+        ``stop_table``. False keeps every bin on its bout-start history.
+        Without ``reward_basis`` there is no reward history to shift, and it
+        does nothing.
 
     Returns
     -------
@@ -591,9 +607,8 @@ def aggregate_to_timebins(
         ``reward_basis``), each name in
         ``stop_covariates``, ``count`` (population onsets in the bin),
         ``onset_lag1..self_history_lags``, and (if ``self_history_basis``)
-        ``hist_rcos_0..self_history_basis-1``. When ``stop_table`` carries
-        ``stop_start``, ``last_well_arrival_time_s`` and
-        ``outcome_known_time_s``, two further per-bin clocks are emitted:
+        ``hist_rcos_0..self_history_basis-1``. With ``arrival_clocks``, two
+        further per-bin clocks:
         ``time_since_last_well_arrival_s`` and ``time_since_outcome_known_s``
         (bin centre minus the absolute clock; ``NaN`` where the clock is
         ``NaN``, and negative for bins that precede the outcome boundary).
@@ -606,10 +621,8 @@ def aggregate_to_timebins(
     -----------------------------
     A stop's reward history is evaluated at bout start, so a stop that is still
     in progress when the current trip's reward or omission becomes observable
-    would carry a history missing that outcome for its later bins. When
-    ``reward_basis`` is set and ``stop_table`` additionally carries
-    ``stop_end``, ``last_well_arrival_time_s``, ``completed_trial_reward`` and
-    the ``known_reward_outcome_lag_{1..10}`` columns, bins whose LEFT EDGE is at
+    would carry a history missing that outcome for its later bins. With
+    ``reward_basis`` and ``outcome_shift``, bins whose LEFT EDGE is at
     or past ``outcome_known_time_s`` (for a stop whose boundary falls inside it)
     get the lag vector shifted by one --
     ``[completed_trial_reward, lag_1, ..., lag_9]`` -- and the basis features and
@@ -636,7 +649,9 @@ def aggregate_to_timebins(
         e.g. an onset at or past the end of its stop's immobility, which is
         binned into the stop's last bin but earns no exposure there.
     KeyError
-        If excluded time has rows and ``stop_table`` has no ``stop_start``.
+        If excluded time has rows and ``stop_table`` has no ``stop_start``, or
+        if ``stop_table`` lacks a column ``arrival_clocks`` or (with
+        ``reward_basis``) ``outcome_shift`` needs.
     SwrSourceError
         With the default ``excluded_intervals``, if an artifact run is
         configured but does not serve one of ``stop_table``'s sessions (as
@@ -659,35 +674,22 @@ def aggregate_to_timebins(
     reward_cols = (
         [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE] if reward_basis else []
     )
-    # Optional per-bin clocks / outcome-boundary shift: both are gated on the
-    # stop frame actually carrying their inputs, so a stop table built before
-    # the arrival clocks existed produces exactly the design it produced before.
-    missing_clock = [
-        c for c in _ARRIVAL_CLOCK_STOP_COLUMNS if c not in stop_table.columns
-    ]
-    missing_shift = [
-        c
-        for c in dict.fromkeys(
+    shift_at_outcome = reward_basis and outcome_shift
+    required = {
+        "arrival_clocks": _ARRIVAL_CLOCK_STOP_COLUMNS if arrival_clocks else (),
+        "outcome_shift": (
             (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
-        )
-        if c not in stop_table.columns
-    ]
-    emit_clocks = not missing_clock
-    shift_at_outcome = reward_basis and not missing_shift
-    # Both branches switch off without a word when their inputs are absent, so
-    # say which ran: a design built without them is a different design.
-    if not reward_basis:
-        shift_status = "not requested (reward_basis=False)"
-    elif missing_shift:
-        shift_status = f"skipped (stop table lacks {missing_shift})"
-    else:
-        shift_status = "applied"
-    logger.debug(
-        "aggregate_to_timebins: per-bin arrival/outcome clocks %s; "
-        "outcome-boundary reward-history shift %s",
-        f"skipped (stop table lacks {missing_clock})" if missing_clock else "applied",
-        shift_status,
-    )
+            if shift_at_outcome
+            else ()
+        ),
+    }
+    for flag, columns in required.items():
+        missing = [c for c in dict.fromkeys(columns) if c not in stop_table.columns]
+        if missing:
+            raise KeyError(
+                f"aggregate_to_timebins({flag}=True) needs {missing} in "
+                f"stop_table; pass {flag}=False to build the design without it"
+            )
     if excluded_intervals is None:
         excluded_intervals = excluded_intervals_by_session(stop_table)
     # an empty mask masks nothing, so a stop table without bounds still builds
@@ -696,7 +698,7 @@ def aggregate_to_timebins(
         raise KeyError("excluded_intervals needs stop_start in stop_table")
     internal_cols = list(
         dict.fromkeys(
-            (_ARRIVAL_CLOCK_STOP_COLUMNS if emit_clocks else ())
+            (_ARRIVAL_CLOCK_STOP_COLUMNS if arrival_clocks else ())
             + (_OUTCOME_SHIFT_STOP_COLUMNS if shift_at_outcome else ())
             + (("stop_start",) if mask_excluded else ())
         )
@@ -725,7 +727,7 @@ def aggregate_to_timebins(
     out = s.iloc[idx][cols].reset_index(drop=True)
     out["binj"] = binj
     out["tc"] = (binj + 0.5) * bin_s
-    if emit_clocks:
+    if arrival_clocks:
         # Bin CENTRE on two absolute session clocks, as elapsed seconds. The
         # arrival clock is >= 0 for an at-well stop (the animal arrived before
         # the bout began); the outcome clock is NEGATIVE for bins that precede

@@ -256,7 +256,9 @@ class TestFamilyBDesign:
         cut the last bins off."""
         stops, onsets = _design_inputs()
 
-        design = aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+        design = aggregate_to_timebins(
+            stops, onsets, bin_s=0.5, tmax=20.0, arrival_clocks=False
+        )
 
         assert design.loc[design["stop_id"] == 11, "binj"].max() == 19
         assert design["count"].sum() == 4
@@ -264,7 +266,12 @@ class TestFamilyBDesign:
     def test_bins_in_the_mask_and_after_it_by_the_history_window_are_dropped(self):
         stops, onsets = _design_inputs()
         full = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
         )
 
         design = aggregate_to_timebins(
@@ -274,6 +281,7 @@ class TestFamilyBDesign:
             tmax=20.0,
             excluded_intervals=_mask_by_session(),
             history_window_s=1.0,
+            arrival_clocks=False,
         )
 
         first = design.loc[design["stop_id"] == 11, "binj"].tolist()
@@ -306,6 +314,7 @@ class TestFamilyBDesign:
             tmax=20.0,
             self_history_lags=2,
             excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
         )
 
         design = aggregate_to_timebins(
@@ -316,6 +325,7 @@ class TestFamilyBDesign:
             self_history_lags=2,
             excluded_intervals=_mask_by_session(),
             history_window_s=1.0,
+            arrival_clocks=False,
         )
 
         merged = design.merge(full, on=["stop_id", "binj"], suffixes=("", "_full"))
@@ -327,7 +337,12 @@ class TestFamilyBDesign:
         empty = _mask_by_session().iloc[0:0]
 
         full = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
         )
         design = aggregate_to_timebins(
             stops,
@@ -336,6 +351,7 @@ class TestFamilyBDesign:
             tmax=20.0,
             excluded_intervals=empty,
             history_window_s=1.0,
+            arrival_clocks=False,
         )
 
         pd.testing.assert_frame_equal(design, full)
@@ -346,7 +362,12 @@ class TestFamilyBDesign:
         stops, onsets = _design_inputs()
 
         design = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, history_window_s=1.0
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            history_window_s=1.0,
+            arrival_clocks=False,
         )
 
         explicit = aggregate_to_timebins(
@@ -356,6 +377,7 @@ class TestFamilyBDesign:
             tmax=20.0,
             excluded_intervals=_mask_by_session(),
             history_window_s=1.0,
+            arrival_clocks=False,
         )
         pd.testing.assert_frame_equal(design, explicit, check_exact=True)
         assert design.attrs == explicit.attrs
@@ -365,11 +387,21 @@ class TestFamilyBDesign:
         stops, onsets = _design_inputs()
 
         design = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, history_window_s=1.0
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            history_window_s=1.0,
+            arrival_clocks=False,
         )
 
         full = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
         )
         pd.testing.assert_frame_equal(design, full, check_exact=True)
         assert "n_bins_excluded" not in design.attrs
@@ -385,9 +417,16 @@ class TestFamilyBDesign:
         stops, onsets = _design_inputs()
 
         with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
-            aggregate_to_timebins(stops, onsets, bin_s=0.5, tmax=20.0)
+            aggregate_to_timebins(
+                stops, onsets, bin_s=0.5, tmax=20.0, arrival_clocks=False
+            )
         design = aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
         )
         assert design["count"].sum() == 4
 
@@ -654,12 +693,18 @@ def test_an_empty_mask_needs_no_stop_bounds():
         tmax=20.0,
         excluded_intervals=_mask_by_session().iloc[0:0],
         history_window_s=1.0,
+        arrival_clocks=False,
     )
 
     pd.testing.assert_frame_equal(
         design,
         aggregate_to_timebins(
-            stops, onsets, bin_s=0.5, tmax=20.0, excluded_intervals=NO_EXCLUDED_TIME
+            stops,
+            onsets,
+            bin_s=0.5,
+            tmax=20.0,
+            excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
         ),
     )
     with pytest.raises(KeyError, match="stop_start"):
@@ -669,6 +714,7 @@ def test_an_empty_mask_needs_no_stop_bounds():
             bin_s=0.5,
             tmax=20.0,
             excluded_intervals=_mask_by_session(),
+            arrival_clocks=False,
         )
 
 

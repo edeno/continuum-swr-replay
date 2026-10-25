@@ -16,6 +16,7 @@ Two guards:
 
 from __future__ import annotations
 
+import functools
 import json
 
 import numpy as np
@@ -164,6 +165,11 @@ def _gated_session(session_date: int, n_stops: int = 24, seed: int = 0):
     return stops, pd.DataFrame(onset_rows), gated
 
 
+_without_clocks_or_shift = functools.partial(
+    aggregate_to_timebins, arrival_clocks=False, outcome_shift=False
+)
+
+
 @pytest.fixture(scope="module")
 def two_session_fits():
     """Both ladders fit on two synthetic sessions with gated post-outcome stops."""
@@ -175,7 +181,10 @@ def two_session_fits():
         stops, _ = mod._mask_post_outcome_covariates(stops)
         frames.append(stops)
         gated_ids.extend(gated)
-        with threadpool_limits(limits=1):
+        # The synthetic stops carry neither the arrival clocks nor the outcome
+        # lags, so the runner's designs opt out of both by name.
+        with threadpool_limits(limits=1), pytest.MonkeyPatch.context() as patch:
+            patch.setattr(mod, "aggregate_to_timebins", _without_clocks_or_shift)
             _, session_rows, skips, session_drops = mod._fit_one_session(
                 ("a", session_date, "02_r1"), stops, onsets
             )
@@ -216,6 +225,8 @@ def test_post_outcome_rung_and_its_null_share_the_gated_cohort(two_session_fits)
         self_history_lags=N_HISTORY_LAGS,
         self_history_basis=N_HISTORY_BASIS,
         stop_covariates=mod.STOP_COVARS,
+        arrival_clocks=False,
+        outcome_shift=False,
     )
     gated_bins = int(design["stop_id"].isin(gated).sum())
     assert gated_bins > 0

@@ -8,6 +8,7 @@ and ``outcome`` / ``model`` values drawn from the canonical key sets.
 
 from __future__ import annotations
 
+import functools
 import importlib.util
 import json
 from pathlib import Path
@@ -55,9 +56,9 @@ def _toy_tables(
     (as a stop that begins before the session's first well arrival does), so
     their bins have no arrival clock and leave the ladder's common cohort, and
     the ``n_stops_long_lead`` after those arrived long enough before the bout
-    that the stop runs off the end of the arrival window. The
-    outcome-boundary reward shift is deliberately not triggered (no
-    ``occupancy_state`` / lag columns), so the planted per-stop reward effect
+    that the stop runs off the end of the arrival window. The table carries
+    no outcome lags, so the fits opt out of the outcome-boundary reward shift
+    (:func:`without_outcome_shift`) and the planted per-stop reward effect
     stays exactly what the stop table says it is.
     """
     rng = np.random.default_rng(seed)
@@ -125,8 +126,23 @@ def _toy_tables(
     return pd.DataFrame(stop_rows), pd.DataFrame(onset_rows)
 
 
+@pytest.fixture
+def without_outcome_shift(monkeypatch):
+    """Build the fitter's designs with ``outcome_shift=False``.
+
+    The toy stop table plants its reward-history features directly and has no
+    outcome lags to re-derive them from, so its designs opt out of the shift by
+    name; every other argument is the fitter's own.
+    """
+    monkeypatch.setattr(
+        fprm,
+        "aggregate_to_timebins",
+        functools.partial(fprm.aggregate_to_timebins, outcome_shift=False),
+    )
+
+
 @pytest.mark.slow
-def test_tidy_schema():
+def test_tidy_schema(without_outcome_shift):
     stop, onsets = _toy_tables()
     # onsets already carry is_swr (as attach_is_swr_to_onsets would set it).
     # Pin BLAS: tiny-matrix GLM fits are faster single-threaded.
@@ -178,7 +194,7 @@ def test_tidy_schema():
     assert not out.duplicated(keys).any()
 
 
-def test_baseline_present_across_outcomes():
+def test_baseline_present_across_outcomes(without_outcome_shift):
     stop, onsets = _toy_tables()
     with threadpool_limits(limits=1):
         out = fprm.fit_per_bin_rate_models(stop, onsets, run_cv=False, run_gof=False)
@@ -188,7 +204,7 @@ def test_baseline_present_across_outcomes():
         assert "M0_const" in set(sub["model"])
 
 
-def test_no_stop_dropped_by_freeze():
+def test_no_stop_dropped_by_freeze(without_outcome_shift):
     """Freezing the shipped ladder keeps every stop, incomplete prefix included.
 
     The first stops of an epoch have fewer than two known outcomes, so their
@@ -240,7 +256,7 @@ ARRIVAL_MODELS = {
 }
 
 
-def test_arrival_rungs_carry_their_clock_and_window():
+def test_arrival_rungs_carry_their_clock_and_window(without_outcome_shift):
     """Arrival rungs are fit on the arrival window and say so in every row.
 
     Stops with no arrival leave the common cohort of EVERY rung (the freeze is
@@ -287,7 +303,9 @@ def test_arrival_rungs_carry_their_clock_and_window():
             assert by_clock["arrival"] < by_clock["stop"], keys
 
 
-def test_cohort_audit_attributes_the_missing_arrival_clock():
+def test_cohort_audit_attributes_the_missing_arrival_clock(
+    without_outcome_shift,
+):
     """A stop with no arrival clock is a common-cohort drop, not an unexplained one."""
     stop, onsets = _toy_tables(n_stops_without_arrival=2)
     with threadpool_limits(limits=1):

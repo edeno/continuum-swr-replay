@@ -7,6 +7,8 @@ C3 regression guard for C1: the per-bin / contrast audits must attribute
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -434,7 +436,13 @@ def test_contrast_ladder_rungs_share_one_cohort():
             })
     stop = pd.DataFrame(stop_rows)
 
-    with threadpool_limits(limits=1):
+    # The synthetic stops carry neither the arrival clocks nor the outcome
+    # lags, so the runner's designs opt out of both by name.
+    design = functools.partial(
+        mod.aggregate_to_timebins, arrival_clocks=False, outcome_shift=False
+    )
+    with threadpool_limits(limits=1), pytest.MonkeyPatch.context() as patch:
+        patch.setattr(mod, "aggregate_to_timebins", design)
         _, rows, skips, drops = mod._fit_one_session(
             ("a", 1, "02_r1"), stop, pd.DataFrame(onset_rows)
         )

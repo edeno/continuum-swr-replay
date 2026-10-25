@@ -73,7 +73,14 @@ def two_stop_design() -> tuple[pd.DataFrame, pd.DataFrame]:
 def test_aggregate_exposure_and_lags(two_stop_design):
     stops, onsets = two_stop_design
     df = aggregate_to_timebins(
-        stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True, self_history_lags=1
+        stops,
+        onsets,
+        bin_s=0.1,
+        tmax=0.5,
+        reward_basis=True,
+        self_history_lags=1,
+        arrival_clocks=False,
+        outcome_shift=False,
     )
 
     s1 = df[df.stop_id == 1].sort_values("binj")
@@ -123,7 +130,7 @@ def test_aggregate_drops_zero_immobility():
         }
     )
     onsets = pd.DataFrame({"stop_id": [2], "t_since_stop_onset": [0.05]})
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, arrival_clocks=False)
     assert set(df.stop_id) == {2}
 
 
@@ -145,7 +152,9 @@ def test_aggregate_nondivisible_tmax_keeps_final_window():
     )
     # onset in the final partial window [0.4, 0.45) -- dropped by the old path.
     onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.42]})
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.45).sort_values("binj")
+    df = aggregate_to_timebins(
+        stops, onsets, bin_s=0.1, tmax=0.45, arrival_clocks=False
+    ).sort_values("binj")
     # ceil(0.45 / 0.1) = 5 bins (0..4), not int()'s 4.
     assert list(df.binj) == [0, 1, 2, 3, 4]
     # the onset is counted in the final bin rather than dropped.
@@ -174,7 +183,9 @@ def test_onset_on_bin_edge():
         }
     )
     onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.2, 0.3]})
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5).sort_values("binj")
+    df = aggregate_to_timebins(
+        stops, onsets, bin_s=0.1, tmax=0.5, arrival_clocks=False
+    ).sort_values("binj")
     assert df["count"].tolist() == [0.0, 0.0, 1.0, 1.0, 0.0]
 
 
@@ -196,7 +207,7 @@ def test_onset_at_the_end_of_immobility_raises():
     )
     onsets = pd.DataFrame({"stop_id": [1, 1], "t_since_stop_onset": [0.05, 0.25]})
     with pytest.raises(ValueError, match=r"binned 2 onset\(s\) but 1"):
-        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, arrival_clocks=False)
 
 
 def test_onset_in_a_dropped_sliver_bin_is_counted_not_raised():
@@ -218,7 +229,7 @@ def test_onset_in_a_dropped_sliver_bin_is_counted_not_raised():
         }
     )
     onsets = pd.DataFrame({"stop_id": [1], "t_since_stop_onset": [0.300000001]})
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, arrival_clocks=False)
     assert df.binj.tolist() == [0, 1, 2]  # the 5e-8-exposure bin 3 is gone
     assert df["count"].sum() == 0
     assert df.attrs["n_onsets_in_dropped_bins"] == 1
@@ -226,7 +237,7 @@ def test_onset_in_a_dropped_sliver_bin_is_counted_not_raised():
 
 def test_no_onsets_are_lost_in_an_ordinary_design(two_stop_design):
     stops, onsets = two_stop_design
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
+    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, arrival_clocks=False)
     assert df["count"].sum() == 3
     assert df.attrs["n_onsets_in_dropped_bins"] == 0
 
@@ -260,6 +271,7 @@ def test_aggregate_history_basis_is_projection():
         tmax=0.5,
         self_history_lags=4,
         self_history_basis=3,
+        arrival_clocks=False,
     )
     assert {"hist_rcos_0", "hist_rcos_1", "hist_rcos_2"} <= set(df.columns)
     B = raised_cosine_history_basis(4, 3)
@@ -306,7 +318,15 @@ def test_reward_groupby_drops_nan_reward():
         }
     )
     onsets = pd.DataFrame({"stop_id": [1, 2], "t_since_stop_onset": [0.05, 0.05]})
-    df = aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True)
+    df = aggregate_to_timebins(
+        stops,
+        onsets,
+        bin_s=0.1,
+        tmax=0.5,
+        reward_basis=True,
+        arrival_clocks=False,
+        outcome_shift=False,
+    )
     assert {1, 2} <= set(df.stop_id)  # both stops produce bins
     cells = df.groupby(["reward_history_rcos_0", "binj"], as_index=False)["count"].sum()
     assert cells["reward_history_rcos_0"].notna().all()  # NaN-reward stop excluded
@@ -486,6 +506,7 @@ def test_aggregate_cross_history_lags():
             self_history_lags=2,
             cross_onset_times=cross,
             cross_history_lags=2,
+            arrival_clocks=False,
         )
         .sort_values("binj")
         .set_index("binj")
@@ -729,11 +750,18 @@ def test_arrival_spanning_and_out_of_stop_boundaries_are_not_shifted(
     assert df.attrs["n_stops_arrival_spanning"] == 1
 
 
-def test_arrival_columns_absent_leaves_the_design_unchanged(two_stop_design):
-    """A stop frame without the clocks produces exactly the pre-existing design."""
+def test_opting_out_builds_the_design_without_clocks_or_shift(two_stop_design):
+    """Opting out of both branches builds exactly the pre-clock design."""
     stops, onsets = two_stop_design
     df = aggregate_to_timebins(
-        stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True, self_history_lags=1
+        stops,
+        onsets,
+        bin_s=0.1,
+        tmax=0.5,
+        reward_basis=True,
+        self_history_lags=1,
+        arrival_clocks=False,
+        outcome_shift=False,
     )
     assert "time_since_last_well_arrival_s" not in df.columns
     assert "time_since_outcome_known_s" not in df.columns
@@ -754,6 +782,8 @@ def test_arrival_columns_absent_leaves_the_design_unchanged(two_stop_design):
         cross_history_lags=2,
         cross_history_basis=2,
         stop_covariates=("is_swr_stop",),
+        arrival_clocks=False,
+        outcome_shift=False,
     )
     assert list(frozen.columns) == FROZEN_COLUMNS
     assert frozen.shape == (13, 21)
@@ -821,31 +851,57 @@ FROZEN_COLUMNS = [
 FROZEN_DIGEST = "7a2311d8acfde43383573a07f6da8a08c7220eb6797a38a3bb962c3dc014fc3c"
 
 
-# ── The optional branches say whether they ran ──
-
-_DESIGN_LOGGER = "continuum_swr_replay.analysis.replay.per_bin_design"
+# ── The optional branches are explicit: a missing input raises ──
 
 
-def test_aggregate_logs_the_optional_branches_it_applied(arrival_clock_stops, caplog):
-    """A stop table carrying the clock and shift inputs reports both as applied."""
+@pytest.mark.parametrize(
+    "column", ["stop_start", "last_well_arrival_time_s", "outcome_known_time_s"]
+)
+def test_arrival_clocks_raise_on_a_missing_clock_column(arrival_clock_stops, column):
+    """The clocks are on by default; a stop table without their input says so."""
     stops, onsets = arrival_clock_stops
-    with caplog.at_level("DEBUG", logger=_DESIGN_LOGGER):
-        _aggregate_with_clocks(stops, onsets)
-    messages = [r.getMessage() for r in caplog.records if r.name == _DESIGN_LOGGER]
-    assert messages == [
-        "aggregate_to_timebins: per-bin arrival/outcome clocks applied; "
-        "outcome-boundary reward-history shift applied"
-    ]
+    with pytest.raises(KeyError, match=rf"arrival_clocks=True.*'{column}'"):
+        aggregate_to_timebins(stops.drop(columns=column), onsets, bin_s=0.1, tmax=0.5)
 
 
-def test_aggregate_logs_the_optional_branches_it_skipped(two_stop_design, caplog):
-    """Without their inputs the branches are named as skipped, not left silent."""
-    stops, onsets = two_stop_design
-    with caplog.at_level("DEBUG", logger=_DESIGN_LOGGER):
-        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True)
-        aggregate_to_timebins(stops, onsets, bin_s=0.1, tmax=0.5)
-    messages = [r.getMessage() for r in caplog.records if r.name == _DESIGN_LOGGER]
-    assert len(messages) == 2
-    assert "arrival/outcome clocks skipped (stop table lacks" in messages[0]
-    assert "reward-history shift skipped (stop table lacks" in messages[0]
-    assert "reward-history shift not requested (reward_basis=False)" in messages[1]
+@pytest.mark.parametrize(
+    "column", ["stop_end", "completed_trial_reward", "known_reward_outcome_lag_10"]
+)
+def test_outcome_shift_raises_on_a_missing_shift_column(arrival_clock_stops, column):
+    """With the reward basis the shift is on by default; its inputs are required."""
+    stops, onsets = arrival_clock_stops
+    with pytest.raises(KeyError, match=rf"outcome_shift=True.*'{column}'"):
+        aggregate_to_timebins(
+            stops.drop(columns=column), onsets, bin_s=0.1, tmax=0.5, reward_basis=True
+        )
+
+
+def test_outcome_shift_needs_nothing_without_the_reward_basis(arrival_clock_stops):
+    """Without the reward basis there is no history to shift and no input to need."""
+    stops, onsets = arrival_clock_stops
+    df = aggregate_to_timebins(
+        stops.drop(columns=["stop_end", "completed_trial_reward", *LAG_COLUMNS]),
+        onsets,
+        bin_s=0.1,
+        tmax=0.5,
+    )
+    assert "time_since_outcome_known_s" in df.columns
+    assert "n_stops_arrival_spanning" not in df.attrs
+
+
+def test_opting_out_of_the_shift_keeps_bout_start_history(arrival_clock_stops):
+    """``outcome_shift=False`` keeps the clocks but every bin's bout-start history."""
+    stops, onsets = arrival_clock_stops
+    df = aggregate_to_timebins(
+        stops, onsets, bin_s=0.1, tmax=0.5, reward_basis=True, outcome_shift=False
+    )
+    assert "time_since_outcome_known_s" in df.columns
+    assert "n_stops_arrival_spanning" not in df.attrs
+    bout_start = stops.set_index("stop_id")["reward_history_rcos_0"]
+    assert df["reward_history_rcos_0"].tolist() == (
+        df["stop_id"].map(bout_start).tolist()
+    )
+    # ... where the default shifts the bins past a stop's boundary.
+    shifted = _aggregate_with_clocks(stops, onsets)
+    moved = shifted["reward_history_rcos_0"] != shifted["stop_id"].map(bout_start)
+    assert moved.any()

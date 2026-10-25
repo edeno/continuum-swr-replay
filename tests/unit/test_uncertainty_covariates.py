@@ -8,6 +8,7 @@ not mutate its input.
 
 from __future__ import annotations
 
+import functools
 import importlib.util
 import warnings
 from pathlib import Path
@@ -912,6 +913,15 @@ def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
         return {"n_stops": design["stop_id"].nunique()}
 
     monkeypatch.setattr(fur, "fit_per_bin_rate_model", _record_fit)
+    # The synthetic stops carry neither the arrival clocks nor the outcome
+    # lags, so the runner's designs opt out of both by name.
+    monkeypatch.setattr(
+        fur,
+        "aggregate_to_timebins",
+        functools.partial(
+            fur.aggregate_to_timebins, arrival_clocks=False, outcome_shift=False
+        ),
+    )
 
     models = fur.fit_uncertainty_rate(stop, onsets)
 
