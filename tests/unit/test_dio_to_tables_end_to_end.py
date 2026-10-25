@@ -89,18 +89,6 @@ def _dio_events() -> tuple[pd.DataFrame, pd.DataFrame]:
     return beam_breaks, pump_events
 
 
-def _position_info() -> pd.DataFrame:
-    """Position frame kept for builder API compatibility."""
-    time = np.arange(0.0, 20.0, 0.02)
-    return pd.DataFrame(
-        {
-            "projected_x_position": np.zeros_like(time),
-            "projected_y_position": np.zeros_like(time),
-        },
-        index=time,
-    )
-
-
 def _data_over_time() -> pd.DataFrame:
     """Decoder output: immobile only inside the three bouts, one event."""
     index = pd.Index(np.round(np.arange(0.0, 20.0, 0.02), 6), name="time")
@@ -168,7 +156,7 @@ def session():
     """Run the real DIO -> tables chain once for the whole module."""
     beam_breaks, pump_events = _dio_events()
     graph = _bandit_graph()
-    well_visits = make_well_visits_df(beam_breaks, pump_events, _position_info(), graph)
+    well_visits = make_well_visits_df(beam_breaks, pump_events)
     trials = make_trials_df_from_well_visits(well_visits)
     port_experiences = make_port_experiences_df(well_visits, trials)
     dot = _data_over_time()

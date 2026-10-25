@@ -196,10 +196,7 @@ def _process_behavioral_data(
         return
 
     well_visits = make_well_visits_df(
-        dio_events["beam_breaks"],
-        dio_events["pump_events"],
-        position_data["position_info"],
-        track_graph=position_data["track_graph"],
+        dio_events["beam_breaks"], dio_events["pump_events"]
     )
 
     if should_load(SessionDataKeys.WELL_VISITS):

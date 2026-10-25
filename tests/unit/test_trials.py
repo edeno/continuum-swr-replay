@@ -6,10 +6,12 @@ Tests the logic for constructing behavioral trials from raw task events
 
 from __future__ import annotations
 
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
 from continuum_swr_replay.data_loaders.trials import (
     get_poke_in_poke_out_times,
     get_run_intervals,
@@ -298,14 +300,52 @@ class TestGetRunIntervals:
         assert result.iloc[0]["duration"] == pytest.approx(0.0)
 
 
+def _bandit_graph(well_positions: dict[int, tuple[float, float]]) -> nx.Graph:
+    """The task's 10-node spider: wells 0-5, patch junctions 6-8, center 9.
+
+    Wells missing from ``well_positions`` sit far away (y = 1000), so they are
+    never nearest. Each patch junction lies between its two wells, nearer
+    the first, so a junction is often the nearest node of all.
+    """
+    graph = nx.Graph()
+    positions = {
+        well: well_positions.get(well, (100.0 * well, 1000.0))
+        for well in sorted(WELL_PATCH_MAPPING)
+    }
+    for junction, (well_a, well_b) in zip(
+        (6, 7, 8), ((0, 1), (2, 3), (4, 5)), strict=True
+    ):
+        (xa, ya), (xb, yb) = positions[well_a], positions[well_b]
+        positions[junction] = (xa + 0.4 * (xb - xa), ya + 0.4 * (yb - ya))
+        graph.add_edge(well_a, junction)
+        graph.add_edge(well_b, junction)
+        graph.add_edge(junction, 9)
+    positions[9] = (-50.0, -50.0)
+    nx.set_node_attributes(graph, positions, "pos")
+    return graph
+
+
 class TestGetStartEndNodeID:
     """Test well node ID determination from position data."""
 
-    def test_identifies_nearest_nodes(self, simple_linear_track):
+    def test_junction_is_never_a_well(self):
+        """An animal standing on a patch junction maps to the nearest well."""
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
+        assert track_graph.nodes[6]["pos"] == (4.0, 0.0)
+        position_info = pd.DataFrame(
+            {"projected_x_position": [4.0, 4.0], "projected_y_position": [0.0, 0.0]},
+            index=[0.0, 1.0],
+        )
+        times = pd.DataFrame({"start_time": [0.0], "end_time": [1.0]})
+
+        result = get_start_end_node_id(position_info, track_graph, times)
+
+        assert result["from_well"][0] == 0
+        assert result["to_well"][0] == 0
+
+    def test_identifies_nearest_nodes(self):
         """Should identify nearest node based on projected position."""
-        # Set up node positions
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]["pos"] = pos
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
 
         # Animal at position near node 1 with multiple time points
         position_info = pd.DataFrame(
@@ -323,17 +363,15 @@ class TestGetStartEndNodeID:
             }
         )
 
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
+        result = get_start_end_node_id(position_info, track_graph, times)
 
         # Should identify node 1 as nearest
         assert result["from_well"][0] == 1
         assert result["to_well"][0] == 1
 
-    def test_different_start_and_end_nodes(self, simple_linear_track):
+    def test_different_start_and_end_nodes(self):
         """Should handle movement from one node to another."""
-        # Set up node positions
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]["pos"] = pos
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
 
         # Animal moves from near node 0 to near node 2
         position_info = pd.DataFrame(
@@ -351,17 +389,15 @@ class TestGetStartEndNodeID:
             }
         )
 
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
+        result = get_start_end_node_id(position_info, track_graph, times)
 
         # Start near node 0, end near node 2
         assert result["from_well"][0] == 0
         assert result["to_well"][0] == 2
 
-    def test_multiple_intervals(self, simple_linear_track):
+    def test_multiple_intervals(self):
         """Should handle multiple time intervals."""
-        # Set up node positions
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]["pos"] = pos
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
 
         # More time points to avoid index errors
         position_info = pd.DataFrame(
@@ -379,18 +415,16 @@ class TestGetStartEndNodeID:
             }
         )
 
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
+        result = get_start_end_node_id(position_info, track_graph, times)
 
         # Two intervals
         assert len(result["from_well"]) == 2
         assert len(result["to_well"]) == 2
 
-    def test_handles_2d_positions(self, simplified_star_track):
+    def test_handles_2d_positions(self):
         """Should work with 2D position data."""
-        # Set positions for a few wells
-        simplified_star_track.nodes[0]["pos"] = (0, 0)
-        simplified_star_track.nodes[1]["pos"] = (10, 10)
-        simplified_star_track.nodes[2]["pos"] = (20, 0)
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
+        track_graph.nodes[1]["pos"] = (10, 10)
 
         # More time points to avoid indexing issues
         position_info = pd.DataFrame(
@@ -408,16 +442,15 @@ class TestGetStartEndNodeID:
             }
         )
 
-        result = get_start_end_node_id(position_info, simplified_star_track, times)
+        result = get_start_end_node_id(position_info, track_graph, times)
 
         # Should identify nearest nodes in 2D
         assert result["from_well"][0] == 0  # Near (0,0)
         assert result["to_well"][0] == 1  # Near (10,10)
 
-    def test_returns_correct_structure(self, simple_linear_track):
+    def test_returns_correct_structure(self):
         """Should return dict with from_well and to_well arrays."""
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]["pos"] = pos
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
 
         position_info = pd.DataFrame(
             {
@@ -434,7 +467,7 @@ class TestGetStartEndNodeID:
             }
         )
 
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
+        result = get_start_end_node_id(position_info, track_graph, times)
 
         # Check structure
         assert "from_well" in result
@@ -442,10 +475,9 @@ class TestGetStartEndNodeID:
         assert isinstance(result["from_well"], np.ndarray)
         assert isinstance(result["to_well"], np.ndarray)
 
-    def test_stationary_at_well(self, simple_linear_track):
+    def test_stationary_at_well(self):
         """Animal stationary at a well should have same from/to well."""
-        for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]["pos"] = pos
+        track_graph = _bandit_graph({0: (0, 0), 1: (10, 0), 2: (20, 0)})
 
         # Stationary at node 1
         position_info = pd.DataFrame(
@@ -463,7 +495,7 @@ class TestGetStartEndNodeID:
             }
         )
 
-        result = get_start_end_node_id(position_info, simple_linear_track, times)
+        result = get_start_end_node_id(position_info, track_graph, times)
 
         # Should be at node 1 for both start and end
         assert result["from_well"][0] == 1

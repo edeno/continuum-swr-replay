@@ -98,9 +98,7 @@ continuum_swr_replay.data_types : WellNodeData TypedDict
 
 Examples
 --------
->>> well_visits = make_well_visits_df(
-...     beam_breaks, pump_events, position_info, track_graph
-... )
+>>> well_visits = make_well_visits_df(beam_breaks, pump_events)
 >>> trials = make_trials_df_from_well_visits(well_visits)
 >>> trials[["from_well", "to_well", "is_reward"]].head()
 >>> experiences = make_port_experiences_df(well_visits, trials)
@@ -654,9 +652,8 @@ def get_start_end_node_id(
     times : pd.DataFrame
         Times with start_time and end_time columns
     well_nodes : list[int] | None
-        Node IDs to consider as wells. If None, uses the well nodes
-        from WELL_PATCH_MAPPING if they exist in the graph, otherwise
-        falls back to all graph nodes.
+        Node IDs to consider as wells. If None, uses the well nodes of
+        WELL_PATCH_MAPPING, which must all be in the graph.
 
     Returns
     -------
@@ -691,24 +688,7 @@ def get_start_end_node_id(
 
     node_attrs = nx.get_node_attributes(track_graph, "pos")
 
-    # Determine which nodes to consider as wells
-    if well_nodes is not None:
-        candidate_ids = sorted(well_nodes)
-    else:
-        # Default: use WELL_PATCH_MAPPING wells if they exist in the graph,
-        # otherwise fall back to all graph nodes (for test compatibility).
-        well_mapping_keys = sorted(WELL_PATCH_MAPPING.keys())
-        if all(n in node_attrs for n in well_mapping_keys):
-            candidate_ids = well_mapping_keys
-        else:
-            import logging
-
-            logging.warning(
-                "WELL_PATCH_MAPPING nodes not found in track graph. "
-                "Falling back to all graph nodes for well assignment. "
-                "This is expected in tests but not in production."
-            )
-            candidate_ids = sorted(node_attrs.keys())
+    candidate_ids = sorted(WELL_PATCH_MAPPING if well_nodes is None else well_nodes)
 
     candidate_pos = np.array([node_attrs[n] for n in candidate_ids])
     candidate_arr = np.array(candidate_ids)
@@ -739,8 +719,6 @@ def get_start_end_node_id(
 def make_well_visits_df(
     beam_breaks: pd.DataFrame,
     pump_events: pd.DataFrame,
-    position_info: pd.DataFrame,
-    track_graph: nx.Graph,
 ) -> pd.DataFrame:
     """Construct well visits DataFrame from beam breaks and pump events.
 
@@ -750,12 +728,6 @@ def make_well_visits_df(
         Beam break events
     pump_events : pd.DataFrame
         Reward pump events
-    position_info : pd.DataFrame
-        Position data retained for API compatibility and independent quality
-        control. It does not determine physical poke identity.
-    track_graph : nx.Graph
-        Track graph retained for API compatibility and independent quality
-        control. It does not determine physical poke identity.
 
     Returns
     -------
@@ -769,7 +741,6 @@ def make_well_visits_df(
     # trials. An epoch boundary is neither a poke nor evidence of occupancy, so
     # it must not enter the scientific interval stream.
     poke_times = make_physical_poke_intervals(beam_breaks, pump_events)
-    poke_times["is_boundary_marker"] = False
     poke_times["is_observed_poke"] = True
     poke_times = poke_times.sort_values("start_time").reset_index(drop=True)
     if poke_times.empty:
@@ -780,7 +751,6 @@ def make_well_visits_df(
                 "start_time",
                 "end_time",
                 "duration",
-                "is_boundary_marker",
                 "is_observed_poke",
                 "is_run",
                 "is_reward",
@@ -806,7 +776,6 @@ def make_well_visits_df(
     poke_times = poke_times.set_index(["from_well", "to_well"])
 
     run_times = get_run_intervals(poke_times)
-    run_times["is_boundary_marker"] = False
     run_times["is_observed_poke"] = False
     # A movement interval connects consecutive physical pokes. Its endpoints
     # therefore come from those DIO channels, not from noisy tracked-position
