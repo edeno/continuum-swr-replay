@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 import scripts.detection.run_event_features as runner
+from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.parameters import ROOT_DIR
 
 
@@ -55,7 +56,8 @@ def test_a_row_of_a_scored_interval_not_requested_is_refused():
 
 def test_importing_the_runner_installs_no_ignore_filter_for_a_warning_class():
     """The spike-evidence script's filters ignore every User, Future and
-    Deprecation warning; the runner keeps them out of the process."""
+    Deprecation warning; the runner shares only its remote distance with it
+    (``analysis.constants.REMOTE_CM``), so none reach the process."""
     code = (
         "import warnings\n"
         "before = list(warnings.filters)\n"
@@ -82,7 +84,7 @@ def test_a_failure_after_the_tables_keeps_no_field_of_an_ok_record(
     decode = tmp_path / "decode.pkl"
     decode.write_bytes(b"decode")
     identifier = "sim20200101_02_r1_HPC"
-    monkeypatch.setattr(runner.comparison, "decode_path", lambda _: decode)
+    monkeypatch.setattr(inventory_run, "decode_path", lambda _: decode)
     found = {
         "memoryless_available": True,
         "marks": {"sha256": "m"},

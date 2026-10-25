@@ -65,7 +65,10 @@ each epoch. A rerun under the same run id skips the epochs already ``ok``
 unless ``--overwrite`` is given, and refuses settings other than the ones the
 manifest was written with. The epochs are the epoch register's analysed ones,
 narrowed by ``--animal``, ``--date`` and ``--epoch``, or the one
-``--epoch-id``, run one at a time in this process.
+``--epoch-id``, run one at a time in this process, on the CPU.
+
+The roster, the comparisons, the grid and the tables' layout are
+``inventory_comparison.inventory_run``'s, which every reader of a run shares.
 
 Usage:
     python scripts/detection/run_inventory_comparison.py --carey-run-id <run id> \\
@@ -75,23 +78,17 @@ Usage:
 
 import argparse
 import json
-import os
 import resource
 import sys
 import time as clock
 import traceback
 from collections.abc import Mapping
-from itertools import combinations
 from pathlib import Path
-from types import MappingProxyType
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from numpy.typing import NDArray
 
-# CPU only: the package imports JAX, which this comparison never needs.
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
@@ -112,8 +109,6 @@ from continuum_swr_replay.analysis.inventory_comparison.adapters import (
     swr_detector_inventory,
 )
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
-    EXCLUSION_DTYPES,
-    GAP_FACTOR,
     OBSERVATION_DTYPES,
     coverage_from_observations,
     exclusion_by_reason,
@@ -122,20 +117,30 @@ from continuum_swr_replay.analysis.inventory_comparison.availability import (
     still_intervals,
 )
 from continuum_swr_replay.analysis.inventory_comparison.cells import (
-    CELL_DTYPES,
-    NO_DETECTOR_DTYPES,
     membership_against,
     no_detector_time,
 )
 from continuum_swr_replay.analysis.inventory_comparison.components import (
-    COMPONENT_DTYPES,
     overlap_components,
 )
+from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
+    CELL_DETECTORS,
+    CELLS,
+    COMPARISONS,
+    DETECTORS,
+    MAX_GAP_S,
+    ROSTER,
+    SAMPLE_INTERVAL_S,
+    SEQUENCE_COHORTS,
+    SWR_DEFINITIONS,
+    TABLE_DTYPES,
+    decode_path,
+    output_paths,
+    speed_trace,
+    stamped_tables,
+)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (
-    DIRECTIONAL_DTYPES,
-    PAIR_DTYPES,
     SET_ASIDE_DTYPES,
-    TIME_COVERAGE_DTYPES,
     directional_agreement,
     event_matches,
     flag_pairs,
@@ -149,7 +154,6 @@ from continuum_swr_replay.analysis.inventory_comparison.recount import (
     merge_fragments,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
-    INVENTORY_DTYPES,
     MEMORYLESS,
     MEMORYLESS_CRITERIA,
     STATE_SPACE,
@@ -157,32 +161,24 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     typed_table,
 )
 from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
-    DISAGREEMENT_DTYPES,
-    LABEL_DTYPES,
-    MATRIX_DTYPES,
-    PAIRED_LABEL_DTYPES,
     definition_disagreement,
     paired_labels,
     swr_label_matrix,
     swr_labels,
 )
-from continuum_swr_replay.data_loaders.epoch_register import (
-    analysed_epoch_ids,
-)
-from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import (
     contains,
     total_duration,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
     CAREY_ROOT,
     INVENTORY_COMPARISON_ROOT,
     MEMORYLESS_ROOT,
 )
 from continuum_swr_replay.runs.batch import run_lock
-from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.cli import parse_run_id, select_analysed_epochs
+from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.io import (
     json_ready,
     replace_outputs,
@@ -193,56 +189,9 @@ from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 OUTPUT_ROOT = INVENTORY_COMPARISON_ROOT
-DECODE_ROOT = PROCESSED_DATA_DIR
-"""Where the canonical HPC decodes are."""
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
-ROSTER: Mapping[str, str | None] = MappingProxyType(
-    {
-        **dict.fromkeys(SWR_DETECTORS),
-        CAREY: None,
-        MUA: None,
-        STATE_SPACE: None,
-        MEMORYLESS: "published",
-        MEMORYLESS_CRITERIA: "replay_criteria",
-    }
-)
-"""Every inventory compared, with its memoryless cohort (``None`` for the
-others)."""
-DETECTORS = tuple(ROSTER)
-SWR_DEFINITIONS = (*SWR_DETECTORS, CAREY)
-SEQUENCE_COHORTS = (STATE_SPACE, MEMORYLESS, MEMORYLESS_CRITERIA)
-"""The cohorts the SWR label matrix labels, and the sequences cell's
-sources."""
-CELL_DETECTORS = tuple(d for d in DETECTORS if d != MEMORYLESS_CRITERIA)
-"""The eight of the exactly-one cell, no-detector time and the overlap
-components: every published memoryless event is also a criteria event, so with
-both, no memoryless event could be found by exactly one detector, and every
-component holding one would count one detector twice."""
-DECODERS = (STATE_SPACE, MEMORYLESS)
-TRIGGERED = (*SWR_DEFINITIONS, MUA)
-"""The LFP- and rate-triggered inventories."""
-CELLS: Mapping[str, tuple[tuple[str, ...], tuple[str, ...]]] = MappingProxyType(
-    {
-        "exactly_one_detector": (CELL_DETECTORS, CELL_DETECTORS),
-        "swr_matched_by_no_decoder": (SWR_DEFINITIONS, DECODERS),
-        "sequence_matched_by_no_trigger": (SEQUENCE_COHORTS, TRIGGERED),
-    }
-)
-"""Each cell's source detectors, and the detectors they are tested against."""
-COMPARISONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
-    {f"{a}+{b}": (a, b) for a, b in combinations(sorted(DETECTORS), 2)}
-    | {"all": DETECTORS}
-    | {f"swr_matrix_{c}": (c, *SWR_DEFINITIONS) for c in SEQUENCE_COHORTS}
-)
-"""Each comparison whose excluded time is split by reason: every pair, all
-nine, and each SWR-matrix population."""
-
-SAMPLE_INTERVAL_S = 0.002
-"""The decode grid's step, on which the recount counts its gaps."""
-MAX_GAP_S = GAP_FACTOR * SAMPLE_INTERVAL_S
-"""A step longer than this breaks the speed trace's runs."""
 BRIDGING = "bridging"
 """The set-aside reason of an event bridging its own detector's unobserved
 time."""
@@ -250,81 +199,6 @@ SPEED_TRACE = "head_speed of the canonical decode frame, on its grid"
 BOUNDS_TOLERANCE_S = SAMPLE_INTERVAL_S / 2
 """How far the decode grid's first or last time may lie from the SWR run's
 position span: less than half a sample, so both name the same samples."""
-
-COUNT_DTYPES: Mapping[str, object] = MappingProxyType(
-    {
-        "animal": object,
-        "day": np.int64,
-        "epoch": object,
-        "detector": object,
-        "run_id": object,
-        "n_native": np.int64,
-        "n_set_aside": np.int64,
-        "n_moving": np.int64,
-        "n_eligible": np.int64,
-        "exposure_s": np.float64,
-        "n_in_exposure": np.int64,
-        "rate_per_s": np.float64,
-        "native_note": object,
-    }
-)
-"""Per detector: native = eligible + moving + set aside (dropped by the rule or
-bridging); the rate is the eligible events wholly inside the detector's own
-exposure per exposure second, NaN with no exposure. ``native_note`` says why a
-native count equals its eligible count (``NATIVE_IS_ELIGIBLE``)."""
-
-TABLE_DTYPES: Mapping[str, Mapping[str, object]] = MappingProxyType(
-    {
-        "inventory": {**INVENTORY_DTYPES, "component_id": "Int64"},
-        "set_aside": SET_ASIDE_DTYPES,
-        "observations": OBSERVATION_DTYPES,
-        "exclusion_by_reason": EXCLUSION_DTYPES,
-        "counts": COUNT_DTYPES,
-        "pairs": {
-            **PAIR_DTYPES,
-            "a_within_shared_exposure": np.bool_,
-            "b_within_shared_exposure": np.bool_,
-        },
-        "directional": DIRECTIONAL_DTYPES,
-        "time_coverage": TIME_COVERAGE_DTYPES,
-        "components": COMPONENT_DTYPES,
-        "recount_directional": {**DIRECTIONAL_DTYPES, "gap_s": np.float64},
-        "cells": {"cell": object, **CELL_DTYPES},
-        "no_detector_time": NO_DETECTOR_DTYPES,
-        "swr_labels": LABEL_DTYPES,
-        "swr_matrix": MATRIX_DTYPES,
-        "paired_labels": PAIRED_LABEL_DTYPES,
-        "definition_disagreement": DISAGREEMENT_DTYPES,
-    }
-)
-"""Every table an epoch writes, with its columns and dtypes. ``inventory``
-holds the compared events and the moving ones; ``component_id`` is missing for
-the moving ones and for ``memoryless_criteria``'s, which the components leave
-out (:data:`CELL_DETECTORS`); ``set_aside`` the events the rule dropped and the
-bridging ones."""
-
-
-def decode_path(identifier: str) -> Path:
-    """The canonical decode's ``data_over_time`` pickle (``decode_paths``)."""
-    return decode_paths(identifier, DECODE_ROOT).data_over_time
-
-
-def _speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:
-    """The frame's grid and its ``head_speed``.
-
-    Raises
-    ------
-    ValueError
-        The grid does not step by ``SAMPLE_INTERVAL_S``.
-    """
-    time = dot.index.to_numpy(dtype=np.float64)
-    step = float(np.median(np.diff(time)))
-    if not np.isclose(step, SAMPLE_INTERVAL_S, rtol=0.0, atol=1e-5):
-        raise ValueError(
-            f"The decode grid steps by {step} s, not {SAMPLE_INTERVAL_S} s, the "
-            "step the recount counts gaps on."
-        )
-    return time, dot["head_speed"].to_numpy(dtype=np.float64)
 
 
 def epoch_inventories(
@@ -436,7 +310,7 @@ def compare_epoch(
         The grid is not the recount's, or ``exclusion_by_reason`` finds time
         with no reason: the coverage was not built from these inputs.
     """
-    time, speed = _speed_trace(dot)
+    time, speed = speed_trace(dot)
     inventories = epoch_inventories(
         dot,
         drops,
@@ -575,29 +449,6 @@ def bounds_mismatch(identifier: str, bounds: tuple[float, float]) -> str | None:
     )
 
 
-def output_path(identifier: str, output_dir: Path, name: str) -> Path:
-    return output_dir / f"{identifier}_{name}.parquet"
-
-
-def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
-    """Every table an epoch can write, by name."""
-    return {name: output_path(identifier, output_dir, name) for name in TABLE_DTYPES}
-
-
-def stamped_tables(
-    tables: Mapping[str, pd.DataFrame], stamp: Mapping[str, str]
-) -> Mapping[str, pd.DataFrame]:
-    """Stamp each table (in place, and return them) with the SWR source and `stamp`.
-
-    The SWR source's stamp (``analysed_time.stamp_swr_source``) goes first, then
-    `stamp`'s keys are merged into each table's ``attrs``.
-    """
-    for frame in tables.values():
-        analysed_time.stamp_swr_source(frame)
-        frame.attrs |= stamp
-    return tables
-
-
 def run_epoch(
     identifier: str,
     *,
@@ -631,7 +482,7 @@ def run_epoch(
         drops = analysed_time.artifact_event_drops(saved)
         dot = analysed_time.with_swr_source(saved)
         del saved
-        time, _ = _speed_trace(dot)
+        time, _ = speed_trace(dot)
         bounds = (float(time[0]), float(time[-1]))
         reason = bounds_mismatch(identifier, bounds)
         if reason is not None:
@@ -753,32 +604,9 @@ def run_settings(carey_run_id: str, memoryless_run_id: str) -> dict:
     return settings
 
 
-def _epoch_parts(identifier: str) -> tuple[str, int, str]:
-    """``(animal, date, epoch)`` of ``{animal}{date}_{epoch}_HPC``."""
-    key = parse_epoch_identifier(identifier)
-    return key.animal, key.date, key.epoch_name
-
-
-def select_epochs(args: argparse.Namespace) -> list[str]:
-    """The analysed epochs the arguments name, as epoch ids."""
-    analysed = analysed_epoch_ids()
-    if args.epoch_id is not None:
-        if args.epoch_id not in analysed:
-            sys.exit(f"{args.epoch_id} is not an analysed epoch of the epoch register.")
-        return [args.epoch_id]
-    selected = []
-    for identifier in analysed:
-        animal, date, epoch = _epoch_parts(identifier)
-        if (
-            (args.animal is None or animal == args.animal)
-            and (args.date is None or date == args.date)
-            and (args.epoch is None or epoch == args.epoch)
-        ):
-            selected.append(identifier)
-    return selected
-
-
 def main(argv: list[str] | None = None) -> None:
+    # CPU only: the package imports JAX, which this comparison never needs
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -843,7 +671,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
         if not (run_dir / "manifest.json").exists():
             sys.exit(f"{option}: no run manifest at {run_dir}.")
     settings = run_settings(args.carey_run_id, args.memoryless_run_id)
-    epochs = select_epochs(args)
+    epochs = select_analysed_epochs(args)
     if not epochs:
         sys.exit("No analysed epochs match --animal, --date and --epoch.")
 

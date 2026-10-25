@@ -7,27 +7,29 @@ Analysis scripts grouped by domain. Run from the repo root, e.g.
 
 **Only `_`-prefixed modules are importable by other scripts.** Shared code belongs in
 the package, or in a `_`-prefixed module beside the scripts that share it
-(`decoding/_decode_runner.py`, `detection/_report.py`, `qa/_report.py`). A script that is not `_`-prefixed is
+(`decoding/_decode_runner.py`, `detection/_report.py`, `qa/_report.py`, `qa/_memoryless_reference.py`). A script that is not `_`-prefixed is
 never imported by another script or by `src/`; tests may import any script.
 [`tests/unit/test_no_new_script_imports.py`](../tests/unit/test_no_new_script_imports.py)
 enforces this for scripts, and
 [`tests/unit/test_import_layering.py`](../tests/unit/test_import_layering.py) for `src/`.
 The first test's `ALLOWED` table is the current exception list, and it only
-shrinks:
-- the detection-comparison family: `figures/generate_event_feature_examples.py`,
-  `figures/generate_inventory_examples.py`, `detection/report_event_features.py`,
-  `detection/report_inventory_comparison.py` and `detection/run_event_features.py` import
-  `detection/run_inventory_comparison.py` (run layout, detector roster, decode helpers) and
-  each other; `figures/generate_inventory_examples.py` and `detection/run_event_features.py`
-  also import `detection/run_carey_detection.py`, the first also
-  `detection/run_memoryless_detection.py` and the second
-  `detection/analyze_event_spike_evidence.py`;
-- the memoryless sweep family: `detection/sweep_memoryless_controls.py`,
-  `detection/sweep_memoryless_heldout.py` and `qa/compare_memoryless_to_reference.py` import
-  `detection/sweep_memoryless_detection.py` (and the reference check also
-  `qa/memoryless_reference.py` and `figures/generate_memoryless_comparison.py`);
-- `exploratory/_content_cohort_control.py`, which runs
-  `content/fit_swr_contrast_content.py` with its cohort rule bypassed.
+shrinks. One entry is left: `exploratory/_content_cohort_control.py`, which runs
+`content/fit_swr_contrast_content.py` with its cohort rule bypassed.
+
+The detection-comparison and memoryless-sweep families once imported each other; their
+shared code is now in the package (2026-10-25): the inventory run's roster, grid and table
+layout in `analysis/inventory_comparison/inventory_run.py`, the event features run's tables
+and inputs in `analysis/inventory_comparison/feature_run.py` (its populations in
+`populations.py`), a decode's marks (`decode_marks`) in `analysis/hippocampus/detection_inputs.py`,
+the example figures' draw, inputs, recomputation and figure in
+`visualization/inventory_examples.py`, the sweep's simulated recording and detector runs in
+`analysis/hippocampus/memoryless_sequence/sweep.py`, the controls' conditions in
+`memoryless_sequence/sweep_controls.py`, the comparison figure's simulation in
+`memoryless_sequence/comparison_simulation.py`, the epoch selection in
+`runs/cli.py` (`select_analysed_epochs`), the device choice and XLA flags in
+`runs/device.py`, the sweeps' commit in `runs/provenance.py` (`described_commit`) and the
+remote distance in `analysis/constants.py` (`REMOTE_CM`). A runner that computes on the CPU
+says so first thing in its `main` (`default_jax_platforms("cpu")`), not when imported.
 
 The exploratory scripts that unit tests pin (`_verify_harmonization_parity.py`,
 `_statescript_contingency.py`, `_augment_data_over_time.py`,
@@ -76,8 +78,8 @@ them importable.
   epochs, which run on a dask `LocalCluster` of `--n-workers` processes, each logging to
   `logs/{epoch_id}_carey.log`; a failing epoch is recorded and the rest run, and a rerun skips the
   epochs already `ok` unless `--overwrite` is given. Built and tested; it ran on all 242 epochs
-  (run `fa6537e48bcf`). Imports the SWR runner's and the
-  memoryless runner's helpers (the exception to the rule above).
+  (run `fa6537e48bcf`). Reads a decode's marks as the memoryless runner does
+  (`detection_inputs.decode_marks`).
 - `run_memoryless_detection.py` — the Widloski & Foster sliding-window detector
   on each HPC epoch's saved decode, with its encoding-pair shuffle; one row per
   candidate sequence (spec 02). Loads the marks from the Spyglass database
@@ -254,8 +256,10 @@ them importable.
   GLM. See `docs/analysis_map.md`.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`.
+- `_memoryless_reference.py` — not a script: the Widloski & Foster reference's sorted-cell
+  arithmetic, re-implemented apart from the port, imported as `scripts.qa._memoryless_reference`.
 - `compare_memoryless_to_reference.py` — runs the memoryless port beside
-  `memoryless_reference.py`, an independent re-implementation of the Widloski & Foster
+  `_memoryless_reference.py`, an independent re-implementation of the Widloski & Foster
   reference's sorted-cell arithmetic, on the Figure 1 simulation step by step and on
   every sweep cell; writes
   `docs/design/replay_detection_comparison/reference_check_summary.csv` (about ten
@@ -403,3 +407,4 @@ An old path is marked "(removed: moved)" so the doc-path test does not look for 
 | `scripts/qa/check_pfc_ridge_lambda0.py` (removed: moved) | `scripts/pfc/check_pfc_ridge_lambda0.py` |
 | `scripts/qa/measure_pfc_null_geometry.py` (removed: moved) | `scripts/pfc/measure_pfc_null_geometry.py` |
 | `scripts/qa/diagnose_pfc_event_definition.py` (removed: moved) | `scripts/pfc/diagnose_pfc_event_definition.py` |
+| `scripts/qa/memoryless_reference.py` (removed: moved) | `scripts/qa/_memoryless_reference.py` (2026-10-25: a module, not a script) |

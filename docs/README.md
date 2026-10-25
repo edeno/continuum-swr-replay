@@ -251,6 +251,23 @@ role summary) and `analysis/replay/contrast_aggregation.py` (the contrast-conten
 assembly). Script moves are listed in [scripts/README.md](../scripts/README.md)
 ("Moved scripts (2026-10)").
 
+The detection-comparison and memoryless-sweep scripts stopped importing one another
+(2026-10-25); what they shared moved here: `analysis/inventory_comparison/inventory_run.py`
+(the inventory run's roster, comparisons, grid, decode path and table layout, taken from
+`run_inventory_comparison.py`; its private `_speed_trace` is now `speed_trace`),
+`analysis/inventory_comparison/feature_run.py` (the event features run's tables, from
+`run_event_features.py`, and `read_inputs`, from `report_event_features.py`),
+`event_populations` and `without_baseline_rows` added to
+`analysis/inventory_comparison/populations.py`, `decode_marks` added to
+`analysis/hippocampus/detection_inputs.py` (from `run_carey_detection.py`),
+`visualization/inventory_examples.py` (from `generate_inventory_examples.py`; its private
+`_label` is now `detector_label`), `analysis/hippocampus/memoryless_sequence/sweep.py`,
+`sweep_controls.py` and `comparison_simulation.py` (from the two sweeps and
+`generate_memoryless_comparison.py`), `runs/device.py` (`xla_flags` and its flags, from
+`run_memoryless_detection.py`, and `default_jax_platforms`), `select_analysed_epochs` added to
+`runs/cli.py`, `described_commit` added to `runs/provenance.py` (the sweeps' `git_commit`), and
+`REMOTE_CM` added to `analysis/constants.py` (from `analyze_event_spike_evidence.py`).
+
 ## Figure outputs
 
 - **`paper/figures/<topic>/`** — publication figures only, in topic subdirs (main-text

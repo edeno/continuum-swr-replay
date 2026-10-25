@@ -17,7 +17,7 @@ Each event is in one of two descriptive subsets by its spike evidence within
 its population, source detector and animal (high: at or above the group's 75th
 percentile; low: at or below its 25th), or in neither. No baseline is compared:
 the lead dropped the baseline windows (2026-10-18). Each figure is
-``generate_inventory_examples.draw_example``'s, with the event's evidence, its
+``visualization.inventory_examples.draw_example``'s, with the event's evidence, its
 spikes per row, and its ``ss_disagreement`` (comparator-only) or
 its rejection stage in each memoryless cohort (ours-only) in the title. A
 figure whose recomputed memoryless windows are not the stored ones is not
@@ -39,15 +39,30 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+import matplotlib
 import numpy as np
 import pandas as pd
 
+matplotlib.use("Agg")
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+    feature_run,
+)
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+    read_inputs,
+)
+from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (  # noqa: E402
+    CELL_DETECTORS,
+)
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
     UNMATCHED,
+)
+from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
+    event_populations,
+    without_baseline_rows,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
     STATE_SPACE,
@@ -65,12 +80,10 @@ from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.io import json_ready  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.detection import report_event_features as report  # noqa: E402
-from scripts.detection import run_event_features as features_runner  # noqa: E402
-from scripts.detection.run_inventory_comparison import CELL_DETECTORS  # noqa: E402
-from scripts.figures import (  # noqa: E402
-    generate_inventory_examples as inventory_examples,
+from continuum_swr_replay.visualization import (  # noqa: E402
+    inventory_examples,
 )
+from scripts.detection._report import read_run  # noqa: E402
 
 PRODUCED_BY = produced_by(__file__)
 FIGURE_ROOT = FIGURE_DIR / "event_features"
@@ -141,7 +154,7 @@ NOT_CALIBRATED = (
 SAMPLING_RULE = (
     "Two populations are drawn from: comparator-only events, each detector's "
     "events unmatched by state_space (unmatched_by:state_space; detectors "
-    f"{', '.join(map(inventory_examples._label, COMPARATOR_DETECTORS))}), and "
+    f"{', '.join(map(inventory_examples.detector_label, COMPARATOR_DETECTORS))}), and "
     "ours-only events, state_space's "
     f"events of the {EXACTLY_ONE} cell. Within each population, source detector "
     f"and animal, an event's evidence is {HIGH} when its evidence_dll is at or "
@@ -250,7 +263,7 @@ def draw_population_examples(
 ) -> pd.DataFrame:
     """The events :data:`SAMPLING_RULE` draws from :func:`sampler_events`.
 
-    Each population is drawn by ``generate_inventory_examples.draw_examples``
+    Each population is drawn by ``inventory_examples.draw_examples``
     by :data:`SUBSET_COLUMN`, with that population's :data:`ROLES`.
 
     Parameters
@@ -339,7 +352,7 @@ def figure_note(drawn: pd.Series, stages: Mapping[str, str], run_id: str) -> str
         )
     else:
         detail = "rejection stage " + ", ".join(
-            f"{inventory_examples._label(cohort)} {stages.get(cohort, 'missing')}"
+            f"{inventory_examples.detector_label(cohort)} {stages.get(cohort, 'missing')}"
             for cohort in REJECTION_COHORTS
         )
     return (
@@ -392,12 +405,12 @@ def write_examples(
         INVENTORY_COMPARISON_ROOT if inventory_root is None else inventory_root
     )
     memoryless_root = MEMORYLESS_ROOT if memoryless_root is None else memoryless_root
-    manifest, tables = report.read_run(
-        run_dir, features_runner.TABLE_DTYPES, features_runner.output_path
+    manifest, tables = read_run(
+        run_dir, feature_run.TABLE_DTYPES, feature_run.output_path
     )
-    tables |= report.read_inputs(manifest, inventory_root, memoryless_root)
-    tables["features"] = report.without_baseline_rows(tables["features"])
-    populations = report.event_populations(
+    tables |= read_inputs(manifest, inventory_root, memoryless_root)
+    tables["features"] = without_baseline_rows(tables["features"])
+    populations = event_populations(
         tables["features"],
         tables["pair_membership"],
         tables["cells"],

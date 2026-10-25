@@ -11,6 +11,9 @@ nothing from ``analysis``. Importing it, or any of its modules, loads no dask:
 - ``cli``: run ids, the decoders' shared options, the epoch filters.
 - ``batch``: the decoders' batch loop, the per-epoch task loop, per-epoch
   logs, the NWB file release and the run folder's lock.
+- ``device``: where a runner's JAX computes (``default_jax_platforms``) and the
+  XLA flags of a deterministic GPU run (``xla_flags``); it imports JAX only
+  when called.
 - ``threads``: pins the BLAS thread pools to one thread; it imports only the
   standard library, so a runner calls it above its numpy import.
 """

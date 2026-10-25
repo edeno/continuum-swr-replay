@@ -17,9 +17,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import scripts.detection.run_inventory_comparison as runner
 import scripts.figures.generate_inventory_examples as examples
+from continuum_swr_replay.analysis.inventory_comparison import inventory_run
+from continuum_swr_replay.runs.device import REQUIRED_XLA_FLAGS
 from continuum_swr_replay.tables.io import write_table
+from continuum_swr_replay.visualization import inventory_examples
 
 SEED = 7
 
@@ -41,7 +43,7 @@ def cells(records: list[tuple[str, str, str, str, int]]) -> pd.DataFrame:
                     "membership": membership,
                 }
             )
-    dtypes = runner.TABLE_DTYPES["cells"]
+    dtypes = inventory_run.TABLE_DTYPES["cells"]
     return pd.DataFrame(rows, columns=list(dtypes)).astype(dict(dtypes))
 
 
@@ -62,19 +64,21 @@ UNIT = ["cell", "detector", "animal"]
 
 
 def test_the_draw_is_deterministic_for_a_seed() -> None:
-    first = examples.draw_examples(LARGE, seed=SEED)
-    again = examples.draw_examples(LARGE, seed=SEED)
+    first = inventory_examples.draw_examples(LARGE, seed=SEED)
+    again = inventory_examples.draw_examples(LARGE, seed=SEED)
     pd.testing.assert_frame_equal(first, again)
     # the input's row order does not change what is drawn
     shuffled = LARGE.sample(frac=1.0, random_state=3).reset_index(drop=True)
-    pd.testing.assert_frame_equal(examples.draw_examples(shuffled, seed=SEED), first)
+    pd.testing.assert_frame_equal(
+        inventory_examples.draw_examples(shuffled, seed=SEED), first
+    )
     # another seed draws other events from these 30-event pools
-    other = examples.draw_examples(LARGE, seed=SEED + 1)
+    other = inventory_examples.draw_examples(LARGE, seed=SEED + 1)
     assert set(other.event_key) != set(first.event_key)
 
 
 def test_each_unit_draws_two_unmatched_and_two_matched() -> None:
-    drawn = examples.draw_examples(LARGE, seed=SEED)
+    drawn = inventory_examples.draw_examples(LARGE, seed=SEED)
     sizes = drawn.groupby([*UNIT, "membership"]).size()
     assert (sizes == 2).all()
     assert len(sizes) == 2 * len(LARGE[UNIT].drop_duplicates())
@@ -91,11 +95,11 @@ def test_unknown_events_are_never_drawn() -> None:
         ]
     )
     for seed in range(20):
-        drawn = examples.draw_examples(only_unknown, seed=seed)
+        drawn = inventory_examples.draw_examples(only_unknown, seed=seed)
         assert set(drawn.membership) == {"unmatched"}
         assert len(drawn) == 1
     assert (
-        examples.draw_examples(LARGE, seed=SEED)
+        inventory_examples.draw_examples(LARGE, seed=SEED)
         .membership.isin(["unmatched", "matched"])
         .all()
     )
@@ -110,14 +114,14 @@ def test_a_small_cell_gives_fewer() -> None:
             ("sequence_matched_by_no_trigger", "memoryless", "a", "matched", 3),
         ]
     )
-    drawn = examples.draw_examples(small, seed=SEED)
+    drawn = inventory_examples.draw_examples(small, seed=SEED)
     counts = drawn.groupby(["cell", "membership"]).size().to_dict()
     assert counts == {
         ("exactly_one_detector", "matched"): 1,
         ("sequence_matched_by_no_trigger", "matched"): 2,
         ("sequence_matched_by_no_trigger", "unmatched"): 1,
     }
-    assert examples.draw_examples(small.iloc[:0], seed=SEED).empty
+    assert inventory_examples.draw_examples(small.iloc[:0], seed=SEED).empty
 
 
 def test_one_units_draw_does_not_depend_on_the_others() -> None:
@@ -128,8 +132,8 @@ def test_one_units_draw_does_not_depend_on_the_others() -> None:
         & (LARGE.detector == "kay")
         & (LARGE.cell == "exactly_one_detector")
     )
-    full = examples.draw_examples(LARGE, seed=SEED)
-    part = examples.draw_examples(alone, seed=SEED)
+    full = inventory_examples.draw_examples(LARGE, seed=SEED)
+    part = inventory_examples.draw_examples(alone, seed=SEED)
     keys = set(LARGE[unit].event_key)
     assert set(full.event_key) & keys == set(part.event_key) & keys
     assert np.isin(part.event_key, LARGE.event_key).all()
@@ -150,7 +154,7 @@ def test_a_draw_that_cannot_be_made_is_recorded_and_the_run_goes_on(
         table = cells([(cell, "kay", animal, "unmatched", 3)]).assign(
             epoch=identifier.split("_", 1)[1].removesuffix("_HPC")
         )
-        write_table(table, runner.output_path(identifier, run_dir, "cells"))
+        write_table(table, inventory_run.output_path(identifier, run_dir, "cells"))
     (run_dir / "manifest.json").write_text(
         json.dumps(
             {
@@ -185,18 +189,18 @@ def test_a_draw_that_cannot_be_made_is_recorded_and_the_run_goes_on(
         )
 
     # the first draw, of epoch one, disagrees; an earlier run left its figure
-    first = examples.draw_examples(
+    first = inventory_examples.draw_examples(
         pd.concat(
-            pd.read_parquet(runner.output_path(identifier, run_dir, "cells"))
+            pd.read_parquet(inventory_run.output_path(identifier, run_dir, "cells"))
             for identifier in epochs
         )
     ).iloc[0]
     disagreeing = first.event_key
-    stale = figure_dir / examples.figure_name(first)
+    stale = figure_dir / inventory_examples.figure_name(first)
     stale.parent.mkdir(parents=True)
     stale.write_bytes(b"an earlier run's figure")
 
-    real_draw_example = examples.draw_example
+    real_draw_example = inventory_examples.draw_example
 
     def draw_example(inputs, drawn, *, against, path, run_id):
         if drawn.event_key == disagreeing:
@@ -209,7 +213,8 @@ def test_a_draw_that_cannot_be_made_is_recorded_and_the_run_goes_on(
 
     monkeypatch.setattr(examples, "load_epoch", load_epoch)
     monkeypatch.setattr(examples, "draw_example", draw_example)
-    monkeypatch.setattr(examples, "recompute_windows", recompute_windows)
+    # the real draw_example recomputes through the library's recompute_windows
+    monkeypatch.setattr(inventory_examples, "recompute_windows", recompute_windows)
 
     records = examples.write_examples(run_dir, figure_dir)
 
@@ -240,8 +245,8 @@ def test_detector_colors_follow_the_paper_families():
     memoryless inventories each take their own family color."""
     from continuum_swr_replay.visualization.palettes import COLORS
 
-    colors = {d: examples.detector_color(d) for d in runner.DETECTORS}
-    assert {colors[d] for d in runner.SWR_DEFINITIONS} == {COLORS["SWR"]}
+    colors = {d: inventory_examples.detector_color(d) for d in inventory_run.DETECTORS}
+    assert {colors[d] for d in inventory_run.SWR_DEFINITIONS} == {COLORS["SWR"]}
     assert colors["mua"] == COLORS["MUA"]
     assert colors["state_space"] == COLORS["Non-Local"]
     assert colors["memoryless"] == colors["memoryless_criteria"]
@@ -305,7 +310,7 @@ def _one_candidate_epoch(monkeypatch, middle_posterior):
     with np.errstate(divide="ignore"):
         log_posterior = np.log(posterior)
     monkeypatch.setattr(
-        examples,
+        inventory_examples,
         "candidate_window_log_likelihood",
         lambda first, stop, *args: log_posterior[first : stop + 1].copy(),
     )
@@ -321,7 +326,7 @@ def test_a_center_moved_to_a_tie_does_not_move_the_candidates_dispersion(
     tie."""
     inputs = _one_candidate_epoch(monkeypatch, np.array([0, 0.5, 0.5, 0, 0]))
 
-    _, _, check = examples.recompute_windows(inputs, 0, 2)
+    _, _, check = inventory_examples.recompute_windows(inputs, 0, 2)
 
     assert check["center_ties"] == 1
     (record,) = check["candidates"]
@@ -334,25 +339,24 @@ def test_a_center_moved_off_a_tie_still_refuses_the_figure(monkeypatch) -> None:
     inputs = _one_candidate_epoch(monkeypatch, np.array([0, 0.6, 0.4, 0, 0]))
 
     with pytest.raises(ValueError, match="1 centers moved off a tie"):
-        examples.recompute_windows(inputs, 0, 2)
+        inventory_examples.recompute_windows(inputs, 0, 2)
 
 
-def test_the_recompute_runs_on_the_gpu_even_when_an_import_pinned_the_cpu(
+def test_the_recompute_runs_on_the_gpu_even_when_the_cpu_was_pinned(
     monkeypatch,
 ) -> None:
-    """Modules the examples import set JAX_PLATFORMS=cpu when imported
-    (scripts/detection/run_state_evidence.py); the recompute still asks JAX for the
-    GPU, under the memoryless run's XLA flags."""
+    """A shell or a caller may pin JAX_PLATFORMS to the CPU; the recompute still
+    asks JAX for the GPU, under the memoryless run's XLA flags."""
     monkeypatch.setenv("JAX_PLATFORMS", "cpu")
     monkeypatch.setenv("XLA_FLAGS", "")
     updates = []
     monkeypatch.setattr(
-        examples.jax.config, "update", lambda *args: updates.append(args)
+        inventory_examples.jax.config, "update", lambda *args: updates.append(args)
     )
 
-    examples.use_memoryless_device()
+    inventory_examples.use_memoryless_device()
 
     assert updates == [("jax_platforms", "cuda")]
-    assert examples.os.environ["JAX_PLATFORMS"] == "cuda"
-    for flag in examples.memoryless_runner.REQUIRED_XLA_FLAGS:
-        assert flag in examples.os.environ["XLA_FLAGS"].split()
+    assert inventory_examples.os.environ["JAX_PLATFORMS"] == "cuda"
+    for flag in REQUIRED_XLA_FLAGS:
+        assert flag in inventory_examples.os.environ["XLA_FLAGS"].split()

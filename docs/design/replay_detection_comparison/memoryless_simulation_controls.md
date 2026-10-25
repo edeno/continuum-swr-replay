@@ -160,7 +160,9 @@ the error estimates the real-data held-out results will be read with.
   path that is NaN in gaps; new pure functions for part recovery and segmentation.
 - `scripts/detection/sweep_memoryless_detection.py`: each detector's per-window function is
   split into "run: reported events with bounds and decoded positions" and "score", so
-  the new script can reuse the first. `summarize` gains paired onset/offset rows by
+  the new script can reuse the first (2026-10-25: the recording and the runs are now
+  `memoryless_sequence/sweep.py`'s, and the controls' conditions
+  `memoryless_sequence/sweep_controls.py`'s). `summarize` gains paired onset/offset rows by
   duration. Every existing summary row must be unchanged.
 - `scripts/detection/sweep_memoryless_controls.py` (new): runs the conditions above; raw table
   to `Processed-Data/replay_detection_comparison/memoryless_controls.parquet`,

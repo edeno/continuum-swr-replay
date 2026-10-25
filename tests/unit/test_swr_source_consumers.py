@@ -816,10 +816,11 @@ DECODE_FRAME_READERS = {
         "reads it through with_swr_source; artifact_event_drops of the frame as "
         "saved, from the one read its sha256 names"
     ),
-    "scripts/detection/run_carey_detection.py": (
-        "the grid's first and last time, the span the marks are loaded over"
+    "src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py": (
+        "decode_marks: the grid's first and last time, the span the marks are "
+        "loaded over"
     ),
-    "scripts/figures/generate_inventory_examples.py": (
+    "src/continuum_swr_replay/visualization/inventory_examples.py": (
         "grid, speed, posterior and position; its events are the comparison's tables"
     ),
     "scripts/detection/run_event_features.py": (

@@ -275,14 +275,14 @@ def test_an_epoch_without_its_inputs_is_recorded_and_the_run_goes_on(
         "rejection": rejection,
     }
     monkeypatch.setattr(
-        examples.report, "read_run", lambda *args: (manifest, dict(tables_read))
+        examples, "read_run", lambda *args: (manifest, dict(tables_read))
     )
     monkeypatch.setattr(
-        examples.report,
+        examples,
         "read_inputs",
         lambda *args: {"cells": None, "directional": None},
     )
-    monkeypatch.setattr(examples.report, "event_populations", lambda *a: populations)
+    monkeypatch.setattr(examples, "event_populations", lambda *a: populations)
     closed = []
 
     def load_epoch(

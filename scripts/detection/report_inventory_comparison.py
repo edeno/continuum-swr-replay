@@ -28,7 +28,6 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 from collections.abc import Collection, Mapping, Sequence
 from itertools import combinations
@@ -38,8 +37,6 @@ from types import MappingProxyType
 import numpy as np
 import pandas as pd
 
-# CPU only: the package imports JAX, which the report never needs.
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -50,15 +47,18 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 
+from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+    inventory_run,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import INVENTORY_COMPARISON_ROOT  # noqa: E402
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.detection import run_inventory_comparison as runner  # noqa: E402
 from scripts.detection._report import (  # noqa: E402
     MEMBERSHIPS,
     PENDING,
@@ -1234,7 +1234,9 @@ def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
     dict
         ``tables`` and ``figures``: the paths written.
     """
-    manifest, tables = read_run(run_dir, runner.TABLE_DTYPES, runner.output_path)
+    manifest, tables = read_run(
+        run_dir, inventory_run.TABLE_DTYPES, inventory_run.output_path
+    )
     out = report_tables(manifest, tables)
     run_id = run_dir.name
     figure_dir = figure_root / run_id
@@ -1278,6 +1280,8 @@ def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # CPU only: the package imports JAX, which the report never needs
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

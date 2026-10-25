@@ -14,7 +14,7 @@ Per epoch:
 1. **Decode.** The epoch is refused, and writes nothing, unless the decode's
    sha256 is the one the comparison run recorded for it. The frame is read
    through the SWR source, and its grid must step by the comparison's
-   ``SAMPLE_INTERVAL_S`` (the median step; ``_speed_trace``).
+   ``SAMPLE_INTERVAL_S`` (the median step; ``inventory_run.speed_trace``).
 2. **Memberships.** The pairwise memberships are rebuilt from
    the stored tables and the frame's still time (``rebuild_matches``); the
    epoch fails unless they reproduce the stored ``directional`` and ``cells``
@@ -41,8 +41,8 @@ stored) and every rejection stage ``unknown``.
 Each epoch writes, under
 ``Processed-Data/replay_detection_comparison/event_features/<run_id>/`` (the
 run id is the first 12 characters of the commit), one set of
-``{epoch_id}_<table>.parquet``, one per table of :data:`TABLE_DTYPES`:
-``features`` (:data:`FEATURE_DTYPES`), ``pair_membership`` (the rebuilt
+``{epoch_id}_<table>.parquet``, one per table of ``feature_run.TABLE_DTYPES``:
+``features`` (``feature_run.FEATURE_DTYPES``), ``pair_membership`` (the rebuilt
 ``event_matches``) and ``rejection``. Every table is made before any is
 written, and a failed epoch keeps none. ``manifest.json`` beside them holds the
 run's settings (the input runs, the stop table, the grid and evidence rules,
@@ -59,8 +59,8 @@ The epochs are the epoch register's analysed ones, narrowed by ``--animal``,
 ``--date`` and ``--epoch``, or the one ``--epoch-id``, run on a dask
 ``LocalCluster`` of ``--n-workers`` processes, one epoch at a time each, each
 logging to ``logs/{epoch_id}_event_features.log`` under the working directory.
-The device is the environment's: ``JAX_PLATFORMS`` (``cpu`` when unset) and
-``CUDA_VISIBLE_DEVICES``. The BLAS and OpenMP thread counts are 1 in every
+The device is the environment's: ``JAX_PLATFORMS`` (``cpu`` when unset, set so in
+``main``) and ``CUDA_VISIBLE_DEVICES``. The BLAS and OpenMP thread counts are 1 in every
 worker (dask's nanny sets them; this process sets them too when unset); JAX's
 CPU threads follow the process's CPU affinity, so pin the run with
 ``taskset``.
@@ -78,7 +78,6 @@ import os
 from continuum_swr_replay.runs.threads import pin_blas_threads
 
 pin_blas_threads()
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
 import argparse  # noqa: E402
 import functools  # noqa: E402
@@ -89,10 +88,8 @@ import resource  # noqa: E402
 import sys  # noqa: E402
 import time as clock  # noqa: E402
 import traceback  # noqa: E402
-import warnings  # noqa: E402
 from collections.abc import Mapping  # noqa: E402
 from pathlib import Path  # noqa: E402
-from types import MappingProxyType  # noqa: E402
 from typing import Any  # noqa: E402
 
 import joblib  # noqa: E402
@@ -101,20 +98,21 @@ import pandas as pd  # noqa: E402
 from dask.distributed import LocalCluster  # noqa: E402
 from numpy.typing import NDArray  # noqa: E402
 
-# Sibling-script import: run as a script, only this file's directory is on
-# sys.path.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+    REMOTE_CM,
 )
 from continuum_swr_replay.analysis.events import (  # noqa: E402
     analysed_time,
     swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
+    MARKS_CACHE_DIR as DEFAULT_MARKS_CACHE_DIR,
+)
+from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
     MARKS_RULE,
+    decode_marks,
     marks_sha256,
 )
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
@@ -134,6 +132,9 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 from continuum_swr_replay.analysis.hippocampus.state_evidence.terms import (  # noqa: E402
     encoding_inputs,
 )
+from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+    inventory_run,
+)
 from continuum_swr_replay.analysis.inventory_comparison.availability import (  # noqa: E402
     still_intervals,
 )
@@ -143,10 +144,14 @@ from continuum_swr_replay.analysis.inventory_comparison.evidence import (  # noq
     epoch_row_evidence,
     interval_evidence,
 )
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+    FEATURE_DTYPES,
+    MS_DTYPES,
+    output_paths,
+)
 from continuum_swr_replay.analysis.inventory_comparison.features import (  # noqa: E402
     DURATION_STRATA_S,
     DURATION_STRATUM_LABELS,
-    STOP_CONTEXT_DTYPES,
     PosteriorTraces,
     RowTraces,
     _grid_rows,
@@ -196,7 +201,11 @@ from continuum_swr_replay.runs.batch import (  # noqa: E402
     run_epochs,
     run_lock,
 )
-from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.cli import (  # noqa: E402
+    parse_run_id,
+    select_analysed_epochs,
+)
+from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.io import (  # noqa: E402
     json_ready,
     replace_outputs,
@@ -209,18 +218,11 @@ from continuum_swr_replay.runs.provenance import (  # noqa: E402
 )
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.detection import run_carey_detection as carey  # noqa: E402
-from scripts.detection import run_inventory_comparison as comparison  # noqa: E402
-
-# the spike-evidence script installs ignore filters for whole warning classes
-# when imported; they stay inside this block, out of the run and its workers
-with warnings.catch_warnings():
-    from scripts.detection.analyze_event_spike_evidence import REMOTE_CM  # noqa: E402
 
 OUTPUT_ROOT = EVENT_FEATURES_ROOT
 INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT
 """Where the comparison runs are."""
-MARKS_CACHE_DIR = carey.MARKS_CACHE_DIR
+MARKS_CACHE_DIR = DEFAULT_MARKS_CACHE_DIR
 """The memoryless runner's marks cache, keyed by the decode's detector file."""
 STOP_TABLE = table_path("stop_table")
 PRODUCED_BY = produced_by(__file__)
@@ -241,75 +243,6 @@ EVIDENCE_LIKELIHOOD = (
     "saved encoding model; the rows of the compared events"
 )
 
-_MS_DTYPES: Mapping[str, object] = MappingProxyType(
-    {
-        "ms_n_windows": "Int64",
-        "ms_n_windows_decoded": "Int64",
-        "ms_n_windows_with_center": "Int64",
-        "ms_spread_cm_mean": np.float64,
-        "ms_extent_cm": np.float64,
-        "ms_distance_cm_mean": np.float64,
-        "ms_frac_windows_kept": np.float64,
-    }
-)
-"""The ``ms_features`` columns; ``ms_n_windows`` is missing, not 0, in an epoch
-with no memoryless run."""
-
-FEATURE_DTYPES: Mapping[str, object] = MappingProxyType(
-    {
-        **INVENTORY_DTYPES,
-        "duration_stratum": object,
-        "first_row": np.int64,
-        "n_rows": np.int64,
-        "n_spikes": "Int64",
-        "n_active_tetrodes": "Int64",
-        "n_tetrodes": np.int64,
-        "spike_rate_hz": np.float64,
-        "ripple_z_max": np.float64,
-        "ripple_z_mean": np.float64,
-        "mua_z_max": np.float64,
-        "mua_z_mean": np.float64,
-        "linear_position_cm": np.float64,
-        "track_segment_id": "Int64",
-        "patch_id": "Int64",
-        "evidence_dll": np.float64,
-        "evidence_n_valid_rows": "Int64",
-        "evidence_valid_fraction": np.float64,
-        "evidence_unscorable": object,
-        "previous_gap_s": np.float64,
-        "next_gap_s": np.float64,
-        **STOP_CONTEXT_DTYPES,
-        "time_in_stop_s": np.float64,
-        "time_since_arrival_s": np.float64,
-        "ss_local_prob_mean": np.float64,
-        "ss_no_spike_prob_mean": np.float64,
-        "ss_continuous_prob_mean": np.float64,
-        "ss_fragmented_prob_mean": np.float64,
-        "ss_nonlocal_prob_max": np.float64,
-        "ss_frac_rows_nonlocal": np.float64,
-        "ss_extent_cm": np.float64,
-        "ss_distance_cm_mean": np.float64,
-        "ss_hpd_cm_mean": np.float64,
-        "ss_n_runs_nonlocal": "Int64",
-        "ss_longest_run_nonlocal_s": np.float64,
-        "ss_nearest_event_gap_s": np.float64,
-        "ss_disagreement": object,
-        **_MS_DTYPES,
-    }
-)
-"""One row per compared event: the inventory schema's columns, the span's
-stratum (a label of ``DURATION_STRATUM_LABELS``, in that order), and every
-feature."""
-
-TABLE_DTYPES: Mapping[str, Mapping[str, object]] = MappingProxyType(
-    {
-        "features": FEATURE_DTYPES,
-        "pair_membership": MATCH_DTYPES,
-        "rejection": REJECTION_DTYPES,
-    }
-)
-"""Every table an epoch writes, with its columns and dtypes."""
-
 INVENTORY_TABLES = (
     "observations",
     "set_aside",
@@ -323,15 +256,6 @@ INVENTORY_TABLES = (
 
 class _EpochRefused(Exception):
     """The epoch's inputs are not the comparison's; the message says why."""
-
-
-def output_path(identifier: str, output_dir: Path, name: str) -> Path:
-    return output_dir / f"{identifier}_{name}.parquet"
-
-
-def output_paths(identifier: str, output_dir: Path) -> dict[str, Path]:
-    """Every table an epoch can write, by name."""
-    return {name: output_path(identifier, output_dir, name) for name in TABLE_DTYPES}
 
 
 def _row_mask(n_time: int, first: NDArray, n_rows: NDArray) -> NDArray[np.bool_]:
@@ -450,10 +374,7 @@ def memoryless_input_mismatch(
 def _missing_ms(index: pd.Index) -> pd.DataFrame:
     """Every ``ms_*`` feature missing, for an epoch with no memoryless run."""
     return pd.DataFrame(
-        {
-            name: pd.Series(index=index, dtype=dtype)
-            for name, dtype in _MS_DTYPES.items()
-        }
+        {name: pd.Series(index=index, dtype=dtype) for name, dtype in MS_DTYPES.items()}
     )
 
 
@@ -502,26 +423,29 @@ def epoch_tables(
         ``cells``; the marks are not the encoding model's; or the memoryless
         run is not the comparison's.
     """
-    saved = pd.read_pickle(comparison.decode_path(identifier))
+    saved = pd.read_pickle(inventory_run.decode_path(identifier))
     dot = analysed_time.with_swr_source(saved)
     del saved
     # raises unless the grid's median step is SAMPLE_INTERVAL_S, the step
     # interval_features is given
-    time, speed = comparison._speed_trace(dot)
+    time, speed = inventory_run.speed_trace(dot)
     animal, day, epoch = (dot[column].iloc[0] for column in SESSION_COLUMNS_DAY)
     session = (str(animal), int(day), str(epoch))
     still = {
         session: still_intervals(
-            time, speed, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, comparison.MAX_GAP_S
+            time,
+            speed,
+            DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+            inventory_run.MAX_GAP_S,
         )
     }
 
     stored = {
-        name: read_table(comparison.output_path(identifier, inventory_dir, name))
+        name: read_table(inventory_run.output_path(identifier, inventory_dir, name))
         for name in INVENTORY_TABLES
     }
     _, matches = rebuild_matches(
-        stored, still, detectors=comparison.DETECTORS, cells=comparison.CELLS
+        stored, still, detectors=inventory_run.DETECTORS, cells=inventory_run.CELLS
     )
     inventory = stored["inventory"]
     compared = inventory[inventory.whole_event_speed_eligible].reset_index(drop=True)
@@ -529,8 +453,8 @@ def epoch_tables(
         compared, matches, stored["cells"], stored["directional"]
     )
 
-    marks = carey.decode_marks(
-        identifier, root=comparison.DECODE_ROOT, cache_dir=MARKS_CACHE_DIR
+    marks = decode_marks(
+        identifier, root=inventory_run.DECODE_ROOT, cache_dir=MARKS_CACHE_DIR
     )
     spike_times = marks["spike_times"]
     spike_waveform_features = marks["spike_waveform_features"]
@@ -577,7 +501,7 @@ def epoch_tables(
 
     intervals = compared[list(INVENTORY_DTYPES)]
     engagement = interval_features(
-        traces, intervals, sample_interval_s=comparison.SAMPLE_INTERVAL_S
+        traces, intervals, sample_interval_s=inventory_run.SAMPLE_INTERVAL_S
     )
     _require_requested(rows, engagement)
 
@@ -699,7 +623,7 @@ def run_epoch(
             raise _EpochRefused(
                 f"Comparison run {inventory_dir.name} has no ok record of the epoch."
             )
-        path = comparison.decode_path(identifier)
+        path = inventory_run.decode_path(identifier)
         record["decode"] = {"path": str(path), "sha256": sha256_file(path)}
         if record["decode"]["sha256"] != decode_sha256[identifier]:
             raise _EpochRefused(
@@ -717,7 +641,7 @@ def run_epoch(
         record |= {"status": "ok", **found}
         record["outputs"] = replace_outputs(
             output_paths(identifier, output_dir),
-            comparison.stamped_tables(tables, stamp),
+            inventory_run.stamped_tables(tables, stamp),
         )
     except _EpochRefused as refused:
         replace_outputs(output_paths(identifier, output_dir), {})
@@ -818,12 +742,12 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
                 "path": str(STOP_TABLE.relative_to(PROCESSED_DATA_DIR)),
                 "sha256": sha256_file(STOP_TABLE),
             },
-            "decode": comparison.decode_path("{epoch_id}").name
+            "decode": inventory_run.decode_path("{epoch_id}").name
             + ", read through the SWR source; its sha256 the comparison's",
             "marks_rule": MARKS_RULE,
             "grid": {
                 "rule": GRID_RULE,
-                "sample_interval_s": comparison.SAMPLE_INTERVAL_S,
+                "sample_interval_s": inventory_run.SAMPLE_INTERVAL_S,
             },
             "evidence": {
                 "likelihood": EVIDENCE_LIKELIHOOD,
@@ -834,7 +758,7 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
             },
             "speed": {
                 "threshold_cm_per_s": DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-                "max_gap_s": comparison.MAX_GAP_S,
+                "max_gap_s": inventory_run.MAX_GAP_S,
             },
             "non_local_threshold": DEFAULT_NON_LOCAL_THRESHOLD,
             "near_s": max(FRAGMENT_GAPS_S),
@@ -853,6 +777,8 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
 
 
 def main(argv: list[str] | None = None) -> None:
+    # the environment's device, the CPU when unset; the workers inherit it
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -929,7 +855,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     if not (memoryless_dir / "manifest.json").exists():
         sys.exit(f"No memoryless run manifest at {memoryless_dir}.")
     settings = run_settings(args.inventory_run_id, inventory)
-    epochs = comparison.select_epochs(args)
+    epochs = select_analysed_epochs(args)
     if not epochs:
         sys.exit("No analysed epochs match --animal, --date and --epoch.")
 

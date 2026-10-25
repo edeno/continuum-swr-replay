@@ -24,7 +24,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     aggregate_windows,
     normalize_windows,
 )
-from scripts.qa import memoryless_reference as reference
+from scripts.qa import _memoryless_reference as reference
 from scripts.qa.compare_memoryless_to_reference import (
     fields_and_thresholds,
     window_counts,

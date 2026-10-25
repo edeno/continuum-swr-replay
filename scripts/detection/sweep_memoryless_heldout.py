@@ -30,7 +30,6 @@ Usage:
 """
 
 import argparse
-import sys
 import time as clock
 import zlib
 from datetime import UTC, datetime
@@ -38,27 +37,30 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from non_local_detector.likelihoods.common import (  # noqa: E402
-    get_spikecount_per_time_bin,
+from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
+from non_local_detector.simulate.sorted_spikes_simulation import (
+    SAMPLING_FREQUENCY,
+    TRACK_HEIGHT,
 )
 
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    sweep,
+    sweep_controls,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     with_reference_rate_floor,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
     score_against_injection,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     Segment,
     inject_activity,
     piecewise_replay,
     place_field_means,
     placements,
 )
-from continuum_swr_replay.analysis.inventory_comparison.heldout import (  # noqa: E402
+from continuum_swr_replay.analysis.inventory_comparison.heldout import (
     COVERAGE_FLOOR,
     event_classes,
     heldout_score,
@@ -67,10 +69,8 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (  # noqa
     poor_coverage_fold,
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
-from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
-from continuum_swr_replay.tables.io import write_table  # noqa: E402
-from scripts.detection import sweep_memoryless_controls as controls  # noqa: E402
-from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
+from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.tables.io import write_table
 
 N_PERMUTATIONS = 100
 COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
@@ -111,14 +111,14 @@ def fold_models(discovery: np.ndarray, evaluation: np.ndarray, seed: int = 0):
 def trials(means: np.ndarray):
     """The sweep's injected replays and the controls' trials, as the controls
     list them: name, grid level, peak rate, builder, and pieces."""
-    sampling_frequency = sweep.SAMPLING_FREQUENCY
+    sampling_frequency = SAMPLING_FREQUENCY
     for path_cm in sweep.PATH_CM:
         for midpoint_cm in sweep.MIDPOINT_CM:
             if (
                 not 0
                 <= midpoint_cm - path_cm / 2
                 <= midpoint_cm + path_cm / 2
-                <= sweep.TRACK_HEIGHT
+                <= TRACK_HEIGHT
             ):
                 continue
             for duration_s in sweep.DURATION_S:
@@ -142,7 +142,7 @@ def trials(means: np.ndarray):
                         make,
                         None,
                     )
-    yield from controls.trials(means, sampling_frequency)
+    yield from sweep_controls.trials(means, sampling_frequency)
 
 
 def event_truth(event, activity, recorded_events: np.ndarray) -> str:
@@ -193,9 +193,9 @@ def matches_injection(event, activity) -> bool:
     return score_against_injection(
         event.decoded_time_s,
         event.decoded_cm,
-        controls.truth_path(activity),
+        sweep_controls.truth_path(activity),
         activity.bounds,
-        controls.covered_cm(activity),
+        sweep_controls.covered_cm(activity),
         sweep.MATCH_TOLERANCE_CM,
     ).matches
 
@@ -275,8 +275,8 @@ def score_events(
 
 def run_fold(fold, discovery, evaluation, n_seeds) -> list[dict]:
     recording, fields = fold_models(discovery, evaluation)
-    means = place_field_means(sweep.N_NEURONS, sweep.TRACK_HEIGHT)
-    intervals = controls.usable_intervals(recording)
+    means = place_field_means(sweep.N_NEURONS, TRACK_HEIGHT)
+    intervals = sweep_controls.usable_intervals(recording)
     rng = np.random.default_rng(PLACEMENT_SEED)
     rows = []
     for condition, level, rate_hz, make, _ in trials(means):
@@ -325,7 +325,9 @@ def run_no_replay_fold(fold, discovery, evaluation, n_recordings) -> list[dict]:
     for recording_seed in range(n_recordings):
         recording, fields = fold_models(discovery, evaluation, seed=recording_seed)
         spike_times = recording["all_spike_times"]
-        for index, (start_s, end_s) in enumerate(controls.usable_intervals(recording)):
+        for index, (start_s, end_s) in enumerate(
+            sweep_controls.usable_intervals(recording)
+        ):
             mask = (recording["time"] >= start_s) & (recording["time"] <= end_s)
             window = tuple(recording[k][mask] for k in ("time", "position", "speed"))
             key = f"no-replay-recording{recording_seed}-stretch{index}"
@@ -458,7 +460,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--folds", nargs="+", default=["A", "B", "C"])
-    parser.add_argument("--n-recordings", type=int, default=controls.N_RECORDINGS)
+    parser.add_argument("--n-recordings", type=int, default=sweep_controls.N_RECORDINGS)
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     args = parser.parse_args()
@@ -477,7 +479,7 @@ def main() -> None:
     table.attrs = {
         "produced_by": produced_by(__file__),
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "git_commit": sweep.git_commit(),
+        "git_commit": described_commit(),
         "n_seeds": args.n_seeds,
         "n_permutations": N_PERMUTATIONS,
         "n_recordings": args.n_recordings,

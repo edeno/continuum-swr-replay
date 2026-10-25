@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     Gap,
     Segment,
     piecewise_replay,
     place_field_means,
 )
-from scripts.detection import sweep_memoryless_detection as sweep
 from scripts.detection import sweep_memoryless_heldout as heldout
 
 REPLAY = piecewise_replay(

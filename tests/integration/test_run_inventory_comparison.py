@@ -33,6 +33,7 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
+from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     coverage_from_observations,
     still_intervals,
@@ -53,6 +54,7 @@ from continuum_swr_replay.intervals import (
     intersect,
     total_duration,
 )
+from continuum_swr_replay.runs import cli
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table
 from tests.unit._swr_inventory_fixtures import (
@@ -248,12 +250,12 @@ def inputs(tmp_path_factory, module_monkeypatch):
         write_decode(decode_root, epoch, identifier)
     write_carey_run(tmp_path / "carey")
     write_memoryless_run(tmp_path / "memoryless")
-    monkeypatch.setattr(runner, "DECODE_ROOT", decode_root)
+    monkeypatch.setattr(inventory_run, "DECODE_ROOT", decode_root)
     monkeypatch.setattr(runner, "CAREY_ROOT", tmp_path / "carey")
     monkeypatch.setattr(runner, "MEMORYLESS_ROOT", tmp_path / "memoryless")
     monkeypatch.setattr(runner, "OUTPUT_ROOT", tmp_path / "inventory")
     monkeypatch.setattr(
-        runner, "analysed_epoch_ids", lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE]
+        cli, "analysed_epoch_ids", lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE]
     )
     return tmp_path
 
@@ -564,7 +566,7 @@ class TestTheStoredTablesRebuildTheComparison:
             seen["matches"] = event_matches(kept, pairs, coverage, **kwargs)
             return seen["matches"]
 
-        saved = pd.read_pickle(runner.decode_path(identifier))
+        saved = pd.read_pickle(inventory_run.decode_path(identifier))
         dot = analysed_time.with_swr_source(saved)
         with pytest.MonkeyPatch.context() as patch:
             patch.setattr(runner, "event_matches", spy)
@@ -575,11 +577,14 @@ class TestTheStoredTablesRebuildTheComparison:
                 carey_dir=runner.CAREY_ROOT / CAREY_RUN,
                 memoryless_dir=runner.MEMORYLESS_ROOT / MEMORYLESS_RUN,
             )
-        time, speed = runner._speed_trace(dot)
+        time, speed = inventory_run.speed_trace(dot)
         key = (ANIMAL, DAY, dot.epoch.iloc[0])
         still = {
             key: still_intervals(
-                time, speed, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC, runner.MAX_GAP_S
+                time,
+                speed,
+                DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+                inventory_run.MAX_GAP_S,
             )
         }
         return seen, still
@@ -614,20 +619,20 @@ class TestTheStoredTablesRebuildTheComparison:
         pairs = tables["pairs"][list(PAIR_DTYPES)]
 
         directional = directional_agreement(
-            compared, pairs, coverage, detectors=runner.DETECTORS
+            compared, pairs, coverage, detectors=inventory_run.DETECTORS
         )
         _, matches = rebuild_matches(
-            tables, still, detectors=runner.DETECTORS, cells=runner.CELLS
+            tables, still, detectors=inventory_run.DETECTORS, cells=inventory_run.CELLS
         )
         cells = pd.concat(
             [
                 membership_against(
                     compared, matches, sources=sources, against=against
                 ).assign(cell=name)
-                for name, (sources, against) in runner.CELLS.items()
+                for name, (sources, against) in inventory_run.CELLS.items()
             ],
             ignore_index=True,
-        )[list(runner.TABLE_DTYPES["cells"])]
+        )[list(inventory_run.TABLE_DTYPES["cells"])]
 
         pd.testing.assert_frame_equal(directional, tables["directional"])
         order = ["cell", "event_key"]
@@ -678,7 +683,7 @@ def test_event_keys_are_unique_across_the_epochs(run):
 
 def test_every_table_keeps_its_dtypes_through_a_write_and_read(run):
     for identifier in EPOCHS.values():
-        for name, dtypes in runner.TABLE_DTYPES.items():
+        for name, dtypes in inventory_run.TABLE_DTYPES.items():
             read = table(run, identifier, name)
             assert list(read.columns) == list(dtypes), name
             assert read.dtypes.to_dict() == {
@@ -704,10 +709,10 @@ def test_the_manifest_records_the_inputs_and_each_epoch(run):
     for identifier in EPOCHS.values():
         record = manifest["epochs"][identifier]
         assert record["status"] == "ok"
-        decode = runner.DECODE_ROOT / f"{identifier}_80_data_over_time.pkl"
+        decode = inventory_run.DECODE_ROOT / f"{identifier}_80_data_over_time.pkl"
         assert record["decode"]["sha256"] == sha256_file(decode)
         assert record["epoch_bounds_s"] == [float(TIME[0]), float(TIME[-1])]
-        assert set(record["outputs"]) == set(runner.TABLE_DTYPES)
+        assert set(record["outputs"]) == set(inventory_run.TABLE_DTYPES)
         for output in record["outputs"].values():
             assert sha256_file(output["path"]) == output["sha256"]
     assert manifest["epochs"][WORKED]["counts"]["kay"]["n_native"] == len(KAY)

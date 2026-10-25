@@ -72,6 +72,7 @@ tests/
 ├── analysis/                # tests that mirror src/continuum_swr_replay/analysis/
 │   ├── hippocampus/
 │   └── pfc/
+├── runs/                    # tests that mirror src/continuum_swr_replay/runs/
 ├── visualization/           # plotting helpers (figure_panels, palettes, etc.)
 ├── integration/             # whole-runner and pipeline tests (marker: integration)
 ├── property/                # hypothesis-based invariants

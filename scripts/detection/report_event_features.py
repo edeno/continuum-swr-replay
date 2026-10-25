@@ -40,7 +40,6 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
@@ -50,8 +49,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-# CPU only: the package imports JAX, which the report never needs.
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -62,24 +59,28 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import matplotlib.ticker  # noqa: E402
 
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
-    memoryless_output_paths as memoryless_outputs,
+from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+    feature_run,
+    inventory_run,
+)
+from continuum_swr_replay.analysis.inventory_comparison.feature_run import (  # noqa: E402
+    read_inputs,
 )
 from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
     ALL,
-    BASELINE,
     NO_SHARED_EXPOSURE,
     OUTSIDE_SHARED_EXPOSURE,
-    POPULATION_DTYPES,
-    population_rows,
+    event_populations,
+    without_baseline_rows,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa: E402
     MEMORYLESS,
+    MEMORYLESS_CRITERIA,
     STATE_SPACE,
     _event_keys,
-    typed_table,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+    REJECTION_COHORTS,
     REJECTION_DTYPES,
     REJECTION_STAGES,
 )
@@ -96,11 +97,12 @@ from continuum_swr_replay.paths import (  # noqa: E402
     MEMORYLESS_ROOT,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
+from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
 from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
-from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
-from scripts.detection import run_event_features as features_runner  # noqa: E402
-from scripts.detection import run_inventory_comparison as comparison  # noqa: E402
+from continuum_swr_replay.visualization.inventory_examples import (  # noqa: E402
+    detector_color,
+)
 from scripts.detection._report import (  # noqa: E402
     MEMBERSHIPS,
     PENDING,
@@ -115,9 +117,6 @@ from scripts.detection._report import (  # noqa: E402
     read_run,
     summed,
     with_pending,
-)
-from scripts.figures.generate_inventory_examples import (  # noqa: E402
-    detector_color,
 )
 
 PRODUCED_BY = produced_by(__file__)
@@ -228,21 +227,6 @@ COMPOSITION = (
     "ss_nearest_event_gap_s",
 )
 """The state-space composition of the comparator-only events."""
-CANDIDATE_COLUMNS: Mapping[str, object] = MappingProxyType(
-    {
-        "animal": object,
-        "day": np.int64,
-        "epoch": object,
-        "ms_event_id": np.int64,
-        "is_replay": np.bool_,
-        "shuffle_pass": np.bool_,
-        "shuffle_testable": np.bool_,
-        "n_shuffles": np.int64,
-        "artifact_drop_reason": object,
-        "whole_event_speed_eligible": np.bool_,
-    }
-)
-"""The columns of the memoryless run's candidate tables the report reads."""
 COHORT_COUNTS = (
     "n_candidates",
     "n_criteria",
@@ -563,67 +547,6 @@ def _session_of(identifier: str) -> tuple[str, int, str]:
     return key.animal, key.date, key.epoch_name
 
 
-def read_inputs(
-    manifest: Mapping, inventory_root: Path, memoryless_root: Path
-) -> dict[str, pd.DataFrame]:
-    """The comparison's ``cells`` and ``directional`` tables and the memoryless
-    run's candidates, for the run's ``ok`` epochs, concatenated.
-
-    The runs are the ones the manifest's ``input_runs`` name. Candidates are
-    read for the epochs the memoryless run observed.
-    """
-    runs = manifest["settings"]["input_runs"]
-    inventory_dir = inventory_root / runs["inventory"]
-    memoryless_dir = memoryless_root / runs["memoryless"]
-    ok = _ok(manifest)
-    tables = {
-        name: typed_table(
-            (
-                read_table(comparison.output_path(identifier, inventory_dir, name))
-                for identifier in ok
-            ),
-            comparison.TABLE_DTYPES[name],
-        )
-        for name in ("cells", "directional")
-    }
-    tables["memoryless_events"] = typed_table(
-        (
-            read_table(
-                memoryless_outputs(identifier, memoryless_dir)["events"],
-                columns=list(CANDIDATE_COLUMNS),
-            )
-            for identifier in ok
-            if manifest["epochs"][identifier].get("memoryless_available")
-        ),
-        CANDIDATE_COLUMNS,
-    )
-    return tables
-
-
-def without_baseline_rows(features: pd.DataFrame) -> pd.DataFrame:
-    """``features`` less the baseline windows (detector ``baseline``) that a
-    run written before the baselines were dropped holds."""
-    kept: pd.DataFrame = features[(features.detector != BASELINE).to_numpy()]
-    return kept.reset_index(drop=True)
-
-
-def event_populations(
-    features: pd.DataFrame,
-    pair_membership: pd.DataFrame,
-    cells: pd.DataFrame,
-    directional: pd.DataFrame,
-) -> pd.DataFrame:
-    """Each compared event once per population it belongs to.
-
-    Returns
-    -------
-    DataFrame
-        Columns and dtypes as ``populations.POPULATION_DTYPES``.
-    """
-    rows = population_rows(features, pair_membership, cells, directional)
-    return rows[list(POPULATION_DTYPES)].astype(dict(POPULATION_DTYPES))
-
-
 def context_by_session(
     populations: pd.DataFrame, features: pd.DataFrame
 ) -> pd.DataFrame:
@@ -689,7 +612,9 @@ def _population_detectors(labels: Collection[str]) -> dict[str, tuple[str, ...]]
         else:
             cell = label.partition(":")[0]
             out[label] = (
-                tuple(comparison.CELLS[cell][1]) if cell in comparison.CELLS else ()
+                tuple(inventory_run.CELLS[cell][1])
+                if cell in inventory_run.CELLS
+                else ()
             )
     return out
 
@@ -924,16 +849,14 @@ def memoryless_cohort_by_session(
     """
     keyed = candidates.assign(
         event_key=_event_keys(
-            comparison.MEMORYLESS_CRITERIA,
+            MEMORYLESS_CRITERIA,
             candidates.animal,
             candidates.day,
             candidates.epoch,
             candidates.ms_event_id,
         )
     )
-    criteria = set(
-        features.event_key[(features.detector == comparison.MEMORYLESS_CRITERIA)]
-    )
+    criteria = set(features.event_key[(features.detector == MEMORYLESS_CRITERIA)])
     absent = criteria - set(keyed.event_key)
     if absent:
         raise ValueError(
@@ -1205,7 +1128,7 @@ def _no_data(ax: plt.Axes, text: str = "no events") -> None:
 def _detectors_of(frame: pd.DataFrame) -> list[str]:
     """The detectors of ``frame``, in the roster's order."""
     present = set(frame.detector)
-    return [d for d in comparison.DETECTORS if d in present]
+    return [d for d in inventory_run.DETECTORS if d in present]
 
 
 def _stacked(
@@ -1361,7 +1284,7 @@ def draw_figures(
     # stage, each labelled by its column and printed, so a thin stage shows
     rejection = out["rejection_by_animal"]
     stages = list(REJECTION_STAGES[:-1])
-    cohorts = list(features_runner.REJECTION_COHORTS)
+    cohorts = list(REJECTION_COHORTS)
     greys = plt.get_cmap("Greys")
     fig, axes = _subplots(
         1,
@@ -1609,7 +1532,7 @@ def write_report(
     memoryless_root = MEMORYLESS_ROOT if memoryless_root is None else memoryless_root
     analysed = analysed_epoch_ids() if analysed is None else analysed
     manifest, tables = read_run(
-        run_dir, features_runner.TABLE_DTYPES, features_runner.output_path
+        run_dir, feature_run.TABLE_DTYPES, feature_run.output_path
     )
     tables |= read_inputs(manifest, inventory_root, memoryless_root)
     out = report_tables(manifest, tables)
@@ -1705,6 +1628,8 @@ def write_report(
 
 
 def main(argv: list[str] | None = None) -> None:
+    # CPU only: the package imports JAX, which the report never needs
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

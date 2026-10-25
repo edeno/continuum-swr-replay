@@ -65,8 +65,10 @@ __all__ = [
     "NO_SHARED_EXPOSURE",
     "OUTSIDE_SHARED_EXPOSURE",
     "POPULATION_DTYPES",
+    "event_populations",
     "population_rows",
     "rebuild_matches",
+    "without_baseline_rows",
 ]
 
 ALL = "all"
@@ -278,4 +280,28 @@ def population_rows(
         unknown_reason="",
     )
     rows = pd.concat([everyone, pairwise, in_cells], ignore_index=True)
+    return rows[list(POPULATION_DTYPES)].astype(dict(POPULATION_DTYPES))
+
+
+def without_baseline_rows(features: pd.DataFrame) -> pd.DataFrame:
+    """``features`` less the baseline windows (detector ``baseline``) that a
+    run written before the baselines were dropped holds."""
+    kept: pd.DataFrame = features[(features.detector != BASELINE).to_numpy()]
+    return kept.reset_index(drop=True)
+
+
+def event_populations(
+    features: pd.DataFrame,
+    pair_membership: pd.DataFrame,
+    cells: pd.DataFrame,
+    directional: pd.DataFrame,
+) -> pd.DataFrame:
+    """Each compared event once per population it belongs to.
+
+    Returns
+    -------
+    DataFrame
+        Columns and dtypes as :data:`POPULATION_DTYPES`.
+    """
+    rows = population_rows(features, pair_membership, cells, directional)
     return rows[list(POPULATION_DTYPES)].astype(dict(POPULATION_DTYPES))

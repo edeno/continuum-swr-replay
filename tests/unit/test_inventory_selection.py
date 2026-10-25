@@ -941,9 +941,11 @@ class TestRejectionStages:
             )
 
     def test_the_cohorts_are_the_comparisons(self):
-        import scripts.detection.run_inventory_comparison as runner
+        from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
+            ROSTER,
+        )
 
-        assert {name: runner.ROSTER[name] for name in REJECTION_COHORTS} == dict(
+        assert {name: ROSTER[name] for name in REJECTION_COHORTS} == dict(
             REJECTION_COHORTS
         )
 

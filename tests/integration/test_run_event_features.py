@@ -58,6 +58,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     ENCODING_KEY,
 )
+from continuum_swr_replay.analysis.inventory_comparison import (
+    feature_run,
+    inventory_run,
+)
 from continuum_swr_replay.analysis.inventory_comparison.availability import (
     still_intervals,
 )
@@ -81,6 +85,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.runs import cli
 from continuum_swr_replay.runs.io import json_ready, sha256_file
 from continuum_swr_replay.tables.io import read_table, write_atomically, write_table
 from scripts.detection.run_memoryless_detection import run_one
@@ -167,7 +172,7 @@ def write_epoch(root: Path, epoch: str, identifier: str, simulated: dict) -> Non
     """The comparison test's decode frame with the columns the features read,
     and the decode's saved encoding model."""
     write_decode(root, epoch, identifier)
-    path = comparison.decode_path(identifier)
+    path = inventory_run.decode_path(identifier)
     dot = pd.read_pickle(path)
     position = simulated["position"]
     continuous = dot["Non-Local_Continuous_prob"].to_numpy()
@@ -307,12 +312,12 @@ def inputs(tmp_path_factory, module_monkeypatch):
 
     decode_root = tmp_path / "decodes"
     decode_root.mkdir()
-    monkeypatch.setattr(comparison, "DECODE_ROOT", decode_root)
+    monkeypatch.setattr(inventory_run, "DECODE_ROOT", decode_root)
     cache_dir = tmp_path / "marks_cache"
     for epoch, identifier in EPOCHS.items():
         write_epoch(decode_root, epoch, identifier, simulated)
         write_marks_cache(cache_dir, decode_root, identifier, simulated)
-    empty = comparison.decode_path(EMPTY)
+    empty = inventory_run.decode_path(EMPTY)
     pd.read_pickle(empty).assign(non_local_event=0).to_pickle(empty)
     write_carey_run(tmp_path / "carey")
     write_memoryless_run(tmp_path / "memoryless", decode_root, simulated)
@@ -324,7 +329,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
     monkeypatch.setattr(comparison, "CAREY_ROOT", tmp_path / "carey")
     monkeypatch.setattr(comparison, "MEMORYLESS_ROOT", tmp_path / "memoryless")
     monkeypatch.setattr(comparison, "OUTPUT_ROOT", tmp_path / "inventory")
-    monkeypatch.setattr(comparison, "analysed_epoch_ids", lambda: [*EPOCHS.values()])
+    monkeypatch.setattr(cli, "analysed_epoch_ids", lambda: [*EPOCHS.values()])
     comparison.main(
         [
             "--carey-run-id",
@@ -338,7 +343,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
         ]
     )
     # the decode changes after the comparison read it
-    changed = comparison.decode_path(CHANGED)
+    changed = inventory_run.decode_path(CHANGED)
     pd.read_pickle(changed).assign(head_speed=1.5).to_pickle(changed)
 
     monkeypatch.setattr(runner, "INVENTORY_ROOT", tmp_path / "inventory")
@@ -385,7 +390,9 @@ def table(run_dir: Path, identifier: str, name: str) -> pd.DataFrame:
 
 def stored(inputs: Path, identifier: str, name: str) -> pd.DataFrame:
     return read_table(
-        comparison.output_path(identifier, inputs / "inventory" / INVENTORY_RUN, name)
+        inventory_run.output_path(
+            identifier, inputs / "inventory" / INVENTORY_RUN, name
+        )
     )
 
 
@@ -408,7 +415,7 @@ class TestTheWorkedEpoch:
         record = manifest(run)["epochs"][WORKED]
 
         assert record["status"] == "ok"
-        assert set(record["outputs"]) == set(runner.TABLE_DTYPES)
+        assert set(record["outputs"]) == set(feature_run.TABLE_DTYPES)
         for output in record["outputs"].values():
             assert Path(output["path"]).exists()
             assert sha256_file(output["path"]) == output["sha256"]
@@ -476,20 +483,20 @@ class TestTheWorkedEpoch:
         names = ("observations", "set_aside", "inventory", "pairs", "directional")
         tables = {name: stored(inputs, WORKED, name) for name in (*names, "cells")}
         dot = analysed_time.with_swr_source(
-            pd.read_pickle(comparison.decode_path(WORKED))
+            pd.read_pickle(inventory_run.decode_path(WORKED))
         )
-        time, speed = comparison._speed_trace(dot)
+        time, speed = inventory_run.speed_trace(dot)
         still = {
             (ANIMAL, DAY, "02_r1"): still_intervals(
                 time,
                 speed,
                 DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-                comparison.MAX_GAP_S,
+                inventory_run.MAX_GAP_S,
             )
         }
 
         _, matches = rebuild_matches(
-            tables, still, detectors=comparison.DETECTORS, cells=comparison.CELLS
+            tables, still, detectors=inventory_run.DETECTORS, cells=inventory_run.CELLS
         )
         order = ["event_key", "other_detector"]
         pd.testing.assert_frame_equal(
@@ -501,7 +508,7 @@ class TestTheWorkedEpoch:
                 membership_against(
                     compared, membership, sources=sources, against=against
                 ).assign(cell=name)
-                for name, (sources, against) in comparison.CELLS.items()
+                for name, (sources, against) in inventory_run.CELLS.items()
             ],
             ignore_index=True,
         )[list(tables["cells"].columns)]
@@ -590,13 +597,13 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
     earlier outputs are removed."""
     inventory_dir = tmp_path / "inventory"
     shutil.copytree(inputs / "inventory" / INVENTORY_RUN, inventory_dir)
-    path = comparison.output_path(WORKED, inventory_dir, "directional")
+    path = inventory_run.output_path(WORKED, inventory_dir, "directional")
     directional = read_table(path)
     directional.loc[0, "n_source_events"] += 1
     write_atomically(path, lambda temporary: directional.to_parquet(temporary))
     output_dir = tmp_path / "out"
     output_dir.mkdir()
-    for name in runner.TABLE_DTYPES:
+    for name in feature_run.TABLE_DTYPES:
         shutil.copy(run / f"{WORKED}_{name}.parquet", output_dir)
 
     key = parse_epoch_identifier(WORKED)
@@ -606,14 +613,14 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
         output_dir=output_dir,
         inventory_dir=inventory_dir,
         memoryless_dir=inputs / "memoryless" / MEMORYLESS_RUN,
-        decode_sha256={WORKED: sha256_file(comparison.decode_path(WORKED))},
+        decode_sha256={WORKED: sha256_file(inventory_run.decode_path(WORKED))},
         stop_table=runner.STOP_TABLE,
         provenance={"commit": COMMIT, "dirty": False},
     )
 
     assert record["status"] == "failed"
     assert "directional" in record["error"]
-    assert record["decode"]["sha256"] == sha256_file(comparison.decode_path(WORKED))
+    assert record["decode"]["sha256"] == sha256_file(inventory_run.decode_path(WORKED))
     assert not list(output_dir.glob("*.parquet"))
 
 
@@ -634,7 +641,7 @@ def test_inputs_other_than_the_memoryless_runs_fail_the_epoch(
     manifest_path.write_text(json.dumps(recorded))
     output_dir = tmp_path / "out"
     output_dir.mkdir()
-    for table_name in runner.TABLE_DTYPES:
+    for table_name in feature_run.TABLE_DTYPES:
         shutil.copy(run / f"{WORKED}_{table_name}.parquet", output_dir)
 
     key = parse_epoch_identifier(WORKED)
@@ -644,7 +651,7 @@ def test_inputs_other_than_the_memoryless_runs_fail_the_epoch(
         output_dir=output_dir,
         inventory_dir=inputs / "inventory" / INVENTORY_RUN,
         memoryless_dir=memoryless_dir,
-        decode_sha256={WORKED: sha256_file(comparison.decode_path(WORKED))},
+        decode_sha256={WORKED: sha256_file(inventory_run.decode_path(WORKED))},
         stop_table=runner.STOP_TABLE,
         provenance={"commit": COMMIT, "dirty": False},
     )
@@ -659,7 +666,7 @@ def test_an_epoch_with_no_compared_event_writes_empty_typed_tables(run):
 
     assert record["status"] == "ok"
     assert record["n_evidence_rows"] == 0
-    for name, dtypes in runner.TABLE_DTYPES.items():
+    for name, dtypes in feature_run.TABLE_DTYPES.items():
         read = table(run, EMPTY, name)
         assert read.empty and read.dtypes.to_dict() == dtypes_of(dtypes), name
 
@@ -677,15 +684,15 @@ def test_a_comparison_under_another_swr_source_is_refused(run, monkeypatch):
 
 def test_every_table_keeps_its_dtypes_through_a_write_and_read(run):
     for identifier in (WORKED, MASKED, EMPTY):
-        for name, dtypes in runner.TABLE_DTYPES.items():
+        for name, dtypes in feature_run.TABLE_DTYPES.items():
             read = table(run, identifier, name)
             assert list(read.columns) == list(dtypes), name
             assert read.dtypes.to_dict() == dtypes_of(dtypes), name
-    assert runner.TABLE_DTYPES["rejection"] == REJECTION_DTYPES
+    assert feature_run.TABLE_DTYPES["rejection"] == REJECTION_DTYPES
 
 
 def test_an_empty_epoch_keeps_the_declared_dtypes(tmp_path):
-    for name, dtypes in runner.TABLE_DTYPES.items():
+    for name, dtypes in feature_run.TABLE_DTYPES.items():
         path = tmp_path / f"{name}.parquet"
         write_table(typed_table([], dtypes), path)
         read = read_table(path)
@@ -718,12 +725,12 @@ def test_the_manifest_records_the_inputs_and_the_rules(run):
     assert settings["evidence"]["block_rows"] == runner.BLOCK_ROWS
     assert settings["evidence"]["library_block_size"] == 100
     assert "baselines" not in settings
-    assert settings["grid"]["sample_interval_s"] == comparison.SAMPLE_INTERVAL_S
+    assert settings["grid"]["sample_interval_s"] == inventory_run.SAMPLE_INTERVAL_S
     assert "unavailable" in settings["tracking_confidence"]
     assert settings["stop_table"]["path"] == "replay_content/stop_table.parquet"
     assert len(settings["stop_table"]["sha256"]) == 64
     record = manifest(run)["epochs"][WORKED]
-    assert record["decode"]["sha256"] == sha256_file(comparison.decode_path(WORKED))
+    assert record["decode"]["sha256"] == sha256_file(inventory_run.decode_path(WORKED))
     assert len(record["marks"]["sha256"]) == 64
     assert record["wall_clock_s"] > 0 and record["worker_peak_rss_gib"] > 0
     counts = record["counts"]

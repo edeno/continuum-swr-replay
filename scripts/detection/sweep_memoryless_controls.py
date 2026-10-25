@@ -40,7 +40,6 @@ Usage:
 """
 
 import argparse
-import sys
 import time as clock
 import zlib
 from datetime import UTC, datetime
@@ -48,10 +47,13 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from non_local_detector.simulate.sorted_spikes_simulation import (
+    SAMPLING_FREQUENCY,
+    TRACK_HEIGHT,
+)
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (  # noqa: E402
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring import (
     SEGMENTATION_LABELS,
     bound_errors,
     part_agreement,
@@ -59,40 +61,24 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.scoring impor
     score_against_injection,
     segmentation,
 )
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (  # noqa: E402
-    Gap,
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedActivity,
     Segment,
-    immobile_intervals,
     inject_activity,
-    jumping_burst,
     piecewise_replay,
     place_field_means,
-    placeless_burst,
     placements,
-    without,
+)
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_controls import (
+    N_RECORDINGS,
+    covered_cm,
+    trials,
+    truth_path,
+    usable_intervals,
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
-from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
-from continuum_swr_replay.tables.io import write_table  # noqa: E402
-from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
-
-BURST_DURATION_S = (0.08, 0.20, 0.50)
-JUMP_CM = (0.0, 20.0, 40.0, 80.0)
-SEGMENT_S = (0.12, 0.20)
-CHAIN_GAP_S = (0.01, 0.03, 0.06, 0.10, 0.20)
-CHAIN_PART_S = 0.15
-PART_CM = 60.0
-
-FAR_END_CM = 125.0
-"""Where a jump's parts reach nearest the animal, 45 cm from where it rests,
-whatever the jump: the second part starts J cm behind the first's end, and the
-first starts wherever puts the far end of the two here."""
-
-CHAIN_STARTS_CM = {"chain_continuing": (30.0, 90.0), "chain_elsewhere": (90.0, 10.0)}
-"""Where each chain's two parts start; both reach 150 cm at most. Continuing: the
-second picks up where the first ended. Elsewhere: the second starts 140 cm
-from the first's end."""
+from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.tables.io import write_table
 
 DETECTORS = (
     "sliding_accepted",
@@ -100,68 +86,10 @@ DETECTORS = (
     "state_space_canonical",
     "state_space_continuous",
 )
-N_RECORDINGS = 8
-"""Recordings for the no-replay control. The simulator's seed changes the
-spikes, not the trajectory, so every recording pauses in the same places and
-the control reads local coding at the track's end, over eight draws of it."""
-
 OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_controls.parquet"
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_controls_summary.csv"
 )
-
-
-def usable_intervals(recording: dict) -> np.ndarray:
-    """The recording's immobile stretches with its own labeled events cut out."""
-    return without(
-        immobile_intervals(
-            recording["time"],
-            recording["speed"],
-            sweep.CONFIG.speed_threshold_cm_per_s,
-            minimum_duration_s=1.0,
-        ),
-        recording["event_times"],
-        margin_s=sweep.PLACEMENT_MARGIN_S,
-    )
-
-
-def truth_path(activity: InjectedActivity):
-    """Where the injected activity says the replay is, at any time.
-
-    Before the first sample the first represented place, after the last the
-    last; inside, the represented place at the nearest sample, NaN in a
-    silent gap.
-    """
-    time, position = activity.time_s, activity.position_cm
-    finite = np.flatnonzero(np.isfinite(position))
-    first, last = position[finite[0]], position[finite[-1]]
-
-    def true_position_cm(at):
-        at = np.asarray(at, dtype=np.float64)
-        nearest = np.clip(np.searchsorted(time, at), 0, time.size - 1)
-        previous = np.clip(nearest - 1, 0, time.size - 1)
-        closer = np.where(
-            np.abs(time[previous] - at) < np.abs(time[nearest] - at), previous, nearest
-        )
-        inside = position[closer]
-        return np.where(at < time[0], first, np.where(at > time[-1], last, inside))
-
-    return true_position_cm
-
-
-def covered_cm(activity: InjectedActivity) -> float:
-    """The ground the activity's parts cover together: the union of their paths."""
-    spans = []
-    for start_s, end_s in activity.parts:
-        here = (activity.time_s >= start_s) & (activity.time_s <= end_s)
-        position = activity.position_cm[here]
-        position = position[np.isfinite(position)]
-        spans.append((position.min(), position.max()))
-    covered, reach = 0.0, -np.inf
-    for low, high in sorted(spans):
-        covered += max(0.0, high - max(low, reach))
-        reach = max(reach, high)
-    return float(covered)
 
 
 def detector_events(sliding: sweep.SlidingWindowRun, state: sweep.StateSpaceRun):
@@ -232,72 +160,6 @@ def score_trial(
     return rows
 
 
-def jump_segments(segment_s: float, jump_cm: float) -> list[Segment]:
-    """Two 60 cm parts, the second starting ``jump_cm`` behind the first's end,
-    their far end at ``FAR_END_CM``."""
-    first_start = FAR_END_CM - max(PART_CM, 2 * PART_CM - jump_cm)
-    return [
-        Segment(segment_s, first_start, PART_CM),
-        Segment(segment_s, first_start + PART_CM - jump_cm, PART_CM),
-    ]
-
-
-def trials(means: np.ndarray, sampling_frequency: float):
-    """Every injected condition: name, grid level, peak rate, builder, and pieces.
-
-    ``pieces`` is the multi-part event's list of segments and gaps, None for a
-    burst.
-    """
-    track_cm = sweep.TRACK_HEIGHT
-
-    def burst(builder, duration_s, rate_hz):
-        def make(at_s, seed):
-            extra = {"seed": seed} if builder is jumping_burst else {}
-            return builder(
-                duration_s, at_s, sampling_frequency, means, rate_hz, track_cm, **extra
-            )
-
-        return make
-
-    def replay(pieces, rate_hz):
-        def make(at_s, seed):
-            return piecewise_replay(pieces, at_s, sampling_frequency, means, rate_hz)
-
-        return make
-
-    for rate_hz in sweep.PEAK_RATE_HZ:
-        for duration_s in BURST_DURATION_S:
-            for name, builder in (
-                ("placeless_burst", placeless_burst),
-                ("jumping_burst", jumping_burst),
-            ):
-                yield (
-                    name,
-                    duration_s,
-                    rate_hz,
-                    burst(builder, duration_s, rate_hz),
-                    None,
-                )
-        for segment_s in SEGMENT_S:
-            for jump_cm in JUMP_CM:
-                pieces = jump_segments(segment_s, jump_cm)
-                yield (
-                    f"jump_{1000 * segment_s:.0f}ms",
-                    jump_cm,
-                    rate_hz,
-                    replay(pieces, rate_hz),
-                    pieces,
-                )
-        for condition, (first, second) in CHAIN_STARTS_CM.items():
-            for gap_s in CHAIN_GAP_S:
-                pieces = [
-                    Segment(CHAIN_PART_S, first, PART_CM),
-                    Gap(gap_s),
-                    Segment(CHAIN_PART_S, second, PART_CM),
-                ]
-                yield condition, gap_s, rate_hz, replay(pieces, rate_hz), pieces
-
-
 def run_detectors(recording: dict, spike_times, activity: InjectedActivity, key: str):
     """Both detectors over the activity and a margin either side, from these spikes."""
     start_s, end_s = activity.bounds
@@ -348,12 +210,10 @@ def run_trials(recording: dict, n_seeds: int) -> list[dict]:
     spikes it had inside the event and the recording's own spikes everywhere
     else, and its recovery alone is kept beside its recovery inside the event.
     """
-    means = place_field_means(sweep.N_NEURONS, sweep.TRACK_HEIGHT)
+    means = place_field_means(sweep.N_NEURONS, TRACK_HEIGHT)
     intervals = usable_intervals(recording)
     rows = []
-    for condition, level, rate_hz, make, pieces in trials(
-        means, sweep.SAMPLING_FREQUENCY
-    ):
+    for condition, level, rate_hz, make, pieces in trials(means, SAMPLING_FREQUENCY):
         span_s = make(0.0, 0).bounds[1]
         at_s = placements(
             intervals,
@@ -378,7 +238,7 @@ def run_trials(recording: dict, n_seeds: int) -> list[dict]:
                     )
                 ):
                     single = piecewise_replay(
-                        [segment], part_start, sweep.SAMPLING_FREQUENCY, means, rate_hz
+                        [segment], part_start, SAMPLING_FREQUENCY, means, rate_hz
                     )
                     sliding, state = run_detectors(
                         recording,
@@ -570,7 +430,7 @@ def main() -> None:
     table.attrs = {
         "produced_by": produced_by(__file__),
         "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        "git_commit": sweep.git_commit(),
+        "git_commit": described_commit(),
         "n_seeds": args.n_seeds,
         "n_recordings": args.n_recordings,
     }

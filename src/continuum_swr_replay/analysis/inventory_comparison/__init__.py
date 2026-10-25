@@ -27,4 +27,8 @@ with per-detector denominators.
   the shared exposure outside every event.
 - ``kay_version``: the Kay version check, a direct Kay inventory's events
   matched against the canonical Spyglass ones.
+- ``inventory_run``: the inventory comparison run's roster, comparisons, decode
+  grid and table layout, which the runner and every reader of its runs share.
+- ``feature_run``: the event features run's tables, and the comparison's and
+  memoryless run's tables its readers read beside it.
 """

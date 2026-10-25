@@ -22,16 +22,6 @@ from tests.unit._imports import REPO, imported_modules, module_index
 
 SCRIPTS = REPO / "scripts"
 
-_INVENTORY = (
-    "the detection-comparison family: the report, the feature runner and the "
-    "example figures read the inventory runner's run layout (roots, output "
-    "paths, table dtypes), detector roster and decode helpers"
-)
-_MEMORYLESS = (
-    "the memoryless sweep family: the control, held-out and reference checks "
-    "reuse the base sweep's simulated recording and its detector runs"
-)
-
 #: (importing file relative to the repo, target module) -> why it is allowed.
 ALLOWED: dict[tuple[str, str], str] = {
     (
@@ -39,86 +29,6 @@ ALLOWED: dict[tuple[str, str], str] = {
         "scripts.content.fit_swr_contrast_content",
     ): "an unsupported one-off that drives the runner's main with the cohort "
     "rule bypassed",
-    (
-        "scripts/figures/generate_event_feature_examples.py",
-        "scripts.figures.generate_inventory_examples",
-    ): _INVENTORY,
-    (
-        "scripts/figures/generate_event_feature_examples.py",
-        "scripts.detection.report_event_features",
-    ): _INVENTORY,
-    (
-        "scripts/figures/generate_event_feature_examples.py",
-        "scripts.detection.run_event_features",
-    ): _INVENTORY,
-    (
-        "scripts/figures/generate_event_feature_examples.py",
-        "scripts.detection.run_inventory_comparison",
-    ): _INVENTORY,
-    (
-        "scripts/figures/generate_inventory_examples.py",
-        "scripts.detection.run_carey_detection",
-    ): _INVENTORY,
-    (
-        "scripts/figures/generate_inventory_examples.py",
-        "scripts.detection.run_memoryless_detection",
-    ): _INVENTORY,
-    (
-        "scripts/figures/generate_inventory_examples.py",
-        "scripts.detection.run_inventory_comparison",
-    ): _INVENTORY,
-    (
-        "scripts/detection/report_event_features.py",
-        "scripts.figures.generate_inventory_examples",
-    ): _INVENTORY,
-    (
-        "scripts/detection/report_event_features.py",
-        "scripts.detection.run_event_features",
-    ): _INVENTORY,
-    (
-        "scripts/detection/report_event_features.py",
-        "scripts.detection.run_inventory_comparison",
-    ): _INVENTORY,
-    (
-        "scripts/detection/report_inventory_comparison.py",
-        "scripts.detection.run_inventory_comparison",
-    ): _INVENTORY,
-    (
-        "scripts/detection/run_event_features.py",
-        "scripts.detection.run_carey_detection",
-    ): _INVENTORY,
-    (
-        "scripts/detection/run_event_features.py",
-        "scripts.detection.analyze_event_spike_evidence",
-    ): _INVENTORY,
-    (
-        "scripts/detection/run_event_features.py",
-        "scripts.detection.run_inventory_comparison",
-    ): _INVENTORY,
-    (
-        "scripts/qa/compare_memoryless_to_reference.py",
-        "scripts.figures.generate_memoryless_comparison",
-    ): _MEMORYLESS,
-    (
-        "scripts/qa/compare_memoryless_to_reference.py",
-        "scripts.qa.memoryless_reference",
-    ): _MEMORYLESS,
-    (
-        "scripts/qa/compare_memoryless_to_reference.py",
-        "scripts.detection.sweep_memoryless_detection",
-    ): _MEMORYLESS,
-    (
-        "scripts/detection/sweep_memoryless_controls.py",
-        "scripts.detection.sweep_memoryless_detection",
-    ): _MEMORYLESS,
-    (
-        "scripts/detection/sweep_memoryless_heldout.py",
-        "scripts.detection.sweep_memoryless_controls",
-    ): _MEMORYLESS,
-    (
-        "scripts/detection/sweep_memoryless_heldout.py",
-        "scripts.detection.sweep_memoryless_detection",
-    ): _MEMORYLESS,
 }
 
 

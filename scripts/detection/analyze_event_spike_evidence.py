@@ -64,6 +64,7 @@ for _cat in (UserWarning, FutureWarning, DeprecationWarning):
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
+    REMOTE_CM,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     excluded_intervals_of,
@@ -106,7 +107,7 @@ THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
 NON_EVENT_THRESHOLD = 0.2  # non-local prob below this = clearly local (baseline)
 IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
 CLOSE_CM = 40.0  # mean |ahead-behind| below this = "close" subset
-REMOTE_CM = 100.0  # above this = "remote" subset
+# REMOTE_CM (analysis.constants): mean |ahead-behind| above this = "remote" subset
 GPI_REMOTE_CM = 100.0  # random-reference bins must be this far from the animal
 MIN_EVENT_BINS = 3
 MAX_BASELINE_BINS = 40

@@ -749,7 +749,7 @@ shared events are in the summary under their own `detector`.
 ### Against the reference's own arithmetic
 
 Passing tests show the port is consistent with itself; they do not show it decides
-as the reference would. `scripts/qa/memoryless_reference.py` re-implements the
+as the reference would. `scripts/qa/_memoryless_reference.py` re-implements the
 reference's sorted-cell path as its MATLAB computes it: a Poisson decode with `+1e-3`
 Hz on every rate map, a continuous center of mass, the 1D spread about it, forward
 jumps, zero jumps set aside by value in the significance test, the merge of

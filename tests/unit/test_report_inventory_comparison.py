@@ -17,7 +17,7 @@ import pandas as pd
 import pytest
 
 import scripts.detection.report_inventory_comparison as report
-import scripts.detection.run_inventory_comparison as runner
+from continuum_swr_replay.analysis.inventory_comparison import inventory_run
 
 # the runner's simulated run, built once for this module
 from tests.integration.test_run_inventory_comparison import (  # noqa: F401
@@ -37,7 +37,7 @@ DEFAULTS = {object: "", np.int64: 0, np.float64: 0.0, np.bool_: True, "Int64": p
 
 def rows(name: str, records: list[dict]) -> pd.DataFrame:
     """Table ``name`` as the runner types it; unnamed columns take a default."""
-    dtypes = runner.TABLE_DTYPES[name]
+    dtypes = inventory_run.TABLE_DTYPES[name]
     return pd.DataFrame(
         {
             column: pd.Series(
@@ -299,13 +299,13 @@ def test_a_run_with_no_ok_epoch_gives_empty_tables(tmp_path, monkeypatch):
     settings = json.loads(
         json.dumps(
             {
-                "roster": dict(runner.ROSTER),
+                "roster": dict(inventory_run.ROSTER),
                 "cells": {
                     name: {"sources": sources, "against": against}
-                    for name, (sources, against) in runner.CELLS.items()
+                    for name, (sources, against) in inventory_run.CELLS.items()
                 },
-                "comparisons": dict(runner.COMPARISONS),
-                "no_detector_time": runner.CELL_DETECTORS,
+                "comparisons": dict(inventory_run.COMPARISONS),
+                "no_detector_time": inventory_run.CELL_DETECTORS,
                 "recount": {"detector": "state_space"},
             }
         )

@@ -25,6 +25,7 @@ from ripple_detection.simulate import simulate_session, simulate_time
 
 import scripts.detection.run_carey_detection as runner
 from continuum_swr_replay.analysis.events import swr_source
+from continuum_swr_replay.analysis.hippocampus import detection_inputs
 from continuum_swr_replay.analysis.hippocampus.swr_detectors import CAREY_SETTINGS
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs.io import array_sha256, sha256_file
@@ -370,7 +371,8 @@ def test_a_detector_error_is_recorded_as_failed_with_the_error(tmp_path):
 def test_the_decodes_marks_are_read_over_its_grid_and_keyed_by_its_detector(
     tmp_path, monkeypatch
 ):
-    """``load_marks`` gets the decode grid's span and its detector's sha256."""
+    """``detection_inputs.decode_marks``, which Carey reads its marks by:
+    ``load_marks`` gets the decode grid's span and its detector's sha256."""
     epoch = _simulated_epoch()
     identifier = "sim20200101_02_r1_HPC"
     detector = tmp_path / f"{identifier}_detector.pkl"
@@ -380,14 +382,16 @@ def test_the_decodes_marks_are_read_over_its_grid_and_keyed_by_its_detector(
         tmp_path / f"{identifier}_80_data_over_time.pkl"
     )
     model = _encoding_model(epoch)
-    monkeypatch.setattr(runner, "load_clusterless_encoding_model", lambda path: model)
+    monkeypatch.setattr(
+        detection_inputs, "load_clusterless_encoding_model", lambda path: model
+    )
     asked = []
 
     def marks_loader(key, cache_dir, span_s, detector_sha256):
         asked.append((key.epoch_id, cache_dir, span_s, detector_sha256))
         return epoch.spike_times, epoch.features
 
-    marks = runner.decode_marks(
+    marks = detection_inputs.decode_marks(
         identifier,
         root=tmp_path,
         cache_dir=tmp_path / "cache",

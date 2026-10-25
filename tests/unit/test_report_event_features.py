@@ -21,15 +21,18 @@ import scripts.detection.report_event_features as report
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
     memoryless_output_paths as memoryless_outputs,
 )
+from continuum_swr_replay.analysis.inventory_comparison import (
+    feature_run,
+    inventory_run,
+)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     DURATION_STRATUM_LABELS,
 )
+from continuum_swr_replay.analysis.inventory_comparison.overlap import MATCH_DTYPES
 from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.tables.io import write_table
-from scripts.detection import run_event_features as features_runner
-from scripts.detection import run_inventory_comparison as comparison
 
 DAY = 20200101
 DETECTORS = ("kay", "state_space", "memoryless", "memoryless_criteria")
@@ -173,7 +176,7 @@ def build(
             for e in events
             if e["detector"] == "memoryless_criteria"
         ]
-    features = typed(dict(features_runner.FEATURE_DTYPES), events, _FEATURE_DEFAULTS)
+    features = typed(dict(feature_run.FEATURE_DTYPES), events, _FEATURE_DEFAULTS)
     compared = [e for e in events if e["detector"] != "baseline"]
     pairs = []
     for e in compared:
@@ -210,19 +213,17 @@ def build(
     cell_rows = [{"day": DAY, "n_against": 2, **row} for row in cells]
     tables = {
         "features": features,
-        "pair_membership": typed(
-            dict(features_runner.MATCH_DTYPES), pairs, _FEATURE_DEFAULTS
-        ),
+        "pair_membership": typed(dict(MATCH_DTYPES), pairs, _FEATURE_DEFAULTS),
         "rejection": typed(
             dict(REJECTION_DTYPES),
             [{"day": DAY, **r} for r in rejection],
             {**_FEATURE_DEFAULTS, "Int64": pd.NA, "boolean": pd.NA},
         ),
         "cells": typed(
-            dict(comparison.TABLE_DTYPES["cells"]), cell_rows, _FEATURE_DEFAULTS
+            dict(inventory_run.TABLE_DTYPES["cells"]), cell_rows, _FEATURE_DEFAULTS
         ),
         "directional": typed(
-            dict(comparison.TABLE_DTYPES["directional"]),
+            dict(inventory_run.TABLE_DTYPES["directional"]),
             directional,
             {**_FEATURE_DEFAULTS, np.float64: 0.0},
         ),
@@ -858,14 +859,14 @@ def _write_run(tmp_path) -> tuple:
             mask = (frame[["animal", "day", "epoch"]] == session).all(axis=1)
             return frame[mask.to_numpy()].reset_index(drop=True)
 
-        for name in features_runner.TABLE_DTYPES:
+        for name in feature_run.TABLE_DTYPES:
             write_table(
-                of(tables[name]), features_runner.output_path(identifier, run_dir, name)
+                of(tables[name]), feature_run.output_path(identifier, run_dir, name)
             )
         for name in ("cells", "directional"):
             write_table(
                 of(tables[name]),
-                comparison.output_path(identifier, inventory_dir, name),
+                inventory_run.output_path(identifier, inventory_dir, name),
             )
         write_table(
             of(tables["memoryless_events"]),
@@ -965,7 +966,7 @@ def test_main_reads_the_run_named(tmp_path, monkeypatch):
 
 
 def test_every_feature_group_names_columns_of_the_features_table():
-    known = {*features_runner.FEATURE_DTYPES, *report.DERIVED_FEATURES}
+    known = {*feature_run.FEATURE_DTYPES, *report.DERIVED_FEATURES}
     for group, columns in report.FEATURE_GROUPS.items():
         assert set(columns) <= known, group
     assert all(c.startswith("ss_") for c in report.FEATURE_GROUPS["ss"])

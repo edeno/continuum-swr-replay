@@ -9,25 +9,36 @@ same rules:
   (:data:`MARKS_RULE`), cached per decode file under :data:`MARKS_CACHE_DIR`
   (:func:`load_marks`, :func:`marks_cache_path`) and hashed in their records
   (:func:`marks_sha256`);
-- a memoryless run's per-epoch files (:func:`memoryless_output_paths`).
+- a memoryless run's per-epoch files (:func:`memoryless_output_paths`);
+- a decode's marks with its encoding model (:func:`decode_marks`), as the Carey
+  and event-feature runners and the inventory examples read them.
 
-It imports only foundation modules, so a runner reads these without importing
-another runner.
+It imports foundation modules and the memoryless likelihood's reader of a
+saved encoding model, so a runner reads these without importing another
+runner.
 """
 
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
+    load_clusterless_encoding_model,
+)
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.decoding.identifiers import EpochKey
+from continuum_swr_replay.decoding.identifiers import EpochKey, parse_epoch_identifier
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import MEMORYLESS_ROOT
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import write_atomically
 
 __all__ = [
@@ -35,6 +46,7 @@ __all__ = [
     "MARKS_RULE",
     "MARKS_RULE_TAG",
     "carey_output_paths",
+    "decode_marks",
     "input_paths",
     "load_marks",
     "marks_cache_path",
@@ -128,6 +140,50 @@ def marks_sha256(spike_times: list, spike_waveform_features: list) -> str:
         digest.update(np.ascontiguousarray(times, dtype=np.float64).tobytes())
         digest.update(np.ascontiguousarray(features, dtype=np.float64).tobytes())
     return digest.hexdigest()
+
+
+def decode_marks(
+    identifier: str,
+    *,
+    root: Path = PROCESSED_DATA_DIR,
+    cache_dir: Path = MARKS_CACHE_DIR,
+    marks_loader: Callable = load_marks,
+) -> dict[str, Any]:
+    """The canonical decode's HPC marks and its encoding model.
+
+    The marks are read as the memoryless runner reads them: ``load_marks``
+    over the decode grid's first and last time, cached by the decode's
+    ``_detector.pkl`` sha256.
+
+    Returns
+    -------
+    dict
+        ``spike_times`` and ``spike_waveform_features`` (one array per
+        tetrode), ``encoding_model``, and ``record``: the marks rule, the
+        detector's sha256, the cache file's name and the decode's span.
+    """
+    paths = input_paths(identifier, root)
+    detector_sha256 = sha256_file(paths["detector"])
+    encoding_model = load_clusterless_encoding_model(paths["detector"])
+    data_over_time = pd.read_pickle(paths["data_over_time"])
+    time = data_over_time.index.to_numpy(dtype=np.float64)
+    span_s = (float(time[0]), float(time[-1]))
+    del data_over_time
+    key = parse_epoch_identifier(identifier)
+    spike_times, spike_waveform_features = marks_loader(
+        key, cache_dir, span_s, detector_sha256
+    )
+    return {
+        "spike_times": spike_times,
+        "spike_waveform_features": spike_waveform_features,
+        "encoding_model": encoding_model,
+        "record": {
+            "rule": MARKS_RULE,
+            "detector_sha256": detector_sha256,
+            "cache": marks_cache_path(key, cache_dir, detector_sha256).name,
+            "decode_span_s": list(span_s),
+        },
+    }
 
 
 def carey_output_paths(epoch_id: str, output_dir: Path) -> dict[str, Path]:

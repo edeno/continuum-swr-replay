@@ -26,7 +26,8 @@ of one window has length 0 and is dropped, and dispersion follows the paper's
 Methods.
 
 Written from the vendored reference and the paper's Methods; nothing here is
-imported by the analysis package.
+imported by the analysis package. Not a script: ``compare_memoryless_to_reference.py``
+imports it as ``scripts.qa._memoryless_reference``.
 """
 
 from dataclasses import dataclass

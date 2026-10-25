@@ -116,7 +116,7 @@ The HPC decode's masks, from the paper's SWR source.
 
 What the replay detection runners read from a saved HPC decode and from each other.
 
-`input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `carey_output_paths`, `memoryless_output_paths`
+`input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
@@ -522,7 +522,7 @@ Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
 Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 
-`swr_run_inputs`, `decode_marks`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`swr_run_inputs`, `observation_table`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/rate/fit_cross_history_rate.py`
 
@@ -716,7 +716,7 @@ Spike-evidence reality analysis for non-SWR non-local events.
 
 Report one event features run: its features per session and per animal.
 
-`distribution`, `epoch_status`, `read_inputs`, `without_baseline_rows`, `event_populations`, `context_by_session`, `feature_tables`, `missing_by_session`, `never_missing`, `with_spikes_per_row`, `evidence_coverage_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
+`distribution`, `epoch_status`, `context_by_session`, `feature_tables`, `missing_by_session`, `never_missing`, `with_spikes_per_row`, `evidence_coverage_by_session`, `rejection_by_session`, `rejection_by_animal`, `memoryless_cohort_by_session`, `comparator_only_events`, `comparator_only_table`, `stratum_labels`, `report_tables`, `draw_figures`, `write_report`, `main`
 
 ### `scripts/detection/report_inventory_comparison.py`
 
@@ -728,13 +728,13 @@ Report one inventory comparison run: its counts per session and per animal.
 
 Event features of every compared event, one epoch per task.
 
-`output_path`, `output_paths`, `evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
+`evidence_rows`, `memoryless_input_mismatch`, `epoch_tables`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/detection/run_inventory_comparison.py`
 
 Compare the replay-detection inventories, one epoch at a time.
 
-`decode_path`, `epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `output_path`, `output_paths`, `stamped_tables`, `run_epoch`, `summary`, `run_settings`, `select_epochs`, `main`, `run`
+`epoch_inventories`, `compare_epoch`, `bounds_mismatch`, `run_epoch`, `summary`, `run_settings`, `main`, `run`
 
 ### `scripts/detection/run_state_evidence.py`
 
@@ -746,7 +746,7 @@ Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
 What each detector does with activity that is not one clean replay.
 
-`usable_intervals`, `truth_path`, `covered_cm`, `detector_events`, `score_trial`, `jump_segments`, `trials`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `summarize`, `main`
+`detector_events`, `score_trial`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `summarize`, `main`
 
 ### `scripts/detection/sweep_memoryless_heldout.py`
 
@@ -783,6 +783,12 @@ Compare the PFC path's old, run-time event definition against the canonical one.
 What the mPFC held-out null's windows look like, beside the real events.
 
 `bundle_paths`, `session_of`, `read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
+
+### `scripts/qa/_memoryless_reference.py`
+
+The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track.
+
+`ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `set_aside_pairs`, `shuffle_statistics`, `shuffle_p_values`
 
 ### `scripts/qa/_report.py`
 
@@ -849,12 +855,6 @@ Diagnostic figures for trial-detection and predictor semantics.
 Freeze the current canonical tables and model outputs as a read-only baseline.
 
 `freeze`, `main`
-
-### `scripts/qa/memoryless_reference.py`
-
-The Widloski & Foster detector as its MATLAB computes it, for a sorted 1-D track.
-
-`ReferenceThresholds`, `decode_windows`, `center_and_spread`, `forward_jumps`, `runs_of_kept`, `merge_runs`, `dispersion_bins`, `ReferenceDetection`, `detect`, `set_aside_pairs`, `shuffle_statistics`, `shuffle_p_values`
 
 ### `scripts/qa/mutation_check.py`
 

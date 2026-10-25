@@ -83,16 +83,10 @@ from continuum_swr_replay.analysis.events.artifact_masks import (
     PADDING_S,
 )
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
-    MARKS_CACHE_DIR,
     MARKS_RULE,
     carey_output_paths,
-    input_paths,
-    load_marks,
-    marks_cache_path,
+    decode_marks,
     marks_sha256,
-)
-from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
-    load_clusterless_encoding_model,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood import (
     check_marks_match_encoding,
@@ -110,12 +104,11 @@ from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.data_loaders.position import (
     get_epoch_position_info,
 )
-from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import (
     interval_mask,
     masked_seconds,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import CAREY_ROOT
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
@@ -128,7 +121,6 @@ from continuum_swr_replay.runs.io import (
     array_sha256,
     json_ready,
     replace_outputs,
-    sha256_file,
     write_json,
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
@@ -136,9 +128,6 @@ from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 OUTPUT_ROOT = CAREY_ROOT
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
-
-DECODE_ROOT = PROCESSED_DATA_DIR
-"""Where the canonical HPC decodes are, whose marks Carey reads."""
 
 CONFIGURATION = (
     "the package's default Hilbert configuration of Carey_candidate_detector, "
@@ -177,50 +166,6 @@ def swr_run_inputs(identifier: str) -> dict[str, Any]:
         "input_sha256": swr_source.swr_inventory_record(identifier)["input_sha256"]
     }
     return with_hashes
-
-
-def decode_marks(
-    identifier: str,
-    *,
-    root: Path = DECODE_ROOT,
-    cache_dir: Path = MARKS_CACHE_DIR,
-    marks_loader: Callable = load_marks,
-) -> dict[str, Any]:
-    """The canonical decode's HPC marks and its encoding model.
-
-    The marks are read as the memoryless runner reads them: ``load_marks``
-    over the decode grid's first and last time, cached by the decode's
-    ``_detector.pkl`` sha256.
-
-    Returns
-    -------
-    dict
-        ``spike_times`` and ``spike_waveform_features`` (one array per
-        tetrode), ``encoding_model``, and ``record``: the marks rule, the
-        detector's sha256, the cache file's name and the decode's span.
-    """
-    paths = input_paths(identifier, root)
-    detector_sha256 = sha256_file(paths["detector"])
-    encoding_model = load_clusterless_encoding_model(paths["detector"])
-    data_over_time = pd.read_pickle(paths["data_over_time"])
-    time = data_over_time.index.to_numpy(dtype=np.float64)
-    span_s = (float(time[0]), float(time[-1]))
-    del data_over_time
-    key = parse_epoch_identifier(identifier)
-    spike_times, spike_waveform_features = marks_loader(
-        key, cache_dir, span_s, detector_sha256
-    )
-    return {
-        "spike_times": spike_times,
-        "spike_waveform_features": spike_waveform_features,
-        "encoding_model": encoding_model,
-        "record": {
-            "rule": MARKS_RULE,
-            "detector_sha256": detector_sha256,
-            "cache": marks_cache_path(key, cache_dir, detector_sha256).name,
-            "decode_span_s": list(span_s),
-        },
-    }
 
 
 def observation_table(time: NDArray, stretches: NDArray) -> pd.DataFrame:

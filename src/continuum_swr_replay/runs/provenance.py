@@ -12,12 +12,20 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 from continuum_swr_replay.runs.io import sha256_file
 
-__all__ = ["git", "git_commit", "git_dirty", "produced_by", "provenance_record"]
+__all__ = [
+    "described_commit",
+    "git",
+    "git_commit",
+    "git_dirty",
+    "produced_by",
+    "provenance_record",
+]
 
 
 def produced_by(file: str | Path) -> str:
@@ -82,6 +90,31 @@ def git_dirty(repo: Path) -> bool:
     unrelated work, and they cannot change how the code ran.
     """
     return bool(git(repo, "status", "--porcelain", "--untracked-files=no"))
+
+
+def described_commit() -> str:
+    """The commit this ran from, so a saved table can be tied back to the code.
+
+    ``git describe --always --dirty --abbrev=12`` in the working directory, as
+    the memoryless simulation sweeps record it. A checkout with uncommitted
+    changes is named with ``-dirty`` and warned of on stderr; when git cannot
+    say, ``"unknown"``, with a warning.
+    """
+    try:
+        commit = git(Path.cwd(), "describe", "--always", "--dirty", "--abbrev=12")
+    except (OSError, subprocess.CalledProcessError) as error:
+        print(
+            f"warning: git commit unknown ({error}); recording 'unknown'",
+            file=sys.stderr,
+        )
+        return "unknown"
+    if commit.endswith("-dirty"):
+        print(
+            f"warning: the working tree has uncommitted changes ({commit}); the "
+            "numbers this run saves cannot be tied to a commit",
+            file=sys.stderr,
+        )
+    return commit
 
 
 def provenance_record(repo: Path) -> dict[str, Any]:

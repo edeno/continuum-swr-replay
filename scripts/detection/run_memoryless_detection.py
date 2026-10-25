@@ -199,6 +199,7 @@ from continuum_swr_replay.runs.batch import (
 )
 from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import parse_run_id
+from continuum_swr_replay.runs.device import xla_flags
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.runs.threads import BLAS_THREAD_VARIABLES
@@ -536,52 +537,6 @@ def run_one(
     }
 
 
-DETERMINISTIC_XLA_FLAG = "--xla_gpu_deterministic_ops=true"
-"""Makes XLA's GPU operations deterministic, so two runs at identical settings
-are bit-for-bit equal (:data:`KNOWN_LIMITS`). XLA reads ``XLA_FLAGS`` once in a
-process, when JAX starts its backend; importing this module does not start it."""
-
-TRITON_GEMM_OFF_XLA_FLAG = "--xla_gpu_enable_triton_gemm=false"
-"""Turns off XLA's Triton GEMM for matrix products; XLA then uses another GEMM path
-(presumably cuBLAS; not checked). Deterministic ops turn off XLA's autotuning, and the default Triton GEMM setup then fails on some
-shapes (the working explanation; not confirmed: the spike tested the fix, not the
-mechanism). With deterministic ops alone, R12 lost 3 of 242 epochs in the shuffle to
-``JaxRuntimeError('CANCELLED: Too small divisible part of the contracting
-dimension.')``, raised at ``non_local_detector/likelihoods/clusterless_kde.py:89``
-(``spike_waveform_feature_distance.T @ position_distance``). With this flag as well,
-one of them, chimi20200224_08_r4_HPC, ran in the spike (:data:`KNOWN_LIMITS`)."""
-
-REQUIRED_XLA_FLAGS = (DETERMINISTIC_XLA_FLAG, TRITON_GEMM_OFF_XLA_FLAG)
-"""The flags every process that runs JAX gets, in the order :func:`xla_flags`
-appends them."""
-
-
-def xla_flags() -> str:
-    """The ``XLA_FLAGS`` every process that runs JAX gets: this process's, with
-    each flag in :data:`REQUIRED_XLA_FLAGS` added at the end unless the last
-    occurrence of that flag's name in them already has the required value.
-
-    XLA uses the last value of a repeated flag, so an earlier
-    ``--xla_gpu_deterministic_ops=true`` is overridden by a later ``=false``, an
-    earlier ``--xla_gpu_enable_triton_gemm=true`` by a later ``=false``, and so
-    on; the appended flag overrides them. A flag that is already right is not
-    added again. The user's other flags are kept as they are. Triton GEMM is
-    off because deterministic ops turn off autotuning and the default Triton GEMM
-    setup then fails on some shapes (the working explanation; not confirmed;
-    :data:`TRITON_GEMM_OFF_XLA_FLAG`). The run settings record the value
-    (``run_settings``), and ``main`` hands that record to the processes: the
-    dask workers (``cuda_cluster``), or this process when it runs the epochs
-    itself.
-    """
-    flags = os.environ.get("XLA_FLAGS", "").strip()
-    for required in REQUIRED_XLA_FLAGS:
-        name = required.split("=")[0]
-        given = [flag for flag in flags.split() if flag.split("=")[0] == name]
-        if not given or given[-1] != required:
-            flags = f"{flags} {required}".lstrip()
-    return flags
-
-
 KNOWN_LIMITS = {
     "bit_reproducible": {
         "value": True,
@@ -649,8 +604,8 @@ KNOWN_LIMITS = {
     }
 }
 """What is known of a run's reproducibility, recorded in every manifest's
-settings: two runs are bit-for-bit equal with :data:`DETERMINISTIC_XLA_FLAG` and
-:data:`TRITON_GEMM_OFF_XLA_FLAG`, which the runner sets (:func:`xla_flags`), and
+settings: two runs are bit-for-bit equal with ``runs.device.DETERMINISTIC_XLA_FLAG`` and
+``TRITON_GEMM_OFF_XLA_FLAG``, which the runner sets (``runs.device.xla_flags``), and
 were not without them. ``history`` keeps the earlier measurements, each with the
 flags it used; ``runs_before_this_change`` says that R12 used Triton GEMM and lost
 3 epochs to an XLA error. See the design note

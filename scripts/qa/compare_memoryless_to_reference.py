@@ -2,7 +2,7 @@
 """Run the port and the reference's own arithmetic on one input, and compare.
 
 The port's detection and significance test run as the figure and the sweep
-run them; ``scripts/qa/memoryless_reference.py`` then recomputes every step
+run them; ``scripts/qa/_memoryless_reference.py`` then recomputes every step
 the way the reference's MATLAB does, from the same place fields, the same
 window spike counts and the same thresholds, and with the same cell
 permutations in the significance test. What differs is only what the port
@@ -29,16 +29,22 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 from pathlib import Path
-
-os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
 import numpy as np
 import pandas as pd
 from non_local_detector.likelihoods.common import get_spikecount_per_time_bin
+from non_local_detector.simulate.sorted_spikes_simulation import (
+    SAMPLING_FREQUENCY,
+    TRACK_HEIGHT,
+)
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import sweep
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.comparison_simulation import (
+    SHUFFLE_RUN_SEED,
+    simulate_and_decode,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.config import (
     MemorylessSequenceConfig,
 )
@@ -61,23 +67,25 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle impor
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     InjectedReplay,
+    immobile_intervals,
     inject_replay,
+    place_field_means,
+    placements,
+    without,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     aggregate_windows,
     normalize_windows,
 )
 from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
-from continuum_swr_replay.runs.provenance import produced_by
+from continuum_swr_replay.runs.device import default_jax_platforms
+from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
+# Sibling-module import: run as a script, only this file's directory is on
+# sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.detection import sweep_memoryless_detection as sweep  # noqa: E402
-from scripts.figures.generate_memoryless_comparison import (  # noqa: E402
-    SHUFFLE_RUN_SEED,
-    simulate_and_decode,
-)
-from scripts.qa import memoryless_reference as reference  # noqa: E402
+from scripts.qa import _memoryless_reference as reference  # noqa: E402
 
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/reference_check_summary.csv"
@@ -421,7 +429,7 @@ def compare_variants(
 
 
 def decode_sweep_cell(recording: dict, injected: list, window: tuple, key: str) -> dict:
-    """The port on one sweep cell, as ``sweep.memoryless_outcome`` runs it."""
+    """The port on one sweep cell, as the sweep's ``memoryless_outcome`` runs it."""
     time, _, speed = window
     config = sweep.CONFIG
     result = sorted_spikes_epoch_log_likelihood(
@@ -473,9 +481,9 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
     sweep scored.
     """
     recording = sweep.build_recording()
-    means = sweep.place_field_means(sweep.N_NEURONS, sweep.TRACK_HEIGHT)
-    intervals = sweep.without(
-        sweep.immobile_intervals(
+    means = place_field_means(sweep.N_NEURONS, TRACK_HEIGHT)
+    intervals = without(
+        immobile_intervals(
             recording["time"],
             recording["speed"],
             sweep.CONFIG.speed_threshold_cm_per_s,
@@ -491,7 +499,7 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
         for duration_s in sweep.DURATION_S
         for rate_hz in sweep.PEAK_RATE_HZ
         if 0.0 <= midpoint_cm - path_cm / 2
-        and midpoint_cm + path_cm / 2 <= sweep.TRACK_HEIGHT
+        and midpoint_cm + path_cm / 2 <= TRACK_HEIGHT
     ]
     rng = np.random.default_rng(0)
     totals = {variant: dict.fromkeys(SWEEP_TOTALS, 0) for variant in VARIANTS}
@@ -499,9 +507,7 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
         totals[variant] |= {"n_cells": 0, "cells_with_replay_count_differing": 0}
         totals[variant] |= {"cells_with_published_count_differing": 0}
     for number, (path_cm, midpoint_cm, duration_s, rate_hz) in enumerate(combinations):
-        at_s = sweep.placements(
-            intervals, duration_s, sweep.PLACEMENT_MARGIN_S, n_seeds, rng
-        )
+        at_s = placements(intervals, duration_s, sweep.PLACEMENT_MARGIN_S, n_seeds, rng)
         for seed in range(n_seeds):
             injected, bounds = inject_replay(
                 recording["spike_times"],
@@ -514,7 +520,7 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
                     at_s=float(at_s[seed]),
                     seed=seed,
                 ),
-                sampling_frequency=sweep.SAMPLING_FREQUENCY,
+                sampling_frequency=SAMPLING_FREQUENCY,
             )
             mask = (recording["time"] >= bounds[0] - sweep.DECODE_MARGIN_S) & (
                 recording["time"] <= bounds[1] + sweep.DECODE_MARGIN_S
@@ -545,6 +551,8 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
 
 
 def main() -> None:
+    # the CPU unless JAX_PLATFORMS names another
+    default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-neurons", type=int, default=25)
     parser.add_argument(
@@ -566,7 +574,7 @@ def main() -> None:
     ).reset_index()[["input", "measure", *VARIANTS]]
     provenance = {
         "produced_by": produced_by(__file__),
-        "git_commit": sweep.git_commit(),
+        "git_commit": described_commit(),
         "n_sweep_seeds": str(args.n_seeds),
     }
     for measure, note in provenance.items():

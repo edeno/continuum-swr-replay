@@ -3,19 +3,28 @@
 from __future__ import annotations
 
 import re
+import sys
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
 from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
+    parse_epoch_identifier,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-__all__ = ["RUN_ID_PATTERN", "add_common_args", "filter_epoch_info", "parse_run_id"]
+__all__ = [
+    "RUN_ID_PATTERN",
+    "add_common_args",
+    "filter_epoch_info",
+    "parse_run_id",
+    "select_analysed_epochs",
+]
 
 RUN_ID_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 """A run id names one folder under its output root: no path separator."""
@@ -79,6 +88,41 @@ def filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame
         is_epoch = np.logical_and(epoch_names == args.epoch, is_epoch)
 
     return epoch_info.loc[is_epoch, :]
+
+
+def select_analysed_epochs(args: Namespace) -> list[str]:
+    """The analysed epochs the arguments name, as epoch ids.
+
+    ``args.epoch_id`` names one epoch of the epoch register's analysed ones (any
+    other exits with a message); otherwise ``args.animal``, ``args.date`` and
+    ``args.epoch`` narrow them, ``None`` leaving a filter off. The detection
+    comparison's runners select their epochs by it.
+
+    Parameters
+    ----------
+    args : Namespace
+        Parsed arguments with ``epoch_id``, ``animal``, ``date`` and ``epoch``.
+
+    Returns
+    -------
+    list of str
+        Epoch ids such as ``"chimi20200225_02_r1_HPC"``, sorted.
+    """
+    analysed = analysed_epoch_ids()
+    if args.epoch_id is not None:
+        if args.epoch_id not in analysed:
+            sys.exit(f"{args.epoch_id} is not an analysed epoch of the epoch register.")
+        return [args.epoch_id]
+    selected = []
+    for identifier in analysed:
+        key = parse_epoch_identifier(identifier)
+        if (
+            (args.animal is None or key.animal == args.animal)
+            and (args.date is None or key.date == args.date)
+            and (args.epoch is None or key.epoch_name == args.epoch)
+        ):
+            selected.append(identifier)
+    return selected
 
 
 def add_common_args(parser: ArgumentParser) -> ArgumentParser:

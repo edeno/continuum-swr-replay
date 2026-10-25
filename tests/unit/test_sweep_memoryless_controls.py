@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    sweep,
+    sweep_controls,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation import (
     Gap,
     Segment,
@@ -11,7 +15,6 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.simulation im
     place_field_means,
 )
 from scripts.detection import sweep_memoryless_controls as controls
-from scripts.detection import sweep_memoryless_detection as sweep
 
 MEANS = place_field_means(25, 170.0)
 
@@ -30,7 +33,7 @@ def event(start_s, end_s, activity, offset_cm=0.0):
     """An event whose decoded positions sit on the activity's path, plus an offset."""
     times = np.linspace(start_s, end_s, 20)
     return sweep.ReportedEvent(
-        start_s, end_s, times, controls.truth_path(activity)(times) + offset_cm
+        start_s, end_s, times, sweep_controls.truth_path(activity)(times) + offset_cm
     )
 
 
@@ -49,7 +52,7 @@ def state_run(activity):
 class TestTruthPath:
     def test_is_silent_in_the_gap_and_held_outside_the_activity(self):
         activity = chain()
-        truth = controls.truth_path(activity)
+        truth = sweep_controls.truth_path(activity)
 
         assert np.isnan(truth([1.2]))[0]
         assert truth([0.5])[0] == pytest.approx(90.0)
@@ -59,24 +62,26 @@ class TestTruthPath:
 
 class TestCoveredGround:
     def test_disjoint_parts_add_up(self):
-        assert controls.covered_cm(chain(90.0, 10.0)) == pytest.approx(120.0, abs=0.5)
+        assert sweep_controls.covered_cm(chain(90.0, 10.0)) == pytest.approx(
+            120.0, abs=0.5
+        )
 
     def test_overlapping_parts_count_their_ground_once(self):
         activity = piecewise_replay(
-            controls.jump_segments(0.12, 20.0), 1.0, 1000.0, MEANS, 60.0
+            sweep_controls.jump_segments(0.12, 20.0), 1.0, 1000.0, MEANS, 60.0
         )
 
-        assert controls.covered_cm(activity) == pytest.approx(100.0, abs=0.5)
+        assert sweep_controls.covered_cm(activity) == pytest.approx(100.0, abs=0.5)
 
 
 class TestJumpGeometry:
-    @pytest.mark.parametrize("jump_cm", controls.JUMP_CM)
+    @pytest.mark.parametrize("jump_cm", sweep_controls.JUMP_CM)
     def test_the_far_end_is_the_same_for_every_jump(self, jump_cm):
-        first, second = controls.jump_segments(0.12, jump_cm)
+        first, second = sweep_controls.jump_segments(0.12, jump_cm)
 
         assert max(
             first.start_cm + first.path_cm, second.start_cm + second.path_cm
-        ) == (pytest.approx(controls.FAR_END_CM))
+        ) == (pytest.approx(sweep_controls.FAR_END_CM))
         assert second.start_cm == pytest.approx(
             first.start_cm + first.path_cm - jump_cm
         )
