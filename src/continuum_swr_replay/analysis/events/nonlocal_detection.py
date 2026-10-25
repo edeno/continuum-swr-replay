@@ -208,7 +208,6 @@ def event_strict_overlap_keys(
     other_col: str,
     *,
     session_cols: tuple[str, ...] = ("animal", "day", "epoch"),
-    other_data: pd.DataFrame | None = None,
 ) -> set[tuple]:
     """Per-(session, primary_id) keys whose interval strictly overlaps any other event.
 
@@ -223,11 +222,8 @@ def event_strict_overlap_keys(
     event table uses, so for Non-Local x SWR the keys are exactly its
     ``is_swr`` events.
 
-    ``other_data`` draws ``other_col`` bounds from a different frame than
-    the primary; it defaults to using ``data_over_time`` for both sides,
-    which is what every current caller wants. Do not use it to pair a
-    speed-filtered primary against a raw other: both sides must come from
-    the same speed-eligible cohort, or the overlap counts mix populations.
+    Both sides come from ``data_over_time``, so they share one
+    speed-eligible cohort and the overlap counts do not mix populations.
 
     Events whose labeled span covers a single timebin have zero duration
     and are excluded from both sides of the comparison.
@@ -256,8 +252,7 @@ def event_strict_overlap_keys(
             for key, grp in active.groupby(sess, sort=False)
         }
 
-    o_source = data_over_time if other_data is None else other_data
-    o_intervals = _session_intervals(o_source, other_col)
+    o_intervals = _session_intervals(data_over_time, other_col)
     keys: set[tuple] = set()
     if not o_intervals:
         return keys
@@ -282,7 +277,6 @@ def event_strict_overlap_mask(
     other_col: str,
     *,
     session_cols: tuple[str, ...] = ("animal", "day", "epoch"),
-    other_data: pd.DataFrame | None = None,
 ) -> pd.Series:
     """Mark every bin of primary events that strictly overlap another event.
 
@@ -291,15 +285,10 @@ def event_strict_overlap_mask(
     deliberately different from a raw per-bin coincidence mask, which splits
     partially overlapping events across both comparison groups.
     """
-    required = [*session_cols, primary_col]
+    required = [*session_cols, primary_col, other_col]
     missing = [column for column in required if column not in data_over_time]
     if missing:
         raise KeyError(f"data_over_time is missing required columns: {missing}")
-    other_source = data_over_time if other_data is None else other_data
-    other_required = [*session_cols, other_col]
-    other_missing = [column for column in other_required if column not in other_source]
-    if other_missing:
-        raise KeyError(f"other event data is missing required columns: {other_missing}")
 
     active = data_over_time[primary_col].to_numpy() > 0
     mask = np.zeros(len(data_over_time), dtype=bool)
@@ -311,7 +300,6 @@ def event_strict_overlap_mask(
         primary_col,
         other_col,
         session_cols=session_cols,
-        other_data=other_data,
     )
     if overlap_keys:
         active_keys = pd.MultiIndex.from_frame(
