@@ -26,8 +26,7 @@ def trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
         if np.isinf(cutoff).any():
             raise ValueError(
                 "destination_first_poke_in_time contains infinity; corrupted "
-                "physical timing "
-                "must not silently fall back to end_time"
+                "physical timing must not silently fall back to end_time"
             )
         missing = np.isnan(cutoff)
         return np.where(missing, end, cutoff)
