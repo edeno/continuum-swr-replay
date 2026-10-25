@@ -825,6 +825,41 @@ class TestEveryCohortHonoursTheMask:
             ("SWR_event", 6),
         ]
 
+    def test_the_drops_carry_each_events_sampled_bounds(
+        self, inventory, tmp_path, monkeypatch
+    ):
+        """An SWR's sampled bounds are its first and last grid sample (NaN for
+        one the speed rule rejects); a labelled event's are its bounds. The
+        second pass reads the dropped events at them (``dropped_on_grid``)."""
+        _artifacts(tmp_path, monkeypatch, ARTIFACTS)
+        dot = self._nonlocal_dot()
+        time = dot.index.to_numpy()
+
+        drops = analysed_time.artifact_event_drops(dot)
+
+        swr = drops["event_col"] == "SWR_event"
+        rows = drops.loc[swr]
+        first = np.searchsorted(time, rows["start_time"].to_numpy(), side="left")
+        last = np.searchsorted(time, rows["end_time"].to_numpy(), side="right") - 1
+        eligible = rows["speed_eligible"].to_numpy()
+        assert not eligible.all()  # SWR 3 moves
+        on_axis = np.c_[time[first.clip(0, time.size - 1)], time[last.clip(0)]]
+        expected = np.where(eligible[:, None], on_axis, np.nan)
+        np.testing.assert_array_equal(
+            rows[["sampled_start_time", "sampled_end_time"]].to_numpy(), expected
+        )
+        np.testing.assert_array_equal(
+            drops.loc[~swr, ["sampled_start_time", "sampled_end_time"]].to_numpy(),
+            drops.loc[~swr, ["start_time", "end_time"]].to_numpy(),
+        )
+        on_grid = analysed_time.dropped_on_grid(drops)
+        dropped = analysed_time.dropped_for_excluded_time(drops)
+        assert on_grid.index.equals(dropped.index)
+        np.testing.assert_array_equal(
+            on_grid[["start_time", "end_time"]].to_numpy(),
+            dropped[["sampled_start_time", "sampled_end_time"]].to_numpy(),
+        )
+
     def test_a_frame_without_an_overlap_keeps_its_events(
         self, inventory, tmp_path, monkeypatch
     ):

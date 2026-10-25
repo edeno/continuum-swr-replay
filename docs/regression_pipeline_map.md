@@ -32,7 +32,7 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 The analysed-time read point: a decode frame held to the one analysed-time rule.
 
-`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
+`stamp_swr_source`, `require_swr_source`, `publish_swr_table`, `excluded_intervals`, `swr_observed_stretches`, `swr_observed_mask`, `sampled_bounds`, `swr_event_labels`, `artifact_event_drops`, `read_artifact_event_drops`, `dropped_for_excluded_time`, `dropped_on_grid`, `with_swr_source`, `excluded_intervals_of`, `excluded_intervals_by_session`, `read_dot_with_swr_source`, `analysed_bins`, `swr_intervals`
 
 ### `src/continuum_swr_replay/analysis/events/artifact_intervals.py`
 

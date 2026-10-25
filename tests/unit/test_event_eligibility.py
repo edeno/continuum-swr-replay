@@ -225,3 +225,215 @@ def test_a_cohort_read_outside_the_source_takes_the_overlap_pass_too():
         DropReason.ARTIFACT.value,
         None,
     ]
+
+
+# --- The speed rule before it was computed once (frozen at 974e9a8d) ---------
+# ``event_drop_reasons`` applied the whole-event rule twice: with the per-event
+# loop of ``immobility.filter_event_intervals_by_speed`` and with the cumsum
+# counts, raising when they disagreed. These are those functions as they were,
+# copied verbatim (the loop's logging dropped), so the counts alone can be
+# checked against the loop.
+
+
+def _frozen_validate_speed_threshold(speed_threshold: float) -> float:
+    threshold = float(speed_threshold)
+    if not np.isfinite(threshold) or threshold <= 0:
+        raise ValueError(
+            f"speed_threshold must be finite and positive, got {speed_threshold!r}"
+        )
+    return threshold
+
+
+def _frozen_event_speeds_are_immobile(speed, *, speed_threshold) -> bool:
+    threshold = _frozen_validate_speed_threshold(speed_threshold)
+    values = np.asarray(speed, dtype=float)
+    if values.ndim != 1:
+        raise ValueError("speed must be one-dimensional")
+    return bool(
+        values.size > 0 and np.isfinite(values).all() and (values < threshold).all()
+    )
+
+
+def _frozen_filter_event_intervals_by_speed(
+    event_times, *, speed, time, speed_threshold
+):
+    threshold = _frozen_validate_speed_threshold(speed_threshold)
+    missing = [
+        column
+        for column in ("start_time", "end_time")
+        if column not in event_times.columns
+    ]
+    if missing:
+        raise KeyError(f"event_times is missing required columns: {missing}")
+
+    time_values = np.asarray(time, dtype=float)
+    speed_values = np.asarray(speed, dtype=float)
+    if time_values.ndim != 1 or speed_values.ndim != 1:
+        raise ValueError("time and speed must be one-dimensional")
+    if len(time_values) != len(speed_values):
+        raise ValueError(
+            "time and speed must have equal length, "
+            f"got {len(time_values)} and {len(speed_values)}"
+        )
+    if not np.isfinite(time_values).all():
+        raise ValueError("time must contain only finite values")
+    if len(time_values) > 1 and not (np.diff(time_values) > 0).all():
+        raise ValueError("time must be strictly increasing")
+
+    starts = event_times["start_time"].to_numpy(dtype=float)
+    ends = event_times["end_time"].to_numpy(dtype=float)
+    if not (np.isfinite(starts).all() and np.isfinite(ends).all()):
+        raise ValueError("event start_time and end_time must be finite")
+    if (ends < starts).any():
+        raise ValueError("event end_time must be greater than or equal to start_time")
+
+    start_indices = np.searchsorted(time_values, starts, side="left")
+    end_indices = np.searchsorted(time_values, ends, side="right")
+    keep = np.fromiter(
+        (
+            _frozen_event_speeds_are_immobile(
+                speed_values[start:end], speed_threshold=threshold
+            )
+            for start, end in zip(start_indices, end_indices, strict=True)
+        ),
+        dtype=bool,
+        count=len(event_times),
+    )
+    return event_times.loc[keep].copy()
+
+
+def _frozen_event_drop_reasons(events, *, speed, time, artifacts, speed_threshold=4.0):
+    time = np.asarray(time, dtype=np.float64)
+    values = np.asarray(speed, dtype=np.float64)
+    starts = events["start_time"].to_numpy(dtype=np.float64)
+    ends = events["end_time"].to_numpy(dtype=np.float64)
+    numbered = pd.DataFrame(
+        {"start_time": starts, "end_time": ends}, index=np.arange(len(events))
+    )
+    immobile = numbered.index.isin(
+        _frozen_filter_event_intervals_by_speed(
+            numbered, speed=values, time=time, speed_threshold=speed_threshold
+        ).index
+    )
+    first = np.searchsorted(time, starts, side="left")
+    stop = np.searchsorted(time, ends, side="right")
+    finite = np.isfinite(values)
+    fast = finite & (values >= speed_threshold)
+
+    def _in_event(flags):
+        cumulative = np.concatenate([[0], np.cumsum(flags, dtype=np.int64)])
+        counts = cumulative[stop] - cumulative[first]
+        return counts
+
+    reasons = np.full(len(events), None, dtype=object)
+    reasons[~immobile & (_in_event(~finite) > 0)] = DropReason.SPEED_UNKNOWN.value
+    reasons[~immobile & (_in_event(fast) > 0)] = DropReason.MOVING.value
+    reasons[~immobile & (stop <= first)] = DropReason.NO_SPEED_SAMPLE.value
+    if (pd.isna(reasons) & ~immobile).any():
+        raise RuntimeError(
+            "an event failed the immobility rule for no reason this module names"
+        )
+    excluded = artifact_drop_reasons(starts, ends, artifacts)
+    in_excluded = ~pd.isna(excluded)
+    reasons[in_excluded] = excluded[in_excluded]
+    return reasons
+
+
+class TestTheSpeedRuleMatchesTheLoop:
+    """The counts alone give every reason the loop and the counts gave."""
+
+    TIME = np.round(np.arange(9.0, 13.0, 0.002), 6)
+
+    def _both(self, events, speed, artifacts=MASK, threshold=4.0):
+        frame = pd.DataFrame(events, columns=["start_time", "end_time"], dtype=float)
+        kwargs = {
+            "speed": speed,
+            "time": self.TIME,
+            "artifacts": artifacts,
+            "speed_threshold": threshold,
+        }
+        return (
+            event_drop_reasons(frame, **kwargs).tolist(),
+            _frozen_event_drop_reasons(frame, **kwargs).tolist(),
+        )
+
+    def _speed(self):
+        speed = np.full(self.TIME.size, 1.0)
+        speed[(self.TIME >= 12.0) & (self.TIME <= 12.1)] = 10.0  # fast
+        speed[self.TIME == 12.2] = 4.0  # exactly the threshold: fast
+        speed[(self.TIME >= 12.5) & (self.TIME <= 12.51)] = np.nan
+        speed[self.TIME == 12.6] = np.inf
+        speed[self.TIME == 12.7] = -np.inf
+        speed[(self.TIME >= 12.8) & (self.TIME <= 12.81)] = np.nan
+        speed[self.TIME == 12.806] = 9.0  # fast beside NaN: moving wins
+        return speed
+
+    def test_no_events(self):
+        new, old = self._both(np.empty((0, 2)), self._speed())
+        assert new == old == []
+
+    @pytest.mark.parametrize("artifacts", [MASK, NO_MASK])
+    def test_named_cases(self, artifacts):
+        events = [
+            (12.05, 12.08),  # fast inside
+            (12.1, 12.15),  # starts exactly on the last fast sample
+            (11.95, 12.0),  # ends exactly on the first fast sample
+            (12.102, 12.198),  # exactly between fast and threshold samples: kept
+            (12.198, 12.2),  # ends exactly on the threshold sample
+            (12.50, 12.52),  # NaN
+            (12.6, 12.6),  # zero length on an inf sample
+            (12.7, 12.7),  # zero length on a -inf sample
+            (12.3, 12.3),  # zero length on an ordinary sample: kept
+            (12.3011, 12.3015),  # between two samples: no sample
+            (12.802, 12.808),  # NaN and fast
+            (8.0, 8.5),  # before the first sample
+            (13.5, 14.0),  # after the last sample
+            (8.0, 9.0),  # ends exactly on the first sample
+            (12.998, 14.0),  # starts exactly on the last sample
+            (10.5, 10.6),  # in the mask
+            (11.1, 11.2),  # near it
+            (9.5, 9.7),  # ends exactly at the reach
+        ]
+        new, old = self._both(events, self._speed(), artifacts)
+        assert new == old
+        if artifacts is MASK:
+            assert new[:11] == [
+                "moving",
+                "moving",
+                "moving",
+                None,
+                "moving",
+                "speed_unknown",
+                "speed_unknown",
+                "speed_unknown",
+                None,
+                "no_speed_sample",
+                "moving",
+            ]
+            assert new[11:] == [
+                "no_speed_sample",
+                "no_speed_sample",
+                None,
+                None,
+                "artifact",
+                "near_artifact",
+                "near_artifact",
+            ]
+
+    @pytest.mark.parametrize("seed", [0, 1, 2])
+    def test_random_events(self, seed):
+        rng = np.random.default_rng(seed)
+        speed = rng.choice(
+            [0.5, 3.9, 4.0, 7.0, np.nan],
+            size=self.TIME.size,
+            p=[0.9, 0.04, 0.01, 0.03, 0.02],
+        )
+        starts = rng.uniform(8.5, 13.5, 500)
+        # a quarter of the bounds land exactly on a sample
+        on_sample = rng.random(500) < 0.25
+        starts[on_sample] = rng.choice(self.TIME, on_sample.sum())
+        lengths = rng.choice([0.0, 0.001, 0.004, 0.02, 0.1], 500)
+        events = np.column_stack([starts, starts + lengths])
+        new, old = self._both(events, speed)
+        assert new == old
+        assert {"moving", "speed_unknown", "no_speed_sample", None} <= set(new)

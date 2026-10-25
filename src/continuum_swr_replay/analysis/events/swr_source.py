@@ -510,7 +510,6 @@ def read_swr_inventory(epoch_id: str) -> pd.DataFrame:
 
 
 def classify(
-    epoch_id: str,
     source: EpochSource,
     speed: pd.Series,
     speed_threshold: float,
@@ -519,20 +518,17 @@ def classify(
     and ``speed_eligible`` (the speed rule alone)."""
     events = source.events.copy()
     no_mask = source.artifacts.iloc[0:0]
-    try:
-        for column, artifacts in (
-            ("speed_reason", no_mask),
-            ("drop_reason", source.artifacts),
-        ):
-            events[column] = event_drop_reasons(
-                events[["start_time", "end_time"]],
-                speed=speed.to_numpy(dtype=float),
-                time=speed.index.to_numpy(dtype=float),
-                artifacts=artifacts,
-                speed_threshold=speed_threshold,
-            )
-    except RuntimeError as error:
-        raise RuntimeError(f"{epoch_id}: {error}") from error
+    for column, artifacts in (
+        ("speed_reason", no_mask),
+        ("drop_reason", source.artifacts),
+    ):
+        events[column] = event_drop_reasons(
+            events[["start_time", "end_time"]],
+            speed=speed.to_numpy(dtype=float),
+            time=speed.index.to_numpy(dtype=float),
+            artifacts=artifacts,
+            speed_threshold=speed_threshold,
+        )
     events["speed_eligible"] = events.pop("speed_reason").isna()
     return events
 
@@ -575,4 +571,4 @@ def swr_events(
         If the epoch cannot be served (:func:`swr_source_files`,
         :func:`artifact_intervals`).
     """
-    return classify(epoch_id, epoch_source(epoch_id), speed, speed_threshold)
+    return classify(epoch_source(epoch_id), speed, speed_threshold)

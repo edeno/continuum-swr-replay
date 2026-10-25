@@ -35,10 +35,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events.immobility import (
-    filter_event_intervals_by_speed,
-    intervals_from_labels,
-)
+from continuum_swr_replay.analysis.events.immobility import intervals_from_labels
 from continuum_swr_replay.intervals import (
     overlaps_intervals,
     pad_intervals,
@@ -210,16 +207,18 @@ def event_drop_reasons(
 ) -> NDArray[np.object_]:
     """The rule on events given as intervals: each one's reason, or None.
 
-    The canonical whole-event immobility rule decides the speed part
-    (``filter_event_intervals_by_speed``: samples in the closed interval, every
-    one finite and strictly below `speed_threshold`); the counts here only name
-    why it failed. Excluded time's reasons come first. The pass for
-    ``overlaps_dropped_event`` needs the other cohorts and is not made here.
+    The speed part is the canonical whole-event immobility rule (as
+    ``immobility.filter_event_intervals_by_speed``): the samples in the closed
+    interval, every one finite and strictly below `speed_threshold`, counted
+    here for every event at once. An event that fails it is named by why.
+    Excluded time's reasons come first. The pass for ``overlaps_dropped_event``
+    needs the other cohorts and is not made here.
 
     Parameters
     ----------
     events : pd.DataFrame
-        ``start_time`` and ``end_time`` (seconds), one row per event.
+        ``start_time`` and ``end_time`` (seconds), one row per event, each
+        ending at or after it starts.
     speed : ndarray, shape (n_time,)
         Head speed (cm/s) on `time`.
     time : ndarray, shape (n_time,)
@@ -233,24 +232,11 @@ def event_drop_reasons(
     -------
     ndarray of object, shape (n_events,)
         A :class:`DropReason` value per dropped event, None per kept one.
-
-    Raises
-    ------
-    RuntimeError
-        If an event fails the immobility rule for no reason named here.
     """
     time = np.asarray(time, dtype=np.float64)
     values = np.asarray(speed, dtype=np.float64)
     starts = events["start_time"].to_numpy(dtype=np.float64)
     ends = events["end_time"].to_numpy(dtype=np.float64)
-    numbered = pd.DataFrame(
-        {"start_time": starts, "end_time": ends}, index=np.arange(len(events))
-    )
-    immobile = numbered.index.isin(
-        filter_event_intervals_by_speed(
-            numbered, speed=values, time=time, speed_threshold=speed_threshold
-        ).index
-    )
     first = np.searchsorted(time, starts, side="left")
     stop = np.searchsorted(time, ends, side="right")
     finite = np.isfinite(values)
@@ -262,13 +248,9 @@ def event_drop_reasons(
         return counts
 
     reasons = np.full(len(events), None, dtype=object)
-    reasons[~immobile & (_in_event(~finite) > 0)] = DropReason.SPEED_UNKNOWN.value
-    reasons[~immobile & (_in_event(fast) > 0)] = DropReason.MOVING.value
-    reasons[~immobile & (stop <= first)] = DropReason.NO_SPEED_SAMPLE.value
-    if (pd.isna(reasons) & ~immobile).any():
-        raise RuntimeError(
-            "an event failed the immobility rule for no reason this module names"
-        )
+    reasons[_in_event(~finite) > 0] = DropReason.SPEED_UNKNOWN.value
+    reasons[_in_event(fast) > 0] = DropReason.MOVING.value
+    reasons[stop <= first] = DropReason.NO_SPEED_SAMPLE.value
     excluded = artifact_drop_reasons(starts, ends, artifacts)
     in_excluded = ~pd.isna(excluded)
     reasons[in_excluded] = excluded[in_excluded]

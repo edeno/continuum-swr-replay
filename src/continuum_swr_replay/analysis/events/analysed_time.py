@@ -117,6 +117,7 @@ __all__ = [
     "analysed_bins",
     "artifact_event_drops",
     "dropped_for_excluded_time",
+    "dropped_on_grid",
     "excluded_intervals",
     "publish_swr_table",
     "excluded_intervals_by_session",
@@ -124,6 +125,7 @@ __all__ = [
     "read_artifact_event_drops",
     "read_dot_with_swr_source",
     "require_swr_source",
+    "sampled_bounds",
     "stamp_swr_source",
     "swr_event_labels",
     "swr_intervals",
@@ -189,6 +191,8 @@ DROP_COLUMNS = [
     "label",
     "start_time",
     "end_time",
+    "sampled_start_time",
+    "sampled_end_time",
     "speed_eligible",
     "drop_reason",
 ]
@@ -337,6 +341,59 @@ def _speed_eligible_labels(
     return eligible
 
 
+def sampled_bounds(
+    events: pd.DataFrame,
+    time: NDArray | pd.Index,
+    speed: NDArray,
+    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+) -> tuple[NDArray[np.int64], NDArray[np.float64]]:
+    """Each event's labels on a decode grid and its sampled bounds there.
+
+    The events are labelled by their row ordinals (1..n) on the grid, as
+    ``build_speed_eligible_event_cohort`` labels them (the ones in excluded
+    time too); an event's sampled bounds are its first and last labelled
+    sample. The rule's second pass (``overlaps_dropped_event``) reads every
+    event at these bounds.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        ``start_time`` and ``end_time`` (seconds), one row per event.
+    time : array-like, shape (n_time,)
+        The grid (seconds), strictly increasing.
+    speed : ndarray, shape (n_time,)
+        Head speed on `time` (cm/s).
+    speed_threshold : float
+        cm/s, strict.
+
+    Returns
+    -------
+    labels : ndarray of int, shape (n_time,)
+        The row ordinal of the event each sample lies in, 0 outside the events
+        the speed rule keeps.
+    bounds : ndarray, shape (n_events, 2)
+        First and last labelled sample (seconds) of each event; NaN for an
+        event the speed rule rejects.
+
+    Raises
+    ------
+    EventDefinitionError
+        If two events claim one sample.
+    """
+    time_index = pd.Index(np.asarray(time, dtype=float), name="time")
+    labels = _speed_eligible_labels(
+        events, time_index, np.asarray(speed, dtype=float), speed_threshold
+    )
+    sampled = intervals_from_labels(
+        pd.DataFrame({"label": labels}, index=time_index), "label"
+    )
+    bounds = np.full((len(events), 2), np.nan)
+    bounds[sampled["label"].to_numpy(dtype=int) - 1] = sampled[
+        ["start_time", "end_time"]
+    ].to_numpy(dtype=np.float64)
+    return labels, bounds
+
+
 def _keep_labels(labels: NDArray[np.int64], kept: NDArray) -> NDArray[np.int64]:
     kept_labels: NDArray[np.int64] = np.where(np.isin(labels, kept), labels, 0)
     return kept_labels
@@ -390,7 +447,6 @@ def swr_event_labels(
     )
     speed_values = np.asarray(speed, dtype=float)
     events = swr_source.classify(
-        epoch_id,
         swr_source.epoch_source(epoch_id),
         pd.Series(speed_values, index=time_index),
         speed_threshold,
@@ -442,26 +498,25 @@ def _frame_epoch(
 
 
 def _drops(
-    epoch_id: str, source: swr_source.EpochSource, dot: pd.DataFrame, time: NDArray
+    source: swr_source.EpochSource, dot: pd.DataFrame, time: NDArray
 ) -> tuple[pd.DataFrame, NDArray[np.int64]]:
     """Every event of the frame with its reason, and the speed-eligible SWR
     labels on its grid.
 
     The SWR rows are the inventory's (its bounds); the label columns' rows are
     the frame's (sampled bounds). The overlap pass reads every event at its
-    sampled bounds on the frame's grid.
+    sampled bounds on the frame's grid (``sampled_start_time``,
+    ``sampled_end_time``).
     """
-    time_index = pd.Index(time, name="time")
     speed_values = dot["head_speed"].to_numpy(dtype=float)
     swrs = swr_source.classify(
-        epoch_id,
         source,
-        pd.Series(speed_values, index=time_index),
+        pd.Series(speed_values, index=pd.Index(time, name="time")),
         DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
-    swr_labels = _speed_eligible_labels(
-        swrs, time_index, speed_values, DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-    )
+    # the inventory numbers its events 1..n in row order, so a row's ordinal
+    # is its SWR_event label
+    swr_labels, swr_bounds = sampled_bounds(swrs, time, speed_values)
     parts = [
         pd.DataFrame(
             {
@@ -469,6 +524,8 @@ def _drops(
                 "label": swrs[SWR_LABEL_COLUMN].to_numpy(),
                 "start_time": swrs["start_time"].to_numpy(dtype=float),
                 "end_time": swrs["end_time"].to_numpy(dtype=float),
+                "sampled_start_time": swr_bounds[:, 0],
+                "sampled_end_time": swr_bounds[:, 1],
                 "speed_eligible": swrs["speed_eligible"].to_numpy(dtype=bool),
                 "drop_reason": swrs["drop_reason"].to_numpy(),
             }
@@ -476,42 +533,28 @@ def _drops(
     ]
     for column in LABEL_COLUMNS:
         if column in dot.columns:
+            labelled = label_drop_reasons(dot, column, source.artifacts)
             parts.append(
-                label_drop_reasons(dot, column, source.artifacts)
-                .rename(columns={column: "label"})
-                .assign(event_col=column, speed_eligible=True)[DROP_COLUMNS]
+                labelled.rename(columns={column: "label"}).assign(
+                    event_col=column,
+                    sampled_start_time=labelled["start_time"],
+                    sampled_end_time=labelled["end_time"],
+                    speed_eligible=True,
+                )[DROP_COLUMNS]
             )
     drops = pd.concat(parts, ignore_index=True)[DROP_COLUMNS]
 
     # One pass: a kept event that overlaps an SWR or MUA event dropped for
     # excluded time (and eligible but for it) has an unknown overlap class.
-    sampled = drops[["event_col", "label", "start_time", "end_time"]].copy()
-    swr_sampled = intervals_from_labels(
-        pd.DataFrame({SWR_LABEL_COLUMN: swr_labels}, index=time_index),
-        SWR_LABEL_COLUMN,
-    ).set_index(SWR_LABEL_COLUMN)
-    is_swr = (sampled["event_col"] == SWR_LABEL_COLUMN).to_numpy()
-    on_grid = sampled["label"].where(is_swr).isin(swr_sampled.index).to_numpy()
-    sampled.loc[is_swr, ["start_time", "end_time"]] = np.nan
-    if on_grid.any():
-        on_grid_labels = sampled.loc[on_grid, "label"]
-        for bound in ("start_time", "end_time"):
-            sampled.loc[on_grid, bound] = swr_sampled.loc[
-                on_grid_labels, bound
-            ].to_numpy(dtype=float)
-    dropped = (
-        drops["event_col"].isin(OVERLAP_SOURCES)
-        & drops["drop_reason"].isin(EXCLUDED_TIME_REASONS)
-        & drops["speed_eligible"]
-    ).to_numpy() & np.isfinite(sampled["start_time"].to_numpy(dtype=float))
+    dropped = dropped_on_grid(drops)
     kept = drops["drop_reason"].isna().to_numpy() & np.isfinite(
-        sampled["start_time"].to_numpy(dtype=float)
+        drops["sampled_start_time"].to_numpy(dtype=float)
     )
-    if dropped.any() and kept.any():
+    if len(dropped) and kept.any():
         overlapping = overlaps_dropped_events(
-            sampled.loc[kept, "start_time"].to_numpy(dtype=float),
-            sampled.loc[kept, "end_time"].to_numpy(dtype=float),
-            sampled.loc[dropped, ["start_time", "end_time"]],
+            drops.loc[kept, "sampled_start_time"].to_numpy(dtype=float),
+            drops.loc[kept, "sampled_end_time"].to_numpy(dtype=float),
+            dropped,
         )
         rows = np.flatnonzero(kept)[overlapping]
         drops.loc[rows, "drop_reason"] = DropReason.OVERLAPS_DROPPED_EVENT.value
@@ -551,9 +594,12 @@ def artifact_event_drops(
     -------
     pd.DataFrame
         Columns :data:`DROP_COLUMNS`: the label column, the event's label, its
-        bounds (seconds; an SWR's are the inventory's), whether the speed rule
-        alone keeps it, and its reason (None for a kept event); SWR events
-        first, then each label column, in label order.
+        bounds (seconds; an SWR's are the inventory's), its sampled bounds on
+        the frame's grid (``sampled_start_time``, ``sampled_end_time``: an
+        SWR's first and last labelled bin, :func:`sampled_bounds`, NaN for one
+        the speed rule rejects; a labelled event's are its bounds), whether the
+        speed rule alone keeps it, and its reason (None for a kept event); SWR
+        events first, then each label column, in label order.
 
     Raises
     ------
@@ -569,7 +615,7 @@ def artifact_event_drops(
         If the epoch cannot be served.
     """
     epoch_id, time = _frame_epoch(dot, "artifact_event_drops", non_local_threshold)
-    drops, _ = _drops(epoch_id, swr_source.epoch_source(epoch_id), dot, time)
+    drops, _ = _drops(swr_source.epoch_source(epoch_id), dot, time)
     return drops
 
 
@@ -604,6 +650,32 @@ def dropped_for_excluded_time(drops: pd.DataFrame) -> pd.DataFrame:
         & drops["speed_eligible"]
     )
     return drops.loc[selected]
+
+
+def dropped_on_grid(drops: pd.DataFrame) -> pd.DataFrame:
+    """:func:`dropped_for_excluded_time` at its events' sampled bounds: the
+    intervals the rule's second pass (``overlaps_dropped_event``) checks a kept
+    event against.
+
+    The speed rule keeps each of these events, so each has sampled bounds on
+    the grid.
+
+    Parameters
+    ----------
+    drops : pd.DataFrame
+        From :func:`artifact_event_drops`.
+
+    Returns
+    -------
+    pd.DataFrame
+        Its rows for those events, ``start_time`` and ``end_time`` set to
+        ``sampled_start_time`` and ``sampled_end_time``.
+    """
+    dropped = dropped_for_excluded_time(drops)
+    return dropped.assign(
+        start_time=dropped["sampled_start_time"],
+        end_time=dropped["sampled_end_time"],
+    )
 
 
 def _normalize_outside_mask(frame: pd.DataFrame, in_mask: NDArray[np.bool_]) -> None:
@@ -713,7 +785,7 @@ def with_swr_source(
     epoch_id, time = _frame_epoch(dot, "with_swr_source", non_local_threshold)
     source = swr_source.epoch_source(epoch_id)
     masking = drop_masked_events and len(source.artifacts) > 0
-    drops, swr_labels = _drops(epoch_id, source, dot, time)
+    drops, swr_labels = _drops(source, dot, time)
     if masking:
         kept_swrs = drops.loc[
             (drops["event_col"] == SWR_LABEL_COLUMN) & drops["drop_reason"].isna(),

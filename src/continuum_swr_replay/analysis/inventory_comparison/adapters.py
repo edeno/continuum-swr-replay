@@ -40,9 +40,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-)
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
@@ -329,43 +326,18 @@ def _numbered_events(path: Path) -> pd.DataFrame:
 
 
 def _sampled_bounds(intervals: pd.DataFrame, epoch: _Epoch) -> NDArray:
-    """Each interval's first and last sample on the decode grid, as
-    ``analysed_time`` samples the SWRs for the rule's second pass.
+    """Each interval's first and last sample on the decode grid
+    (``analysed_time.sampled_bounds``), as the rule's second pass reads them.
 
     Returns
     -------
     bounds : ndarray, shape (n_intervals, 2)
         NaN for an interval the speed rule rejects, which the pass never reads.
     """
-    time_index = pd.Index(epoch.time, name="time")
-    # labels are the intervals' row ordinals, 1..n
-    labels = analysed_time._speed_eligible_labels(
-        intervals[["start_time", "end_time"]],
-        time_index,
-        epoch.speed,
-        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    _, bounds = analysed_time.sampled_bounds(
+        intervals[["start_time", "end_time"]], epoch.time, epoch.speed
     )
-    sampled = intervals_from_labels(
-        pd.DataFrame({"label": labels}, index=time_index), "label"
-    )
-    bounds = np.full((len(intervals), 2), np.nan)
-    bounds[sampled["label"].to_numpy(dtype=int) - 1] = sampled[
-        ["start_time", "end_time"]
-    ].to_numpy(dtype=np.float64)
     return bounds
-
-
-def _dropped_on_grid(drops: pd.DataFrame, epoch: _Epoch) -> pd.DataFrame:
-    """``analysed_time.dropped_for_excluded_time`` at the bounds ``analysed_time``
-    reads them: each SWR's sampled on the grid (the drops hold the
-    inventory's), each labelled event's as the drops hold them."""
-    sampled = drops.copy()
-    is_swr = (sampled["event_col"] == swr_source.SWR_LABEL_COLUMN).to_numpy()
-    sampled.loc[is_swr, ["start_time", "end_time"]] = _sampled_bounds(
-        sampled.loc[is_swr], epoch
-    )
-    dropped = analysed_time.dropped_for_excluded_time(sampled)
-    return dropped[np.isfinite(dropped["start_time"].to_numpy(dtype=np.float64))]
 
 
 def _lfp_inventory(
@@ -395,7 +367,6 @@ def _lfp_inventory(
     )
     try:
         sampled = _sampled_bounds(events, epoch)
-        dropped = _dropped_on_grid(drops, epoch)
     except EventDefinitionError as error:
         return _unavailable(
             epoch,
@@ -404,7 +375,9 @@ def _lfp_inventory(
             f"two events share a decode-grid sample: {str(error)[:200]}",
         )
     kept = np.flatnonzero(pd.isna(reasons) & np.isfinite(sampled[:, 0]))
-    overlapping = overlaps_dropped_events(sampled[kept, 0], sampled[kept, 1], dropped)
+    overlapping = overlaps_dropped_events(
+        sampled[kept, 0], sampled[kept, 1], analysed_time.dropped_on_grid(drops)
+    )
     reasons[kept[overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
     aside = np.isin(reasons.astype(str), list(SET_ASIDE_REASONS))
     inventory = inventory_from_intervals(
@@ -672,7 +645,7 @@ def _memoryless_second_pass(
     ``overlaps_dropped_event`` is not read: the cohort's candidates outside
     excluded time are checked at their bounds sampled on the decode grid
     against the SWR and MUA events dropped for excluded time at theirs
-    (:func:`_dropped_on_grid`).
+    (``analysed_time.dropped_on_grid``).
 
     Raises
     ------
@@ -694,7 +667,7 @@ def _memoryless_second_pass(
     )
     on_grid = np.isfinite(sampled[:, 0])
     overlapping = overlaps_dropped_events(
-        sampled[on_grid, 0], sampled[on_grid, 1], _dropped_on_grid(drops, epoch)
+        sampled[on_grid, 0], sampled[on_grid, 1], analysed_time.dropped_on_grid(drops)
     )
     reasons[checked[on_grid][overlapping]] = DropReason.OVERLAPS_DROPPED_EVENT.value
     return reasons
