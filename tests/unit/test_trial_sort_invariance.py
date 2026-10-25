@@ -101,7 +101,7 @@ class TestTrialSortInvariance:
 
         for col in (
             "prev_well",
-            "current_well",
+            "last_visited_well",
             "next_well",
             "last_rewarded_well",
             "did_last_completed_trip_switch_patch",
@@ -309,7 +309,7 @@ class TestNoPastTrialsContract:
             ]
         )
         # Event at t=2.0: trial 0 is past (cutoff=end_time=1.0 ≤ 2.0);
-        # trial 1's start_time has passed (so ``current_well``
+        # trial 1's start_time has passed (so ``next_well``
         # evaluates) but its cutoff=2.5 > 2.0.
         event_times = np.array([2.0])
         dot = pd.DataFrame(index=event_times)

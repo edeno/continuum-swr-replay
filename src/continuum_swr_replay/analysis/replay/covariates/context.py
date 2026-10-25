@@ -453,7 +453,7 @@ def add_trial_context(
 
     Columns added
     -------------
-    - ``prev_well``, ``current_well``, ``last_visited_well`` (internal,
+    - ``prev_well``, ``last_visited_well`` (internal,
       past-only well identities; persisted occupancy uses canonical names)
     - ``next_well`` (forward-looking: the not-yet-reached destination)
     - ``last_rewarded_well`` — advances only when a reward is observable
@@ -487,7 +487,6 @@ def add_trial_context(
     if trials.empty:
         for col in (
             "prev_well",
-            "current_well",
             "last_visited_well",
             "next_well",
             "last_rewarded_well",
@@ -566,9 +565,6 @@ def add_trial_context(
     dot["prev_well"] = np.where(has_completed, from_wells[completed_clipped], np.nan)
     last_visited = np.where(has_completed, to_wells[completed_clipped], np.nan)
     dot["last_visited_well"] = last_visited
-    # Compatibility alias: unlike the previous implementation, current_well
-    # is now strictly past-only and never means an in-progress destination.
-    dot["current_well"] = last_visited
 
     started_idx = np.searchsorted(trial_start_times, dot_times, side="right") - 1
     next_idx = completed_idx + 1

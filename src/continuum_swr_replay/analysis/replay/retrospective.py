@@ -638,17 +638,12 @@ def compute_retrospective_metrics(
     event_arm_table: pd.DataFrame,
     event_sequence_table: pd.DataFrame,
     *,
-    include_patch: bool = True,
     include_prev: bool = True,
 ) -> pd.DataFrame:
     """Join the retrospective metrics into a single per-event table.
 
     Parameters
     ----------
-    include_patch : bool, default True
-        Also compute ``chosen_patch_fraction`` and
-        ``ends_at_next_patch``. Set False for the arm-only legacy
-        behavior (matches the original three-metric API).
     include_prev : bool, default True
         Also compute the ``prev_arm`` retrospective mirror:
         ``chosen_arm_fraction_prev``, ``ends_at_prev``,
@@ -660,8 +655,8 @@ def compute_retrospective_metrics(
         One row per event with valid ``occupancy_well_arm`` / ``next_arm`` /
         ``next_patch``. Always includes ``chosen_arm_fraction``,
         ``ends_at_next``, ``contains_path_to_next``. Adds
-        ``chosen_patch_fraction``, ``ends_at_next_patch`` when
-        ``include_patch=True``, and the ``prev_arm`` mirror when
+        ``chosen_patch_fraction``, ``ends_at_next_patch`` when the event
+        table has ``next_patch``, and the ``prev_arm`` mirror when
         ``include_prev=True``.
     """
     sess_keys = _session_keys(event_table)
@@ -671,7 +666,7 @@ def compute_retrospective_metrics(
     out = cf.merge(en, on=[*sess_keys, "event_id"], how="outer").merge(
         cp, on=[*sess_keys, "event_id"], how="outer"
     )
-    if include_patch and "next_patch" in event_table.columns:
+    if "next_patch" in event_table.columns:
         cpf = chosen_patch_fraction(event_table, event_arm_table)
         enp = ends_at_next_patch(event_table, event_sequence_table)
         if not cpf.empty:

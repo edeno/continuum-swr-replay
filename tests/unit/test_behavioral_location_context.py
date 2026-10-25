@@ -106,7 +106,6 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
     # The in-progress first trip exposes no destination/outcome through a
     # past-context field. Its destination is present only in ``next_well``.
     assert pd.isna(out.loc[2.0, "last_visited_well"])
-    assert pd.isna(out.loc[2.0, "current_well"])
     assert pd.isna(out.loc[2.0, "prev_well"])
     assert pd.isna(out.loc[2.0, "is_rewarded_outcome"])
     assert pd.isna(out.loc[2.0, "did_last_completed_trip_switch_patch"])
@@ -119,7 +118,6 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
     # reward stays unavailable until its separate pump-onset clock.
     for time in (3.0, 3.249):
         assert out.loc[time, "last_visited_well"] == 1.0
-        assert out.loc[time, "current_well"] == 1.0
         assert out.loc[time, "prev_well"] == 0.0
         assert pd.isna(out.loc[time, "is_rewarded_outcome"])
         assert pd.isna(out.loc[time, "last_rewarded_well"])
@@ -144,7 +142,6 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
     # Trial 2's destination is visible at arrival, while its omission remains
     # unknown until the conservative trip-end/poke-out boundary.
     assert out.loc[6.0, "last_visited_well"] == 2.0
-    assert out.loc[6.0, "current_well"] == 2.0
     assert out.loc[6.0, "prev_well"] == 1.0
     assert pd.isna(out.loc[6.0, "is_rewarded_outcome"])
     assert out.loc[6.0, "did_last_completed_trip_switch_patch"] == 1.0
@@ -173,7 +170,6 @@ def test_appending_future_trials_cannot_change_past_context_or_location():
     # later data are appended. Every past-only field must be invariant.
     past_only = [
         "prev_well",
-        "current_well",
         "last_visited_well",
         "last_rewarded_well",
         "is_rewarded_outcome",

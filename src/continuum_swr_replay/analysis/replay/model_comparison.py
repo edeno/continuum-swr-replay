@@ -75,7 +75,7 @@ def compare_nested_models(
     ----------
     parent_results : pd.DataFrame
         Per-session results from the simpler (parent) model. Must have
-        columns: ll, aic, bic, n_params, plus session identifiers.
+        columns: llf, aic, bic, n_params, plus session identifiers.
     child_results : pd.DataFrame
         Per-session results from the more complex (child) model.
     session_cols : list[str] | None
@@ -101,9 +101,6 @@ def compare_nested_models(
     if session_cols is None:
         session_cols = list(SESSION_COLUMNS)
 
-    # Accept both "ll" (legacy binomial) and "llf" (conditional Poisson)
-    ll_col = "llf" if "llf" in parent_results.columns else "ll"
-
     # Cohort-size columns present in BOTH frames are carried through so the
     # guard below can invalidate a comparison whose rungs were fit to different
     # rows. Which one is the unit depends on the family: events (conditional
@@ -122,7 +119,7 @@ def compare_nested_models(
         for col in METADATA_COLUMNS
         if col in parent_results.columns and col in child_results.columns
     ]
-    fit_cols = [ll_col, "aic", "bic", "n_params", *count_cols, *meta_cols]
+    fit_cols = ["llf", "aic", "bic", "n_params", *count_cols, *meta_cols]
 
     merged = parent_results[session_cols + fit_cols].merge(
         child_results[session_cols + fit_cols],
@@ -133,8 +130,8 @@ def compare_nested_models(
     if len(merged) == 0:
         return pd.DataFrame()
 
-    ll_parent = f"{ll_col}_parent"
-    ll_child = f"{ll_col}_child"
+    ll_parent = "llf_parent"
+    ll_child = "llf_child"
 
     # Delta AIC/BIC and LRT require parent and child to be fit on
     # the same observations. Callers must ensure this by pre-filtering

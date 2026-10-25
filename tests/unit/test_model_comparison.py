@@ -2,10 +2,11 @@
 
 Covers the behavior the paper's statistical tables rely on:
 - compare_nested_models: ΔAIC / ΔBIC / LR-stat arithmetic, mismatched-
-  n_events invalidation, schema acceptance for both ll and llf columns
+  n_events invalidation
 - summarize_comparison: empty input, NaN-drop before Wilcoxon, the <5
   sessions threshold, negative LR handling
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -35,14 +36,14 @@ def _make_comparison_df(daic_values):
     )
 
 
-def _make_fit_results(*, ll, aic, bic, n_params, n_events=100, n_sessions=1, ll_col="llf"):
+def _make_fit_results(*, ll, aic, bic, n_params, n_events=100, n_sessions=1):
     """One row per session with the columns compare_nested_models needs."""
     return pd.DataFrame(
         {
             "animal": ["a"] * n_sessions,
             "session_date": list(range(n_sessions)),
             "epoch": ["02_r1"] * n_sessions,
-            ll_col: [ll] * n_sessions,
+            "llf": [ll] * n_sessions,
             "aic": [aic] * n_sessions,
             "bic": [bic] * n_sessions,
             "n_params": [n_params] * n_sessions,
@@ -102,13 +103,6 @@ class TestCompareNestedModels:
         cmp = compare_nested_models(parent, child)
         assert cmp["delta_aic"].notna().all()
 
-    def test_accepts_legacy_ll_column(self):
-        """Old binomial path used ``ll`` instead of ``llf``."""
-        parent = _make_fit_results(ll=-50, aic=100, bic=110, n_params=2, ll_col="ll")
-        child = _make_fit_results(ll=-44, aic=90, bic=105, n_params=4, ll_col="ll")
-        cmp = compare_nested_models(parent, child)
-        assert cmp["lr_stat"].iloc[0] == 12.0
-
     def test_empty_inputs_return_empty_frame(self):
         parent = _make_fit_results(ll=-50, aic=100, bic=110, n_params=2, n_sessions=0)
         child = _make_fit_results(ll=-44, aic=90, bic=105, n_params=4, n_sessions=0)
@@ -162,9 +156,7 @@ class TestSummarizeComparison:
         returns NaN for any NaN in the input. summarize_comparison must
         drop NaN sessions before calling wilcoxon so the omnibus p-value
         is valid whenever at least five sessions are comparable."""
-        comparisons = _make_comparison_df(
-            [-1.0, -2.0, np.nan, -0.5, -1.5, -2.5]
-        )
+        comparisons = _make_comparison_df([-1.0, -2.0, np.nan, -0.5, -1.5, -2.5])
         result = summarize_comparison(comparisons, "M0", "M1")
         assert not np.isnan(result["wilcoxon_p"])
 
@@ -203,9 +195,7 @@ class TestSummarizeComparison:
         """``n_sessions`` reports input length (unchanged from prior
         behavior). It is the wilcoxon test that uses the NaN-dropped
         subset, not this counter."""
-        comparisons = _make_comparison_df(
-            [-1.0, -2.0, np.nan, -0.5, -1.5, -2.5]
-        )
+        comparisons = _make_comparison_df([-1.0, -2.0, np.nan, -0.5, -1.5, -2.5])
         result = summarize_comparison(comparisons, "M0", "M1")
         assert result["n_sessions"] == 6
 
@@ -217,6 +207,7 @@ def test_mismatched_n_bins_invalidates():
     fewer bins wins mechanically. ``n_bins`` (Family B) and ``n_stops``
     (Family A) are guarded exactly like ``n_events``.
     """
+
     def rows(*, aic, bic, ll, n_params, n_bins, n_stops):
         return pd.DataFrame(
             {
@@ -239,15 +230,11 @@ def test_mismatched_n_bins_invalidates():
         assert np.isnan(invalid[col]), f"{col} must be NaN on mismatched n_bins"
 
     # A stop-count mismatch alone (Family A) invalidates too.
-    child_stops = rows(
-        aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=940
-    )
+    child_stops = rows(aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=940)
     assert np.isnan(compare_nested_models(parent, child_stops).iloc[0]["delta_aic"])
 
     # Matched bins and stops leave the arithmetic intact.
-    child_ok = rows(
-        aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=1000
-    )
+    child_ok = rows(aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=1000)
     valid = compare_nested_models(parent, child_ok).iloc[0]
     assert valid["delta_aic"] == 10.0
     assert valid["delta_bic"] == 5.0

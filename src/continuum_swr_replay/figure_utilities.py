@@ -431,51 +431,45 @@ def set_figure_defaults(
     mpl.rcParams.update(mpl.rcParamsDefault)
 
     if context == "paper":
-        # Try loading custom style file first
-        style_path = FIGURE_DIR / "styles" / "paper.mplstyle"
-        if style_path.exists():
-            mpl.style.use(str(style_path))
-        else:
-            # Fallback to programmatic configuration
-            rc_params = {
-                # Fonts (editable in Illustrator)
-                "pdf.fonttype": 42,
-                "ps.fonttype": 42,
-                "font.family": "sans-serif",
-                "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-                "font.size": PAPER_FONT_MIN,
-                # Axes
-                "axes.labelsize": PAPER_AXIS_LABEL,
-                "axes.labelcolor": "#222222",
-                "axes.linewidth": 0.8,
-                "axes.labelpad": 4.0,
-                "axes.spines.top": False,
-                "axes.spines.right": False,
-                # Ticks
-                "xtick.labelsize": PAPER_TICK_LABEL,
-                "ytick.labelsize": PAPER_TICK_LABEL,
-                "xtick.major.size": 5,
-                "ytick.major.size": 5,
-                "xtick.major.width": 0.8,
-                "ytick.major.width": 0.8,
-                "xtick.bottom": True,
-                "ytick.left": True,
-                # Lines and markers
-                "lines.linewidth": 1.5,
-                "lines.markersize": 4,
-                # Legend
-                "legend.fontsize": PAPER_LEGEND,
-                "legend.frameon": False,
-                # Text
-                "text.color": "#222222",
-                "text.usetex": False,
-                # Figure
-                "figure.dpi": 450,
-                "figure.constrained_layout.use": True,
-                "savefig.dpi": 450,
-                "savefig.bbox": "tight",
-            }
-            sns.set_theme(style="white", context="paper", rc=rc_params)
+        rc_params = {
+            # Fonts (editable in Illustrator)
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "font.family": "sans-serif",
+            "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+            "font.size": PAPER_FONT_MIN,
+            # Axes
+            "axes.labelsize": PAPER_AXIS_LABEL,
+            "axes.labelcolor": "#222222",
+            "axes.linewidth": 0.8,
+            "axes.labelpad": 4.0,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            # Ticks
+            "xtick.labelsize": PAPER_TICK_LABEL,
+            "ytick.labelsize": PAPER_TICK_LABEL,
+            "xtick.major.size": 5,
+            "ytick.major.size": 5,
+            "xtick.major.width": 0.8,
+            "ytick.major.width": 0.8,
+            "xtick.bottom": True,
+            "ytick.left": True,
+            # Lines and markers
+            "lines.linewidth": 1.5,
+            "lines.markersize": 4,
+            # Legend
+            "legend.fontsize": PAPER_LEGEND,
+            "legend.frameon": False,
+            # Text
+            "text.color": "#222222",
+            "text.usetex": False,
+            # Figure
+            "figure.dpi": 450,
+            "figure.constrained_layout.use": True,
+            "savefig.dpi": 450,
+            "savefig.bbox": "tight",
+        }
+        sns.set_theme(style="white", context="paper", rc=rc_params)
 
     elif context == "presentation":
         rc_params = {
