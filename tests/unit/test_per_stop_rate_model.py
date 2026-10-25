@@ -69,15 +69,15 @@ class TestInterceptOnlyRecovery:
     def test_recovers_known_baseline_rate(self):
         """With no predictors, exp(intercept) = mean rate per second
         of immobility. Generate at λ = 2 events/sec, fit intercept
-        only, and check exp(coef_intercept) is within a few SE of 2.0."""
+        only, and check exp(coef_Intercept) is within a few SE of 2.0."""
         true_rate = 2.0
         df = _simulate_stops(
             n_stops=400, log_intercept=np.log(true_rate), seed=42
         )
         fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is not None
-        recovered_rate = fit["rr_intercept"]
-        z = (np.log(recovered_rate) - np.log(true_rate)) / fit["bse_intercept"]
+        recovered_rate = fit["rr_Intercept"]
+        z = (np.log(recovered_rate) - np.log(true_rate)) / fit["bse_Intercept"]
         assert abs(z) < 3, (
             f"intercept rate {recovered_rate:.3f} (truth {true_rate}, z={z:.2f})"
         )
@@ -86,14 +86,27 @@ class TestInterceptOnlyRecovery:
         """``rr_*`` columns must literally be ``exp(coef_*)``."""
         df = _simulate_stops(n_stops=200, log_intercept=np.log(1.0), seed=0)
         fit = fit_per_stop_rate_model(df, predictors=[])
-        assert fit["rr_intercept"] == pytest.approx(
-            np.exp(fit["coef_intercept"])
+        assert fit["rr_Intercept"] == pytest.approx(
+            np.exp(fit["coef_Intercept"])
         )
 
     def test_bic_uses_log_likelihood_formula(self):
         """BIC should be on the same LLF scale as AIC/model comparisons."""
         df = _simulate_stops(n_stops=100, log_intercept=np.log(1.0), seed=0)
         fit = fit_per_stop_rate_model(df, predictors=[])
+        expected = fit["n_params"] * np.log(fit["n_stops"]) - 2 * fit["llf"]
+        assert fit["bic"] == pytest.approx(expected)
+
+    def test_intercept_has_one_name(self):
+        """Every fitted term, the intercept included, has a coefficient and an
+        SD under the same name, ``Intercept`` as in the formula families."""
+        df = _simulate_stops(
+            n_stops=200, log_intercept=0.0, coefs={"is_after_reward": 0.5}, seed=0
+        )
+        fit = fit_per_stop_rate_model(df, predictors=["is_after_reward"])
+        coef_terms = {k[len("coef_") :] for k in fit if k.startswith("coef_")}
+        sd_terms = {k[len("sd_") :] for k in fit if k.startswith("sd_")}
+        assert coef_terms == sd_terms == {"Intercept", "is_after_reward"}
         expected = fit["n_params"] * np.log(fit["n_stops"]) - 2 * fit["llf"]
         assert fit["bic"] == pytest.approx(expected)
 
@@ -192,7 +205,7 @@ class TestImmobilityTimeOffset:
         fit_b = fit_per_stop_rate_model(df_b, predictors=[])
         # Both should recover ~true_rate within tolerance.
         for fit in (fit_a, fit_b):
-            z = (np.log(fit["rr_intercept"]) - np.log(true_rate)) / fit["bse_intercept"]
+            z = (np.log(fit["rr_Intercept"]) - np.log(true_rate)) / fit["bse_Intercept"]
             assert abs(z) < 3
 
     def test_zero_duration_stops_are_refused(self):

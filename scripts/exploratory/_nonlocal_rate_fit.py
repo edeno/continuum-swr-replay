@@ -104,7 +104,7 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
         )
     # Predicted expected count: exp(intercept + X beta) * immobility_time.
     expo = sub["immobility_duration_s"].to_numpy(float)
-    eta = np.full(n_stops, fit["coef_intercept"], dtype=float)
+    eta = np.full(n_stops, fit["coef_Intercept"], dtype=float)
     for p in predictors:
         eta = eta + fit[f"coef_{p}"] * sub[p].to_numpy(float)
     pred = np.exp(eta) * expo

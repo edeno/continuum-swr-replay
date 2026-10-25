@@ -141,12 +141,12 @@ def fit_per_stop_rate_model(
         # a no-op for a constant predictor, the returned ``X`` has
         # ``len(predictors)`` columns instead of
         # ``len(predictors) + 1``, ``col_names`` claims an extra
-        # ``"intercept"`` slot, and the post-fit
+        # ``"Intercept"`` slot, and the post-fit
         # ``zip(col_names, result.params, strict=True)`` raises
         # ValueError after the GLM has already run.
         raw_X = df[predictors].to_numpy(dtype=float)
         X = sm.add_constant(raw_X, has_constant="add")
-        col_names = ["intercept"] + predictors
+        col_names = ["Intercept", *predictors]
 
         # Full-rank check rejects constant predictors, perfect
         # collinearity, duplicated columns, and any other zero
@@ -156,7 +156,7 @@ def fit_per_stop_rate_model(
         rank = int(np.linalg.matrix_rank(X))
         if rank < X.shape[1]:
             logger.warning(
-                "Poisson GLM not fit: design matrix [intercept, %s] is "
+                "Poisson GLM not fit: design matrix [Intercept, %s] is "
                 "rank-deficient (rank %d < %d) within the %d-stop subset.",
                 ", ".join(predictors),
                 rank,
@@ -166,7 +166,7 @@ def fit_per_stop_rate_model(
             return None
     else:
         X = np.ones((len(df), 1))
-        col_names = ["intercept"]
+        col_names = ["Intercept"]
 
     try:
         with capture_fit_warnings() as caught:
@@ -176,15 +176,14 @@ def fit_per_stop_rate_model(
         logger.warning("Poisson GLM failed for predictors %s", predictors)
         return None
     predictor_sd = np.asarray(X, dtype=float).std(axis=0)
-    # The array design names its constant column "intercept"; the separation
-    # judgment uses the formula-style "Intercept" so the shared nuisance set
-    # covers it in both families.
-    term_names = ["Intercept", *col_names[1:]]
+    # The constant column carries the formula-style name "Intercept", so the
+    # shared nuisance set and every saved column use one spelling in both
+    # families.
     status = fit_status(
         result,
         "glm",
         predictor_sd=predictor_sd,
-        term_names=term_names,
+        term_names=col_names,
         nuisance_terms=NUISANCE_TERMS,
     )
 
@@ -192,7 +191,6 @@ def fit_per_stop_rate_model(
     bse = dict(zip(col_names, result.bse, strict=True))
     pvals = dict(zip(col_names, result.pvalues, strict=True))
     n_params = len(col_names)
-    bic_llf = n_params * np.log(len(df)) - 2 * float(result.llf)
 
     output = {
         **{f"coef_{k}": float(v) for k, v in coefs.items()},
@@ -204,13 +202,13 @@ def fit_per_stop_rate_model(
         "n_params": n_params,
         "llf": float(result.llf),
         "aic": float(result.aic),
-        "bic": float(bic_llf),
+        "bic": float(result.bic_llf),
         "deviance": float(result.deviance),
         "pearson_chi2": float(result.pearson_chi2),
         "mean_rate": float(y.sum() / np.exp(offset).sum()),
         **{
             f"sd_{name}": float(s)
-            for name, s in zip(term_names, predictor_sd, strict=True)
+            for name, s in zip(col_names, predictor_sd, strict=True)
         },
         "converged": status["converged"],
         "separated": status["separated"],
