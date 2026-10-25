@@ -1,20 +1,30 @@
 #!/usr/bin/env python
-"""Generate all manuscript figures.
+"""Generate the four main manuscript figures, Figures 1-4.
 
-This script orchestrates the generation of all composite figures for the
-manuscript by running each figure generation script in sequence.
+Runs each script in ``FIGURE_SCRIPTS`` in turn, each in its own subprocess
+with this Python interpreter, so no matplotlib state carries from one figure
+to the next. Run it from the repository root: the script paths are relative
+to it.
 
-Figures generated:
-- Figure 1: Switching state-space model (simulated example)
-- Figure 2: Model works on real data (example + distributions + triggered avg)
-- Figure 3: Events outside SWRs (non-SWR example + SWR z-score by state +
-  replay speed + replayed position, SWR vs non-SWR)
-- Figure 4: PFC responds regardless (GLM + population heatmaps + significance)
+Figures it covers (``FIGURE_SCRIPTS``):
+- figure01 (``generate_figure01.py``): Switching state-space model
+  (simulated example)
+- figure02 (``generate_figure02.py``): Model works on real data (example +
+  distributions + triggered avg)
+- figure03 (``generate_figure03.py``): Events outside SWRs (non-SWR example +
+  SWR z-score by state + replay speed + replayed position, SWR vs non-SWR)
+- figure04 (``generate_figure04.py``): PFC responds regardless (GLM +
+  population heatmaps + significance)
+
+It does not draw the other figure scripts in ``scripts/figures/`` (the
+supplementary, gallery and diagnostic figures, such as
+``generate_supp_decoder_validation.py`` or
+``generate_memoryless_comparison.py``); run those directly.
 
 Usage:
-    python scripts/figures/generate_all_figures.py
-    python scripts/figures/generate_all_figures.py --skip figure01 figure04
-    python scripts/figures/generate_all_figures.py --only figure02 figure03
+    uv run python scripts/figures/generate_all_figures.py
+    uv run python scripts/figures/generate_all_figures.py --skip figure01 figure04
+    uv run python scripts/figures/generate_all_figures.py --only figure02 figure03
 """
 
 import argparse
@@ -76,7 +86,7 @@ def run_figure_script(
     """
     logging.info(f"Generating {script_name}...")
 
-    cmd = ["uv", "run", "python", script_config["script"]]
+    cmd = [sys.executable, script_config["script"]]
     cmd.extend(["--output-dir", script_config["output_dir"]])
 
     if data_dir and script_name != "figure01":
@@ -96,7 +106,7 @@ def run_figure_script(
     except subprocess.CalledProcessError as e:
         elapsed = time.time() - start_time
         logging.error(f"  {script_name} failed after {elapsed:.1f}s")
-        logging.error(f"  Error: {e.stderr[-500:]}")
+        logging.error(f"  stderr:\n{e.stderr}")
         return False, elapsed
 
 
