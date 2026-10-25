@@ -247,7 +247,13 @@ def _plot_error_distribution(summary: pd.DataFrame, output_path) -> None:
     axes[1].set_title("Error by animal")
 
     fig.tight_layout()
-    fig.savefig(output_path / "error_distribution.pdf")
+    figure_utilities.save_figure(
+        fig,
+        "error_distribution",
+        base_dir=output_path,
+        formats=["pdf"],
+        transparent=False,
+    )
     plt.close(fig)
 
 
@@ -281,7 +287,9 @@ def _plot_state_fractions(summary: pd.DataFrame, output_path) -> None:
     ax.set_xlim(-0.5, len(valid) - 0.5)
 
     fig.tight_layout()
-    fig.savefig(output_path / "state_fractions.pdf")
+    figure_utilities.save_figure(
+        fig, "state_fractions", base_dir=output_path, formats=["pdf"], transparent=False
+    )
     plt.close(fig)
 
 
@@ -304,7 +312,13 @@ def _plot_nonlocal_movement(summary: pd.DataFrame, output_path) -> None:
     axes[1].set_title("Non-local duration during movement")
 
     fig.tight_layout()
-    fig.savefig(output_path / "nonlocal_during_movement.pdf")
+    figure_utilities.save_figure(
+        fig,
+        "nonlocal_during_movement",
+        base_dir=output_path,
+        formats=["pdf"],
+        transparent=False,
+    )
     plt.close(fig)
 
 
@@ -351,7 +365,13 @@ def _plot_calibration_curves(data: pd.DataFrame, output_path) -> None:
 
     fig.suptitle("Calibration curves (error vs. local probability)")
     fig.tight_layout()
-    fig.savefig(output_path / "calibration_curves.pdf")
+    figure_utilities.save_figure(
+        fig,
+        "calibration_curves",
+        base_dir=output_path,
+        formats=["pdf"],
+        transparent=False,
+    )
     plt.close(fig)
 
 
@@ -389,7 +409,9 @@ def _plot_event_context(data: pd.DataFrame, output_path) -> None:
     ax.set_xlim(-0.5, len(sorted_ctx) - 0.5)
 
     fig.tight_layout()
-    fig.savefig(output_path / "event_context.pdf")
+    figure_utilities.save_figure(
+        fig, "event_context", base_dir=output_path, formats=["pdf"], transparent=False
+    )
     plt.close(fig)
 
 
@@ -405,7 +427,13 @@ def _plot_nospike_correlation(summary: pd.DataFrame, output_path) -> None:
     ax.set_title("No-spike / firing rate correspondence")
 
     fig.tight_layout()
-    fig.savefig(output_path / "nospike_mua_correlation.pdf")
+    figure_utilities.save_figure(
+        fig,
+        "nospike_mua_correlation",
+        base_dir=output_path,
+        formats=["pdf"],
+        transparent=False,
+    )
     plt.close(fig)
 
 
@@ -441,7 +469,13 @@ def _plot_segment_error(data: pd.DataFrame, output_path) -> None:
     ax.set_title("Median error by track segment (cm)")
     fig.colorbar(im, ax=ax, label="Error (cm)")
 
-    fig.savefig(output_path / "segment_error_heatmap.pdf")
+    figure_utilities.save_figure(
+        fig,
+        "segment_error_heatmap",
+        base_dir=output_path,
+        formats=["pdf"],
+        transparent=False,
+    )
     plt.close(fig)
 
 

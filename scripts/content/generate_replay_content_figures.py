@@ -116,7 +116,14 @@ def main(argv: Sequence[str] | None = None):
         )
         if fig is not None:
             path = OUTPUT_DIR / "model_hierarchy_comparison.png"
-            fig.savefig(path, dpi=300)
+            figure_utilities.save_figure(
+                fig,
+                path.stem,
+                base_dir=path.parent,
+                dpi=300,
+                formats=["png"],
+                transparent=False,
+            )
             plt.close(fig)
             logging.info("Saved %s", path)
 
@@ -124,7 +131,14 @@ def main(argv: Sequence[str] | None = None):
     fig = plot_pseudo_r2_progression(all_results)
     if fig is not None:
         path = OUTPUT_DIR / "pseudo_r2_progression.png"
-        fig.savefig(path, dpi=300)
+        figure_utilities.save_figure(
+            fig,
+            path.stem,
+            base_dir=path.parent,
+            dpi=300,
+            formats=["png"],
+            transparent=False,
+        )
         plt.close(fig)
         logging.info("Saved %s", path)
 
@@ -138,7 +152,14 @@ def main(argv: Sequence[str] | None = None):
         fig = plot_coefficient_forest(mdf, spec.predictors, model_name)
         if fig is not None:
             path = OUTPUT_DIR / f"coefficients_{model_name}.png"
-            fig.savefig(path, dpi=300)
+            figure_utilities.save_figure(
+                fig,
+                path.stem,
+                base_dir=path.parent,
+                dpi=300,
+                formats=["png"],
+                transparent=False,
+            )
             plt.close(fig)
             logging.info("Saved %s", path)
 
@@ -156,7 +177,14 @@ def main(argv: Sequence[str] | None = None):
         fig = plot_behavior_prediction_results(cv_results, chance_level=chance)
         if fig is not None:
             path = OUTPUT_DIR / "behavior_prediction.png"
-            fig.savefig(path, dpi=300)
+            figure_utilities.save_figure(
+                fig,
+                path.stem,
+                base_dir=path.parent,
+                dpi=300,
+                formats=["png"],
+                transparent=False,
+            )
             plt.close(fig)
             logging.info("Saved %s", path)
 
@@ -207,7 +235,14 @@ def main(argv: Sequence[str] | None = None):
             sns.despine(ax=ax)
 
             path = OUTPUT_DIR / f"mixed_effects_{model_name}.png"
-            fig.savefig(path, dpi=300)
+            figure_utilities.save_figure(
+                fig,
+                path.stem,
+                base_dir=path.parent,
+                dpi=300,
+                formats=["png"],
+                transparent=False,
+            )
             plt.close(fig)
             logging.info("Saved %s", path)
 
