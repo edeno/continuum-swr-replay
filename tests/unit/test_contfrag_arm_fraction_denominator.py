@@ -216,8 +216,8 @@ def _three_trial_history() -> pd.DataFrame:
     """Visits whose arrival and outcome clocks bracket the three events."""
     return pd.DataFrame(
         {
-            "start_time": [-0.20, 0.10, 0.32],
-            "goal_arrival_time": [0.00, 0.20, 0.40],
+            "movement_start_time": [-0.20, 0.10, 0.32],
+            "destination_first_poke_in_time": [0.00, 0.20, 0.40],
             "reward_on_time": [0.01, 0.255, np.nan],
             "outcome_known_time": [0.01, 0.255, 0.42],
             "end_time": [0.02, 0.30, 0.42],
@@ -341,8 +341,8 @@ class TestContfragArmFractionDenominator:
         dot = _build_dot({0: 3, 1: 2}, junction_bins=0)
         trials = pd.DataFrame(
             {
-                "start_time": [-1.0],
-                "goal_arrival_time": [-0.5],
+                "movement_start_time": [-1.0],
+                "destination_first_poke_in_time": [-0.5],
                 "end_time": [-0.4],
                 "from_well": [1],
                 "to_well": [0],
@@ -371,10 +371,10 @@ class TestContfragArmFractionDenominator:
         dot = _build_dot({0: 3, 1: 2}, junction_bins=0)
         trials = pd.DataFrame(
             {
-                "start_time": [-1.0],
+                "movement_start_time": [-1.0],
                 # Event spans 0.05--0.09 and has midpoint 0.07. The arrival
                 # would leak into history under the retired midpoint cutoff.
-                "goal_arrival_time": [0.07],
+                "destination_first_poke_in_time": [0.07],
                 "end_time": [0.10],
                 "from_well": [1],
                 "to_well": [0],

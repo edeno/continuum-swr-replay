@@ -111,7 +111,7 @@ def _trials_starting_after_event() -> pd.DataFrame:
     # active, so add_trial_context fills NaN for the entire event.
     return pd.DataFrame(
         {
-            "start_time": [2.5],
+            "movement_start_time": [2.5],
             "end_time": [3.0],
             "from_well": [1],
             "to_well": [0],
@@ -175,7 +175,7 @@ class TestEventStartContextNoLeak:
         dot = _pre_trial_event_dot()
         trials = pd.DataFrame(
             {
-                "start_time": [1.0],
+                "movement_start_time": [1.0],
                 "end_time": [2.5],
                 "from_well": [1],
                 "to_well": [0],

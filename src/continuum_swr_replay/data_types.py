@@ -84,7 +84,7 @@ class SessionData(TypedDict, total=False):
     well_visits : pd.DataFrame
         Well visit intervals with poke in/out times and well IDs.
     trials : pd.DataFrame
-        Trial-level data with start_time, end_time, start_node, end_node, etc.
+        Trial-level data with movement_start_time, end_time, from_well, to_well, etc.
     task_variables : pd.DataFrame
         Time-indexed task variables including:
         - path_progress: 0-1 normalized progress through trial

@@ -42,10 +42,9 @@ Well Visits DataFrame contains:
     - trial_number: Trial index assignment
 
 Trials DataFrame contains:
-    - start_time / movement_start_time: final poke-out at the origin port
+    - movement_start_time: final poke-out at the origin port
     - destination_first_poke_in_time: first physical poke-in at the destination
     - destination_first_poke_out_time: end of its first photogate bout
-    - goal_arrival_time: compatibility alias for destination_first_poke_in_time
     - end_time: final destination poke-out, after any same-port re-pokes
     - duration: final-exit to final-exit task-trial duration
     - reward_on_time: First pump onset on rewarded trials, else NaN
@@ -864,11 +863,9 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
     experiences = _collapse_physical_pokes_to_port_experiences(physical)
 
     columns = [
-        "start_time",
         "movement_start_time",
         "destination_first_poke_in_time",
         "destination_first_poke_out_time",
-        "goal_arrival_time",
         "end_time",
         "duration",
         "from_well",
@@ -893,14 +890,11 @@ def make_trials_df_from_well_visits(well_visits: pd.DataFrame) -> pd.DataFrame:
             raise ValueError("movement-trial clocks are not chronologically ordered")
         trials = pd.DataFrame(
             {
-                "start_time": movement_start,
                 "movement_start_time": movement_start,
                 "destination_first_poke_in_time": arrival,
                 "destination_first_poke_out_time": destination[
                     "first_poke_out_time"
                 ].to_numpy(dtype=float),
-                # Compatibility alias retained until downstream schemas migrate.
-                "goal_arrival_time": arrival,
                 "end_time": trial_end,
                 "duration": trial_end - movement_start,
                 "from_well": origin["port"].to_numpy(dtype=np.int64),
@@ -994,14 +988,9 @@ def make_port_experiences_df(
         empty.attrs.update(experiences.attrs)
         return empty
 
-    arrival_column = (
-        "destination_first_poke_in_time"
-        if "destination_first_poke_in_time" in trials
-        else "goal_arrival_time"
-    )
     required_trials = {
         "movement_start_time",
-        arrival_column,
+        "destination_first_poke_in_time",
         "destination_first_poke_out_time",
         "end_time",
         "from_well",
@@ -1019,7 +1008,7 @@ def make_port_experiences_df(
             "port experiences require canonical movement-trial columns; "
             f"missing={missing_trials}"
         )
-    ordered_trials = trials.sort_values(arrival_column, kind="stable")
+    ordered_trials = trials.sort_values("destination_first_poke_in_time", kind="stable")
     if len(experiences) != len(ordered_trials) + 1:
         raise ValueError(
             "physical port experiences must equal movement trials plus one; "
@@ -1053,7 +1042,7 @@ def make_port_experiences_df(
         ),
         (
             experiences["arrival_time"].to_numpy(dtype=float)[1:],
-            ordered_trials[arrival_column].to_numpy(dtype=float),
+            ordered_trials["destination_first_poke_in_time"].to_numpy(dtype=float),
             "destination first poke-in",
         ),
         (

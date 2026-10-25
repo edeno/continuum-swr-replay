@@ -62,17 +62,17 @@ def figure_trial_sanity(
     dot = pd.read_pickle(decode_paths(base, PROCESSED_DATA_DIR).data_over_time)
     nwb = f"{animal}{day}_.nwb"
     data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
-    trials = data["trials"].sort_values("start_time").reset_index(drop=True)
+    trials = data["trials"].sort_values("movement_start_time").reset_index(drop=True)
 
     if window_start is None:
         # Pick a window with a few trips — start near the median of the trips
         # to dodge any startup junk.
-        window_start = float(trials["start_time"].iloc[10])
+        window_start = float(trials["movement_start_time"].iloc[10])
 
     win = dot.loc[window_start : window_start + window_seconds]
     win_t = win.index.values - window_start
     trips_in_win = trials[
-        (trials["start_time"] < window_start + window_seconds)
+        (trials["movement_start_time"] < window_start + window_seconds)
         & (trials["end_time"] > window_start)
     ].copy()
 
@@ -97,7 +97,7 @@ def figure_trial_sanity(
     ax.invert_yaxis()
     # Overlay trip start/end markers
     for _, t in trips_in_win.iterrows():
-        s = t["start_time"] - window_start
+        s = t["movement_start_time"] - window_start
         e = t["end_time"] - window_start
         from_arm = int(t["from_well"])  # leaf arm = well id
         to_arm = int(t["to_well"])
@@ -133,7 +133,7 @@ def figure_trial_sanity(
     ax = axes[2]
     # For each trip in window, draw a horizontal bar colored by the trip's to_well arm
     for _i, (_, t) in enumerate(trips_in_win.iterrows()):
-        s = max(0, t["start_time"] - window_start)
+        s = max(0, t["movement_start_time"] - window_start)
         e = min(window_seconds, t["end_time"] - window_start)
         to_arm = int(t["to_well"])
         ax.barh(

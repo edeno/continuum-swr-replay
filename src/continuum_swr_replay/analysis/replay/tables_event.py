@@ -600,7 +600,7 @@ def build_event_table(
     env : Environment
         Decoder environment for ``map_estimate_to_arm``.
     trials : pd.DataFrame
-        Spyglass trial frame with ``start_time``, ``end_time``,
+        Spyglass trial frame with ``movement_start_time``, ``end_time``,
         ``to_well``, ``from_well``, ``is_reward``, ``is_patch_change``.
     port_experiences : pd.DataFrame
         Complete reward-port occupancy stream: the starting port followed by

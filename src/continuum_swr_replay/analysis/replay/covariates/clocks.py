@@ -13,19 +13,20 @@ from continuum_swr_replay.data_loaders.trial_clocks import (
 def trial_arrival_times(trials: pd.DataFrame) -> np.ndarray:
     """Per-trial destination-arrival timestamps for visit/location history.
 
-    Uses ``goal_arrival_time`` (the moment the animal *arrives at* the
-    goal well -- poke-in, which precedes reward delivery) when available,
-    falling back to ``end_time`` per row when ``goal_arrival_time`` is NaN,
+    Uses ``destination_first_poke_in_time`` (the moment the animal *arrives
+    at* the goal well -- poke-in, which precedes reward delivery) when
+    available, falling back to ``end_time`` per row when it is NaN,
     and per frame when the column is absent. This clock controls destination,
     visit-recency, and switch history only. Reward-bearing history must use
     :func:`trial_outcome_times` instead.
     """
-    if "goal_arrival_time" in trials.columns:
-        cutoff = trials["goal_arrival_time"].to_numpy(dtype=float)
+    if "destination_first_poke_in_time" in trials.columns:
+        cutoff = trials["destination_first_poke_in_time"].to_numpy(dtype=float)
         end = trials["end_time"].to_numpy(dtype=float)
         if np.isinf(cutoff).any():
             raise ValueError(
-                "goal_arrival_time contains infinity; corrupted physical timing "
+                "destination_first_poke_in_time contains infinity; corrupted "
+                "physical timing "
                 "must not silently fall back to end_time"
             )
         missing = np.isnan(cutoff)

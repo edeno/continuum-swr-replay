@@ -92,8 +92,8 @@ def test_q_learner_lives_in_its_diagnostics_module():
 def test_unobserved_initial_occupancy_is_rejected_as_noncanonical():
     trials = pd.DataFrame(
         {
-            "start_time": [1.0],
-            "goal_arrival_time": [2.0],
+            "movement_start_time": [1.0],
+            "destination_first_poke_in_time": [2.0],
             "end_time": [3.0],
             "from_well": [0],
             "to_well": [1],
@@ -380,9 +380,10 @@ def _single_arm_trials(n_trials: int, rewarded_indices: set[int]) -> pd.DataFram
     """``n_trials`` consecutive trips that all end at well 0 (leaf arm 0)."""
     return pd.DataFrame(
         {
-            "start_time": np.arange(n_trials, dtype=float) * 10.0,
+            "movement_start_time": np.arange(n_trials, dtype=float) * 10.0,
             "end_time": np.arange(n_trials, dtype=float) * 10.0 + 9.0,
-            "goal_arrival_time": np.arange(n_trials, dtype=float) * 10.0 + 8.0,
+            "destination_first_poke_in_time": np.arange(n_trials, dtype=float) * 10.0
+            + 8.0,
             "from_well": 1,
             "to_well": 0,
             "is_reward": [i in rewarded_indices for i in range(n_trials)],
@@ -395,9 +396,9 @@ def test_visit_recency_and_never_visited_are_time_local_and_arm_typed():
     """Recency uses only completed history; trunks are structural, not novel."""
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 10.0, 20.0],
+            "movement_start_time": [0.0, 10.0, 20.0],
             "end_time": [9.0, 19.0, 29.0],
-            "goal_arrival_time": [8.0, 18.0, 28.0],
+            "destination_first_poke_in_time": [8.0, 18.0, 28.0],
             "from_well": [1, 0, 1],
             "to_well": [0, 1, 0],
             "is_reward": [True, False, True],
@@ -859,8 +860,8 @@ def test_reward_rate_arm_window_is_ten_visits_not_five():
     """The column is named k10; pin the window so a 5->10 migration can't half-land."""
     trials = pd.DataFrame(
         {
-            "start_time": np.arange(12, dtype=float),
-            "goal_arrival_time": np.arange(12, dtype=float) + 0.5,
+            "movement_start_time": np.arange(12, dtype=float),
+            "destination_first_poke_in_time": np.arange(12, dtype=float) + 0.5,
             "end_time": np.arange(12, dtype=float) + 0.5,
             "from_well": [0] * 12,
             "to_well": [1] * 12,
@@ -897,8 +898,8 @@ def test_reward_rate_arm_counts_only_resolved_visits():
     """
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 10.0],
-            "goal_arrival_time": [5.0, 15.0],
+            "movement_start_time": [0.0, 10.0],
+            "destination_first_poke_in_time": [5.0, 15.0],
             "end_time": [6.0, 16.0],
             "from_well": [0, 1],
             "to_well": [1, 1],

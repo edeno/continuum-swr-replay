@@ -64,7 +64,6 @@ Examples
 
 """
 
-
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -87,7 +86,9 @@ PATH_PROGRESS_EPSILON: float = 1e-10
 # Omission shifts: look back N trials to check for reward omissions
 DEFAULT_OMISSION_SHIFTS: tuple[int, ...] = tuple(range(1, 6))  # (1, 2, 3, 4, 5)
 # Patch change shifts: look N trials relative to current (-5 to +5)
-DEFAULT_PATCH_CHANGE_SHIFTS: tuple[int, ...] = tuple(range(-5, 6))  # (-5, -4, ..., 4, 5)
+DEFAULT_PATCH_CHANGE_SHIFTS: tuple[int, ...] = tuple(
+    range(-5, 6)
+)  # (-5, -4, ..., 4, 5)
 
 
 def path_progress_for_run_segment(
@@ -328,7 +329,7 @@ def turn_direction(
 
     """
     trial_segment_ids = position_info.loc[
-        trial.start_time : trial.end_time
+        trial.movement_start_time : trial.end_time
     ].track_segment_id.unique()  # pandas unique is not sorted
 
     # Need ≥2 samples to estimate sampling_frequency from
@@ -344,7 +345,7 @@ def turn_direction(
     sampling_frequency = 1.0 / np.median(np.diff(times))
     min_segment_samples = int(0.1 * sampling_frequency)
     is_bad = (
-        position_info.loc[trial.start_time : trial.end_time]
+        position_info.loc[trial.movement_start_time : trial.end_time]
         .groupby("track_segment_id")
         .size()
         < min_segment_samples
@@ -361,9 +362,7 @@ def turn_direction(
     edge_for_segment = {
         track_graph.edges[edge]["edge_id"]: edge for edge in track_graph.edges
     }
-    trial_nodes = np.array(
-        [edge_for_segment[int(sid)] for sid in trial_segment_ids]
-    )
+    trial_nodes = np.array([edge_for_segment[int(sid)] for sid in trial_segment_ids])
 
     if trial_nodes[0][0] != trial.from_well:
         trial_nodes = trial_nodes[::-1]
@@ -476,11 +475,11 @@ def make_task_variables(
     is_patch_change_pos = np.full((n_time, n_shifts), False)
 
     for trial in trials_df.itertuples():
-        is_in_trial = (time >= trial.start_time) & (time < trial.end_time)
-        from_start_time_to_goal = (time >= trial.start_time) & (
-            time < trial.goal_arrival_time
+        is_in_trial = (time >= trial.movement_start_time) & (time < trial.end_time)
+        from_start_time_to_goal = (time >= trial.movement_start_time) & (
+            time < trial.destination_first_poke_in_time
         )
-        from_goal_to_next_movement = (time >= trial.goal_arrival_time) & (
+        from_goal_to_next_movement = (time >= trial.destination_first_poke_in_time) & (
             time < trial.end_time
         )
         trial_number[is_in_trial] = trial.Index
@@ -512,9 +511,7 @@ def make_task_variables(
         is_prev_reward_omission_pos[is_in_trial] = is_prev_reward_omission.loc[
             trial.Index
         ].to_numpy()
-        is_patch_change_pos[is_in_trial] = is_patch_change.loc[
-            trial.Index
-        ].to_numpy()
+        is_patch_change_pos[is_in_trial] = is_patch_change.loc[trial.Index].to_numpy()
 
     return pd.DataFrame(
         {

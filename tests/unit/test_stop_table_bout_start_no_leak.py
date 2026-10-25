@@ -71,7 +71,7 @@ def _trials_starting_at_t1() -> pd.DataFrame:
     # start) has no active trial context.
     return pd.DataFrame(
         {
-            "start_time": [1.0],
+            "movement_start_time": [1.0],
             "end_time": [1.5],
             "from_well": [1],
             "to_well": [0],

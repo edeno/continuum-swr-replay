@@ -259,7 +259,7 @@ def build_contfrag_event_table(
     env : Environment
         Decoder environment for ``map_estimate_to_arm``.
     trials : pd.DataFrame
-        Trial frame with ``start_time``, ``end_time``, ``to_well``,
+        Trial frame with ``movement_start_time``, ``end_time``, ``to_well``,
         ``from_well``, ``is_reward``, ``is_patch_change``.
     port_experiences : pd.DataFrame
         Complete starting-port-plus-destinations occupancy stream. Visit

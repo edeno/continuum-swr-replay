@@ -34,7 +34,7 @@ _WELL_TO_ARM = {well: well for well in range(6)}  # each leaf well -> its own ar
 def _trials(end_times, is_reward, to_well=None) -> pd.DataFrame:
     end = np.asarray(end_times, dtype=float)
     data = {
-        "start_time": end - 0.5,
+        "movement_start_time": end - 0.5,
         "end_time": end,
         "is_reward": np.asarray(is_reward),
     }

@@ -58,8 +58,8 @@ def _trials() -> pd.DataFrame:
     inside excluded time, and leaves it at 7.5 s."""
     return pd.DataFrame(
         {
-            "start_time": [1.1],
-            "goal_arrival_time": [5.2],
+            "movement_start_time": [1.1],
+            "destination_first_poke_in_time": [5.2],
             "end_time": [7.5],
             "from_well": [1],
             "to_well": [0],

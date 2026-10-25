@@ -27,7 +27,7 @@ def _make_trials(n_trials: int, rng: np.random.Generator) -> pd.DataFrame:
     end_times = np.sort(rng.uniform(0, 100, n_trials))
     start_times = end_times - rng.uniform(0.5, 2.0, n_trials)
     return pd.DataFrame({
-        "start_time": start_times,
+        "movement_start_time": start_times,
         "end_time": end_times,
         "to_well": rng.choice([0, 1, 2, 3, 4, 5], n_trials).astype(float),
         "from_well": rng.choice([0, 1, 2, 3, 4, 5], n_trials).astype(float),

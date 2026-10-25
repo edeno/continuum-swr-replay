@@ -30,8 +30,8 @@ def test_gallery_separates_active_trip_from_completed_regression_history():
     """An underway trip is visible but its future outcome is not in history."""
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 4.0],
-            "goal_arrival_time": [3.0, 7.0],
+            "movement_start_time": [0.0, 4.0],
+            "destination_first_poke_in_time": [3.0, 7.0],
             "end_time": [3.5, 7.5],
             "from_well": [0, 1],
             "to_well": [1, 2],
@@ -50,8 +50,8 @@ def test_gallery_separates_active_trip_from_completed_regression_history():
 def test_gallery_completion_is_inclusive_at_goal_arrival():
     trials = pd.DataFrame(
         {
-            "start_time": [0.0],
-            "goal_arrival_time": [3.0],
+            "movement_start_time": [0.0],
+            "destination_first_poke_in_time": [3.0],
             "end_time": [3.5],
             "to_well": [1],
             "is_reward": [1],
@@ -66,8 +66,8 @@ def test_gallery_completion_is_inclusive_at_goal_arrival():
 def test_gallery_distinguishes_arrived_destination_from_pending_outcome():
     trials = pd.DataFrame(
         {
-            "start_time": [0.0],
-            "goal_arrival_time": [3.0],
+            "movement_start_time": [0.0],
+            "destination_first_poke_in_time": [3.0],
             # 0.2 s pump latency, inside the observed distribution and under
             # OMISSION_KNOWN_LATENCY_SEC (see the guard in trial_outcome_times).
             "reward_on_time": [3.2],

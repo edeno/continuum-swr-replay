@@ -115,7 +115,7 @@ class TestTrialRail:
     def test_empty_window_shows_placeholder(self):
         trials = pd.DataFrame(
             {
-                "start_time": [100.0],
+                "movement_start_time": [100.0],
                 "end_time": [110.0],
                 "to_well": [3],
                 "from_well": [0],
@@ -132,7 +132,7 @@ class TestTrialRail:
     def test_step_post_plots_one_line_per_trial(self):
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0, 20.0],
+                "movement_start_time": [0.0, 10.0, 20.0],
                 "end_time": [5.0, 15.0, 25.0],
                 "to_well": [1, 3, 5],
                 "from_well": [0, 1, 3],
@@ -155,7 +155,7 @@ class TestTrialRail:
     def test_ylim_covers_leaf_wells(self):
         trials = pd.DataFrame(
             {
-                "start_time": [0.0],
+                "movement_start_time": [0.0],
                 "end_time": [5.0],
                 "to_well": [4],
                 "from_well": [0],
@@ -173,7 +173,7 @@ class TestTrialRail:
         """The rail remains at the last well between completed trips."""
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
+                "movement_start_time": [0.0, 10.0],
                 "end_time": [5.0, 15.0],
                 "to_well": [1, 3],
                 "from_well": [0, 1],
@@ -228,8 +228,8 @@ class TestTrialRail:
         """Trips whose start, arrival, and interval-end times are distinct."""
         return pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
-                "goal_arrival_time": [6.0, np.nan],
+                "movement_start_time": [0.0, 10.0],
+                "destination_first_poke_in_time": [6.0, np.nan],
                 "end_time": [8.0, 18.0],
                 "from_well": [0, 1],
                 "to_well": [1, 3],
@@ -343,8 +343,8 @@ class TestComputeMismatchTable:
         trials = pd.DataFrame(
             {
                 # Deliberately shuffled: production sorts before searchsorted.
-                "start_time": [20.0, 0.0, 10.0],
-                "goal_arrival_time": [24.0, 4.0, np.nan],
+                "movement_start_time": [20.0, 0.0, 10.0],
+                "destination_first_poke_in_time": [24.0, 4.0, np.nan],
                 "end_time": [25.0, 5.0, 15.0],
                 "from_well": [1, 0, 0],
                 "to_well": [2, 0, 1],
@@ -391,7 +391,7 @@ class TestComputeMismatchTable:
         event_table = _make_event_table([5.0, 15.0], [5.0, 3.0])
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0, 20.0],
+                "movement_start_time": [0.0, 10.0, 20.0],
                 "end_time": [5.0, 15.0, 25.0],
                 "from_well": [0, 3, 5],
                 "to_well": [3, 5, 3],
@@ -412,7 +412,7 @@ class TestComputeMismatchTable:
         event_table = _make_event_table([5.0], [1.0])  # WRONG canonical
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
+                "movement_start_time": [0.0, 10.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -430,7 +430,7 @@ class TestComputeMismatchTable:
         event_table = _make_event_table([100.0], [np.nan])
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
+                "movement_start_time": [0.0, 10.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -448,7 +448,7 @@ class TestComputeMismatchTable:
         event_table = _make_event_table([10.001], [1.0], event_start_times=[9.96])
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0, 20.0],
+                "movement_start_time": [0.0, 10.0, 20.0],
                 "end_time": [5.0, 15.0, 25.0],
                 "from_well": [0, 0, 1],
                 "to_well": [0, 1, 2],
@@ -466,7 +466,7 @@ class TestComputeMismatchTable:
         event_table = _make_event_table([15.0], [2.0], event_start_times=[15.0])
         trials = pd.DataFrame(
             {
-                "start_time": [20.0, 0.0, 10.0],
+                "movement_start_time": [20.0, 0.0, 10.0],
                 "end_time": [25.0, 5.0, 15.0],
                 "from_well": [1, 0, 0],
                 "to_well": [2, 0, 1],
@@ -485,7 +485,7 @@ class TestComputeMismatchTable:
         event_table = _make_event_table([-0.5], [np.nan], event_start_times=[-1.0])
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
+                "movement_start_time": [0.0, 10.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 1],
                 "to_well": [1, 2],
@@ -519,7 +519,9 @@ class TestComputeMismatchTable:
 class TestArmMarkersPanel:
     def test_renders_without_error(self):
         event_table = _make_event_table([5.0, 15.0], [3.0, 5.0])
-        trials = pd.DataFrame({"start_time": [], "end_time": [], "to_well": []})
+        trials = pd.DataFrame(
+            {"movement_start_time": [], "end_time": [], "to_well": []}
+        )
         fig, ax = plt.subplots()
         _plot_arm_markers(ax, _ctx_for_debug(event_table, trials, (0.0, 20.0)))
         # 4 marker kinds × present events = at least 4 scatter collections.
@@ -528,7 +530,9 @@ class TestArmMarkersPanel:
 
     def test_empty_window_placeholder(self):
         event_table = _make_event_table([1000.0], [3.0])
-        trials = pd.DataFrame({"start_time": [], "end_time": [], "to_well": []})
+        trials = pd.DataFrame(
+            {"movement_start_time": [], "end_time": [], "to_well": []}
+        )
         fig, ax = plt.subplots()
         _plot_arm_markers(ax, _ctx_for_debug(event_table, trials, (0.0, 20.0)))
         assert any("no events" in t.get_text() for t in ax.texts)
@@ -540,7 +544,7 @@ class TestMismatchPointersPanel:
         event_table = _make_event_table([5.0], [1.0])  # wrong canonical
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
+                "movement_start_time": [0.0, 10.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -560,7 +564,7 @@ class TestMismatchPointersPanel:
         event_table = _make_event_table([5.0], [3.0])
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 10.0],
+                "movement_start_time": [0.0, 10.0],
                 "end_time": [5.0, 15.0],
                 "from_well": [0, 3],
                 "to_well": [3, 5],
@@ -738,7 +742,7 @@ def _public_plot_inputs() -> dict:
     )
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 2.0],
+            "movement_start_time": [0.0, 2.0],
             "end_time": [0.5, 3.0],
             "from_well": [0, 0],
             "to_well": [0, 1],
@@ -1339,8 +1343,8 @@ class TestPublicPlotSessionTables:
         graph = production_test_graph()
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 4.0, 8.0],
-                "goal_arrival_time": [0.8, 4.8, 8.8],
+                "movement_start_time": [0.0, 4.0, 8.0],
+                "destination_first_poke_in_time": [0.8, 4.8, 8.8],
                 "end_time": [1.0, 5.0, 9.0],
                 "from_well": [0, 0, 1],
                 "to_well": [0, 1, 2],
@@ -1535,7 +1539,7 @@ class TestPublicPlotSessionTables:
         for frame_name, columns in (
             ("event_table", ("event_start_s", "event_end_s", "event_midpoint_s")),
             ("event_arm_table", ("event_start_s", "event_end_s")),
-            ("trials", ("start_time", "end_time")),
+            ("trials", ("movement_start_time", "end_time")),
             (
                 "port_experiences",
                 ("arrival_time", "departure_time", "outcome_known_time"),

@@ -315,7 +315,7 @@ the event it predicts. Classification of the covariates fitted by the rate model
 
 **Arrival is not the outcome boundary.** Canonical trials therefore carry two
 clocks. `destination_first_poke_in_time` controls destination, visit, and
-inbound-switch history (`goal_arrival_time` is a temporary compatibility alias).
+inbound-switch history.
 Consecutive same-port re-pokes are one task experience, matching Comrie: arrival
 is its first poke-in and departure is its final poke-out. This task-port context
 is deliberately broader than literal photogate engagement during each bout.

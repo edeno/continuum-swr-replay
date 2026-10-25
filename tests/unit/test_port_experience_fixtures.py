@@ -26,8 +26,8 @@ def _trials_with_reward_on_time_only() -> pd.DataFrame:
     """One omission and one rewarded trip, with no explicit outcome clock."""
     return pd.DataFrame(
         {
-            "start_time": [0.0, 3.0],
-            "goal_arrival_time": [_OMISSION_ARRIVAL, _REWARD_ARRIVAL],
+            "movement_start_time": [0.0, 3.0],
+            "destination_first_poke_in_time": [_OMISSION_ARRIVAL, _REWARD_ARRIVAL],
             "end_time": [_OMISSION_DEPARTURE, 7.0],
             "reward_on_time": [np.nan, _PUMP_TIME],
             "from_well": [1, 0],

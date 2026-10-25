@@ -267,7 +267,7 @@ class TestDistToGoal:
             'track_segment_id': [0, 1, 1],
         }, index=time)
 
-        trial = pd.Series({'to_well': 2, 'start_time': 0.0, 'end_time': 0.006})
+        trial = pd.Series({'to_well': 2, "movement_start_time": 0.0, 'end_time': 0.006})
 
         distances = dist_to_goal(
             pos_info,
@@ -298,7 +298,7 @@ class TestDistToGoal:
             'track_segment_id': [0 if x < 10 else 1 for x in x_positions],
         }, index=time)
 
-        trial = pd.Series({'to_well': 2, 'start_time': 0.0, 'end_time': 0.01})
+        trial = pd.Series({'to_well': 2, "movement_start_time": 0.0, 'end_time': 0.01})
 
         distances = dist_to_goal(
             pos_info,
@@ -339,7 +339,7 @@ class TestTurnDirection:
         }, index=time)
 
         trial = pd.Series({
-            'start_time': 0.0,
+            "movement_start_time": 0.0,
             'end_time': 1.0,
             'from_well': 0,
             'to_well': 2,
@@ -402,7 +402,7 @@ class TestTurnDirection:
         }, index=time)
 
         trial = pd.Series({
-            'start_time': 0.0,
+            "movement_start_time": 0.0,
             'end_time': 1.0,
             'from_well': 0,
             'to_well': 2,
@@ -444,7 +444,7 @@ class TestTurnDirection:
         }, index=time)
 
         trial = pd.Series({
-            'start_time': 0.0,
+            "movement_start_time": 0.0,
             'end_time': 1.0,
             'from_well': 0,
             'to_well': 2,
@@ -507,7 +507,7 @@ class TestTurnDirection:
             index=time,
         )
         trial = pd.Series(
-            {"start_time": 0.0, "end_time": 1.0, "from_well": 0, "to_well": 2}
+            {"movement_start_time": 0.0, "end_time": 1.0, "from_well": 0, "to_well": 2}
         )
 
         direction = turn_direction(trial, pos_info, graph)
@@ -532,7 +532,7 @@ class TestTurnDirection:
         }, index=time)
 
         trial = pd.Series({
-            'start_time': 0.0,
+            "movement_start_time": 0.0,
             'end_time': 1.0,
             'from_well': 0,
             'to_well': 2,
@@ -594,7 +594,7 @@ class TestEdgeCases:
             simple_linear_track.edges[edge]["edge_id"] = i
 
         trial = pd.Series(
-            {"start_time": 1.0, "end_time": 1.0, "from_well": 0, "to_well": 1}
+            {"movement_start_time": 1.0, "end_time": 1.0, "from_well": 0, "to_well": 1}
         )
 
         # Single-sample slice.
@@ -746,7 +746,7 @@ class TestNumericalStabilityFixes:
         # Create a mock trial Series with to_well as the goal
         trial = pd.Series({
             'to_well': 2,
-            'start_time': 0.0,
+            "movement_start_time": 0.0,
             'end_time': 0.1,
         })
 
@@ -790,7 +790,7 @@ class TestNumericalStabilityFixes:
             'track_segment_id': segment_ids,
         }, index=time)
 
-        trial = pd.Series({'to_well': 2, 'start_time': 0.0, 'end_time': time[-1] + 0.002})
+        trial = pd.Series({'to_well': 2, "movement_start_time": 0.0, 'end_time': time[-1] + 0.002})
 
         # Vectorized result
         vectorized = dist_to_goal(

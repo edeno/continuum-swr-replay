@@ -128,8 +128,8 @@ def _completed_trial() -> pd.DataFrame:
     """One fully known visit before the shared event window."""
     return pd.DataFrame(
         {
-            "start_time": [0.5],
-            "goal_arrival_time": [1.0],
+            "movement_start_time": [0.5],
+            "destination_first_poke_in_time": [1.0],
             "end_time": [1.4],
             "outcome_known_time": [1.2],
             "from_well": [0],

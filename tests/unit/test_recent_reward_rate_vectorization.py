@@ -101,9 +101,9 @@ def _trials(to_wells, rewards, arrivals=None) -> pd.DataFrame:
     arrivals = np.asarray(arrivals, dtype=float)
     return pd.DataFrame(
         {
-            "start_time": arrivals - 8.0,
+            "movement_start_time": arrivals - 8.0,
             "end_time": arrivals + 1.0,
-            "goal_arrival_time": arrivals,
+            "destination_first_poke_in_time": arrivals,
             "from_well": 0,
             "to_well": list(to_wells),
             "is_reward": list(rewards),

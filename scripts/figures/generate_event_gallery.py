@@ -628,10 +628,10 @@ def _plot_2d_context(
     completed = _completed_trials_at(data["trials"], event_start)
     trial = completed.iloc[-1] if len(completed) else None
     if trial is not None:
-        run_end = trial.get("goal_arrival_time")
+        run_end = trial.get("destination_first_poke_in_time")
         if run_end is None or (isinstance(run_end, float) and np.isnan(run_end)):
             run_end = trial["end_time"]
-        run = pos.loc[trial["start_time"] : run_end]
+        run = pos.loc[trial["movement_start_time"] : run_end]
         if len(run):
             # High-contrast run path: thick navy line with a white halo so it
             # reads clearly over the tab10 arm colors and faint occupancy.
@@ -1128,8 +1128,8 @@ def _active_trip_at_time(trials: pd.DataFrame, t: float) -> pd.Series | None:
     """
     if trials is None or not len(trials):
         return None
-    ordered = trials.sort_values("start_time", kind="stable")
-    active = ordered[(ordered["start_time"] <= t) & (ordered["end_time"] >= t)]
+    ordered = trials.sort_values("movement_start_time", kind="stable")
+    active = ordered[(ordered["movement_start_time"] <= t) & (ordered["end_time"] >= t)]
     return active.iloc[-1] if len(active) else None
 
 
@@ -1167,11 +1167,11 @@ def _plot_behavioral_context(
     rewarded = None
     outcome_known = False
     if trial is not None:
-        ga = trial.get("goal_arrival_time")
+        ga = trial.get("destination_first_poke_in_time")
         if ga is None or (isinstance(ga, float) and np.isnan(ga)):
             ga = trial["end_time"]
         rs, gr, te = (
-            trial["start_time"] - center,
+            trial["movement_start_time"] - center,
             float(ga) - center,
             trial["end_time"] - center,
         )

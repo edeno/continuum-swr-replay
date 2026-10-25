@@ -49,8 +49,8 @@ ARRIVALS = np.array([3.0, 7.0, 11.0, 15.0])
 def _trials() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "start_time": ARRIVALS - 1.0,
-            "goal_arrival_time": ARRIVALS,
+            "movement_start_time": ARRIVALS - 1.0,
+            "destination_first_poke_in_time": ARRIVALS,
             "end_time": ARRIVALS + 3.0,
             "from_well": [1, 0, 1, 0],
             "to_well": [0, 1, 0, 1],
@@ -68,7 +68,9 @@ def _dot(trials: pd.DataFrame) -> pd.DataFrame:
     """
     moving = np.zeros(TIME.size, dtype=bool)
     for start, arrival in zip(
-        trials["start_time"], trials["goal_arrival_time"], strict=True
+        trials["movement_start_time"],
+        trials["destination_first_poke_in_time"],
+        strict=True,
     ):
         moving |= (TIME > start) & (TIME < arrival)
     dot = _exposure_dot()

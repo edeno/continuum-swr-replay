@@ -50,7 +50,11 @@ def port_experiences_from_trials(
     if trials.empty:
         return empty_port_experiences()
     frame = trials.copy()
-    arrival_col = "goal_arrival_time" if "goal_arrival_time" in frame else "end_time"
+    arrival_col = (
+        "destination_first_poke_in_time"
+        if "destination_first_poke_in_time" in frame
+        else "end_time"
+    )
     arrival = pd.to_numeric(frame[arrival_col], errors="coerce").to_numpy(dtype=float)
     end = pd.to_numeric(frame["end_time"], errors="coerce").to_numpy(dtype=float)
     arrival = np.where(np.isfinite(arrival), arrival, end)
@@ -116,7 +120,9 @@ def port_experiences_from_trials(
         destination.loc[initial_mask, "movement_trial_number"] = pd.NA
         return destination[PORT_EXPERIENCE_COLUMNS]
 
-    first_start = float(pd.to_numeric(frame["start_time"], errors="coerce").min())
+    first_start = float(
+        pd.to_numeric(frame["movement_start_time"], errors="coerce").min()
+    )
     first_arrival = float(arrival[0])
     initial_outcome = first_start
     initial_arrival = min(first_start, initial_outcome) - 1.0

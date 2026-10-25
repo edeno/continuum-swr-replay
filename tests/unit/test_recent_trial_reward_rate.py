@@ -26,7 +26,7 @@ def _trials(end_times, is_reward) -> pd.DataFrame:
     end = np.asarray(end_times, dtype=float)
     return pd.DataFrame(
         {
-            "start_time": end - 0.5,
+            "movement_start_time": end - 0.5,
             "end_time": end,
             "is_reward": np.asarray(is_reward),
         }

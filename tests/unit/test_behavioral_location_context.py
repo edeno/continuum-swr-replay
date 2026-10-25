@@ -36,9 +36,9 @@ def _trials() -> pd.DataFrame:
     """Two valid trips, deliberately returned out of time order."""
     return pd.DataFrame(
         {
-            "start_time": [4.0, 1.0],
+            "movement_start_time": [4.0, 1.0],
             "end_time": [7.0, 3.5],
-            "goal_arrival_time": [6.0, 3.0],
+            "destination_first_poke_in_time": [6.0, 3.0],
             "reward_on_time": [np.nan, 3.25],
             # Omission: arrival + the omission latency, capped at end_time.
             # Rewarded: pump onset. Derived from the constant so this fixture
@@ -159,7 +159,7 @@ def test_trial_context_is_past_only_while_next_well_is_explicitly_future():
 
 
 def test_appending_future_trials_cannot_change_past_context_or_location():
-    first = _trials().sort_values("goal_arrival_time").iloc[[0]].copy()
+    first = _trials().sort_values("destination_first_poke_in_time").iloc[[0]].copy()
     appended = _trials()
     dot_time = np.array([3.5])
 
@@ -327,8 +327,8 @@ def test_full_trial_history_includes_a_completed_visit_with_no_sampled_stop():
     """A reduced stop sequence may jump 0→2, but history must include trial 1."""
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 2.0, 4.0],
-            "goal_arrival_time": [1.0, 3.0, 5.0],
+            "movement_start_time": [0.0, 2.0, 4.0],
+            "destination_first_poke_in_time": [1.0, 3.0, 5.0],
             "end_time": [1.5, 3.5, 5.5],
             "from_well": [1, 0, 2],
             "to_well": [0, 2, 4],
@@ -354,8 +354,8 @@ def test_full_trial_history_includes_a_completed_visit_with_no_sampled_stop():
 def test_trial_context_rejects_a_discontinuous_poke_chain():
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 2.0],
-            "goal_arrival_time": [1.0, 3.0],
+            "movement_start_time": [0.0, 2.0],
+            "destination_first_poke_in_time": [1.0, 3.0],
             "end_time": [1.5, 3.5],
             "from_well": [0, 2],
             "to_well": [1, 3],
@@ -373,7 +373,7 @@ def test_trial_context_rejects_a_discontinuous_poke_chain():
         (
             pd.DataFrame(
                 {
-                    "start_time": [0.0, 2.0],
+                    "movement_start_time": [0.0, 2.0],
                     "end_time": [3.0, 4.0],
                     "from_well": [0, 1],
                     "to_well": [1, 2],
@@ -386,7 +386,7 @@ def test_trial_context_rejects_a_discontinuous_poke_chain():
         (
             pd.DataFrame(
                 {
-                    "start_time": [2.0],
+                    "movement_start_time": [2.0],
                     "end_time": [1.0],
                     "from_well": [0],
                     "to_well": [1],
@@ -505,10 +505,12 @@ def test_outcome_known_time_names_the_boundary_from_arrival_onward():
     contract cannot be restated as literal seconds.
     """
     trials = _trials()
-    ordered = trials.sort_values("goal_arrival_time").reset_index(drop=True)
-    arrival = ordered["goal_arrival_time"].to_numpy(dtype=float)
+    ordered = trials.sort_values("destination_first_poke_in_time").reset_index(
+        drop=True
+    )
+    arrival = ordered["destination_first_poke_in_time"].to_numpy(dtype=float)
     outcome = ordered["outcome_known_time"].to_numpy(dtype=float)
-    before_first_arrival = float(ordered["start_time"].iloc[0])
+    before_first_arrival = float(ordered["movement_start_time"].iloc[0])
     between = 0.5 * (outcome[0] + arrival[1])
 
     times = np.array(

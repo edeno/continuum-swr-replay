@@ -288,28 +288,37 @@ class TestMakeWellVisitsDf:
 class TestMakeTrialsDfFromWellVisits:
     """Test trial aggregation from well visits."""
 
-    def test_has_goal_arrival_time(self, beam_breaks, pump_events):
-        """Each trial should have a goal_arrival_time."""
+    def test_has_destination_arrival_time(self, beam_breaks, pump_events):
+        """Each trial should have a destination_first_poke_in_time."""
         well_visits = make_well_visits_df(beam_breaks, pump_events)
         trials = make_trials_df_from_well_visits(well_visits)
 
-        assert "goal_arrival_time" in trials.columns
-        assert not trials["goal_arrival_time"].isna().any()
+        assert "destination_first_poke_in_time" in trials.columns
+        assert not trials["destination_first_poke_in_time"].isna().any()
 
-    def test_goal_arrival_within_trial_bounds(self, beam_breaks, pump_events):
-        """goal_arrival_time should be within [start_time, end_time]."""
+    def test_destination_arrival_within_trial_bounds(self, beam_breaks, pump_events):
+        """Arrival lies within [movement_start_time, end_time]."""
         well_visits = make_well_visits_df(beam_breaks, pump_events)
         trials = make_trials_df_from_well_visits(well_visits)
 
-        assert (trials["goal_arrival_time"] >= trials["start_time"]).all()
-        assert (trials["goal_arrival_time"] <= trials["end_time"]).all()
+        arrival = trials["destination_first_poke_in_time"]
+        assert (arrival >= trials["movement_start_time"]).all()
+        assert (arrival <= trials["end_time"]).all()
 
     def test_start_before_end(self, beam_breaks, pump_events):
-        """start_time should be before end_time for all trials."""
+        """movement_start_time should be before end_time for all trials."""
         well_visits = make_well_visits_df(beam_breaks, pump_events)
         trials = make_trials_df_from_well_visits(well_visits)
 
-        assert (trials["start_time"] <= trials["end_time"]).all()
+        assert (trials["movement_start_time"] <= trials["end_time"]).all()
+
+    def test_has_no_compatibility_aliases(self, beam_breaks, pump_events):
+        """start_time and goal_arrival_time were aliases; they are gone."""
+        well_visits = make_well_visits_df(beam_breaks, pump_events)
+        trials = make_trials_df_from_well_visits(well_visits)
+
+        assert "start_time" not in trials.columns
+        assert "goal_arrival_time" not in trials.columns
 
     def test_trial_count_matches_run_count(self, beam_breaks, pump_events):
         """Number of trials should equal number of unique run trial numbers."""
@@ -329,7 +338,7 @@ class TestMakeTrialsDfFromWellVisits:
         trials = make_trials_df_from_well_visits(well_visits)
 
         required = [
-            "start_time",
+            "movement_start_time",
             "end_time",
             "is_reward",
             "reward_on_time",
@@ -339,7 +348,7 @@ class TestMakeTrialsDfFromWellVisits:
             "from_patch",
             "to_patch",
             "is_patch_change",
-            "goal_arrival_time",
+            "destination_first_poke_in_time",
             "duration",
         ]
         for col in required:
@@ -360,7 +369,9 @@ class TestMakeTrialsDfFromWellVisits:
             trials.loc[~rewarded, "outcome_known_time"],
             trials.loc[~rewarded, "end_time"],
         )
-        assert (trials["outcome_known_time"] >= trials["goal_arrival_time"]).all()
+        assert (
+            trials["outcome_known_time"] >= trials["destination_first_poke_in_time"]
+        ).all()
         assert (trials["outcome_known_time"] <= trials["end_time"]).all()
 
 
@@ -531,7 +542,7 @@ class TestMakePortExperiencesDf:
                 "from_well": [0],
                 "to_well": [2],
                 "to_patch": [2],
-                "goal_arrival_time": [10.0],
+                "destination_first_poke_in_time": [10.0],
                 "end_time": [11.0],
                 "reward_on_time": [10.2],
                 "outcome_known_time": [10.2],

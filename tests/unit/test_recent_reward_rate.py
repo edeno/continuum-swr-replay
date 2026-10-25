@@ -29,7 +29,7 @@ def _trials():
     n = 6
     return pd.DataFrame(
         {
-            "start_time": np.arange(n, dtype=float),
+            "movement_start_time": np.arange(n, dtype=float),
             "end_time": np.arange(n, dtype=float) + 0.5,
             "from_well": [0, 1, 2, 3, 4, 5],
             "to_well": [1, 2, 3, 4, 5, 0],  # arm 1 visited first, then 2,3,4,5,0

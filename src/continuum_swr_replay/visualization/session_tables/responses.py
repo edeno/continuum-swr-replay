@@ -125,7 +125,8 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
     """Production-aligned behavioral location and completed-trip context.
 
     Dark horizontal segments show dwell intervals at a well. Light shading
-    marks ``[start_time, goal_arrival_time)`` transit intervals, during which
+    marks ``[movement_start_time, destination_first_poke_in_time)`` transit
+    intervals, during which
     destination and outcome are not exposed as current context. Reward stars
     and purple patch-switch ticks occur at the completion cutoff (goal arrival,
     with the established per-row ``end_time`` fallback).
@@ -136,7 +137,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
         trials,
         "trials",
         (
-            "start_time",
+            "movement_start_time",
             "end_time",
             "from_well",
             "to_well",
@@ -159,11 +160,11 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
         return
 
     # keep the trial ids: the port-experience stream names trips by them
-    ordered = trials.sort_values("start_time", kind="stable")
-    start_times = ordered["start_time"].to_numpy(dtype=float)
+    ordered = trials.sort_values("movement_start_time", kind="stable")
+    start_times = ordered["movement_start_time"].to_numpy(dtype=float)
     if not np.isfinite(start_times).all() or np.any(np.diff(start_times) < 0):
         raise ValueError(
-            "trials.start_time must be finite and chronologically sortable"
+            "trials.movement_start_time must be finite and chronologically sortable"
         )
 
     # Validate using the same helper as the canonical table builders.
@@ -174,7 +175,7 @@ def _plot_trial_rail(ax: Axes, ctx: _PanelContext) -> None:
 
     drew_interval = False
     for trial_idx, (_, row) in enumerate(ordered.iterrows()):
-        transit_start = max(float(row["start_time"]), lo)
+        transit_start = max(float(row["movement_start_time"]), lo)
         transit_end = min(float(completion_times[trial_idx]), hi)
         if transit_end > transit_start:
             ax.axvspan(
@@ -295,7 +296,7 @@ def _compute_mismatch_table(
         trials,
         "trials",
         (
-            "start_time",
+            "movement_start_time",
             "end_time",
             "from_well",
             "to_well",

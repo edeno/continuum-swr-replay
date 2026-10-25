@@ -220,8 +220,8 @@ def _location_contract_session():
 
     trials = pd.DataFrame(
         {
-            "start_time": [1.0, 6.5],
-            "goal_arrival_time": [3.0, 8.0],
+            "movement_start_time": [1.0, 6.5],
+            "destination_first_poke_in_time": [3.0, 8.0],
             # The first destination dwell lasts until the next departure; the
             # final dwell lasts through this toy session's last timestamp.
             "end_time": [6.5, 9.0],
@@ -311,7 +311,7 @@ def test_stop_table_persists_arrival_and_outcome_clocks():
     """
     dot, _env, trials, graph = _location_contract_session()
     stops = build_stop_table(dot, trials, graph).sort_values("stop_start")
-    first_trip = trials.sort_values("goal_arrival_time").iloc[0]
+    first_trip = trials.sort_values("destination_first_poke_in_time").iloc[0]
 
     # Pre-trial stop: no arrival has completed, so neither clock borrows the
     # trip that only completes later.
@@ -320,7 +320,7 @@ def test_stop_table_persists_arrival_and_outcome_clocks():
 
     # At-well stop after the first arrival: both clocks are that trip's.
     assert stops["last_well_arrival_time_s"].iloc[1] == pytest.approx(
-        first_trip["goal_arrival_time"]
+        first_trip["destination_first_poke_in_time"]
     )
     assert stops["outcome_known_time_s"].iloc[1] == pytest.approx(
         first_trip["outcome_known_time"]
@@ -330,7 +330,7 @@ def test_stop_table_persists_arrival_and_outcome_clocks():
     # both clocks. Bout-start anchoring keeps the earlier trip's values instead
     # of importing an arrival that had not happened when the stop began.
     assert stops["last_well_arrival_time_s"].iloc[2] == pytest.approx(
-        first_trip["goal_arrival_time"]
+        first_trip["destination_first_poke_in_time"]
     )
     assert stops["outcome_known_time_s"].iloc[2] == pytest.approx(
         first_trip["outcome_known_time"]
@@ -379,8 +379,8 @@ def test_physical_trunk_is_kept_separate_from_at_well_location_arm():
     # field says trunk 7; the two facts must be exposed independently.
     trials = pd.DataFrame(
         {
-            "start_time": [0.0],
-            "goal_arrival_time": [1.0],
+            "movement_start_time": [0.0],
+            "destination_first_poke_in_time": [1.0],
             "end_time": [10.0],
             "from_well": [0],
             "to_well": [3],
@@ -442,8 +442,8 @@ def test_event_arm_table_emits_time_local_novelty_and_swr_interaction(tiny_sessi
     et = build_event_table(dot, env, empty_trials, graph)
     trials = pd.DataFrame(
         {
-            "start_time": [0.0, 4.0],
-            "goal_arrival_time": [1.0, 5.0],
+            "movement_start_time": [0.0, 4.0],
+            "destination_first_poke_in_time": [1.0, 5.0],
             "end_time": [1.5, 5.5],
             "from_well": [1, 0],
             "to_well": [0, 1],

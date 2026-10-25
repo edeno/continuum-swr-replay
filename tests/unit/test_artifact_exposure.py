@@ -112,7 +112,7 @@ def _graph() -> nx.Graph:
 def _trials() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "start_time": [11.0],
+            "movement_start_time": [11.0],
             "end_time": [15.0],
             "from_well": [1],
             "to_well": [0],

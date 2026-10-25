@@ -347,8 +347,8 @@ def load_data(
     Get trial information:
 
     >>> trials = data['trials']
-    >>> trials[['start_time', 'end_time', 'is_reward', 'from_well', 'to_well']].head(3)
-       start_time  end_time  is_reward  from_well  to_well
+    >>> trials[['movement_start_time', 'end_time', 'is_reward', 'from_well', 'to_well']].head(3)
+       movement_start_time  end_time  is_reward  from_well  to_well
     0   1234.5     1240.2    True       0          3
     1   1241.0     1247.8    False      3          1
     2   1249.3     1256.1    True       1          4

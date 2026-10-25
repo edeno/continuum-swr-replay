@@ -57,9 +57,9 @@ def trials_df():
     """Two trials covering the position data time range."""
     return pd.DataFrame(
         {
-            "start_time": [0.0, 2.0],
+            "movement_start_time": [0.0, 2.0],
             "end_time": [2.0, 4.0],
-            "goal_arrival_time": [1.5, 3.5],
+            "destination_first_poke_in_time": [1.5, 3.5],
             "from_well": [0, 1],
             "to_well": [1, 2],
             "is_reward": [True, False],
@@ -260,9 +260,9 @@ class TestMakeTaskVariablesValues:
         )
         trials = pd.DataFrame(
             {
-                "start_time": [0.0, 2.0],
+                "movement_start_time": [0.0, 2.0],
                 "end_time": [1.0, 3.0],
-                "goal_arrival_time": [0.8, 2.8],
+                "destination_first_poke_in_time": [0.8, 2.8],
                 "from_well": [0, 0],
                 "to_well": [1, 1],
                 "is_reward": [True, True],
@@ -338,9 +338,9 @@ class TestMakeTaskVariablesEdgeCases:
         )
         trials = pd.DataFrame(
             {
-                "start_time": [0.0],
+                "movement_start_time": [0.0],
                 "end_time": [2.0],
-                "goal_arrival_time": [1.5],
+                "destination_first_poke_in_time": [1.5],
                 "from_well": [0],
                 "to_well": [1],
                 "is_reward": [True],
@@ -358,9 +358,9 @@ class TestMakeTaskVariablesEdgeCases:
         """Empty trials DataFrame should produce all-NaN task variables."""
         empty_trials = pd.DataFrame(
             {
-                "start_time": pd.Series(dtype=float),
+                "movement_start_time": pd.Series(dtype=float),
                 "end_time": pd.Series(dtype=float),
-                "goal_arrival_time": pd.Series(dtype=float),
+                "destination_first_poke_in_time": pd.Series(dtype=float),
                 "from_well": pd.Series(dtype=int),
                 "to_well": pd.Series(dtype=int),
                 "is_reward": pd.Series(dtype=bool),

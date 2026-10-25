@@ -47,7 +47,7 @@ def _prepare_trials_for_context(
 ) -> tuple[pd.DataFrame, np.ndarray]:
     """Validate and order trials by their canonical destination-arrival time.
 
-    A trip reaches its destination at ``goal_arrival_time``, with the
+    A trip reaches its destination at ``destination_first_poke_in_time``, with the
     established per-row ``end_time`` fallback. Sorting by that clock is
     essential for location and visit history. Reward history uses the separate
     outcome clock returned by :func:`trial_outcome_times`.
@@ -55,24 +55,19 @@ def _prepare_trials_for_context(
     if trials.empty:
         return trials.copy(), np.array([], dtype=float)
 
-    base_columns = {"start_time", "end_time", "to_well", *required_columns}
+    base_columns = {"movement_start_time", "end_time", "to_well", *required_columns}
     missing = sorted(base_columns.difference(trials.columns))
     if missing:
         raise KeyError(f"trial context requires columns {missing}")
 
     prepared = trials.copy()
-    departure_column = (
-        "movement_start_time"
-        if "movement_start_time" in prepared.columns
-        else "start_time"
-    )
-    starts = prepared[departure_column].to_numpy(dtype=float)
+    starts = prepared["movement_start_time"].to_numpy(dtype=float)
     ends = prepared["end_time"].to_numpy(dtype=float)
     cutoffs = trial_arrival_times(prepared)
     to_wells = prepared["to_well"].to_numpy(dtype=float)
 
     if not np.isfinite(starts).all():
-        raise ValueError("trial start_time values must be finite")
+        raise ValueError("trial movement_start_time values must be finite")
     if not np.isfinite(ends).all():
         raise ValueError("trial end_time values must be finite")
     if not np.isfinite(cutoffs).all():
@@ -183,12 +178,7 @@ def _validate_trial_experience_alignment(
             "trial patch-switch labels disagree with the physical-poke sequence"
         )
 
-    departure_column = (
-        "movement_start_time"
-        if "movement_start_time" in prepared.columns
-        else "start_time"
-    )
-    departure_times = prepared[departure_column].to_numpy(dtype=float)
+    departure_times = prepared["movement_start_time"].to_numpy(dtype=float)
     if not np.isclose(
         float(initial["departure_time"]),
         departure_times[0],
@@ -504,10 +494,7 @@ def add_trial_context(
         return dot
 
     n_trials = len(trials)
-    departure_column = (
-        "movement_start_time" if "movement_start_time" in trials else "start_time"
-    )
-    trial_start_times = trials[departure_column].to_numpy(dtype=float)
+    trial_start_times = trials["movement_start_time"].to_numpy(dtype=float)
     to_wells = trials["to_well"].to_numpy(dtype=float)
     from_wells = trials["from_well"].to_numpy(dtype=float)
     destination_experiences = experiences.iloc[1:].reset_index(drop=True)

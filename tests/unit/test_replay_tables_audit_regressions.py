@@ -211,9 +211,9 @@ def test_visit_recency_does_not_depend_on_future_trials():
     def _trials(n: int) -> pd.DataFrame:
         return pd.DataFrame(
             {
-                "start_time": np.arange(n, dtype=float),
+                "movement_start_time": np.arange(n, dtype=float),
                 "end_time": np.arange(1, n + 1, dtype=float),
-                "goal_arrival_time": np.arange(1, n + 1, dtype=float),
+                "destination_first_poke_in_time": np.arange(1, n + 1, dtype=float),
                 "to_well": [0, 1, 0, 1, 0][:n],
                 "from_well": [1, 0, 1, 0, 1][:n],
                 "is_reward": [1, 0, 1, 0, 1][:n],
@@ -235,7 +235,7 @@ def test_visit_recency_does_not_depend_on_future_trials():
 def test_trial_context_is_not_taken_from_the_in_progress_trip():
     """Context during a run must not describe the run's own outcome.
 
-    A trial spans ``[start_time, goal_arrival_time)`` — departure to arrival.
+    A trial spans ``[movement_start_time, destination_first_poke_in_time)`` — departure to arrival.
     At a timepoint inside that interval the animal is still running and the
     destination has not been reached, so neither the patch-change status nor
     the reward outcome of that trip is determined yet. With no earlier
@@ -243,9 +243,9 @@ def test_trial_context_is_not_taken_from_the_in_progress_trip():
     """
     trials = pd.DataFrame(
         {
-            "start_time": [0.0],
+            "movement_start_time": [0.0],
             "end_time": [10.0],
-            "goal_arrival_time": [10.0],
+            "destination_first_poke_in_time": [10.0],
             "to_well": [2.0],  # patch 2
             "from_well": [0.0],  # patch 1 -> this trip IS a patch change
             "is_reward": [1.0],
