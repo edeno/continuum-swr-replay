@@ -75,7 +75,7 @@ src/continuum_swr_replay/
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
 │   └── constants.py       #   analysis constants and defaults
-├── decoding/              # decode configs, transitions, file names, the results.nc reader
+├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS
@@ -458,7 +458,7 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 
 1. **Time units**: Always in seconds (never milliseconds)
 2. **Epoch naming**: Format is `"{epoch_number}_r{replicate}"` (e.g., "02_r1")
-3. **Epoch identifiers**: `{animal}{date}_{epoch}_{brain_area}` (e.g., "chimi20200212_02_r1_HPC")
+3. **Epoch identifiers**: `{animal}{date}_{epoch}_{brain_area}` (e.g., "chimi20200212_02_r1_HPC"), built and parsed only by `decoding/identifiers.py`
 4. **Brain area names**: Use "HPC", "mPFC", "OFC" (exact capitalization matters)
 5. **Interval naming**: Spyglass uses " noPrePostTrialTimes" suffix for trimmed intervals
 6. **Track graph**: NetworkX graph of 10 nodes, where nodes 0–5 are wells (6–8 patch junctions, 9 the center) and edges are track segments
