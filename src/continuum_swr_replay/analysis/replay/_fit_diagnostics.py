@@ -169,7 +169,9 @@ def fit_status(
     if kind == "glm":
         converged = bool(getattr(result, "converged", False))
     elif kind == "mle":
-        converged = bool((getattr(result, "mle_retvals", {}) or {}).get("converged", False))
+        converged = bool(
+            (getattr(result, "mle_retvals", {}) or {}).get("converged", False)
+        )
     elif kind == "conditional":
         if caught is None:
             converged = None  # statsmodels does not expose it; caller didn't capture

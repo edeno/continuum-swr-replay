@@ -374,10 +374,22 @@ def build_choice_dataset(
             replay_fraction=(fraction_col, strict_mean),
             visit_recency_trials=("visit_recency_trials", "last"),
             is_candidate_arm_never_visited=("is_candidate_arm_never_visited", "last"),
-            reward_count_candidate_arm_last10_known_trials=("reward_count_candidate_arm_last10_known_trials", "last"),
-            reward_fraction_candidate_arm_last10_visits=("reward_fraction_candidate_arm_last10_visits", "last"),
-            reward_belief_mean_candidate_arm_preoutcome=("reward_belief_mean_candidate_arm_preoutcome", "last"),
-            task_reward_probability_candidate_arm=("task_reward_probability_candidate_arm", "last"),
+            reward_count_candidate_arm_last10_known_trials=(
+                "reward_count_candidate_arm_last10_known_trials",
+                "last",
+            ),
+            reward_fraction_candidate_arm_last10_visits=(
+                "reward_fraction_candidate_arm_last10_visits",
+                "last",
+            ),
+            reward_belief_mean_candidate_arm_preoutcome=(
+                "reward_belief_mean_candidate_arm_preoutcome",
+                "last",
+            ),
+            task_reward_probability_candidate_arm=(
+                "task_reward_probability_candidate_arm",
+                "last",
+            ),
             distance_to_candidate_arm_cm=("distance_to_candidate_arm_cm", "last"),
             candidate_arm_distance_rank=("candidate_arm_distance_rank", "last"),
             is_same_patch_as_current=("is_same_patch_as_current", "last"),
@@ -393,7 +405,9 @@ def build_choice_dataset(
     # honest NaN lets the fitter drop those stops from any model using
     # the split predictors.
     if "is_swr" in event_arm_table.columns:
-        eat_swr = event_arm_table[["stop_id", "candidate_arm", fraction_col, "is_swr"]].copy()
+        eat_swr = event_arm_table[
+            ["stop_id", "candidate_arm", fraction_col, "is_swr"]
+        ].copy()
         swr_frac = (
             eat_swr[eat_swr["is_swr"]]
             .groupby(["stop_id", "candidate_arm"])[fraction_col]
@@ -409,7 +423,9 @@ def build_choice_dataset(
             .reset_index()
         )
         stop_arm = stop_arm.merge(swr_frac, on=["stop_id", "candidate_arm"], how="left")
-        stop_arm = stop_arm.merge(non_swr_frac, on=["stop_id", "candidate_arm"], how="left")
+        stop_arm = stop_arm.merge(
+            non_swr_frac, on=["stop_id", "candidate_arm"], how="left"
+        )
 
     # Join with stop-level info.
     stop_info = valid_stops[
@@ -442,7 +458,9 @@ def build_choice_dataset(
     ].reset_index(drop=True)
 
     # Response: did the animal choose this arm?
-    choice_df["chosen"] = (choice_df["candidate_arm"] == choice_df["next_arm"]).astype(int)
+    choice_df["chosen"] = (choice_df["candidate_arm"] == choice_df["next_arm"]).astype(
+        int
+    )
 
     # Sanity: exactly one chosen arm per stop.
     chosen_per_stop = choice_df.groupby("stop_id")["chosen"].sum()
