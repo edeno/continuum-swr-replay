@@ -13,10 +13,17 @@ The tool is `scripts/qa/table_parity.py`:
   (`.claude/research/refresh_r13/r13c_report.md`): stop bootstrap, then qvals,
   then one replay shard per animal beside the time-bin build, then assemble,
   then ContFrag SWR and MUA.
-- `diff` compares two roots table by table on each table's row key, exactly
-  (`tables.parity.diff_table`, `atol=0`). It also compares the tables' attrs and
-  the two standardization references byte for byte. It reports every table, and
-  exits 1 if any differs.
+- `diff` compares two roots table by table:
+  - values on each table's row key, exactly (`tables.parity.diff_table`,
+    `atol=0`);
+  - the column list and order, every column's dtype, and the on-disk row order;
+  - the tables' attrs, and the two standardization references byte for byte.
+
+  It reports every missing table, every extra `*.parquet`/`*.json` in the
+  candidate's table folders and every differing table, then exits 1 if there
+  is any. `--restrict` takes its sessions from the candidate slice's own
+  `epoch_register.csv` and its qvals stops from the reference's stop table, so
+  a candidate that lost a session cannot shrink the reference.
 
 ## Slice parity (each task)
 
@@ -67,7 +74,12 @@ What the root holds and reads:
 - `replay_content/` and `contfrag_replay_content/` (the layout of
   `Processed-Data`), plus `logs/<step>.log` and `timings.json`.
 - Its own copy of the needed `_session_cache/comrie_photogate_trials_v4` entries,
-  so nothing is written to the live cache.
+  so nothing is written to the live cache. The cache is frozen, so slice parity
+  (and the full run) do not cover changes to the code that builds it, which is
+  `load_behavioral_context`'s Spyglass path (`load_data`'s trials and track
+  graph). A task that changes that code needs its own check. A cache entry
+  missing from the canonical cache is logged as a warning, and that session falls
+  back to Spyglass and is cached into the root.
 - Decodes and the artifact/SWR runs are read from `PROCESSED_DATA_DIR` as usual.
   `CSR_PROCESSED_DATA_DIR` is not used: pointing it at a scratch root would hide
   the decodes.
@@ -99,7 +111,8 @@ pre-branch code:
 
 1. The slice reference was compared with the live tables restricted to its three
    epochs (`diff --restrict --reference Processed-Data`). 14 of the 16 tables are
-   identical in every row, key and column. That covers all the ContFrag tables
+   identical in every row, key and column, and also in column order, dtypes and
+   row order (checked again after fix round 1). That covers all the ContFrag tables
    and the stop, event, event-patch, event-sequence, event-onset and stop-timebin
    tables.
 2. Only the pooled `_z` columns differ, and that is expected. These are the 4

@@ -884,7 +884,7 @@ Print Stage 6's per-role cross-session FDR table for a saved bundle.
 
 Regenerate the canonical tables into a scratch root and diff two roots.
 
-`regen`, `diff`, `main`
+`regen`, `frame_problems`, `diff`, `main`
 
 ### `scripts/qa/write_epoch_register_doc.py`
 

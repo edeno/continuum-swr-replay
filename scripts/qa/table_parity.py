@@ -8,9 +8,10 @@ and MUA tables -- into a new root, with the same builders, flags and order as
 the 2026-10-11 rebuild the live tables come from
 (``.claude/research/refresh_r13/r13c_report.md``): stop bootstrap -> qvals ->
 one replay shard per animal (beside the time-bin build) -> assemble -> ContFrag
-SWR and MUA. ``diff`` compares two roots table by table on each table's row
-key, exactly (``tables.parity.diff_table`` with ``atol=0``), and reports every
-table before failing.
+SWR and MUA. ``diff`` compares two roots table by table: values exactly on
+each table's row key (``tables.parity.diff_table`` with ``atol=0``), and also
+the column list and order, every dtype, the on-disk row order and the attrs. It
+reports every missing, extra or differing table before failing.
 
 ``--sessions`` restricts ``regen`` to a few epochs. Every builder takes its
 sessions from the epoch register, so each builder runs with
@@ -45,7 +46,7 @@ Usage::
         --candidate Processed-Data/_scratch_simplify_20261024/full_<label> \
         --reference Processed-Data
 
-    # a slice against the live tables restricted to the slice's sessions
+    # a slice against the live tables restricted to the slice's requested sessions
     uv run python scripts/qa/table_parity.py diff --restrict \
         --candidate <slice root> --reference Processed-Data
 """
@@ -55,6 +56,7 @@ from __future__ import annotations
 import argparse
 import filecmp
 import json
+import logging
 import os
 import runpy
 import shutil
@@ -65,6 +67,7 @@ from pathlib import Path
 
 import pandas as pd
 
+LOGGER = logging.getLogger(__name__)
 REPO = Path(__file__).resolve().parents[2]
 RC = "replay_content"
 CF = "contfrag_replay_content"
@@ -84,15 +87,15 @@ _PREPARE = "scripts/tables/prepare_replay_content_data.py"
 _CONTFRAG = "scripts/tables/prepare_contfrag_replay_content_data.py"
 
 
-def _slice_register(sessions: list[str], path: Path) -> list[str]:
-    """Write the register with every analysed epoch outside `sessions` excluded.
+def _slice_register(sessions: list[str]) -> pd.DataFrame:
+    """The register with every analysed epoch outside `sessions` excluded.
 
-    Returns the animals of `sessions`, in register order.
+    Raises ``ValueError`` naming any of `sessions` the register does not analyse,
+    before anything is written.
     """
     from continuum_swr_replay.data_loaders.epoch_register import (
         Reason,
         Status,
-        analysed_animals,
         analysed_epoch_ids,
         read_register,
     )
@@ -111,6 +114,19 @@ def _slice_register(sessions: list[str], path: Path) -> list[str]:
     register.loc[drop, "status"] = Status.EXCLUDED.value
     register.loc[drop, "reason"] = Reason.MISSING_INPUT.value
     register.loc[drop, "evidence"] = "outside the table-parity slice"
+    return register
+
+
+def _write_register(
+    register: pd.DataFrame, sessions: list[str], path: Path
+) -> list[str]:
+    """Write the sliced register and check it; return its animals, in order."""
+    from continuum_swr_replay.data_loaders.epoch_register import (
+        analysed_animals,
+        analysed_epoch_ids,
+        read_register,
+    )
+
     register.reset_index().to_csv(path, index=False)
     sliced = read_register(path)  # the copy obeys the register's contract
     assert sorted(analysed_epoch_ids(sliced)) == sorted(sessions)
@@ -133,6 +149,11 @@ def _copy_cache(sessions: list[str] | None, root: Path) -> None:
     for name in names:
         if (src / name).exists():
             shutil.copy2(src / name, dst / name)
+        else:
+            # The builder then falls back to Spyglass and caches into the root.
+            LOGGER.warning(
+                "no canonical cache entry %s; Spyglass serves it", src / name
+            )
 
 
 def _launch(step: str, script: str, args: list[str], root: Path, register: Path | None):
@@ -170,12 +191,13 @@ def _wait(running: list, timings: dict[str, float]) -> None:
 def regen(root: Path, sessions: list[str] | None) -> None:
     """Rebuild every canonical table into `root` (refuses an existing root)."""
     root = root.resolve()
+    sliced = _slice_register(sessions) if sessions else None  # validate first
     root.mkdir(parents=True)  # FileExistsError on a used root, by design
     (root / "logs").mkdir()
     register = None
     if sessions:
         register = root / "epoch_register.csv"
-        animals = _slice_register(sessions, register)
+        animals = _write_register(sliced, sessions, register)
     else:
         from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 
@@ -276,48 +298,127 @@ def regen(root: Path, sessions: list[str] | None) -> None:
     print(f"regenerated -> {root} in {timings['total']:.0f} s", flush=True)
 
 
-def _session_restriction(candidate: Path):
-    """The candidate's sessions and stops, to restrict a full reference to them."""
+def _session_restriction(candidate: Path, reference: Path):
+    """Cut a full reference down to the sessions the candidate slice was asked for.
+
+    The sessions come from the slice's own register (``<candidate>/epoch_register.csv``,
+    written by ``regen --sessions``), and the qvals stops from the *reference*
+    stop table, so a candidate that lost a session cannot shrink the reference.
+    """
+    from continuum_swr_replay.data_loaders.epoch_register import Status, read_register
+    from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
     from continuum_swr_replay.tables.io import read_table
     from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-    stops = read_table(candidate / RC / "stop_table")
+    path = candidate / "epoch_register.csv"
+    if not path.exists():
+        raise FileNotFoundError(f"--restrict needs a slice root with {path}")
+    register = read_register(path)
+    analysed = register.index[register["status"] == Status.ANALYSED]
+    sessions = pd.MultiIndex.from_tuples(
+        [(*parse_nwb_filename(name), epoch) for name, epoch in analysed],
+        names=list(SESSION_COLUMNS),
+    )
     columns = list(SESSION_COLUMNS)
-    sessions = pd.MultiIndex.from_frame(stops[columns].drop_duplicates())
-    stop_ids = set(stops["stop_id"])
 
     def restrict(frame: pd.DataFrame) -> pd.DataFrame:
+        return frame[pd.MultiIndex.from_frame(frame[columns]).isin(sessions)]
+
+    stop_ids = set(restrict(read_table(reference / RC / "stop_table"))["stop_id"])
+
+    def keep(frame: pd.DataFrame) -> pd.DataFrame:
         if set(columns) <= set(frame.columns):
-            return frame[pd.MultiIndex.from_frame(frame[columns]).isin(sessions)]
+            return restrict(frame)
         return frame[frame["stop_id"].isin(stop_ids)]  # qvals: no session columns
 
-    return restrict
+    return keep
+
+
+def frame_problems(
+    cand: pd.DataFrame, ref: pd.DataFrame, *, keys: list[str], label: str
+) -> list[str]:
+    """Every way `cand` differs from `ref`; empty when they are the same table.
+
+    ``tables.parity.diff_table`` compares values on the sorted row key. On top of
+    it this requires the same columns in the same order, the same dtype per
+    column, and the same rows in the same on-disk order, so a refactor that
+    turns an int column into float, reorders columns or rows, or casts to
+    category is a difference too.
+    """
+    from continuum_swr_replay.tables.parity import diff_table
+
+    problems = []
+    if list(cand.columns) != list(ref.columns):
+        problems.append(
+            f"column list/order differs: candidate {list(cand.columns)} "
+            f"vs reference {list(ref.columns)}"
+        )
+    dtypes = [
+        f"{c}: {cand[c].dtype} vs {ref[c].dtype}"
+        for c in cand.columns
+        if c in ref.columns and cand[c].dtype != ref[c].dtype
+    ]
+    if dtypes:
+        problems.append(f"dtype differs: {dtypes}")
+    try:
+        diff_table(cand, ref, keys=keys, label=label, atol=0.0)
+    except ValueError as error:
+        problems.append(str(error))
+    else:
+        cand_keys = cand[keys].reset_index(drop=True)
+        ref_keys = ref[keys].reset_index(drop=True)
+        if not cand_keys.astype(object).equals(ref_keys.astype(object)):
+            problems.append(f"row order differs on {keys}")
+    return problems
+
+
+def _root_files(root: Path) -> set[str]:
+    """The table and reference files at the top of a root's two table folders."""
+    return {
+        f"{folder}/{path.name}"
+        for folder in (RC, CF)
+        for pattern in ("*.parquet", "*.json")
+        for path in (root / folder).glob(pattern)
+    }
 
 
 def diff(candidate: Path, reference: Path, restrict: bool) -> int:
-    """Diff every canonical table of two roots; return the number that differ."""
+    """Diff every canonical table of two roots; return the number of differences.
+
+    Every table and reference file is checked and reported before returning: a
+    table missing from either root, a file the candidate has but the canonical
+    set does not, and any table whose columns, dtypes, row order, values or
+    attrs differ each count once.
+    """
     from continuum_swr_replay.paths import BASENAME_TO_TABLE, CANONICAL_TABLE_BASENAMES
     from continuum_swr_replay.tables.covariate_registry import row_keys
     from continuum_swr_replay.tables.io import read_table
-    from continuum_swr_replay.tables.parity import diff_table
 
-    keep = _session_restriction(candidate) if restrict else (lambda frame: frame)
+    keep = _session_restriction(candidate, reference) if restrict else (lambda f: f)
     tables = [
         (f"{RC}/{name}", BASENAME_TO_TABLE[name]) for name in CANONICAL_TABLE_BASENAMES
     ]
     tables += [(f"{CF}/{name}", table) for name, table in CONTFRAG_TABLES]
+    expected = {f"{relative}.parquet" for relative, _ in tables} | set(REFERENCE_FILES)
     n_bad = 0
+    for extra in sorted(_root_files(candidate) - expected):
+        n_bad += 1
+        print(f"EXTRA    {extra} (not a canonical table or reference)", flush=True)
     for relative, table in tables:
-        cand = read_table(candidate / relative)
-        ref_all = read_table(reference / relative)
-        ref = keep(ref_all).reset_index(drop=True)
         try:
-            diff_table(
-                cand, ref, keys=list(row_keys(table=table)), label=relative, atol=0.0
-            )
-        except ValueError as error:
+            cand = read_table(candidate / relative)
+            ref_all = read_table(reference / relative)
+        except FileNotFoundError as error:
             n_bad += 1
-            print(f"DIFFERS  {relative}: {error}", flush=True)
+            print(f"MISSING  {relative}: {error}", flush=True)
+            continue
+        ref = keep(ref_all).reset_index(drop=True)
+        problems = frame_problems(
+            cand, ref, keys=list(row_keys(table=table)), label=relative
+        )
+        if problems:
+            n_bad += 1
+            print(f"DIFFERS  {relative}: " + "; ".join(problems), flush=True)
             continue
         # The attrs (schema stamp, SWR source, cohort sums) must match too; a
         # restricted reference's cohort sums are the full cohort's, so there
@@ -331,6 +432,10 @@ def diff(candidate: Path, reference: Path, restrict: bool) -> int:
         attrs = f"attrs DIFFER {moved}" if moved else "attrs equal"
         print(f"same     {relative} ({len(cand)} rows, {attrs})", flush=True)
     for relative in REFERENCE_FILES:
+        if not ((candidate / relative).exists() and (reference / relative).exists()):
+            n_bad += 1
+            print(f"MISSING  {relative}", flush=True)
+            continue
         same = filecmp.cmp(candidate / relative, reference / relative, shallow=False)
         print(f"{'same    ' if same else 'DIFFERS '} {relative} (bytes)", flush=True)
         n_bad += not same
@@ -370,7 +475,8 @@ def main(argv: list[str] | None = None) -> None:
     p_diff.add_argument(
         "--restrict",
         action="store_true",
-        help="restrict the reference to the candidate's sessions",
+        help="restrict the reference to the sessions the candidate slice's "
+        "epoch_register.csv analyses",
     )
     p_step = sub.add_parser("_step", help="internal: run one builder")
     p_step.add_argument("--register", default=None)
