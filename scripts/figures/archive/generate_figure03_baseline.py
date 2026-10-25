@@ -16,7 +16,8 @@ from scipy.stats import sem
 
 import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.figure_utilities import save_figure
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
@@ -36,7 +37,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_data_over_time():
     # Load all relevant data files
-    data_path = PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl")
+    data_path = processed_data_dir().glob("*_HPC_80_data_over_time.pkl")
     data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
     data_over_time["Non-Local_prob"] = (
         data_over_time["Non-Local_Continuous_prob"]

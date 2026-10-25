@@ -233,8 +233,7 @@ def belief_chain_output_subdir() -> str:
     Returns
     -------
     str
-        The bundle directory name, relative to ``PROCESSED_DATA_DIR /
-        "replay_content"``.
+        The bundle directory name, relative to ``paths.replay_content_dir()``.
     """
     return partial_ladder_subdir(
         canonical_output_subdir(

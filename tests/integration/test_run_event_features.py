@@ -50,6 +50,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
     input_paths,
+    marks_cache_dir,
     marks_cache_path,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
@@ -85,6 +86,14 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
+from continuum_swr_replay.paths import (
+    PROCESSED_DATA_DIR_ENV,
+    carey_root,
+    event_features_root,
+    inventory_comparison_root,
+    memoryless_root,
+    table_path,
+)
 from continuum_swr_replay.runs import cli
 from continuum_swr_replay.runs.io import json_ready, sha256_file
 from continuum_swr_replay.tables.io import read_table, write_atomically, write_table
@@ -288,7 +297,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
     }
 
     swr_run = write_swr_inventory(
-        tmp_path / "swr",
+        tmp_path,
         {WORKED: KAY, MASKED: MASKED_KAY, CHANGED: KAY, EMPTY: []},
         observed=dict.fromkeys(EPOCHS.values(), STORED_BAND),
     )
@@ -305,30 +314,24 @@ def inputs(tmp_path_factory, module_monkeypatch):
             )
             add_swr_detector(swr_run, identifier, detector, intervals)
     artifact_run = write_artifact_run(
-        tmp_path / "artifacts",
+        tmp_path,
         {WORKED: [], MASKED: [("spk", 30.05, 30.05)], CHANGED: [], EMPTY: []},
     )
+    # the data root is tmp_path: the decodes, the stop table and every run
+    # folder (and the marks cache) are where paths puts them under it
     use_swr_source(monkeypatch, swr_run, artifact_run)
 
-    decode_root = tmp_path / "decodes"
-    decode_root.mkdir()
-    monkeypatch.setattr(inventory_run, "DECODE_ROOT", decode_root)
-    cache_dir = tmp_path / "marks_cache"
     for epoch, identifier in EPOCHS.items():
-        write_epoch(decode_root, epoch, identifier, simulated)
-        write_marks_cache(cache_dir, decode_root, identifier, simulated)
+        write_epoch(tmp_path, epoch, identifier, simulated)
+        write_marks_cache(marks_cache_dir(), tmp_path, identifier, simulated)
     empty = inventory_run.decode_path(EMPTY)
     pd.read_pickle(empty).assign(non_local_event=0).to_pickle(empty)
-    write_carey_run(tmp_path / "carey")
-    write_memoryless_run(tmp_path / "memoryless", decode_root, simulated)
-    processed = tmp_path / "processed"
-    stop_table = processed / "replay_content" / "stop_table.parquet"
+    write_carey_run(carey_root())
+    write_memoryless_run(memoryless_root(), tmp_path, simulated)
+    stop_table = table_path("stop_table")
     stop_table.parent.mkdir(parents=True)
     write_stop_table(stop_table)
 
-    monkeypatch.setattr(comparison, "CAREY_ROOT", tmp_path / "carey")
-    monkeypatch.setattr(comparison, "MEMORYLESS_ROOT", tmp_path / "memoryless")
-    monkeypatch.setattr(comparison, "OUTPUT_ROOT", tmp_path / "inventory")
     monkeypatch.setattr(cli, "analysed_epoch_ids", lambda: [*EPOCHS.values()])
     comparison.main(
         [
@@ -346,12 +349,6 @@ def inputs(tmp_path_factory, module_monkeypatch):
     changed = inventory_run.decode_path(CHANGED)
     pd.read_pickle(changed).assign(head_speed=1.5).to_pickle(changed)
 
-    monkeypatch.setattr(runner, "INVENTORY_ROOT", tmp_path / "inventory")
-    monkeypatch.setattr(runner, "MEMORYLESS_ROOT", tmp_path / "memoryless")
-    monkeypatch.setattr(runner, "MARKS_CACHE_DIR", cache_dir)
-    monkeypatch.setattr(runner, "PROCESSED_DATA_DIR", processed)
-    monkeypatch.setattr(runner, "STOP_TABLE", stop_table)
-    monkeypatch.setattr(runner, "OUTPUT_ROOT", tmp_path / "event_features")
     monkeypatch.setattr(
         runner, "provenance_record", lambda root: {"commit": COMMIT, "dirty": False}
     )
@@ -381,7 +378,7 @@ def run(inputs):
         pytest.raises(SystemExit, match="1 epochs failed"),
     ):
         runner.main([*ARGS, "--animal", ANIMAL])
-    return inputs / "event_features" / RUN_ID
+    return event_features_root() / RUN_ID
 
 
 def table(run_dir: Path, identifier: str, name: str) -> pd.DataFrame:
@@ -391,7 +388,7 @@ def table(run_dir: Path, identifier: str, name: str) -> pd.DataFrame:
 def stored(inputs: Path, identifier: str, name: str) -> pd.DataFrame:
     return read_table(
         inventory_run.output_path(
-            identifier, inputs / "inventory" / INVENTORY_RUN, name
+            identifier, inventory_comparison_root() / INVENTORY_RUN, name
         )
     )
 
@@ -596,7 +593,7 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
     """A stored ``directional`` table one count off: the epoch fails, and its
     earlier outputs are removed."""
     inventory_dir = tmp_path / "inventory"
-    shutil.copytree(inputs / "inventory" / INVENTORY_RUN, inventory_dir)
+    shutil.copytree(inventory_comparison_root() / INVENTORY_RUN, inventory_dir)
     path = inventory_run.output_path(WORKED, inventory_dir, "directional")
     directional = read_table(path)
     directional.loc[0, "n_source_events"] += 1
@@ -612,9 +609,9 @@ def test_memberships_that_do_not_reproduce_the_stored_tables_fail_the_epoch(
         key.epoch_name,
         output_dir=output_dir,
         inventory_dir=inventory_dir,
-        memoryless_dir=inputs / "memoryless" / MEMORYLESS_RUN,
+        memoryless_dir=memoryless_root() / MEMORYLESS_RUN,
         decode_sha256={WORKED: sha256_file(inventory_run.decode_path(WORKED))},
-        stop_table=runner.STOP_TABLE,
+        stop_table=table_path("stop_table"),
         provenance={"commit": COMMIT, "dirty": False},
     )
 
@@ -632,7 +629,7 @@ def test_inputs_other_than_the_memoryless_runs_fail_the_epoch(
     another decode: the epoch is refused with that reason, and its earlier
     outputs are removed."""
     memoryless_dir = tmp_path / "memoryless"
-    shutil.copytree(inputs / "memoryless" / MEMORYLESS_RUN, memoryless_dir)
+    shutil.copytree(memoryless_root() / MEMORYLESS_RUN, memoryless_dir)
     manifest_path = memoryless_dir / "manifest.json"
     recorded = json.loads(manifest_path.read_text())
     epoch = recorded["epochs"][WORKED]
@@ -649,10 +646,10 @@ def test_inputs_other_than_the_memoryless_runs_fail_the_epoch(
         key.nwb_file_name,
         key.epoch_name,
         output_dir=output_dir,
-        inventory_dir=inputs / "inventory" / INVENTORY_RUN,
+        inventory_dir=inventory_comparison_root() / INVENTORY_RUN,
         memoryless_dir=memoryless_dir,
         decode_sha256={WORKED: sha256_file(inventory_run.decode_path(WORKED))},
-        stop_table=runner.STOP_TABLE,
+        stop_table=table_path("stop_table"),
         provenance={"commit": COMMIT, "dirty": False},
     )
 
@@ -741,16 +738,16 @@ def test_the_settings_name_no_absolute_path(run, inputs, tmp_path, monkeypatch):
     """Two roots holding the same stop table, as two worktrees whose
     Processed-Data links to one folder, give the same settings."""
     inventory = json.loads(
-        (inputs / "inventory" / INVENTORY_RUN / "manifest.json").read_text()
+        (inventory_comparison_root() / INVENTORY_RUN / "manifest.json").read_text()
     )
     settings = []
+    canonical_stop_table = table_path("stop_table")
     for root in (tmp_path / "one" / "Processed-Data", tmp_path / "two" / "elsewhere"):
         stop_table = root / "replay_content" / "stop_table.parquet"
         stop_table.parent.mkdir(parents=True)
-        shutil.copy(runner.STOP_TABLE, stop_table)
+        shutil.copy(canonical_stop_table, stop_table)
         with monkeypatch.context() as patch:
-            patch.setattr(runner, "PROCESSED_DATA_DIR", root)
-            patch.setattr(runner, "STOP_TABLE", stop_table)
+            patch.setenv(PROCESSED_DATA_DIR_ENV, str(root))
             settings.append(runner.run_settings(INVENTORY_RUN, inventory))
 
     assert settings[0] == settings[1] == manifest(run)["settings"]

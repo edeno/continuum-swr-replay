@@ -22,7 +22,7 @@ in [0, 1], so their coefficients are reported per unit of the fraction (factor 1
 ``per_unit``) rather than per SD.
 
 The second half of the module assembles the content contrast ladder's cohorts:
-it reads the canonical tables (:data:`CONTENT_FIT_INPUTS`), attaches the design
+it reads the canonical tables (:func:`contrast_fit_inputs`), attaches the design
 columns and the fit-time ``_z`` reference (:func:`assemble_arm`,
 :func:`assemble_patch`), freezes the per-SD scales before the outcome stratum
 (:func:`prepare_cohorts`), and applies the per-session cohort rules
@@ -47,8 +47,8 @@ from statsmodels.stats.multitest import multipletests
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,
     STANDARDIZATION_REFERENCE,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
@@ -721,16 +721,24 @@ def specs_from_ladder(ladder: dict, key_term: dict) -> list[tuple[str, str, str]
 MIN_EVENTS = 18
 
 
-# The tables every content contrast fit is built from. Their hashes go into the
-# provenance sidecar of each artifact the content contrast runner writes, and the
-# readers of those artifacts check the same mapping, so a regenerated table
-# cannot be read through coefficients that predate it.
-CONTENT_FIT_INPUTS = {
-    "event_arm_table": table_path("event_arm_table", REPLAY_CONTENT_DIR),
-    "event_patch_table": table_path("event_patch_table", REPLAY_CONTENT_DIR),
-    "stop_table": table_path("stop_table", REPLAY_CONTENT_DIR),
-    "qvals_table": table_path("qvals_table", REPLAY_CONTENT_DIR),
-}
+def contrast_fit_inputs(root: Path | None = None) -> dict[str, Path]:
+    """The tables every content contrast fit is built from, by name.
+
+    Their hashes go into the provenance sidecar of each artifact the content
+    contrast runner writes, and the readers of those artifacts check the same
+    mapping, so a regenerated table cannot be read through coefficients that
+    predate it. `root` is the replay-content root,
+    ``paths.replay_content_dir()`` when None, resolved at the call.
+    """
+    return {
+        name: table_path(name, root)
+        for name in (
+            "event_arm_table",
+            "event_patch_table",
+            "stop_table",
+            "qvals_table",
+        )
+    }
 
 
 # event-level scalars z-scored (so :is_current coefs are per-SD & comparable)
@@ -987,8 +995,8 @@ def _cohort_log(label: str, report: dict) -> None:
 
 
 def assemble_arm(
-    fit_inputs: Mapping[str, Path] = CONTENT_FIT_INPUTS,
-    reference_path: Path = REPLAY_CONTENT_DIR / STANDARDIZATION_REFERENCE,
+    fit_inputs: Mapping[str, Path] | None = None,
+    reference_path: Path | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """Load the arm cohort and attach its design columns and ``_z`` reference.
 
@@ -996,11 +1004,11 @@ def assemble_arm(
     ----------
     fit_inputs : Mapping[str, Path], optional
         Table name -> path; the event-arm, stop and qvals tables are read from
-        it. :data:`CONTENT_FIT_INPUTS`, the canonical fit's, by default.
+        it. :func:`contrast_fit_inputs`, the canonical fit's, when None.
     reference_path : Path, optional
         The tables' standardization reference, against which the persisted
         ``arm_uncertainty_z`` is validated; the canonical root's
-        (``paths.STANDARDIZATION_REFERENCE``) by default.
+        (``paths.STANDARDIZATION_REFERENCE``) when None.
 
     Returns
     -------
@@ -1008,6 +1016,10 @@ def assemble_arm(
         The at-well arm cohort with its design columns, and the fit-time
         standardization reference actually used.
     """
+    if fit_inputs is None:
+        fit_inputs = contrast_fit_inputs()
+    if reference_path is None:
+        reference_path = replay_content_dir() / STANDARDIZATION_REFERENCE
     ev = read_table(fit_inputs["event_arm_table"])
     require_covariate_schema(ev, table="event_arm")
     require_swr_source(ev, what=str(fit_inputs["event_arm_table"]))
@@ -1120,7 +1132,7 @@ def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
 
 def assemble_patch(
-    arm_ev: pd.DataFrame, fit_inputs: Mapping[str, Path] = CONTENT_FIT_INPUTS
+    arm_ev: pd.DataFrame, fit_inputs: Mapping[str, Path] | None = None
 ) -> tuple[pd.DataFrame, dict]:
     """Load the patch cohort and attach its design columns and ``_z`` reference.
 
@@ -1131,7 +1143,7 @@ def assemble_patch(
         the event-level time and length the patch table lacks.
     fit_inputs : Mapping[str, Path], optional
         Table name -> path; the event-patch, stop and qvals tables are read from
-        it. :data:`CONTENT_FIT_INPUTS` by default.
+        it. :func:`contrast_fit_inputs` when None.
 
     Returns
     -------
@@ -1139,6 +1151,8 @@ def assemble_patch(
         The at-well patch cohort with its design columns, and the fit-time
         standardization reference actually used.
     """
+    if fit_inputs is None:
+        fit_inputs = contrast_fit_inputs()
     pt = read_table(fit_inputs["event_patch_table"])
     require_covariate_schema(pt, table="event_patch")
     require_swr_source(pt, what=str(fit_inputs["event_patch_table"]))

@@ -24,10 +24,7 @@ from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import parquet_path, read_table
 
-__all__ = ["DEFAULT_STOP_TABLE_PATH", "load_session_stop_cohort"]
-
-#: The canonical stop table every family's cohort is cut from.
-DEFAULT_STOP_TABLE_PATH = table_path("stop_table")
+__all__ = ["load_session_stop_cohort"]
 
 
 def load_session_stop_cohort(
@@ -51,7 +48,8 @@ def load_session_stop_cohort(
         ``at_well`` is canonical and, at the stop grain, means *well-anchored*:
         ``occupancy_state`` of ``at_well`` or ``mixed``.
     stop_table_path : str or Path, optional
-        Stop table to read; defaults to :data:`DEFAULT_STOP_TABLE_PATH`.
+        Stop table to read; defaults to the canonical stop table every
+        family's cohort is cut from, ``table_path("stop_table")``.
 
     Returns
     -------
@@ -74,7 +72,9 @@ def load_session_stop_cohort(
         problem, not an empty cohort, and fitting the whole epoch instead would
         silently reintroduce the population this restriction exists to remove.
     """
-    path = DEFAULT_STOP_TABLE_PATH if stop_table_path is None else Path(stop_table_path)
+    path = (
+        table_path("stop_table") if stop_table_path is None else Path(stop_table_path)
+    )
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
     stop_table = read_table(path)

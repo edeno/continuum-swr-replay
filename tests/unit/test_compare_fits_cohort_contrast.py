@@ -29,7 +29,6 @@ from scripts.qa.compare_fits import (
     COHORT_ORDER,
     FULL_MODEL,
     IMMEDIATE_COEF,
-    PER_STOP_ALL_STOPS_FALLBACK,
     REWARD_X_TIME_RUNGS,
     STOP_TIME_RUNG,
     SWR_IMMEDIATE_COEF,
@@ -49,6 +48,7 @@ from scripts.qa.compare_fits import (
     cohort_size_table,
     collect_cohort_inputs,
     in_transit_power_note,
+    per_stop_all_stops_fallback,
     per_stop_source_note,
     rate_rung_sort_key,
     reward_kernel_lag1,
@@ -743,7 +743,7 @@ def test_per_stop_source_note_marks_the_stand_in_all_stops_ladder(tmp_path):
     note = per_stop_source_note(
         {
             "per-stop (at_well)": tmp_path / "all_models.pkl",
-            "per-stop (all_stops)": PER_STOP_ALL_STOPS_FALLBACK,
+            "per-stop (all_stops)": per_stop_all_stops_fallback(),
         }
     )
     assert "`at_well` from" in note and "`all_stops` from" in note
@@ -768,13 +768,13 @@ def _collect_with_absent_all_stops(cohort_fits, tmp_path):
 
 @pytest.mark.parametrize("backup_on_disk", [True, False])
 def test_absent_all_stops_per_stop_ladder_falls_back_to_the_backup(
-    cohort_fits, tmp_path, monkeypatch, backup_on_disk
+    cohort_fits, tmp_path, processed_data_root, backup_on_disk
 ):
-    backup = tmp_path / "backup" / "all_models.pkl"
+    backup = per_stop_all_stops_fallback()
+    assert backup.is_relative_to(processed_data_root)
     if backup_on_disk:
-        backup.parent.mkdir()
+        backup.parent.mkdir(parents=True)
         _per_stop_fits(PER_STOP_DELTAS).to_pickle(backup)
-    monkeypatch.setattr("scripts.qa.compare_fits.PER_STOP_ALL_STOPS_FALLBACK", backup)
 
     per_stop, inputs = _collect_with_absent_all_stops(cohort_fits, tmp_path)
 
@@ -787,11 +787,12 @@ def test_absent_all_stops_per_stop_ladder_falls_back_to_the_backup(
 
 @pytest.mark.real_data
 def test_the_real_all_stops_backup_is_the_fallback(cohort_fits, tmp_path):
-    assert PER_STOP_ALL_STOPS_FALLBACK.exists(), PER_STOP_ALL_STOPS_FALLBACK
+    fallback = per_stop_all_stops_fallback()
+    assert fallback.exists(), fallback
 
     per_stop, inputs = _collect_with_absent_all_stops(cohort_fits, tmp_path)
 
-    assert inputs["per-stop (all_stops)"] == PER_STOP_ALL_STOPS_FALLBACK
+    assert inputs["per-stop (all_stops)"] == fallback
     assert set(per_stop) == {"at_well", "all_stops"}
 
 

@@ -38,7 +38,7 @@ from continuum_swr_replay.analysis.replay.tables_stop import (  # noqa: E402
     add_nonlocal_swr_split,
 )
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
     stamp_covariate_schema,
@@ -54,7 +54,6 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
 )
 logger = logging.getLogger(__name__)
-RC = REPLAY_CONTENT_DIR
 
 
 def build_one(session: dict) -> pd.DataFrame | None:
@@ -197,11 +196,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
     stop = pd.concat(tables, ignore_index=True)
 
-    event_table = read_table(table_path("event_table", RC))
+    rc = replay_content_dir()
+    event_table = read_table(table_path("event_table", rc))
     require_covariate_schema(event_table, table="event")
     # The split joins the shipped event table's is_swr onto stops whose SWR
     # columns were just built from the live source: both must be one source.
-    require_swr_source(event_table, what=f"{RC / 'event_table'}")
+    require_swr_source(event_table, what=f"{rc / 'event_table'}")
     _assert_matches_event_table(stop, event_table)
     stop = add_nonlocal_swr_split(stop, event_table)
     stop = stamp_swr_source(stamp_covariate_schema(stop, table="stop"))
@@ -210,13 +210,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.no_save:
         logger.info("--no-save: built %d stops, not written", len(stop))
         return
-    out = table_path("stop_table", RC)
+    out = table_path("stop_table", rc)
     if table_exists(out):
-        backup = write_table(read_table(out), RC / "stop_table_previous")
+        backup = write_table(read_table(out), rc / "stop_table_previous")
         logger.info("backed up existing -> %s", backup.name)
     out = publish_swr_table(
         stop,
-        RC,
+        rc,
         table="stop",
         basename="stop_table",
     )

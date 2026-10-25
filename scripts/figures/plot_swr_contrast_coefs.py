@@ -25,6 +25,7 @@ standardization factor is 1.0.
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 import matplotlib
 
@@ -47,53 +48,64 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,
     figure_dir,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 
-RC = REPLAY_CONTENT_DIR
-OUT = figure_dir("swr_contrast")
 
-SWR_CONTRAST_RATE = model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl"
-# The tables fit_swr_contrast_rate.py fit that artifact on; checked against its
-# provenance sidecar here, before any table or fit is read, so a figure cannot be
-# drawn from coefficients that predate the tables on disk.
-SWR_CONTRAST_RATE_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "qvals_table": table_path("qvals_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-}
-# The per-SD units the audited rate table states its coefficients in: SDs over
-# the at-well stop cohort the fits name, recorded by the rate fitter beside the
-# audited table. The full-table SDs differ by up to ~7 %.
-SWR_CONTRAST_RATE_META = model_dir("per_bin_rate", RC) / "swr_contrast_rate_meta.json"
+def fit_artifact_paths() -> dict[str, Path]:
+    """The fitted artifacts the figures are drawn from, by name.
 
-# The per-SD units the audited contrast table states its arm coefficients in.
-# They are frozen by the fitter over the six leaf arms and are NOT recomputable
-# here: the same covariates measured over all nine candidates have a 2.1x larger
-# SD (the trunks are structural zeros), which would shrink every per-SD arm
-# effect in this figure by that factor relative to the audited table.
-SWR_CONTRAST_CONTENT_PROVENANCE = (
-    model_dir("swr_contrast", RC) / "swr_contrast_content_provenance.json"
-)
+    ``rate`` and its ``rate_meta``: the per-SD units the audited rate table
+    states its coefficients in, SDs over the at-well stop cohort the fits name,
+    recorded by the rate fitter beside the audited table (the full-table SDs
+    differ by up to ~7 %). ``content_provenance``: the per-SD units the audited
+    contrast table states its arm coefficients in. They are frozen by the fitter
+    over the six leaf arms and are NOT recomputable here: the same covariates
+    measured over all nine candidates have a 2.1x larger SD (the trunks are
+    structural zeros), which would shrink every per-SD arm effect in this figure
+    by that factor relative to the audited table. ``content_arm`` and
+    ``content_patch``: the content contrast fits. Under
+    ``paths.replay_content_dir()``, read when called.
+    """
+    rate, contrast = model_dir("per_bin_rate"), model_dir("swr_contrast")
+    return {
+        "rate": rate / "swr_contrast_rate.pkl",
+        "rate_meta": rate / "swr_contrast_rate_meta.json",
+        "content_provenance": contrast / "swr_contrast_content_provenance.json",
+        "content_arm": contrast / "swr_contrast_content_arm.pkl",
+        "content_patch": contrast / "swr_contrast_content_patch.pkl",
+    }
 
-SWR_CONTRAST_CONTENT_ARM = (
-    model_dir("swr_contrast", RC) / "swr_contrast_content_arm.pkl"
-)
-SWR_CONTRAST_CONTENT_PATCH = (
-    model_dir("swr_contrast", RC) / "swr_contrast_content_patch.pkl"
-)
-# The tables fit_swr_contrast_content.py fit those two artifacts on, gated the
-# same way as the rate half.
-SWR_CONTRAST_CONTENT_INPUTS = {
-    "event_arm_table": table_path("event_arm_table", RC),
-    "event_patch_table": table_path("event_patch_table", RC),
-    "stop_table": table_path("stop_table", RC),
-    "qvals_table": table_path("qvals_table", RC),
-}
+
+def rate_input_paths() -> dict[str, Path]:
+    """The tables fit_swr_contrast_rate.py fit the rate artifact on.
+
+    Checked against its provenance sidecar here, before any table or fit is
+    read, so a figure cannot be drawn from coefficients that predate the tables
+    on disk.
+    """
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "qvals_table": table_path("qvals_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+    }
+
+
+def content_input_paths() -> dict[str, Path]:
+    """The tables fit_swr_contrast_content.py fit the two content artifacts on,
+    gated the same way as the rate half."""
+    rc = replay_content_dir()
+    return {
+        "event_arm_table": table_path("event_arm_table", rc),
+        "event_patch_table": table_path("event_patch_table", rc),
+        "stop_table": table_path("stop_table", rc),
+        "qvals_table": table_path("qvals_table", rc),
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -110,16 +122,17 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _per_sd_units():
+def _per_sd_units(artifacts: dict[str, Path]):
     """Covariate -> SD the figure states its per-SD effects in.
 
-    Both sets come from the fits' own records: the rate covariates from the rate
+    Both sets come from the fits' own records (`artifacts`, as
+    :func:`fit_artifact_paths` names them): the rate covariates from the rate
     meta's ``fit_time_sd_reference``, the per-arm covariates from the content
     provenance's ``per_sd_scale``. The two key sets are disjoint.
     """
     return {
-        **load_fit_time_sd_reference(SWR_CONTRAST_RATE_META),
-        **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
+        **load_fit_time_sd_reference(artifacts["rate_meta"]),
+        **load_per_sd_scale(artifacts["content_provenance"], "arm_cohort"),
     }
 
 
@@ -456,37 +469,36 @@ def content_patch_figure(P, sd):
 
 def main(argv: Sequence[str] | None = None) -> None:
     allow_stale = build_parser().parse_args(argv).allow_stale
+    artifacts = fit_artifact_paths()
+    rate, rate_meta = artifacts["rate"], artifacts["rate_meta"]
     # The provenance gate fires ahead of the first table read.
-    require_fresh_inputs(
-        SWR_CONTRAST_RATE, SWR_CONTRAST_RATE_INPUTS, allow_stale=allow_stale
-    )
-    for content_fit in (SWR_CONTRAST_CONTENT_ARM, SWR_CONTRAST_CONTENT_PATCH):
+    require_fresh_inputs(rate, rate_input_paths(), allow_stale=allow_stale)
+    for content_fit in (artifacts["content_arm"], artifacts["content_patch"]):
         require_fresh_inputs(
-            content_fit, SWR_CONTRAST_CONTENT_INPUTS, allow_stale=allow_stale
+            content_fit, content_input_paths(), allow_stale=allow_stale
         )
     # The fitter writes the meta after the per-session fits, so a meta older
     # than them states the units of an earlier fit (an aggregation that failed).
-    if not allow_stale and (
-        SWR_CONTRAST_RATE_META.stat().st_mtime < SWR_CONTRAST_RATE.stat().st_mtime
-    ):
+    if not allow_stale and (rate_meta.stat().st_mtime < rate.stat().st_mtime):
         raise RuntimeError(
-            f"{SWR_CONTRAST_RATE_META.name} predates {SWR_CONTRAST_RATE.name}, so "
+            f"{rate_meta.name} predates {rate.name}, so "
             "its per-SD units may belong to an earlier fit; re-run "
             "scripts/rate/fit_swr_contrast_rate.py --aggregate-only"
         )
-    sd = _per_sd_units()
-    OUT.mkdir(parents=True, exist_ok=True)
-    rate_figure(pd.read_pickle(SWR_CONTRAST_RATE), sd).savefig(
-        OUT / "rate_swr_contrast_coefs.png", dpi=150
+    sd = _per_sd_units(artifacts)
+    out = figure_dir("swr_contrast")
+    out.mkdir(parents=True, exist_ok=True)
+    rate_figure(pd.read_pickle(rate), sd).savefig(
+        out / "rate_swr_contrast_coefs.png", dpi=150
     )
-    content_arm_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_ARM), sd).savefig(
-        OUT / "content_swr_contrast_coefs.png", dpi=150
+    content_arm_figure(pd.read_pickle(artifacts["content_arm"]), sd).savefig(
+        out / "content_swr_contrast_coefs.png", dpi=150
     )
-    content_patch_figure(pd.read_pickle(SWR_CONTRAST_CONTENT_PATCH), sd).savefig(
-        OUT / "content_patch_swr_contrast_coefs.png", dpi=150
+    content_patch_figure(pd.read_pickle(artifacts["content_patch"]), sd).savefig(
+        out / "content_patch_swr_contrast_coefs.png", dpi=150
     )
     print("wrote:")
-    for p in sorted(OUT.glob("*.png")):
+    for p in sorted(out.glob("*.png")):
         print("  ", p)
 
 

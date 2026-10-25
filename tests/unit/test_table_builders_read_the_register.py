@@ -8,7 +8,7 @@ refuses to start when one of them has no decode, rather than building tables
 that silently cover fewer epochs than the register.
 
 Offline: the register's selection is replaced by a frame of the epochs a test
-names, the decodes are empty files under ``tmp_path``, and the ContFrag script
+names, the decodes are empty files under ``tmp_path`` (the data root), and the ContFrag script
 is imported with ``spyglass`` stubbed in ``sys.modules``.
 """
 
@@ -23,6 +23,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay import prepare_data as pdm
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 
 CONTFRAG_SCRIPT = "scripts.tables.prepare_contfrag_replay_content_data"
 
@@ -72,7 +73,7 @@ def contfrag_prepare(monkeypatch):
 
 
 def test_replay_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch):
-    monkeypatch.setattr(pdm, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         pdm,
         "analysed_epochs",
@@ -108,7 +109,7 @@ def test_replay_sessions_are_the_registers_analysed_epochs(tmp_path, monkeypatch
 def test_replay_sessions_keep_the_first_of_each_animal(tmp_path, monkeypatch):
     keys = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
     keys.append(("b20200102_.nwb", "02_r1"))
-    monkeypatch.setattr(pdm, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(pdm, "analysed_epochs", _analysed(*keys))
     for nwb_file_name, epoch in keys:
         identifier = f"{nwb_file_name.removesuffix('_.nwb')}_{epoch}_HPC"
@@ -127,7 +128,7 @@ def test_an_analysed_epoch_without_its_decode_stops_the_replay_build(
     tmp_path, monkeypatch, missing
 ):
     keys = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
-    monkeypatch.setattr(pdm, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(pdm, "analysed_epochs", _analysed(*keys))
     for identifier in ("a20200101_02_r1_HPC", "a20200101_04_r2_HPC"):
         _decode(tmp_path, identifier, "80_data_over_time.pkl", results=True)
@@ -145,7 +146,7 @@ def test_an_analysed_epoch_without_its_decode_stops_the_replay_build(
 def test_contfrag_sessions_are_the_registers_analysed_epochs(
     contfrag_prepare, tmp_path, monkeypatch
 ):
-    monkeypatch.setattr(contfrag_prepare, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         contfrag_prepare, "analysed_epochs", _analysed(("a20200101_.nwb", "02_r1"))
     )
@@ -173,7 +174,7 @@ def test_contfrag_sessions_are_the_registers_analysed_epochs(
 def test_an_analysed_epoch_without_its_hpc_contfrag_decode_stops_the_build(
     contfrag_prepare, tmp_path, monkeypatch
 ):
-    monkeypatch.setattr(contfrag_prepare, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         contfrag_prepare,
         "analysed_epochs",
@@ -192,7 +193,7 @@ def test_a_cortical_contfrag_build_keeps_the_analysed_epochs_it_decoded(
 ):
     """mPFC and OFC are recorded in some sessions only: an analysed epoch with no
     decode for the area is outside that area's cohort, not missing."""
-    monkeypatch.setattr(contfrag_prepare, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     monkeypatch.setattr(
         contfrag_prepare,
         "analysed_epochs",

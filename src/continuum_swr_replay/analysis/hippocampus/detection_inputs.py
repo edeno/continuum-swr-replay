@@ -6,7 +6,7 @@ same rules:
 - a decode's two saved files, its detector and its ``data_over_time``
   (:func:`input_paths`);
 - its HPC spike marks, read as ``load_data`` read them for the decode
-  (:data:`MARKS_RULE`), cached per decode file under :data:`MARKS_CACHE_DIR`
+  (:data:`MARKS_RULE`), cached per decode file under :func:`marks_cache_dir`
   (:func:`load_marks`, :func:`marks_cache_path`) and hashed in their records
   (:func:`marks_sha256`);
 - a memoryless run's per-epoch files (:func:`memoryless_output_paths`);
@@ -36,19 +36,18 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import EpochKey, parse_epoch_identifier
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import MEMORYLESS_ROOT
+from continuum_swr_replay.paths import memoryless_root, processed_data_dir
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import write_atomically
 
 __all__ = [
-    "MARKS_CACHE_DIR",
     "MARKS_RULE",
     "MARKS_RULE_TAG",
     "carey_output_paths",
     "decode_marks",
     "input_paths",
     "load_marks",
+    "marks_cache_dir",
     "marks_cache_path",
     "marks_sha256",
     "memoryless_output_paths",
@@ -63,9 +62,12 @@ MARKS_RULE = (
 MARKS_RULE_TAG = "loader"
 """:data:`MARKS_RULE`'s name in a marks cache file; another rule needs another tag."""
 
-MARKS_CACHE_DIR = MEMORYLESS_ROOT / "marks_cache"
-"""Where the runners cache the marks by default: the memoryless runner's
-``--cache-dir`` default, which the Carey and event-feature runners share."""
+
+def marks_cache_dir() -> Path:
+    """Where the runners cache the marks by default: the memoryless runner's
+    ``--cache-dir`` default, which the Carey and event-feature runners share.
+    Under ``paths.memoryless_root()``, read when called."""
+    return memoryless_root() / "marks_cache"
 
 
 def input_paths(epoch_id: str, root: Path) -> dict[str, Path]:
@@ -145,15 +147,17 @@ def marks_sha256(spike_times: list, spike_waveform_features: list) -> str:
 def decode_marks(
     identifier: str,
     *,
-    root: Path = PROCESSED_DATA_DIR,
-    cache_dir: Path = MARKS_CACHE_DIR,
+    root: Path | None = None,
+    cache_dir: Path | None = None,
     marks_loader: Callable = load_marks,
 ) -> dict[str, Any]:
     """The canonical decode's HPC marks and its encoding model.
 
     The marks are read as the memoryless runner reads them: ``load_marks``
     over the decode grid's first and last time, cached by the decode's
-    ``_detector.pkl`` sha256.
+    ``_detector.pkl`` sha256. `root` (the decode folder) is
+    ``paths.processed_data_dir()`` and `cache_dir` :func:`marks_cache_dir`
+    when None.
 
     Returns
     -------
@@ -162,6 +166,10 @@ def decode_marks(
         tetrode), ``encoding_model``, and ``record``: the marks rule, the
         detector's sha256, the cache file's name and the decode's span.
     """
+    if root is None:
+        root = processed_data_dir()
+    if cache_dir is None:
+        cache_dir = marks_cache_dir()
     paths = input_paths(identifier, root)
     detector_sha256 = sha256_file(paths["detector"])
     encoding_model = load_clusterless_encoding_model(paths["detector"])

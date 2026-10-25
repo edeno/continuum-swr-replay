@@ -201,7 +201,7 @@ doc-path test does not look for it. The source of truth is
 
 | Old module | New home |
 |---|---|
-| `analysis/hippocampus/swr_source.py` (removed: split) | `analysis/events/analysed_time.py` (the analysed-time read point: `excluded_intervals`, `with_swr_source`, `artifact_event_drops`, `swr_event_labels`, …) and `analysis/events/swr_source.py` (the SWR inventory read: `SWR_INVENTORY_RUN_ID`, `ARTIFACT_INTERVALS_RUN_ID`, `read_swr_inventory`, `swr_events`, `SwrSourceError`, …). `ARTIFACT_INTERVALS_ROOT` is now `paths.ARTIFACT_INTERVALS_DIR`; `SWR_INVENTORY_ROOT` is in `paths.py`; `SWR_SOURCE_TABLES` is in `tables/io.py` |
+| `analysis/hippocampus/swr_source.py` (removed: split) | `analysis/events/analysed_time.py` (the analysed-time read point: `excluded_intervals`, `with_swr_source`, `artifact_event_drops`, `swr_event_labels`, …) and `analysis/events/swr_source.py` (the SWR inventory read: `SWR_INVENTORY_RUN_ID`, `ARTIFACT_INTERVALS_RUN_ID`, `read_swr_inventory`, `swr_events`, `SwrSourceError`, …). `ARTIFACT_INTERVALS_ROOT` is now `paths.artifact_intervals_root()`; `SWR_INVENTORY_ROOT` is `paths.swr_inventory_root()`; `SWR_SOURCE_TABLES` is in `tables/io.py` |
 | `analysis/hippocampus/artifacts/io.py` (removed: moved) | `analysis/events/artifact_intervals.py` |
 | `analysis/hippocampus/artifacts/masks.py` (removed: split) | `analysis/events/artifact_masks.py` (`PADDING_S`, `core_class`, `artifact_intervals`, the signature sets); the generic interval functions (`merge_intervals`, `interval_mask`, `subtract_intervals`, `masked_seconds`, `pad_intervals`, `overlaps_intervals`, `covered_seconds`) are in `intervals.py` |
 | `analysis/hippocampus/event_table.py` (removed: moved) | `analysis/events/classified_table.py` |
@@ -296,7 +296,7 @@ Three tiers:
    (`all_models.pkl` and friends) hold live statsmodels objects and stay pickled.
    Superseded table pickles are kept under `_pickle_archive/`; nothing reads them.
    Code spells these locations through `continuum_swr_replay.paths`
-   (`REPLAY_CONTENT_DIR`, `model_dir(key, root)`, `table_path(name, root)`), not inline.
+   (`replay_content_dir()`, `model_dir(key, root)`, `table_path(name, root)`), not inline.
 
    | dir | producer | holds |
    |---|---|---|
@@ -314,19 +314,24 @@ Three tiers:
    [the code-organization plan](../.claude/docs/plans/code-organization/PLAN.md)).
 
    The tables are built from the upstream runs below. Each location is a
-   `continuum_swr_replay.paths` constant (or `parameters.PROCESSED_DATA_DIR`); a run
-   folder's `manifest.json` names its inputs and settings.
+   `continuum_swr_replay.paths` function, resolved when called under the data root
+   `paths.processed_data_dir()`: `$CSR_PROCESSED_DATA_DIR` when set, else the
+   checkout's `Processed-Data/`. That variable is the one place a run or a test
+   moves every root; no module binds a root at import. (The old upper-case names,
+   `parameters.PROCESSED_DATA_DIR` and `paths.REPLAY_CONTENT_DIR` and the rest,
+   still resolve for notebooks and `scripts/exploratory/`.) A run folder's
+   `manifest.json` names its inputs and settings.
 
-   | location | constant | producer | holds |
+   | location | `paths.` | producer | holds |
    |---|---|---|---|
-   | `Processed-Data/` (root) | `parameters.PROCESSED_DATA_DIR` | `scripts/decoding/run_decoding_bandit.py`, `run_decoding_contfrag.py` | the per-epoch decodes: `*_results.nc`, `*_detector.pkl`, `*_environment.pkl`, `*_data_over_time.pkl` (file names: `decoding/files.py:decode_paths`) |
-   | `artifact_intervals/<run_id>/` | `ARTIFACT_INTERVALS_DIR` | `scripts/detection/run_artifact_detection.py` | the artifact intervals each epoch's excluded time is built from |
-   | `replay_detection_comparison/swr/<run_id>/` | `SWR_INVENTORY_ROOT` | `scripts/detection/run_swr_detection.py` | the SWR inventories (Kay and the other detectors) |
-   | `replay_detection_comparison/memoryless/<run_id>/` | `MEMORYLESS_ROOT` | `scripts/detection/run_memoryless_detection.py` | the memoryless sequence detector's events |
-   | `replay_detection_comparison/carey/<run_id>/` | `CAREY_ROOT` | `scripts/detection/run_carey_detection.py` | the Carey detector's events |
-   | `replay_detection_comparison/inventory/<run_id>/` | `INVENTORY_COMPARISON_ROOT` | `scripts/detection/run_inventory_comparison.py` | the detectors' inventories compared |
-   | `replay_detection_comparison/event_features/<run_id>/` | `EVENT_FEATURES_ROOT` | `scripts/detection/run_event_features.py` | per-event features for the comparison |
-   | `contfrag_replay_content/` | `CONTFRAG_REPLAY_CONTENT_DIR` | `scripts/tables/prepare_contfrag_replay_content_data.py` | the replay-content tables built from the Continuous-Fragmented decodes |
+   | `Processed-Data/` (root) | `processed_data_dir()` | `scripts/decoding/run_decoding_bandit.py`, `run_decoding_contfrag.py` | the per-epoch decodes: `*_results.nc`, `*_detector.pkl`, `*_environment.pkl`, `*_data_over_time.pkl` (file names: `decoding/files.py:decode_paths`) |
+   | `artifact_intervals/<run_id>/` | `artifact_intervals_root()` | `scripts/detection/run_artifact_detection.py` | the artifact intervals each epoch's excluded time is built from |
+   | `replay_detection_comparison/swr/<run_id>/` | `swr_inventory_root()` | `scripts/detection/run_swr_detection.py` | the SWR inventories (Kay and the other detectors) |
+   | `replay_detection_comparison/memoryless/<run_id>/` | `memoryless_root()` | `scripts/detection/run_memoryless_detection.py` | the memoryless sequence detector's events |
+   | `replay_detection_comparison/carey/<run_id>/` | `carey_root()` | `scripts/detection/run_carey_detection.py` | the Carey detector's events |
+   | `replay_detection_comparison/inventory/<run_id>/` | `inventory_comparison_root()` | `scripts/detection/run_inventory_comparison.py` | the detectors' inventories compared |
+   | `replay_detection_comparison/event_features/<run_id>/` | `event_features_root()` | `scripts/detection/run_event_features.py` | per-event features for the comparison |
+   | `contfrag_replay_content/` | `contfrag_replay_content_dir()` | `scripts/tables/prepare_contfrag_replay_content_data.py` | the replay-content tables built from the Continuous-Fragmented decodes |
 
    Both rate families are fit on the **well-anchored stop cohort** — the same
    population the content family is fit on at the event grain — and an

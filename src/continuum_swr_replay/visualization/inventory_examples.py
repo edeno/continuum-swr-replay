@@ -63,6 +63,7 @@ from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.figure_utilities import WONG
 from continuum_swr_replay.intervals import interval_mask
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.device import xla_flags
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -406,7 +407,7 @@ def load_epoch(identifier: str, *, run_dir: Path, memoryless_dir: Path) -> Epoch
         # h5netcdf, as the decode wrote it (open_results): the netCDF4 library
         # fails on this file once Spyglass has loaded its own HDF5
         results=open_results(
-            decode_paths(identifier, inventory_run.DECODE_ROOT).results, cache=False
+            decode_paths(identifier, processed_data_dir()).results, cache=False
         ),
         spike_times=marks["spike_times"],
         spike_waveform_features=marks["spike_waveform_features"],

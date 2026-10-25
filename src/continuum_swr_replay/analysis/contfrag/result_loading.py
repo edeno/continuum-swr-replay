@@ -12,7 +12,6 @@ from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_TRAINING_TYPE,
     format_epoch_identifier,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 
 def load_contfrag_results(
@@ -23,7 +22,7 @@ def load_contfrag_results(
     non_stationary: bool = False,
     ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     training_type: str = DEFAULT_TRAINING_TYPE,
-    root: Path = PROCESSED_DATA_DIR,
+    root: Path | None = None,
 ) -> tuple[xr.Dataset, ContFragClusterlessClassifier | None, Environment | None]:
     """Load saved ContFrag decoding results and classifier model.
 
@@ -49,8 +48,8 @@ def load_contfrag_results(
         ``run_decoding_contfrag.py`` so the ``_{training_type}`` suffix is
         reconstructed correctly. The default ``"no_ripple"`` appends no suffix.
     root : Path, optional
-        Folder every file is read from, by default ``PROCESSED_DATA_DIR``. A
-        decode resuming from a staging folder passes that folder.
+        Folder every file is read from; ``paths.processed_data_dir()`` when
+        None. A decode resuming from a staging folder passes that folder.
 
     Returns
     -------

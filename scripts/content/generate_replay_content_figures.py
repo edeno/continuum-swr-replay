@@ -19,6 +19,7 @@ import argparse
 import logging
 import pickle
 from collections.abc import Sequence
+from pathlib import Path
 
 import matplotlib
 
@@ -39,9 +40,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,
     figure_dir,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
@@ -60,14 +61,24 @@ logging.basicConfig(
 
 figure_utilities.set_figure_defaults(context="paper")
 
-RC = REPLAY_CONTENT_DIR
-MODEL_DIR = model_dir("content_arm", RC)
-ALL_MODELS = MODEL_DIR / "all_models.pkl"
-# The table fit_replay_content_models.py fit the canonical arm bundle on.
-# Checked against each artifact's provenance sidecar before plotting, so a
-# figure cannot be rendered from coefficients that predate the table on disk.
-ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC)}
-OUTPUT_DIR = figure_dir("replay_content")
+
+def bundle_dir() -> Path:
+    """The canonical arm bundle the figures are drawn from."""
+    return model_dir("content_arm")
+
+
+def all_models_input_paths() -> dict[str, Path]:
+    """The table fit_replay_content_models.py fit the canonical arm bundle on.
+
+    Checked against each artifact's provenance sidecar before plotting, so a
+    figure cannot be rendered from coefficients that predate the table on disk.
+    """
+    return {"event_arm_table": table_path("event_arm_table")}
+
+
+def output_dir() -> Path:
+    """Where the figures go: beside the data root (``paths.figure_dir``)."""
+    return figure_dir("replay_content")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -86,12 +97,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None):
     args = build_parser().parse_args(argv)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    rc, models_dir, out_dir = replay_content_dir(), bundle_dir(), output_dir()
+    all_models_inputs = all_models_input_paths()
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Load results ──
-    all_models_path = ALL_MODELS
-    comparison_path = MODEL_DIR / "model_comparison.pkl"
-    behavior_path = RC / "behavior_prediction.pkl"
+    all_models_path = models_dir / "all_models.pkl"
+    comparison_path = models_dir / "model_comparison.pkl"
+    behavior_path = rc / "behavior_prediction.pkl"
 
     if not all_models_path.exists():
         logging.error(
@@ -100,7 +113,7 @@ def main(argv: Sequence[str] | None = None):
         return
 
     require_fresh_inputs(
-        all_models_path, ALL_MODELS_INPUTS, allow_stale=args.allow_stale
+        all_models_path, all_models_inputs, allow_stale=args.allow_stale
     )
     all_results = pd.read_pickle(all_models_path)
     logging.info("Loaded %d model fits", len(all_results))
@@ -108,14 +121,14 @@ def main(argv: Sequence[str] | None = None):
     # ── Figure 1: Model hierarchy comparison ──
     if comparison_path.exists():
         require_fresh_inputs(
-            comparison_path, ALL_MODELS_INPUTS, allow_stale=args.allow_stale
+            comparison_path, all_models_inputs, allow_stale=args.allow_stale
         )
         comparison = pd.read_pickle(comparison_path)
         fig = plot_model_hierarchy_comparison(
             comparison, scale_label=scale_label(frame_estimator(comparison))
         )
         if fig is not None:
-            path = OUTPUT_DIR / "model_hierarchy_comparison.png"
+            path = out_dir / "model_hierarchy_comparison.png"
             figure_utilities.save_figure(
                 fig,
                 path.stem,
@@ -130,7 +143,7 @@ def main(argv: Sequence[str] | None = None):
     # ── Figure 2: Pseudo-R² progression ──
     fig = plot_pseudo_r2_progression(all_results)
     if fig is not None:
-        path = OUTPUT_DIR / "pseudo_r2_progression.png"
+        path = out_dir / "pseudo_r2_progression.png"
         figure_utilities.save_figure(
             fig,
             path.stem,
@@ -151,7 +164,7 @@ def main(argv: Sequence[str] | None = None):
         spec = MODEL_HIERARCHY[model_name]
         fig = plot_coefficient_forest(mdf, spec.predictors, model_name)
         if fig is not None:
-            path = OUTPUT_DIR / f"coefficients_{model_name}.png"
+            path = out_dir / f"coefficients_{model_name}.png"
             figure_utilities.save_figure(
                 fig,
                 path.stem,
@@ -167,7 +180,7 @@ def main(argv: Sequence[str] | None = None):
     if behavior_path.exists():
         cv_results = pd.read_pickle(behavior_path)
         # Determine chance level from data
-        bout_path = RC / "bout_data.pkl"
+        bout_path = rc / "bout_data.pkl"
         chance = 1 / 6  # default
         if bout_path.exists():
             bout_data = pd.read_pickle(bout_path)
@@ -176,7 +189,7 @@ def main(argv: Sequence[str] | None = None):
 
         fig = plot_behavior_prediction_results(cv_results, chance_level=chance)
         if fig is not None:
-            path = OUTPUT_DIR / "behavior_prediction.png"
+            path = out_dir / "behavior_prediction.png"
             figure_utilities.save_figure(
                 fig,
                 path.stem,
@@ -189,7 +202,7 @@ def main(argv: Sequence[str] | None = None):
             logging.info("Saved %s", path)
 
     # ── Figure 5: Mixed-effects results (if available) ──
-    mixed_dir = MODEL_DIR / "mixed_effects"
+    mixed_dir = models_dir / "mixed_effects"
     if mixed_dir.exists():
         for pkl_file in sorted(mixed_dir.glob("*_mixed.pkl")):
             model_name = pkl_file.stem.replace("_mixed", "")
@@ -234,7 +247,7 @@ def main(argv: Sequence[str] | None = None):
             ax.invert_yaxis()
             sns.despine(ax=ax)
 
-            path = OUTPUT_DIR / f"mixed_effects_{model_name}.png"
+            path = out_dir / f"mixed_effects_{model_name}.png"
             figure_utilities.save_figure(
                 fig,
                 path.stem,
@@ -246,7 +259,7 @@ def main(argv: Sequence[str] | None = None):
             plt.close(fig)
             logging.info("Saved %s", path)
 
-    logging.info("Done! All figures saved to %s", OUTPUT_DIR)
+    logging.info("Done! All figures saved to %s", out_dir)
 
 
 if __name__ == "__main__":

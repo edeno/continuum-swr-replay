@@ -76,9 +76,9 @@ from continuum_swr_replay.analysis.replay.content_response import (  # noqa: E40
 # cohort, assembled by the same helpers rather than re-derived here, so the two
 # cannot drift.
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
-    CONTENT_FIT_INPUTS,
     MIN_EVENTS,
     assemble_arm,
+    contrast_fit_inputs,
     prepare_session,
     select_outcome_stratum,
 )
@@ -114,7 +114,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, figure_dir
+from continuum_swr_replay.paths import figure_dir, replay_content_dir
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import (  # noqa: E402
     SESSION_COLUMNS,
@@ -129,9 +129,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 SC = list(SESSION_COLUMNS)
-RC = REPLAY_CONTENT_DIR
-DEFAULT_OUTPUT_DIR = RC / "content_estimator_comparison"
-DEFAULT_FIGURES_DIR = figure_dir("content_estimators")
 
 COEFFICIENTS_BASENAME = "content_estimator_comparison"
 SUMMARY_BASENAME = "content_estimator_comparison_summary"
@@ -1246,8 +1243,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--n-bootstrap", type=int, default=N_BOOTSTRAP)
     parser.add_argument("--seed", type=int, default=BOOTSTRAP_SEED)
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    parser.add_argument("--figures-dir", type=Path, default=DEFAULT_FIGURES_DIR)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=replay_content_dir() / "content_estimator_comparison",
+    )
+    parser.add_argument(
+        "--figures-dir", type=Path, default=figure_dir("content_estimators")
+    )
     return parser.parse_args(argv)
 
 
@@ -1261,8 +1264,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
 
     logger.info("loading the at-well arm cohort")
-    ev, _z_reference = assemble_arm()
-    inputs = record_inputs(CONTENT_FIT_INPUTS)
+    contrast_inputs = contrast_fit_inputs()
+    ev, _z_reference = assemble_arm(contrast_inputs)
+    inputs = record_inputs(contrast_inputs)
     # Only the arm cohort is compared, so the patch cohort is not assembled:
     # this is prepare_cohorts' arm half, for the "all" stratum.
     ev, stratum_audit = select_outcome_stratum(ev, "all")

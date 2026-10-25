@@ -34,10 +34,8 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, figure_dir
+from continuum_swr_replay.paths import figure_dir, replay_content_dir
 
-DEFAULT_RESULTS_DIR = REPLAY_CONTENT_DIR / "uncertainty_content"
-DEFAULT_OUTPUT_DIR = figure_dir("uncertainty_content")
 ANIMAL_ORDER = list(analysed_animals())
 ANIMAL_COLORS = dict(zip(ANIMAL_ORDER, [WONG[i] for i in [1, 2, 3, 5, 7]], strict=True))
 ANIMAL_MARKERS = dict(zip(ANIMAL_ORDER, ["o", "s", "^", "D", "P"], strict=True))
@@ -52,13 +50,13 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        default=DEFAULT_RESULTS_DIR,
+        default=replay_content_dir() / "uncertainty_content",
         help="Directory written by analyze_uncertainty_content.py.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
+        default=figure_dir("uncertainty_content"),
         help="Figure output directory.",
     )
     parser.add_argument(

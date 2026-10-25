@@ -51,7 +51,11 @@ from scripts.detection.run_swr_detection import (
     main,
     run_epoch,
 )
-from tests.unit._swr_inventory_fixtures import ARTIFACT_RUN_ID, write_artifact_run
+from tests.unit._swr_inventory_fixtures import (
+    ARTIFACT_RUN_ID,
+    use_artifact_run,
+    write_artifact_run,
+)
 
 FS = 1000.0
 BASE_TIME_S = 1.58e9
@@ -1035,7 +1039,7 @@ def _artifact_run(tmp_path, identifier: str, cores=None) -> Path:
         at = BASE_TIME_S + ARTIFACT_CORE_S
         cores = [("ca1", at, at)]
     return write_artifact_run(
-        tmp_path / "artifacts",
+        tmp_path,
         {identifier: cores},
         span=(BASE_TIME_S, BASE_TIME_S + 60.0),
     )
@@ -1588,8 +1592,7 @@ def test_the_run_reads_and_records_the_configured_artifact_run(
     the same run id with another artifact run is refused."""
     identifier = epoch_id(NWB_FILE_NAME, EPOCH_NAME)
     artifact_dir = _artifact_run(tmp_path, identifier)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", artifact_dir.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifact_dir.name)
+    use_artifact_run(monkeypatch, artifact_dir)
     monkeypatch.setattr(
         runner,
         "epochs_to_run",

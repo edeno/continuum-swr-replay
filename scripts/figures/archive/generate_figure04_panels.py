@@ -61,7 +61,7 @@ from continuum_swr_replay.figure_utilities import (
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.glm_plots import (
     plot_AICs,
     plot_hist_relative_to_event,
@@ -338,9 +338,9 @@ def main() -> None:
         plt.close(fig3)
 
     # Optional: Load and display processed modulation data
-    if (PROCESSED_DATA_DIR / "*_mPFC_modulation.pkl").exists():
+    if (processed_data_dir() / "*_mPFC_modulation.pkl").exists():
         print("Loading processed mPFC modulation data...")
-        data_path = PROCESSED_DATA_DIR.glob("*_mPFC_modulation.pkl")
+        data_path = processed_data_dir().glob("*_mPFC_modulation.pkl")
         df = pd.concat([pd.read_pickle(p) for p in data_path])
         df["animal"] = df["nwb_file_name"].str[:-13]
         print(f"Loaded modulation data: {len(df)} entries")

@@ -9,6 +9,9 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import tempfile
+from pathlib import Path
 
 # The suite runs on a shared GPU host, and JAX preallocates most of every card
 # it can see the first time it is used. A test must never do that to somebody
@@ -24,11 +27,41 @@ import re
 os.environ.setdefault("JAX_PLATFORMS", "cpu")
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
 
+# No test reads or writes the live data root unless it asks to. Every data root
+# is resolved when it is used, from ``$CSR_PROCESSED_DATA_DIR``
+# (``paths.processed_data_dir()``), so that variable is the one place a test
+# moves them -- its child processes included. It is set here, before any test
+# module (and so any package module) is imported, to a sentinel: a regular file,
+# not a folder. Every path under it is unusable: a read raises
+# ``NotADirectoryError``, a write (``mkdir``, ``open``) raises
+# ``NotADirectoryError`` or ``FileExistsError``, ``exists()`` is False and a
+# glob finds nothing. A test that needs a data root takes ``processed_data_root``
+# (a folder under its ``tmp_path``); a ``real_data`` test gets the live root back
+# (``real_data_reads_the_live_root``).
+PROCESSED_DATA_DIR_ENV = "CSR_PROCESSED_DATA_DIR"
+#: The root a ``real_data`` test reads: the caller's ``$CSR_PROCESSED_DATA_DIR``,
+#: or None for the checkout's ``Processed-Data/``.
+LIVE_PROCESSED_DATA_DIR = os.environ.get(PROCESSED_DATA_DIR_ENV)
+NO_PROCESSED_DATA_ROOT = (
+    Path(tempfile.mkdtemp(prefix="csr-tests-"))
+    / "NO_PROCESSED_DATA_ROOT__use_the_processed_data_root_fixture"
+)
+NO_PROCESSED_DATA_ROOT.write_text(
+    "Stand-in for the processed-data root during the test suite; see tests/conftest.py.\n"
+)
+os.environ[PROCESSED_DATA_DIR_ENV] = str(NO_PROCESSED_DATA_ROOT)
+
 import networkx as nx  # noqa: E402
 import numpy as np  # noqa: E402
 import pytest  # noqa: E402
 
 pytest_plugins = ["pytester"]
+
+
+def pytest_unconfigure(config):
+    """Remove the sentinel root's folder, and whatever a test wrote beside it."""
+    shutil.rmtree(NO_PROCESSED_DATA_ROOT.parent, ignore_errors=True)
+
 
 # ============================================================================
 # Real-data tests are opt-in
@@ -52,6 +85,63 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if item.get_closest_marker("real_data") is not None:
             item.add_marker(skip)
+
+
+# ============================================================================
+# The data root
+# ============================================================================
+
+
+@pytest.fixture
+def processed_data_root(tmp_path, monkeypatch) -> Path:
+    """An empty processed-data root under ``tmp_path``, the one every reader uses.
+
+    Points ``$CSR_PROCESSED_DATA_DIR`` at ``tmp_path / "Processed-Data"`` for the
+    test, so ``paths.processed_data_dir()`` and every root under it
+    (``replay_content_dir()``, ``swr_inventory_root()``, ...) resolve there, in
+    this process and in the processes it starts. Lay a test's inputs out as
+    ``Processed-Data`` is laid out.
+    """
+    root = tmp_path / "Processed-Data"
+    root.mkdir()
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(root))
+    return root
+
+
+@pytest.fixture
+def replay_content_root(processed_data_root) -> Path:
+    """``paths.replay_content_dir()`` under ``processed_data_root``, created."""
+    root = processed_data_root / "replay_content"
+    root.mkdir()
+    return root
+
+
+@pytest.fixture(scope="session")
+def live_processed_data_dir() -> Path:
+    """The root ``real_data`` tests read (the caller's, or the checkout's).
+
+    For a module- or session-scoped fixture of a ``real_data`` module, which
+    ``real_data_reads_the_live_root`` does not reach: pass it as the root.
+    """
+    if LIVE_PROCESSED_DATA_DIR is not None:
+        return Path(LIVE_PROCESSED_DATA_DIR)
+    return Path(__file__).resolve().parents[1] / "Processed-Data"
+
+
+@pytest.fixture(autouse=True)
+def real_data_reads_the_live_root(request, monkeypatch):
+    """A ``real_data`` test reads the live data root, as production does.
+
+    Function-scoped, like ``real_data_sees_the_configured_artifact_run``, so a
+    module- or session-scoped fixture still sees the sentinel root; one that
+    reads real data passes ``live_processed_data_dir()`` as its root.
+    """
+    if request.node.get_closest_marker("real_data") is None:
+        return
+    if LIVE_PROCESSED_DATA_DIR is None:
+        monkeypatch.delenv(PROCESSED_DATA_DIR_ENV)
+    else:
+        monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, LIVE_PROCESSED_DATA_DIR)
 
 
 # ============================================================================

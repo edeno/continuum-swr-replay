@@ -76,8 +76,7 @@ from continuum_swr_replay.decoding.files import (  # noqa: E402
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path  # noqa: E402
+from continuum_swr_replay.paths import processed_data_dir, table_path  # noqa: E402
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -126,12 +125,12 @@ def find_sessions(animal: str | None) -> list[str]:
     glob, so a pending epoch's decode in the folder is not read.
     """
     out = []
-    for env in analysed_decode_files(PROCESSED_DATA_DIR, "_environment.pkl"):
+    for env in analysed_decode_files(processed_data_dir(), "_environment.pkl"):
         epoch_id = env.name.removesuffix("_environment.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
         if decode_paths(
-            epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+            epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
         ).data_over_time.exists():
             out.append(epoch_id)
     return out
@@ -165,7 +164,7 @@ def session_content_distances(
     nearest reward well. Returns ``None`` if too few wells are localizable.
     """
     paths = decode_paths(
-        epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+        epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
     )
     # The read refuses labels that break the speed rule or the probability
     # contract.
@@ -233,7 +232,7 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     Returns a (9-arm x {nonSWR, SWR}) fraction table, or None if the canonical
     ``replay_content/event_arm_table.pkl`` is unavailable.
     """
-    f = table_path("event_arm_table", REPLAY_CONTENT_DIR)
+    f = table_path("event_arm_table")
     if not table_exists(f):
         return None
     ea = read_table(f)

@@ -305,13 +305,15 @@ def test_cohort_audit_reconciles_across_both_cohorts(two_session_fits):
     assert null_primary["n_modeled"] == 48  # 2 sessions x 24 stops
 
 
-def test_aggregate_only_refuses_fits_without_per_term_flags(tmp_path, monkeypatch):
+def test_aggregate_only_refuses_fits_without_per_term_flags(
+    replay_content_root, monkeypatch
+):
     """A pre-term-level fit cannot be re-aggregated under the per-term drop rule.
 
     Without ``separated_terms`` every session would read as unseparated for every
     term, silently turning the identifiability filter off instead of applying it.
     """
-    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir = replay_content_root / "models_per_bin_rate"
     out_dir.mkdir(parents=True)
     pd.DataFrame(
         {
@@ -323,27 +325,24 @@ def test_aggregate_only_refuses_fits_without_per_term_flags(tmp_path, monkeypatc
             "separated": [False],
         }
     ).to_pickle(out_dir / "swr_contrast_rate.pkl")
-    monkeypatch.setattr(mod, "RC", tmp_path)
 
     with pytest.raises(SystemExit, match="separated_terms"):
         mod._aggregate_only(smoke=False, cohort="at_well")
 
 
-def test_aggregate_only_requires_the_per_session_fits(tmp_path, monkeypatch):
-    (tmp_path / "models_per_bin_rate").mkdir(parents=True)
-    monkeypatch.setattr(mod, "RC", tmp_path)
+def test_aggregate_only_requires_the_per_session_fits(replay_content_root, monkeypatch):
+    (replay_content_root / "models_per_bin_rate").mkdir(parents=True)
 
     with pytest.raises(SystemExit, match="no per-session fits"):
         mod._aggregate_only(smoke=False, cohort="at_well")
 
 
-def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, tmp_path):
+def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, replay_content_root):
     """``--aggregate-only`` must look for the cohort's artifact, not the canonical one.
 
     Re-aggregating an ``_allstops`` run against the unsuffixed pickle would
     silently rewrite the canonical audited table from a sensitivity fit.
     """
-    monkeypatch.setattr(mod, "RC", tmp_path)
 
     with pytest.raises(SystemExit) as excinfo:
         mod._aggregate_only(smoke=False, cohort="all_stops")
@@ -359,17 +358,17 @@ def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, tmp_path):
 # ── The audited bundle names its own stop population ──
 
 
-def _aggregation_inputs(monkeypatch, tmp_path, stops):
-    """Point the aggregation at ``tmp_path`` and at a synthetic covariate source.
+def _aggregation_inputs(monkeypatch, replay_content_root, stops):
+    """Point the aggregation at `replay_content_root` (the fixture's
+    ``paths.replay_content_dir()``) and at a synthetic covariate source.
 
     ``_write_aggregation`` re-reads the qvals and stop tables only to recover the
     per-SD factors for its ``std_*`` columns, which is not what these tests are
     about; the synthetic stop frame carries the same covariate columns, so the
     aggregation runs end to end without the canonical tables.
     """
-    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir = replay_content_root / "models_per_bin_rate"
     out_dir.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(mod, "RC", tmp_path)
     monkeypatch.setattr(mod, "read_table", lambda _path: stamp_swr_source(stops))
     monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(mod, "add_uncertainty_covariates", lambda frame: frame)
@@ -377,11 +376,11 @@ def _aggregation_inputs(monkeypatch, tmp_path, stops):
 
 
 def test_audited_bundle_carries_the_cohort_its_fits_were_made_on(
-    two_session_fits, monkeypatch, tmp_path
+    two_session_fits, monkeypatch, replay_content_root
 ):
     """A sensitivity bundle must not be readable as the canonical one."""
     fits, stops, _drops, _gated = two_session_fits
-    out_dir = _aggregation_inputs(monkeypatch, tmp_path, stops)
+    out_dir = _aggregation_inputs(monkeypatch, replay_content_root, stops)
     # The aggregation refuses to publish a term fit in fewer than five
     # sessions, so the two synthetic sessions are replicated across three
     # animals. The coefficients repeat; what is under test is the label the
@@ -412,11 +411,11 @@ def test_audited_bundle_carries_the_cohort_its_fits_were_made_on(
 
 
 def test_aggregation_refuses_fits_that_mix_stop_cohorts(
-    two_session_fits, monkeypatch, tmp_path
+    two_session_fits, monkeypatch, replay_content_root
 ):
     """Two populations concatenated into one bundle is not one audited ladder."""
     fits, stops, _drops, _gated = two_session_fits
-    out_dir = _aggregation_inputs(monkeypatch, tmp_path, stops)
+    out_dir = _aggregation_inputs(monkeypatch, replay_content_root, stops)
     mixed = fits.assign(
         stop_cohort=np.where(np.arange(len(fits)) % 2, "at_well", "all_stops")
     )
@@ -425,14 +424,16 @@ def test_aggregation_refuses_fits_that_mix_stop_cohorts(
         mod._write_aggregation(mixed, out_dir, "", {}, ["fit_swr_contrast_rate.py"])
 
 
-def test_aggregate_only_records_the_bundle_it_read_by_name(monkeypatch, tmp_path):
+def test_aggregate_only_records_the_bundle_it_read_by_name(
+    monkeypatch, replay_content_root
+):
     """The sidecar names the sensitivity pickle, not the canonical one.
 
     The freshness sweep resolves a recorded input name to a file beside the
     sidecar, so a bare ``swr_contrast_rate`` would point an ``_allstops``
     aggregate at the canonical at-well fit and report it as permanently stale.
     """
-    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir = replay_content_root / "models_per_bin_rate"
     out_dir.mkdir(parents=True)
     pd.DataFrame(
         {
@@ -445,7 +446,6 @@ def test_aggregate_only_records_the_bundle_it_read_by_name(monkeypatch, tmp_path
             "stop_cohort": ["all_stops"],
         }
     ).to_pickle(out_dir / "swr_contrast_rate_allstops.pkl")
-    monkeypatch.setattr(mod, "RC", tmp_path)
     recorded: dict[str, object] = {}
     monkeypatch.setattr(
         mod,
@@ -545,7 +545,7 @@ def _sd_probe_fits(stop_cohort: str) -> pd.DataFrame:
     ("stop_cohort", "suffix"), [("at_well", ""), ("all_stops", "_allstops")]
 )
 def test_std_columns_use_the_bundles_own_cohort_sds(
-    monkeypatch, tmp_path, stop_cohort, suffix
+    monkeypatch, replay_content_root, stop_cohort, suffix
 ):
     """``std_*`` rescales by the SD of the population the fits were made on.
 
@@ -555,9 +555,8 @@ def test_std_columns_use_the_bundles_own_cohort_sds(
     full-table values.
     """
     stops, qvals = _sd_source_tables()
-    out_dir = tmp_path / "models_per_bin_rate"
+    out_dir = replay_content_root / "models_per_bin_rate"
     out_dir.mkdir(parents=True)
-    monkeypatch.setattr(mod, "RC", tmp_path)
     monkeypatch.setattr(
         mod,
         "read_table",
@@ -738,7 +737,7 @@ def _fake_fit_one_session(keys, stops_g, onsets_g):
 
 
 @pytest.fixture()
-def stubbed_fan_out(monkeypatch, tmp_path):
+def stubbed_fan_out(monkeypatch, replay_content_root):
     """Run ``main`` on fake per-session fits; return what it saved per run."""
     keys = [(f"r{i % 2}", 20200100 + i, "02_r1") for i in range(5)]
     stops = pd.DataFrame(
@@ -750,7 +749,6 @@ def stubbed_fan_out(monkeypatch, tmp_path):
     )
     onsets = stops.iloc[:-1].copy()
     aggregated: list[pd.DataFrame] = []
-    monkeypatch.setattr(mod, "RC", tmp_path)
     monkeypatch.setattr(mod, "_load", lambda cohort: (stops, onsets, 0))
     monkeypatch.setattr(mod, "record_inputs", lambda inputs: {})
     monkeypatch.setattr(mod, "_fit_one_session", _fake_fit_one_session)
@@ -760,7 +758,7 @@ def stubbed_fan_out(monkeypatch, tmp_path):
         mod, "_write_aggregation", lambda models, *a, **k: aggregated.append(models)
     )
     monkeypatch.setattr(mod, "ProcessPoolExecutor", InlineExecutor)
-    saved = tmp_path / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+    saved = replay_content_root / "models_per_bin_rate" / "swr_contrast_rate.pkl"
 
     def run(workers: int, finish=lambda futures: list(futures)):
         monkeypatch.setattr(mod, "as_completed", finish)

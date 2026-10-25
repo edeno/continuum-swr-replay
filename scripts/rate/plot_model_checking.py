@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 import matplotlib
 import numpy as np
@@ -57,9 +58,9 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 )
 from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,  # noqa: E402
     figure_dir,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -68,16 +69,25 @@ from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = REPLAY_CONTENT_DIR
-ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
-# The tables fit_per_bin_rate_models.py fit all_models.pkl on; checked against the
-# artifact's provenance sidecar before the fitted GOF columns are read.
-ALL_MODELS_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-}
-FIGS = figure_dir("rate")
+
+def all_models_path() -> Path:
+    """The per-bin ladder's fitted bundle, ``all_models.pkl``."""
+    return model_dir("per_bin_rate") / "all_models.pkl"
+
+
+def all_models_input_paths() -> dict[str, Path]:
+    """The tables fit_per_bin_rate_models.py fit all_models.pkl on; checked against
+    the artifact's provenance sidecar before the fitted GOF columns are read. Under
+    ``paths.replay_content_dir()``, read when called.
+    """
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+    }
+
+
 SC = list(SESSION_COLUMNS)
 # The two clocks are two ladders, not one. An arrival rung is fit to the
 # arrival window — a strict subset of the frozen cohort's rows — so its AIC,
@@ -225,7 +235,7 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
         fontsize=10,
     )
     fig.tight_layout()
-    out = FIGS / "model_checking_ladder.png"
+    out = figure_dir("rate") / "model_checking_ladder.png"
     save_figure(
         fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
     )
@@ -353,7 +363,7 @@ def plot_example_quartet(
 
     fig.suptitle(title, y=1.0)
     fig.tight_layout()
-    out = FIGS / fname
+    out = figure_dir("rate") / fname
     save_figure(
         fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
     )
@@ -404,9 +414,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
-    require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
-    df = pd.read_pickle(ALL_MODELS)
-    FIGS.mkdir(parents=True, exist_ok=True)
+    all_models, inputs = all_models_path(), all_models_input_paths()
+    require_fresh_inputs(all_models, inputs, allow_stale=args.allow_stale)
+    df = pd.read_pickle(all_models)
+    figure_dir("rate").mkdir(parents=True, exist_ok=True)
 
     plot_gof_ladder(df)
     _print_ladder_table(df)
@@ -445,15 +456,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
 
     # --- example-session diagnostic quartets (inline refit) ---
-    stop = read_table(table_path("stop_table", RC))
-    onset_table = read_table(table_path("event_onset_table", RC))
-    event_table = read_table(table_path("event_table", RC))
+    stop = read_table(inputs["stop_table"])
+    onset_table = read_table(inputs["event_onset_table"])
+    event_table = read_table(inputs["event_table"])
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
-    require_swr_source(stop, what=str(ALL_MODELS_INPUTS["stop_table"]))
-    require_swr_source(onset_table, what=str(ALL_MODELS_INPUTS["event_onset_table"]))
-    require_swr_source(event_table, what=str(ALL_MODELS_INPUTS["event_table"]))
+    require_swr_source(stop, what=str(inputs["stop_table"]))
+    require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
+    require_swr_source(event_table, what=str(inputs["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     full_nl = df[(df.outcome == "non_local") & (df.model == FULL)].dropna(
         subset=["n_events"]

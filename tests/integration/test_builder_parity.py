@@ -32,7 +32,7 @@ from continuum_swr_replay.analysis.behavior.qvals_table import QVALS_STANDARDIZE
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -44,11 +44,23 @@ from continuum_swr_replay.tables.standardization import (
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
-_RC = REPLAY_CONTENT_DIR
-_EVENT_ARM = table_path("event_arm_table", _RC)
-_EVENT_ARM_REF = _RC / "standardization_reference.json"
-_QVALS = table_path("qvals_table", _RC)
-_QVALS_REF = _RC / "qvals_standardization_reference.json"
+
+# The live tables, resolved in the test (a real_data test reads the live root;
+# this module's import sees the suite's sentinel root).
+def _event_arm() -> Path:
+    return table_path("event_arm_table")
+
+
+def _event_arm_ref() -> Path:
+    return replay_content_dir() / "standardization_reference.json"
+
+
+def _qvals() -> Path:
+    return table_path("qvals_table")
+
+
+def _qvals_ref() -> Path:
+    return replay_content_dir() / "qvals_standardization_reference.json"
 
 
 def _require(path: Path, *, table: str):
@@ -63,21 +75,22 @@ def _require(path: Path, *, table: str):
 
 
 @pytest.mark.parametrize(
-    "path, cols",
-    [(_EVENT_ARM, EVENT_ARM_STANDARDIZED_COLS), (_QVALS, QVALS_STANDARDIZED_COLS)],
+    "table_file, cols",
+    [(_event_arm, EVENT_ARM_STANDARDIZED_COLS), (_qvals, QVALS_STANDARDIZED_COLS)],
 )
-def test_folded_standardization_reproduces_materialized_z(path, cols):
+def test_folded_standardization_reproduces_materialized_z(table_file, cols):
     """Recomputing the scientific reference gives the materialized transform."""
-    table = "event_arm" if path == _EVENT_ARM else "qvals"
+    path = table_file()
+    table = "event_arm" if table_file is _event_arm else "qvals"
     df = _require(path, table=table)
     cols = [c for c in cols if c in df.columns and f"{c}_z" in df.columns]
     assert cols, f"no standardized columns to check in {path.name}"
-    if path == _EVENT_ARM:
-        if not _EVENT_ARM_REF.exists():
+    if table_file is _event_arm:
+        if not _event_arm_ref().exists():
             pytest.fail(
                 "leaf-support reference not written; regenerate event-arm table"
             )
-        current_reference = load_reference(_EVENT_ARM_REF)
+        current_reference = load_reference(_event_arm_ref())
         if any(
             current_reference.get(column, {}).get("support") != "leaf_arms"
             for column in cols
@@ -105,18 +118,19 @@ def test_folded_standardization_reproduces_materialized_z(path, cols):
 
 
 @pytest.mark.parametrize(
-    "table_path, ref_path, cols",
+    "table_file, ref_file, cols",
     [
-        (_EVENT_ARM, _EVENT_ARM_REF, EVENT_ARM_STANDARDIZED_COLS),
-        (_QVALS, _QVALS_REF, QVALS_STANDARDIZED_COLS),
+        (_event_arm, _event_arm_ref, EVENT_ARM_STANDARDIZED_COLS),
+        (_qvals, _qvals_ref, QVALS_STANDARDIZED_COLS),
     ],
 )
-def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, cols):
+def test_persisted_reference_reproduces_materialized_z(table_file, ref_file, cols):
     """F5 frozen-reference gate: apply the PERSISTED reference JSON to the materialized
     raw columns and match the materialized _z within atol=1e-10. Fails until the
     operational rebuild has written the reference — so an absent/stale reference
     cannot silently pass."""
-    table = "event_arm" if table_path == _EVENT_ARM else "qvals"
+    table_path, ref_path = table_file(), ref_file()
+    table = "event_arm" if table_file is _event_arm else "qvals"
     df = _require(table_path, table=table)
     if not ref_path.exists():
         pytest.fail(
@@ -131,7 +145,7 @@ def test_persisted_reference_reproduces_materialized_z(table_path, ref_path, col
             f"materialized {ref_path.name} predates support-aware reference "
             "metadata; regenerate its owning table"
         )
-    if table_path == _EVENT_ARM and any(
+    if table_file is _event_arm and any(
         reference.get(column, {}).get("support") != "leaf_arms" for column in cols
     ):
         pytest.fail(
@@ -154,14 +168,14 @@ def test_frozen_reference_matches_on_one_session_slice():
     """F5: a full-table reference applied to ONE session's raw rows matches the
     materialized _z for those rows — a per-session recompute would NOT (different
     mean/SD). Uses the persisted reference when available, else the table-derived one."""
-    df = _require(_EVENT_ARM, table="event_arm")
+    df = _require(_event_arm(), table="event_arm")
     cols = [
         c
         for c in EVENT_ARM_STANDARDIZED_COLS
         if c in df.columns and f"{c}_z" in df.columns
     ]
-    if _EVENT_ARM_REF.exists():
-        reference = load_reference(_EVENT_ARM_REF)
+    if _event_arm_ref().exists():
+        reference = load_reference(_event_arm_ref())
         if any(
             reference.get(column, {}).get("support") != "leaf_arms" for column in cols
         ):

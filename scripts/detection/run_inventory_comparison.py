@@ -172,9 +172,9 @@ from continuum_swr_replay.intervals import (
 )
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.paths import (
-    CAREY_ROOT,
-    INVENTORY_COMPARISON_ROOT,
-    MEMORYLESS_ROOT,
+    carey_root,
+    inventory_comparison_root,
+    memoryless_root,
 )
 from continuum_swr_replay.runs.batch import run_lock
 from continuum_swr_replay.runs.cli import parse_run_id, select_analysed_epochs
@@ -188,7 +188,6 @@ from continuum_swr_replay.runs.io import (
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
-OUTPUT_ROOT = INVENTORY_COMPARISON_ROOT
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
@@ -654,15 +653,15 @@ def main(argv: list[str] | None = None) -> None:
             f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
             flush=True,
         )
-    output_dir = OUTPUT_ROOT / run_id
+    output_dir = inventory_comparison_root() / run_id
     with run_lock(output_dir):
         run(args, provenance, output_dir)
 
 
 def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     """``main``'s run, under the run folder's lock."""
-    carey_dir = CAREY_ROOT / args.carey_run_id
-    memoryless_dir = MEMORYLESS_ROOT / args.memoryless_run_id
+    carey_dir = carey_root() / args.carey_run_id
+    memoryless_dir = memoryless_root() / args.memoryless_run_id
     for option, run_dir in (
         ("--carey-run-id", carey_dir),
         ("--memoryless-run-id", memoryless_dir),

@@ -92,9 +92,11 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
-    EVENT_FEATURES_ROOT,
-    INVENTORY_COMPARISON_ROOT,
-    MEMORYLESS_ROOT,
+    event_features_root,
+    inventory_comparison_root,
+)
+from continuum_swr_replay.paths import (  # noqa: E402
+    memoryless_root as memoryless_runs_root,
 )
 from continuum_swr_replay.runs.cli import parse_run_id  # noqa: E402
 from continuum_swr_replay.runs.device import default_jax_platforms  # noqa: E402
@@ -120,9 +122,6 @@ from scripts.detection._report import (  # noqa: E402
 )
 
 PRODUCED_BY = produced_by(__file__)
-OUTPUT_ROOT = EVENT_FEATURES_ROOT
-"""Where the event features runs are."""
-INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT
 FIGURE_ROOT = FIGURE_DIR / "event_features"
 REPORT_DIR = "report"
 """The report's folder inside the run's."""
@@ -1519,7 +1518,8 @@ def write_report(
     figure_root : Path
     inventory_root, memoryless_root : Path, optional
         Where the comparison and memoryless runs are;
-        :data:`INVENTORY_ROOT` and :data:`MEMORYLESS_ROOT` by default.
+        ``paths.inventory_comparison_root()`` and ``paths.memoryless_root()``
+        by default.
     analysed : collection of str, optional
         The analysed epochs; the epoch register's by default.
 
@@ -1528,8 +1528,10 @@ def write_report(
     dict
         ``tables`` and ``figures``: the paths written.
     """
-    inventory_root = INVENTORY_ROOT if inventory_root is None else inventory_root
-    memoryless_root = MEMORYLESS_ROOT if memoryless_root is None else memoryless_root
+    if inventory_root is None:
+        inventory_root = inventory_comparison_root()
+    if memoryless_root is None:
+        memoryless_root = memoryless_runs_root()
     analysed = analysed_epoch_ids() if analysed is None else analysed
     manifest, tables = read_run(
         run_dir, feature_run.TABLE_DTYPES, feature_run.output_path
@@ -1641,14 +1643,15 @@ def main(argv: list[str] | None = None) -> None:
         "replay_detection_comparison/event_features/.",
     )
     args = parser.parse_args(argv)
-    run_dir = OUTPUT_ROOT / args.run_id
+    # where the event features runs are
+    run_dir = event_features_root() / args.run_id
     if not (run_dir / "manifest.json").exists():
         sys.exit(f"No event features run manifest at {run_dir}.")
     written = write_report(
         run_dir,
         FIGURE_ROOT,
-        inventory_root=INVENTORY_ROOT,
-        memoryless_root=MEMORYLESS_ROOT,
+        inventory_root=inventory_comparison_root(),
+        memoryless_root=memoryless_runs_root(),
         analysed=analysed_epoch_ids(),
     )
     print(

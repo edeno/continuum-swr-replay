@@ -100,7 +100,7 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
+from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 
 # --- Parameters (provisional; see spec) ---------------------------------------
 # the data_over_time file the threshold names (``_80_``)
@@ -144,12 +144,12 @@ def find_sessions(animal: str | None) -> list[str]:
     glob, so a pending epoch's decode in the folder is not read.
     """
     out = []
-    for det in analysed_decode_files(PROCESSED_DATA_DIR, "_detector.pkl"):
+    for det in analysed_decode_files(processed_data_dir(), "_detector.pkl"):
         epoch_id = det.name.removesuffix("_detector.pkl")
         if animal is not None and not epoch_id.startswith(animal):
             continue
         paths = decode_paths(
-            epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+            epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
         )
         if paths.results.exists() and paths.data_over_time.exists():
             out.append(epoch_id)
@@ -357,7 +357,7 @@ def analyze_session(
     # contract.
     dot = read_dot_with_swr_source(
         decode_paths(
-            epoch_id, PROCESSED_DATA_DIR, threshold_percent=THRESHOLD_PERCENT
+            epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
         ).data_over_time,
         non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
     )

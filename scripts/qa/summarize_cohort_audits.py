@@ -27,7 +27,7 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
     COHORT_COLUMNS,
     DROP_FIELDS,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 
 def load_all(root: Path) -> pd.DataFrame:
@@ -74,7 +74,7 @@ def flag(df: pd.DataFrame, *, min_retained: float) -> pd.DataFrame:
 def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--root", type=Path, default=PROCESSED_DATA_DIR,
+        "--root", type=Path, default=processed_data_dir(),
         help="directory to scan recursively for *_cohort_audit.csv",
     )
     ap.add_argument(

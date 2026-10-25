@@ -55,6 +55,7 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -87,7 +88,7 @@ from continuum_swr_replay.analysis.replay.per_stop_rate_model import (
     cross_validate_per_stop_rate_model,
     fit_per_stop_rate_model,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -100,10 +101,13 @@ from continuum_swr_replay.tables.session_keys import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = REPLAY_CONTENT_DIR
 
-# The table this family is fit on; recorded in the artifact's provenance sidecar.
-FIT_INPUTS = {"stop_table": table_path("stop_table", RC)}
+def fit_input_paths() -> dict[str, Path]:
+    """The table this family is fit on, recorded in the artifact's provenance
+    sidecar; under ``paths.replay_content_dir()``, read when called."""
+    return {"stop_table": table_path("stop_table")}
+
+
 # Per-stop count outcomes (canonical stop_table columns), tagged by `outcome`.
 RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
 OFFSET_COL = "immobility_duration_s"
@@ -276,14 +280,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)
 
-    stop = read_table(table_path("stop_table", RC))
+    inputs = fit_input_paths()
+    stop = read_table(inputs["stop_table"])
     require_covariate_schema(stop, table="stop")
     # Its SWR counts (is_swr_stop, n_swr_events, ...) must come from the
     # configured source, artifact run included.
-    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
+    require_swr_source(stop, what=str(inputs["stop_table"]))
     # Hash the input now, not at write time, so the sidecar describes the bytes
     # this fit read rather than whatever is on disk when it finishes.
-    fit_inputs = record_inputs(FIT_INPUTS)
+    fit_inputs = record_inputs(inputs)
     missing = [c for c in RESPONSE_COLS.values() if c not in stop.columns]
     if missing:
         raise SystemExit(
@@ -326,7 +331,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     rate["stop_cohort"] = args.stop_cohort
 
-    out_dir = model_dir("per_stop_rate", RC)
+    out_dir = model_dir("per_stop_rate")
     out_dir.mkdir(parents=True, exist_ok=True)
     sfx = stop_cohort_suffix(args.stop_cohort, smoke=args.max_per_animal is not None)
     out = out_dir / f"all_models{sfx}.pkl"

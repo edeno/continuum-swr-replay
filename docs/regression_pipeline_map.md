@@ -116,7 +116,7 @@ The HPC decode's masks, from the paper's SWR source.
 
 What the replay detection runners read from a saved HPC decode and from each other.
 
-`input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
+`marks_cache_dir`, `input_paths`, `marks_cache_path`, `load_marks`, `marks_sha256`, `decode_marks`, `carey_output_paths`, `memoryless_output_paths`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/event_analysis.py`
 
@@ -176,7 +176,7 @@ Immobility bouts: where a stop begins and ends, and what falls inside one.
 
 Build the four canonical replay-content tables across all sessions.
 
-`find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`
+`output_dir`, `session_cache_dir`, `find_sessions`, `behavioral_context_cache_path`, `load_behavioral_context`, `populate_behavioral_context_cache`, `build_stop_table_scope`, `run_prepare_data`
 
 ### `src/continuum_swr_replay/analysis/replay/table_contracts.py`
 
@@ -432,13 +432,13 @@ Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligne
 
 Stage 5B: per-session retrospective replay-content alignment.
 
-`main`
+`fit_input_paths`, `main`
 
 ### `scripts/behavior/run_stay_leave.py`
 
 Stage 6: replay content × reward outcome → behavioral change.
 
-`summary_path`, `fit_path`, `write_summary_provenance`, `log_cross_session_role_summary`, `main`
+`fit_input_paths`, `summary_path`, `fit_path`, `write_summary_provenance`, `log_cross_session_role_summary`, `main`
 
 ### `scripts/content/analyze_content_occupancy.py`
 
@@ -480,7 +480,7 @@ Fit the beta-bernoulli replay-CONTENT ladder (arm + patch), is_swr version.
 
 Generate all figures for the replay content analysis.
 
-`build_parser`, `main`
+`bundle_dir`, `all_models_input_paths`, `output_dir`, `build_parser`, `main`
 
 ### `scripts/content/quantify_swr_overlap_geometry.py`
 
@@ -516,7 +516,7 @@ Run Continuous-Fragmented (ContFrag) decoding on spatial bandit task data.
 
 Detect LFP and spike artifacts in every epoch's CA1 data, on CPU.
 
-`detector_constants`, `run_settings`, `reference_lfp`, `run_epoch`, `summary`, `register_epochs`, `main`, `run`
+`detector_constants`, `run_settings`, `reference_lfp`, `run_epoch`, `summary`, `register_epochs`, `build_parser`, `main`, `run`
 
 ### `scripts/detection/run_carey_detection.py`
 
@@ -534,43 +534,43 @@ Bivariate per-bin conditional intensity: does one non-local stream's history dri
 
 Fit the per-bin conditional-intensity ladder (Family B) and persist it.
 
-`fit_per_bin_rate_models`, `main`
+`fit_input_paths`, `fit_per_bin_rate_models`, `main`
 
 ### `scripts/rate/fit_per_stop_rate_models.py`
 
 Fit the per-stop replay-rate hierarchy (R0-R1) and persist it.
 
-`fit_per_stop_rate_hierarchy`, `main`
+`fit_input_paths`, `fit_per_stop_rate_hierarchy`, `main`
 
 ### `scripts/rate/fit_swr_contrast_rate.py`
 
 Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.md).
 
-`main`
+`fit_input_paths`, `main`
 
 ### `scripts/rate/fit_uncertainty_rate.py`
 
 Fit the per-bin replay rate vs behavioral-uncertainty / value, by population.
 
-`fit_uncertainty_rate`, `main`
+`fit_input_paths`, `fit_uncertainty_rate`, `main`
 
 ### `scripts/rate/plot_model_checking.py`
 
 Point-process model checking for the per-bin ladder (Family B).
 
-`arrival_retention_note`, `plot_gof_ladder`, `isi_autocorrelation_window`, `plot_rescaled_isi_autocorrelation`, `plot_example_quartet`, `build_parser`, `main`
+`all_models_path`, `all_models_input_paths`, `arrival_retention_note`, `plot_gof_ladder`, `isi_autocorrelation_window`, `plot_rescaled_isi_autocorrelation`, `plot_example_quartet`, `build_parser`, `main`
 
 ### `scripts/rate/plot_per_bin_rate_models.py`
 
 Plot the per-bin conditional-intensity ladder (Family B) from its tidy output.
 
-`plot_reward_kernel`, `plot_selfhistory`, `build_parser`, `main`
+`all_models_path`, `all_models_input_paths`, `plot_reward_kernel`, `plot_selfhistory`, `build_parser`, `main`
 
 ### `scripts/rate/plot_per_bin_rate_summary.py`
 
 Six-panel summary figure for the per-bin rate ladder (Family B).
 
-`build_parser`, `main`
+`all_models_path`, `all_models_input_paths`, `build_parser`, `main`
 
 ### `scripts/rate/plot_uncertainty_rate.py`
 
@@ -582,7 +582,7 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 Summarize the per-bin conditional-intensity ladder (Family B) effects.
 
-`section_baseline`, `section_coef`, `section_kernel`, `section_reward_kernel`, `section_selfhistory`, `section_ladder`, `build_parser`, `main`
+`all_models_path`, `all_models_input_paths`, `section_baseline`, `section_coef`, `section_kernel`, `section_reward_kernel`, `section_selfhistory`, `section_ladder`, `build_parser`, `main`
 
 ### `scripts/tables/assemble_contfrag_shards.py`
 
@@ -606,7 +606,7 @@ Build the Part B within-stop time-binned tables over all sessions.
 
 Convert the materialized canonical tables from pickle to parquet.
 
-`convert`, `main`
+`canonical_tables`, `convert`, `main`
 
 ### `scripts/tables/prepare_contfrag_replay_content_data.py`
 
@@ -652,7 +652,7 @@ Per-model cohort / drop-profile audit records.
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
+`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `contrast_fit_inputs`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/replay/learning.py`
 
@@ -824,7 +824,7 @@ Report whether every fitted artifact is still current for the tables it read.
 
 Compare a backed-up rate fit against the current one and write a markdown audit.
 
-`delta_aic`, `n_bins_table`, `reward_quantities`, `arrival_clock_cv_table`, `arrival_clock_shape_table`, `cv_nan_share_table`, `arrival_cohort_table`, `outcome_boundary_shift_cohort`, `reward_boundary_shift_table`, `session_counts_by`, `rung_session_counts`, `cv_validity_table`, `per_stop_validity_table`, `contrast_fit_flag_table`, `term_separation_table`, `audited_row_table`, `audited_term_drop_table`, `drop_mechanism_table`, `build_report`, `ContentFraming`, `content_term_table`, `content_scale_table`, `content_rung_session_counts`, `content_delta_aic_table`, `content_separation_table`, `rung_sort_key`, `contrast_audited_table`, `contrast_design_delta_table`, `contrast_stratum_table`, `build_content_report`, `collect_content_inputs`, `run_content_mode`, `rate_rung_sort_key`, `cohort_size_table`, `reward_kernel_lag1`, `cohort_reward_rr_table`, `cohort_paired_swr_table`, `cohort_delta_aic_table`, `cohort_per_stop_delta_aic_table`, `cohort_arrival_shape_table`, `per_stop_source_note`, `cohort_burst_peak_table`, `cohort_arrival_retention_table`, `cohort_contrast_rung_table`, `cohort_provenance_table`, `cohort_provenance_note`, `in_transit_power_note`, `build_cohort_report`, `collect_cohort_inputs`, `run_cohort_contrast_mode`, `build_parser`, `main`
+`default_fit_paths`, `delta_aic`, `n_bins_table`, `reward_quantities`, `arrival_clock_cv_table`, `arrival_clock_shape_table`, `cv_nan_share_table`, `arrival_cohort_table`, `outcome_boundary_shift_cohort`, `reward_boundary_shift_table`, `session_counts_by`, `rung_session_counts`, `cv_validity_table`, `per_stop_validity_table`, `contrast_fit_flag_table`, `term_separation_table`, `audited_row_table`, `audited_term_drop_table`, `drop_mechanism_table`, `build_report`, `ContentFraming`, `content_term_table`, `content_scale_table`, `content_rung_session_counts`, `content_delta_aic_table`, `content_separation_table`, `rung_sort_key`, `contrast_audited_table`, `contrast_design_delta_table`, `contrast_stratum_table`, `build_content_report`, `collect_content_inputs`, `run_content_mode`, `per_stop_all_stops_fallback`, `rate_rung_sort_key`, `cohort_size_table`, `reward_kernel_lag1`, `cohort_reward_rr_table`, `cohort_paired_swr_table`, `cohort_delta_aic_table`, `cohort_per_stop_delta_aic_table`, `cohort_arrival_shape_table`, `per_stop_source_note`, `cohort_burst_peak_table`, `cohort_arrival_retention_table`, `cohort_contrast_rung_table`, `cohort_provenance_table`, `cohort_provenance_note`, `in_transit_power_note`, `build_cohort_report`, `collect_cohort_inputs`, `run_cohort_contrast_mode`, `build_parser`, `main`
 
 ### `scripts/qa/compare_memoryless_to_reference.py`
 

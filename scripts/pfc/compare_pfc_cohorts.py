@@ -66,7 +66,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
@@ -2500,7 +2500,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--before",
         dest="before_dir",
         type=Path,
-        default=PROCESSED_DATA_DIR / "_pre_atwell_pfc_backup_20260913",
+        default=processed_data_dir() / "_pre_atwell_pfc_backup_20260913",
         help=(
             "Directory holding the earlier mPFC bundles. For the cohort audit "
             "that is the pre-cohort tree; for the rerun audit it is the "
@@ -2512,7 +2512,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--after",
         dest="after_dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
+        default=processed_data_dir(),
         help="Directory holding the current mPFC bundles.",
     )
     parser.add_argument(

@@ -38,14 +38,13 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (  # noqa: E402
 )
 from continuum_swr_replay.data_loaders import load_data  # noqa: E402
 from continuum_swr_replay.data_types import SessionDataKeys  # noqa: E402
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import replay_content_dir
 from continuum_swr_replay.tables.session_keys import n_sessions  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
 )
 logger = logging.getLogger(__name__)
-RC = REPLAY_CONTENT_DIR
 
 
 def build_one(session: dict) -> tuple[pd.DataFrame, pd.DataFrame] | None:
@@ -111,7 +110,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     ap.add_argument(
         "--output-dir",
         type=Path,
-        default=RC,
+        default=replay_content_dir(),
         help=(
             "Directory both tables are written to. Defaults to the canonical "
             "replay_content root; pass a staging directory to build without "

@@ -78,6 +78,7 @@ import time  # noqa: E402
 import warnings  # noqa: E402
 from collections import Counter  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor, as_completed  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 import pandas as pd  # noqa: E402
 
@@ -129,8 +130,8 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    REPLAY_CONTENT_DIR,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -151,16 +152,21 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = REPLAY_CONTENT_DIR
 
-# The tables every fit in this family is built from. The provenance sidecar
-# records their hashes, and the summarizer/plotter check the same mapping, so a
-# regenerated table cannot be read through a fit that predates it.
-FIT_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-}
+def fit_input_paths() -> dict[str, Path]:
+    """The tables every fit in this family is built from, by name.
+
+    The provenance sidecar records their hashes, and the summarizer/plotter
+    check the same mapping, so a regenerated table cannot be read through a fit
+    that predates it. Under ``paths.replay_content_dir()``, read when called.
+    """
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+    }
+
 
 # The ladder is fit on one frozen cohort, so its bins are dropped by its
 # longest-reaching history window: a bin whose window touches excluded
@@ -588,20 +594,21 @@ def main(argv: Sequence[str] | None = None) -> None:
     for spec in MODEL_PER_BIN_RATE.values():
         assert_predictor_timing(c for c in _design_columns(spec) if c != "count")
 
-    stop = read_table(table_path("stop_table", RC))
-    onset_table = read_table(table_path("event_onset_table", RC))
-    event_table = read_table(table_path("event_table", RC))
+    inputs = fit_input_paths()
+    stop = read_table(inputs["stop_table"])
+    onset_table = read_table(inputs["event_onset_table"])
+    event_table = read_table(inputs["event_table"])
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
     # The bins are dropped by the configured source's excluded time, so the
     # tables must come from that source (its artifact run included).
-    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
-    require_swr_source(onset_table, what=str(FIT_INPUTS["event_onset_table"]))
+    require_swr_source(stop, what=str(inputs["stop_table"]))
+    require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
     # Hash the inputs now, not at write time: the ladder runs long enough that a
     # table could be regenerated mid-fit and be certified as this fit's input.
-    fit_inputs = record_inputs(FIT_INPUTS)
-    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
+    fit_inputs = record_inputs(inputs)
+    require_swr_source(event_table, what=str(inputs["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # The cohort is applied to the whole stop table BEFORE the smoke subset (so a
     # smoke session is a cohort session) and before the per-session common-cohort
@@ -645,7 +652,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
 
-    out_dir = model_dir("per_bin_rate", RC)
+    out_dir = model_dir("per_bin_rate")
     out_dir.mkdir(parents=True, exist_ok=True)
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None

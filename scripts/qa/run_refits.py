@@ -28,7 +28,7 @@ runs, in the order their code requires:
 
 Each fit needs the table runs it reads. With ``--only``, ``--with-tables`` adds
 only the table runs the selected runs need. The tables are written where the
-fits read them, under ``PROCESSED_DATA_DIR``. The bootstrap refuses to replace
+fits read them, under ``paths.processed_data_dir()``. The bootstrap refuses to replace
 a complete stop table (one with the SWR split), so a rebuild runs on a data root
 that has none (``CSR_PROCESSED_DATA_DIR``); in a root that has one it fails at
 once and blocks every run after it.
@@ -344,7 +344,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     )
     from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
     from continuum_swr_replay.decoding.files import decode_paths
-    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+    from continuum_swr_replay.paths import processed_data_dir
 
     problems = [
         f"no pinned run folder {folder}"
@@ -367,10 +367,11 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
             ("data_over_time", "environment"),
         )
     epoch_ids = analysed_epoch_ids()
+    decode_dir = processed_data_dir()
     for kind, (suffix, naming, needed) in decodes.items():
         missing = []
         for epoch_id in epoch_ids:
-            paths = decode_paths(epoch_id + suffix, PROCESSED_DATA_DIR, **naming)
+            paths = decode_paths(epoch_id + suffix, decode_dir, **naming)
             missing += [
                 getattr(paths, name).name
                 for name in needed
@@ -379,7 +380,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
         if missing:
             problems.append(
                 f"{len(missing)} {kind} decode files of the {len(epoch_ids)} "
-                f"analysed epochs are not in {PROCESSED_DATA_DIR}: "
+                f"analysed epochs are not in {decode_dir}: "
                 + ", ".join(missing[:5])
                 + (", ..." if len(missing) > 5 else "")
             )
@@ -421,8 +422,10 @@ def schedule(
     free = list(cpus)
     codes: dict[str, int | None] = {r.name: None for r in runs}
     blocked: set[str] = set()
-    from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+    from continuum_swr_replay.paths import processed_data_dir
     from continuum_swr_replay.runs.provenance import git
+
+    data_root = processed_data_dir()
 
     # check=False: a refit batch records an empty commit rather than not running
     commit = git(REPO, "rev-parse", "HEAD", check=False)
@@ -439,7 +442,7 @@ def schedule(
             "env": {var: str(run.threads) for var in THREAD_VARS},
             "commit": commit,
             "tree_dirty": dirty,
-            "processed_data_dir": str(PROCESSED_DATA_DIR),
+            "processed_data_dir": str(data_root),
             "host": socket.gethostname(),
             **fields,
         }
@@ -550,13 +553,13 @@ def fit_roots() -> dict[str, Path]:
     Imported here, not at the top, so the scheduler loads no package code.
     """
     from continuum_swr_replay.paths import (
-        CONTFRAG_REPLAY_CONTENT_DIR,
-        REPLAY_CONTENT_DIR,
+        contfrag_replay_content_dir,
+        replay_content_dir,
     )
 
     return {
-        "replay_content": REPLAY_CONTENT_DIR,
-        "contfrag_replay_content": CONTFRAG_REPLAY_CONTENT_DIR,
+        "replay_content": replay_content_dir(),
+        "contfrag_replay_content": contfrag_replay_content_dir(),
     }
 
 

@@ -30,14 +30,13 @@ from continuum_swr_replay.analysis.replay.fit_outputs import (
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
     MODEL_SUBDIRS,
-    REPLAY_CONTENT_DIR,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.runs.io import sha256_file
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
-RC = REPLAY_CONTENT_DIR
 # Every fitted bundle the baseline is supposed to cover. ``models_event_grain``
 # is not among them: the event-grain ladder is no longer refit (the fraction
 # ladder serves its purpose) and survives only in backups, so freezing it would
@@ -74,7 +73,8 @@ def _symlinks(directory: str, names: list[str]) -> list[str]:
 
 
 def freeze(label: str) -> Path:
-    out = RC / f"_golden_baseline_{label}"
+    rc = replay_content_dir()
+    out = rc / f"_golden_baseline_{label}"
     if out.exists():
         raise FileExistsError(f"{out} already exists; refusing to overwrite a baseline")
     out.mkdir(parents=True)
@@ -85,7 +85,7 @@ def freeze(label: str) -> Path:
     }
 
     for name in CANONICAL_TABLE_BASENAMES:
-        src = table_path(name, RC)
+        src = table_path(name, rc)
         if not src.exists():
             raise FileNotFoundError(f"canonical table missing: {src}")
         dst = out / f"{name}.parquet"
@@ -96,7 +96,7 @@ def freeze(label: str) -> Path:
         logger.info("froze %s (%d rows)", name, n_rows)
 
     for model_dir in _MODEL_DIRS:
-        src = RC / model_dir
+        src = rc / model_dir
         if not src.exists():
             # Named, not silent: a baseline missing a ladder is a baseline a
             # later comparison cannot check that ladder against, and the freeze
@@ -105,7 +105,7 @@ def freeze(label: str) -> Path:
             logger.warning(
                 "model dir %s is absent from %s; the baseline will not cover it",
                 model_dir,
-                RC,
+                rc,
             )
             continue
         # A symlink left at an output's old path is not frozen as a second copy.

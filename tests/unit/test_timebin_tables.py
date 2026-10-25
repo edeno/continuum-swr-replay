@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (
     build_event_onset_table,
     build_stop_timebin_table,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import replay_content_dir
 
 # All sources require whole-event head speed to be finite and < 4 cm/s.
 # Non-Local onsets additionally require every event bin's probability > 0.8.
@@ -278,17 +278,19 @@ def _small_tables(session: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
     return onset, dense
 
 
-def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
-    """``--output-dir`` receives both tables; without it they go to ``RC``.
+def test_output_dir_receives_both_tables(
+    timebin_script, monkeypatch, tmp_path, processed_data_root
+):
+    """``--output-dir`` receives both tables; without it they go to
+    ``paths.replay_content_dir()``.
 
     The sessions are synthetic, ``build_one`` returns small frames instead of
     reading a decode and calling ``load_data``, ``validate`` is a no-op, and
     ``publish_swr_table`` records the directory it is given instead of writing,
-    refusing any directory outside ``tmp_path``. For the default case ``RC`` is
-    pointed at a folder under ``tmp_path``, after checking its real value.
+    refusing any directory outside ``tmp_path``. For the default case the data
+    root is ``processed_data_root``, under ``tmp_path``.
     """
     script = timebin_script
-    assert script.RC == REPLAY_CONTENT_DIR
     monkeypatch.setattr(script, "find_sessions", lambda max_per_animal: _SESSIONS)
     monkeypatch.setattr(script, "build_one", _small_tables)
     monkeypatch.setattr(script, "validate", lambda onset, dense, in_excluded: None)
@@ -311,8 +313,8 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
     script.main(["--output-dir", str(tmp_path)])
     assert published == [(tmp_path, "event_onset"), (tmp_path, "stop_timebin")]
 
-    canonical = tmp_path / "canonical"
-    monkeypatch.setattr(script, "RC", canonical)
+    canonical = replay_content_dir()
+    assert canonical == processed_data_root / "replay_content"
     published.clear()
     script.main([])
     assert published == [(canonical, "event_onset"), (canonical, "stop_timebin")]

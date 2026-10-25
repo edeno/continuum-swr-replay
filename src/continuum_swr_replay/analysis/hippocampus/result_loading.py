@@ -43,7 +43,7 @@ from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
 )
 from continuum_swr_replay.decoding.results import open_results
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 
 def load_results(
@@ -54,7 +54,7 @@ def load_results(
     non_stationary: bool = False,
     ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     training_type: str = DEFAULT_TRAINING_TYPE,
-    root: Path = PROCESSED_DATA_DIR,
+    root: Path | None = None,
 ) -> tuple[xr.Dataset, NonLocalClusterlessDetector | None, Environment | None]:
     """Load saved decoding results and detector model.
 
@@ -80,8 +80,8 @@ def load_results(
         ``run_decoding_bandit.py`` so the ``_{training_type}`` suffix is
         reconstructed correctly. The default ``"no_ripple"`` appends no suffix.
     root : Path, optional
-        Folder every file is read from, by default ``PROCESSED_DATA_DIR``. A
-        decode resuming from a staging folder passes that folder.
+        Folder every file is read from; ``paths.processed_data_dir()`` when
+        None. A decode resuming from a staging folder passes that folder.
 
     Returns
     -------
@@ -112,7 +112,7 @@ def _load_saved_decode(
     non_stationary: bool,
     ripple_detector_name: str,
     training_type: str,
-    root: Path,
+    root: Path | None,
 ) -> tuple[xr.Dataset, Any | None, Environment | None]:
     """Read one saved decode's results and, optionally, its fitted model.
 
@@ -143,7 +143,9 @@ def _load_saved_decode(
         training_type=training_type,
     )
 
-    paths = decode_paths(epoch_identifier, root)
+    paths = decode_paths(
+        epoch_identifier, processed_data_dir() if root is None else root
+    )
     results = open_results(paths.results)
 
     if load_detector:

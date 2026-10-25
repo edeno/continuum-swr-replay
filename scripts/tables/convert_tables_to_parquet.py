@@ -33,36 +33,37 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.paths import (
-    CONTFRAG_REPLAY_CONTENT_DIR,
-    REPLAY_CONTENT_DIR,
+    contfrag_replay_content_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.io import parquet_path, read_table, write_table
 
 LOGGER = logging.getLogger(__name__)
 
-_RC = REPLAY_CONTENT_DIR
-_CF = CONTFRAG_REPLAY_CONTENT_DIR
 
-CANONICAL_TABLES: tuple[Path, ...] = (
-    table_path("event_table", _RC, fmt="pkl"),
-    table_path("event_arm_table", _RC, fmt="pkl"),
-    table_path("event_patch_table", _RC, fmt="pkl"),
-    table_path("event_sequence_table", _RC, fmt="pkl"),
-    table_path("stop_table", _RC, fmt="pkl"),
-    table_path("event_onset_table", _RC, fmt="pkl"),
-    table_path("qvals_table", _RC, fmt="pkl"),
-    *(
-        _CF / f"{name}_{source}_HPC.pkl"
-        for name in (
-            "event_table",
-            "event_arm_table",
-            "event_patch_table",
-            "stop_table",
-        )
-        for source in ("swr", "mua")
-    ),
-)
+def canonical_tables() -> tuple[Path, ...]:
+    """The retired pickles of the canonical tables, under the data root."""
+    rc, cf = replay_content_dir(), contfrag_replay_content_dir()
+    return (
+        table_path("event_table", rc, fmt="pkl"),
+        table_path("event_arm_table", rc, fmt="pkl"),
+        table_path("event_patch_table", rc, fmt="pkl"),
+        table_path("event_sequence_table", rc, fmt="pkl"),
+        table_path("stop_table", rc, fmt="pkl"),
+        table_path("event_onset_table", rc, fmt="pkl"),
+        table_path("qvals_table", rc, fmt="pkl"),
+        *(
+            cf / f"{name}_{source}_HPC.pkl"
+            for name in (
+                "event_table",
+                "event_arm_table",
+                "event_patch_table",
+                "stop_table",
+            )
+            for source in ("swr", "mua")
+        ),
+    )
 
 
 def convert(path: Path, *, apply: bool) -> tuple[bool, str]:
@@ -125,7 +126,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         LOGGER.info("DRY RUN -- pass --apply to convert\n")
 
     failures = []
-    for path in CANONICAL_TABLES:
+    for path in canonical_tables():
         if args.apply and parquet_path(path).exists() and not path.exists():
             LOGGER.info("%-46s already parquet", path.name)
             continue

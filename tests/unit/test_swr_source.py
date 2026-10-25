@@ -52,10 +52,12 @@ from continuum_swr_replay.analysis.events.swr_source import (
     read_swr_inventory,
     swr_events,
 )
+from continuum_swr_replay.paths import artifact_intervals_root, swr_inventory_root
 from continuum_swr_replay.runs.io import sha256_file
 from tests.unit._swr_inventory_fixtures import (
     ARTIFACT_RUN_ID,
     RUN_ID,
+    use_artifact_run,
     use_swr_source,
     write_artifact_run,
     write_swr_inventory,
@@ -94,7 +96,7 @@ ARTIFACT_INTERVALS = [(104.01, 104.21), (105.04, 105.24)]
 @pytest.fixture
 def inventory(tmp_path, monkeypatch):
     """The source's configured inventory is a synthetic run folder."""
-    directory = write_swr_inventory(tmp_path / "swr", {EPOCH: EVENTS})
+    directory = write_swr_inventory(tmp_path, {EPOCH: EVENTS})
     use_swr_source(monkeypatch, directory)
     return directory
 
@@ -102,9 +104,8 @@ def inventory(tmp_path, monkeypatch):
 def _artifacts(tmp_path, monkeypatch, cores, span=(0.0, 1e6)) -> None:
     """Configure an artifact run whose cores for EPOCH are `cores`
     (``(signatures, core_start, core_end)``)."""
-    directory = write_artifact_run(tmp_path / "artifacts", {EPOCH: cores}, span=span)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    directory = write_artifact_run(tmp_path, {EPOCH: cores}, span=span)
+    use_artifact_run(monkeypatch, directory)
 
 
 CONFIGURED_ARTIFACT_RUN_ID = swr_source.ARTIFACT_INTERVALS_RUN_ID
@@ -117,14 +118,14 @@ class TestTheConfiguredInventory:
         assert swr_source.SWR_INVENTORY_RUN_ID == "056eee0dcb5a"
         assert swr_source.SWR_DETECTOR == "kay"
         assert swr_source.swr_inventory_dir() == (
-            swr_source.SWR_INVENTORY_ROOT / swr_source.SWR_INVENTORY_RUN_ID
+            swr_inventory_root() / swr_source.SWR_INVENTORY_RUN_ID
         )
         assert CONFIGURED_ARTIFACT_RUN_ID == "fbbff144a123"
         monkeypatch.setattr(
             swr_source, "ARTIFACT_INTERVALS_RUN_ID", CONFIGURED_ARTIFACT_RUN_ID
         )
         assert swr_source.artifact_intervals_dir() == (
-            swr_source.ARTIFACT_INTERVALS_DIR / "fbbff144a123"
+            artifact_intervals_root() / "fbbff144a123"
         )
         assert swr_source.swr_source_name() == (
             "kay@056eee0dcb5a+artifacts@fbbff144a123"
@@ -138,7 +139,7 @@ class TestTheConfiguredInventory:
 
         assert swr_source.swr_inventory_dir().name == "rerun_masked"
         assert swr_source.artifact_intervals_dir() == (
-            swr_source.ARTIFACT_INTERVALS_DIR / "task16"
+            artifact_intervals_root() / "task16"
         )
         assert swr_source.swr_source_name() == "kay@rerun_masked+artifacts@task16"
 
@@ -164,10 +165,12 @@ class TestTheConfiguredInventory:
 
         assert holders == ["src/continuum_swr_replay/analysis/events/swr_source.py"]
 
-    def test_the_swr_runner_writes_where_the_source_reads(self):
+    def test_the_swr_runner_writes_where_the_source_reads(self, processed_data_root):
         import scripts.detection.run_swr_detection as runner
 
-        assert runner.OUTPUT_ROOT == swr_source.SWR_INVENTORY_ROOT
+        output_root = runner.build_parser().parse_args([]).output_root
+        assert output_root == swr_source.swr_inventory_dir().parent
+        assert output_root.is_relative_to(processed_data_root)
 
     def test_the_configured_folder_is_read_when_called(self, inventory):
         events = read_swr_inventory(EPOCH)
@@ -209,7 +212,7 @@ class TestWhichEpochsAreServed:
         self, tmp_path, monkeypatch, record
     ):
         directory = write_swr_inventory(
-            tmp_path / "swr", {}, records={"j1620210710_02_r1_HPC": record}
+            tmp_path, {}, records={"j1620210710_02_r1_HPC": record}
         )
         use_swr_source(monkeypatch, directory)
 
@@ -221,7 +224,7 @@ class TestWhichEpochsAreServed:
     ):
         # The Kay-input fetch failing (j16's DB inconsistency) leaves the
         # inventories intact; only the version check is missing.
-        directory = write_swr_inventory(tmp_path / "swr", {EPOCH: EVENTS[:2]})
+        directory = write_swr_inventory(tmp_path, {EPOCH: EVENTS[:2]})
         manifest = directory / "manifest.json"
         manifest.write_text(manifest.read_text().replace('"ok"', '"partial"', 1))
         use_swr_source(monkeypatch, directory)
@@ -242,7 +245,7 @@ class TestWhichEpochsAreServed:
     def test_a_folder_holding_another_runs_manifest_raises(
         self, inventory, tmp_path, monkeypatch
     ):
-        moved = inventory.rename(tmp_path / "swr" / "another_run")
+        moved = inventory.rename(inventory.parent / "another_run")
         use_swr_source(monkeypatch, moved)
 
         with pytest.raises(SwrSourceError, match="run 'testrun0001'"):
@@ -357,9 +360,7 @@ class TestTheArtifactIntervals:
     def test_an_epoch_the_artifact_run_never_saw_is_refused(
         self, inventory, tmp_path, monkeypatch
     ):
-        directory = write_artifact_run(
-            tmp_path / "artifacts", {"chimi20200225_02_r1_HPC": ARTIFACTS}
-        )
+        directory = write_artifact_run(tmp_path, {"chimi20200225_02_r1_HPC": ARTIFACTS})
         use_swr_source(monkeypatch, inventory, directory)
 
         with pytest.raises(SwrSourceError, match="not in the artifact run"):
@@ -477,7 +478,7 @@ class TestTheLabels:
         self, tmp_path, monkeypatch
     ):
         directory = write_swr_inventory(
-            tmp_path / "swr", {EPOCH: [(100.500, 100.530), (100.520, 100.540)]}
+            tmp_path, {EPOCH: [(100.500, 100.530), (100.520, 100.540)]}
         )
         use_swr_source(monkeypatch, directory)
 
@@ -488,7 +489,7 @@ class TestTheLabels:
 class TestCoverage:
     def test_the_mask_is_the_stored_bands_closed_stretches(self, tmp_path, monkeypatch):
         directory = write_swr_inventory(
-            tmp_path / "swr",
+            tmp_path,
             {EPOCH: EVENTS[:1]},
             observed={EPOCH: [(100.0, 101.0), (102.0, 103.0)]},
         )
@@ -506,7 +507,7 @@ class TestCoverage:
         there is neither SWR nor non-SWR. Its intervals leave the coverage,
         endpoints included, and the stretches say the same as the mask."""
         directory = write_swr_inventory(
-            tmp_path / "swr",
+            tmp_path,
             {EPOCH: EVENTS[:1]},
             observed={EPOCH: [(100.0, 101.0), (102.0, 109.0)]},
         )
@@ -608,7 +609,7 @@ class TestAnAnalysisFrame:
         self, tmp_path, monkeypatch
     ):
         directory = write_swr_inventory(
-            tmp_path / "swr",
+            tmp_path,
             {},
             records={EPOCH: {"status": "failed", "error": "boom"}},
         )

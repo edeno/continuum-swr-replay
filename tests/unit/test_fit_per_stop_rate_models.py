@@ -99,7 +99,7 @@ def _cohort_stop_table() -> pd.DataFrame:
 
 
 @pytest.fixture()
-def stubbed_run(monkeypatch, tmp_path):
+def stubbed_run(monkeypatch, replay_content_root):
     """Run ``main`` without fitting: record what the fitter was handed."""
     seen: dict = {}
     stop = _cohort_stop_table()
@@ -117,13 +117,12 @@ def stubbed_run(monkeypatch, tmp_path):
         )
         return rate, []
 
-    monkeypatch.setattr(fpsr, "RC", tmp_path)
     # stamped by the configured SWR source, as the shipped table is
     monkeypatch.setattr(fpsr, "read_table", lambda _path: stamp_swr_source(stop))
     monkeypatch.setattr(fpsr, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(fpsr, "record_inputs", lambda inputs: {})
     monkeypatch.setattr(fpsr, "fit_per_stop_rate_hierarchy", _fit)
-    return seen, tmp_path
+    return seen, replay_content_root
 
 
 def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run):

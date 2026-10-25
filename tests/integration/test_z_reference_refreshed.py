@@ -23,7 +23,7 @@ import pytest
 from continuum_swr_replay.analysis.replay._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -32,9 +32,6 @@ from continuum_swr_replay.tables.standardization import load_reference
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
-_RC = REPLAY_CONTENT_DIR
-_EVENT_ARM = table_path("event_arm_table", _RC)
-_EVENT_ARM_REF = _RC / "standardization_reference.json"
 
 _ENCODED_COL = "reward_fraction_candidate_arm_last10_visits"
 
@@ -54,12 +51,15 @@ def _require_table(path: Path):
 
 
 def _load():
-    ea = read_table(_require_table(_EVENT_ARM))
+    # the live tables, resolved here (this module's import sees the sentinel root)
+    ea = read_table(_require_table(table_path("event_arm_table")))
     try:
         require_covariate_schema(ea, table="event_arm")
     except ValueError as error:
         pytest.fail(f"materialized table requires canonical regeneration: {error}")
-    ref = load_reference(_require(_EVENT_ARM_REF))
+    ref = load_reference(
+        _require(replay_content_dir() / "standardization_reference.json")
+    )
     return ea, ref
 
 

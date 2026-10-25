@@ -42,18 +42,17 @@ from pathlib import Path
 
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
-    REPLAY_CONTENT_DIR,
+    replay_content_dir,
 )
 from continuum_swr_replay.tables.parity import compare_table_roots
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
-RC = REPLAY_CONTENT_DIR
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--candidate", type=Path, default=RC)
+    parser.add_argument("--candidate", type=Path, default=replay_content_dir())
     parser.add_argument("--baseline", type=Path, required=True)
     parser.add_argument(
         "--tables",

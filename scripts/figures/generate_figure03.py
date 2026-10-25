@@ -73,7 +73,7 @@ from continuum_swr_replay.figure_utilities import (
     label_panels,
     save_figure,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.figure_panels import (
     plot_replay_position_by_swr,
     plot_replay_speed_by_swr,
@@ -223,7 +223,7 @@ def generate_figure(
     # from other animals will be evaluated separately.
     nwb_file_name="wilbur20210329_.nwb",
     epoch_name="02_r1",
-    data_dir=PROCESSED_DATA_DIR,
+    data_dir=None,
 ):
     """Generate composite Figure 3.
 
@@ -240,6 +240,8 @@ def generate_figure(
     -------
     fig : matplotlib.figure.Figure
     """
+    if data_dir is None:
+        data_dir = processed_data_dir()
     # --- Load data ---
     logging.info("Loading session data for example panel...")
     epoch_id = swr_epoch_id(nwb_file_name, epoch_name)
@@ -345,7 +347,7 @@ def main(argv: Sequence[str] | None = None):
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
+        default=processed_data_dir(),
     )
     parser.add_argument("--show", action="store_true")
 

@@ -182,7 +182,7 @@ def test_every_cited_path_resolves() -> None:
 def test_resolver_on_known_names() -> None:
     """The resolver accepts real modules and names and rejects invented ones."""
     assert _resolves("continuum_swr_replay.parameters")
-    assert _resolves("continuum_swr_replay.parameters.PROCESSED_DATA_DIR")
+    assert _resolves("continuum_swr_replay.paths.processed_data_dir")
     assert _resolves("continuum_swr_replay.analysis.replay")
     # A lazily exported name, found in the package's _LAZY_EXPORTS table.
     assert _resolves("continuum_swr_replay.analysis.replay.fit_conditional_poisson")

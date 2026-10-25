@@ -48,9 +48,9 @@ MASK_INTERVALS = [(104.01, 104.21), (106.7, 107.3)]
 def sources(tmp_path, monkeypatch):
     """The SWR source configured with a synthetic inventory and artifact run."""
     inventory = write_swr_inventory(
-        tmp_path / "swr", {EPOCH: EVENTS}, artifact_run_id=ARTIFACT_RUN_ID
+        tmp_path, {EPOCH: EVENTS}, artifact_run_id=ARTIFACT_RUN_ID
     )
-    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: CORES})
+    artifacts = write_artifact_run(tmp_path, {EPOCH: CORES})
     use_swr_source(monkeypatch, inventory, artifacts)
 
 
@@ -169,10 +169,8 @@ def test_an_inventory_masked_by_another_artifact_run_is_refused(
     masked with (none for a run made before the SWR runner masked artifacts,
     such as R3's); an HPC decode under another artifact run is refused, and
     the error names both run ids."""
-    inventory = write_swr_inventory(
-        tmp_path / "swr", {EPOCH: EVENTS}, artifact_run_id=recorded
-    )
-    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: CORES})
+    inventory = write_swr_inventory(tmp_path, {EPOCH: EVENTS}, artifact_run_id=recorded)
+    artifacts = write_artifact_run(tmp_path, {EPOCH: CORES})
     use_swr_source(monkeypatch, inventory, artifacts)
 
     for refuse in (
@@ -192,10 +190,10 @@ def test_an_inventory_masked_by_the_configured_artifact_run_is_accepted(sources)
 
 def test_a_configured_run_missing_the_epoch_is_refused(tmp_path, monkeypatch):
     artifacts = write_artifact_run(
-        tmp_path / "other", {"chimi20200225_02_r1_HPC": CORES}, run_id="otherrun"
+        tmp_path, {"chimi20200225_02_r1_HPC": CORES}, run_id="otherrun"
     )
     inventory = write_swr_inventory(
-        tmp_path / "swr", {EPOCH: EVENTS}, artifact_run_id="otherrun"
+        tmp_path, {EPOCH: EVENTS}, artifact_run_id="otherrun"
     )
     use_swr_source(monkeypatch, inventory, artifacts)
 

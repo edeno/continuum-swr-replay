@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -48,19 +49,28 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reward_kernel_rate_ratios,
     self_history_rate_ratios,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import model_dir, replay_content_dir, table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = REPLAY_CONTENT_DIR
-ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
-# The tables fit_per_bin_rate_models.py fit all_models.pkl on. Checked against
-# the artifact's provenance sidecar before anything is summarized, so a table
-# regenerated after the fit cannot be reported through the old coefficients.
-ALL_MODELS_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-}
+
+def all_models_path() -> Path:
+    """The per-bin ladder's fitted bundle, ``all_models.pkl``."""
+    return model_dir("per_bin_rate") / "all_models.pkl"
+
+
+def all_models_input_paths() -> dict[str, Path]:
+    """The tables fit_per_bin_rate_models.py fit all_models.pkl on. Checked against
+    the artifact's provenance sidecar before anything is summarized, so a table
+    regenerated after the fit cannot be reported through the old coefficients. Under
+    ``paths.replay_content_dir()``, read when called.
+    """
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+    }
+
 
 SC = list(SESSION_COLUMNS)
 OUT = ["swr", "non_local", "non_local_swr", "non_local_no_swr"]
@@ -230,9 +240,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None):
     args = build_parser().parse_args(argv)
-    require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
+    all_models, inputs = all_models_path(), all_models_input_paths()
+    require_fresh_inputs(all_models, inputs, allow_stale=args.allow_stale)
     global df
-    df = pd.read_pickle(ALL_MODELS)
+    df = pd.read_pickle(all_models)
     print(
         f"all_models.pkl: {len(df)} rows, {df.groupby(SC).ngroups} sessions, "
         f"{df.model.nunique()} models, BIN_S={BIN_S}"

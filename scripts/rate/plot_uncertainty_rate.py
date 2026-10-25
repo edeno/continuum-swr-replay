@@ -57,8 +57,6 @@ _FIT_SPEC = importlib.util.spec_from_file_location(
 _fit = importlib.util.module_from_spec(_FIT_SPEC)
 _FIT_SPEC.loader.exec_module(_fit)
 POPULATIONS = _fit.POPULATIONS_TO_FIT
-# The same tables the fitter recorded in the artifact's provenance sidecar.
-UNCERTAINTY_RATE_INPUTS = _fit.FIT_INPUTS
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
@@ -186,8 +184,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     rc = model_dir("per_bin_rate")
     fname = "uncertainty_rate_smoke.pkl" if args.smoke else "uncertainty_rate.pkl"
+    # the same tables the fitter recorded in the artifact's provenance sidecar
     require_fresh_inputs(
-        rc / fname, UNCERTAINTY_RATE_INPUTS, allow_stale=args.allow_stale
+        rc / fname, _fit.fit_input_paths(), allow_stale=args.allow_stale
     )
     models = pd.read_pickle(rc / fname)
     logger.info("Loaded %d rows from %s", len(models), rc / fname)

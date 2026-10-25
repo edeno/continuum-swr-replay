@@ -24,7 +24,7 @@ from scipy.stats import pearsonr
 import continuum_swr_replay.figure_utilities as figure_utilities
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.figure_utilities import PANEL_SINGLE_SQUARE, save_figure
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
@@ -77,7 +77,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
-    parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
     args = parser.parse_args(argv)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

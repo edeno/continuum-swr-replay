@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Stage 6: replay content × reward outcome → behavioral change.
 
-Reads the canonical tables under ``PROCESSED_DATA_DIR/replay_content/``
+Reads the canonical tables under ``paths.replay_content_dir()``
 and runs:
 
 1. :func:`stop_replay_summary` — per-stop replay-content aggregates.
@@ -64,7 +64,7 @@ from continuum_swr_replay.analysis.replay.learning import (
     fit_is_stay_pooled_gee,
     stop_replay_summary,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     COVARIATE_SCHEMA_VERSION,
     require_covariate_schema,
@@ -77,15 +77,18 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INPUT_DIR = REPLAY_CONTENT_DIR
 
-#: The canonical tables the per-stop summary is built from, hashed into every
-#: provenance sidecar this script writes.
-FIT_INPUTS = {
-    "stop_table": table_path("stop_table", INPUT_DIR),
-    "event_table": table_path("event_table", INPUT_DIR),
-    "event_arm_table": table_path("event_arm_table", INPUT_DIR),
-}
+def fit_input_paths() -> dict[str, Path]:
+    """The canonical tables the per-stop summary is built from, hashed into
+    every provenance sidecar this script writes; under
+    ``paths.replay_content_dir()``, read when called."""
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "event_table": table_path("event_table", rc),
+        "event_arm_table": table_path("event_arm_table", rc),
+    }
+
 
 #: Populations Stage 6 may be read on. ``at_well`` is the canonical shared
 #: cohort and publishes the unsuffixed artifact names; ``all_stops`` applies no
@@ -97,7 +100,10 @@ STOP_COHORTS = ("at_well", "all_stops")
 
 def summary_path(stop_cohort: str) -> Path:
     """Cached per-stop summary for one population."""
-    return INPUT_DIR / f"stop_replay_summary{stop_cohort_suffix(stop_cohort)}.pkl"
+    return (
+        replay_content_dir()
+        / f"stop_replay_summary{stop_cohort_suffix(stop_cohort)}.pkl"
+    )
 
 
 def fit_path(kind: str, stratum: str, stop_cohort: str) -> Path:
@@ -109,7 +115,7 @@ def fit_path(kind: str, stratum: str, stop_cohort: str) -> Path:
     """
     stratum_part = "" if stratum == "all" else f"_{stratum}"
     suffix = stop_cohort_suffix(stop_cohort)
-    return INPUT_DIR / f"stage6_is_stay_{kind}{stratum_part}{suffix}.pkl"
+    return replay_content_dir() / f"stage6_is_stay_{kind}{stratum_part}{suffix}.pkl"
 
 
 def write_summary_provenance(
@@ -195,21 +201,22 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
+    inputs = fit_input_paths()
     cache_path = summary_path(args.stop_cohort)
     if not cache_path.exists() or args.rebuild_summary:
         logging.info("Building stop_replay_summary from canonical tables...")
-        st = read_table(FIT_INPUTS["stop_table"])
-        ev = read_table(FIT_INPUTS["event_table"])
-        ea = read_table(FIT_INPUTS["event_arm_table"])
+        st = read_table(inputs["stop_table"])
+        ev = read_table(inputs["event_table"])
+        ea = read_table(inputs["event_arm_table"])
         # Hash the tables while this run is reading them, not at write time.
-        fit_inputs = record_inputs(FIT_INPUTS)
+        fit_inputs = record_inputs(inputs)
         require_covariate_schema(st, table="stop")
         require_covariate_schema(ev, table="event")
         require_covariate_schema(ea, table="event_arm")
         # the content strata split on is_swr
-        require_swr_source(st, what=str(FIT_INPUTS["stop_table"]))
-        require_swr_source(ev, what=str(FIT_INPUTS["event_table"]))
-        require_swr_source(ea, what=str(FIT_INPUTS["event_arm_table"]))
+        require_swr_source(st, what=str(inputs["stop_table"]))
+        require_swr_source(ev, what=str(inputs["event_table"]))
+        require_swr_source(ea, what=str(inputs["event_arm_table"]))
         logging.info(
             "  stops=%d  events=%d  event_arm rows=%d",
             len(st),
@@ -263,7 +270,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         # from. A regenerated stop or event table changes which stops and events
         # the summary holds without changing its name, so the cache is only
         # usable while the tables it read are the tables on disk.
-        current_inputs = record_inputs(FIT_INPUTS)
+        current_inputs = record_inputs(inputs)
         moved = sorted(
             name
             for name, record in current_inputs.items()

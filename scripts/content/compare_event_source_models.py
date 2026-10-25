@@ -64,7 +64,7 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
 )
-from continuum_swr_replay.paths import CONTFRAG_REPLAY_CONTENT_DIR, REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -85,14 +85,14 @@ for noisy in (
 
 SESS = list(SESSION_COLUMNS)
 
-# event source -> (input directory, table-name stem). ``None`` stem means
+# event source -> (input directory's accessor, table-name stem). ``None`` stem means
 # the non-local replay-content tables (HPC clusterless only, no suffix).
 # The ContFrag sources are per-brain-area; the brain area is appended at
 # load time so mPFC/OFC outputs aren't silently read as HPC.
 _SOURCES = {
-    "non_local": (REPLAY_CONTENT_DIR, None),
-    "SWR": (CONTFRAG_REPLAY_CONTENT_DIR, "swr"),
-    "MUA": (CONTFRAG_REPLAY_CONTENT_DIR, "mua"),
+    "non_local": (replay_content_dir, None),
+    "SWR": (contfrag_replay_content_dir, "swr"),
+    "MUA": (contfrag_replay_content_dir, "mua"),
 }
 
 
@@ -171,7 +171,8 @@ def _comparison_output_path(out_dir: Path, event_source: str, brain_area: str) -
 
 def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
     """Load event / event_arm / stop tables for an event source."""
-    d, stem = _SOURCES[event_source]
+    input_dir, stem = _SOURCES[event_source]
+    d = input_dir()
     effective_area = _effective_brain_area(event_source, brain_area)
     if stem is None:
         suffix = ""  # non-local replay content is HPC clusterless only
@@ -579,7 +580,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     src = args.event_source
 
     tables = _load_tables(src, args.brain_area)
-    out_dir = REPLAY_CONTENT_DIR / "event_source_comparison"
+    out_dir = replay_content_dir() / "event_source_comparison"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Built once — both patch fits consume it.

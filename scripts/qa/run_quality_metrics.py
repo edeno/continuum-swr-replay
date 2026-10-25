@@ -39,9 +39,9 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_fil
 from continuum_swr_replay.decoding.files import data_over_time_suffix
 from continuum_swr_replay.parameters import (
     FIGURE_DIR,
-    PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
 RAW_STATS_JOIN_COLS = list(SESSION_COLUMNS_DAY)
@@ -105,11 +105,11 @@ def load_all_sessions(
     glob, so a pending epoch's decode in the folder is not read.
     """
     suffix = data_over_time_suffix(threshold)
-    paths = analysed_decode_files(PROCESSED_DATA_DIR, suffix)
+    paths = analysed_decode_files(processed_data_dir(), suffix)
 
     if not paths:
         raise FileNotFoundError(
-            f"No analysed epoch's *{suffix} found in {PROCESSED_DATA_DIR}"
+            f"No analysed epoch's *{suffix} found in {processed_data_dir()}"
         )
 
     if animal is not None:
@@ -485,7 +485,7 @@ def main(argv: Sequence[str] | None = None):
         "--output",
         type=str,
         default="quality_summary.csv",
-        help="Output CSV filename (saved in PROCESSED_DATA_DIR)",
+        help="Output CSV filename (saved in paths.processed_data_dir())",
     )
     parser.add_argument("--animal", type=str, default=None, help="Filter to one animal")
     parser.add_argument(
@@ -521,7 +521,7 @@ def main(argv: Sequence[str] | None = None):
     data = load_all_sessions(animal=args.animal, threshold=args.threshold)
     non_local_threshold = args.threshold / 100.0
 
-    output_path = PROCESSED_DATA_DIR / args.output
+    output_path = processed_data_dir() / args.output
 
     if args.plots_only:
         logger.info("Loading existing summary from %s", output_path)
@@ -535,7 +535,7 @@ def main(argv: Sequence[str] | None = None):
         )
         summary = maybe_merge_raw_stats(
             summary,
-            PROCESSED_DATA_DIR / args.raw_stats_csv,
+            processed_data_dir() / args.raw_stats_csv,
         )
         summary.to_csv(output_path, index=False)
         logger.info("Saved summary to %s", output_path)

@@ -27,7 +27,6 @@ from continuum_swr_replay.data_loaders.trial_clocks import (
 from continuum_swr_replay.data_loaders.utils import quiet_spyglass
 from continuum_swr_replay.paths import (
     QVALS_STANDARDIZATION_REFERENCE,
-    REPLAY_CONTENT_DIR,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (
@@ -45,7 +44,6 @@ from continuum_swr_replay.tables.standardization import (
 
 from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
 
-RC = REPLAY_CONTENT_DIR
 # stop_table uses lowercase animal labels; BehaviorModel capitalizes Senor.
 ANIMAL_SUBJECT = {
     "chimi": "chimi",

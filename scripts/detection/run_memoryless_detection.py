@@ -145,10 +145,10 @@ from continuum_swr_replay.analysis.events.swr_source import (
     swr_source_name,
 )
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (
-    MARKS_CACHE_DIR,
     MARKS_RULE,
     input_paths,
     load_marks,
+    marks_cache_dir,
     marks_cache_path,
     marks_sha256,
     memoryless_output_paths,
@@ -189,8 +189,8 @@ from continuum_swr_replay.intervals import (
     interval_mask,
     masked_seconds,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR
-from continuum_swr_replay.paths import MEMORYLESS_ROOT
+from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import memoryless_root, processed_data_dir
 from continuum_swr_replay.runs.batch import (
     cuda_cluster_class,
     raise_open_file_limit,
@@ -205,7 +205,6 @@ from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 from continuum_swr_replay.runs.threads import BLAS_THREAD_VARIABLES
 from continuum_swr_replay.tables.io import write_atomically, write_table
 
-OUTPUT_ROOT = MEMORYLESS_ROOT
 DESIGN_SPEC = "docs/design/replay_detection_comparison/02-memoryless-sequence.md"
 NOT_ANALYSED = "not an analysed epoch in the epoch register"
 """Why a decode under ``--root`` is left out when the register does not analyse
@@ -904,9 +903,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--run-id", type=parse_run_id, help="Defaults to the commit and the seed."
     )
-    parser.add_argument("--root", type=Path, default=PROCESSED_DATA_DIR)
-    parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
-    parser.add_argument("--cache-dir", type=Path, default=MARKS_CACHE_DIR)
+    parser.add_argument("--root", type=Path, default=processed_data_dir())
+    parser.add_argument("--output-root", type=Path, default=memoryless_root())
+    parser.add_argument("--cache-dir", type=Path, default=marks_cache_dir())
     parser.add_argument(
         "--overwrite", action="store_true", help="Redo epochs already written."
     )

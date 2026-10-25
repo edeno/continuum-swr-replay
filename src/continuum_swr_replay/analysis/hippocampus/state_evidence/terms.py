@@ -19,10 +19,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
 )
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 
-def load_detector(epoch_id: str, decode_dir: Path = PROCESSED_DATA_DIR) -> Any:
+def load_detector(epoch_id: str, decode_dir: Path | None = None) -> Any:
     """The decode's saved detector, its encoding environment marked fitted.
 
     Parameters
@@ -30,13 +30,16 @@ def load_detector(epoch_id: str, decode_dir: Path = PROCESSED_DATA_DIR) -> Any:
     epoch_id : str
         e.g. ``"chimi20200213_02_r1_HPC"``.
     decode_dir : Path, optional
-        Where ``{epoch_id}_detector.pkl`` is.
+        Where ``{epoch_id}_detector.pkl`` is; ``paths.processed_data_dir()``
+        when None.
 
     Raises
     ------
     KeyError
         The detector holds no :data:`ENCODING_KEY` encoding model.
     """
+    if decode_dir is None:
+        decode_dir = processed_data_dir()
     detector = joblib.load(decode_paths(epoch_id, Path(decode_dir)).detector)
     if ENCODING_KEY not in detector.encoding_model_:
         raise KeyError(
@@ -71,7 +74,7 @@ def encoding_inputs(encoding_model: dict) -> dict:
     return {"env": env, "encargs": encargs, "pos": pos, "gpi": gpi}
 
 
-def load_encoding(epoch_id: str, decode_dir: Path = PROCESSED_DATA_DIR) -> dict:
+def load_encoding(epoch_id: str, decode_dir: Path | None = None) -> dict:
     """Load the fitted encoding model and derived position arrays.
 
     :func:`encoding_inputs` of the decode's own encoding model.

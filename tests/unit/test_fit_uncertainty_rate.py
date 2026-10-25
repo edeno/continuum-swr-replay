@@ -60,7 +60,7 @@ def _cohort_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 @pytest.fixture()
-def stubbed_run(monkeypatch, tmp_path):
+def stubbed_run(monkeypatch, replay_content_root):
     """Run ``main`` without fitting: record what the fitter was handed."""
     seen: dict = {}
     stops, qvals = _cohort_tables()
@@ -87,7 +87,6 @@ def stubbed_run(monkeypatch, tmp_path):
         models.attrs["post_outcome_gate_audit"] = []
         return models
 
-    monkeypatch.setattr(mod, "RC", tmp_path)
     monkeypatch.setattr(mod, "read_table", _read_table)
     monkeypatch.setattr(mod, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(mod, "record_inputs", lambda inputs: {})
@@ -98,7 +97,7 @@ def stubbed_run(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(mod, "fit_uncertainty_rate", _fit)
     monkeypatch.setattr(mod, "_cohort_records", lambda *a, **k: [])
-    return seen, tmp_path
+    return seen, replay_content_root
 
 
 def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run):

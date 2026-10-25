@@ -80,7 +80,7 @@ def decode_paths(
         The decode's full identifier, suffixes included, such as
         ``"chimi20200212_02_r1_HPC"`` or ``"chimi20200212_02_r1_HPC_contfrag"``.
     root : Path
-        The decode folder, such as ``PROCESSED_DATA_DIR``.
+        The decode folder, such as ``paths.processed_data_dir()``.
     threshold_percent : int or None, optional
         The non-local threshold in percent that names ``data_over_time``
         (:func:`non_local_threshold_percent`; 80 by default), or None for a

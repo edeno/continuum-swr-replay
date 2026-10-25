@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 import scripts.qa.run_quality_metrics as quality_script
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 
 
 def test_main_converts_filename_threshold_and_forwards_it(monkeypatch, tmp_path):
@@ -33,7 +34,7 @@ def test_main_converts_filename_threshold_and_forwards_it(monkeypatch, tmp_path)
     monkeypatch.setattr(quality_script, "maybe_merge_raw_stats", lambda frame, _: frame)
     monkeypatch.setattr(quality_script, "print_summary", lambda _: None)
     monkeypatch.setattr(quality_script, "plot_diagnostics", _plot_diagnostics)
-    monkeypatch.setattr(quality_script, "PROCESSED_DATA_DIR", tmp_path)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
     quality_script.main(["--threshold", "50"])
 
     assert calls["load"] == (None, 50)

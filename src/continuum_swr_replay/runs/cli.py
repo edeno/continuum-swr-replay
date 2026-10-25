@@ -16,7 +16,7 @@ from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_TRAINING_TYPE,
     parse_epoch_identifier,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 __all__ = [
     "RUN_ID_PATTERN",
@@ -144,7 +144,7 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
     parser.add_argument(
         "--save_dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
+        default=processed_data_dir(),
         help="Folder the decodes are written to, and resumed from "
         "(default: Processed-Data). Created if missing.",
     )

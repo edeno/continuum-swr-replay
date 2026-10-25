@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Stage 5B: per-session retrospective replay-content alignment.
 
-Reads the canonical tables under ``PROCESSED_DATA_DIR/replay_content/``
+Reads the canonical tables under ``paths.replay_content_dir()``
 and computes, for every session, five event-level alignment metrics
 between replay content during a stop and the arm the animal visited
 next:
@@ -36,6 +36,7 @@ import logging
 import sys
 import time
 from collections.abc import Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -50,7 +51,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -63,15 +64,17 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-INPUT_DIR = REPLAY_CONTENT_DIR
-OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
 
-#: The tables this analysis is cut from, hashed into the provenance sidecar.
-FIT_INPUTS = {
-    "event_table": table_path("event_table", INPUT_DIR),
-    "event_arm_table": table_path("event_arm_table", INPUT_DIR),
-    "event_sequence_table": table_path("event_sequence_table", INPUT_DIR),
-}
+def fit_input_paths() -> dict[str, Path]:
+    """The tables this analysis is cut from, hashed into the provenance sidecar;
+    under ``paths.replay_content_dir()``, read when called."""
+    rc = replay_content_dir()
+    return {
+        "event_table": table_path("event_table", rc),
+        "event_arm_table": table_path("event_arm_table", rc),
+        "event_sequence_table": table_path("event_sequence_table", rc),
+    }
+
 
 #: The only population these metrics are defined on. A retrospective metric
 #: asks what the animal did after a stop at a well, and needs the event's
@@ -128,6 +131,8 @@ def _retrospective_status(
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    input_dir = replay_content_dir()
+    default_output = input_dir / "stage5b_retrospective.pkl"
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--n-shuffles",
@@ -154,7 +159,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--output",
         type=str,
-        default=str(OUTPUT_PATH),
+        default=str(default_output),
         help="Output pickle path. Defaults next to the input tables.",
     )
     parser.add_argument(
@@ -187,26 +192,25 @@ def main(argv: Sequence[str] | None = None) -> None:
         label = "non_swr_only"
 
     output_path = args.output
-    if label != "all" and output_path == str(OUTPUT_PATH):
-        output_path = str(INPUT_DIR / f"stage5b_retrospective_{label}.pkl")
+    if label != "all" and output_path == str(default_output):
+        output_path = str(input_dir / f"stage5b_retrospective_{label}.pkl")
 
-    logging.info("Loading canonical tables from %s", INPUT_DIR)
-    event_table = read_table(FIT_INPUTS["event_table"])
-    event_arm_table = read_table(FIT_INPUTS["event_arm_table"])
-    event_sequence_table = read_table(FIT_INPUTS["event_sequence_table"])
+    logging.info("Loading canonical tables from %s", input_dir)
+    inputs = fit_input_paths()
+    event_table = read_table(inputs["event_table"])
+    event_arm_table = read_table(inputs["event_arm_table"])
+    event_sequence_table = read_table(inputs["event_sequence_table"])
     # Hash the tables while this run is reading them: a regeneration hours
     # later must not be certified as this analysis's input.
-    fit_inputs = record_inputs(FIT_INPUTS)
+    fit_inputs = record_inputs(inputs)
     require_covariate_schema(event_table, table="event")
     require_covariate_schema(event_arm_table, table="event_arm")
     require_covariate_schema(event_sequence_table, table="event_sequence")
     # is_swr splits the events, so the tables must come from the configured
     # SWR source (an atomic set: all three carry its stamp).
-    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
-    require_swr_source(event_arm_table, what=str(FIT_INPUTS["event_arm_table"]))
-    require_swr_source(
-        event_sequence_table, what=str(FIT_INPUTS["event_sequence_table"])
-    )
+    require_swr_source(event_table, what=str(inputs["event_table"]))
+    require_swr_source(event_arm_table, what=str(inputs["event_arm_table"]))
+    require_swr_source(event_sequence_table, what=str(inputs["event_sequence_table"]))
     logging.info(
         "events=%d  event_arm rows=%d  event_seq rows=%d  sessions=%d",
         len(event_table),

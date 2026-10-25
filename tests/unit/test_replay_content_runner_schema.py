@@ -11,6 +11,7 @@ import pytest
 from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 from continuum_swr_replay.analysis.replay.fit_provenance import check_fit_provenance
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
@@ -23,9 +24,9 @@ from scripts.content import fit_replay_content_models as runner
 
 
 def _use_data_root(monkeypatch, root):
-    """Point every event source's input directory under `root`, keeping its name."""
-    for config in runner._EVENT_SOURCE_CONFIG.values():
-        monkeypatch.setitem(config, "input_dir", root / config["input_dir"].name)
+    """Make `root` the data root, so every event source's input directory is
+    under it."""
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(root))
 
 
 def _partial_ladder_dir(input_dir, *rungs: str):

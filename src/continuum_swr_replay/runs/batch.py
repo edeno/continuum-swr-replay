@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.cli import filter_epoch_info
 
 __all__ = [
@@ -231,7 +231,7 @@ def run_batch(
     ``--date`` and ``--epoch``. Pending epochs are decoded into a staging folder
     and promoted with the register edit that makes them analysed
     (``docs/epoch_register.md``), so ``--pending-only`` refuses the canonical
-    ``PROCESSED_DATA_DIR``: a reader of that folder must never meet a pending
+    ``paths.processed_data_dir()``: a reader of that folder must never meet a pending
     epoch's decode.
 
     Before the cluster starts, the soft open-file limit is raised
@@ -247,7 +247,7 @@ def run_batch(
         If ``dask_cuda`` is not importable and ``--allow_cpu`` was not given.
         Without this check the batch would silently decode on a CPU cluster.
     ValueError
-        If ``--pending-only`` would decode into ``PROCESSED_DATA_DIR``.
+        If ``--pending-only`` would decode into ``paths.processed_data_dir()``.
     """
     local_cuda_cluster = cuda_cluster_class()
     if local_cuda_cluster is None and not args.allow_cpu:
@@ -263,7 +263,7 @@ def run_batch(
     # Resolved once, here, before any worker sees it: a relative --save_dir
     # would otherwise be read against each worker's working directory.
     save_dir = Path(args.save_dir).resolve()
-    if args.pending_only and save_dir == Path(PROCESSED_DATA_DIR).resolve():
+    if args.pending_only and save_dir == processed_data_dir().resolve():
         raise ValueError(
             "--pending-only decodes the register's pending epochs, which must "
             "not reach the canonical folder before they are analysed: give a "

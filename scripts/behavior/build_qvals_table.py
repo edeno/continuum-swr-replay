@@ -46,11 +46,9 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from continuum_swr_replay.analysis.behavior.qvals_table import (
-    RC,
-    run_build_qvals_table,
-)
+from continuum_swr_replay.analysis.behavior.qvals_table import run_build_qvals_table
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.paths import replay_content_dir
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -60,7 +58,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     p.add_argument(
         "--replay-content-dir",
         type=Path,
-        default=RC,
+        default=replay_content_dir(),
         help=(
             "Replay-content root containing stop_table and receiving the qvals "
             "artifact. Pass the same explicit staging root used by "

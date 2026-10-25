@@ -242,13 +242,11 @@ def edit_record(run_dir: Path, change) -> None:
 def write_epoch(tmp_path, monkeypatch, kay=KAY, karlsson=KARLSSON) -> dict:
     """The SWR and artifact runs configured; the decode frame read once
     through the source, and its drops from the frame as saved."""
-    swr_run = write_swr_inventory(
-        tmp_path / "swr", {EPOCH: kay}, observed={EPOCH: STORED_BAND}
-    )
+    swr_run = write_swr_inventory(tmp_path, {EPOCH: kay}, observed={EPOCH: STORED_BAND})
     add_detector(swr_run, "karlsson", karlsson)
     add_detector(swr_run, "yu", [])
     add_detector(swr_run, "zugaro", [(107.000, 107.030)])
-    artifact_run = write_artifact_run(tmp_path / "artifacts", {EPOCH: ARTIFACTS})
+    artifact_run = write_artifact_run(tmp_path, {EPOCH: ARTIFACTS})
     use_swr_source(monkeypatch, swr_run, artifact_run)
     raw = raw_dot()
     return {

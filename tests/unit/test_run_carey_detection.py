@@ -235,7 +235,7 @@ def test_the_artifact_mask_leaves_the_scaling_and_drops_what_it_overlaps(tmp_pat
     epoch = _simulated_epoch()
     at = BASE_TIME_S + 15.0
     artifact_dir = write_artifact_run(
-        tmp_path / "artifacts",
+        tmp_path,
         {IDENTIFIER: [("ca1", at, at)]},
         span=(epoch.time[0], epoch.time[-1]),
     )

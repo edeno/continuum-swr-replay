@@ -56,7 +56,7 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
     PAIRED_LABEL_DTYPES,
 )
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 __all__ = [
     "CELLS",
@@ -64,7 +64,6 @@ __all__ = [
     "COMPARISONS",
     "COUNT_DTYPES",
     "DECODERS",
-    "DECODE_ROOT",
     "DETECTORS",
     "MAX_GAP_S",
     "ROSTER",
@@ -79,9 +78,6 @@ __all__ = [
     "speed_trace",
     "stamped_tables",
 ]
-
-DECODE_ROOT = PROCESSED_DATA_DIR
-"""Where the canonical HPC decodes are."""
 
 ROSTER: Mapping[str, str | None] = MappingProxyType(
     {
@@ -182,8 +178,9 @@ bridging ones."""
 
 
 def decode_path(identifier: str) -> Path:
-    """The canonical decode's ``data_over_time`` pickle (``decode_paths``)."""
-    return decode_paths(identifier, DECODE_ROOT).data_over_time
+    """The canonical decode's ``data_over_time`` pickle (``decode_paths``),
+    under ``paths.processed_data_dir()``."""
+    return decode_paths(identifier, processed_data_dir()).data_over_time
 
 
 def speed_trace(dot: pd.DataFrame) -> tuple[NDArray, NDArray]:

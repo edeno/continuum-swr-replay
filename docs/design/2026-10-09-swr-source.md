@@ -74,13 +74,13 @@ What the comparison shows:
 `analysis/events/swr_source.py` (the inventory, its run ids and the source's name) and
 `analysis/events/analysed_time.py` (the stamp, excluded time and the decode-frame read point):
 
-- **`SWR_INVENTORY_RUN_ID`, `SWR_DETECTOR` (`"kay"`), `SWR_INVENTORY_ROOT`.** These are
+- **`SWR_INVENTORY_RUN_ID`, `SWR_DETECTOR` (`"kay"`), `paths.swr_inventory_root()`.** These are
   the only definitions; the root is defined in `paths.py`, with the other output
-  locations. The SWR runner writes under the same `SWR_INVENTORY_ROOT`.
-- **`ARTIFACT_INTERVALS_RUN_ID`, `ARTIFACT_INTERVALS_DIR`** (the directory in `paths.py`). Task 16's hook, configured
+  locations. The SWR runner writes under the same `paths.swr_inventory_root()`.
+- **`ARTIFACT_INTERVALS_RUN_ID`, `paths.artifact_intervals_root()`** (the directory). Task 16's hook, configured
   once like the run id. The run id is None today: no artifact is masked.
   `artifact_intervals(epoch_id)` reads the artifact detector's run
-  (`ARTIFACT_INTERVALS_DIR / <run id>`: `manifest.json` and one
+  (`artifact_intervals_root() / <run id>`: `manifest.json` and one
   `{epoch_id}_artifact_intervals.parquet` of unpadded cores per epoch) and returns the
   artifact mask's intervals (`start_time`, `end_time`): the cores padded by the one
   padding table, merged and clipped to the epoch's span

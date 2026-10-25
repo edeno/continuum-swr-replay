@@ -80,9 +80,11 @@ What the root holds and reads:
   graph). A task that changes that code needs its own check. A cache entry
   missing from the canonical cache is logged as a warning, and that session falls
   back to Spyglass and is cached into the root.
-- Decodes and the artifact/SWR runs are read from `PROCESSED_DATA_DIR` as usual.
-  `CSR_PROCESSED_DATA_DIR` is not used: pointing it at a scratch root would hide
-  the decodes.
+- Decodes and the artifact/SWR runs are read from `paths.processed_data_dir()`
+  as usual (since Task 19 every data root is resolved when called from
+  `CSR_PROCESSED_DATA_DIR`, else the checkout's `Processed-Data/`; the commands
+  above are unchanged). `CSR_PROCESSED_DATA_DIR` must be unset for `regen`:
+  pointing it at a scratch root would hide the decodes.
 
 Ruling R2 (Task 19): if the data-root mechanism changes, keep these commands
 working or update them here.

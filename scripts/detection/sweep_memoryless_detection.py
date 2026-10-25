@@ -88,7 +88,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep import 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statistics import (
     dispersion_cm,
 )
-from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
@@ -660,7 +660,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--out",
         type=Path,
-        default=DETECTION_COMPARISON_DIR / "memoryless_detection_sweep.parquet",
+        default=detection_comparison_dir() / "memoryless_detection_sweep.parquet",
     )
     parser.add_argument(
         "--summary",

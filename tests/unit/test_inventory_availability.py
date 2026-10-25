@@ -403,14 +403,14 @@ class TestExcludedTime:
 
     @pytest.fixture
     def masked(self, tmp_path, monkeypatch):
-        from continuum_swr_replay.analysis.events import analysed_time, swr_source
-        from tests.unit._swr_inventory_fixtures import write_artifact_run
-
-        directory = write_artifact_run(
-            tmp_path / "artifacts", {self.EPOCH_ID: self.CORES}
+        from continuum_swr_replay.analysis.events import analysed_time
+        from tests.unit._swr_inventory_fixtures import (
+            use_artifact_run,
+            write_artifact_run,
         )
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+
+        directory = write_artifact_run(tmp_path, {self.EPOCH_ID: self.CORES})
+        use_artifact_run(monkeypatch, directory)
         np.testing.assert_allclose(
             analysed_time.excluded_intervals(self.EPOCH_ID).to_numpy(), self.EXCLUDED
         )

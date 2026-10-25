@@ -32,7 +32,13 @@ from continuum_swr_replay.analysis.inventory_comparison.overlap import MATCH_DTY
 from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_DTYPES,
 )
+from continuum_swr_replay.paths import (
+    event_features_root,
+    inventory_comparison_root,
+)
+from continuum_swr_replay.paths import memoryless_root as memoryless_runs_root
 from continuum_swr_replay.tables.io import write_table
+from tests.unit._swr_inventory_fixtures import under_root
 
 DAY = 20200101
 DETECTORS = ("kay", "state_space", "memoryless", "memoryless_criteria")
@@ -808,7 +814,9 @@ def test_an_unscorable_reason_the_report_does_not_know_is_refused():
 # The report written from a small run on disk.
 
 
-def _write_run(tmp_path) -> tuple:
+def _write_run(root) -> tuple:
+    """A run, its comparison run and its memoryless run, where ``paths`` puts
+    them under data root `root`; the three run folders' parents."""
     events = [
         event(
             epoch,
@@ -845,9 +853,9 @@ def _write_run(tmp_path) -> tuple:
     ]
     manifest, tables = build(events, rejection=rejection)
     manifest["epochs"]["sim20200101_06_r3_HPC"] = {"status": "failed", "error": "e"}
-    run_dir = tmp_path / "event_features" / "run01"
-    inventory_dir = tmp_path / "inventory" / "inventory01"
-    memoryless_dir = tmp_path / "memoryless" / "memoryless01"
+    run_dir = under_root(root, event_features_root) / "run01"
+    inventory_dir = under_root(root, inventory_comparison_root) / "inventory01"
+    memoryless_dir = under_root(root, memoryless_runs_root) / "memoryless01"
     for folder in (run_dir, inventory_dir, memoryless_dir):
         folder.mkdir(parents=True)
     (run_dir / "manifest.json").write_text(json.dumps(manifest))
@@ -951,11 +959,8 @@ class TestTheReportOnARunOnDisk:
         )
 
 
-def test_main_reads_the_run_named(tmp_path, monkeypatch):
-    run_dir, inventory_root, memoryless_root = _write_run(tmp_path)
-    monkeypatch.setattr(report, "OUTPUT_ROOT", run_dir.parent)
-    monkeypatch.setattr(report, "INVENTORY_ROOT", inventory_root)
-    monkeypatch.setattr(report, "MEMORYLESS_ROOT", memoryless_root)
+def test_main_reads_the_run_named(tmp_path, processed_data_root, monkeypatch):
+    run_dir, _, _ = _write_run(processed_data_root)
     monkeypatch.setattr(report, "FIGURE_ROOT", tmp_path / "figures")
     monkeypatch.setattr(report, "analysed_epoch_ids", lambda: [])
 

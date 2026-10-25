@@ -629,7 +629,9 @@ def test_an_absent_rate_meta_is_refused(tmp_path: Path) -> None:
         contrast_aggregation.load_fit_time_sd_reference(tmp_path / "absent.json")
 
 
-def test_the_contrast_figure_takes_every_unit_from_the_fits() -> None:
+def test_the_contrast_figure_takes_every_unit_from_the_fits(
+    replay_content_root,
+) -> None:
     """No SD is recomputed in the figure, for either ladder.
 
     A recomputed per-arm unit pools over all nine candidate arms (the trunks are
@@ -647,9 +649,10 @@ def test_the_contrast_figure_takes_every_unit_from_the_fits() -> None:
 
     assert {"load_per_sd_scale", "load_fit_time_sd_reference"} <= called
     assert not called & {"_global_sd", "nanstd", "std", "read_table"}
-    assert (
-        'SWR_CONTRAST_RATE_META = model_dir("per_bin_rate", RC) / '
-        '"swr_contrast_rate_meta.json"' in source
+    from scripts.figures import plot_swr_contrast_coefs as figure
+
+    assert figure.fit_artifact_paths()["rate_meta"] == (
+        replay_content_root / "models_per_bin_rate" / "swr_contrast_rate_meta.json"
     )
 
 

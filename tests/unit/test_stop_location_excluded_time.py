@@ -23,10 +23,10 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.contfrag.tables import build_contfrag_stop_table
-from continuum_swr_replay.analysis.events import analysed_time, swr_source
+from continuum_swr_replay.analysis.events import analysed_time
 from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
-from tests.unit._swr_inventory_fixtures import write_artifact_run
+from tests.unit._swr_inventory_fixtures import use_artifact_run, write_artifact_run
 from tests.unit.test_artifact_exposure import CORES, EPOCH_ID, TIME, _graph
 from tests.unit.test_artifact_exposure import _dot as _exposure_dot
 
@@ -108,9 +108,8 @@ def tables(tmp_path, monkeypatch) -> dict[str, dict[str, pd.DataFrame]]:
     summarised over all its rows), then with the exposure test's cores
     (``"masked"``). The source stays configured for the test."""
     all_rows = _tables()
-    directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    directory = write_artifact_run(tmp_path, {EPOCH_ID: CORES})
+    use_artifact_run(monkeypatch, directory)
     return {"all_rows": all_rows, "masked": _tables()}
 
 

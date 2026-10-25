@@ -109,7 +109,7 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")
@@ -494,7 +494,7 @@ def generate_figure(
     nwb_file_name="wilbur20210329_.nwb",
     epoch_name="02_r1",
     neuron_ind=27,
-    data_dir=PROCESSED_DATA_DIR,
+    data_dir=None,
     stop_cohort="at_well",
     fitter="jax",
     penalty_sigma=DEFAULT_PENALTY_SIGMA,
@@ -534,6 +534,8 @@ def generate_figure(
         If ``penalty_sigma`` is not the canonical prior, before anything is
         loaded or fit: that bundle has no held-out p-values for panel d.
     """
+    if data_dir is None:
+        data_dir = processed_data_dir()
     if float(penalty_sigma) != DEFAULT_PENALTY_SIGMA:
         raise ValueError(
             f"penalty_sigma={penalty_sigma} names a sensitivity bundle, which "
@@ -850,7 +852,7 @@ def main(argv: Sequence[str] | None = None):
     parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
     parser.add_argument("--epoch-name", type=str, default="02_r1")
     parser.add_argument("--neuron-ind", type=int, default=27)
-    parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
     parser.add_argument(
         "--stop-cohort",
         type=str,

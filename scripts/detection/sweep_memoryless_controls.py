@@ -77,7 +77,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.sweep_control
     truth_path,
     usable_intervals,
 )
-from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
@@ -87,7 +87,6 @@ DETECTORS = (
     "state_space_canonical",
     "state_space_continuous",
 )
-OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_controls.parquet"
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_controls_summary.csv"
 )
@@ -416,7 +415,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--n-recordings", type=int, default=N_RECORDINGS)
-    parser.add_argument("--out", type=Path, default=OUT_PATH)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=detection_comparison_dir() / "memoryless_controls.parquet",
+    )
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     args = parser.parse_args(argv)
 

@@ -9,7 +9,7 @@ outputs, the flags, and the ``--from-cache`` contract are documented.
 
 Also the home of the session-scope and behavioral-cache helpers
 (:func:`find_sessions`, :func:`load_behavioral_context`,
-:func:`populate_behavioral_context_cache`, :data:`SESSION_CACHE_DIR`) that the
+:func:`populate_behavioral_context_cache`, :func:`session_cache_dir`) that the
 other ``scripts/tables`` drivers share.
 """
 
@@ -77,10 +77,10 @@ from continuum_swr_replay.data_loaders.trials import (
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,
     STANDARDIZATION_REFERENCE,
+    processed_data_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.io import (
@@ -99,10 +99,29 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-OUTPUT_DIR = REPLAY_CONTENT_DIR
-# Per-session cache of the Spyglass-sourced behavioral context and track graph.
-# Populated on every full run; consumed by --from-cache to skip load_data.
-SESSION_CACHE_DIR = OUTPUT_DIR / "_session_cache"
+OUTPUT_DIR: Path | None = None
+"""The run's output folder, set from ``--output-dir`` by :func:`run_prepare_data`;
+None means ``paths.replay_content_dir()``, resolved when read (:func:`output_dir`)."""
+
+SESSION_CACHE_DIR: Path | None = None
+"""The per-session cache of the Spyglass-sourced behavioral context and track
+graph, populated on every full run and read by ``--from-cache`` to skip
+``load_data``. Set from ``--behavior-cache-dir`` by the table drivers; None means
+``<output_dir()>/_session_cache``, resolved when read (:func:`session_cache_dir`)."""
+
+
+def output_dir() -> Path:
+    """:data:`OUTPUT_DIR`, or ``paths.replay_content_dir()`` while it is unset."""
+    return replay_content_dir() if OUTPUT_DIR is None else OUTPUT_DIR
+
+
+def session_cache_dir() -> Path:
+    """:data:`SESSION_CACHE_DIR`, or ``<output_dir()>/_session_cache`` while unset."""
+    if SESSION_CACHE_DIR is None:
+        return output_dir() / "_session_cache"
+    return SESSION_CACHE_DIR
+
+
 from continuum_swr_replay.tables.versions import (  # noqa: E402
     BEHAVIORAL_CONTEXT_CACHE_VERSION,  # value centralized in versions.py
     assert_versions_compatible,
@@ -143,14 +162,15 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
     ------
     FileNotFoundError
         If a selected epoch has no ``data_over_time.pkl`` or ``environment.pkl``
-        under ``PROCESSED_DATA_DIR``: the tables would otherwise cover fewer
+        under ``paths.processed_data_dir()``: the tables would otherwise cover fewer
         epochs than the register analyses.
     """
     by_animal: dict[str, list] = {}
+    decode_dir = processed_data_dir()
     for nwb_file_name, epoch in analysed_epochs().index:
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = swr_epoch_id(nwb_file_name, epoch)
-        paths = decode_paths(session_id, PROCESSED_DATA_DIR)
+        paths = decode_paths(session_id, decode_dir)
         by_animal.setdefault(animal, []).append(
             {
                 "nwb_file_name": nwb_file_name,
@@ -178,7 +198,7 @@ def find_sessions(max_per_animal: int | None = None) -> list[dict]:
     if missing:
         raise FileNotFoundError(
             f"{len(missing)} decode file(s) of the epoch register's analysed epochs "
-            f"are not under {PROCESSED_DATA_DIR}: {', '.join(missing[:10])}"
+            f"are not under {decode_dir}: {', '.join(missing[:10])}"
             + (", ..." if len(missing) > 10 else "")
         )
     return selected
@@ -202,7 +222,7 @@ def behavioral_context_cache_path(
 ) -> Path:
     """Return the versioned cache path without mutating an older cache bundle."""
     return (
-        SESSION_CACHE_DIR
+        session_cache_dir()
         / BEHAVIORAL_CONTEXT_CACHE_VERSION
         / f"{cache_key or session['session_id']}.pkl"
     )
@@ -231,7 +251,7 @@ def load_behavioral_context(
 
     These behavioral inputs are pulled from Spyglass (the ~3 h cost of a full
     run) and pickled to
-    :data:`SESSION_CACHE_DIR` keyed by ``session_id`` so a covariate-only
+    :func:`session_cache_dir` keyed by ``session_id`` so a covariate-only
     rebuild (``from_cache=True``) can skip ``load_data`` entirely.
 
     ``from_cache=True`` reads the cache when present and otherwise falls back
@@ -869,7 +889,7 @@ def _standardize_event_arm(
         support_mask=leaf_support,
         support_label="leaf_arms",
     )
-    save_reference(z_reference, OUTPUT_DIR / STANDARDIZATION_REFERENCE)
+    save_reference(z_reference, output_dir() / STANDARDIZATION_REFERENCE)
     # Rebuild-completeness guard: a future refactor must not silently drop the _z
     # columns (the exact regression this phase fixes).
     assert_standardized_present(
@@ -900,7 +920,7 @@ def _publish_canonical_tables(frames: tuple) -> None:
         stamp_swr_source(frame)
         path = publish_swr_table(
             frame,
-            OUTPUT_DIR,
+            output_dir(),
             table=table_key,
             basename=basename,
         )

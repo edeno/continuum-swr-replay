@@ -41,8 +41,8 @@ from continuum_swr_replay.analysis.replay.uncertainty_content import (
     within_arm_horserace,
 )
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,
     STANDARDIZATION_REFERENCE,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (
@@ -55,8 +55,6 @@ from continuum_swr_replay.tables.standardization import (
 )
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_DATA_DIR = REPLAY_CONTENT_DIR
-DEFAULT_OUTPUT_DIR = DEFAULT_DATA_DIR / "uncertainty_content"
 DEFAULT_EXAMPLE_SESSION = ("wilbur", "20210329", "08_r4")
 
 
@@ -79,13 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=DEFAULT_DATA_DIR,
+        default=replay_content_dir(),
         help="Replay-content artifact directory.",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=DEFAULT_OUTPUT_DIR,
+        default=replay_content_dir() / "uncertainty_content",
         help="Directory for derived uncertainty-content tables.",
     )
     parser.add_argument(

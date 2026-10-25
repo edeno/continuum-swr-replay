@@ -109,7 +109,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
-from continuum_swr_replay.paths import CAREY_ROOT
+from continuum_swr_replay.paths import carey_root
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
     run_epoch_task,
@@ -125,7 +125,6 @@ from continuum_swr_replay.runs.io import (
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 
-OUTPUT_ROOT = CAREY_ROOT
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/03-inventory-comparison.md"
 
@@ -485,7 +484,7 @@ def main(argv: list[str] | None = None) -> None:
         help="The run's folder under --output-root: letters, digits, '.', '_' "
         "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
     )
-    parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
+    parser.add_argument("--output-root", type=Path, default=carey_root())
     args = parser.parse_args(argv)
 
     # before the cluster starts: its worker processes inherit this limit

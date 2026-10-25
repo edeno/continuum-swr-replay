@@ -60,7 +60,7 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
     make_matched_control_times,
     matched_control_seed,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
@@ -527,7 +527,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
+        default=processed_data_dir(),
         help="Tree holding the canonical mPFC bundles and their sidecars.",
     )
     parser.add_argument(

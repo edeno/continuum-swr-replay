@@ -42,7 +42,7 @@ from continuum_swr_replay.analysis.hippocampus.hpc_raw_stats import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_types import DataLoadingPreset
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,7 +57,7 @@ ALL_STAT_COLS = list(RAW_STAT_COLUMNS) + list(TRANSITION_MATRIX_COLUMNS)
 
 def _load_detector(epoch_identifier: str):
     """Load a fitted HPC detector pickle for an epoch, or None if missing."""
-    path = decode_paths(f"{epoch_identifier}_HPC", PROCESSED_DATA_DIR).detector
+    path = decode_paths(f"{epoch_identifier}_HPC", processed_data_dir()).detector
     if not path.exists():
         return None
     # Local import to keep module import cheap when --help is requested
@@ -148,7 +148,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--output",
         type=str,
         default="hpc_raw_stats.csv",
-        help="Output CSV filename (saved in PROCESSED_DATA_DIR)",
+        help="Output CSV filename (saved in paths.processed_data_dir())",
     )
     parser.add_argument("--animal", type=str, default=None, help="Filter to one animal")
     parser.add_argument(
@@ -164,7 +164,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(argv)
 
-    output_path = PROCESSED_DATA_DIR / args.output
+    output_path = processed_data_dir() / args.output
     sessions = _build_session_list(args.animal, args.limit)
     logger.info("Processing %d sessions", len(sessions))
 

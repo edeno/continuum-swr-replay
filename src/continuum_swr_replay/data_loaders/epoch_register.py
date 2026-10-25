@@ -485,7 +485,7 @@ def analysed_decode_files(
     Parameters
     ----------
     directory : Path
-        A decode folder, such as ``PROCESSED_DATA_DIR``.
+        A decode folder, such as ``paths.processed_data_dir()``.
     suffix : str
         What follows the epoch id, such as ``"_80_data_over_time.pkl"`` or
         ``"_contfrag_data_over_time.pkl"``.

@@ -18,19 +18,17 @@ the environment.
 Nothing here may write outside the test's own ``tmp_path``. Three things keep
 it there:
 
-- Every call passes ``save_dir`` and ``log_directory`` under ``tmp_path``. The
-  defaults bound at definition time (``run_decode``'s ``save_dir`` and the
-  loaders' ``root``) still name the real ``Processed-Data``, so no test leaves a
-  write to them.
+- Every call passes ``save_dir`` and ``log_directory`` under ``tmp_path``.
 - Every stand-in that writes refuses any path outside ``tmp_path`` before it
   writes.
 - The epoch is synthetic (``testrat20990101``), so even an unguarded write
   could not land on a real decode's file.
 
-Each script's ``PROCESSED_DATA_DIR`` global also points at an empty folder under
-``tmp_path``. That catches only code that writes through the global, not
-through a default. An unguarded version of these tests once overwrote real
-decodes.
+The data root (``paths.processed_data_dir()``, which ``run_decode``'s
+``save_dir`` and the loaders' ``root`` default to) is also a folder under
+``tmp_path``, ``canonical``, and that folder holds nothing but the synthetic SWR
+source, so a write to the default lands there and is caught. An unguarded
+version of these tests once overwrote real decodes.
 
 An HPC decode reads the SWR source's Kay inventory and artifact run, so the
 fixture points the source at synthetic run folders under ``tmp_path`` for the
@@ -74,7 +72,7 @@ from continuum_swr_replay.analysis.events.immobility import (
 from continuum_swr_replay.analysis.hippocampus import decode_masks
 from continuum_swr_replay.analysis.hippocampus import result_loading as hpc_loading
 from continuum_swr_replay.decoding import files as decoding_files
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV, processed_data_dir
 from continuum_swr_replay.runs import batch, cli, provenance
 from continuum_swr_replay.tables.io import write_atomically
 from tests.unit._swr_inventory_fixtures import (
@@ -109,6 +107,8 @@ SWR_EVENTS = [(100.5, 100.56), (102.4, 102.6)]
 ARTIFACT_CORES = [("ca1", 104.0, 104.0)]
 """Its artifact run's cores: one CA1 step, [103.7, 104.3] in the one mask."""
 MASK_INTERVAL = (103.7, 104.3)
+SOURCE_FOLDERS = {"replay_detection_comparison", "artifact_intervals"}
+"""The data root's folders the SWR source's two run folders are written under."""
 
 
 @dataclass(frozen=True)
@@ -156,7 +156,11 @@ class Decoders:
     flow: types.ModuleType
     """``_decode_runner``: the names ``run_decode`` reads are patched here."""
     canonical: Path
-    """Where each script's ``PROCESSED_DATA_DIR`` global points during the test."""
+    """The data root during the test: it holds the synthetic SWR source alone."""
+
+    def holds_no_decode(self) -> bool:
+        """Nothing but the SWR source's two run folders is in the data root."""
+        return {path.name for path in self.canonical.iterdir()} == SOURCE_FOLDERS
 
 
 @pytest.fixture
@@ -167,10 +171,8 @@ def decoders(monkeypatch, tmp_path):
     modules imported here that bind the stub are forgotten afterwards, so a
     later import gets the real ones.
 
-    Each script's ``PROCESSED_DATA_DIR`` global, and the shared flow's, is
-    pointed at an empty folder under
-    ``tmp_path``. That catches code that writes through the global. It does not
-    change the defaults bound at definition time, so every test passes
+    The data root is a folder under ``tmp_path`` that holds only the
+    synthetic SWR source (:attr:`Decoders.canonical`); every test still passes
     ``save_dir`` itself.
     """
     common = types.ModuleType("spyglass.common")
@@ -189,17 +191,16 @@ def decoders(monkeypatch, tmp_path):
     flow = importlib.import_module(SHARED_MODULE)
     canonical = tmp_path / "canonical"
     canonical.mkdir()
-    for module in (*modules.values(), flow):
-        monkeypatch.setattr(module, "PROCESSED_DATA_DIR", canonical)
     use_swr_source(
         monkeypatch,
         write_swr_inventory(
-            tmp_path / "swr_inventory",
+            canonical,
             {SWR_EPOCH: SWR_EVENTS},
             artifact_run_id=ARTIFACT_RUN_ID,
         ),
-        write_artifact_run(tmp_path / "artifact_run", {SWR_EPOCH: ARTIFACT_CORES}),
+        write_artifact_run(canonical, {SWR_EPOCH: ARTIFACT_CORES}),
     )
+    assert processed_data_dir() == canonical
 
     yield Decoders(modules=modules, flow=flow, canonical=canonical)
 
@@ -444,10 +445,10 @@ def _git_repo(path: Path) -> Callable[..., str]:
 # --------------------------------------------------------------------------
 
 
-def test_save_dir_and_allow_cpu_defaults():
+def test_save_dir_and_allow_cpu_defaults(processed_data_root):
     args = _parse([])
 
-    assert args.save_dir == PROCESSED_DATA_DIR
+    assert args.save_dir == processed_data_root
     assert args.allow_cpu is False
 
     staged = _parse(
@@ -627,7 +628,7 @@ def _record_reads(monkeypatch, detector_class: type) -> list[Path]:
     return reads
 
 
-def test_load_results_reads_from_root(monkeypatch, tmp_path):
+def test_load_results_reads_from_root(monkeypatch, tmp_path, processed_data_root):
     reads = _record_reads(monkeypatch, hpc_loading.NonLocalClusterlessDetector)
     stem = DECODERS["nonlocal"].epoch_identifier
 
@@ -638,10 +639,12 @@ def test_load_results_reads_from_root(monkeypatch, tmp_path):
 
     reads.clear()
     hpc_loading.load_results(NWB_FILE_NAME, EPOCH_NAME)
-    assert [path.parent for path in reads] == [PROCESSED_DATA_DIR] * 2
+    assert [path.parent for path in reads] == [processed_data_root] * 2
 
 
-def test_load_contfrag_results_reads_from_root(monkeypatch, tmp_path):
+def test_load_contfrag_results_reads_from_root(
+    monkeypatch, tmp_path, processed_data_root
+):
     reads = _record_reads(monkeypatch, contfrag_loading.ContFragClusterlessClassifier)
     stem = DECODERS["contfrag"].epoch_identifier
 
@@ -654,7 +657,7 @@ def test_load_contfrag_results_reads_from_root(monkeypatch, tmp_path):
 
     reads.clear()
     contfrag_loading.load_contfrag_results(NWB_FILE_NAME, EPOCH_NAME)
-    assert [path.parent for path in reads] == [PROCESSED_DATA_DIR] * 2
+    assert [path.parent for path in reads] == [processed_data_root] * 2
 
 
 # --------------------------------------------------------------------------
@@ -746,7 +749,7 @@ def test_run_decode_resume_keeps_saved_files(decoders, monkeypatch, tmp_path, ke
     assert roots == [save_dir]
     assert _saved_file_hashes(save_dir, decoder.epoch_identifier) == before
     assert (save_dir / decoder.data_over_time_name).exists()
-    assert not any(decoders.canonical.iterdir())
+    assert decoders.holds_no_decode()
     log = _log(tmp_path, decoder).splitlines()
     resumed = [line for line in log if "RESUMED" in line]
     assert len(resumed) == 1
@@ -821,7 +824,7 @@ def test_save_dir_is_created(decoders, monkeypatch, tmp_path, key):
         [f"{decoder.epoch_identifier}_{name}" for name in SAVED_FILES]
         + [decoder.data_over_time_name]
     )
-    assert not any(decoders.canonical.iterdir())
+    assert decoders.holds_no_decode()
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
@@ -1170,10 +1173,8 @@ def test_an_hpc_decode_refuses_an_inventory_masked_by_another_artifact_run(
     """Today's case: the artifact run is set, but the inventory is one made
     without the mask (R3's has no ``settings.artifacts``)."""
     decoder, module = DECODERS[key], decoders.modules[key]
-    unmasked = write_swr_inventory(
-        tmp_path / "unmasked_inventory", {SWR_EPOCH: SWR_EVENTS}
-    )
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", unmasked.parent)
+    # the fixture's inventory, rewritten without the artifact run it was masked by
+    write_swr_inventory(decoders.canonical, {SWR_EPOCH: SWR_EVENTS})
 
     def load_data(*args: Any, **kwargs: Any) -> None:
         raise AssertionError("an HPC decode loaded data on an unmasked inventory")
@@ -1552,7 +1553,7 @@ def test_pending_epochs_are_never_decoded_into_the_canonical_folder(
     _stand_in_batch(monkeypatch, tmp_path, has_cuda=True, cluster=_no_cluster)
     monkeypatch.setattr(batch, "epochs_to_run", must_not_select)
     canonical = tmp_path / "Processed-Data"
-    monkeypatch.setattr(batch, "PROCESSED_DATA_DIR", canonical)
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(canonical))
     args = _parse(
         ["--pending-only", "--save_dir", str(canonical), "--local_scratch_dir", "s"]
     )

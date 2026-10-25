@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 import matplotlib
 import numpy as np
@@ -56,24 +57,33 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,  # noqa: E402
     figure_dir,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-RC = REPLAY_CONTENT_DIR
-ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
-# The tables fit_per_bin_rate_models.py fit all_models.pkl on. Checked against
-# the artifact's provenance sidecar before plotting, so a figure cannot be
-# rendered from coefficients that predate the tables on disk.
-ALL_MODELS_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-}
-FIGS = figure_dir("rate")
+
+def all_models_path() -> Path:
+    """The per-bin ladder's fitted bundle, ``all_models.pkl``."""
+    return model_dir("per_bin_rate") / "all_models.pkl"
+
+
+def all_models_input_paths() -> dict[str, Path]:
+    """The tables fit_per_bin_rate_models.py fit all_models.pkl on. Checked against
+    the artifact's provenance sidecar before plotting, so a figure cannot be
+    rendered from coefficients that predate the tables on disk. Under
+    ``paths.replay_content_dir()``, read when called.
+    """
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+    }
+
+
 SC = list(SESSION_COLUMNS)
 MODEL = "M7r_time_histcos_rew"
 
@@ -248,7 +258,7 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     )
 
     fig.tight_layout()
-    out = FIGS / "reward_kernel_basis.png"
+    out = figure_dir("rate") / "reward_kernel_basis.png"
     fig.savefig(out, dpi=150)
     plt.close(fig)
     print(f"saved {out}")
@@ -281,7 +291,7 @@ def plot_selfhistory(m7: pd.DataFrame) -> None:
     ax.set_title("Within-stop event autocorrelation\n(<1 = refractory, >1 = bursty)")
     ax.legend(frameon=False)
     fig.tight_layout()
-    out = FIGS / "selfhistory_autocorr.png"
+    out = figure_dir("rate") / "selfhistory_autocorr.png"
     fig.savefig(out, dpi=150)
     plt.close(fig)
     print(f"saved {out}")
@@ -303,14 +313,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
-    require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
-    df = pd.read_pickle(ALL_MODELS)
+    all_models, inputs = all_models_path(), all_models_input_paths()
+    require_fresh_inputs(all_models, inputs, allow_stale=args.allow_stale)
+    df = pd.read_pickle(all_models)
     m7 = df[df.model == MODEL]
     if m7.empty:
         raise SystemExit(
             f"No {MODEL} rows in all_models.pkl; run fit_per_bin_rate_models.py first."
         )
-    FIGS.mkdir(parents=True, exist_ok=True)
+    figure_dir("rate").mkdir(parents=True, exist_ok=True)
     plot_reward_kernel(m7)
     plot_selfhistory(m7)
 

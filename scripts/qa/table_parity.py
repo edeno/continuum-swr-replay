@@ -23,7 +23,7 @@ slice is compared with a slice, not with the live tables.
 
 A root holds ``replay_content/`` and ``contfrag_replay_content/``, the layout of
 ``Processed-Data`` itself, so the live tables are a valid ``--reference`` for a
-full-cohort ``regen``. Decodes are read from ``PROCESSED_DATA_DIR``; nothing is
+full-cohort ``regen``. Decodes are read from ``paths.processed_data_dir()``; nothing is
 written outside ``--root``. The behavioral cache entries are copied from the
 canonical cache into the root, so a missing entry falls back to Spyglass and is
 cached in the root, not in the live cache.
@@ -135,10 +135,10 @@ def _write_register(
 
 def _copy_cache(sessions: list[str] | None, root: Path) -> None:
     """Copy the canonical behavioral-cache entries the run reads into `root`."""
-    from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+    from continuum_swr_replay.paths import replay_content_dir
     from continuum_swr_replay.tables.versions import BEHAVIORAL_CONTEXT_CACHE_VERSION
 
-    src = REPLAY_CONTENT_DIR / CACHE / BEHAVIORAL_CONTEXT_CACHE_VERSION
+    src = replay_content_dir() / CACHE / BEHAVIORAL_CONTEXT_CACHE_VERSION
     dst = root / CACHE / BEHAVIORAL_CONTEXT_CACHE_VERSION
     dst.mkdir(parents=True)
     names = (

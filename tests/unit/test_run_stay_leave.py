@@ -107,20 +107,10 @@ def _write_tables(input_dir):
 
 
 @pytest.fixture
-def stage6(tmp_path, monkeypatch):
-    """Point the runner at a synthetic table set in ``tmp_path``."""
-    _write_tables(tmp_path)
-    monkeypatch.setattr(runner, "INPUT_DIR", tmp_path)
-    monkeypatch.setattr(
-        runner,
-        "FIT_INPUTS",
-        {
-            "stop_table": tmp_path / "stop_table.parquet",
-            "event_table": tmp_path / "event_table.parquet",
-            "event_arm_table": tmp_path / "event_arm_table.parquet",
-        },
-    )
-    return tmp_path
+def stage6(replay_content_root):
+    """A synthetic table set where the runner reads it, under a test data root."""
+    _write_tables(replay_content_root)
+    return replay_content_root
 
 
 def _run(*cli: str) -> None:

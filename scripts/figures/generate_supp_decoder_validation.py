@@ -59,7 +59,7 @@ from continuum_swr_replay.figure_utilities import (
     label_panels,
     save_figure,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.figure_panels import (
     plot_calibration_curve,
     plot_event_duration_distribution,
@@ -118,7 +118,9 @@ def plot_non_local_prob_distribution(data_over_time, ax) -> None:
 # ---------------------------------------------------------------------------
 
 
-def generate_figure(data_dir: Path = PROCESSED_DATA_DIR):
+def generate_figure(data_dir: Path | None = None):
+    if data_dir is None:
+        data_dir = processed_data_dir()
     logging.info("Loading aggregated data...")
     data_over_time = load_data_over_time(data_dir)
     event_types = get_event_types(data_over_time)
@@ -198,7 +200,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         type=Path,
         default=Path("paper/figures/supp_decoder_validation"),
     )
-    parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
     parser.add_argument("--show", action="store_true")
 
     args = parser.parse_args(argv)

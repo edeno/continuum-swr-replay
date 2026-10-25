@@ -14,9 +14,10 @@ DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC : float
 ROOT_DIR : Path
     Root directory of the project (parent of src/).
 PROCESSED_DATA_DIR : Path
-    Directory for saving analysis results and processed data: the checkout's
-    ``Processed-Data/`` unless ``CSR_PROCESSED_DATA_DIR`` names another, so a run
-    from any checkout can read and write one root.
+    The processed-data root, kept for notebooks and exploratory scripts:
+    ``paths.processed_data_dir()``, resolved at each attribute access (``from
+    ... import PROCESSED_DATA_DIR`` binds it at that import). Library code and
+    scripts call ``paths.processed_data_dir()``.
 FIGURE_DIR : Path
     Directory for saving generated figures.
 PLACE_BIN_SIZE_1D : float
@@ -59,11 +60,12 @@ Examples
 
 """
 
-import os
 from pathlib import Path
 from typing import Final
 
 import numpy as np
+
+from continuum_swr_replay.paths import ROOT_DIR, processed_data_dir
 
 # Decoding sampling frequency in samples per second
 SAMPLING_FREQUENCY = 500
@@ -72,12 +74,8 @@ SAMPLING_FREQUENCY = 500
 # analysis events (cm/s). Every event-bin speed must be strictly below it.
 DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0
 
-# Data directories and definitions
-# ROOT_DIR is the project root (continuum-swr-replay/), not src/
-ROOT_DIR = Path(__file__).parent.parent.parent
-PROCESSED_DATA_DIR = Path(
-    os.environ.get("CSR_PROCESSED_DATA_DIR", ROOT_DIR / "Processed-Data")
-)
+# Data directories and definitions. ROOT_DIR, the project root
+# (continuum-swr-replay/, not src/), is defined in paths beside the data roots.
 FIGURE_DIR = ROOT_DIR / "paper" / "figures"
 
 # Multiunit High Synchrony Event (HSE) detection parameters
@@ -104,6 +102,13 @@ DEFAULT_NON_LOCAL_THRESHOLD: Final[float] = 0.8
 """Default probability threshold for classifying non-local events (0-1)."""
 
 
+def __getattr__(name: str) -> Path:
+    # PROCESSED_DATA_DIR is resolved when read, not bound at import.
+    if name == "PROCESSED_DATA_DIR":
+        return processed_data_dir()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     # Sampling and thresholds
     "SAMPLING_FREQUENCY",
@@ -116,7 +121,7 @@ __all__ = [
     "HSE_CLOSE_EVENT_THRESHOLD_SEC",
     # Directories
     "ROOT_DIR",
-    "PROCESSED_DATA_DIR",
+    "PROCESSED_DATA_DIR",  # noqa: F822 -- resolved by __getattr__
     "FIGURE_DIR",
     # Spatial binning parameters
     "PLACE_BIN_SIZE_1D",

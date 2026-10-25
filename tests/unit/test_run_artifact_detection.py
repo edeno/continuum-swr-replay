@@ -230,21 +230,24 @@ def test_lfp_columns_that_are_not_band_and_references_in_id_order_fail(tmp_path)
     assert "reference" in record["error"]
 
 
-def test_the_runner_writes_where_the_source_reads():
-    assert runner.OUTPUT_ROOT == swr_source.ARTIFACT_INTERVALS_DIR
+def test_the_runner_writes_where_the_source_reads(processed_data_root, monkeypatch):
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
+
+    output_root = runner.build_parser().parse_args([]).output_root
+    assert output_root / "run0001" == swr_source.artifact_intervals_dir()
+    assert output_root.is_relative_to(processed_data_root)
 
 
-def test_the_source_reads_a_run_the_runner_wrote(tmp_path, monkeypatch):
+def test_the_source_reads_a_run_the_runner_wrote(processed_data_root, monkeypatch):
     """End to end: the runner's file and manifest are what ``swr_source`` reads,
     and it pads them into the one mask."""
     epoch = _artifact_epoch()
-    output_dir = tmp_path / "artifacts" / "run0001"
+    output_dir = runner.build_parser().parse_args([]).output_root / "run0001"
     output_dir.mkdir(parents=True)
     record = _run_epoch(output_dir, epoch)
     runner.write_manifest(
         output_dir, {"run_id": "run0001", "epochs": {EPOCH_ID: record}}
     )
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", output_dir.parent)
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "run0001")
 
     stored = read_epoch_cores(output_dir, EPOCH_ID)

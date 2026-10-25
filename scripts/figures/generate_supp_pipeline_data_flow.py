@@ -44,11 +44,10 @@ from continuum_swr_replay.analysis.replay.spatial_mapping import (
     map_estimate_to_arm,
 )
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import (
-    REPLAY_CONTENT_DIR,
     figure_dir,
     model_dir,
+    processed_data_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (
@@ -56,11 +55,16 @@ from continuum_swr_replay.tables.covariate_registry import (
 )
 from continuum_swr_replay.tables.io import read_table
 
-RC = REPLAY_CONTENT_DIR
-# The panel draws the fitted M3 arm model, so it is gated on the same table the
-# content ladder recorded when it fit M3.
-M3_PATH = model_dir("content_arm", RC) / "M3.pkl"
-ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC)}
+
+def m3_path() -> Path:
+    """The fitted M3 arm model the panel draws."""
+    return model_dir("content_arm") / "M3.pkl"
+
+
+def all_models_input_paths() -> dict[str, Path]:
+    """The table the content ladder recorded when it fit M3, which gates the panel."""
+    return {"event_arm_table": table_path("event_arm_table")}
+
 
 # The event's long-format rows, as panel E shows them.
 INDICATOR_COLUMNS = [
@@ -110,7 +114,7 @@ ARM_COLORS = {
 
 
 def load_session(animal: str, day: int, epoch: str):
-    paths = decode_paths(f"{animal}{day}_{epoch}_HPC", PROCESSED_DATA_DIR)
+    paths = decode_paths(f"{animal}{day}_{epoch}_HPC", processed_data_dir())
     dot_path = paths.data_over_time
     env_path = paths.environment
     # Through the SWR source: its event labels, and the excluded-time column.
@@ -499,14 +503,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
 
     dot, env = load_session(args.animal, args.day, args.epoch)
-    long_count = read_table(table_path("event_arm_table", RC))
-    events = read_table(table_path("event_table", RC))
+    long_count = read_table(table_path("event_arm_table"))
+    events = read_table(table_path("event_table"))
     require_covariate_schema(long_count, table="event_arm")
     require_covariate_schema(events, table="event")
-    require_swr_source(long_count, what=str(table_path("event_arm_table", RC)))
-    require_swr_source(events, what=str(table_path("event_table", RC)))
-    require_fresh_inputs(M3_PATH, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
-    m3_fits = pd.read_pickle(M3_PATH)
+    require_swr_source(long_count, what=str(table_path("event_arm_table")))
+    require_swr_source(events, what=str(table_path("event_table")))
+    require_fresh_inputs(
+        m3_path(), all_models_input_paths(), allow_stale=args.allow_stale
+    )
+    m3_fits = pd.read_pickle(m3_path())
 
     sess_mask = (
         (long_count["animal"] == args.animal)

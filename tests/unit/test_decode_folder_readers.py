@@ -9,6 +9,8 @@ Offline: ``REGISTER_PATH`` points at a register written under ``tmp_path``,
 analysing ``a20200101 02_r1`` and ``b20200102 04_r2`` and holding
 ``a20200101 06_r3`` pending; the decode files are small stand-ins, and the SWR
 source is a synthetic inventory with no SWRs (the frames are read through it).
+The data root is ``tmp_path / "decodes"``: the inventory is written under it, and
+the decode folder a reader scans by default is that root.
 """
 
 from __future__ import annotations
@@ -26,13 +28,12 @@ import scripts.qa.run_quality_metrics as quality_metrics
 from continuum_swr_replay.analysis.contfrag.data_aggregation import (
     load_contfrag_data_over_time,
 )
-from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     load_data_over_time,
 )
 from continuum_swr_replay.data_loaders import epoch_register
 from continuum_swr_replay.decoding.files import non_local_threshold_percent
-from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
+from tests.unit._swr_inventory_fixtures import use_swr_source, write_swr_inventory
 
 ANALYSED = ("a20200101_02_r1_HPC", "b20200102_04_r2_HPC")
 PENDING = "a20200101_06_r3_HPC"
@@ -54,11 +55,12 @@ def register(tmp_path, monkeypatch):
 
 @pytest.fixture(autouse=True)
 def source(tmp_path, monkeypatch):
-    """The decode frames are read through the SWR source: an empty inventory."""
-    root = tmp_path / "swr"
-    write_swr_inventory(root, {epoch_id: [] for epoch_id in (*ANALYSED, PENDING)})
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+    """The decode frames are read through the SWR source: an empty inventory,
+    under the data root ``tmp_path / "decodes"``."""
+    inventory = write_swr_inventory(
+        tmp_path / "decodes", {epoch_id: [] for epoch_id in (*ANALYSED, PENDING)}
+    )
+    use_swr_source(monkeypatch, inventory)
 
 
 def _frame(epoch_id: str) -> pd.DataFrame:
@@ -115,9 +117,8 @@ def test_the_contfrag_loader_reads_only_the_analysed_epochs(tmp_path):
         )
 
 
-def test_quality_metrics_load_only_the_analysed_epochs(tmp_path, monkeypatch):
-    folder = _folder(tmp_path, "_80_data_over_time.pkl")
-    monkeypatch.setattr(quality_metrics, "PROCESSED_DATA_DIR", folder)
+def test_quality_metrics_load_only_the_analysed_epochs(tmp_path):
+    _folder(tmp_path, "_80_data_over_time.pkl")  # the data root
 
     data = quality_metrics.load_all_sessions(threshold=80)
     one_animal = quality_metrics.load_all_sessions(animal="b", threshold=80)
@@ -130,12 +131,10 @@ def test_quality_metrics_load_only_the_analysed_epochs(tmp_path, monkeypatch):
 
 def test_the_content_scan_finds_only_analysed_epochs(tmp_path, monkeypatch):
     folder = tmp_path / "decodes"
-    folder.mkdir()
     for epoch_id in (*ANALYSED, PENDING):
         (folder / f"{epoch_id}_environment.pkl").touch()
         (folder / f"{epoch_id}_80_data_over_time.pkl").touch()
     (folder / f"{ANALYSED[1]}_80_data_over_time.pkl").unlink()
-    monkeypatch.setattr(content_occupancy, "PROCESSED_DATA_DIR", folder)
 
     assert content_occupancy.find_sessions(None) == [ANALYSED[0]]
     assert content_occupancy.find_sessions("b") == []
@@ -143,11 +142,9 @@ def test_the_content_scan_finds_only_analysed_epochs(tmp_path, monkeypatch):
 
 def test_the_spike_evidence_scan_finds_only_analysed_epochs(tmp_path, monkeypatch):
     folder = tmp_path / "decodes"
-    folder.mkdir()
     for epoch_id in (*ANALYSED, PENDING):
         for suffix in ("_detector.pkl", "_results.nc", "_80_data_over_time.pkl"):
             (folder / f"{epoch_id}{suffix}").touch()
-    monkeypatch.setattr(spike_evidence, "PROCESSED_DATA_DIR", folder)
 
     assert spike_evidence.find_sessions(None) == list(ANALYSED)
     assert spike_evidence.find_sessions("a") == [ANALYSED[0]]
@@ -205,7 +202,6 @@ def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path, monkeyp
         script.DEFAULT_NON_LOCAL_THRESHOLD
     )
     folder = tmp_path / "decodes"
-    folder.mkdir()
     for suffix in (
         "_environment.pkl",
         "_detector.pkl",
@@ -213,7 +209,6 @@ def test_a_scan_names_the_file_its_threshold_validates(script, tmp_path, monkeyp
         "_50_data_over_time.pkl",
     ):
         (folder / f"{ANALYSED[0]}{suffix}").touch()
-    monkeypatch.setattr(script, "PROCESSED_DATA_DIR", folder)
 
     assert script.find_sessions(None) == []
     monkeypatch.setattr(script, "THRESHOLD_PERCENT", 50)

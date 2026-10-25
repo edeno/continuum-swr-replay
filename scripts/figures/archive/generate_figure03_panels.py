@@ -44,7 +44,8 @@ from continuum_swr_replay.figure_utilities import (
     get_figure_size,
     save_figure,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 
 logging.basicConfig(
@@ -794,8 +795,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
-        help=f"Directory containing processed data (default: {PROCESSED_DATA_DIR})",
+        default=processed_data_dir(),
+        help=f"Directory containing processed data (default: {processed_data_dir()})",
     )
 
     args = parser.parse_args(argv)

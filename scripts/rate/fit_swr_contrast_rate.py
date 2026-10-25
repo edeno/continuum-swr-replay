@@ -136,8 +136,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_RATE_STOP_COVARS as STOP_COVARS,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    REPLAY_CONTENT_DIR,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -190,15 +190,20 @@ _RATE_CONT_COVARS = [
     "reward_belief_differential_entropy_leaf_mean_preoutcome",
     "reward_belief_mean_update_l1_all_ports_postoutcome",
 ]
-RC = REPLAY_CONTENT_DIR
 
-# The tables `_load` reads; recorded in each artifact's provenance sidecar.
-FIT_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "qvals_table": table_path("qvals_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-}
+
+def fit_input_paths() -> dict[str, Path]:
+    """The tables `_load` reads, recorded in each artifact's provenance sidecar;
+    under ``paths.replay_content_dir()``, read when called."""
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "qvals_table": table_path("qvals_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+    }
+
+
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
 MIN_BINS, MIN_EVENTS = 200, 20
 _EXPECTED = (
@@ -566,18 +571,19 @@ def _mask_post_outcome_covariates(
 
 
 def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
-    stop = read_table(table_path("stop_table", RC))
-    q = read_table(table_path("qvals_table", RC))
-    onset_table = read_table(table_path("event_onset_table", RC))
-    event_table = read_table(table_path("event_table", RC))
+    inputs = fit_input_paths()
+    stop = read_table(inputs["stop_table"])
+    q = read_table(inputs["qvals_table"])
+    onset_table = read_table(inputs["event_onset_table"])
+    event_table = read_table(inputs["event_table"])
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
     # The bins are dropped by the configured source's excluded time, so the
     # tables must come from that source (its artifact run included).
-    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
-    require_swr_source(onset_table, what=str(FIT_INPUTS["event_onset_table"]))
+    require_swr_source(stop, what=str(inputs["stop_table"]))
+    require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
     stop = add_uncertainty_covariates(stop)
     qcols = [
         "stop_id",
@@ -645,7 +651,7 @@ def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
             if count
         },
     )
-    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
+    require_swr_source(event_table, what=str(inputs["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
     # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
@@ -934,11 +940,12 @@ def _write_aggregation(
         ignore_index=True,
     ).to_csv(out_dir / f"swr_contrast_rate_term_diagnostics{suffix}.csv", index=False)
 
-    qv_full = read_table(FIT_INPUTS["qvals_table"])
-    st_full = read_table(FIT_INPUTS["stop_table"])
+    inputs = fit_input_paths()
+    qv_full = read_table(inputs["qvals_table"])
+    st_full = read_table(inputs["stop_table"])
     require_covariate_schema(qv_full, table="qvals")
     require_covariate_schema(st_full, table="stop")
-    require_swr_source(st_full, what=str(FIT_INPUTS["stop_table"]))
+    require_swr_source(st_full, what=str(inputs["stop_table"]))
     st_full = add_uncertainty_covariates(st_full)
     # A std_* column rescales a coefficient fit on ONE stop cohort, so its SD has
     # to come from that same cohort: dividing an at-well coefficient by an
@@ -1039,7 +1046,7 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
         apply the per-term drop rule to fits that carry no per-term information.
     """
     suffix = stop_cohort_suffix(cohort, smoke=smoke)
-    out_dir = model_dir("per_bin_rate", RC)
+    out_dir = model_dir("per_bin_rate")
     fits_path = out_dir / f"swr_contrast_rate{suffix}.pkl"
     if not fits_path.exists():
         raise SystemExit(f"no per-session fits at {fits_path}; run the fit first")
@@ -1119,7 +1126,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     stop, onsets, n_qvals_dropped = _load(args.stop_cohort)
     # Hash the inputs now, not at write time: the fan-out runs long enough that a
     # table could be regenerated mid-fit and be certified as this fit's input.
-    fit_inputs = record_inputs(FIT_INPUTS)
+    fit_inputs = record_inputs(fit_input_paths())
     if args.max_per_animal is not None:
         stop = subset_max_per_animal(stop, args.max_per_animal)
 
@@ -1197,7 +1204,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
 
-    out_dir = model_dir("per_bin_rate", RC)
+    out_dir = model_dir("per_bin_rate")
     out_dir.mkdir(parents=True, exist_ok=True)
     csfx = stop_cohort_suffix(args.stop_cohort, smoke=smoke)
     out = out_dir / f"swr_contrast_rate{csfx}.pkl"

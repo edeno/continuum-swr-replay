@@ -17,7 +17,7 @@ import seaborn as sns
 from scipy.ndimage import label
 
 import continuum_swr_replay.figure_utilities as figure_utilities
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 
 # Output directory for baseline figures
@@ -33,7 +33,7 @@ figure_utilities.set_figure_defaults(context="paper")
 warnings.filterwarnings("ignore")
 
 # %%
-data_path = PROCESSED_DATA_DIR.glob("*_HPC_80_data_over_time.pkl")
+data_path = processed_data_dir().glob("*_HPC_80_data_over_time.pkl")
 
 data_over_time = pd.concat([pd.read_pickle(p) for p in data_path])
 data_over_time["Non-Local_prob"] = (

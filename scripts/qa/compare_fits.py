@@ -87,7 +87,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     aggregate_to_timebins,
     reconstruct_reward_kernels,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import model_dir, replay_content_dir, table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -97,36 +97,60 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.qa._report import _invocation  # noqa: E402
 
-RC = REPLAY_CONTENT_DIR
 REPO = Path(__file__).resolve().parents[2]
 SC = list(SESSION_COLUMNS)
 KEY = SC + ["outcome"]
 
-DEFAULT_OLD_PER_BIN = (
-    RC / "_pre_fix_backup_20260904" / "models_per_bin_rate" / "all_models.pkl"
-)
-DEFAULT_NEW_PER_BIN = model_dir("per_bin_rate", RC) / "all_models.pkl"
-DEFAULT_OLD_PER_STOP = (
-    RC
-    / "_pre_v5_regression_refit_backup_20260902"
-    / "models_per_stop_rate"
-    / "all_models.pkl"
-)
-DEFAULT_NEW_PER_STOP = model_dir("per_stop_rate", RC) / "all_models.pkl"
 
-# The term-level separation section compares the SAME specification fit under the
-# fit-level flag and under the per-term flag, so its "before" is the immediately
-# preceding refit, not the pre-reward-basis one used above.
-TERMLEVEL_BACKUP_ROOT = RC / "_pre_termlevel_backup_20260904"
-TERMLEVEL_BACKUP = TERMLEVEL_BACKUP_ROOT / "models_per_bin_rate"
-DEFAULT_OLD_TERMLEVEL_PER_STOP = (
-    TERMLEVEL_BACKUP_ROOT / "models_per_stop_rate" / "all_models.pkl"
-)
-DEFAULT_OLD_CONTRAST = TERMLEVEL_BACKUP / "swr_contrast_rate.pkl"
-DEFAULT_NEW_CONTRAST = model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl"
-DEFAULT_OLD_AUDITED = TERMLEVEL_BACKUP / "swr_contrast_rate_audited.pkl"
-DEFAULT_NEW_AUDITED = model_dir("per_bin_rate", RC) / "swr_contrast_rate_audited.pkl"
-DEFAULT_OLD_TERMLEVEL_PER_BIN = TERMLEVEL_BACKUP / "all_models.pkl"
+def default_fit_paths() -> dict[str, Path]:
+    """The command line's default fits, by option name, under the data root.
+
+    The term-level separation section compares the SAME specification fit under
+    the fit-level flag and under the per-term flag, so its "before" is the
+    immediately preceding refit (``_pre_termlevel_backup_20260904``), not the
+    pre-reward-basis one the other "old" defaults name. Resolved when called.
+    """
+    rc = replay_content_dir()
+    per_bin, per_stop = model_dir("per_bin_rate", rc), model_dir("per_stop_rate", rc)
+    termlevel_root = rc / "_pre_termlevel_backup_20260904"
+    termlevel = termlevel_root / "models_per_bin_rate"
+    return {
+        "old_per_bin": (
+            rc / "_pre_fix_backup_20260904" / "models_per_bin_rate" / "all_models.pkl"
+        ),
+        "new_per_bin": per_bin / "all_models.pkl",
+        "old_per_stop": (
+            rc
+            / "_pre_v5_regression_refit_backup_20260902"
+            / "models_per_stop_rate"
+            / "all_models.pkl"
+        ),
+        "new_per_stop": per_stop / "all_models.pkl",
+        "old_termlevel_per_bin": termlevel / "all_models.pkl",
+        "old_termlevel_per_stop": (
+            termlevel_root / "models_per_stop_rate" / "all_models.pkl"
+        ),
+        "old_contrast": termlevel / "swr_contrast_rate.pkl",
+        "new_contrast": per_bin / "swr_contrast_rate.pkl",
+        "old_audited": termlevel / "swr_contrast_rate_audited.pkl",
+        "new_audited": per_bin / "swr_contrast_rate_audited.pkl",
+        "old_content_root": rc / "_pre_fix_backup_20260905",
+        "new_content_root": rc,
+        # the rate ladders fit on each stop cohort (--cohort-contrast)
+        "at_well_per_bin": per_bin / "all_models.pkl",
+        "all_stops_per_bin": per_bin / "all_models_allstops.pkl",
+        "in_transit_per_bin": per_bin / "all_models_intransit.pkl",
+        "at_well_contrast": per_bin / "swr_contrast_rate.pkl",
+        "all_stops_contrast": per_bin / "swr_contrast_rate_allstops.pkl",
+        # Family A (per-stop Poisson) is published as one ladder per cohort.
+        # Only the canonical at-well fit is written under its own name; the
+        # all-stops ladder was never re-published after the well-anchored refit
+        # overwrote it, so the pre-refit backup IS the all-stops fit
+        # (per_stop_all_stops_fallback) and the section says where it came from.
+        "at_well_per_stop": per_stop / "all_models.pkl",
+        "all_stops_per_stop": per_stop / "all_models_allstops.pkl",
+    }
+
 
 # The reward step of each family: (rung, its reward-free parent).
 OLD_PER_BIN_STEPS = {
@@ -1617,7 +1641,7 @@ def build_report(
     )
     add(_md(reward_boundary_shift_table(old_bin, new_bin), floatfmt="{:.3f}"))
 
-    stop_path = table_path("stop_table", RC)
+    stop_path = table_path("stop_table")
     if table_exists(stop_path):
         add(
             "\nWhich stops the shift applies to, on the canonical stop table. A "
@@ -1869,7 +1893,6 @@ CONTENT_FRAMINGS = {
         ),
     ),
 }
-DEFAULT_CONTENT_BACKUP_ROOT = RC / "_pre_fix_backup_20260905"
 # Terms carried by every rung above M0a purely to absorb each arm's static
 # occupancy. Sorted last so the scientific terms lead the coefficient table.
 CONTENT_NUISANCE_PREFIX = "is_candidate_arm_"
@@ -2692,26 +2715,22 @@ COHORT_RULE_NOTE = {
     "all_stops": "every immobility stop — sensitivity bundle",
     "in_transit": "in-transit stops only — sensitivity bundle",
 }
-DEFAULT_COHORT_PER_BIN = {
-    "at_well": model_dir("per_bin_rate", RC) / "all_models.pkl",
-    "all_stops": model_dir("per_bin_rate", RC) / "all_models_allstops.pkl",
-    "in_transit": model_dir("per_bin_rate", RC) / "all_models_intransit.pkl",
-}
-DEFAULT_COHORT_CONTRAST = {
-    "at_well": model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl",
-    "all_stops": model_dir("per_bin_rate", RC) / "swr_contrast_rate_allstops.pkl",
-}
-# Family A (per-stop Poisson) is published as one ladder per cohort. Only the
-# canonical at-well fit is written under its own name; the all-stops ladder was
-# never re-published after the well-anchored refit overwrote it, so the pre-refit
-# backup IS the all-stops fit and the section says where it came from.
-DEFAULT_COHORT_PER_STOP = {
-    "at_well": model_dir("per_stop_rate", RC) / "all_models.pkl",
-    "all_stops": model_dir("per_stop_rate", RC) / "all_models_allstops.pkl",
-}
-PER_STOP_ALL_STOPS_FALLBACK = (
-    RC / "_pre_atwell_backup_20260912" / "models_per_stop_rate" / "all_models.pkl"
-)
+
+
+def per_stop_all_stops_fallback() -> Path:
+    """The pre-refit backup that holds the all-stops Family A ladder.
+
+    The well-anchored refit overwrote the canonical per-stop bundle in place,
+    so this backup is where the all-stops fit lives (``default_fit_paths``).
+    """
+    return (
+        replay_content_dir()
+        / "_pre_atwell_backup_20260912"
+        / "models_per_stop_rate"
+        / "all_models.pkl"
+    )
+
+
 #: The Family A reward step, child first: the four-parameter reward-history
 #: block against the offset-only null it is nested in.
 PER_STOP_STEP = ("R1", "R0")
@@ -3062,7 +3081,7 @@ def per_stop_source_note(inputs: dict[str, Path]) -> str:
         path = inputs.get(f"per-stop ({cohort})")
         if path is None:
             continue
-        stood_in = path == PER_STOP_ALL_STOPS_FALLBACK
+        stood_in = path == per_stop_all_stops_fallback()
         origin = (
             " — the pre-refit backup, which is where the all-stops fit of this "
             "ladder now lives: Family A publishes no bundle under an "
@@ -3682,7 +3701,7 @@ def collect_cohort_inputs(
     still meaningful with two cohorts -- but the canonical at-well per-bin fit
     is required, since it is what the other columns are read against. A named
     per-stop (Family A) ladder that is absent falls back to
-    :data:`PER_STOP_ALL_STOPS_FALLBACK` only for the all-stops cohort, which is
+    :func:`per_stop_all_stops_fallback` only for the all-stops cohort, which is
     the one the refit overwrote in place; the fallback is recorded as the input
     so the report can say where the column came from.
     """
@@ -3702,7 +3721,7 @@ def collect_cohort_inputs(
             inputs[f"is_swr-contrast rate ({cohort})"] = path
         path = per_stop.get(cohort)
         if path is not None and not path.exists() and cohort == "all_stops":
-            path = PER_STOP_ALL_STOPS_FALLBACK
+            path = per_stop_all_stops_fallback()
         if path is not None and path.exists():
             per_stop_fits[cohort] = pd.read_pickle(path)
             inputs[f"per-stop ({cohort})"] = path
@@ -3747,21 +3766,22 @@ def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    defaults = default_fit_paths()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--old-per-bin", type=Path, default=DEFAULT_OLD_PER_BIN)
-    parser.add_argument("--new-per-bin", type=Path, default=DEFAULT_NEW_PER_BIN)
-    parser.add_argument("--old-per-stop", type=Path, default=DEFAULT_OLD_PER_STOP)
-    parser.add_argument("--new-per-stop", type=Path, default=DEFAULT_NEW_PER_STOP)
+    parser.add_argument("--old-per-bin", type=Path, default=defaults["old_per_bin"])
+    parser.add_argument("--new-per-bin", type=Path, default=defaults["new_per_bin"])
+    parser.add_argument("--old-per-stop", type=Path, default=defaults["old_per_stop"])
+    parser.add_argument("--new-per-stop", type=Path, default=defaults["new_per_stop"])
     parser.add_argument(
         "--old-termlevel-per-bin",
         type=Path,
-        default=DEFAULT_OLD_TERMLEVEL_PER_BIN,
+        default=defaults["old_termlevel_per_bin"],
         help="Family B fit under the fit-level separation flag (same spec).",
     )
     parser.add_argument(
         "--old-termlevel-per-stop",
         type=Path,
-        default=DEFAULT_OLD_TERMLEVEL_PER_STOP,
+        default=defaults["old_termlevel_per_stop"],
         help="Family A fit under the fit-level separation flag (same spec).",
     )
     parser.add_argument(
@@ -3774,10 +3794,10 @@ def build_parser() -> argparse.ArgumentParser:
             "rung the CV measurement then retired; defaults to --new-per-bin."
         ),
     )
-    parser.add_argument("--old-contrast", type=Path, default=DEFAULT_OLD_CONTRAST)
-    parser.add_argument("--new-contrast", type=Path, default=DEFAULT_NEW_CONTRAST)
-    parser.add_argument("--old-audited", type=Path, default=DEFAULT_OLD_AUDITED)
-    parser.add_argument("--new-audited", type=Path, default=DEFAULT_NEW_AUDITED)
+    parser.add_argument("--old-contrast", type=Path, default=defaults["old_contrast"])
+    parser.add_argument("--new-contrast", type=Path, default=defaults["new_contrast"])
+    parser.add_argument("--old-audited", type=Path, default=defaults["old_audited"])
+    parser.add_argument("--new-audited", type=Path, default=defaults["new_audited"])
     parser.add_argument(
         "--per-stop-note",
         default=(
@@ -3799,13 +3819,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--old-content-root",
         type=Path,
-        default=DEFAULT_CONTENT_BACKUP_ROOT,
+        default=defaults["old_content_root"],
         help="Root holding the pre-fix content bundles (--content).",
     )
     parser.add_argument(
         "--new-content-root",
         type=Path,
-        default=RC,
+        default=defaults["new_content_root"],
         help="Root holding the current content bundles (--content).",
     )
     parser.add_argument(
@@ -3836,43 +3856,43 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--at-well-per-bin",
         type=Path,
-        default=DEFAULT_COHORT_PER_BIN["at_well"],
+        default=defaults["at_well_per_bin"],
         help="Canonical at-well per-bin fit (--cohort-contrast).",
     )
     parser.add_argument(
         "--all-stops-per-bin",
         type=Path,
-        default=DEFAULT_COHORT_PER_BIN["all_stops"],
+        default=defaults["all_stops_per_bin"],
         help="All-stops per-bin sensitivity fit (--cohort-contrast).",
     )
     parser.add_argument(
         "--in-transit-per-bin",
         type=Path,
-        default=DEFAULT_COHORT_PER_BIN["in_transit"],
+        default=defaults["in_transit_per_bin"],
         help="In-transit per-bin sensitivity fit (--cohort-contrast).",
     )
     parser.add_argument(
         "--at-well-contrast",
         type=Path,
-        default=DEFAULT_COHORT_CONTRAST["at_well"],
+        default=defaults["at_well_contrast"],
         help="Canonical at-well is_swr-contrast rate bundle (--cohort-contrast).",
     )
     parser.add_argument(
         "--all-stops-contrast",
         type=Path,
-        default=DEFAULT_COHORT_CONTRAST["all_stops"],
+        default=defaults["all_stops_contrast"],
         help="All-stops is_swr-contrast rate bundle (--cohort-contrast).",
     )
     parser.add_argument(
         "--at-well-per-stop",
         type=Path,
-        default=DEFAULT_COHORT_PER_STOP["at_well"],
+        default=defaults["at_well_per_stop"],
         help="Canonical at-well Family A per-stop ladder (--cohort-contrast).",
     )
     parser.add_argument(
         "--all-stops-per-stop",
         type=Path,
-        default=DEFAULT_COHORT_PER_STOP["all_stops"],
+        default=defaults["all_stops_per_stop"],
         help=(
             "All-stops Family A per-stop ladder (--cohort-contrast); falls back "
             "to the pre-refit backup, which holds that fit."

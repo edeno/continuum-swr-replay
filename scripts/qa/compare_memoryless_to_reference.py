@@ -78,7 +78,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
     aggregate_windows,
     normalize_windows,
 )
-from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.device import default_jax_platforms
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
@@ -91,7 +91,6 @@ from scripts.qa import _memoryless_reference as reference  # noqa: E402
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/reference_check_summary.csv"
 )
-OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_reference_check.parquet"
 FIGURE_SEED = ShuffleSeed(run=SHUFFLE_RUN_SEED, session="figure-one-simulation")
 """The figure's seed, so both procedures see the same cell permutations."""
 
@@ -559,7 +558,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--n-seeds", type=int, default=8, help="Sweep seeds; 8 is the whole sweep."
     )
-    parser.add_argument("--out", type=Path, default=OUT_PATH)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=detection_comparison_dir() / "memoryless_reference_check.parquet",
+    )
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     args = parser.parse_args(argv)
 

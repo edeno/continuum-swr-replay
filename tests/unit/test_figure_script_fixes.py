@@ -177,10 +177,8 @@ TIME = np.round(100.0 + np.arange(2000) / 500.0, 6)
 def test_the_data_flow_figure_reads_its_frame_through_the_source(tmp_path, monkeypatch):
     """An artifact core at 102.15 s (a spike line, padded by 0.1 s and widened
     by 0.3 s) puts [101.75, 102.55] in excluded time."""
-    inventory = write_swr_inventory(tmp_path / "swr", {EPOCH_ID: []})
-    artifacts = write_artifact_run(
-        tmp_path / "artifacts", {EPOCH_ID: [("spk", 102.15, 102.15)]}
-    )
+    inventory = write_swr_inventory(tmp_path, {EPOCH_ID: []})
+    artifacts = write_artifact_run(tmp_path, {EPOCH_ID: [("spk", 102.15, 102.15)]})
     use_swr_source(monkeypatch, inventory, artifacts)
     pd.DataFrame(
         {
@@ -201,7 +199,6 @@ def test_the_data_flow_figure_reads_its_frame_through_the_source(tmp_path, monke
     (tmp_path / f"{EPOCH_ID}_environment.pkl").write_bytes(
         pickle.dumps({"environment": "stand-in"})
     )
-    monkeypatch.setattr(flow, "PROCESSED_DATA_DIR", tmp_path)
     monkeypatch.setattr(
         flow, "map_estimate_to_arm", lambda values, env: np.full(len(values), np.nan)
     )
@@ -852,12 +849,12 @@ def test_the_arrival_retention_note_is_words_only_without_the_cohort_tallies():
 
 @pytest.mark.usefixtures("default_style")
 def test_the_gof_ladder_title_carries_the_computed_retention_note(
-    tmp_path, monkeypatch
+    processed_data_root, monkeypatch
 ):
     import matplotlib.pyplot as plt
 
+    # the figure goes beside the data root, under processed_data_root's tmp_path
     checking = importlib.import_module("scripts.rate.plot_model_checking")
-    monkeypatch.setattr(checking, "FIGS", tmp_path)
     figures = []
     # ``checking.plt`` is pyplot itself, so keep the real close for the cleanup.
     real_close = plt.close

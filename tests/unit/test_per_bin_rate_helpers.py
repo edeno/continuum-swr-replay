@@ -25,14 +25,10 @@ from continuum_swr_replay.analysis.replay import (
 from continuum_swr_replay.analysis.replay.covariates.history.reward_history import (
     reward_basis_from_lags,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table, table_exists
-
-RC = REPLAY_CONTENT_DIR
-
 
 # ── Synthetic fixture for aggregate_to_timebins ──
 
@@ -337,13 +333,13 @@ def test_reward_groupby_drops_nan_reward():
 
 
 @pytest.fixture(scope="module")
-def session_slice():
+def session_slice(live_processed_data_dir):
     """One real session's onset / event / stop rows (fails if data absent).
 
     Only ``real_data`` tests may request it.
     """
     paths = {
-        name: RC / f"{name}.parquet"
+        name: live_processed_data_dir / "replay_content" / f"{name}.parquet"
         for name in ("event_onset_table", "event_table", "stop_table")
     }
     for p in paths.values():

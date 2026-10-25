@@ -27,9 +27,14 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.data_loaders.epoch_register import read_register
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, write_table
-from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory
+from tests.unit._swr_inventory_fixtures import (
+    RUN_ID,
+    use_swr_source,
+    write_swr_inventory,
+)
 
 
 @pytest.fixture
@@ -180,10 +185,10 @@ class TestLoadSessionSwrIntervals:
     @pytest.fixture
     def source(self, tmp_path, monkeypatch):
         def write(intervals):
-            root = tmp_path / "swr"
-            write_swr_inventory(root, {"j1620210706_02_r1_HPC": intervals})
-            monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-            monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+            use_swr_source(
+                monkeypatch,
+                write_swr_inventory(tmp_path, {"j1620210706_02_r1_HPC": intervals}),
+            )
 
         return write
 
@@ -303,10 +308,7 @@ class TestCanonicalEventInputHashes:
     def test_a_missing_input_hashes_to_none_so_the_session_is_refit(
         self, tmp_path, monkeypatch
     ):
-        import continuum_swr_replay.analysis.pfc.canonical_events as module
-
-        monkeypatch.setattr(module, "PROCESSED_DATA_DIR", tmp_path)
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", tmp_path / "swr")
+        monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
 
         provenance = canonical_event_input_hashes(
             "j1620210706_.nwb", "02_r1", event_table_path=tmp_path / "absent.parquet"
@@ -321,12 +323,9 @@ class TestCanonicalEventInputHashes:
     def test_present_inputs_hash_to_the_files_on_disk(
         self, tmp_path, event_table_path, monkeypatch
     ):
-        import continuum_swr_replay.analysis.pfc.canonical_events as module
-
-        monkeypatch.setattr(module, "PROCESSED_DATA_DIR", tmp_path)
-        write_swr_inventory(tmp_path / "swr", {"j1620210706_02_r1_HPC": []})
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", tmp_path / "swr")
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+        use_swr_source(
+            monkeypatch, write_swr_inventory(tmp_path, {"j1620210706_02_r1_HPC": []})
+        )
         dot = _synthetic_dot([0, 1, 1, 0], [1.0, 1.0, 1.0, 1.0])
         dot_path = tmp_path / "j1620210706_02_r1_HPC_80_data_over_time.pkl"
         dot.to_pickle(dot_path)
@@ -340,7 +339,9 @@ class TestCanonicalEventInputHashes:
         )
         assert provenance["data_over_time_sha256"] == sha256_file(dot_path)
         assert provenance["data_over_time_path"] == str(dot_path)
-        events = tmp_path / "swr" / RUN_ID / "j1620210706_02_r1_HPC_kay_events.parquet"
+        events = (
+            swr_source.swr_inventory_dir() / "j1620210706_02_r1_HPC_kay_events.parquet"
+        )
         assert provenance["swr_interval_source"] == f"kay@{RUN_ID}+artifacts@none"
         assert provenance["swr_events_path"] == str(events)
         assert provenance["swr_events_sha256"] == sha256_file(events)

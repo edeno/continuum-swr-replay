@@ -10,7 +10,6 @@ from __future__ import annotations
 import ast
 import hashlib
 import importlib.util
-import inspect
 import json
 import os
 import re
@@ -24,7 +23,7 @@ import pytest
 
 from continuum_swr_replay.analysis.replay import fit_outputs, fit_provenance
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
-    CONTENT_FIT_INPUTS,
+    contrast_fit_inputs,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
@@ -34,8 +33,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     require_fresh_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import model_dir
 from continuum_swr_replay.tables.io import write_table
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -421,40 +419,13 @@ def _load_script(path: Path) -> ModuleType:
     return _MODULES[path.name]
 
 
-def _module_constants(path: Path) -> dict[str, object]:
-    """Evaluate a script's module-level constants from source, without importing.
+def _read_table_keys(path: Path, mappings: set[str]) -> set[str]:
+    """The key of every ``read_table(<mapping>["key"])`` call in ``path``.
 
-    For scripts whose import is unwanted here (the swr-contrast coefficient
-    figure drew its figures at import until it gained a ``main``). Only
-    assignments are evaluated, in order, against a namespace seeded with the
-    data-directory constants; anything that needs a name the namespace does not
-    carry (a dataframe read, a plot handle) is skipped.
+    Every ``read_table`` must read through one of the named `mappings`, so a
+    table the script reads is a table its provenance mapping names.
     """
-    namespace: dict[str, object] = {
-        "PROCESSED_DATA_DIR": PROCESSED_DATA_DIR,
-        "P": PROCESSED_DATA_DIR,
-        "Path": Path,
-        "REPLAY_CONTENT_DIR": REPLAY_CONTENT_DIR,
-        "model_dir": model_dir,
-        "table_path": table_path,
-    }
-    for node in ast.parse(path.read_text()).body:
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-        ):
-            try:
-                value = eval(ast.unparse(node.value), namespace)  # noqa: S307
-            except Exception:
-                continue
-            namespace[node.targets[0].id] = value
-    return namespace
-
-
-def _read_table_paths(path: Path, constants: dict[str, object]) -> set[Path]:
-    """Every table path the script hands to ``read_table``, from its source."""
-    paths = set()
+    keys = set()
     for node in ast.walk(ast.parse(path.read_text())):
         if not (
             isinstance(node, ast.Call)
@@ -462,21 +433,39 @@ def _read_table_paths(path: Path, constants: dict[str, object]) -> set[Path]:
             and node.func.id == "read_table"
         ):
             continue
-        expression = ast.unparse(node.args[0])
-        try:
-            paths.add(Path(eval(expression, dict(constants))))  # noqa: S307
-        except Exception as error:  # pragma: no cover - drift makes this fire
+        argument = node.args[0]
+        if not (
+            isinstance(argument, ast.Subscript)
+            and isinstance(argument.value, ast.Name)
+            and argument.value.id in mappings
+            and isinstance(argument.slice, ast.Constant)
+        ):  # pragma: no cover - drift makes this fire
             raise AssertionError(
-                f"{path.name}: cannot resolve read_table({expression}) against the "
-                "module constants, so the provenance mapping cannot be checked "
-                "against it -- read the table through a module-level constant."
-            ) from error
-    return paths
+                f"{path.name}: read_table({ast.unparse(argument)}) does not read "
+                f"through the provenance mapping ({sorted(mappings)}), so the "
+                "mapping cannot be checked against it."
+            )
+        keys.add(argument.slice.value)
+    return keys
 
 
-# Each fitter and the readers of the artifacts it writes, with the module-level
-# name each one declares its input mapping under. The content contrast runner is
-# not listed: its tables are read in ``contrast_aggregation``'s assemblers, and
+def _names_bound_to(path: Path, function: str) -> set[str]:
+    """The names ``path`` assigns from a call to ``function()``."""
+    return {
+        target.id
+        for node in ast.walk(ast.parse(path.read_text()))
+        if isinstance(node, ast.Assign)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+        and node.value.func.id == function
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+
+
+# Each fitter and the readers of the artifacts it writes. A fitter declares its
+# input mapping as ``fit_input_paths()``. The content contrast runner is not
+# listed: its tables are read in ``contrast_aggregation``'s assemblers, and
 # ``test_content_contrast_fits_record_every_table_they_read`` covers it.
 FITTERS = [
     RATE / "fit_per_bin_rate_models.py",
@@ -484,63 +473,64 @@ FITTERS = [
     RATE / "fit_swr_contrast_rate.py",
     RATE / "fit_uncertainty_rate.py",
 ]
-# (reader, name of its input mapping, the fitter that writes what it reads: a
-# script, whose ``FIT_INPUTS`` it records, or the recorded mapping itself).
-# ``plot_swr_contrast_coefs``'s constants are read from source rather than
-# imported (it used to draw its figures at import; the source read still works).
+# (reader, the function that returns its input mapping, the fitter that writes
+# what it reads: a script, whose ``fit_input_paths()`` it records, or the
+# function that returns the recorded mapping).
 READERS = [
     (
         RATE / "summarize_per_bin_rate_models.py",
-        "ALL_MODELS_INPUTS",
+        "all_models_input_paths",
         RATE / "fit_per_bin_rate_models.py",
     ),
     (
         RATE / "plot_per_bin_rate_models.py",
-        "ALL_MODELS_INPUTS",
+        "all_models_input_paths",
         RATE / "fit_per_bin_rate_models.py",
     ),
     (
         RATE / "plot_model_checking.py",
-        "ALL_MODELS_INPUTS",
+        "all_models_input_paths",
         RATE / "fit_per_bin_rate_models.py",
     ),
     (
         RATE / "plot_per_bin_rate_summary.py",
-        "ALL_MODELS_INPUTS",
+        "all_models_input_paths",
         RATE / "fit_per_bin_rate_models.py",
     ),
     (
         RATE / "plot_uncertainty_rate.py",
-        "UNCERTAINTY_RATE_INPUTS",
+        "_fit.fit_input_paths",
         RATE / "fit_uncertainty_rate.py",
     ),
     (
         FIGURES / "plot_swr_contrast_coefs.py",
-        "SWR_CONTRAST_RATE_INPUTS",
+        "rate_input_paths",
         RATE / "fit_swr_contrast_rate.py",
     ),
     (
         FIGURES / "plot_swr_contrast_coefs.py",
-        "SWR_CONTRAST_CONTENT_INPUTS",
-        CONTENT_FIT_INPUTS,
+        "content_input_paths",
+        contrast_fit_inputs,
     ),
 ]
-RUNS_AT_IMPORT = {"plot_swr_contrast_coefs.py"}
 
 
 @pytest.mark.parametrize(
-    "reader,mapping,fitter", READERS, ids=lambda v: getattr(v, "stem", v)
+    "reader,mapping,fitter",
+    READERS,
+    ids=lambda v: getattr(v, "stem", getattr(v, "__name__", v)),
 )
-def test_readers_check_the_same_inputs_the_fitter_recorded(reader, mapping, fitter):
+def test_readers_check_the_same_inputs_the_fitter_recorded(
+    reader, mapping, fitter, processed_data_root
+):
     """A reader checking a different table set than the fitter recorded is blind."""
-    expected = _load_script(fitter).FIT_INPUTS if isinstance(fitter, Path) else fitter
-    declared = (
-        _module_constants(reader)
-        if reader.name in RUNS_AT_IMPORT
-        else vars(_load_script(reader))
+    expected = (
+        _load_script(fitter).fit_input_paths() if isinstance(fitter, Path) else fitter()
     )
+    declared = eval(f"module.{mapping}()", {"module": _load_script(reader)})
 
-    assert declared[mapping] == expected
+    assert declared == expected
+    assert all(path.is_relative_to(processed_data_root) for path in declared.values())
 
 
 @pytest.mark.parametrize(
@@ -569,31 +559,42 @@ def test_readers_default_to_refusing_a_stale_fit(reader):
         "plot_per_bin_rate_summary",
     ],
 )
-def test_per_bin_readers_gate_the_ladder_artifact(reader):
+def test_per_bin_readers_gate_the_ladder_artifact(reader, replay_content_root):
     module = _load_script(RATE / f"{reader}.py")
 
-    assert module.ALL_MODELS == module.RC / "models_per_bin_rate" / "all_models.pkl"
-
-
-def test_contrast_figure_gates_the_rate_artifact():
-    constants = _module_constants(FIGURES / "plot_swr_contrast_coefs.py")
-    fitter = _load_script(RATE / "fit_swr_contrast_rate.py")
-
-    assert constants["SWR_CONTRAST_RATE"] == (
-        fitter.RC / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+    assert module.all_models_path() == (
+        replay_content_root / "models_per_bin_rate" / "all_models.pkl"
     )
 
 
-def test_contrast_figure_gates_both_content_artifacts():
+def test_contrast_figure_gates_the_rate_artifact(replay_content_root):
+    figure = _load_script(FIGURES / "plot_swr_contrast_coefs.py")
+    fitter = (RATE / "fit_swr_contrast_rate.py").read_text()
+
+    assert figure.fit_artifact_paths()["rate"] == (
+        replay_content_root / "models_per_bin_rate" / "swr_contrast_rate.pkl"
+    )
+    # the fitter writes the per-session fits there
+    assert 'out_dir = model_dir("per_bin_rate")' in fitter
+    assert 'out_dir / f"swr_contrast_rate{csfx}.pkl"' in fitter
+
+
+def test_contrast_figure_gates_both_content_artifacts(replay_content_root):
     """The content half draws from two pickles; both are gated, not just one."""
-    constants = _module_constants(FIGURES / "plot_swr_contrast_coefs.py")
-    fitter = _load_script(CONTENT / "fit_swr_contrast_content.py")
+    artifacts = _load_script(
+        FIGURES / "plot_swr_contrast_coefs.py"
+    ).fit_artifact_paths()
+    fitter = (CONTENT / "fit_swr_contrast_content.py").read_text()
 
-    assert constants["SWR_CONTRAST_CONTENT_ARM"] == (
-        fitter.RC / "models_swr_contrast" / "swr_contrast_content_arm.pkl"
+    assert artifacts["content_arm"] == (
+        replay_content_root / "models_swr_contrast" / "swr_contrast_content_arm.pkl"
     )
-    assert constants["SWR_CONTRAST_CONTENT_PATCH"] == (
-        fitter.RC / "models_swr_contrast" / "swr_contrast_content_patch.pkl"
+    assert artifacts["content_patch"] == (
+        replay_content_root / "models_swr_contrast" / "swr_contrast_content_patch.pkl"
+    )
+    assert 'model_dir("swr_contrast") / f"swr_contrast_content_arm{sfx}.pkl"' in fitter
+    assert (
+        'model_dir("swr_contrast") / f"swr_contrast_content_patch{sfx}.pkl"' in fitter
     )
 
 
@@ -604,37 +605,42 @@ def test_content_contrast_fits_live_outside_the_arm_ladder_bundle():
     contrast, arm = model_dir("swr_contrast"), model_dir("content_arm")
 
     assert 'model_dir("content_arm"' not in source
-    assert 'model_dir("swr_contrast", RC)' in source
+    assert 'model_dir("swr_contrast")' in source
     assert not contrast.is_relative_to(arm) and not arm.is_relative_to(contrast)
 
 
-def test_content_ladder_readers_check_the_table_the_ladder_records():
+def test_content_ladder_readers_check_the_table_the_ladder_records(
+    replay_content_root,
+):
     """The ladder resolves its input from the CLI, so readers rebuild the map.
 
     ``fit_replay_content_models.py`` reads one candidate table whose path
-    depends on the event source and hierarchy, so it has no module-level
-    ``FIT_INPUTS``. Its readers declare the canonical arm mapping instead, and
-    that declaration is checked against the helper the fitter itself uses.
+    depends on the event source and hierarchy, so it has no ``fit_input_paths``.
+    Its readers declare the canonical arm mapping instead, and that declaration
+    is checked against the helper the fitter itself uses.
     """
     fitter = _load_script(CONTENT / "fit_replay_content_models.py")
-    expected = fitter.content_fit_inputs(fitter.REPLAY_CONTENT_DIR, "event_arm_table")
+    expected = fitter.content_fit_inputs(replay_content_root, "event_arm_table")
     figures = _load_script(CONTENT / "generate_replay_content_figures.py")
     uncertainty = _load_script(CONTENT / "analyze_uncertainty_content.py")
+    data_dir = uncertainty.build_parser().parse_args([]).data_dir
 
-    assert figures.ALL_MODELS_INPUTS == expected
-    assert uncertainty.mu_inputs(uncertainty.DEFAULT_DATA_DIR) == expected
+    assert figures.all_models_input_paths() == expected
+    assert uncertainty.mu_inputs(data_dir) == expected
 
 
-def test_content_ladder_readers_gate_the_canonical_bundle():
+def test_content_ladder_readers_gate_the_canonical_bundle(replay_content_root):
     """The gated artifacts live in the directory a full fraction run publishes."""
-    fitter = _load_script(CONTENT / "fit_replay_content_models.py")
     figures = _load_script(CONTENT / "generate_replay_content_figures.py")
-    bundle = fitter.REPLAY_CONTENT_DIR / (
+    bundle = replay_content_root / (
         fit_outputs.canonical_output_subdir("non_local", "HPC", "arm", "all", "timebin")
     )
 
-    assert figures.MODEL_DIR == bundle
-    assert figures.ALL_MODELS == bundle / "all_models.pkl"
+    assert figures.bundle_dir() == bundle
+    assert (
+        'all_models_path = models_dir / "all_models.pkl"'
+        in (CONTENT / "generate_replay_content_figures.py").read_text()
+    )
 
 
 def test_uncertainty_reader_defaults_to_the_bundle_the_belief_chain_writes():
@@ -650,14 +656,15 @@ def test_uncertainty_reader_defaults_to_the_bundle_the_belief_chain_writes():
         ["--leaf-only", "--models", ",".join(fit_outputs.BELIEF_CHAIN_MODEL_NAMES)]
     )
     expected = fitter._resolve_run_config(runner_args).output_dir
+    data_dir = uncertainty.build_parser().parse_args([]).data_dir
 
-    resolved = uncertainty.resolve_models_dir(uncertainty.DEFAULT_DATA_DIR)
+    resolved = uncertainty.resolve_models_dir(data_dir)
 
     assert resolved == expected
     assert resolved.name != "models"
-    assert uncertainty.resolve_models_dir(
-        uncertainty.DEFAULT_DATA_DIR, Path("/tmp/mine")
-    ) == Path("/tmp/mine")
+    assert uncertainty.resolve_models_dir(data_dir, Path("/tmp/mine")) == Path(
+        "/tmp/mine"
+    )
 
 
 @pytest.mark.parametrize(
@@ -679,20 +686,24 @@ def test_content_readers_default_to_refusing_a_stale_fit(reader):
 def test_fitters_record_every_table_they_read(fitter):
     """The declared mapping is the whole set of tables the runner loads.
 
-    A new ``read_table`` that never reaches ``FIT_INPUTS`` would leave an input
-    out of the sidecar, so the fit would pass the reader gate after that table
-    was regenerated.
+    A new ``read_table`` that never reaches ``fit_input_paths()`` would leave an
+    input out of the sidecar, so the fit would pass the reader gate after that
+    table was regenerated.
     """
-    constants = _module_constants(fitter)
+    mappings = _names_bound_to(fitter, "fit_input_paths")
 
-    assert _read_table_paths(fitter, constants) == set(constants["FIT_INPUTS"].values())
+    assert mappings
+    assert _read_table_keys(fitter, mappings) == set(
+        _load_script(fitter).fit_input_paths()
+    )
 
 
 def _mapping_arguments(path: Path) -> dict[str, list[str]]:
     """The mapping each ``record_inputs`` / ``assemble_*`` call in ``path`` is handed.
 
-    An assembler called without one reads its default, ``CONTENT_FIT_INPUTS``
-    (pinned by ``test_the_assemblers_default_to_the_content_fit_inputs``).
+    An assembler called without one reads ``contrast_fit_inputs()`` (pinned by
+    ``test_the_assemblers_default_to_the_contrast_fit_inputs``); it is listed
+    as that call.
     """
     position = {"record_inputs": 0, "assemble_arm": 0, "assemble_patch": 1}
     found: dict[str, list[str]] = {name: [] for name in position}
@@ -707,21 +718,38 @@ def _mapping_arguments(path: Path) -> dict[str, list[str]]:
             argument = (
                 node.args[index]
                 if len(node.args) > index
-                else (keyword[0] if keyword else ast.Name("CONTENT_FIT_INPUTS"))
+                else (keyword[0] if keyword else ast.parse("contrast_fit_inputs()"))
             )
             found[node.func.id].append(ast.unparse(argument))
     return found
 
 
-def test_the_assemblers_default_to_the_content_fit_inputs():
+@pytest.mark.parametrize("assembler", ["assemble_arm", "assemble_patch"])
+def test_the_assemblers_default_to_the_contrast_fit_inputs(
+    assembler, replay_content_root, monkeypatch
+):
     from continuum_swr_replay.analysis.replay import contrast_aggregation
 
-    for assembler in (
-        contrast_aggregation.assemble_arm,
-        contrast_aggregation.assemble_patch,
-    ):
-        default = inspect.signature(assembler).parameters["fit_inputs"].default
-        assert default is CONTENT_FIT_INPUTS
+    read = []
+
+    def stop(path):
+        read.append(path)
+        raise _StopReading
+
+    monkeypatch.setattr(contrast_aggregation, "read_table", stop)
+    with pytest.raises(_StopReading):
+        if assembler == "assemble_arm":
+            contrast_aggregation.assemble_arm()
+        else:
+            contrast_aggregation.assemble_patch(pd.DataFrame())
+
+    table = "event_arm_table" if assembler == "assemble_arm" else "event_patch_table"
+    assert read == [contrast_fit_inputs()[table]]
+    assert read[0].parent == replay_content_root
+
+
+class _StopReading(Exception):
+    """Raised by a ``read_table`` stand-in at the first read."""
 
 
 @pytest.mark.parametrize(
@@ -736,32 +764,29 @@ def test_the_assemblers_default_to_the_content_fit_inputs():
 def test_content_contrast_fits_record_every_table_they_read(script, assemblers):
     """The content contrast tables are read by ``contrast_aggregation``'s
     assemblers, through the mapping they are handed. Each script that fits on
-    those cohorts hands them ``CONTENT_FIT_INPUTS``, records that same mapping,
-    and reads no table of its own, so a table cannot reach the fit without
-    reaching the sidecar."""
-    assembled = _read_table_paths(
-        CONTRAST_AGGREGATION, {"fit_inputs": CONTENT_FIT_INPUTS}
+    those cohorts hands them one ``contrast_fit_inputs()``, records that same
+    mapping, and reads no table of its own, so a table cannot reach the fit
+    without reaching the sidecar."""
+    assert _read_table_keys(CONTRAST_AGGREGATION, {"fit_inputs"}) == set(
+        contrast_fit_inputs()
     )
-
-    assert assembled == set(CONTENT_FIT_INPUTS.values())
-    assert _read_table_paths(script, {}) == set()
+    assert _read_table_keys(script, set()) == set()
+    (mapping,) = _names_bound_to(script, "contrast_fit_inputs")
     assert _mapping_arguments(script) == {
-        "record_inputs": ["CONTENT_FIT_INPUTS"],
-        "assemble_arm": ["CONTENT_FIT_INPUTS"],
-        "assemble_patch": (
-            ["CONTENT_FIT_INPUTS"] if "assemble_patch" in assemblers else []
-        ),
+        "record_inputs": [mapping],
+        "assemble_arm": [mapping],
+        "assemble_patch": [mapping] if "assemble_patch" in assemblers else [],
     }
 
 
-def test_data_flow_figure_gates_the_arm_model_it_draws():
+def test_data_flow_figure_gates_the_arm_model_it_draws(replay_content_root):
     """The pipeline figure plots fitted M3 coefficients, so it is gated too."""
     figure = _load_script(FIGURES / "generate_supp_pipeline_data_flow.py")
     fitter = _load_script(CONTENT / "fit_replay_content_models.py")
-    expected = fitter.content_fit_inputs(fitter.REPLAY_CONTENT_DIR, "event_arm_table")
+    expected = fitter.content_fit_inputs(replay_content_root, "event_arm_table")
 
-    assert figure.ALL_MODELS_INPUTS == expected
-    assert figure.M3_PATH == fitter.REPLAY_CONTENT_DIR / "models" / "M3.pkl"
+    assert figure.all_models_input_paths() == expected
+    assert figure.m3_path() == replay_content_root / "models" / "M3.pkl"
     assert figure.build_parser().parse_args([]).allow_stale is False
     assert figure.build_parser().parse_args(["--allow-stale"]).allow_stale is True
 

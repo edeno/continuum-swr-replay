@@ -1,20 +1,23 @@
 """Synthetic SWR inventories, written as the SWR runner writes them.
 
-``write_swr_inventory`` makes a run folder under a ``tmp_path``: a
-``manifest.json`` with one record per epoch and, for each served epoch, its
-``{epoch_id}_kay_events.parquet`` (indexed by ``event_number`` 1..n) and
-``{epoch_id}_swr_observed.parquet``, with the sha256 of each in the record, as
-``run_swr_detection.py`` writes them. ``write_artifact_run`` writes an artifact
-run folder as ``run_artifact_detection.py`` writes it (one cores file per epoch
-and a manifest), which ``swr_source.artifact_intervals`` reads, and
-``use_swr_source`` points the source's configured constants at both. Offline:
-nothing here touches Spyglass or ``Processed-Data``.
+``write_swr_inventory`` makes a run folder under a data root (a ``tmp_path``),
+where ``paths.swr_inventory_root()`` puts it: a ``manifest.json`` with one record
+per epoch and, for each served epoch, its ``{epoch_id}_kay_events.parquet``
+(indexed by ``event_number`` 1..n) and ``{epoch_id}_swr_observed.parquet``, with
+the sha256 of each in the record, as ``run_swr_detection.py`` writes them.
+``write_artifact_run`` writes an artifact run folder where
+``paths.artifact_intervals_root()`` puts it, as ``run_artifact_detection.py``
+writes it (one cores file per epoch and a manifest), which
+``swr_source.artifact_intervals`` reads. ``use_swr_source`` and
+``use_artifact_run`` point the source at them: the data root
+(``$CSR_PROCESSED_DATA_DIR``) at the root they were written under, and the run
+ids at theirs. Offline: nothing here touches Spyglass or ``Processed-Data``.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -26,10 +29,34 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
     write_cores,
     write_manifest,
 )
+from continuum_swr_replay.paths import (
+    PROCESSED_DATA_DIR_ENV,
+    artifact_intervals_root,
+    processed_data_dir,
+    swr_inventory_root,
+)
 from continuum_swr_replay.runs.io import sha256_file
 
 RUN_ID = "testrun0001"
 ARTIFACT_RUN_ID = "testartifacts01"
+
+
+def _layout(accessor: Callable[[], Path]) -> Path:
+    """Where `accessor`'s folder sits relative to the data root (``paths``' layout)."""
+    return accessor().relative_to(processed_data_dir())
+
+
+def under_root(root: Path, accessor: Callable[[], Path]) -> Path:
+    """`accessor`'s folder (``paths.swr_inventory_root``, say) for data root `root`."""
+    return root / _layout(accessor)
+
+
+def _root_of(folder: Path, accessor: Callable[[], Path]) -> Path:
+    """The data root that holds `folder` as `accessor`'s folder."""
+    layout = _layout(accessor).parts
+    if folder.parts[-len(layout) :] != layout:
+        raise ValueError(f"{folder} is not {'/'.join(layout)} under a data root")
+    return Path(*folder.parts[: -len(layout)])
 
 
 def kay_events(intervals: Sequence[tuple[float, float]]) -> pd.DataFrame:
@@ -62,7 +89,8 @@ def write_swr_inventory(
     Parameters
     ----------
     root : Path
-        The folder that holds run folders (``SWR_INVENTORY_ROOT``'s stand-in).
+        The data root; the run folder goes where ``paths.swr_inventory_root()``
+        puts it under that root.
     events : mapping
         Epoch id -> Kay event intervals ``(start, end)`` in seconds; each such
         epoch is ``ok``.
@@ -77,7 +105,7 @@ def write_swr_inventory(
         runner writes it (``settings.artifacts.run_id``); no settings when
         None, as in a run made before the runner masked artifacts.
     """
-    directory = root / run_id
+    directory = under_root(root, swr_inventory_root) / run_id
     directory.mkdir(parents=True, exist_ok=True)
     manifest_epochs: dict[str, dict] = {}
     for epoch_id, intervals in events.items():
@@ -141,8 +169,8 @@ def write_artifact_run(
     Parameters
     ----------
     root : Path
-        The folder that holds run folders (``ARTIFACT_INTERVALS_DIR``'s
-        stand-in).
+        The data root; the run folder goes where
+        ``paths.artifact_intervals_root()`` puts it under that root.
     cores : mapping
         Epoch id -> its unpadded cores ``(signatures, core_start, core_end)``,
         such as ``("spk", 104.11, 104.11)``; each epoch is ``ok``.
@@ -150,7 +178,7 @@ def write_artifact_run(
         Every epoch's span, which the mask's intervals are clipped to.
     run_id : str
     """
-    directory = root / run_id
+    directory = under_root(root, artifact_intervals_root) / run_id
     directory.mkdir(parents=True, exist_ok=True)
     records = {}
     for epoch_id, epoch_cores in cores.items():
@@ -167,11 +195,35 @@ def write_artifact_run(
 
 def use_swr_source(monkeypatch, inventory: Path, artifacts: Path | None = None) -> None:
     """Point the SWR source at a written inventory run folder (and artifact run
-    folder, if given), as its configured constants would."""
+    folder, if given), as its configured constants would.
+
+    The data root becomes the root `inventory` was written under; `artifacts`
+    must have been written under the same one.
+    """
     from continuum_swr_replay.analysis.events import swr_source
 
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
+    _use_root(monkeypatch, _root_of(inventory.parent, swr_inventory_root))
     monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
     if artifacts is not None:
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        use_artifact_run(monkeypatch, artifacts)
+
+
+def use_artifact_run(monkeypatch, artifacts: Path) -> None:
+    """Point the SWR source at a written artifact run folder.
+
+    The data root becomes the root `artifacts` was written under (the one an
+    inventory, if any, was written under too), and the configured artifact run
+    its run id.
+    """
+    from continuum_swr_replay.analysis.events import swr_source
+
+    _use_root(monkeypatch, _root_of(artifacts.parent, artifact_intervals_root))
+    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+
+
+def _use_root(monkeypatch, root: Path) -> None:
+    """Make `root` the data root, unless the test already uses another one."""
+    current = processed_data_dir()
+    if current != root and current.is_dir():
+        raise ValueError(f"{root} is not the data root already in use, {current}")
+    monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(root))

@@ -24,7 +24,7 @@ python run_decoding_bandit.py --animal chimi --save_dir Processed-Data/_staging_
 
 Output Files
 ------------
-Saved to ``--save_dir`` (default PROCESSED_DATA_DIR):
+Saved to ``--save_dir`` (default ``paths.processed_data_dir()``):
 
 {epoch_identifier}_results.nc
     Decoding results as xarray Dataset (posterior distributions, state probabilities)
@@ -60,7 +60,6 @@ from continuum_swr_replay.decoding.identifiers import (
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
-    PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
 from continuum_swr_replay.runs.batch import run_batch
@@ -149,7 +148,7 @@ def run_decode(
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     brain_area: str = "HPC",
-    save_dir: Path = PROCESSED_DATA_DIR,
+    save_dir: Path | None = None,
     release_nwb: bool = False,
 ) -> str | None:
     """Run NonLocal decoding for a single session (``_decode_runner.run_decode``).

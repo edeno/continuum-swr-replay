@@ -62,9 +62,9 @@ from continuum_swr_replay.decoding.transitions import NON_STATIONARY_REFUSAL
 from continuum_swr_replay.parameters import (
     PLACE_BIN_SIZE_1D,
     PLACE_BIN_SIZE_2D,
-    PROCESSED_DATA_DIR,
     ROOT_DIR,
 )
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.runs.batch import release_nwb_files, setup_logger
 from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.io import write_atomically
@@ -357,14 +357,15 @@ def run_decode(
     non_stationary: bool = False,
     ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     brain_area: str = "HPC",
-    save_dir: Path = PROCESSED_DATA_DIR,
+    save_dir: Path | None = None,
     release_nwb: bool = False,
     non_local_threshold: float | None = None,
     create_figurl: bool = False,
 ) -> str | None:
     """Run `runner`'s decode for a single session.
 
-    Results are written to ``save_dir``. If they are already there (and
+    Results are written to ``save_dir`` (``paths.processed_data_dir()`` when
+    None). If they are already there (and
     ``overwrite`` is False), the decode resumes: it logs ``RESUMED from existing
     results in <save_dir>``, reads them back from ``save_dir`` and rewrites only
     ``data_over_time``.
@@ -394,6 +395,8 @@ def run_decode(
         ``None`` on success or graceful skip; the ``epoch_identifier``
         on caught exception so ``run_batch`` can aggregate failures.
     """
+    if save_dir is None:
+        save_dir = processed_data_dir()
     epoch_identifier = decode_identifier(
         format_epoch_identifier(
             nwb_file_name, epoch_name, brain_area, runner.file_suffix

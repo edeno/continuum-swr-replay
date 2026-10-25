@@ -2,68 +2,139 @@
 
 One place spells where the pipeline's outputs live, so moving an output
 (staging, a backup, a renamed directory) is a change here rather than a hunt
-through every reader and writer. Every constant is a path under
-:data:`~continuum_swr_replay.parameters.PROCESSED_DATA_DIR`.
+through every reader and writer. Every location is under the processed-data
+root, :func:`processed_data_dir`, and is resolved when called: the root is
+``$CSR_PROCESSED_DATA_DIR`` when set, else the checkout's ``Processed-Data/``.
+That environment variable is the one place a run (or a test) moves every data
+root, its child processes included. No module binds a root at import.
 
 The canonical tables are named once, by :data:`CANONICAL_TABLES`; their
 basenames (:data:`CANONICAL_TABLE_BASENAMES`), ``tables.io.SWR_SOURCE_TABLES``
 and the covariate registry's row keys follow from it. :func:`table_path` turns
 a name and a root into the file, and refuses a name outside the registry.
+
+The upper-case names this module once bound at import (``REPLAY_CONTENT_DIR``
+and the rest of :data:`_LEGACY_ROOTS`) still resolve, through the module's
+``__getattr__``, for notebooks and exploratory scripts; library code and
+supported scripts call the functions.
 """
 
 from __future__ import annotations
 
+import os
+from collections.abc import Callable
 from pathlib import Path
 
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-
 __all__ = [
-    "ARTIFACT_INTERVALS_DIR",
+    "ROOT_DIR",
     "BASENAME_TO_TABLE",
-    "CAREY_ROOT",
     "CANONICAL_TABLES",
     "CANONICAL_TABLE_BASENAMES",
-    "CONTFRAG_REPLAY_CONTENT_DIR",
-    "DETECTION_COMPARISON_DIR",
-    "EVENT_FEATURES_ROOT",
-    "INVENTORY_COMPARISON_ROOT",
-    "MEMORYLESS_ROOT",
     "MODEL_SUBDIRS",
+    "PROCESSED_DATA_DIR_ENV",
     "QVALS_STANDARDIZATION_REFERENCE",
-    "REPLAY_CONTENT_DIR",
     "STANDARDIZATION_REFERENCE",
-    "SWR_INVENTORY_ROOT",
+    "artifact_intervals_root",
+    "carey_root",
+    "contfrag_replay_content_dir",
+    "detection_comparison_dir",
+    "event_features_root",
     "figure_dir",
+    "inventory_comparison_root",
+    "memoryless_root",
     "model_dir",
+    "processed_data_dir",
+    "replay_content_dir",
+    "swr_inventory_root",
     "table_path",
 ]
 
-REPLAY_CONTENT_DIR = PROCESSED_DATA_DIR / "replay_content"
-"""The non-local replay-content tables and the fits made from them."""
+ROOT_DIR = Path(__file__).parent.parent.parent
+"""The project root (continuum-swr-replay/, not src/); also
+``parameters.ROOT_DIR``."""
 
-CONTFRAG_REPLAY_CONTENT_DIR = PROCESSED_DATA_DIR / "contfrag_replay_content"
-"""The ContFrag (SWR- and MUA-labelled) replay-content tables and their fits."""
+PROCESSED_DATA_DIR_ENV = "CSR_PROCESSED_DATA_DIR"
+"""The environment variable that moves the processed-data root."""
 
-DETECTION_COMPARISON_DIR = PROCESSED_DATA_DIR / "replay_detection_comparison"
-"""The event-detector runs (SWR, memoryless, Carey) and their comparison."""
 
-SWR_INVENTORY_ROOT = DETECTION_COMPARISON_DIR / "swr"
-"""Where the SWR runner writes its run folders, one per run id."""
+def processed_data_dir() -> Path:
+    """The processed-data root, read when called.
 
-MEMORYLESS_ROOT = DETECTION_COMPARISON_DIR / "memoryless"
-"""Where the memoryless runner writes its run folders (and its marks cache)."""
+    ``$CSR_PROCESSED_DATA_DIR`` when set, so a run from any checkout can read
+    and write one root; otherwise the checkout's ``Processed-Data/``.
+    """
+    return Path(os.environ.get(PROCESSED_DATA_DIR_ENV, ROOT_DIR / "Processed-Data"))
 
-CAREY_ROOT = DETECTION_COMPARISON_DIR / "carey"
-"""Where the Carey runner writes its run folders."""
 
-INVENTORY_COMPARISON_ROOT = DETECTION_COMPARISON_DIR / "inventory"
-"""Where the inventory-comparison runner writes its run folders."""
+def replay_content_dir() -> Path:
+    """The non-local replay-content tables and the fits made from them."""
+    return processed_data_dir() / "replay_content"
 
-EVENT_FEATURES_ROOT = DETECTION_COMPARISON_DIR / "event_features"
-"""Where the event-feature runner writes its run folders."""
 
-ARTIFACT_INTERVALS_DIR = PROCESSED_DATA_DIR / "artifact_intervals"
-"""Where artifact-interval run folders go, one per run id."""
+def contfrag_replay_content_dir() -> Path:
+    """The ContFrag (SWR- and MUA-labelled) replay-content tables and their fits."""
+    return processed_data_dir() / "contfrag_replay_content"
+
+
+def detection_comparison_dir() -> Path:
+    """The event-detector runs (SWR, memoryless, Carey) and their comparison."""
+    return processed_data_dir() / "replay_detection_comparison"
+
+
+def swr_inventory_root() -> Path:
+    """Where the SWR runner writes its run folders, one per run id."""
+    return detection_comparison_dir() / "swr"
+
+
+def memoryless_root() -> Path:
+    """Where the memoryless runner writes its run folders (and its marks cache)."""
+    return detection_comparison_dir() / "memoryless"
+
+
+def carey_root() -> Path:
+    """Where the Carey runner writes its run folders."""
+    return detection_comparison_dir() / "carey"
+
+
+def inventory_comparison_root() -> Path:
+    """Where the inventory-comparison runner writes its run folders."""
+    return detection_comparison_dir() / "inventory"
+
+
+def event_features_root() -> Path:
+    """Where the event-feature runner writes its run folders."""
+    return detection_comparison_dir() / "event_features"
+
+
+def artifact_intervals_root() -> Path:
+    """Where artifact-interval run folders go, one per run id."""
+    return processed_data_dir() / "artifact_intervals"
+
+
+_LEGACY_ROOTS: dict[str, Callable[[], Path]] = {
+    "REPLAY_CONTENT_DIR": replay_content_dir,
+    "CONTFRAG_REPLAY_CONTENT_DIR": contfrag_replay_content_dir,
+    "DETECTION_COMPARISON_DIR": detection_comparison_dir,
+    "SWR_INVENTORY_ROOT": swr_inventory_root,
+    "MEMORYLESS_ROOT": memoryless_root,
+    "CAREY_ROOT": carey_root,
+    "INVENTORY_COMPARISON_ROOT": inventory_comparison_root,
+    "EVENT_FEATURES_ROOT": event_features_root,
+    "ARTIFACT_INTERVALS_DIR": artifact_intervals_root,
+}
+"""The constants this module bound at import, by the function now behind each.
+
+Kept for notebooks and exploratory scripts. ``paths.REPLAY_CONTENT_DIR`` is
+resolved at each access; ``from ... import REPLAY_CONTENT_DIR`` binds the value
+at that import, as the constant did. ``tests/unit/test_paths.py`` keeps them out
+of ``src/`` and the supported scripts."""
+
+
+def __getattr__(name: str) -> Path:
+    if name in _LEGACY_ROOTS:
+        return _LEGACY_ROOTS[name]()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 MODEL_SUBDIRS: dict[str, str] = {
     "content_arm": "models",
@@ -84,7 +155,7 @@ delete anything else written there.
 """
 
 
-def model_dir(key: str, root: Path = REPLAY_CONTENT_DIR) -> Path:
+def model_dir(key: str, root: Path | None = None) -> Path:
     """Return fitted-model directory `key` under `root`.
 
     Parameters
@@ -93,9 +164,7 @@ def model_dir(key: str, root: Path = REPLAY_CONTENT_DIR) -> Path:
         One of :data:`MODEL_SUBDIRS`.
     root : Path, optional
         The replay-content root (the canonical one, a staging root, a backup);
-        :data:`REPLAY_CONTENT_DIR` by default. The default is bound at import,
-        so a test redirects by passing its own root, not by patching this
-        module.
+        :func:`replay_content_dir` when None, resolved at the call.
 
     Returns
     -------
@@ -111,7 +180,7 @@ def model_dir(key: str, root: Path = REPLAY_CONTENT_DIR) -> Path:
             f"{key!r} is not a fitted-model directory; expected one of "
             f"{tuple(MODEL_SUBDIRS)}"
         )
-    return root / MODEL_SUBDIRS[key]
+    return (replay_content_dir() if root is None else root) / MODEL_SUBDIRS[key]
 
 
 def figure_dir(topic: str, root: Path | None = None) -> Path:
@@ -130,15 +199,14 @@ def figure_dir(topic: str, root: Path | None = None) -> Path:
     topic : str
         The figure topic subdirectory, e.g. ``"rate"``.
     root : Path, optional
-        The processed-data root;
-        :data:`~continuum_swr_replay.parameters.PROCESSED_DATA_DIR` by default,
-        bound at import, as for :func:`model_dir`.
+        The processed-data root; :func:`processed_data_dir` when None,
+        resolved at the call.
 
     Returns
     -------
     Path
     """
-    return (root or PROCESSED_DATA_DIR).parent / "paper" / "figures" / topic
+    return (root or processed_data_dir()).parent / "paper" / "figures" / topic
 
 
 CANONICAL_TABLES: tuple[str, ...] = (
@@ -170,9 +238,7 @@ QVALS_STANDARDIZATION_REFERENCE = "qvals_standardization_reference.json"
 """``qvals_table``'s ``_z`` standardization reference, beside it at the root."""
 
 
-def table_path(
-    name: str, root: Path = REPLAY_CONTENT_DIR, *, fmt: str = "parquet"
-) -> Path:
+def table_path(name: str, root: Path | None = None, *, fmt: str = "parquet") -> Path:
     """Return the file of canonical table `name` under `root`.
 
     Every canonical table sits at `root`, so a pipeline root (the canonical
@@ -183,7 +249,8 @@ def table_path(
     name : str
         One of :data:`CANONICAL_TABLE_BASENAMES`.
     root : Path, optional
-        The replay-content root; :data:`REPLAY_CONTENT_DIR` by default.
+        The replay-content root; :func:`replay_content_dir` when None, resolved
+        at the call.
     fmt : str, optional
         The file suffix without its dot: ``"parquet"``, or ``"pkl"`` for a
         retired pickle (only ``scripts/tables/convert_tables_to_parquet.py``
@@ -203,4 +270,4 @@ def table_path(
             f"{name!r} is not a canonical table; expected one of "
             f"{CANONICAL_TABLE_BASENAMES}"
         )
-    return root / f"{name}.{fmt}"
+    return (replay_content_dir() if root is None else root) / f"{name}.{fmt}"

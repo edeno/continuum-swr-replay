@@ -55,7 +55,7 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -87,9 +87,11 @@ COARSE_ORDER = [
 def quantify_session(
     nwb_file_name: str,
     epoch_name: str,
-    data_dir: Path = PROCESSED_DATA_DIR,
+    data_dir: Path | None = None,
 ) -> pd.DataFrame:
     """Load one session and return per-event geometry classification."""
+    if data_dir is None:
+        data_dir = processed_data_dir()
     logger.info(f"Loading {nwb_file_name} {epoch_name}...")
     data = load_data(nwb_file_name, epoch_name)
     results, _, _ = load_results(

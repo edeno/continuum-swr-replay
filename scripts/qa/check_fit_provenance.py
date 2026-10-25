@@ -34,13 +34,12 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 )
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
-    REPLAY_CONTENT_DIR,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.io import parquet_path
 
 _SIDECAR_SUFFIX = ".provenance.json"
-DEFAULT_ROOT = REPLAY_CONTENT_DIR
 
 
 def artifact_for_sidecar(sidecar: Path) -> Path:
@@ -190,7 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--root",
         type=Path,
-        default=DEFAULT_ROOT,
+        default=replay_content_dir(),
         help="Directory holding the models*/ trees.",
     )
     parser.add_argument(

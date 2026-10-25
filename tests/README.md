@@ -24,19 +24,32 @@ runs together: the default run, then `-m real_data` on a host with the data.
 
 The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
 
-- **`real_data`**: the test reads `Processed-Data/` (`PROCESSED_DATA_DIR`),
+- **`real_data`**: the test reads `Processed-Data/` (`paths.processed_data_dir()`),
   `/stelmo`, a raw NWB file or the Spyglass/DataJoint database.
   - The root [`conftest.py`](conftest.py) skips it unless the `-m` expression
     names `real_data`. The skip reason is `real_data: opt in with -m real_data`.
   - Under `-m real_data` the test runs. Missing or stale data fails it rather
     than skipping it: opting in means the data must be there.
-  - Every other test runs with no artifact run configured
-    (`continuum_swr_replay.analysis.events.swr_source.ARTIFACT_INTERVALS_RUN_ID`
-    is None). A `real_data` test gets the
-    committed run back, so the canonical tables pass their SWR-source check.
-    That restore is a function-scoped fixture: a module- or session-scoped
-    fixture in a `real_data` module still sees None, and one that reads a
-    table through `analysed_time.with_swr_source` must set the run itself.
+  - Every other test runs with no data root and no artifact run configured.
+    Every data root is resolved when used, from `$CSR_PROCESSED_DATA_DIR`
+    (`paths.processed_data_dir()`), and the root `conftest.py` sets that
+    variable, before any test module is imported, to a sentinel: a regular file,
+    so a test that forgets to set a root reads or writes nothing (a read raises
+    `NotADirectoryError`, a write `NotADirectoryError` or `FileExistsError`,
+    `exists()` is False). A test that needs a root takes the
+    `processed_data_root` fixture (an empty `Processed-Data` under its
+    `tmp_path`, via `monkeypatch.setenv`) or `replay_content_root` (its
+    `replay_content/`), and lays its inputs out as `Processed-Data` is; the
+    SWR-source fixtures in `unit/_swr_inventory_fixtures.py` write their run
+    folders where `paths` puts them under a root and point the variable at it.
+    That one variable is the patch point: no test patches a module's root.
+    And `continuum_swr_replay.analysis.events.swr_source.ARTIFACT_INTERVALS_RUN_ID`
+    is None. A `real_data` test gets the live root and the committed run back,
+    so the canonical tables pass their SWR-source check. Those restores are
+    function-scoped fixtures: a module- or session-scoped fixture in a
+    `real_data` module still sees the sentinel and None; one that reads real
+    data takes the `live_processed_data_dir` fixture as its root, and one that
+    reads a table through `analysed_time.with_swr_source` must set the run itself.
   - A test that reads only a small fixture committed under `tests/` is not real
     data. In a file that mixes the two, mark the real-data tests, not the file.
   - The hook is pinned by [`unit/test_markers.py`](unit/test_markers.py).

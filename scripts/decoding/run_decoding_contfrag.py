@@ -22,7 +22,8 @@ python run_decoding_contfrag.py --animal chimi --save_dir Processed-Data/_stagin
 
 Output Files
 ------------
-Saved to ``--save_dir`` (default PROCESSED_DATA_DIR) with ``_contfrag`` suffix:
+Saved to ``--save_dir`` (default ``paths.processed_data_dir()``) with
+``_contfrag`` suffix:
 
 {epoch_identifier}_contfrag_results.nc
 {epoch_identifier}_contfrag_detector.pkl
@@ -50,7 +51,6 @@ from continuum_swr_replay.decoding.identifiers import (
     DEFAULT_TRAINING_TYPE,
 )
 from continuum_swr_replay.decoding.transitions import contfrag_transition_settings
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.runs.batch import run_batch
 from continuum_swr_replay.runs.cli import add_common_args
 
@@ -99,7 +99,7 @@ def run_decode(
     non_stationary: bool = False,
     ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     brain_area: str = "HPC",
-    save_dir: Path = PROCESSED_DATA_DIR,
+    save_dir: Path | None = None,
     release_nwb: bool = False,
 ) -> str | None:
     """Run ContFrag decoding for a single session (``_decode_runner.run_decode``).

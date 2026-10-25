@@ -163,7 +163,7 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(tmp_path):
         )
     )
     fit_inputs = {
-        **contrast_aggregation.CONTENT_FIT_INPUTS,
+        **contrast_aggregation.contrast_fit_inputs(),
         "event_arm_table": tmp_path / "event_arm_table.parquet",
     }
 
@@ -181,7 +181,7 @@ def test_swr_content_assembly_refuses_a_table_from_another_swr_source(
     frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
     write_table(frame, tmp_path / "event_arm_table.parquet")
     fit_inputs = {
-        **contrast_aggregation.CONTENT_FIT_INPUTS,
+        **contrast_aggregation.contrast_fit_inputs(),
         "event_arm_table": tmp_path / "event_arm_table.parquet",
     }
     monkeypatch.setattr(

@@ -91,11 +91,11 @@ def simulated_is_missing() -> np.ndarray:
 def source(tmp_path, monkeypatch):
     """The SWR source the simulated decode was made under."""
     inventory = write_swr_inventory(
-        tmp_path / "swr",
+        tmp_path,
         {EPOCH: [(TIME[RIPPLE[0]], TIME[RIPPLE[1] - 1])]},
         artifact_run_id=ARTIFACT_RUN_ID,
     )
-    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH: ARTIFACT_CORES})
+    artifacts = write_artifact_run(tmp_path, {EPOCH: ARTIFACT_CORES})
     use_swr_source(monkeypatch, inventory, artifacts)
 
 

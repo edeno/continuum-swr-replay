@@ -81,8 +81,8 @@ class _Stop(Exception):
 def source(tmp_path, monkeypatch):
     """The source's configured inventory and artifact run are synthetic ones
     under ``tmp_path``."""
-    inventory = write_swr_inventory(tmp_path / "swr", {EPOCH_ID: SOURCE_SWRS})
-    artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: [ARTIFACT]})
+    inventory = write_swr_inventory(tmp_path, {EPOCH_ID: SOURCE_SWRS})
+    artifacts = write_artifact_run(tmp_path, {EPOCH_ID: [ARTIFACT]})
     use_swr_source(monkeypatch, inventory, artifacts)
     return inventory
 
@@ -213,10 +213,8 @@ def test_the_quality_metrics_loader_returns_the_sources_labels(
 ):
     import scripts.qa.run_quality_metrics as quality_metrics
 
-    folder = tmp_path / "decodes"
-    folder.mkdir()
-    decode_frame().to_pickle(folder / f"{EPOCH_ID}_80_data_over_time.pkl")
-    monkeypatch.setattr(quality_metrics, "PROCESSED_DATA_DIR", folder)
+    # the decode folder is the data root, ``source``'s ``tmp_path``
+    decode_frame().to_pickle(tmp_path / f"{EPOCH_ID}_80_data_over_time.pkl")
 
     assert_source_labels(quality_metrics.load_all_sessions(threshold=80))
 
@@ -380,7 +378,6 @@ def test_the_content_occupancy_scan_reads_the_sources_labels(
     import scripts.content.analyze_content_occupancy as occupancy
 
     decode_frame().to_pickle(tmp_path / f"{EPOCH_ID}_80_data_over_time.pkl")
-    monkeypatch.setattr(occupancy, "PROCESSED_DATA_DIR", tmp_path)
     seen: list = []
     monkeypatch.setattr(occupancy, "validate_dot_event_contract", recorder(seen))
 
@@ -396,7 +393,6 @@ def test_the_spike_evidence_scan_reads_the_sources_labels(
     import scripts.detection.analyze_event_spike_evidence as spike_evidence
 
     decode_frame().to_pickle(tmp_path / f"{EPOCH_ID}_80_data_over_time.pkl")
-    monkeypatch.setattr(spike_evidence, "PROCESSED_DATA_DIR", tmp_path)
     seen: list = []
     monkeypatch.setattr(spike_evidence, "validate_dot_event_contract", recorder(seen))
 
@@ -472,8 +468,6 @@ def test_the_pfc_provenance_names_the_source_and_hashes_its_events(
 ):
     import continuum_swr_replay.analysis.pfc.canonical_events as canonical
 
-    monkeypatch.setattr(canonical, "PROCESSED_DATA_DIR", tmp_path)
-
     provenance = canonical.canonical_event_input_hashes(
         NWB, EPOCH, event_table_path=tmp_path / "absent.parquet"
     )
@@ -490,10 +484,9 @@ def test_a_pfc_epoch_the_source_cannot_serve_hashes_to_none(tmp_path, monkeypatc
     import continuum_swr_replay.analysis.pfc.canonical_events as canonical
 
     inventory = write_swr_inventory(
-        tmp_path / "swr", {}, records={EPOCH_ID: {"status": "failed"}}
+        tmp_path, {}, records={EPOCH_ID: {"status": "failed"}}
     )
     use_swr_source(monkeypatch, inventory)
-    monkeypatch.setattr(canonical, "PROCESSED_DATA_DIR", tmp_path)
 
     provenance = canonical.canonical_event_input_hashes(NWB, EPOCH)
 
@@ -669,7 +662,6 @@ def test_the_content_occupancy_refuses_an_arm_table_from_another_source(
     )
     arm.attrs["swr_source"] = STALE
     write_table(arm, folder / "event_arm_table.parquet")
-    monkeypatch.setattr(occupancy, "REPLAY_CONTENT_DIR", folder)
     monkeypatch.setattr(
         occupancy, "require_covariate_schema", lambda frame, table: None
     )

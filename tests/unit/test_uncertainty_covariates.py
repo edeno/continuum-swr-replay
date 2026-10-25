@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.replay.covariates import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
+from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import subset_max_per_animal
 
@@ -951,7 +951,7 @@ def test_runner_smoke():
         attach_is_swr_to_onsets,
     )
 
-    rc = REPLAY_CONTENT_DIR
+    rc = replay_content_dir()
     qvals_path = table_path("qvals_table", rc)
     if not table_exists(qvals_path):
         pytest.fail(

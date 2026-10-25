@@ -28,7 +28,12 @@ from continuum_swr_replay.data_loaders.lfp import (
     kay_ripple_power_z,
     with_ripple_power,
 )
-from tests.unit._swr_inventory_fixtures import write_artifact_run, write_swr_inventory
+from tests.unit._swr_inventory_fixtures import (
+    use_artifact_run,
+    use_swr_source,
+    write_artifact_run,
+    write_swr_inventory,
+)
 
 FS = 1000.0
 TIME = 100.0 + np.arange(20_000) / FS
@@ -153,7 +158,7 @@ class TestTheSourcesInputs:
         self, tmp_path, monkeypatch
     ):
         epoch_id = "m20200101_02_r1_HPC"
-        inventory = write_swr_inventory(tmp_path / "swr", {epoch_id: [(1.0, 1.05)]})
+        inventory = write_swr_inventory(tmp_path, {epoch_id: [(1.0, 1.05)]})
         manifest = json.loads((inventory / "manifest.json").read_text())
         record = manifest["epochs"][epoch_id]
         record["electrode_ids"] = [4, 12]
@@ -164,13 +169,9 @@ class TestTheSourcesInputs:
             "kept": [False, True, True],
         }
         (inventory / "manifest.json").write_text(json.dumps(manifest))
-        artifacts = write_artifact_run(
-            tmp_path / "artifacts", {epoch_id: [("S", 3.0, 4.0)]}
-        )
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        artifacts = write_artifact_run(tmp_path, {epoch_id: [("S", 3.0, 4.0)]})
+        use_swr_source(monkeypatch, inventory)
+        use_artifact_run(monkeypatch, artifacts)
 
         inputs = swr_source.ripple_power_inputs(epoch_id)
 
@@ -186,13 +187,12 @@ class TestTheSourcesInputs:
         self, tmp_path, monkeypatch
     ):
         epoch_id = "m20200101_02_r1_HPC"
-        inventory = write_swr_inventory(tmp_path / "swr", {epoch_id: [(1.0, 1.05)]})
+        inventory = write_swr_inventory(tmp_path, {epoch_id: [(1.0, 1.05)]})
         manifest = json.loads((inventory / "manifest.json").read_text())
         manifest["epochs"][epoch_id]["electrode_ids"] = [0, 4, 12]
         manifest["epochs"][epoch_id]["sampling"] = {"nominal": 1000.0}
         (inventory / "manifest.json").write_text(json.dumps(manifest))
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", inventory.parent)
-        monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", inventory.name)
+        use_swr_source(monkeypatch, inventory)
 
         inputs = swr_source.ripple_power_inputs(epoch_id)
 

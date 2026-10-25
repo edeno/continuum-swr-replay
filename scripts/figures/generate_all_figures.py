@@ -119,7 +119,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--data-dir",
         type=Path,
         default=None,
-        help="Data directory override (default: PROCESSED_DATA_DIR)",
+        help="Data directory override (default: paths.processed_data_dir())",
     )
     parser.add_argument(
         "--skip",

@@ -55,7 +55,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -64,8 +64,6 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
-
-RC = REPLAY_CONTENT_DIR
 
 # Both directions: (response population, cross/predictor population).
 DIRECTIONS = {
@@ -191,9 +189,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     p.add_argument("--write", action="store_true")
     args = p.parse_args(argv)
 
-    stop_path = table_path("stop_table", RC)
-    onset_path = table_path("event_onset_table", RC)
-    event_path = table_path("event_table", RC)
+    stop_path = table_path("stop_table")
+    onset_path = table_path("event_onset_table")
+    event_path = table_path("event_table")
     stop = read_table(stop_path)
     onset_table = read_table(onset_path)
     event_table = read_table(event_path)
@@ -221,7 +219,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     models = fit_cross_history(stop, onsets)
     _summary(models)
     if args.write:
-        out = model_dir("per_bin_rate", RC) / "cross_history_models.pkl"
+        out = model_dir("per_bin_rate") / "cross_history_models.pkl"
         models.attrs["swr_source"] = swr_source_name()
         models.to_pickle(out)
         print(f"\nwrote {len(models)} rows -> {out}")

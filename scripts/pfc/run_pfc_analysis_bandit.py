@@ -88,7 +88,6 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (  # noqa: E402
     canonical_event_input_hashes,
 )
 from continuum_swr_replay.analysis.pfc.cohort import (  # noqa: E402
-    DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
 from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES  # noqa: E402
@@ -139,9 +138,9 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 )
 from continuum_swr_replay.parameters import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
+from continuum_swr_replay.paths import processed_data_dir, table_path  # noqa: E402
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     release_nwb_files,
@@ -807,7 +806,7 @@ def run_analysis(
     overwrite: bool = False,
     git_hash: str | None = None,
     stop_cohort: str = "at_well",
-    output_dir: Path = PROCESSED_DATA_DIR,
+    output_dir: Path | None = None,
     fitter: str = "jax",
     fit_diagnostics: bool = False,
     gpu: int | None = None,
@@ -842,8 +841,9 @@ def run_analysis(
     stop_cohort : {"at_well", "all_stops"}
         Population to fit: the well-anchored stops the hippocampal ladders are
         read on, or no stop restriction at all.
-    output_dir : Path
-        Directory the artifacts and their provenance sidecar are written to.
+    output_dir : Path, optional
+        Directory the artifacts and their provenance sidecar are written to;
+        ``paths.processed_data_dir()`` when None.
     fitter : {"jax"}
         How the GLMs are fit: the batched backend, which fits every neuron of
         the session against each design at once and is the only one with a
@@ -888,6 +888,8 @@ def run_analysis(
     batch that hits them should stop rather than work through 70 more sessions
     failing the same way.
     """
+    if output_dir is None:
+        output_dir = processed_data_dir()
     epoch_identifier = session_identifier(nwb_file_name, epoch_name, brain_area)
     save_file = modulation_path(
         output_dir, epoch_identifier, stop_cohort, penalty_sigma
@@ -1136,7 +1138,9 @@ def run_analysis(
         # which stop table, and how many bins and events survived it.
         sidecar = write_fit_provenance(
             save_file,
-            {"stop_table": DEFAULT_STOP_TABLE_PATH} if cohort_stops is not None else {},
+            {"stop_table": table_path("stop_table")}
+            if cohort_stops is not None
+            else {},
             estimator=ESTIMATOR,
             cli=sys.argv,
             commit=git_hash,
@@ -1333,10 +1337,10 @@ def get_command_line_arguments(argv: Sequence[str] | None = None) -> Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
+        default=processed_data_dir(),
         help=(
             "Directory for the modulation artifacts and their provenance "
-            f"sidecars (default: {PROCESSED_DATA_DIR})"
+            f"sidecars (default: {processed_data_dir()})"
         ),
     )
     parser.add_argument(

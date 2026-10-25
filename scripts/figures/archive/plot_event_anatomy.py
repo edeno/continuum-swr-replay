@@ -14,9 +14,9 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 
-INPUT_DIR = PROCESSED_DATA_DIR / "replay_content"
+INPUT_DIR = processed_data_dir() / "replay_content"
 
 # ── Load data ──
 long = pd.read_pickle(INPUT_DIR / "long.pkl")

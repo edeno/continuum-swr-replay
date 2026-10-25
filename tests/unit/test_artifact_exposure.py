@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.replay.timebin_tables import (
 )
 from continuum_swr_replay.tables.io import SWR_SOURCE_TABLES
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
-from tests.unit._swr_inventory_fixtures import write_artifact_run
+from tests.unit._swr_inventory_fixtures import use_artifact_run, write_artifact_run
 
 EPOCH_ID = "m20200101_02_r1_HPC"
 TIME = np.round(np.arange(0.0, 20.0, 0.002), 6)
@@ -125,9 +125,8 @@ def _trials() -> pd.DataFrame:
 @pytest.fixture
 def masked(tmp_path, monkeypatch):
     """The source's artifact run holds CORES for the test epoch."""
-    directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
-    monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+    directory = write_artifact_run(tmp_path, {EPOCH_ID: CORES})
+    use_artifact_run(monkeypatch, directory)
     np.testing.assert_allclose(swr_source.artifact_intervals(EPOCH_ID).to_numpy(), MASK)
     np.testing.assert_allclose(
         analysed_time.excluded_intervals(EPOCH_ID).to_numpy(), EXCLUDED
@@ -159,9 +158,8 @@ class TestStopExposure:
     @pytest.mark.parametrize("table", ["nonlocal", "contfrag"])
     def test_only_exposure_and_location_change(self, tmp_path, monkeypatch, table):
         unmasked = _stop_tables()[table]
-        directory = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        directory = write_artifact_run(tmp_path, {EPOCH_ID: CORES})
+        use_artifact_run(monkeypatch, directory)
 
         masked_stops = _stop_tables()[table]
 
@@ -409,11 +407,8 @@ class TestFamilyBDesign:
     def test_a_run_that_does_not_serve_the_session_raises(self, tmp_path, monkeypatch):
         """The default never falls back to an unmasked design; the no-mask
         sentinel still builds one."""
-        directory = write_artifact_run(
-            tmp_path / "artifacts", {"m20200101_04_r2_HPC": CORES}
-        )
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", directory.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", directory.name)
+        directory = write_artifact_run(tmp_path, {"m20200101_04_r2_HPC": CORES})
+        use_artifact_run(monkeypatch, directory)
         stops, onsets = _design_inputs()
 
         with pytest.raises(swr_source.SwrSourceError, match="not in the artifact run"):
@@ -626,11 +621,11 @@ class TestNoArtifactsChangeNothing:
         )
 
         inventory = write_swr_inventory(
-            tmp_path / "swr", {EPOCH_ID: [(1.0, 1.05), (3.0, 3.05), (7.0, 7.05)]}
+            tmp_path, {EPOCH_ID: [(1.0, 1.05), (3.0, 3.05), (7.0, 7.05)]}
         )
         use_swr_source(monkeypatch, inventory)
         unconfigured = self._outputs(tmp_path)
-        empty = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: []})
+        empty = write_artifact_run(tmp_path, {EPOCH_ID: []})
         use_swr_source(monkeypatch, inventory, empty)
 
         configured = self._outputs(tmp_path)
@@ -650,11 +645,11 @@ class TestNoArtifactsChangeNothing:
         )
 
         inventory = write_swr_inventory(
-            tmp_path / "swr", {EPOCH_ID: [(1.0, 1.05), (3.0, 3.05), (7.0, 7.05)]}
+            tmp_path, {EPOCH_ID: [(1.0, 1.05), (3.0, 3.05), (7.0, 7.05)]}
         )
         use_swr_source(monkeypatch, inventory)
         before = self._outputs(tmp_path)
-        artifacts = write_artifact_run(tmp_path / "artifacts", {EPOCH_ID: CORES})
+        artifacts = write_artifact_run(tmp_path, {EPOCH_ID: CORES})
         use_swr_source(monkeypatch, inventory, artifacts)
 
         after = self._outputs(tmp_path)

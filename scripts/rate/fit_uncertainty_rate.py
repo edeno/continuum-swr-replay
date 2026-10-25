@@ -108,8 +108,8 @@ from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E
     _design_columns,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    REPLAY_CONTENT_DIR,
     model_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
@@ -139,15 +139,18 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = REPLAY_CONTENT_DIR
 
-# The tables `main` reads; recorded in the artifact's provenance sidecar.
-FIT_INPUTS = {
-    "stop_table": table_path("stop_table", RC),
-    "event_onset_table": table_path("event_onset_table", RC),
-    "event_table": table_path("event_table", RC),
-    "qvals_table": table_path("qvals_table", RC),
-}
+def fit_input_paths() -> dict[str, Path]:
+    """The tables `main` reads, recorded in the artifact's provenance sidecar;
+    under ``paths.replay_content_dir()``, read when called."""
+    rc = replay_content_dir()
+    return {
+        "stop_table": table_path("stop_table", rc),
+        "event_onset_table": table_path("event_onset_table", rc),
+        "event_table": table_path("event_table", rc),
+        "qvals_table": table_path("qvals_table", rc),
+    }
+
 
 # Nominal schedule covariates, now sourced from qvals_table (derived from Alison's
 # p_rew_leaf/contingency_count, exactly stop-start-aligned) rather than the difflib
@@ -603,17 +606,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     smoke = args.max_per_animal is not None
 
     t0 = time.perf_counter()
-    stop = read_table(table_path("stop_table", RC))
-    onset_table = read_table(table_path("event_onset_table", RC))
-    event_table = read_table(table_path("event_table", RC))
+    inputs = fit_input_paths()
+    stop = read_table(inputs["stop_table"])
+    onset_table = read_table(inputs["event_onset_table"])
+    event_table = read_table(inputs["event_table"])
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
     # The bins are dropped by the configured source's excluded time, so the
     # tables must come from that source (its artifact run included).
-    require_swr_source(stop, what=str(FIT_INPUTS["stop_table"]))
-    require_swr_source(onset_table, what=str(FIT_INPUTS["event_onset_table"]))
-    require_swr_source(event_table, what=str(FIT_INPUTS["event_table"]))
+    require_swr_source(stop, what=str(inputs["stop_table"]))
+    require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
+    require_swr_source(event_table, what=str(inputs["event_table"]))
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
 
     # add_uncertainty_covariates validates the upstream recent_switch_rate (the
@@ -626,11 +630,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     # for this model). Keep qvals' canonical RPE name. Inner join: keep
     # only stops mapped to a trial (post-final-trial tails ~1-3% drop out); model
     # DVs are NaN on the first trial of a session -> listwise-dropped at fit.
-    qvals = read_table(table_path("qvals_table", RC))
+    qvals = read_table(inputs["qvals_table"])
     require_covariate_schema(qvals, table="qvals")
     # Hash the inputs now, not at write time: the fit runs long enough that a
     # table could be regenerated mid-run and be certified as this fit's input.
-    fit_inputs = record_inputs(FIT_INPUTS)
+    fit_inputs = record_inputs(inputs)
     qcols = qvals[
         [
             "stop_id",
@@ -731,7 +735,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # the model comparison invalidates a cross-cohort step on this column.
     models["stop_cohort"] = args.stop_cohort
     out = _write_outputs(
-        model_dir("per_bin_rate", RC),
+        model_dir("per_bin_rate"),
         models=models,
         z_reference=z_reference,
         gate_audit=gate_audit,

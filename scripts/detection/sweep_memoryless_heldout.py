@@ -69,7 +69,7 @@ from continuum_swr_replay.analysis.inventory_comparison.heldout import (
     nearest_window_content,
     poor_coverage_fold,
 )
-from continuum_swr_replay.paths import DETECTION_COMPARISON_DIR
+from continuum_swr_replay.paths import detection_comparison_dir
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.io import write_table
 
@@ -77,7 +77,6 @@ N_PERMUTATIONS = 100
 COVERAGE_SENSITIVITY = (2.0, COVERAGE_FLOOR, 10.0)
 PLACEMENT_SEED = 2
 
-OUT_PATH = DETECTION_COMPARISON_DIR / "memoryless_heldout.parquet"
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
 )
@@ -462,7 +461,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--folds", nargs="+", default=["A", "B", "C"])
     parser.add_argument("--n-recordings", type=int, default=sweep_controls.N_RECORDINGS)
-    parser.add_argument("--out", type=Path, default=OUT_PATH)
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=detection_comparison_dir() / "memoryless_heldout.parquet",
+    )
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
     args = parser.parse_args(argv)
 

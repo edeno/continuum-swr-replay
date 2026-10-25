@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
 from continuum_swr_replay.data_loaders import spikes
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV, swr_inventory_root
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.provenance import provenance_record
 from continuum_swr_replay.tables.io import read_table
@@ -55,9 +56,12 @@ from tests.unit._memoryless_clusterless_epoch import (
 )
 from tests.unit._swr_inventory_fixtures import (
     RUN_ID,
+    under_root,
+    use_artifact_run,
     write_artifact_run,
     write_swr_inventory,
 )
+from tests.unit._swr_inventory_fixtures import use_swr_source as _use_inventory
 
 EPOCH_ID = "sim20200101_02_r1_HPC"
 N_SHUFFLES = 19
@@ -328,8 +332,9 @@ def write_swr_source(root, *, swrs=None, observed=None):
 
 
 def use_swr_source(monkeypatch, root):
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_ROOT", root)
-    monkeypatch.setattr(swr_source, "SWR_INVENTORY_RUN_ID", RUN_ID)
+    """Point the SWR source at the inventory ``write_swr_source`` wrote under
+    data root `root`."""
+    _use_inventory(monkeypatch, under_root(root, swr_inventory_root) / RUN_ID)
 
 
 @pytest.fixture(scope="module")
@@ -455,12 +460,10 @@ class TestRunOne:
     ):
         """The source has one SWR over the whole epoch; the decode's stored
         labels mark only an early one. Every classified candidate is an SWR."""
-        use_swr_source(
-            monkeypatch,
-            write_swr_source(
-                tmp_path / "swr", swrs=[(SIM_TIME[0], SIM_TIME[-1])]
-            ).parent,
-        )
+        # this test's own data root, in place of the module's
+        monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
+        write_swr_source(tmp_path, swrs=[(SIM_TIME[0], SIM_TIME[-1])])
+        use_swr_source(monkeypatch, tmp_path)
 
         record = run(decode_root, tmp_path)
         table = read_table(record["outputs"]["events"])
@@ -564,12 +567,10 @@ class TestRunOne:
         root = tmp_path / "processed"
         root.mkdir()
         write_epoch(root, epoch)
-        use_swr_source(
-            monkeypatch,
-            write_swr_source(
-                tmp_path / "swr", observed=(SIM_TIME[1000], SIM_TIME[-1])
-            ).parent,
-        )
+        # this test's own data root, in place of the module's
+        monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
+        write_swr_source(tmp_path, observed=(SIM_TIME[1000], SIM_TIME[-1]))
+        use_swr_source(monkeypatch, tmp_path)
 
         record = run((root, epoch), tmp_path)
         table = read_table(record["outputs"]["events"])
@@ -596,12 +597,15 @@ class TestRunOne:
         _, epoch = decode_root
         step_s = float(epoch.time[1000])
         artifacts = write_artifact_run(
-            tmp_path / "artifacts",
+            tmp_path,
             {EPOCH_ID: [("ca1", step_s, step_s)]},
             span=(float(epoch.time[0]), float(epoch.time[-1])),
         )
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_DIR", artifacts.parent)
-        monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", artifacts.name)
+        # this test's own data root, in place of the module's
+        monkeypatch.setenv(PROCESSED_DATA_DIR_ENV, str(tmp_path))
+        write_swr_source(tmp_path)
+        use_swr_source(monkeypatch, tmp_path)
+        use_artifact_run(monkeypatch, artifacts)
         missing = (epoch.time >= step_s - 0.3) & (epoch.time <= step_s + 0.3)
 
         record = run(decode_root, tmp_path)

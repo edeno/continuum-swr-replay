@@ -160,28 +160,29 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_canonical_table_contract,
     validate_requested_standardization,
 )
-from continuum_swr_replay.paths import CONTFRAG_REPLAY_CONTENT_DIR, REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-# Map event source to model hierarchy and input directory
+# Map event source to model hierarchy and input directory (the accessor that
+# resolves it, called when the run starts)
 _EVENT_SOURCE_CONFIG = {
     "non_local": {
         "hierarchy": MODEL_HIERARCHY,
-        "input_dir": REPLAY_CONTENT_DIR,
+        "input_dir": replay_content_dir,
         "table_name": "event_arm_table",
     },
     "SWR": {
         "hierarchy": MODEL_HIERARCHY_SWR,
-        "input_dir": CONTFRAG_REPLAY_CONTENT_DIR,
+        "input_dir": contfrag_replay_content_dir,
         "table_name": "event_arm_table_swr",
     },
     "MUA": {
         "hierarchy": MODEL_HIERARCHY_MUA,
-        "input_dir": CONTFRAG_REPLAY_CONTENT_DIR,
+        "input_dir": contfrag_replay_content_dir,
         "table_name": "event_arm_table_mua",
     },
 }
@@ -1170,7 +1171,7 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     input_dir = (
         args.input_dir.resolve()
         if args.input_dir is not None
-        else source_config["input_dir"]
+        else source_config["input_dir"]()
     )
     # SWR subset: restrict to is_swr=True or =False events. Within a
     # subset is_swr is constant, so the swr_x_* interactions (M6/M7,

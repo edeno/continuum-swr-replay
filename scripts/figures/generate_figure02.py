@@ -98,7 +98,7 @@ from continuum_swr_replay.figure_utilities import (
     label_panels,
     save_figure,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.figure_panels import (
     compute_triggered_average_curves,
     plot_decoding_error_distribution,
@@ -388,7 +388,7 @@ def _compute_figure_inputs(
 def generate_figure(
     nwb_file_name: str = "wilbur20210329_.nwb",
     epoch_name: str = "02_r1",
-    data_dir: Path = PROCESSED_DATA_DIR,
+    data_dir: Path | None = None,
     window_sec: float = 0.4,
     use_cache: bool = True,
 ):
@@ -403,6 +403,8 @@ def generate_figure(
         (``--force-recompute``), recompute and overwrite the cache.
         Figure-only edits (layout, styling) reuse the cache.
     """
+    if data_dir is None:
+        data_dir = processed_data_dir()
     cache_path = _figure02_cache_path(nwb_file_name, epoch_name, data_dir)
     if use_cache and cache_path.exists():
         logging.info(
@@ -604,7 +606,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument("--nwb-file-name", type=str, default="wilbur20210329_.nwb")
     parser.add_argument("--epoch-name", type=str, default="02_r1")
-    parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
     parser.add_argument("--window-sec", type=float, default=0.4)
     parser.add_argument(
         "--force-recompute",

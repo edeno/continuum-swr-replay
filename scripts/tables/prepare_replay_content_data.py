@@ -8,7 +8,7 @@ each session it loads the pre-saved ``data_over_time.pkl``,
 ``environment.pkl``, and ``results.nc``, pulls ``trials`` +
 ``track_graph`` from Spyglass, and calls the four table builders.
 
-Outputs (under ``PROCESSED_DATA_DIR/replay_content/``):
+Outputs (under ``paths.replay_content_dir()``):
 
 - ``event_table.pkl`` — one row per non-local event
 - ``event_arm_table.pkl`` — one row per (event, arm)
@@ -54,9 +54,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 # Imported as a module, not by name: ``run_prepare_data`` rebinds
-# ``prepare_data.OUTPUT_DIR`` from ``--output-dir``, so the flag's default has to
-# read the module attribute when the parser is built rather than snapshot it at
-# import time.
+# ``prepare_data.OUTPUT_DIR`` from ``--output-dir``, so the flag's default is
+# read (``prepare_data.output_dir()``) when the parser is built.
 from continuum_swr_replay.analysis.replay import prepare_data
 from continuum_swr_replay.analysis.replay.prepare_data import run_prepare_data
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
@@ -106,7 +105,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=prepare_data.OUTPUT_DIR,
+        default=prepare_data.output_dir(),
         help=(
             "Candidate replay-content root. Defaults to the production root; "
             "pass an explicit staging directory for regeneration so existing "

@@ -9,7 +9,7 @@ from Spyglass, and calls the ContFrag table builders.
 Events are defined externally (SWR or MUA times), not by model-detected
 probability thresholding.
 
-Outputs (under ``PROCESSED_DATA_DIR/contfrag_replay_content/``), with
+Outputs (under ``paths.contfrag_replay_content_dir()``), with
 ``{source}`` lowercase (``swr`` / ``mua``) and ``{brain_area}`` mirroring
 the case used at decode time (``HPC`` / ``mPFC`` / ``OFC``):
 
@@ -69,11 +69,11 @@ from continuum_swr_replay.decoding.identifiers import (
     parse_nwb_filename,
 )
 from continuum_swr_replay.decoding.results import open_results
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import (
     BASENAME_TO_TABLE,
-    CONTFRAG_REPLAY_CONTENT_DIR,
-    REPLAY_CONTENT_DIR,
+    contfrag_replay_content_dir,
+    processed_data_dir,
+    replay_content_dir,
     table_path,
 )
 from continuum_swr_replay.tables.covariate_registry import (
@@ -150,9 +150,6 @@ def publish_contfrag_tables(
     return tables
 
 
-OUTPUT_DIR = CONTFRAG_REPLAY_CONTENT_DIR
-
-
 def find_sessions(
     max_per_animal: int | None = None,
     brain_area: str = "HPC",
@@ -187,15 +184,16 @@ def find_sessions(
     ------
     FileNotFoundError
         If, for HPC, a selected epoch has no ContFrag ``data_over_time.pkl`` or
-        ``environment.pkl`` under ``PROCESSED_DATA_DIR``.
+        ``environment.pkl`` under ``paths.processed_data_dir()``.
     """
     by_animal: dict[str, list] = {}
+    decode_dir = processed_data_dir()
     for nwb_file_name, epoch in analysed_epochs().index:
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = format_epoch_identifier(
             nwb_file_name, epoch, brain_area, "_contfrag"
         )
-        paths = decode_paths(session_id, PROCESSED_DATA_DIR, threshold_percent=None)
+        paths = decode_paths(session_id, decode_dir, threshold_percent=None)
         dot_file = paths.data_over_time
         env_file = paths.environment
         if brain_area != "HPC" and not (dot_file.exists() and env_file.exists()):
@@ -228,7 +226,7 @@ def find_sessions(
     if missing:
         raise FileNotFoundError(
             f"{len(missing)} ContFrag decode file(s) of the epoch register's "
-            f"analysed epochs are not under {PROCESSED_DATA_DIR}: "
+            f"analysed epochs are not under {decode_dir}: "
             f"{', '.join(missing[:10])}" + (", ..." if len(missing) > 10 else "")
         )
     return selected
@@ -399,7 +397,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=OUTPUT_DIR,
+        default=contfrag_replay_content_dir(),
         help=(
             "Candidate ContFrag root. Pass an explicit staging directory so "
             "existing scientific artifacts are not overwritten."
@@ -408,7 +406,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--replay-content-dir",
         type=Path,
-        default=REPLAY_CONTENT_DIR,
+        default=replay_content_dir(),
         help=(
             "Replay-content root providing qvals and, unless "
             "--behavior-cache-dir is given, the version-matched behavioral "

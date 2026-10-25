@@ -349,7 +349,7 @@ def _cohort_stop_table() -> pd.DataFrame:
 
 
 @pytest.fixture()
-def stubbed_run(monkeypatch, tmp_path):
+def stubbed_run(monkeypatch, replay_content_root):
     """Run ``main`` without fitting: record what the fitter was handed."""
     seen: dict = {}
 
@@ -377,7 +377,6 @@ def stubbed_run(monkeypatch, tmp_path):
         out.attrs["cohort_stop_drops"] = {}
         return out
 
-    monkeypatch.setattr(fprm, "RC", tmp_path)
     monkeypatch.setattr(fprm, "read_table", _read_table)
     monkeypatch.setattr(fprm, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(fprm, "record_inputs", lambda inputs: {})
@@ -387,7 +386,7 @@ def stubbed_run(monkeypatch, tmp_path):
     monkeypatch.setattr(
         fprm, "write_cohort_audit", lambda records, path: seen.setdefault("audit", path)
     )
-    return seen, tmp_path
+    return seen, replay_content_root
 
 
 def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run):

@@ -174,7 +174,8 @@ from continuum_swr_replay.decoding.results import open_results  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
+from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
+from continuum_swr_replay.paths import processed_data_dir  # noqa: E402
 from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     run_epoch_logged,
@@ -1603,13 +1604,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--decode-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR,
+        default=processed_data_dir(),
         help="Where the decodes are read from (default: Processed-Data).",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=PROCESSED_DATA_DIR
+        default=processed_data_dir()
         / f"_refresh_{date.today():%Y%m%d}"
         / "state_evidence",
         help="The only place written to (default: "

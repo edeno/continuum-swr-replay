@@ -23,7 +23,7 @@ from continuum_swr_replay.figure_utilities import (
     FIGURE_TWO_PANEL_HORIZONTAL,
     save_figure,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")
@@ -152,7 +152,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
-    parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
     args = parser.parse_args(argv)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

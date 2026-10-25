@@ -54,6 +54,12 @@ from continuum_swr_replay.intervals import (
     intersect,
     total_duration,
 )
+from continuum_swr_replay.paths import (
+    carey_root,
+    inventory_comparison_root,
+    memoryless_root,
+    processed_data_dir,
+)
 from continuum_swr_replay.runs import cli
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table
@@ -222,7 +228,7 @@ def inputs(tmp_path_factory, module_monkeypatch):
     tmp_path = tmp_path_factory.mktemp("comparison")
     monkeypatch = module_monkeypatch
     swr_run = write_swr_inventory(
-        tmp_path / "swr",
+        tmp_path,
         {WORKED: KAY, MASKED: MASKED_KAY, SHIFTED: KAY},
         observed=dict.fromkeys([*EPOCHS.values(), SHIFTED], STORED_BAND),
     )
@@ -240,20 +246,15 @@ def inputs(tmp_path_factory, module_monkeypatch):
             )
             add_swr_detector(swr_run, identifier, detector, intervals)
     artifact_run = write_artifact_run(
-        tmp_path / "artifacts",
+        tmp_path,
         {WORKED: [], MASKED: [("spk", 30.05, 30.05)], SHIFTED: []},
     )
+    # the data root is tmp_path: the decodes and every run folder are under it
     use_swr_source(monkeypatch, swr_run, artifact_run)
-    decode_root = tmp_path / "decodes"
-    decode_root.mkdir()
     for epoch, identifier in [*EPOCHS.items(), ("06_r3", SHIFTED)]:
-        write_decode(decode_root, epoch, identifier)
-    write_carey_run(tmp_path / "carey")
-    write_memoryless_run(tmp_path / "memoryless")
-    monkeypatch.setattr(inventory_run, "DECODE_ROOT", decode_root)
-    monkeypatch.setattr(runner, "CAREY_ROOT", tmp_path / "carey")
-    monkeypatch.setattr(runner, "MEMORYLESS_ROOT", tmp_path / "memoryless")
-    monkeypatch.setattr(runner, "OUTPUT_ROOT", tmp_path / "inventory")
+        write_decode(tmp_path, epoch, identifier)
+    write_carey_run(carey_root())
+    write_memoryless_run(memoryless_root())
     monkeypatch.setattr(
         cli, "analysed_epoch_ids", lambda: [*EPOCHS.values(), SHIFTED, NO_DECODE]
     )
@@ -275,7 +276,7 @@ def run(inputs):
     """The runner over the four epochs, two failing; its run folder."""
     with pytest.raises(SystemExit, match="2 epochs failed"):
         runner.main([*ARGS, "--animal", ANIMAL])
-    return inputs / "inventory" / RUN_ID
+    return inventory_comparison_root() / RUN_ID
 
 
 def table(run_dir: Path, identifier: str, name: str) -> pd.DataFrame:
@@ -574,8 +575,8 @@ class TestTheStoredTablesRebuildTheComparison:
                 dot,
                 analysed_time.artifact_event_drops(saved),
                 decode_run_id="decode",
-                carey_dir=runner.CAREY_ROOT / CAREY_RUN,
-                memoryless_dir=runner.MEMORYLESS_ROOT / MEMORYLESS_RUN,
+                carey_dir=carey_root() / CAREY_RUN,
+                memoryless_dir=memoryless_root() / MEMORYLESS_RUN,
             )
         time, speed = inventory_run.speed_trace(dot)
         key = (ANIMAL, DAY, dot.epoch.iloc[0])
@@ -709,7 +710,7 @@ def test_the_manifest_records_the_inputs_and_each_epoch(run):
     for identifier in EPOCHS.values():
         record = manifest["epochs"][identifier]
         assert record["status"] == "ok"
-        decode = inventory_run.DECODE_ROOT / f"{identifier}_80_data_over_time.pkl"
+        decode = processed_data_dir() / f"{identifier}_80_data_over_time.pkl"
         assert record["decode"]["sha256"] == sha256_file(decode)
         assert record["epoch_bounds_s"] == [float(TIME[0]), float(TIME[-1])]
         assert set(record["outputs"]) == set(inventory_run.TABLE_DTYPES)
@@ -762,7 +763,7 @@ def test_a_rerun_skips_ok_epochs(run, monkeypatch, capsys):
 
 
 def test_a_rerun_under_other_settings_is_refused(run, inputs):
-    other = inputs / "carey" / "careyrun02"
+    other = carey_root() / "careyrun02"
     other.mkdir()
     (other / "manifest.json").write_text(
         json.dumps({"run_id": "careyrun02", "epochs": {}})

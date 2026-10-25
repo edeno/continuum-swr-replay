@@ -1,37 +1,141 @@
 """``paths``: each output location equals the inline spelling it replaced.
 
-A migrated constant that resolved to a different ``Path`` would silently read a
-stale artifact, so every constant is pinned to the literal it replaced, and
-``table_path`` is checked over the whole canonical-table registry.
+A migrated location that resolved to a different ``Path`` would silently read a
+stale artifact, so every root is pinned to the literal it replaced, and
+``table_path`` is checked over the whole canonical-table registry. Every root is
+resolved when called, from ``$CSR_PROCESSED_DATA_DIR``: the suite points it at a
+sentinel (``tests/conftest.py``), and these tests at a root of their own.
 """
 
 from __future__ import annotations
 
-import os
-import subprocess
+import ast
+import re
 import sys
 from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay import paths
-from continuum_swr_replay.parameters import FIGURE_DIR, PROCESSED_DATA_DIR, ROOT_DIR
+from continuum_swr_replay import parameters, paths
+from continuum_swr_replay.parameters import FIGURE_DIR, ROOT_DIR
 
-RC = PROCESSED_DATA_DIR / "replay_content"
+#: The data root these tests point ``$CSR_PROCESSED_DATA_DIR`` at.
+DATA_ROOT = Path("/a/data/root")
+RC = DATA_ROOT / "replay_content"
+
+ROOT_LITERALS = {
+    "replay_content_dir": "replay_content",
+    "contfrag_replay_content_dir": "contfrag_replay_content",
+    "detection_comparison_dir": "replay_detection_comparison",
+    "swr_inventory_root": "replay_detection_comparison/swr",
+    "memoryless_root": "replay_detection_comparison/memoryless",
+    "carey_root": "replay_detection_comparison/carey",
+    "inventory_comparison_root": "replay_detection_comparison/inventory",
+    "event_features_root": "replay_detection_comparison/event_features",
+    "artifact_intervals_root": "artifact_intervals",
+}
+"""Each root's accessor -> its spelling under the data root."""
+
+
+@pytest.fixture(autouse=True)
+def data_root(monkeypatch):
+    monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(DATA_ROOT))
 
 
 def test_roots_equal_the_literals_they_replaced():
-    assert paths.REPLAY_CONTENT_DIR == RC
-    assert paths.CONTFRAG_REPLAY_CONTENT_DIR == (
-        PROCESSED_DATA_DIR / "contfrag_replay_content"
+    assert paths.processed_data_dir() == DATA_ROOT
+    for accessor, literal in ROOT_LITERALS.items():
+        assert getattr(paths, accessor)() == DATA_ROOT / literal, accessor
+
+
+def test_every_root_follows_the_environment_when_called(monkeypatch, tmp_path):
+    """No root is bound at import: moving the variable moves every root."""
+    monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(tmp_path))
+
+    assert paths.processed_data_dir() == tmp_path
+    for accessor, literal in ROOT_LITERALS.items():
+        assert getattr(paths, accessor)() == tmp_path / literal, accessor
+    assert (
+        paths.table_path("stop_table") == tmp_path / "replay_content/stop_table.parquet"
     )
-    assert paths.DETECTION_COMPARISON_DIR == (
-        PROCESSED_DATA_DIR / "replay_detection_comparison"
+    assert (
+        paths.model_dir("per_bin_rate")
+        == tmp_path / "replay_content/models_per_bin_rate"
     )
-    assert paths.SWR_INVENTORY_ROOT == (
-        PROCESSED_DATA_DIR / "replay_detection_comparison" / "swr"
-    )
-    assert paths.ARTIFACT_INTERVALS_DIR == PROCESSED_DATA_DIR / "artifact_intervals"
+
+
+def test_without_the_variable_the_root_is_the_checkouts(monkeypatch):
+    monkeypatch.delenv(paths.PROCESSED_DATA_DIR_ENV)
+
+    assert paths.processed_data_dir() == ROOT_DIR / "Processed-Data"
+
+
+def test_the_upper_case_names_resolve_when_read(monkeypatch, tmp_path):
+    """Kept for notebooks: ``paths.REPLAY_CONTENT_DIR`` and the rest, and
+    ``parameters.PROCESSED_DATA_DIR``, are the accessors' values at the read."""
+    names = {
+        "REPLAY_CONTENT_DIR": "replay_content_dir",
+        "CONTFRAG_REPLAY_CONTENT_DIR": "contfrag_replay_content_dir",
+        "DETECTION_COMPARISON_DIR": "detection_comparison_dir",
+        "SWR_INVENTORY_ROOT": "swr_inventory_root",
+        "MEMORYLESS_ROOT": "memoryless_root",
+        "CAREY_ROOT": "carey_root",
+        "INVENTORY_COMPARISON_ROOT": "inventory_comparison_root",
+        "EVENT_FEATURES_ROOT": "event_features_root",
+        "ARTIFACT_INTERVALS_DIR": "artifact_intervals_root",
+    }
+    for root in (DATA_ROOT, tmp_path):
+        monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(root))
+        assert parameters.PROCESSED_DATA_DIR == root
+        for name, accessor in names.items():
+            assert getattr(paths, name) == getattr(paths, accessor)(), name
+    with pytest.raises(AttributeError):
+        paths.NOT_A_ROOT  # noqa: B018
+    with pytest.raises(AttributeError):
+        parameters.NOT_A_PARAMETER  # noqa: B018
+
+
+# The modules that may name the upper-case roots: their definitions, and the
+# unsupported one-off scripts (``scripts/exploratory``), which notebooks resemble.
+_ROOT_NAME = re.compile(
+    r"\b(PROCESSED_DATA_DIR|REPLAY_CONTENT_DIR|CONTFRAG_REPLAY_CONTENT_DIR|"
+    r"DETECTION_COMPARISON_DIR|SWR_INVENTORY_ROOT|MEMORYLESS_ROOT|CAREY_ROOT|"
+    r"INVENTORY_COMPARISON_ROOT|EVENT_FEATURES_ROOT|ARTIFACT_INTERVALS_DIR)\b"
+)
+
+
+def test_no_supported_module_binds_a_root_by_its_upper_case_name():
+    """A module that imported a root by name would hold it from its import on,
+    and a test would have to patch that module to move it."""
+    allowed = {
+        ROOT_DIR / "src/continuum_swr_replay/paths.py",
+        ROOT_DIR / "src/continuum_swr_replay/parameters.py",
+    }
+    offenders = []
+    for folder in ("src", "scripts"):
+        for path in sorted((ROOT_DIR / folder).rglob("*.py")):
+            if path in allowed or "exploratory" in path.parts:
+                continue
+            tree = ast.parse(path.read_text())
+            names = (
+                {
+                    alias.name
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.ImportFrom)
+                    for alias in node.names
+                }
+                | {
+                    node.attr
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Attribute)
+                }
+                | {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+            )
+            hits = sorted(name for name in names if _ROOT_NAME.fullmatch(name))
+            if hits:
+                offenders.append(f"{path.relative_to(ROOT_DIR)}: {hits}")
+
+    assert offenders == []
 
 
 MODEL_LITERALS = {
@@ -122,8 +226,6 @@ def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
 
     from scripts.coupling import fit_swr_power_model as mod
 
-    assert mod.OUTPUT_DIR == RC / "models_per_event_swr_power"
-    assert mod.OUTPUT_DIR == paths.model_dir("per_event_swr_power")
     out_dir = paths.model_dir("per_event_swr_power", tmp_path)
     mod._write_outputs(
         out_dir,
@@ -184,7 +286,9 @@ def test_the_qvals_builder_writes_beside_the_other_canonical_tables(monkeypatch)
 
 
 @pytest.mark.parametrize("topic", ["rate", "replay_content", "qc_diagnosis"])
-def test_figure_dir_on_the_default_root_is_the_paper_figure_dir(topic):
+def test_figure_dir_on_the_default_root_is_the_paper_figure_dir(topic, monkeypatch):
+    monkeypatch.delenv(paths.PROCESSED_DATA_DIR_ENV)
+
     assert paths.figure_dir(topic) == FIGURE_DIR / topic
 
 
@@ -194,61 +298,52 @@ def test_figure_dir_on_a_staging_root_sits_beside_it():
 
 
 # Each run_refits figure script (and compare_content_estimators, a fit that
-# also draws), and the module-level default it writes to.
-# ``plot_uncertainty_rate`` builds its directory inside ``main``, so it is
-# not listed; it calls ``figure_dir("rate")`` directly.
+# also draws), and where it writes: an expression on the imported script, or,
+# for one that calls ``figure_dir`` where it saves, None (its source is checked).
 FIGURE_SCRIPT_DEFAULTS = {
-    "scripts/rate/plot_per_bin_rate_models.py": ("FIGS", "rate"),
-    "scripts/rate/plot_per_bin_rate_summary.py": ("FIGS", "rate"),
-    "scripts/rate/plot_model_checking.py": ("FIGS", "rate"),
+    "scripts/rate/plot_per_bin_rate_models.py": (None, "rate"),
+    "scripts/rate/plot_per_bin_rate_summary.py": (None, "rate"),
+    "scripts/rate/plot_model_checking.py": (None, "rate"),
+    "scripts/rate/plot_uncertainty_rate.py": (None, "rate"),
     "scripts/figures/generate_uncertainty_content_figure.py": (
-        "DEFAULT_OUTPUT_DIR",
+        "_parse_args([]).output_dir",
         "uncertainty_content",
     ),
     "scripts/content/generate_replay_content_figures.py": (
-        "OUTPUT_DIR",
+        "output_dir()",
         "replay_content",
     ),
     "scripts/figures/generate_supp_pipeline_data_flow.py": (
         "build_parser().parse_args([]).output_dir",
         "qc_diagnosis",
     ),
-    "scripts/figures/plot_swr_contrast_coefs.py": ("OUT", "swr_contrast"),
+    "scripts/figures/plot_swr_contrast_coefs.py": (None, "swr_contrast"),
     "scripts/content/compare_content_estimators.py": (
-        "DEFAULT_FIGURES_DIR",
+        "_parse_args([]).figures_dir",
         "content_estimators",
     ),
 }
 
-_PRINT_DEFAULTS = """
-import importlib.util, sys
-from pathlib import Path
-for rel, attr in zip(sys.argv[1::2], sys.argv[2::2]):
-    spec = importlib.util.spec_from_file_location(Path(rel).stem, rel)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod  # a script's dataclasses look themselves up here
-    spec.loader.exec_module(mod)
-    print(eval("mod." + attr))
-"""
 
-
-def test_figure_scripts_write_beside_a_staging_data_root(tmp_path):
+@pytest.mark.parametrize("rel", sorted(FIGURE_SCRIPT_DEFAULTS))
+def test_figure_scripts_write_beside_a_staging_data_root(rel, tmp_path, monkeypatch):
     # A run on another root (run_refits on a staging root, cwd the repo) must
-    # not write into the paper's figures. The env var is read at import, so
-    # the scripts are imported in a fresh interpreter.
-    root = tmp_path / "Processed-Data"
-    argv = [a for rel, (attr, _) in FIGURE_SCRIPT_DEFAULTS.items() for a in (rel, attr)]
-    env = {**os.environ, "CSR_PROCESSED_DATA_DIR": str(root), "MPLBACKEND": "Agg"}
-    out = subprocess.run(
-        [sys.executable, "-c", _PRINT_DEFAULTS, *argv],
-        cwd=ROOT_DIR,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.split()
-    expected = [
-        str(tmp_path / "paper" / "figures" / topic)
-        for _, topic in FIGURE_SCRIPT_DEFAULTS.values()
-    ]
-    assert out == expected
+    # not write into the paper's figures. The root is read when the figure
+    # directory is resolved, so the script is imported here, root already set.
+    import importlib.util
+
+    expression, topic = FIGURE_SCRIPT_DEFAULTS[rel]
+    path = ROOT_DIR / rel
+    if expression is None:
+        source = path.read_text()
+        assert f'figure_dir("{topic}")' in source
+        assert "FIGURE_DIR" not in source
+        return
+    monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(tmp_path / "Processed-Data"))
+    monkeypatch.setenv("MPLBACKEND", "Agg")
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, module)  # dataclasses look it up
+    spec.loader.exec_module(module)
+
+    assert eval("module." + expression) == tmp_path / "paper" / "figures" / topic

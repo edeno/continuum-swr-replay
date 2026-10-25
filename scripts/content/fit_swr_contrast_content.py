@@ -95,12 +95,12 @@ from continuum_swr_replay.analysis.replay.content_response import (
     validate_fraction_response,
 )
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
-    CONTENT_FIT_INPUTS,
     LOG_EVENT_LENGTH,
     OUTCOME_STRATA,
     aggregate_contrast,
     assemble_arm,
     assemble_patch,
+    contrast_fit_inputs,
     prepare_cohorts,
     prepare_session,
     specs_from_ladder,
@@ -147,7 +147,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     SWR_CONTRAST_CONTENT_PATCH_LADDER as PATCH_LADDER,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir
+from continuum_swr_replay.paths import model_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from continuum_swr_replay.tables.standardization import (
     save_reference,
@@ -163,7 +163,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
-RC = REPLAY_CONTENT_DIR
 SC = list(SESSION_COLUMNS)
 
 #: Concentration contrast the Dirichlet-multinomial adds to every rung.
@@ -861,22 +860,23 @@ def main(argv: Sequence[str] | None = None) -> None:
     sfx = _artifact_suffix(args, response)
     # Not ``content_arm``: the arm content ladder publishes that directory by
     # replacing it whole, which would delete these fits.
-    (model_dir("swr_contrast", RC)).mkdir(parents=True, exist_ok=True)
+    (model_dir("swr_contrast")).mkdir(parents=True, exist_ok=True)
     # The standardization references are taken over the FULL assembled cohorts,
     # before the outcome stratum and the smoke subset, so every stratum's
     # coefficients are stated in the same per-SD unit.
-    ev, arm_z_reference = assemble_arm()
-    pt, patch_z_reference = assemble_patch(ev)
+    contrast_inputs = contrast_fit_inputs()
+    ev, arm_z_reference = assemble_arm(contrast_inputs)
+    pt, patch_z_reference = assemble_patch(ev, contrast_inputs)
     # Hash the tables now, while they are the ones being fit: the ladder runs
     # for long enough that a table could be regenerated before the artifacts are
     # written, and a sidecar hashed at write time would certify bytes no fit saw.
-    fit_inputs = record_inputs(CONTENT_FIT_INPUTS)
+    fit_inputs = record_inputs(contrast_inputs)
     if response == "fraction":
         validate_fraction_response(
-            ev, arm_response, table_label=CONTENT_FIT_INPUTS["event_arm_table"]
+            ev, arm_response, table_label=contrast_inputs["event_arm_table"]
         )
         validate_fraction_response(
-            pt, patch_response, table_label=CONTENT_FIT_INPUTS["event_patch_table"]
+            pt, patch_response, table_label=contrast_inputs["event_patch_table"]
         )
     logger.info("response = %s / %s (%s)", arm_response, patch_response, estimator)
     fit_z_reference = {"arm_cohort": arm_z_reference, "patch_cohort": patch_z_reference}
@@ -906,7 +906,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     arm, arm_audit = _run(
         ev, ARM_LADDER, response_col=arm_response, n_categories=9, **fit_kwargs
     )
-    arm_path = model_dir("swr_contrast", RC) / f"swr_contrast_content_arm{sfx}.pkl"
+    arm_path = model_dir("swr_contrast") / f"swr_contrast_content_arm{sfx}.pkl"
     arm.to_pickle(arm_path)
     write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(arm_z_reference, z_reference_path(arm_path))
@@ -920,7 +920,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     patch, patch_audit = _run(
         pt, PATCH_LADDER, response_col=patch_response, n_categories=3, **fit_kwargs
     )
-    patch_path = model_dir("swr_contrast", RC) / f"swr_contrast_content_patch{sfx}.pkl"
+    patch_path = model_dir("swr_contrast") / f"swr_contrast_content_patch{sfx}.pkl"
     patch.to_pickle(patch_path)
     write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     save_reference(patch_z_reference, z_reference_path(patch_path))
@@ -929,7 +929,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # n_modeled at the event grain) + term-level quasi-separation diagnostics.
     write_cohort_audit(
         arm_audit + patch_audit,
-        model_dir("swr_contrast", RC) / f"swr_contrast_content_cohort_audit{sfx}.csv",
+        model_dir("swr_contrast") / f"swr_contrast_content_cohort_audit{sfx}.csv",
     )
     term_diag = pd.concat(
         [
@@ -939,8 +939,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         ignore_index=True,
     )
     term_diag.to_csv(
-        model_dir("swr_contrast", RC)
-        / f"swr_contrast_content_term_diagnostics{sfx}.csv",
+        model_dir("swr_contrast") / f"swr_contrast_content_term_diagnostics{sfx}.csv",
         index=False,
     )
 
@@ -948,7 +947,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "saved arm=%d patch=%d rows -> %s",
         len(arm),
         len(patch),
-        model_dir("swr_contrast", RC),
+        model_dir("swr_contrast"),
     )
     print("\n########## ARM ##########")
     _summ(arm, ARM_LADDER, ARM_KEY_TERM)
@@ -985,9 +984,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         ],
         ignore_index=True,
     )
-    audited_path = (
-        model_dir("swr_contrast", RC) / f"swr_contrast_content_audited{sfx}.pkl"
-    )
+    audited_path = model_dir("swr_contrast") / f"swr_contrast_content_audited{sfx}.pkl"
     agg.to_pickle(audited_path)
     write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
     prov = _provenance(
@@ -1000,12 +997,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         concentration_cols,
     )
     (
-        model_dir("swr_contrast", RC) / f"swr_contrast_content_provenance{sfx}.json"
+        model_dir("swr_contrast") / f"swr_contrast_content_provenance{sfx}.json"
     ).write_text(json.dumps(prov, indent=2))
     logger.info(
         "saved audited table (%d rows) + provenance -> %s",
         len(agg),
-        model_dir("swr_contrast", RC),
+        model_dir("swr_contrast"),
     )
     print(
         "\n########## AUDITED  (animal-level = primary; session signed-rank = descriptive) ##########"

@@ -120,7 +120,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
 )
 from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (
     _track_edge_colors,
@@ -1748,7 +1748,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
+    parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
     parser.add_argument("--gallery-dir", type=Path, default=DEFAULT_GALLERY_DIR)
     sub = parser.add_subparsers(dest="command", required=True)
 

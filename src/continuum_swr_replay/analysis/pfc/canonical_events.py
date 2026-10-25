@@ -55,14 +55,12 @@ from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import table_path
+from continuum_swr_replay.paths import processed_data_dir, table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, resolved_table_path
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 __all__ = [
-    "DEFAULT_EVENT_TABLE_PATH",
     "IS_SWR_DEFINITION",
     "canonical_event_provenance",
     "canonical_event_input_hashes",
@@ -71,9 +69,6 @@ __all__ = [
     "session_data_over_time_path",
     "session_swr_events_file",
 ]
-
-#: The canonical per-event table every family's events are read from.
-DEFAULT_EVENT_TABLE_PATH = table_path("event_table")
 
 #: Provenance labels for the two definitions this module fixes. Written to each
 #: run's sidecar so an artifact states which event definition it was fit on.
@@ -106,7 +101,8 @@ def load_session_canonical_events(
     epoch_name : str
         Epoch name, e.g. ``"02_r1"``.
     event_table_path : str or Path, optional
-        Event table to read; defaults to :data:`DEFAULT_EVENT_TABLE_PATH`.
+        Event table to read; defaults to the canonical per-event table every
+        family's events are read from, ``table_path("event_table")``.
 
     Returns
     -------
@@ -136,7 +132,9 @@ def load_session_canonical_events(
         to remove.
     """
     path = (
-        DEFAULT_EVENT_TABLE_PATH if event_table_path is None else Path(event_table_path)
+        table_path("event_table")
+        if event_table_path is None
+        else Path(event_table_path)
     )
     animal, session_date = parse_nwb_filename(nwb_file_name)
 
@@ -193,7 +191,7 @@ def session_data_over_time_path(
         here, so a malformed name fails at once rather than as a missing file.
     """
     parse_nwb_filename(nwb_file_name)
-    directory = PROCESSED_DATA_DIR if data_dir is None else Path(data_dir)
+    directory = processed_data_dir() if data_dir is None else Path(data_dir)
     return decode_paths(
         format_epoch_identifier(nwb_file_name, epoch_name, "HPC"),
         directory,
@@ -359,7 +357,9 @@ def canonical_event_input_hashes(
     than skipped.
     """
     table = (
-        DEFAULT_EVENT_TABLE_PATH if event_table_path is None else Path(event_table_path)
+        table_path("event_table")
+        if event_table_path is None
+        else Path(event_table_path)
     )
     resolved_table = resolved_table_path(table)
     dot = session_data_over_time_path(

@@ -69,9 +69,9 @@ Examples
 >>> from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 ...     load_data_over_time,
 ... )
->>> from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+>>> from continuum_swr_replay.paths import processed_data_dir
 >>> # The analysed epochs, with the SWR source's labels
->>> data = load_data_over_time(PROCESSED_DATA_DIR)
+>>> data = load_data_over_time(processed_data_dir())
 >>> summary = compute_session_quality_summary(data)
 >>> print(summary[["animal", "day", "epoch", "median_error_cm", "local_fraction", "n_flags"]])
 

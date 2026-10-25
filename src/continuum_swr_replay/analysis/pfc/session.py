@@ -59,6 +59,7 @@ from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
     interval_mask,
 )
+from continuum_swr_replay.paths import table_path
 
 # ``load_data`` and the hippocampus helpers below open a Spyglass /
 # DataJoint connection at import time. We defer those imports into
@@ -1324,7 +1325,6 @@ def _session_events(
     # the top of this module).
     from continuum_swr_replay.analysis.events import analysed_time
     from continuum_swr_replay.analysis.pfc.canonical_events import (
-        DEFAULT_EVENT_TABLE_PATH,
         canonical_event_provenance,
         load_session_canonical_events,
         load_session_swr_intervals,
@@ -1344,7 +1344,7 @@ def _session_events(
     )
     swr_events_file = session_swr_events_file(nwb_file_name, epoch_name)
     event_provenance = canonical_event_provenance(
-        event_table_path=DEFAULT_EVENT_TABLE_PATH,
+        event_table_path=table_path("event_table"),
         event_table_sha256=event_table_sha256,
         data_over_time_path=session_data_over_time_path(
             nwb_file_name, epoch_name, non_local_threshold=non_local_threshold

@@ -31,11 +31,13 @@ runner = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(runner)
 
 
-def test_stop_cohort_defaults_to_the_canonical_at_well_population():
+def test_stop_cohort_defaults_to_the_canonical_at_well_population(
+    processed_data_root,
+):
     args = runner.get_command_line_arguments([])
 
     assert args.stop_cohort == "at_well"
-    assert args.output_dir == runner.PROCESSED_DATA_DIR
+    assert args.output_dir == processed_data_root
     assert args.max_sessions is None
     assert args.n_control_draws == runner.DEFAULT_CONTROL_DRAWS == 1_000
 
@@ -218,15 +220,14 @@ def test_an_allstops_bundle_matches_when_no_stop_table_was_read(tmp_path):
 
 
 @pytest.fixture
-def fake_session(monkeypatch, tmp_path):
+def fake_session(monkeypatch, tmp_path, replay_content_root):
     """Replace the per-session fit and the cohort load with recorded stubs."""
     calls: dict[str, object] = {}
 
     # The sidecar hashes the stop table the cohort was cut from; give it one
-    # here rather than read the shared Processed-Data tree.
-    stop_table = tmp_path / "stop_table.parquet"
+    # under the test's data root rather than read the shared Processed-Data tree.
+    stop_table = replay_content_root / "stop_table.parquet"
     write_table(pd.DataFrame({"stop_start": [10.0], "stop_end": [11.0]}), stop_table)
-    monkeypatch.setattr(runner, "DEFAULT_STOP_TABLE_PATH", stop_table)
 
     # These tests are about what the runner writes, not about which card it
     # fits on; without this they would claim a real GPU on a shared host.

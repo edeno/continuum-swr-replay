@@ -108,9 +108,6 @@ from continuum_swr_replay.analysis.events import (  # noqa: E402
     swr_source,
 )
 from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
-    MARKS_CACHE_DIR as DEFAULT_MARKS_CACHE_DIR,
-)
-from continuum_swr_replay.analysis.hippocampus.detection_inputs import (  # noqa: E402
     MARKS_RULE,
     decode_marks,
     marks_sha256,
@@ -188,11 +185,12 @@ from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, ROOT_DIR  # noqa: E402
+from continuum_swr_replay.parameters import ROOT_DIR  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
-    EVENT_FEATURES_ROOT,
-    INVENTORY_COMPARISON_ROOT,
-    MEMORYLESS_ROOT,
+    event_features_root,
+    inventory_comparison_root,
+    memoryless_root,
+    processed_data_dir,
     table_path,
 )
 from continuum_swr_replay.runs.batch import (  # noqa: E402
@@ -219,12 +217,6 @@ from continuum_swr_replay.runs.provenance import (  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY  # noqa: E402
 
-OUTPUT_ROOT = EVENT_FEATURES_ROOT
-INVENTORY_ROOT = INVENTORY_COMPARISON_ROOT
-"""Where the comparison runs are."""
-MARKS_CACHE_DIR = DEFAULT_MARKS_CACHE_DIR
-"""The memoryless runner's marks cache, keyed by the decode's detector file."""
-STOP_TABLE = table_path("stop_table")
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/replay_detection_comparison/04-event-features.md"
 
@@ -453,9 +445,9 @@ def epoch_tables(
         compared, matches, stored["cells"], stored["directional"]
     )
 
-    marks = decode_marks(
-        identifier, root=inventory_run.DECODE_ROOT, cache_dir=MARKS_CACHE_DIR
-    )
+    # the canonical decode, and the memoryless runner's marks cache, keyed by
+    # the decode's detector file
+    marks = decode_marks(identifier)
     spike_times = marks["spike_times"]
     spike_waveform_features = marks["spike_waveform_features"]
     check_marks_match_encoding(
@@ -739,8 +731,8 @@ def run_settings(inventory_run_id: str, inventory: Mapping[str, Any]) -> dict:
             # relative, so a worktree whose Processed-Data links to the same
             # folder records the same settings
             "stop_table": {
-                "path": str(STOP_TABLE.relative_to(PROCESSED_DATA_DIR)),
-                "sha256": sha256_file(STOP_TABLE),
+                "path": str(table_path("stop_table").relative_to(processed_data_dir())),
+                "sha256": sha256_file(table_path("stop_table")),
             },
             "decode": inventory_run.decode_path("{epoch_id}").name
             + ", read through the SWR source; its sha256 the comparison's",
@@ -822,14 +814,15 @@ def main(argv: list[str] | None = None) -> None:
             f"warning: uncommitted changes; run {run_id} cannot be tied to a commit",
             flush=True,
         )
-    output_dir = OUTPUT_ROOT / run_id
+    output_dir = event_features_root() / run_id
     with run_lock(output_dir):
         run(args, provenance, output_dir)
 
 
 def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
     """``main``'s run, under the run folder's lock."""
-    inventory_dir = INVENTORY_ROOT / args.inventory_run_id
+    # where the comparison runs are
+    inventory_dir = inventory_comparison_root() / args.inventory_run_id
     inventory_manifest = inventory_dir / "manifest.json"
     if not inventory_manifest.exists():
         sys.exit(f"--inventory-run-id: no run manifest at {inventory_manifest}.")
@@ -851,7 +844,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
             f"{inventory['settings']['swr_source']}; the SWR source is "
             f"{swr_source.swr_source_name()}."
         )
-    memoryless_dir = MEMORYLESS_ROOT / input_runs["memoryless"]
+    memoryless_dir = memoryless_root() / input_runs["memoryless"]
     if not (memoryless_dir / "manifest.json").exists():
         sys.exit(f"No memoryless run manifest at {memoryless_dir}.")
     settings = run_settings(args.inventory_run_id, inventory)
@@ -912,7 +905,7 @@ def run(args: argparse.Namespace, provenance: dict, output_dir: Path) -> None:
             for identifier, record in inventory["epochs"].items()
             if record["status"] == "ok"
         },
-        "stop_table": STOP_TABLE,
+        "stop_table": table_path("stop_table"),
         "provenance": provenance,
     }
     failed = []

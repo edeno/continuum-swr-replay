@@ -205,7 +205,7 @@ from continuum_swr_replay.intervals import (
     masked_seconds,
 )
 from continuum_swr_replay.parameters import ROOT_DIR
-from continuum_swr_replay.paths import SWR_INVENTORY_ROOT
+from continuum_swr_replay.paths import swr_inventory_root
 from continuum_swr_replay.runs.batch import (
     raise_open_file_limit,
     run_epoch_task,
@@ -221,8 +221,6 @@ from continuum_swr_replay.runs.io import (
 )
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
 
-OUTPUT_ROOT = SWR_INVENTORY_ROOT
-"""Where the run folders go: where the paper's SWR source reads them."""
 PRODUCED_BY = produced_by(__file__)
 DESIGN_SPEC = "docs/design/2026-10-03-full-pipeline-refresh-design.md"
 
@@ -1045,7 +1043,8 @@ def run_settings(provenance: dict, artifact_run_id: str | None) -> dict:
     return settings
 
 
-def main(argv: list[str] | None = None) -> None:
+def build_parser() -> argparse.ArgumentParser:
+    """The command line; its defaults are read when it is built."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -1075,8 +1074,13 @@ def main(argv: list[str] | None = None) -> None:
         help="The run's folder under --output-root: letters, digits, '.', '_' "
         "and '-'. Defaults to the first 12 characters of git rev-parse HEAD.",
     )
-    parser.add_argument("--output-root", type=Path, default=OUTPUT_ROOT)
-    args = parser.parse_args(argv)
+    # Where the run folders go: where the paper's SWR source reads them.
+    parser.add_argument("--output-root", type=Path, default=swr_inventory_root())
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
 
     # before the cluster starts: its worker processes inherit this limit
     old_soft, new_soft = raise_open_file_limit()

@@ -33,8 +33,7 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import processed_data_dir, replay_content_dir
 
 ARM_COLORS = {
     0: "#1f77b4",
@@ -60,7 +59,7 @@ def figure_trial_sanity(
 ) -> None:
     """Plot a window of position + speed + trip boundaries for one session."""
     base = f"{animal}{day}_{epoch}_HPC"
-    dot = pd.read_pickle(decode_paths(base, PROCESSED_DATA_DIR).data_over_time)
+    dot = pd.read_pickle(decode_paths(base, processed_data_dir()).data_over_time)
     nwb = f"{animal}{day}_.nwb"
     data = load_data(nwb, epoch, include=frozenset({SessionDataKeys.TRIALS}))
     trials = data["trials"].sort_values("movement_start_time").reset_index(drop=True)
@@ -171,7 +170,7 @@ def figure_trial_sanity(
 
 def figure_predictor_collapse(*, output_dir: Path) -> None:
     """Across all events, quantify how often each predictor collapses with is_current."""
-    ev = pd.read_pickle(REPLAY_CONTENT_DIR / "events.pkl")
+    ev = pd.read_pickle(replay_content_dir() / "events.pkl")
     ev = ev.copy()
     ev["cur"] = ev["track_segment_id"]
     ev["prev"] = ev["prev_trial_from_well"]

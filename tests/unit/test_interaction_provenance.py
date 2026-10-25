@@ -393,7 +393,7 @@ def test_timing_and_qvals_answers_match_436c4538():
 @pytest.mark.real_data
 def test_products_match_the_old_builders_on_the_canonical_tables(monkeypatch):
     """The canonical fit's cohorts, built with the declaration and the old code."""
-    inputs = ca.CONTENT_FIT_INPUTS
+    inputs = ca.contrast_fit_inputs()
     real = ca.attach_interactions
     captured = {}
 
