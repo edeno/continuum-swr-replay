@@ -16,12 +16,15 @@ the row reconciliation — they annotate the retained cohort, they do not remove
 
 from __future__ import annotations
 
-from collections.abc import Container, Iterable
+from collections.abc import Container, Iterable, Iterator
 
 import numpy as np
 import pandas as pd
 
-from .covariates.definitions import QVALS_ROW_GATED_COVARIATES
+from .covariates.definitions import (
+    QVALS_ROW_GATED_COVARIATES,
+    QVALS_SOURCED_COVARIATES,
+)
 
 # Row-level drop buckets, in the schema's PRIORITY order. Each dropped unit is
 # attributed to exactly the first bucket it hits, so the reconciliation closes even
@@ -69,19 +72,73 @@ TERM_DIAGNOSTICS_COLUMNS = (
 _QUASI_SEP_ABS = 10.0
 
 #: Name modifiers a design column may carry over its base covariate: the fit-time
-#: ``_z`` standardization and the leaf-mean ``_patch`` aggregate.
+#: ``_z`` standardization and the leaf-mean ``_patch`` aggregate, in either order.
 _DERIVED_SUFFIXES = ("_z", "_patch")
+
+#: Boolean design-frame column: True when the row's stop has a ``qvals_table``
+#: row. The qvals-gap drop bucket is booked from it, per row.
+HAS_QVALS_ROW = "has_qvals_row"
+
+
+def _factor_forms(name: str) -> Iterator[str]:
+    """Each ``_x_`` factor of ``name``, then every form of it with suffixes removed.
+
+    Suffixes are removed one at a time from the end, in whatever order they
+    were applied, so ``<base>_patch_z`` and ``<base>_z_patch`` both reach
+    ``<base>``. Every intermediate form is yielded, so a base name that itself
+    ends in a suffix is still found.
+    """
+    for factor in name.split("_x_"):
+        yield factor
+        stripped = True
+        while stripped:
+            stripped = False
+            for suffix in _DERIVED_SUFFIXES:
+                if factor.endswith(suffix) and factor != suffix:
+                    factor = factor.removesuffix(suffix)
+                    yield factor
+                    stripped = True
+
+
+def _is_built_from(name: object, bases: frozenset[str]) -> bool:
+    """Whether any factor of design column ``name`` is one of ``bases``."""
+    if not isinstance(name, str):
+        return False
+    return any(form in bases for form in _factor_forms(name))
+
+
+def is_qvals_sourced_column(name: object) -> bool:
+    """Whether design column ``name`` is built from a ``qvals_table`` covariate.
+
+    A column qualifies when one of its factors is catalogued as
+    ``qvals_sourced`` (:data:`QVALS_SOURCED_COVARIATES`), so it is NaN on every
+    stop with no qvals row. Factors are the ``_x_``-separated parts of the name
+    (``swr_x_<base>``, ``<base>_z_x_is_current_arm``), each optionally carrying
+    ``_z`` and/or ``_patch`` suffixes. A product is NaN wherever any factor is.
+
+    Parameters
+    ----------
+    name : object
+        A design-column name.
+
+    Returns
+    -------
+    bool
+        True when ``name`` is built from a qvals-sourced covariate.
+    """
+    return _is_built_from(name, QVALS_SOURCED_COVARIATES)
 
 
 def is_qvals_gap_column(name: object) -> bool:
-    """Whether a NaN in design column ``name`` means the stop has no qvals row.
+    """Whether a NaN in design column ``name`` alone means the stop has no qvals row.
 
     The qvals gap (mechanism B) is the set of stops with no ``qvals_table``
     row. A column is in it when one of its factors is a covariate catalogued
-    as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`). Factors are
-    the ``_x_``-separated parts of the name, so ``swr_x_<base>`` and
-    ``<base>_z_x_is_current_arm`` qualify, and each factor may carry a ``_z``
-    or ``_patch`` suffix. A product is NaN wherever any factor is NaN.
+    as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`); factors and
+    suffixes are parsed as in :func:`is_qvals_sourced_column`. The drop
+    buckets do not use this: they book the gap per row from
+    :data:`HAS_QVALS_ROW`. It names the columns whose NaN can stand in for that
+    flag (:func:`attach_has_qvals_row`).
 
     Parameters
     ----------
@@ -93,14 +150,7 @@ def is_qvals_gap_column(name: object) -> bool:
     bool
         True when ``name`` is built from a qvals-row-gated covariate.
     """
-    if not isinstance(name, str):
-        return False
-    for factor in name.split("_x_"):
-        for suffix in _DERIVED_SUFFIXES:
-            factor = factor.removesuffix(suffix)
-        if factor in QVALS_ROW_GATED_COVARIATES:
-            return True
-    return False
+    return _is_built_from(name, QVALS_ROW_GATED_COVARIATES)
 
 
 class _QvalsGapColumns(Container[str]):
@@ -113,13 +163,120 @@ class _QvalsGapColumns(Container[str]):
         return f"QVALS_GAP_COLS(bases={sorted(QVALS_ROW_GATED_COVARIATES)})"
 
 
-# When a qvals-gap column is a model's required predictor, an event/stop it drops
-# is attributed to ``n_drop_qvals_gap`` (with priority over generic own-predictor
-# missingness), keeping mechanism B distinguishable from mechanism A (e.g.
-# candidate-arm reward history's early-session NaN). Derived from the covariate
-# catalog rather than listed, so a new qvals covariate and its variants join the
-# gap once its definition is flagged.
+# Columns whose NaN alone marks a stop with no qvals row. Derived from the
+# covariate catalog rather than listed, so a new row-gated covariate and its
+# variants join once its definition is flagged.
 QVALS_GAP_COLS: Container[str] = _QvalsGapColumns()
+
+
+def attach_has_qvals_row(
+    frame: pd.DataFrame, *, from_column: str, event_col: str = "event_id"
+) -> pd.DataFrame:
+    """Add :data:`HAS_QVALS_ROW` to a frame that carries no qvals join of its own.
+
+    For a frame read straight from a canonical table (the content ladder's
+    event-arm / event-patch frame), the flag is the non-NaN mask of a
+    qvals-row-gated base column, which is NaN exactly on the stops with no
+    qvals row. Use the explicit join flag instead wherever the frame is merged
+    with ``qvals_table``.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        Long design frame, one row per event x candidate.
+    from_column : str
+        A row-gated base covariate (no ``_x_`` product), present in ``frame``.
+    event_col : str, optional
+        The event key. Every event belongs to one stop, so the flag must be
+        constant within it.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of ``frame`` with the boolean :data:`HAS_QVALS_ROW` column.
+
+    Raises
+    ------
+    ValueError
+        If ``from_column`` is not a row-gated base covariate, or its NaN mask
+        differs between the rows of one event (it is then not the stop's qvals
+        status).
+    KeyError
+        If ``from_column`` is absent: the flag cannot be inferred, and is not
+        guessed.
+    """
+    if "_x_" in from_column or not is_qvals_gap_column(from_column):
+        raise ValueError(
+            f"{from_column!r} is not a qvals-row-gated base covariate; its NaN "
+            "does not say whether the stop has a qvals row"
+        )
+    if from_column not in frame.columns:
+        raise KeyError(
+            f"cannot mark which stops have a qvals row: {from_column!r} is not "
+            "in the frame"
+        )
+    has_row = frame[from_column].notna()
+    mixed = has_row.groupby(frame[event_col], sort=False).nunique() > 1
+    if mixed.any():
+        raise ValueError(
+            f"{from_column!r} is NaN on some but not all rows of "
+            f"{int(mixed.sum())} event(s); it cannot stand in for the stop's "
+            "qvals-row status"
+        )
+    return frame.assign(**{HAS_QVALS_ROW: has_row.to_numpy()})
+
+
+def qvals_gap_event_ids(
+    frame: pd.DataFrame, predictors: Iterable[str], *, event_col: str = "event_id"
+) -> set:
+    """Events a rung drops for the qvals gap (mechanism B), decided per row.
+
+    An event is in the gap when one of the rung's qvals-sourced predictors
+    (:func:`is_qvals_sourced_column`) is NaN on its rows **and** its stop has
+    no qvals row (``frame[HAS_QVALS_ROW]`` is False). A qvals-sourced NaN on a
+    stop that has a row -- ``qvals_table`` masks some columns next to a
+    behavioral-model trial gap -- is not the gap; the caller books it as
+    own-predictor missingness.
+
+    Parameters
+    ----------
+    frame : pandas.DataFrame
+        Long design frame carrying ``event_col``, the predictors present, and,
+        when any of them is qvals-sourced, the boolean :data:`HAS_QVALS_ROW`.
+    predictors : iterable of str
+        This rung's own predictors; those absent from ``frame`` are ignored.
+    event_col : str, optional
+        The event key.
+
+    Returns
+    -------
+    set
+        Event ids dropped for the qvals gap; empty for a rung with no
+        qvals-sourced predictor.
+
+    Raises
+    ------
+    KeyError
+        If the rung has a qvals-sourced predictor and ``frame`` lacks
+        :data:`HAS_QVALS_ROW`.
+    TypeError
+        If :data:`HAS_QVALS_ROW` is not boolean.
+    """
+    qvals_cols = [
+        c for c in predictors if c in frame.columns and is_qvals_sourced_column(c)
+    ]
+    if not qvals_cols:
+        return set()
+    if HAS_QVALS_ROW not in frame.columns:
+        raise KeyError(
+            f"{HAS_QVALS_ROW!r} is required to book the qvals gap for "
+            f"{qvals_cols}; carry it from the qvals join (or attach_has_qvals_row)"
+        )
+    has_row = frame[HAS_QVALS_ROW]
+    if not pd.api.types.is_bool_dtype(has_row):
+        raise TypeError(f"{HAS_QVALS_ROW!r} must be boolean, got {has_row.dtype}")
+    in_gap = frame[qvals_cols].isna().any(axis=1) & ~has_row
+    return set(frame.loc[in_gap, event_col])
 
 
 def cohort_record(
@@ -206,10 +363,11 @@ def event_drop_buckets(
     (qvals_gap → own_predictor_missing → nonfinite → common_cohort_other →
     zero_response):
 
-    - ``n_drop_qvals_gap`` — a qvals-tail covariate (:data:`QVALS_GAP_COLS`) that **this
-      rung itself uses** is NaN (0 for a rung with no value covariate, per Contract 1);
-    - ``n_drop_own_predictor_missing`` — one of *this rung's* own (non-qvals) predictors
-      is NaN;
+    - ``n_drop_qvals_gap`` — a qvals-sourced covariate that **this rung itself uses**
+      is NaN and the event's stop has no qvals row (:func:`qvals_gap_event_ids`; 0 for
+      a rung with no value covariate, per Contract 1);
+    - ``n_drop_own_predictor_missing`` — any other NaN in one of *this rung's* own
+      predictors, including a qvals column masked on a stop that has a qvals row;
     - ``n_drop_nonfinite`` — a required numeric value is present but ±Inf or
       otherwise nonnumeric;
     - ``n_drop_common_cohort_other`` — dropped only because *another* rung's predictor is
@@ -229,18 +387,10 @@ def event_drop_buckets(
         numeric = pd.to_numeric(long_df[column], errors="coerce")
         invalid = long_df[column].notna() & ~np.isfinite(numeric.to_numpy(dtype=float))
         nonfinite_by_col[column] = set(long_df.loc[invalid, event_col])
-    # qvals gap is attributed only when THIS rung's own value covariate is missing.
-    own_qvals_cols = [
-        c for c in own_predictors if c in QVALS_GAP_COLS and c in nan_by_col
-    ]
-    qvals_events = (
-        set().union(*(nan_by_col[c] for c in own_qvals_cols))
-        if own_qvals_cols
-        else set()
-    )
-    own_cols = [
-        c for c in own_predictors if c in nan_by_col and c not in QVALS_GAP_COLS
-    ]
+    # qvals gap is attributed only when THIS rung's own value covariate is missing
+    # on a stop with no qvals row.
+    own_cols = [c for c in own_predictors if c in nan_by_col]
+    qvals_events = qvals_gap_event_ids(long_df, own_cols, event_col=event_col)
     own_events = (
         set().union(*(nan_by_col[c] for c in own_cols)) if own_cols else set()
     ) - qvals_events

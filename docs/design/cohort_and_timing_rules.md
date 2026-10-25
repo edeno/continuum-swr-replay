@@ -417,9 +417,11 @@ cohort), `fit_swr_contrast_content.py` and `fit_swr_contrast_rate.py` (the
 content, `stop` for the rate families). Drops are **mutually exclusive**,
 assigned by priority:
 
-`n_drop_qvals_gap` (mechanism B — a value covariate is missing on the unmapped
-stop tail) → `n_drop_own_predictor_missing` (this model's own predictor NaN,
-e.g. an early-session reward-history gap) → `n_drop_nonfinite` (a required
+`n_drop_qvals_gap` (mechanism B — the stop has no `qvals_table` row, the
+unmapped stop tail, and one of this model's own qvals-sourced covariates is NaN
+there; decided per row, so a qvals column masked on a stop that does have a row
+is not the gap) → `n_drop_own_predictor_missing` (this model's own predictor NaN
+otherwise, e.g. an early-session reward-history gap) → `n_drop_nonfinite` (a required
 value is present but invalid, such as ±Inf) → `n_drop_zero_response`
 (Σcount == 0) → `n_drop_common_cohort_other` (union complete-case: dropped only
 for *another* rung's predictor) → `n_excluded_session` (data-level

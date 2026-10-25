@@ -53,6 +53,7 @@ def test_qvals_gap_drop_is_bucketed_separately(monkeypatch):
     df = pd.DataFrame(
         {
             "event_id": [1, 1, 1, 2, 2, 2],
+            "has_qvals_row": [False, False, False, True, True, True],
             "arm_count_hard": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
             "reward_belief_mean_candidate_arm_preoutcome": [
                 float("nan"),

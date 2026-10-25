@@ -86,10 +86,12 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
 )
 from continuum_swr_replay.analysis.replay._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.replay.cohort_audit import (
+    attach_has_qvals_row,
     cohort_record,
     drop_profile,
     estimator_skip_note,
     event_drop_buckets,
+    is_qvals_sourced_column,
     write_cohort_audit,
 )
 from continuum_swr_replay.analysis.replay.content_response import (
@@ -1256,6 +1258,15 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     )
 
 
+# Per hierarchy, the row-gated column whose NaN marks an event on a stop with no
+# qvals row (exactly those rows on the live tables: 8,676 event-arm and 2,892
+# event-patch rows, checked 2026-10-24).
+_QVALS_ROW_GATED_SOURCE = {
+    "arm": "task_reward_probability_candidate_arm",
+    "patch": "task_reward_probability_candidate_arm_patch",
+}
+
+
 def _load_and_filter_cohort(
     args: argparse.Namespace, config: _RunConfig
 ) -> _ContentCohort:
@@ -1403,6 +1414,16 @@ def _load_and_filter_cohort(
             len(long_df),
             response_col,
             response_renormalized,
+        )
+
+    # The cohort audit books a value rung's drop to the qvals gap only when the
+    # event's stop has no qvals row. The candidate table carries no qvals join,
+    # so the flag is read off a row-gated column (NaN exactly on those stops).
+    if any(is_qvals_sourced_column(c) for c in union_predictors):
+        long_df = attach_has_qvals_row(
+            long_df,
+            from_column=_QVALS_ROW_GATED_SOURCE[args.hierarchy],
+            event_col=event_col,
         )
 
     # Pre-filter to common complete-case event set: drop entire events

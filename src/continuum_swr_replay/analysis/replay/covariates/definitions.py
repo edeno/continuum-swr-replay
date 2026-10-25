@@ -56,13 +56,17 @@ class QueryClock(StrEnum):
 class CovariateDefinition:
     """Scientific contract for one canonical model-facing quantity.
 
-    ``qvals_row_gated`` is True when the value is joined from ``qvals_table``
-    by ``stop_id`` and is NaN exactly when the stop has no qvals row, so a fit
-    that drops it has hit the qvals gap. It is False for a qvals column that is
-    also NaN on stops that do have a row: the switch-minus-stay value and the
+    ``qvals_sourced`` is True when the value is joined from ``qvals_table``
+    by ``stop_id``, so it is NaN on every stop with no qvals row (the qvals
+    gap). ``qvals_row_gated`` is True when it is NaN *exactly* there, so its
+    NaN alone says the stop has no qvals row; every row-gated covariate is
+    qvals-sourced. A qvals-sourced covariate that is not row-gated is also NaN
+    on stops that do have a row: the switch-minus-stay value and the
     belief-update magnitudes, which ``qvals_table`` masks next to a gap in the
     behavioral model's trials. The peri-switch fields would also be NaN in an
     epoch with no patch switch; no analysed epoch lacks one (checked 2026-10-24).
+    The current-outcome flags are not qvals-sourced: the event and stop tables
+    carry them on stops with no qvals row too.
     """
 
     name: str
@@ -76,6 +80,7 @@ class CovariateDefinition:
     missingness: str
     structural_zero: str | None
     producer: str
+    qvals_sourced: bool = False
     qvals_row_gated: bool = False
 
 
@@ -92,6 +97,7 @@ def _definition(
     window: str | None = None,
     missingness: str = "unavailable at the declared query clock",
     structural_zero: str | None = None,
+    qvals_sourced: bool = False,
     qvals_row_gated: bool = False,
 ) -> CovariateDefinition:
     return CovariateDefinition(
@@ -106,6 +112,9 @@ def _definition(
         missingness=missingness,
         structural_zero=structural_zero,
         producer=producer,
+        # A row-gated value is NaN on the stops with no qvals row, so it is
+        # qvals-sourced by definition.
+        qvals_sourced=qvals_sourced or qvals_row_gated,
         qvals_row_gated=qvals_row_gated,
     )
 
@@ -382,7 +391,7 @@ _DEFINITIONS = [
         availability=Availability.POST_OUTCOME,
         support="qvals-mapped stops",
         producer="analysis.behavior.qvals_table.add_experienced_value_columns",
-        missingness="behavioral model or current outcome unavailable",
+        missingness="no qvals row for the stop",
         qvals_row_gated=True,
     ),
     _definition(
@@ -394,7 +403,11 @@ _DEFINITIONS = [
         availability=Availability.POST_OUTCOME,
         support="qvals-mapped stops",
         producer="analysis.behavior.qvals_table canonical ingestion adapter",
-        missingness="behavioral model or current outcome unavailable",
+        missingness=(
+            "no qvals row for the stop, or masked by qvals_table next to a "
+            "behavioral-model trial gap"
+        ),
+        qvals_sourced=True,
     ),
     _definition(
         "relative_value_switch_minus_stay_preoutcome",
@@ -405,7 +418,11 @@ _DEFINITIONS = [
         availability=Availability.PRE_OUTCOME,
         support="qvals-mapped stops",
         producer="analysis.behavior._spatial_bandit_rl via qvals adapter",
-        missingness="behavioral model unavailable",
+        missingness=(
+            "no qvals row for the stop, or masked by qvals_table next to a "
+            "behavioral-model trial gap"
+        ),
+        qvals_sourced=True,
     ),
     _definition(
         "reward_belief_differential_entropy_leaf_mean_preoutcome",
@@ -416,7 +433,7 @@ _DEFINITIONS = [
         availability=Availability.PRE_OUTCOME,
         support="qvals-mapped stops",
         producer="analysis.behavior.qvals_table.add_beta_belief_entropy",
-        missingness="behavioral model unavailable",
+        missingness="no qvals row for the stop",
         qvals_row_gated=True,
     ),
     _definition(
@@ -428,7 +445,7 @@ _DEFINITIONS = [
         availability=Availability.FUTURE_REFERENCING,
         support="sessions with at least one patch switch",
         producer="analysis.behavior.qvals_table.peri_switch_index",
-        missingness="session contains no patch switch",
+        missingness="no qvals row for the stop, or no patch switch in the session",
         qvals_row_gated=True,
     ),
     _definition(
@@ -440,7 +457,7 @@ _DEFINITIONS = [
         availability=Availability.FUTURE_REFERENCING,
         support="sessions with at least one patch switch",
         producer="analysis.behavior.qvals_table.peri_switch_index",
-        missingness="session contains no patch switch",
+        missingness="no qvals row for the stop, or no patch switch in the session",
         qvals_row_gated=True,
     ),
     _definition(
@@ -586,7 +603,7 @@ _DEFINITIONS.extend(
             availability=Availability.PRE_OUTCOME,
             support="qvals-mapped stops",
             producer="analysis.behavior.qvals_table",
-            missingness="behavioral model block metadata unavailable",
+            missingness="no qvals row for the stop",
             qvals_row_gated=True,
         ),
         _definition(
@@ -598,7 +615,7 @@ _DEFINITIONS.extend(
             availability=Availability.PRE_OUTCOME,
             support="qvals-mapped stops",
             producer="analysis.behavior.qvals_table",
-            missingness="task contingency unavailable",
+            missingness="no qvals row for the stop",
             qvals_row_gated=True,
         ),
         _definition(
@@ -610,7 +627,7 @@ _DEFINITIONS.extend(
             availability=Availability.POST_CHOICE,
             support="qvals-mapped stops after choice arrival",
             producer="analysis.behavior.qvals_table.add_experienced_value_columns",
-            missingness="destination or behavioral-model row unavailable",
+            missingness="no qvals row for the stop",
             qvals_row_gated=True,
         ),
         _definition(
@@ -622,7 +639,7 @@ _DEFINITIONS.extend(
             availability=Availability.POST_CHOICE,
             support="qvals-mapped stops after choice arrival",
             producer="analysis.behavior.qvals_table.add_experienced_value_columns",
-            missingness="destination or task contingency unavailable",
+            missingness="no qvals row for the stop",
             qvals_row_gated=True,
         ),
         _definition(
@@ -634,7 +651,11 @@ _DEFINITIONS.extend(
             availability=Availability.POST_OUTCOME,
             support="qvals-mapped stops",
             producer="analysis.behavior.qvals_table canonical ingestion adapter",
-            missingness="behavioral model or current outcome unavailable",
+            missingness=(
+                "no qvals row for the stop, or masked by qvals_table next to a "
+                "behavioral-model trial gap"
+            ),
+            qvals_sourced=True,
         ),
         _definition(
             "is_rewarded_outcome",
@@ -971,6 +992,14 @@ COVARIATE_DEFINITIONS: dict[str, CovariateDefinition] = {
 }
 if len(COVARIATE_DEFINITIONS) != len(_DEFINITIONS):
     raise RuntimeError("duplicate canonical names in COVARIATE_DEFINITIONS")
+
+#: Canonical covariates joined from ``qvals_table``: NaN on every stop with no
+#: qvals row, and (unless row-gated) on some stops that have one.
+QVALS_SOURCED_COVARIATES: frozenset[str] = frozenset(
+    name
+    for name, definition in COVARIATE_DEFINITIONS.items()
+    if definition.qvals_sourced
+)
 
 #: Canonical covariates that are NaN exactly when the stop has no qvals row.
 QVALS_ROW_GATED_COVARIATES: frozenset[str] = frozenset(

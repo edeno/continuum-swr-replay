@@ -66,7 +66,7 @@ from continuum_swr_replay.tables.standardization import (
 
 from ._fit_diagnostics import SEPARATION_COEF_ABS
 from ._helpers import add_arm_fixed_effects
-from .cohort_audit import QVALS_GAP_COLS
+from .cohort_audit import HAS_QVALS_ROW, qvals_gap_event_ids
 from .covariates.history.value_uncertainty import validate_uncertainty_inputs
 from .fitting import parse_unidentified_terms
 from .model_specs import LEAF_ONLY_N_CATEGORIES, REWARD_HISTORY_COLUMNS
@@ -272,15 +272,21 @@ def std_factor(term: str, sd: dict) -> tuple[float, str]:
     ------
     KeyError
         If ``term`` is none of the above: a raw-scale continuous term with no
-        SD would be reported at raw scale under a "per SD" label.
+        SD would be reported at raw scale under a "per SD" label. Also if its
+        SD is zero or NaN.
     """
     if term in BINARY_TERMS:
         return 1.0, "per_category"
     if term in PER_UNIT_TERMS:
         return 1.0, "per_unit"
     cov = sd_covariate(term, sd)
-    if cov is not None and sd[cov] > 0:
-        return sd[cov], "per_SD"
+    if cov is not None:
+        if sd[cov] > 0:
+            return sd[cov], "per_SD"
+        raise KeyError(
+            f"term {term!r} resolves to {cov!r}, whose SD is {sd[cov]}: a "
+            "predictor with no spread in the fit's cohort has no per-SD effect."
+        )
     if term.endswith("_z") or "_z_x_" in term:
         return 1.0, "per_SD"
     raise KeyError(
@@ -1021,24 +1027,40 @@ def assemble_arm(
         # duplicate the event-arm rows it joins to.
         validate="many_to_one",
     )
-    ev = ev.merge(
-        q[
-            [
-                "stop_id",
-                "rpe_postoutcome",
-                "relative_value_switch_minus_stay_preoutcome",
-                "reward_belief_differential_entropy_leaf_mean_preoutcome",
-                "reward_belief_mean_update_l1_all_ports_postoutcome",
-                "periswitch_index_trials",
-                "is_periswitch_post",
-                "trials_since_block_change",
-            ]
+    ev = _merge_qvals(
+        ev,
+        q,
+        [
+            "rpe_postoutcome",
+            "relative_value_switch_minus_stay_preoutcome",
+            "reward_belief_differential_entropy_leaf_mean_preoutcome",
+            "reward_belief_mean_update_l1_all_ports_postoutcome",
+            "periswitch_index_trials",
+            "is_periswitch_post",
+            "trials_since_block_change",
         ],
-        on="stop_id",
-        how="left",
-        validate="many_to_one",
     )
     return _attach_arm_design_columns(ev)
+
+
+def _merge_qvals(frame: pd.DataFrame, q: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """Left-join ``cols`` of ``qvals_table`` by stop, flagging the rows it matched.
+
+    The flag, :data:`~.cohort_audit.HAS_QVALS_ROW`, is what the cohort audit
+    books the qvals gap from: a qvals column can also be NaN on a stop that has
+    a row, so the column's NaN alone does not say which.
+    """
+    out = frame.merge(
+        q[["stop_id", *cols]],
+        on="stop_id",
+        how="left",
+        # One row per stop on the right: a duplicated stop_id would silently
+        # duplicate the rows it joins to.
+        validate="many_to_one",
+        indicator=HAS_QVALS_ROW,
+    )
+    out[HAS_QVALS_ROW] = out[HAS_QVALS_ROW].eq("both").to_numpy()
+    return out
 
 
 def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
@@ -1155,12 +1177,7 @@ def assemble_patch(
         how="left",
         validate="many_to_one",
     )
-    pt = pt.merge(
-        q[["stop_id", "periswitch_index_trials"]],
-        on="stop_id",
-        how="left",
-        validate="many_to_one",
-    )
+    pt = _merge_qvals(pt, q, ["periswitch_index_trials"])
     return _attach_patch_design_columns(pt)
 
 
@@ -1248,23 +1265,20 @@ def prepare_session(
             "reason": f"missing:{','.join(missing)}",
         }
 
-    # Split NaN-dropped events into the qvals gap (mechanism B) vs own-predictor
-    # missingness (mechanism A), qvals taking priority so the buckets stay disjoint.
-    qvals_preds = [c for c in predictors if c in QVALS_GAP_COLS]
+    # Split NaN-dropped events into the qvals gap (mechanism B: a qvals-sourced
+    # predictor NaN on a stop with no qvals row, decided per row) vs own-predictor
+    # missingness (mechanism A: every other predictor NaN, a qvals column masked
+    # on a stop that has a row included), qvals taking priority so the buckets
+    # stay disjoint.
+    qvals_nan = qvals_gap_event_ids(g, predictors, event_col="event_id")
     # The response is not a predictor. An event whose response is undefined --
     # every candidate NaN, which is what a leaf-only event with no leaf mass
     # renormalizes to -- has no allocation to fit, and that is a response drop,
     # not predictor missingness. Keeping it out of this split books it under
     # n_drop_zero_response below, as the ladder's cohort audit does.
-    other_cols = [c for c in predictors if c not in QVALS_GAP_COLS]
-    qvals_nan = (
-        set(g.loc[g[qvals_preds].isna().any(axis=1), "event_id"])
-        if qvals_preds
-        else set()
-    )
     other_nan = (
-        set(g.loc[g[other_cols].isna().any(axis=1), "event_id"])
-        if other_cols
+        set(g.loc[g[predictors].isna().any(axis=1), "event_id"])
+        if predictors
         else set()
     )
     other_nan -= qvals_nan

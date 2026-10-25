@@ -194,37 +194,43 @@ def _long(events_cols: dict, n_arms: int = 3) -> pd.DataFrame:
 
 def test_event_drop_buckets_common_cohort_and_qvals():
     # event 1: own predictor 'own' NaN -> own_predictor_missing
-    # event 2: a value covariate q_arm NaN -> qvals_gap (priority over own/common)
+    # event 2: a value covariate q_arm NaN on a stop with no qvals row -> qvals_gap
+    #          (priority over own/common)
     # event 3: only the OTHER rung's predictor 'other' NaN -> common_cohort_other
     # event 4: complete but response all zero -> zero_response
     # event 5: clean -> modeled
     df = _long(
         {
             1: {
+                "has_qvals_row": [True, True, True],
                 "y": [1, 0, 0],
                 "own": [float("nan"), 1.0, 1.0],
                 "other": [1, 1, 1],
                 "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
             },
             2: {
+                "has_qvals_row": [False, False, False],
                 "y": [1, 0, 0],
                 "own": [1.0, 1.0, 1.0],
                 "other": [1, 1, 1],
                 "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3],
             },
             3: {
+                "has_qvals_row": [True, True, True],
                 "y": [1, 0, 0],
                 "own": [1.0, 1.0, 1.0],
                 "other": [float("nan"), 1, 1],
                 "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
             },
             4: {
+                "has_qvals_row": [True, True, True],
                 "y": [0, 0, 0],
                 "own": [1.0, 1.0, 1.0],
                 "other": [1, 1, 1],
                 "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
             },
             5: {
+                "has_qvals_row": [True, True, True],
                 "y": [1, 0, 0],
                 "own": [1.0, 1.0, 1.0],
                 "other": [1, 1, 1],
@@ -298,11 +304,13 @@ def test_event_drop_buckets_qvals_gap_only_for_own_value_covariate():
     df = _long(
         {
             1: {
+                "has_qvals_row": [False, False, False],
                 "y": [1, 0, 0],
                 "own": [1.0, 1.0, 1.0],
                 "reward_belief_mean_candidate_arm_preoutcome": [float("nan"), 0.2, 0.3],
             },
             2: {
+                "has_qvals_row": [True, True, True],
                 "y": [1, 0, 0],
                 "own": [1.0, 1.0, 1.0],
                 "reward_belief_mean_candidate_arm_preoutcome": [0.1, 0.2, 0.3],
@@ -360,6 +368,8 @@ def test_every_contrast_belief_predictor_is_booked_to_the_qvals_gap():
         "reward_belief_variance_candidate_arm_preoutcome_z",
         "swr_x_reward_belief_mean_candidate_arm_preoutcome",
         "reward_belief_mean_candidate_arm_preoutcome_patch",
+        "reward_belief_mean_candidate_arm_preoutcome_patch_z",
+        "reward_belief_mean_candidate_arm_preoutcome_z_patch",
         "rpe_postoutcome_z_x_is_current_arm",
         "trials_since_block_change_z_x_is_current_arm",
         "periswitch_index_trials_z_x_is_current_patch",
@@ -396,20 +406,24 @@ def test_qvals_gap_excludes_columns_missing_for_other_reasons(column):
 def test_every_qvals_produced_covariate_declares_its_gap_status():
     """A new qvals covariate must be classified, not silently left out of the gap.
 
-    Every catalogued covariate whose producer is the qvals pipeline is either
-    ``qvals_row_gated`` or named here with the reason it is not.
+    Every catalogued covariate whose producer is the qvals pipeline is
+    ``qvals_sourced`` (and row-gated or not) or named here with the reason it
+    is not.
     """
     from continuum_swr_replay.analysis.replay.covariates.definitions import (
         COVARIATE_DEFINITIONS,
         QVALS_ROW_GATED_COVARIATES,
+        QVALS_SOURCED_COVARIATES,
     )
 
-    not_gated = {
+    sourced_not_gated = {
         # masked on qvals rows next to a behavioral-model trial gap
         "relative_value_switch_minus_stay_preoutcome",
         "reward_belief_mean_update_l1_all_ports_postoutcome",
         "reward_belief_mean_update_l1_alternative_patches_postoutcome",
-        # NaN until the current outcome is known, qvals row or not
+    }
+    not_sourced = {
+        # carried on stops with no qvals row too; NaN until the outcome is known
         "is_rewarded_outcome",
         "is_omitted_outcome",
     }
@@ -418,8 +432,155 @@ def test_every_qvals_produced_covariate_declares_its_gap_status():
         for name, definition in COVARIATE_DEFINITIONS.items()
         if "qvals" in definition.producer
     }
-    assert QVALS_ROW_GATED_COVARIATES <= qvals_produced
-    assert qvals_produced - not_gated == QVALS_ROW_GATED_COVARIATES
+    assert QVALS_ROW_GATED_COVARIATES <= QVALS_SOURCED_COVARIATES <= qvals_produced
+    assert qvals_produced - not_sourced == QVALS_SOURCED_COVARIATES
+    assert QVALS_SOURCED_COVARIATES - sourced_not_gated == QVALS_ROW_GATED_COVARIATES
+
+
+@pytest.mark.parametrize(
+    ("column", "sourced"),
+    [
+        ("relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm", True),
+        ("reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm", True),
+        ("rpe_postoutcome_z_x_is_current_arm", True),
+        ("task_reward_probability_candidate_arm_patch", True),
+        ("is_rewarded_outcome", False),
+        ("reward_fraction_candidate_arm_last10_visits", False),
+        ("swr_x_is_current_arm", False),
+        (None, False),
+    ],
+)
+def test_qvals_sourced_columns_include_the_masked_qvals_columns(column, sourced):
+    from continuum_swr_replay.analysis.replay.cohort_audit import (
+        is_qvals_sourced_column,
+    )
+
+    assert is_qvals_sourced_column(column) is sourced
+
+
+def _masked_value_frame() -> pd.DataFrame:
+    """Three events of a C7-style rung (one masked qvals scalar, ``v``).
+
+    event 1: ``v`` NaN, stop has no qvals row       -> qvals gap
+    event 2: ``v`` NaN, stop HAS a qvals row (masked) -> own-predictor missing
+    event 3: clean                                   -> modeled
+    """
+    v = "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"
+    return _long(
+        {
+            1: {
+                "y": [1, 0, 0],
+                "is_current_arm": [1.0, 0.0, 0.0],
+                v: [float("nan")] * 3,
+                "has_qvals_row": [False] * 3,
+            },
+            2: {
+                "y": [1, 0, 0],
+                "is_current_arm": [1.0, 0.0, 0.0],
+                v: [float("nan")] * 3,
+                "has_qvals_row": [True] * 3,
+            },
+            3: {
+                "y": [1, 0, 0],
+                "is_current_arm": [1.0, 0.0, 0.0],
+                v: [0.5, 0.0, 0.0],
+                "has_qvals_row": [True] * 3,
+            },
+        }
+    )
+
+
+def test_event_drop_buckets_books_the_qvals_gap_per_row():
+    """A masked qvals column on a mapped stop is own-predictor missingness."""
+    frame = _masked_value_frame()
+    predictors = [
+        "is_current_arm",
+        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    ]
+
+    buckets = event_drop_buckets(
+        frame,
+        event_col="event_id",
+        response_col="y",
+        own_predictors=predictors,
+        union_predictors=predictors,
+    )
+
+    assert buckets["n_drop_qvals_gap"] == 1
+    assert buckets["n_drop_own_predictor_missing"] == 1
+    assert buckets["dropped_event_ids"] == {1, 2}
+
+
+def test_prepare_session_books_the_qvals_gap_per_row(monkeypatch):
+    from continuum_swr_replay.analysis.replay import contrast_aggregation
+
+    monkeypatch.setattr(contrast_aggregation, "MIN_EVENTS", 1)
+    predictors = [
+        "is_current_arm",
+        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    ]
+
+    surv, prep = contrast_aggregation.prepare_session(
+        _masked_value_frame(), predictors, response_col="y"
+    )
+
+    assert (prep["n_qvals"], prep["n_own"], prep["n_surv"]) == (1, 1, 1)
+    assert set(surv["event_id"]) == {3}
+
+
+def test_qvals_gap_needs_the_row_flag_only_for_a_qvals_predictor():
+    from continuum_swr_replay.analysis.replay.cohort_audit import (
+        qvals_gap_event_ids,
+    )
+
+    frame = _masked_value_frame().drop(columns="has_qvals_row")
+    assert qvals_gap_event_ids(frame, ["is_current_arm"]) == set()
+    with pytest.raises(KeyError, match="has_qvals_row"):
+        qvals_gap_event_ids(
+            frame,
+            ["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"],
+        )
+    with pytest.raises(TypeError, match="boolean"):
+        qvals_gap_event_ids(
+            frame.assign(has_qvals_row=1.0),
+            ["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"],
+        )
+
+
+def test_attach_has_qvals_row_reads_a_row_gated_base_column():
+    from continuum_swr_replay.analysis.replay.cohort_audit import attach_has_qvals_row
+
+    frame = _long(
+        {
+            1: {"task_reward_probability_candidate_arm": [float("nan")] * 3},
+            2: {"task_reward_probability_candidate_arm": [0.5, 0.2, 0.0]},
+        }
+    )
+    out = attach_has_qvals_row(
+        frame, from_column="task_reward_probability_candidate_arm"
+    )
+    assert out.groupby("event_id")["has_qvals_row"].first().to_dict() == {
+        1: False,
+        2: True,
+    }
+    assert out["has_qvals_row"].dtype == bool
+
+    # Not row-gated, a product, absent, or NaN on only part of an event: refused.
+    with pytest.raises(ValueError, match="row-gated"):
+        attach_has_qvals_row(
+            frame.assign(relative_value_switch_minus_stay_preoutcome=0.0),
+            from_column="relative_value_switch_minus_stay_preoutcome",
+        )
+    with pytest.raises(ValueError, match="row-gated"):
+        attach_has_qvals_row(frame, from_column="rpe_postoutcome_z_x_is_current_arm")
+    with pytest.raises(KeyError, match="not in the frame"):
+        attach_has_qvals_row(frame, from_column="rpe_postoutcome")
+    partial = frame.copy()
+    partial.loc[3, "task_reward_probability_candidate_arm"] = float("nan")
+    with pytest.raises(ValueError, match="some but not all rows"):
+        attach_has_qvals_row(
+            partial, from_column="task_reward_probability_candidate_arm"
+        )
 
 
 def test_records_from_common_cohort_provenance():

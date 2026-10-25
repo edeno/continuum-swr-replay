@@ -640,7 +640,7 @@ Across-session and across-animal summaries, contrasts and model comparison over 
 
 Per-model cohort / drop-profile audit records.
 
-`is_qvals_gap_column`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
+`is_qvals_sourced_column`, `is_qvals_gap_column`, `attach_has_qvals_row`, `qvals_gap_event_ids`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
 
 ### `src/continuum_swr_replay/analysis/replay/contrast_aggregation.py`
 

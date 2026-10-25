@@ -814,3 +814,35 @@ def test_arm_assembly_refuses_a_duplicated_stop_id(
     else:
         ev, _ = ca.assemble_arm(fit_inputs, reference)
         assert len(ev) == 2
+
+
+def test_arm_assembly_flags_the_stops_with_a_qvals_row(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The qvals join says which stops it matched; the audit books the gap from it."""
+    tables = _assembly_tables("")
+    tables["qvals"] = tables["qvals"].iloc[:1]  # stop 11 has no qvals row
+    ca = contrast_aggregation
+    monkeypatch.setattr(ca, "read_table", lambda key: tables[key].copy())
+    for name in (
+        "require_covariate_schema",
+        "require_swr_source",
+        "assert_standardized_matches_reference",
+        "load_reference",
+        "add_arm_fixed_effects",
+        "validate_uncertainty_inputs",
+        "_cohort_log",
+    ):
+        monkeypatch.setattr(ca, name, lambda *a, **k: None)
+    monkeypatch.setattr(ca, "select_event_cohort", lambda f, cohort: (f, {}))
+    monkeypatch.setattr(ca, "_attach_arm_design_columns", lambda f: (f, {}))
+    reference = tmp_path / "standardization_reference.json"
+    reference.write_text("{}")
+
+    ev, _ = ca.assemble_arm(
+        {"event_arm_table": "event_arm", "stop_table": "stop", "qvals_table": "qvals"},
+        reference,
+    )
+
+    assert ev["has_qvals_row"].dtype == bool
+    assert ev.set_index("stop_id")["has_qvals_row"].to_dict() == {10: True, 11: False}

@@ -51,6 +51,7 @@ def _synthetic_arm_events(n_sessions=3, n_events=12, qvals_gap_events=2, seed=0)
                         "reward_belief_mean_candidate_arm_preoutcome": np.nan
                         if qhmm_nan
                         else float(rng.normal()),
+                        "has_qvals_row": not qhmm_nan,
                         "is_swr": is_swr,
                         "time_since_stop_start_s": float(rng.uniform(0, 3)),
                     }
