@@ -6,9 +6,8 @@ Every run answers one of the paper's questions (``QUESTIONS``; the full map is
 ``<question>.<analysis>[.<variant>]``, for example ``rate.swr_contrast.at_well``.
 Each run is one command, the number of CPUs it gets and the runs it needs first.
 Selecting a run also selects every run that depends on it, so
-``--only content.arm_ladder.all_arms`` refits the content contrasts too. They
-are ordered after it, though their outputs now sit in ``models_swr_contrast``,
-which that run does not rewrite.
+``--only content.arm_ladder.all_arms`` redraws the figures that read the arm
+ladder too.
 
 With ``--with-tables`` the canonical tables are rebuilt first, as ``tables.*``
 runs, in the order their code requires:
@@ -186,15 +185,15 @@ RUNS: tuple[Run, ...] = (
     _run("content.patch_ladder.all_events", f"{_CL} --hierarchy patch", 1, _RT),
     _run("content.patch_ladder.swr_only", f"{_CL} --hierarchy patch --swr-subset T", 1, _RT),
     _run("content.patch_ladder.non_swr_only", f"{_CL} --hierarchy patch --swr-subset F", 1, _RT),
-    # The contrasts write into models_swr_contrast/, not the models/ the arm ladder
-    # replaces whole, so running after it is ordering only, not protection.
-    _run("content.swr_contrast.all", f"{_KC} --outcome-stratum all", 2, [_ARM, *_RT], threads=2),
-    _run("content.swr_contrast.rewarded", f"{_KC} --outcome-stratum rewarded", 2, [_ARM, *_RT], threads=2),
-    _run("content.swr_contrast.omitted", f"{_KC} --outcome-stratum omitted", 2, [_ARM, *_RT], threads=2),
-    _run("content.breadth_contrast.all", f"{_KC} {_DM} --n-jobs 16 --outcome-stratum all", 16, [_ARM, *_RT]),
-    _run("content.breadth_contrast.all_length_adjusted", f"{_KC} {_DM} --n-jobs 16 --concentration-length --outcome-stratum all", 16, [_ARM, *_RT]),
-    _run("content.breadth_contrast.rewarded", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum rewarded", 8, [_ARM, *_RT]),
-    _run("content.breadth_contrast.omitted", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum omitted", 8, [_ARM, *_RT]),
+    # The contrasts read only the tables and write models_swr_contrast/, which the
+    # arm ladder (it replaces models/ whole) neither reads nor writes.
+    _run("content.swr_contrast.all", f"{_KC} --outcome-stratum all", 2, _RT, threads=2),
+    _run("content.swr_contrast.rewarded", f"{_KC} --outcome-stratum rewarded", 2, _RT, threads=2),
+    _run("content.swr_contrast.omitted", f"{_KC} --outcome-stratum omitted", 2, _RT, threads=2),
+    _run("content.breadth_contrast.all", f"{_KC} {_DM} --n-jobs 16 --outcome-stratum all", 16, _RT),
+    _run("content.breadth_contrast.all_length_adjusted", f"{_KC} {_DM} --n-jobs 16 --concentration-length --outcome-stratum all", 16, _RT),
+    _run("content.breadth_contrast.rewarded", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum rewarded", 8, _RT),
+    _run("content.breadth_contrast.omitted", f"{_KC} {_DM} --n-jobs 8 --outcome-stratum omitted", 8, _RT),
     _run("content.estimator_comparison", "scripts/content/compare_content_estimators.py --n-jobs 16", 16, _RT),
     _run("content.uncertainty", "scripts/content/analyze_uncertainty_content.py", 1, ["content.arm_ladder.leaf_arms", *_RT]),
     # Content of events found by SWR- or MUA-anchored detection (ContFrag).

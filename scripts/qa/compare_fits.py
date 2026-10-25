@@ -2554,18 +2554,27 @@ def _read_optional(path: Path) -> pd.DataFrame:
     return pd.read_pickle(path) if path.exists() else pd.DataFrame()
 
 
-def _swr_contrast_path(root: Path, name: str) -> Path:
-    """Where `root` keeps the content is_swr-contrast artifact `name`.
+def _read_swr_contrast(root: Path, name: str) -> tuple[pd.DataFrame, Path]:
+    """Read the content is_swr-contrast artifact `name` from `root`.
 
-    The fits moved out of ``content_arm`` (``models/``) into their own
-    directory on 2026-10-24, because the arm ladder replaces ``models/``
-    whole. A root from before the move (a backup) keeps them in ``models/``;
-    the fallback is per file, so a root holding only some artifacts in the
-    new directory still finds the rest where they were written.
+    The fits are read from ``models_swr_contrast/`` only. They were written
+    to ``models/`` until 2026-10-24, when they moved because the arm ladder
+    replaces ``models/`` whole. The backup roots then in use were given a
+    ``models_swr_contrast/`` copy; any other old root fails here.
+
+    Raises
+    ------
+    SystemExit
+        If the artifact is not in `root`'s ``models_swr_contrast/``.
     """
-    current = model_dir("swr_contrast", root) / name
-    legacy = model_dir("content_arm", root) / name
-    return legacy if not current.exists() and legacy.exists() else current
+    path = model_dir("swr_contrast", root) / name
+    if not path.exists():
+        raise SystemExit(
+            f"{name} is missing from {path.parent}; the content is_swr-contrast "
+            "fits are read from models_swr_contrast/ only (a root from before "
+            "2026-10-24 has them in models/: copy them across)"
+        )
+    return pd.read_pickle(path), path
 
 
 def collect_content_inputs(
@@ -2575,13 +2584,20 @@ def collect_content_inputs(
 
     A bundle with only one side is still reported (the missing side shows as an
     empty frame) so a refit that has not run yet is visible in the audit rather
-    than silently omitted.
+    than silently omitted. The is_swr-contrast artifacts are required on both
+    sides (:func:`_read_swr_contrast`).
 
     Returns
     -------
     (bundles, contrast, inputs, missing)
         Ladder bundles, contrast frames, the artifacts to hash in the header,
-        and one prose line per artifact that had no file.
+        and one prose line per bundle file that was absent.
+
+    Raises
+    ------
+    SystemExit
+        If an is_swr-contrast artifact is missing from a root's
+        ``models_swr_contrast/``.
     """
     bundles: dict = {}
     inputs: dict[str, Path] = {}
@@ -2606,29 +2622,24 @@ def collect_content_inputs(
                 inputs[f"{name} ({label})"] = path
 
     contrast: dict[str, pd.DataFrame] = {}
-    audited = "swr_contrast_content_audited.pkl"
     for root, label in ((old_root, "before"), (new_root, "after")):
-        path = _swr_contrast_path(root, audited)
-        contrast[f"audited_{label}"] = _read_optional(path)
-        if path.exists():
-            inputs[f"swr-content audited ({label})"] = path
-        else:
-            missing.append(f"SWR-content audited ({label}): `{path}` absent")
+        contrast[f"audited_{label}"], path = _read_swr_contrast(
+            root, "swr_contrast_content_audited.pkl"
+        )
+        inputs[f"swr-content audited ({label})"] = path
         # The per-session fits, for the design-delta check: the audited
         # aggregate carries one row per term and cannot say which terms a rung
         # was fit with.
-        fits = _swr_contrast_path(root, "swr_contrast_content_arm.pkl")
-        contrast[f"fits_{label}"] = _read_optional(fits)
-        if fits.exists():
-            inputs[f"swr-content arm fits ({label})"] = fits
+        contrast[f"fits_{label}"], path = _read_swr_contrast(
+            root, "swr_contrast_content_arm.pkl"
+        )
+        inputs[f"swr-content arm fits ({label})"] = path
     for stratum in CONTRAST_OUTCOME_STRATA:
         sfx = "" if stratum == "all" else f"_{stratum}"
-        path = _swr_contrast_path(new_root, f"swr_contrast_content_audited{sfx}.pkl")
-        if path.exists():
-            contrast[f"stratum_{stratum}"] = pd.read_pickle(path)
-            inputs[f"swr-content audited ({stratum})"] = path
-        else:
-            missing.append(f"outcome stratum `{stratum}`: `{path}` absent")
+        contrast[f"stratum_{stratum}"], path = _read_swr_contrast(
+            new_root, f"swr_contrast_content_audited{sfx}.pkl"
+        )
+        inputs[f"swr-content audited ({stratum})"] = path
     return bundles, contrast, inputs, missing
 
 
@@ -2637,11 +2648,6 @@ def run_content_mode(args: argparse.Namespace) -> None:
     bundles, contrast, inputs, missing = collect_content_inputs(
         args.old_content_root, args.new_content_root, args.content_bundles
     )
-    if not inputs:
-        raise SystemExit(
-            f"no content artifacts found under {args.old_content_root} or "
-            f"{args.new_content_root}"
-        )
     note = (
         "**Artifacts with only one side.** " + "; ".join(missing) + "."
         if missing

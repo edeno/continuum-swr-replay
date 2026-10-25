@@ -260,12 +260,60 @@ def test_strata_are_joined_side_by_side_on_the_spec():
     assert table.loc[0, "n_sessions_rewarded"] == 120
 
 
+_CONTRAST_BOTH_SIDES = (
+    "swr_contrast_content_audited.pkl",
+    "swr_contrast_content_arm.pkl",
+)
+_CONTRAST_STRATA = (
+    "swr_contrast_content_audited_rewarded.pkl",
+    "swr_contrast_content_audited_omitted.pkl",
+)
+
+
+def _contrast_artifacts(old_root, new_root, skip=()):
+    """Empty is_swr-contrast artifacts in each root's ``models_swr_contrast/``."""
+    for root, names in (
+        (old_root, _CONTRAST_BOTH_SIDES),
+        (new_root, _CONTRAST_BOTH_SIDES + _CONTRAST_STRATA),
+    ):
+        (root / "models_swr_contrast").mkdir(parents=True, exist_ok=True)
+        for name in names:
+            if name not in skip:
+                pd.DataFrame().to_pickle(root / "models_swr_contrast" / name)
+
+
+def test_a_missing_contrast_artifact_fails_naming_its_directory(tmp_path):
+    old_root, new_root = tmp_path / "backup", tmp_path / "live"
+    _contrast_artifacts(old_root, new_root, skip=_CONTRAST_STRATA[1:])
+
+    with pytest.raises(SystemExit) as exc:
+        collect_content_inputs(old_root, new_root, ())
+
+    message = str(exc.value)
+    assert "swr_contrast_content_audited_omitted.pkl" in message
+    assert str(new_root / "models_swr_contrast") in message
+
+
+def test_contrast_artifacts_left_in_models_are_not_read(tmp_path):
+    """No fallback to ``models/``, where the fits lived before 2026-10-24."""
+    old_root, new_root = tmp_path / "backup", tmp_path / "live"
+    _contrast_artifacts(old_root, new_root)
+    legacy = old_root / "models"
+    legacy.mkdir()
+    for name in _CONTRAST_BOTH_SIDES:
+        (old_root / "models_swr_contrast" / name).rename(legacy / name)
+
+    with pytest.raises(SystemExit, match="models_swr_contrast"):
+        collect_content_inputs(old_root, new_root, ())
+
+
 def test_a_bundle_present_on_only_one_side_is_named_not_dropped(tmp_path):
     """A refit that has not run yet must be visible in the audit, not omitted."""
     old_root, new_root = tmp_path / "backup", tmp_path / "live"
     (old_root / "models").mkdir(parents=True)
     (new_root / "models").mkdir(parents=True)
     _old().to_pickle(old_root / "models" / "all_models.pkl")
+    _contrast_artifacts(old_root, new_root)
 
     bundles, contrast, inputs, missing = collect_content_inputs(
         old_root, new_root, ("models", "models_patch")
@@ -285,6 +333,7 @@ def test_the_report_states_that_the_aic_scales_differ(tmp_path):
     (new_root / "models").mkdir(parents=True)
     _old().to_pickle(old_root / "models" / "all_models.pkl")
     _new().to_pickle(new_root / "models" / "all_models.pkl")
+    _contrast_artifacts(old_root, new_root)
 
     bundles, contrast, inputs, missing = collect_content_inputs(
         old_root, new_root, ("models",)
@@ -294,7 +343,7 @@ def test_the_report_states_that_the_aic_scales_differ(tmp_path):
     assert "different scales" in report
     assert "event-clustered" in report
     assert "conditional_poisson_fraction" in report
-    # The one-sided artifacts are named rather than silently absent.
+    # The contrast artifacts read are named in the input table.
     assert "swr_contrast_content_audited.pkl" in report
 
 
@@ -386,6 +435,7 @@ def test_the_report_warns_that_the_per_sd_unit_changed(tmp_path):
     (new_root / "models").mkdir(parents=True)
     _old().to_pickle(old_root / "models" / "all_models.pkl")
     _new().to_pickle(new_root / "models" / "all_models.pkl")
+    _contrast_artifacts(old_root, new_root)
 
     bundles, contrast, inputs, missing = collect_content_inputs(
         old_root, new_root, ("models",)

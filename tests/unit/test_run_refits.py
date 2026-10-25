@@ -26,21 +26,19 @@ def test_every_run_answers_a_listed_question():
     assert {r.question for r in rr.RUNS} <= set(rr.QUESTIONS)
 
 
-def test_selecting_the_arm_ladder_adds_the_contrasts_and_the_figures_that_read_them():
+def test_selecting_the_arm_ladder_adds_only_the_figures_that_read_it():
+    # The content contrasts read the tables, not the arm ladder's fits.
     names = [r.name for r in rr.select(["content.arm_ladder.all_arms"])]
     assert names == [
         "content.arm_ladder.all_arms",
-        "content.swr_contrast.all",
-        "content.swr_contrast.rewarded",
-        "content.swr_contrast.omitted",
-        "content.breadth_contrast.all",
-        "content.breadth_contrast.all_length_adjusted",
-        "content.breadth_contrast.rewarded",
-        "content.breadth_contrast.omitted",
-        "content.fig.swr_contrast_coefs",
         "content.fig.ladder",
         "content.fig.pipeline_data_flow",
     ]
+
+
+def test_selecting_the_content_contrast_adds_the_coefficient_figure():
+    names = [r.name for r in rr.select(["content.swr_contrast.all"])]
+    assert names == ["content.swr_contrast.all", "content.fig.swr_contrast_coefs"]
 
 
 def test_no_dependents_selects_only_what_is_named():
