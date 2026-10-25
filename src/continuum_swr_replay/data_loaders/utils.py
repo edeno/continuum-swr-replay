@@ -74,6 +74,7 @@ if TYPE_CHECKING:
     from ..data_types import SessionData
 
 from ..decoding.identifiers import TrainingType, parse_nwb_filename
+from ..intervals import interval_mask
 from .constants import (
     FIRST_EXPOSURE_DESCRIPTIONS,
     NWB_FILES,
@@ -258,12 +259,19 @@ def get_training_timepoints(
         Type of training data selection. Default is TrainingType.NO_RIPPLE.
         Accepts either TrainingType enum or equivalent string:
         - TrainingType.ALL or "all": use all time points
-        - TrainingType.NO_RIPPLE or "no_ripple": exclude ripple times
+        - TrainingType.NO_RIPPLE or "no_ripple": exclude ripple times, each
+          ripple closed (``intervals.interval_mask``)
 
     Returns
     -------
     np.ndarray
-        Boolean mask of time points to use for training
+        Boolean mask of time points to use for training, shape (n_time,)
+
+    Raises
+    ------
+    ValueError
+        For an unknown `training_type`, or, for "no_ripple", a ripple with a
+        NaN bound or a start after its end.
 
     Examples
     --------
@@ -288,11 +296,8 @@ def get_training_timepoints(
         return np.ones((n_time,), dtype=bool)
 
     elif training_type == TrainingType.NO_RIPPLE:
-        ripple_labels = get_labels(data["ripple_times"], data["position_info"].index)
-        is_ripple = ripple_labels > 0
-        not_ripple = ~np.asarray(is_ripple).squeeze()
-
-        return not_ripple
+        # closed: a time on a ripple's start or end is a ripple time
+        return ~interval_mask(data["position_info"].index, data["ripple_times"])
     else:
         raise ValueError(
             f"Unknown training_type: {training_type}. "

@@ -13,8 +13,20 @@ import types
 import numpy as np
 import pandas as pd
 import pytest
+from numpy.typing import NDArray
+from ripple_detection import (
+    get_multiunit_population_firing_rate,
+    multiunit_HSE_detector,
+)
 
 from continuum_swr_replay.data_loaders.lfp import get_multiunit, get_multiunit_hse
+from continuum_swr_replay.intervals import interval_mask, overlaps_intervals
+from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+    HSE_CLOSE_EVENT_THRESHOLD_SEC,
+    HSE_MINIMUM_DURATION_SEC,
+    HSE_ZSCORE_THRESHOLD,
+)
 
 
 class TestGetMultiunitHSE:
@@ -433,3 +445,152 @@ class TestTheLoadersIntervalRulesAreTheMasks:
             np.testing.assert_array_equal(
                 kept.to_numpy(), events.loc[~overlaps].to_numpy()
             )
+
+
+# --- get_multiunit_hse before it binned with get_spikecount_per_time_bin -------
+# (frozen at ba2961a5). The function as it was, copied verbatim (docstring
+# dropped), with the inline digitize/bincount binning, so the rewrite's three
+# outputs can be checked against it exactly.
+
+
+def _frozen_get_multiunit_hse(
+    spike_times: list[NDArray[np.float64]],
+    speed: NDArray[np.float64],
+    bin_time: NDArray[np.float64],
+    artifact_intervals: pd.DataFrame | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    sampling_frequency = 1 / np.median(np.diff(bin_time))
+    start_time, end_time = bin_time[[0, -1]]
+    # ``np.digitize(t, bin_time[1:])`` assigns spikes to bin index
+    # 0..N-1 where bin ``i`` covers ``[bin_time[i], bin_time[i+1])``
+    # (and bin N-1 also catches ``t == bin_time[-1]``). The previous
+    # ``bin_time[1:-1]`` form produced indices 0..N-2 only, so the
+    # final output bin was unreachable — verified with
+    # ``bin_time=[0,1,2,3]``: spikes at 2.5 and 3.0 both landed in
+    # bin 2 and bin 3 stayed at zero.
+    multiunit_spikes = np.stack(
+        [
+            np.bincount(
+                np.digitize(
+                    unit_spike_times[
+                        np.logical_and(
+                            unit_spike_times >= start_time,
+                            unit_spike_times <= end_time,
+                        )
+                    ],
+                    bin_time[1:],
+                ),
+                minlength=bin_time.shape[0],
+            )
+            for unit_spike_times in spike_times
+        ],
+        axis=1,
+    )
+
+    multiunit_firing_rate = pd.DataFrame(
+        get_multiunit_population_firing_rate(multiunit_spikes, sampling_frequency),
+        index=bin_time,
+        columns=["firing_rate"],
+    )
+    is_artifact = (
+        np.zeros(bin_time.shape, dtype=bool)
+        if artifact_intervals is None
+        else interval_mask(bin_time, artifact_intervals)
+    )
+    observed_rate = multiunit_firing_rate.to_numpy()[~is_artifact]
+    mean = np.nanmean(observed_rate) if observed_rate.size else np.nan
+    std = np.nanstd(observed_rate) if observed_rate.size else np.nan
+
+    # Avoid division by near-zero if firing rate is constant
+    if std < 1e-10 or np.isnan(std):
+        multiunit_rate_zscore = pd.DataFrame(
+            np.zeros_like(multiunit_firing_rate),
+            index=bin_time,
+            columns=["firing_rate"],
+        )
+        # A constant rate holds no HSE. ripple_detection 2.0 raises on a rate
+        # with no scale, where 1.7.0 returned no events, so skip the detector.
+        hse_times = pd.DataFrame(
+            {"start_time": [], "end_time": [], "duration": []},
+            index=pd.Index([], dtype=np.int64, name="event_number"),
+            dtype=float,
+        )
+        return hse_times, multiunit_firing_rate, multiunit_rate_zscore
+
+    multiunit_rate_zscore = (multiunit_firing_rate - mean) / std
+
+    hse_times = multiunit_HSE_detector(
+        bin_time,
+        multiunit_spikes,
+        speed,
+        sampling_frequency,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        minimum_duration=HSE_MINIMUM_DURATION_SEC,
+        zscore_threshold=HSE_ZSCORE_THRESHOLD,
+        close_event_threshold=HSE_CLOSE_EVENT_THRESHOLD_SEC,
+        normalization_mask=None if not is_artifact.any() else ~is_artifact,
+    )
+    if artifact_intervals is not None and len(artifact_intervals):
+        hse_times = hse_times.loc[
+            ~overlaps_intervals(
+                hse_times["start_time"].to_numpy(dtype=float),
+                hse_times["end_time"].to_numpy(dtype=float),
+                artifact_intervals,
+            )
+        ]
+        hse_times.index = pd.RangeIndex(1, len(hse_times) + 1, name="event_number")
+
+    return hse_times, multiunit_firing_rate, multiunit_rate_zscore
+
+
+class TestMultiunitHSEMatchesFrozen:
+    """``get_multiunit_hse``'s outputs are the frozen version's, exactly."""
+
+    @staticmethod
+    def _assert_same(spike_times, speed, bin_time, artifact_intervals=None):
+        old = _frozen_get_multiunit_hse(
+            spike_times, speed, bin_time, artifact_intervals
+        )
+        new = get_multiunit_hse(spike_times, speed, bin_time, artifact_intervals)
+        for old_frame, new_frame in zip(old, new, strict=True):
+            pd.testing.assert_frame_equal(new_frame, old_frame, check_exact=True)
+        return new
+
+    def test_spikes_on_bin_edges_and_at_the_ends(self):
+        bin_time = np.arange(0.0, 2.0, 0.002)
+        speed = np.zeros_like(bin_time)
+        spike_times = [
+            bin_time[[0, 1, 2, 500, 998, 999]],  # on edges, first and last
+            np.array([-0.001, 0.0, 1.0, bin_time[-1], bin_time[-1] + 1e-9]),
+            np.array([]),  # an empty unit
+            np.array([1.0011, 0.5, 0.25, np.nan]),  # unsorted, with a NaN
+        ]
+        mua = self._assert_same(spike_times, speed, bin_time)[1]
+        assert mua["firing_rate"].iloc[-1] > 0
+
+    def test_simulated_sessions(self):
+        rng = np.random.default_rng(3)
+        bin_time = np.arange(0.0, 20.0, 0.002)
+        speed = np.where((bin_time > 5.0) & (bin_time < 8.0), 20.0, 1.0)
+        for n_units in (1, 5, 30):
+            spike_times = [
+                np.sort(rng.uniform(-0.5, 20.5, rng.poisson(400)))
+                for _ in range(n_units)
+            ]
+            for burst in (3.0, 11.0, 16.0):
+                spike_times = [
+                    np.sort(np.append(times, rng.uniform(burst, burst + 0.08, 30)))
+                    for times in spike_times
+                ]
+            artifacts = pd.DataFrame(
+                {"start_time": [2.9, 15.0, 19.0], "end_time": [3.05, 15.0, 25.0]}
+            )
+            hse = self._assert_same(spike_times, speed, bin_time)[0]
+            assert len(hse) > 0
+            self._assert_same(spike_times, speed, bin_time, artifacts)
+
+    def test_no_spikes(self):
+        bin_time = np.arange(0.0, 1.0, 0.002)
+        self._assert_same(
+            [np.array([]), np.array([])], np.zeros_like(bin_time), bin_time
+        )

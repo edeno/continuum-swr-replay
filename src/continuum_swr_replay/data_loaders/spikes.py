@@ -51,7 +51,6 @@ import warnings
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy.ndimage import label
 
 # ``spyglass`` opens a DataJoint connection at module import time. We
 # defer those imports into the DB-loading function bodies so that
@@ -126,67 +125,30 @@ def detect_coincident_spikes(
     sort_group_id = sort_group_id[sort_ind]
     time_bin_ind = time_bin_ind[sort_ind]
 
+    # A cluster is a run of spikes each closer than the threshold to the one
+    # before it; a spike not close to its predecessor starts a new cluster.
     is_close = np.diff(sorted_spike_times) < spike_closeness_threshold
-    is_close = np.concatenate([[False], is_close])
-    labels, _ = label(is_close)
-
-    # ``scipy.ndimage.label`` leaves the first spike of each close
-    # cluster with label=0 because ``np.diff`` is backward-looking.
-    # Extend each labeled run backward by one spike so the cluster's
-    # leading spike contributes to ``coincident_fraction``. Without
-    # this, a 2-spike cluster spanning 2 distinct tetrodes on a
-    # 4-tetrode session evaluates as 1/4 (only the trailing spike
-    # counted), which is below the default 0.33 threshold even though
-    # the true coincidence is 2/4 = 0.5 — keeping the artifact in.
-    labels_arr = np.asarray(labels)
-    next_label = np.concatenate([labels_arr[1:], [0]])
-    cluster_labels = np.where(
-        (labels_arr == 0) & (next_label > 0), next_label, labels_arr
-    )
-
-    spike_events = pd.DataFrame(
-        {
-            "labels": cluster_labels,
-            "sort_group_id": sort_group_id,
-            "time_bin_ind": time_bin_ind,
-            "spike_times": sorted_spike_times,
-        },
-    )
-    # Calculate coincident fraction to identify artifacts.
+    cluster_id = np.cumsum(np.concatenate([[True], ~is_close]))
+    cluster_size = np.bincount(cluster_id)
+    # distinct tetrodes per cluster: count the distinct (cluster, tetrode) pairs
     n_sort_groups = len(spike_times)
-    coincident_fraction = (
-        spike_events.loc[spike_events.labels > 0]
-        .groupby("labels")
-        .sort_group_id.nunique()
-        / n_sort_groups
+    pair_cluster = (
+        np.unique(cluster_id * n_sort_groups + sort_group_id) // n_sort_groups
     )
-    artifact_labels = coincident_fraction[coincident_fraction > max_coincident_fraction]
+    n_tetrodes = np.bincount(pair_cluster)
+    # a lone spike is never an artifact, whatever the number of tetrodes
+    is_artifact_cluster = (cluster_size > 1) & (
+        n_tetrodes / n_sort_groups > max_coincident_fraction
+    )
+    keep = ~is_artifact_cluster[cluster_id]
 
-    # ``cluster_labels`` already includes the leading spike of each
-    # cluster, so flagging artifact rows directly removes every spike
-    # in any too-coincident cluster — no extra ``.shift(-1)`` step
-    # needed.
-    is_artifact = spike_events.labels.isin(artifact_labels.index)
-    spike_events = spike_events.loc[~is_artifact]
-
-    grouped = spike_events.groupby("sort_group_id")
-    grouped_spike_times = grouped.spike_times.apply(np.array)
-    grouped_time_bin_ind = grouped.time_bin_ind.apply(np.array)
-
-    # Preserve all original sort group indices so the output aligns 1:1 with the input.
-    # Sort groups that lost all spikes get empty arrays.
-    filtered_spike_times = [
-        grouped_spike_times[i]
-        if i in grouped_spike_times.index
-        else np.array([], dtype=np.float64)
-        for i in range(n_sort_groups)
-    ]
-    filtered_time_bin_ind = [
-        grouped_time_bin_ind[i]
-        if i in grouped_time_bin_ind.index
-        else np.array([], dtype=np.intp)
-        for i in range(n_sort_groups)
-    ]
+    # Each tetrode's kept spikes, in time order. Sort groups that lost all
+    # spikes get empty arrays, so the output aligns 1:1 with the input.
+    kept_group = sort_group_id[keep]
+    by_group = np.argsort(kept_group, kind="stable")
+    split_at = np.cumsum(np.bincount(kept_group, minlength=n_sort_groups))[:-1]
+    filtered_spike_times = np.split(sorted_spike_times[keep][by_group], split_at)
+    filtered_time_bin_ind = np.split(time_bin_ind[keep][by_group], split_at)
 
     return filtered_spike_times, filtered_time_bin_ind
 

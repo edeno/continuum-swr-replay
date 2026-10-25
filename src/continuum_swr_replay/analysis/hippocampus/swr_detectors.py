@@ -114,6 +114,7 @@ from scipy.signal import butter, sosfilt, sosfiltfilt
 
 from continuum_swr_replay.data_types import RippleBandInputs
 from continuum_swr_replay.intervals import (
+    contiguous_true_runs,
     get_spikecount_per_time_bin,
     overlaps_intervals,
 )
@@ -834,8 +835,13 @@ def tetrode_spike_counts(
 
 
 def _mask_intervals(time: NDArray, mask: NDArray[np.bool_]) -> pd.DataFrame:
-    """The runs of True samples, each from its first to its last sample time."""
-    runs = gap_free_stretches(time, np.where(mask, 0.0, np.nan))
+    """The runs of True samples, each from its first to its last sample time.
+
+    A run is not split at a timestamp gap: the gap holds no sample, so an event
+    that begins and ends on samples overlaps the run exactly when it shares a
+    sample with it.
+    """
+    runs = contiguous_true_runs(mask)
     return pd.DataFrame(
         {"start_time": time[runs[:, 0]], "end_time": time[runs[:, 1] - 1]},
         dtype=np.float64,

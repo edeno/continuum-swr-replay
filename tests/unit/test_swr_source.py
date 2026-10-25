@@ -1319,3 +1319,22 @@ def test_the_decodes_event_counts_are_dropped(inventory, drop_masked_events):
 
     assert not set(counts) & set(out.columns)
     assert not set(analysed_time.DECODE_SWR_COUNT_COLUMNS) & set(out.columns)
+
+
+def test_session_epoch_id_is_the_one_built_from_a_file_name():
+    """The id is the one the frozen (ba2961a5) fake-file-name route built."""
+
+    def frozen(animal, day, epoch):
+        return swr_source.swr_epoch_id(f"{animal}{day}_.nwb", str(epoch))
+
+    for animal, day, epoch in [
+        ("chimi", 20200225, "02_r1"),
+        ("j16", np.int64(20210706), np.str_("04_r2")),
+        ("peanut", "20201125", "10_r5"),
+        ("senor", np.int32(20201030), "02_r1"),
+    ]:
+        new = swr_source.swr_epoch_id_of_session(animal, day, epoch)
+        assert new == frozen(animal, day, epoch)
+    assert swr_source.swr_epoch_id_of_session("chimi", 20200225, "02_r1") == (
+        "chimi20200225_02_r1_HPC"
+    )

@@ -530,3 +530,235 @@ class TestSpikeDataIntegrity:
                     f"{brain_area} sort group {i}: {feats.shape[0]} features != {len(times)} spikes"
                 )
                 assert feats.shape[1] == n_features
+
+
+# --- detect_coincident_spikes before its clusters were cumsum ids (frozen at ba2961a5)
+# The clusters were labelled with ``scipy.ndimage.label``, shifted back one spike,
+# and the kept spikes regrouped with ``groupby().apply``. This is that function as
+# it was, copied verbatim (docstring and comments dropped), so the rewrite can be
+# checked against it spike for spike: same spikes kept, same order, same dtype.
+
+
+def _frozen_detect_coincident_spikes(
+    spike_times,
+    spike_closeness_threshold=0.00004,
+    max_coincident_fraction=0.33,
+):
+    import pandas as pd
+    from scipy.ndimage import label
+
+    if not spike_times or all(len(st) == 0 for st in spike_times):
+        return [], []
+
+    concat_spike_times = np.concatenate(spike_times)
+    sort_group_id = np.concatenate(
+        [
+            np.ones(len(spike_time), dtype=int) * i
+            for i, spike_time in enumerate(spike_times)
+        ]
+    )
+    time_bin_ind = np.concatenate(
+        [np.arange(len(spike_time), dtype=int) for spike_time in spike_times]
+    )
+
+    sort_ind = np.argsort(concat_spike_times)
+    sorted_spike_times = concat_spike_times[sort_ind]
+    sort_group_id = sort_group_id[sort_ind]
+    time_bin_ind = time_bin_ind[sort_ind]
+
+    is_close = np.diff(sorted_spike_times) < spike_closeness_threshold
+    is_close = np.concatenate([[False], is_close])
+    labels, _ = label(is_close)
+
+    labels_arr = np.asarray(labels)
+    next_label = np.concatenate([labels_arr[1:], [0]])
+    cluster_labels = np.where(
+        (labels_arr == 0) & (next_label > 0), next_label, labels_arr
+    )
+
+    spike_events = pd.DataFrame(
+        {
+            "labels": cluster_labels,
+            "sort_group_id": sort_group_id,
+            "time_bin_ind": time_bin_ind,
+            "spike_times": sorted_spike_times,
+        },
+    )
+    n_sort_groups = len(spike_times)
+    coincident_fraction = (
+        spike_events.loc[spike_events.labels > 0]
+        .groupby("labels")
+        .sort_group_id.nunique()
+        / n_sort_groups
+    )
+    artifact_labels = coincident_fraction[coincident_fraction > max_coincident_fraction]
+
+    is_artifact = spike_events.labels.isin(artifact_labels.index)
+    spike_events = spike_events.loc[~is_artifact]
+
+    grouped = spike_events.groupby("sort_group_id")
+    grouped_spike_times = grouped.spike_times.apply(np.array)
+    grouped_time_bin_ind = grouped.time_bin_ind.apply(np.array)
+
+    filtered_spike_times = [
+        grouped_spike_times[i]
+        if i in grouped_spike_times.index
+        else np.array([], dtype=np.float64)
+        for i in range(n_sort_groups)
+    ]
+    filtered_time_bin_ind = [
+        grouped_time_bin_ind[i]
+        if i in grouped_time_bin_ind.index
+        else np.array([], dtype=np.intp)
+        for i in range(n_sort_groups)
+    ]
+
+    return filtered_spike_times, filtered_time_bin_ind
+
+
+def _assert_same_filtering(spike_times, **kwargs):
+    """The rewrite keeps exactly the spikes the frozen function kept."""
+    old_times, old_ind = _frozen_detect_coincident_spikes(spike_times, **kwargs)
+    new_times, new_ind = detect_coincident_spikes(spike_times, **kwargs)
+    assert len(new_times) == len(old_times)
+    assert len(new_ind) == len(old_ind)
+    for old, new in zip(old_times + old_ind, new_times + new_ind, strict=True):
+        assert new.dtype == old.dtype
+        assert new.shape == old.shape
+        np.testing.assert_array_equal(new, old)
+    return new_times, new_ind
+
+
+def _random_session(seed, n_tetrodes, n_spikes, n_artifacts, jitter_s=2e-5):
+    """Poisson-ish spikes per tetrode plus synchronous lines on random subsets."""
+    rng = np.random.default_rng(seed)
+    duration = n_spikes / 50.0
+    spike_times = [
+        np.sort(rng.uniform(0.0, duration, rng.poisson(n_spikes)))
+        for _ in range(n_tetrodes)
+    ]
+    for t in rng.uniform(0.0, duration, n_artifacts):
+        n_involved = rng.integers(1, n_tetrodes + 1)
+        for tetrode in rng.choice(n_tetrodes, n_involved, replace=False):
+            offset = rng.uniform(0.0, jitter_s)
+            spike_times[tetrode] = np.sort(np.append(spike_times[tetrode], t + offset))
+    return spike_times
+
+
+class TestCoincidentSpikesMatchFrozen:
+    """The cumsum-cluster rewrite against the frozen ``ndimage.label`` version."""
+
+    def test_empty_inputs(self):
+        assert _assert_same_filtering([]) == ([], [])
+        assert _assert_same_filtering([np.array([]), np.array([])]) == ([], [])
+
+    def test_empty_tetrodes_among_full_ones(self):
+        spike_times = [
+            np.array([]),
+            np.array([1.0, 2.0, 3.0]),
+            np.array([]),
+            np.array([1.00001, 2.5]),
+        ]
+        _assert_same_filtering(spike_times)
+
+    def test_a_single_tetrode(self):
+        """One tetrode: a close pair is 1/1 of tetrodes, a lone spike is kept."""
+        spike_times = [np.array([0.0, 1.0, 1.00001, 1.00002, 2.0, 3.0, 3.00003])]
+        new_times, _ = _assert_same_filtering(spike_times)
+        np.testing.assert_array_equal(new_times[0], [0.0, 2.0])
+
+    def test_lone_spikes_are_never_artifacts_with_few_tetrodes(self):
+        """With 2 or 3 tetrodes a lone spike is 1/n > 0.33 but is no cluster."""
+        for n_tetrodes in (2, 3):
+            spike_times = [np.arange(0.1 * i, 10.0, 1.0) for i in range(n_tetrodes)]
+            new_times, _ = _assert_same_filtering(spike_times)
+            for old, new in zip(spike_times, new_times, strict=True):
+                np.testing.assert_array_equal(new, old)
+
+    def test_a_same_tetrode_pair_with_three_tetrodes(self):
+        """1 of 3 tetrodes is 0.333 > 0.33: a same-tetrode close pair is dropped."""
+        spike_times = [np.array([1.0, 1.00001, 5.0]), np.array([2.0]), np.array([3.0])]
+        new_times, _ = _assert_same_filtering(spike_times)
+        np.testing.assert_array_equal(new_times[0], [5.0])
+
+    def test_the_closeness_threshold_boundary(self):
+        """A step of exactly the threshold is not close; one just under it is."""
+        threshold = 0.00004
+        spike_times = [
+            np.array([0.0, 10.0, 20.0, 30.0]),
+            np.array(
+                [
+                    threshold,
+                    10.0 + threshold,
+                    np.nextafter(20.0 + threshold, 0.0),
+                    30.0 + threshold * 1.0000001,
+                ]
+            ),
+        ]
+        _assert_same_filtering(spike_times)
+
+    def test_the_coincident_fraction_boundary(self):
+        """33 of 100 tetrodes is exactly 0.33 (kept); 34 of 100 is dropped."""
+        n_tetrodes = 100
+        spike_times = [np.array([100.0 + i]) for i in range(n_tetrodes)]
+        for tetrode in range(33):
+            spike_times[tetrode] = np.sort(np.append(spike_times[tetrode], 1.0))
+        for tetrode in range(34):
+            spike_times[tetrode] = np.sort(
+                np.append(spike_times[tetrode], 2.0 + tetrode * 1e-7)
+            )
+        new_times, _ = _assert_same_filtering(spike_times)
+        assert all(1.0 in times for times in new_times[:33])
+        assert not any(np.any((times > 1.5) & (times < 3.0)) for times in new_times)
+
+    def test_chained_clusters(self):
+        """Each spike within 40 us of the last makes one cluster, end to end."""
+        spike_times = [
+            np.array([1.0, 1.00009]),
+            np.array([1.00003]),
+            np.array([1.00006]),
+            np.array([7.0]),
+        ]
+        new_times, _ = _assert_same_filtering(spike_times)
+        assert [len(times) for times in new_times] == [0, 0, 0, 1]
+
+    def test_unsorted_input_and_ties(self):
+        """Unsorted tetrodes and equal times keep the old order and indices."""
+        spike_times = [
+            np.array([3.0, 1.0, 2.0, 1.0, 9.0]),
+            np.array([2.0, 5.0, 4.0]),
+            np.array([8.0, 6.0, 7.0, 2.0]),
+            np.array([10.0, 11.0]),
+        ]
+        _assert_same_filtering(spike_times)
+
+    def test_nan_spike_times(self):
+        spike_times = [np.array([1.0, np.nan, 2.0]), np.array([np.nan, 1.00001])]
+        _assert_same_filtering(spike_times)
+
+    def test_spike_times_that_are_all_removed(self):
+        spike_times = [np.array([1.0]), np.array([1.00001]), np.array([1.00002])]
+        new_times, new_ind = _assert_same_filtering(spike_times)
+        assert all(len(times) == 0 for times in new_times)
+
+    def test_other_thresholds(self):
+        spike_times = _random_session(
+            seed=7, n_tetrodes=8, n_spikes=400, n_artifacts=60
+        )
+        for closeness, fraction in [(1e-3, 0.5), (1e-5, 0.1), (0.0, 0.33), (1.0, 0.9)]:
+            _assert_same_filtering(
+                spike_times,
+                spike_closeness_threshold=closeness,
+                max_coincident_fraction=fraction,
+            )
+
+    def test_random_sessions(self):
+        for seed in range(40):
+            rng = np.random.default_rng(1000 + seed)
+            spike_times = _random_session(
+                seed=seed,
+                n_tetrodes=int(rng.integers(1, 30)),
+                n_spikes=int(rng.integers(0, 500)),
+                n_artifacts=int(rng.integers(0, 100)),
+            )
+            _assert_same_filtering(spike_times)

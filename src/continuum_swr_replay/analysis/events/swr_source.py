@@ -279,7 +279,7 @@ def swr_epoch_id_of_session(animal: str, day: object, epoch: object) -> str:
     ``swr_epoch_id_of_session("chimi", 20200225, "02_r1")`` is
     ``"chimi20200225_02_r1_HPC"``.
     """
-    return swr_epoch_id(f"{animal}{day}_.nwb", str(epoch))
+    return format_epoch_identifier(f"{animal}{day}", str(epoch), "HPC")
 
 
 def swr_source_files(epoch_id: str) -> dict[str, dict[str, str]]:

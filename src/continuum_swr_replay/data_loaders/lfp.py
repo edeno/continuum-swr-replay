@@ -81,7 +81,11 @@ from ..data_types import MultiunitData, RippleBandInputs, RippleData, ThetaData
 # pure helpers (``get_multiunit``, ``get_multiunit_hse``,
 # ``filter_ripple_lfp_time``) — and the unit tests that exercise them
 # — stay offline-importable on machines without VPN.
-from ..intervals import interval_mask, overlaps_intervals
+from ..intervals import (
+    get_spikecount_per_time_bin,
+    interval_mask,
+    overlaps_intervals,
+)
 from ..parameters import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     HSE_CLOSE_EVENT_THRESHOLD_SEC,
@@ -767,28 +771,9 @@ def get_multiunit_hse(
 
     """
     sampling_frequency = 1 / np.median(np.diff(bin_time))
-    start_time, end_time = bin_time[[0, -1]]
-    # ``np.digitize(t, bin_time[1:])`` assigns spikes to bin index
-    # 0..N-1 where bin ``i`` covers ``[bin_time[i], bin_time[i+1])``
-    # (and bin N-1 also catches ``t == bin_time[-1]``). The previous
-    # ``bin_time[1:-1]`` form produced indices 0..N-2 only, so the
-    # final output bin was unreachable — verified with
-    # ``bin_time=[0,1,2,3]``: spikes at 2.5 and 3.0 both landed in
-    # bin 2 and bin 3 stayed at zero.
     multiunit_spikes = np.stack(
         [
-            np.bincount(
-                np.digitize(
-                    unit_spike_times[
-                        np.logical_and(
-                            unit_spike_times >= start_time,
-                            unit_spike_times <= end_time,
-                        )
-                    ],
-                    bin_time[1:],
-                ),
-                minlength=bin_time.shape[0],
-            )
+            get_spikecount_per_time_bin(unit_spike_times, bin_time)
             for unit_spike_times in spike_times
         ],
         axis=1,

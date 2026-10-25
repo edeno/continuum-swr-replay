@@ -286,3 +286,46 @@ def test_too_few_tetrodes_or_no_spikes_is_the_package_error(
 
     assert isinstance(result, ValueError)
     assert message in str(result)
+
+
+# --- _mask_intervals before it read contiguous_true_runs (frozen at ba2961a5) --
+# The mask's runs were read through ``gap_free_stretches`` on a NaN-for-False
+# column, which also splits a run at a timestamp gap. This is that function as
+# it was, copied verbatim (docstring dropped). The gap holds no sample, so the
+# events Carey keeps, which begin and end on samples, are the same either way.
+
+
+def _frozen_mask_intervals(time: NDArray, mask: NDArray[np.bool_]) -> pd.DataFrame:
+    runs = swr_detectors.gap_free_stretches(time, np.where(mask, 0.0, np.nan))
+    return pd.DataFrame(
+        {"start_time": time[runs[:, 0]], "end_time": time[runs[:, 1] - 1]},
+        dtype=np.float64,
+    )
+
+
+def test_mask_runs_drop_the_events_the_gap_split_runs_dropped():
+    """Same kept events and drop count, with runs spanning gaps or not."""
+    rng = np.random.default_rng(5)
+    n_spanning = 0
+    for _ in range(200):
+        n_time = int(rng.integers(2, 400))
+        steps = np.full(n_time - 1, 0.001)
+        gaps = rng.random(n_time - 1) < 0.03
+        steps[gaps] = rng.uniform(0.002, 0.5, gaps.sum())
+        time = np.concatenate([[0.0], np.cumsum(steps)])
+        mask = rng.random(n_time) < rng.choice([0.0, 0.05, 0.5, 0.95, 1.0])
+        first = rng.integers(0, n_time, 50)
+        last = np.minimum(first + rng.integers(0, 40, 50), n_time - 1)
+        events = pd.DataFrame(
+            {"start_time": time[first], "end_time": time[last], "peak": first},
+            index=pd.RangeIndex(1, 51, name="event_number"),
+        )
+
+        old_runs = _frozen_mask_intervals(time, mask)
+        new_runs = swr_detectors._mask_intervals(time, mask)
+        n_spanning += len(new_runs) < len(old_runs)
+        old_kept, old_dropped = swr_detectors.drop_overlapping_events(events, old_runs)
+        new_kept, new_dropped = swr_detectors.drop_overlapping_events(events, new_runs)
+        assert new_dropped == old_dropped
+        pd.testing.assert_frame_equal(new_kept, old_kept, check_exact=True)
+    assert n_spanning > 0  # some masked runs did span a gap
