@@ -317,9 +317,10 @@ Three tiers:
    `continuum_swr_replay.paths` function, resolved when called under the data root
    `paths.processed_data_dir()`: `$CSR_PROCESSED_DATA_DIR` when set, else the
    checkout's `Processed-Data/`. That variable is the one place a run or a test
-   moves every root; no module binds a root at import. (The old upper-case names,
+   moves every root; no library module or supported script binds one at import. (The old upper-case names,
    `parameters.PROCESSED_DATA_DIR` and `paths.REPLAY_CONTENT_DIR` and the rest,
-   still resolve for notebooks and `scripts/exploratory/`.) A run folder's
+   still resolve for notebooks and `scripts/exploratory/`; assigning one moves
+   nothing, so to redirect a run set `$CSR_PROCESSED_DATA_DIR`.) A run folder's
    `manifest.json` names its inputs and settings.
 
    | location | `paths.` | producer | holds |

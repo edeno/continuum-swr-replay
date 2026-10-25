@@ -22,13 +22,17 @@ moves regardless, because the runner's fit-time standardization reference is
 computed over the assembled cohort, so restricting the cohort changes the unit
 of every ``_z`` covariate.
 
-The output root must look like ``replay_content`` to the runner, which reads its
-input tables and ``standardization_reference.json`` from the same root it writes
-to. Symlinking every entry except the output directory ``models_swr_contrast``
-is enough (a symlinked one would send the run's output into the canonical
-directory)::
+The output root must be a ``replay_content`` folder to the runner, which reads
+its input tables and ``standardization_reference.json`` from the same root it
+writes to: the run points ``$CSR_PROCESSED_DATA_DIR`` (the one place every data
+root is resolved from, ``paths.processed_data_dir()``) at the output root's
+parent, so the root must be named ``replay_content`` and its parent must not be
+the live ``Processed-Data``. Symlinking every entry except the output directory
+``models_swr_contrast`` is enough (a symlinked one would send the run's output
+into the canonical directory); before the runner starts, the run refuses an
+output directory that resolves under the live ``Processed-Data``::
 
-    ROOT=/tmp/content_cohort_control
+    ROOT=/tmp/content_cohort_control/replay_content
     mkdir -p "$ROOT/models_swr_contrast"
     for entry in Processed-Data/replay_content/*; do
         [ "$(basename "$entry")" = models_swr_contrast ] && continue
@@ -46,12 +50,13 @@ patches a runner's module globals and is not part of any pipeline.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.paths import model_dir
+from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV, ROOT_DIR, model_dir
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -79,19 +84,44 @@ def bypass_event_cohort(
     }
 
 
+def use_output_root(out_root: Path) -> Path:
+    """Make `out_root` the run's ``replay_content`` and return its output folder.
+
+    Points ``$CSR_PROCESSED_DATA_DIR`` at ``out_root``'s parent, the one patch
+    point every root is resolved from, then checks that the folder the runner
+    will write to (``model_dir("swr_contrast")``) is a real directory and not
+    under the live ``Processed-Data``.
+    """
+    live = (ROOT_DIR / "Processed-Data").resolve()
+    out_root = out_root.resolve()
+    if out_root.name != "replay_content" or out_root.parent == live:
+        raise SystemExit(
+            f"{out_root} must be a folder named replay_content outside {live} "
+            "(see this module's docstring)"
+        )
+    os.environ[PROCESSED_DATA_DIR_ENV] = str(out_root.parent)
+    out_dir = model_dir("swr_contrast")
+    if out_dir != out_root / "models_swr_contrast":  # pragma: no cover - drift
+        raise SystemExit(f"the runner would write to {out_dir}, not under {out_root}")
+    if not out_dir.is_dir() or out_dir.is_symlink():
+        raise SystemExit(
+            f"{out_dir} must be a real directory and {out_root} must mirror "
+            "replay_content (see this module's docstring)"
+        )
+    if out_dir.resolve().is_relative_to(live):
+        raise SystemExit(f"{out_dir} resolves under the live {live}; refusing to write")
+    return out_dir
+
+
 def main() -> None:
     if len(sys.argv) < 3:
         raise SystemExit(
             "usage: _content_cohort_control.py <output-root> <outcome-stratum> "
             "[extra runner args...]"
         )
-    out_root = Path(sys.argv[1]).resolve()
-    out_dir = model_dir("swr_contrast", out_root)
-    if not out_dir.is_dir() or out_dir.is_symlink():
-        raise SystemExit(
-            f"{out_dir} must be a real directory and {out_root} must mirror "
-            "replay_content (see this module's docstring)"
-        )
+    # Before anything resolves a root: the runner reads and writes through
+    # paths, which reads the variable this sets.
+    use_output_root(Path(sys.argv[1]))
     runner_argv = ["fit_swr_contrast_content.py", "--outcome-stratum", *sys.argv[2:]]
     sys.path.insert(0, str(REPO))
     sys.argv = runner_argv
@@ -99,7 +129,6 @@ def main() -> None:
     import scripts.content.fit_swr_contrast_content as runner
     from continuum_swr_replay.analysis.replay import contrast_aggregation
 
-    runner.RC = out_root
     # The cohort rule is applied where the cohorts are assembled.
     contrast_aggregation.select_event_cohort = bypass_event_cohort
     runner.main()

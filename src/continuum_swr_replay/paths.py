@@ -6,7 +6,8 @@ through every reader and writer. Every location is under the processed-data
 root, :func:`processed_data_dir`, and is resolved when called: the root is
 ``$CSR_PROCESSED_DATA_DIR`` when set, else the checkout's ``Processed-Data/``.
 That environment variable is the one place a run (or a test) moves every data
-root, its child processes included. No module binds a root at import.
+root, its child processes included. No library module, and no supported
+script's function or default, binds a root at import.
 
 The canonical tables are named once, by :data:`CANONICAL_TABLES`; their
 basenames (:data:`CANONICAL_TABLE_BASENAMES`), ``tables.io.SWR_SOURCE_TABLES``

@@ -17,9 +17,9 @@ m = importlib.util.module_from_spec(spec)
 sys.modules["swrc"] = m
 spec.loader.exec_module(m)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
-    CONTENT_FIT_INPUTS,
     assemble_arm,
     assemble_patch,
+    contrast_fit_inputs,
     prepare_cohorts,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
@@ -27,9 +27,11 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     BASEc,
     BASEc_NT,
 )
+from continuum_swr_replay.paths import replay_content_dir  # noqa: E402
 
-ev, _ = assemble_arm(CONTENT_FIT_INPUTS, m.RC / "standardization_reference.json")
-pt, _ = assemble_patch(ev, CONTENT_FIT_INPUTS)
+inputs = contrast_fit_inputs()
+ev, _ = assemble_arm(inputs, replay_content_dir() / "standardization_reference.json")
+pt, _ = assemble_patch(ev, inputs)
 ev, pt, _, _ = prepare_cohorts(ev, pt, outcome_stratum="all", max_per_animal=None)
 print("cohort events", ev.event_id.nunique(), "rows", len(ev), flush=True)
 KEY = "swr_x_reward_belief_mean_candidate_arm_preoutcome"

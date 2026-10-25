@@ -125,7 +125,9 @@ def live_processed_data_dir() -> Path:
     """
     if LIVE_PROCESSED_DATA_DIR is not None:
         return Path(LIVE_PROCESSED_DATA_DIR)
-    return Path(__file__).resolve().parents[1] / "Processed-Data"
+    from continuum_swr_replay.paths import ROOT_DIR  # the root paths itself uses
+
+    return ROOT_DIR / "Processed-Data"
 
 
 @pytest.fixture(autouse=True)
