@@ -166,10 +166,10 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence import (  # noqa: 
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
-from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
+from continuum_swr_replay.decoding.files import decode_paths  # noqa: E402
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
-from continuum_swr_replay.decoding.files import decode_paths  # noqa: E402
 from continuum_swr_replay.decoding.results import open_results  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,

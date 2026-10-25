@@ -99,7 +99,7 @@ def _slice_register(sessions: list[str]) -> pd.DataFrame:
         analysed_epoch_ids,
         read_register,
     )
-    from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
+    from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 
     register = read_register()
     unknown = sorted(set(sessions) - set(analysed_epoch_ids(register)))
@@ -306,7 +306,7 @@ def _session_restriction(candidate: Path, reference: Path):
     stop table, so a candidate that lost a session cannot shrink the reference.
     """
     from continuum_swr_replay.data_loaders.epoch_register import Status, read_register
-    from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+    from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
     from continuum_swr_replay.tables.io import read_table
     from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 

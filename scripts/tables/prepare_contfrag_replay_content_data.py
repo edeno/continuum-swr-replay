@@ -62,11 +62,11 @@ from continuum_swr_replay.analysis.replay import build_event_patch_table
 from continuum_swr_replay.analysis.replay import prepare_data as replay_prepare_data
 from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
-from continuum_swr_replay.data_loaders.utils import (
+from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
 )
-from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import (

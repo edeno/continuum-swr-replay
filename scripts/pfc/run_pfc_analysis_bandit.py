@@ -133,7 +133,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epochs,
 )
-from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     format_epoch_identifier,
 )
 from continuum_swr_replay.parameters import (  # noqa: E402

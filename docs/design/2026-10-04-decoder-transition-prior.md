@@ -205,8 +205,8 @@ in `.claude/research/refresh_ablation/ablation_report.md` ("Ablation 5", "Ablati
   Non-Local Continuous bouts. Our event analyses exclude these bouts through the whole-event
   immobility rule (every sample below 4 cm/s).
 - **Validated on HPC clusterless decodes only.** `create_detector` serves every brain area in
-  `DETECTOR_CONFIG`, so mPFC and OFC sorted-spike decodes, which are not part of the refresh,
-  would also take P30-B.
+  `decoding/config.py:nonlocal_detector_classes`, so mPFC and OFC sorted-spike decodes, which
+  are not part of the refresh, would also take P30-B.
 - **Five epochs.** Pooled event-level rates treat events as independent.
 
 ## Sources

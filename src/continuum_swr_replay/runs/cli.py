@@ -9,6 +9,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.decoding.identifiers import (
+    DEFAULT_SWR_DEFINITION,
+    DEFAULT_TRAINING_TYPE,
+)
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 __all__ = ["RUN_ID_PATTERN", "add_common_args", "filter_epoch_info", "parse_run_id"]
@@ -84,8 +88,10 @@ def add_common_args(parser: ArgumentParser) -> ArgumentParser:
     )
     parser.add_argument("--local_scratch_dir", type=str, default=".local_scratch")
     parser.add_argument("--brain_area", type=str, default="HPC")
-    parser.add_argument("--training_type", type=str, default="no_ripple")
-    parser.add_argument("--ripple_detector_name", type=str, default="Kay")
+    parser.add_argument("--training_type", type=str, default=DEFAULT_TRAINING_TYPE)
+    parser.add_argument(
+        "--ripple_detector_name", type=str, default=DEFAULT_SWR_DEFINITION
+    )
     parser.add_argument("--non_stationary", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--animal", type=str)

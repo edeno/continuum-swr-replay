@@ -117,8 +117,8 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
     analysed_epoch_ids,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.plots import (

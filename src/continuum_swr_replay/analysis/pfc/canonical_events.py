@@ -47,13 +47,13 @@ from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
-from continuum_swr_replay.data_loaders.utils import (
-    format_epoch_identifier,
-    parse_nwb_filename,
-)
 from continuum_swr_replay.decoding.files import (
     decode_paths,
     non_local_threshold_percent,
+)
+from continuum_swr_replay.decoding.identifiers import (
+    format_epoch_identifier,
+    parse_nwb_filename,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import table_path

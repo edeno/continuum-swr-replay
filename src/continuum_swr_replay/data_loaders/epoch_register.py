@@ -59,7 +59,8 @@ from typing import NamedTuple
 
 import pandas as pd
 
-from .utils import format_epoch_identifier, get_epoch_info, parse_nwb_filename
+from ..decoding.identifiers import format_epoch_identifier, parse_nwb_filename
+from .utils import get_epoch_info
 
 REGISTER_PATH = Path(__file__).with_name("epoch_register.csv")
 """The committed register, one row per (nwb_file_name, epoch)."""

@@ -25,8 +25,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from continuum_swr_replay.data_loaders.spikes import filter_spike_times, get_hpc_marks
-from continuum_swr_replay.data_loaders.utils import EpochKey
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import EpochKey
 from continuum_swr_replay.paths import MEMORYLESS_ROOT
 from continuum_swr_replay.tables.io import write_atomically
 

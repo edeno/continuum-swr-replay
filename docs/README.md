@@ -233,6 +233,13 @@ Names that left a module that still exists:
 - `COLORS` and `CONTFRAG_COLORS`: from `parameters.py` to `visualization/palettes.py`.
 - `kay_version_check`: from `swr_inventories.py` (now
   `analysis/hippocampus/swr_detectors.py`) to `analysis/inventory_comparison/kay_version.py`.
+- `parse_nwb_filename`, `parse_epoch_identifier`, `format_epoch_identifier`, `EpochKey`,
+  `DEFAULT_SWR_DEFINITION`, `DEFAULT_TRAINING_TYPE` and `OTHER_RIPPLE_DETECTORS`: from
+  `data_loaders/utils.py` to `decoding/identifiers.py`, which also took `decode_identifier`
+  from `decoding/files.py` and `TrainingType` from `parameters.py` (2026-10-25).
+- `DETECTOR_CONFIG` and `CONTFRAG_DETECTOR_CONFIG` (class names as strings) left
+  `parameters.py`; `decoding/config.py`'s `nonlocal_detector_classes()` and
+  `contfrag_classifier_classes()` return the classes themselves (2026-10-25).
 
 Renamed functions: `inventory_comparison.adapters.swr_inventory` is now
 `swr_detector_inventory` (it reads any one of the four SWR detectors' inventories).

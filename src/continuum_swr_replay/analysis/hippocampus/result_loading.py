@@ -35,8 +35,13 @@ import xarray as xr
 from non_local_detector import NonLocalClusterlessDetector
 from non_local_detector.environment import Environment
 
-from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
-from continuum_swr_replay.decoding.files import decode_identifier, decode_paths
+from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import (
+    DEFAULT_SWR_DEFINITION,
+    DEFAULT_TRAINING_TYPE,
+    decode_identifier,
+    format_epoch_identifier,
+)
 from continuum_swr_replay.decoding.results import open_results
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
@@ -47,8 +52,8 @@ def load_results(
     decoding_brain_area: str = "HPC",
     load_detector: bool = True,
     non_stationary: bool = False,
-    ripple_detector_name: str = "Kay",
-    training_type: str = "no_ripple",
+    ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
+    training_type: str = DEFAULT_TRAINING_TYPE,
     root: Path = PROCESSED_DATA_DIR,
 ) -> tuple[xr.Dataset, NonLocalClusterlessDetector | None, Environment | None]:
     """Load saved decoding results and detector model.

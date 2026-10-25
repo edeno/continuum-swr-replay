@@ -99,7 +99,7 @@ from continuum_swr_replay.analysis.events.swr_source import (
     SwrSourceError,
     swr_epoch_id_of_session,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.intervals import as_frame, interval_mask
 from continuum_swr_replay.tables.io import SWR_SOURCE_ATTR, publish_canonical
 from continuum_swr_replay.tables.session_keys import (

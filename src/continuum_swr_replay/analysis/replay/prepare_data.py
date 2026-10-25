@@ -74,9 +74,9 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.trials import (
     validate_port_experience_pump_audit,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.paths import (
     REPLAY_CONTENT_DIR,

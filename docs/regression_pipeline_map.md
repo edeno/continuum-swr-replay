@@ -950,7 +950,13 @@ Sidecar records tying a fitted artifact to the tables it was fit on.
 
 The one naming rule for a decode's files.
 
-`non_local_threshold_percent`, `data_over_time_suffix`, `decode_identifier`, `DecodePaths`, `decode_paths`, `results_exist`
+`non_local_threshold_percent`, `data_over_time_suffix`, `DecodePaths`, `decode_paths`, `results_exist`
+
+### `src/continuum_swr_replay/decoding/identifiers.py`
+
+The epoch identifier: how a decode is named, built and read back.
+
+`TrainingType`, `parse_nwb_filename`, `EpochKey`, `format_epoch_identifier`, `decode_identifier`, `parse_epoch_identifier`
 
 ### `src/continuum_swr_replay/decoding/results.py`
 

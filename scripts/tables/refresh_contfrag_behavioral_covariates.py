@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.replay.table_contracts import (
     validate_event_patch_table,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
-from continuum_swr_replay.data_loaders.utils import (
+from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
 )

@@ -28,7 +28,7 @@ from continuum_swr_replay.analysis.events.artifact_intervals import (
 from continuum_swr_replay.analysis.events.artifact_masks import (
     artifact_intervals,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_attrs

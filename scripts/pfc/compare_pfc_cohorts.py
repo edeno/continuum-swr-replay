@@ -64,7 +64,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 # Sibling-script import: run as a script, only this file's directory is on

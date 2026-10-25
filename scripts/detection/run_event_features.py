@@ -177,7 +177,9 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
     REJECTION_DTYPES,
     rejection_stages,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
+    parse_epoch_identifier,
+)
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )

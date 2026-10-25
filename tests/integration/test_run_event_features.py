@@ -80,7 +80,7 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (
     REJECTION_COHORTS,
     REJECTION_DTYPES,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.runs.io import json_ready, sha256_file
 from continuum_swr_replay.tables.io import read_table, write_atomically, write_table
 from scripts.detection.run_memoryless_detection import run_one

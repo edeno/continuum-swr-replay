@@ -86,7 +86,9 @@ from continuum_swr_replay.analysis.inventory_comparison.selection import (  # no
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epoch_ids,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
+    parse_epoch_identifier,
+)
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     EVENT_FEATURES_ROOT,

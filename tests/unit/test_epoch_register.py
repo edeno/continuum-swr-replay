@@ -44,7 +44,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     register_reason,
     select_epochs,
 )
-from continuum_swr_replay.data_loaders.utils import (
+from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_epoch_identifier,
     parse_nwb_filename,

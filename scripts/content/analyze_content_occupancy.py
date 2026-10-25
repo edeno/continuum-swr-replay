@@ -68,10 +68,12 @@ from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E40
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier  # noqa: E402
 from continuum_swr_replay.decoding.files import (  # noqa: E402
     decode_paths,
     non_local_threshold_percent,
+)
+from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
+    parse_epoch_identifier,
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR  # noqa: E402
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path  # noqa: E402

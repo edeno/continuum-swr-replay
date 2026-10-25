@@ -157,8 +157,8 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
     get_overlap_times,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
     SAMPLING_FREQUENCY,

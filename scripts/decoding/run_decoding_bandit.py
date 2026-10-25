@@ -45,15 +45,20 @@ from typing import Any
 
 import pandas as pd
 import xarray as xr
-from non_local_detector import NonLocalClusterlessDetector, NonLocalSortedSpikesDetector
 
 from continuum_swr_replay.analysis.hippocampus import get_data_over_time, load_results
 from continuum_swr_replay.data_types import SessionData
-from continuum_swr_replay.decoding.config import NonLocalDecodingConfig
+from continuum_swr_replay.decoding.config import (
+    NonLocalDecodingConfig,
+    nonlocal_detector_classes,
+)
+from continuum_swr_replay.decoding.identifiers import (
+    DEFAULT_SWR_DEFINITION,
+    DEFAULT_TRAINING_TYPE,
+)
 from continuum_swr_replay.decoding.transitions import nonlocal_transition_settings
 from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD,
-    DETECTOR_CONFIG,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
@@ -69,11 +74,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.decoding import _decode_runner  # noqa: E402
 
 warnings.filterwarnings("ignore")
-
-_DETECTOR_CLASSES_BY_NAME = {
-    cls.__name__: cls
-    for cls in (NonLocalClusterlessDetector, NonLocalSortedSpikesDetector)
-}
 
 
 def nonlocal_detector_kwargs(config: NonLocalDecodingConfig) -> dict[str, Any]:
@@ -121,10 +121,7 @@ def generate_figurl(
 
 
 RUNNER = _decode_runner.DecodeRunner(
-    detector_classes={
-        brain_area: (_DETECTOR_CLASSES_BY_NAME[class_name], param_type)
-        for brain_area, (class_name, param_type) in DETECTOR_CONFIG.items()
-    },
+    detector_classes=nonlocal_detector_classes(),
     config_class=NonLocalDecodingConfig,
     detector_kwargs=nonlocal_detector_kwargs,
     aggregate=get_data_over_time,
@@ -146,10 +143,10 @@ def run_decode(
     log_directory: str = "",
     overwrite: bool = False,
     create_figurl: bool = False,
-    training_type: str = "no_ripple",
+    training_type: str = DEFAULT_TRAINING_TYPE,
     non_stationary: bool = False,
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
-    ripple_detector_name: str = "Kay",
+    ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     brain_area: str = "HPC",
     save_dir: Path = PROCESSED_DATA_DIR,
     release_nwb: bool = False,

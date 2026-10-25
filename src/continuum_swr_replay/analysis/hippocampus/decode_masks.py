@@ -23,8 +23,8 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.events import swr_source
 from continuum_swr_replay.analysis.events.artifact_masks import PADDING_S
+from continuum_swr_replay.decoding.identifiers import TrainingType
 from continuum_swr_replay.intervals import interval_mask
-from continuum_swr_replay.parameters import TrainingType
 
 
 def require_hpc_decode_sources() -> None:

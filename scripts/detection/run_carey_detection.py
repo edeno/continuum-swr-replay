@@ -110,7 +110,7 @@ from continuum_swr_replay.data_loaders.lfp import get_ripple_band_inputs
 from continuum_swr_replay.data_loaders.position import (
     get_epoch_position_info,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import (
     interval_mask,
     masked_seconds,

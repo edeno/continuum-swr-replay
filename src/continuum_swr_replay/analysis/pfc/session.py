@@ -54,7 +54,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     get_frac_explained_deviance,
     get_frac_null_deviance,
 )
-from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
     interval_mask,

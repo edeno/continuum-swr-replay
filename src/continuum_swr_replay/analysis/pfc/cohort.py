@@ -19,7 +19,7 @@ from typing import Any
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import parquet_path, read_table

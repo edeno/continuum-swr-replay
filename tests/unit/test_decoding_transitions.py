@@ -5,7 +5,8 @@ which changed after April (+32 % non-local events on identical inputs).
 ``decoding.transitions`` now holds every value: setting P30-B for the NonLocal
 detector (decision R10, ``docs/design/2026-10-04-decoder-transition-prior.md``)
 and, for the ContFrag classifier, the values C0 constructed. C0 is commit
-``de15650``, the decode code just before this pin.
+``de15650``, the decode code just before this pin. The last tests pin which
+class decodes each brain area (``decoding.config``).
 
 Offline: both decoder scripts import ``bandit_task``, which imports Spyglass at
 import time, so they are imported with ``spyglass`` stubbed, as
@@ -22,6 +23,7 @@ import types
 from collections.abc import Iterator
 from typing import Any
 
+import non_local_detector
 import numpy as np
 import pandas as pd
 import pytest
@@ -36,7 +38,11 @@ from non_local_detector.discrete_state_transitions import (
 )
 
 from continuum_swr_replay.decoding import transitions
-from continuum_swr_replay.decoding.config import DecodingConfig
+from continuum_swr_replay.decoding.config import (
+    DecodingConfig,
+    contfrag_classifier_classes,
+    nonlocal_detector_classes,
+)
 from continuum_swr_replay.decoding.transitions import (
     contfrag_transition_settings,
     nonlocal_transition_settings,
@@ -381,3 +387,41 @@ def test_contfrag_settings_are_documented_values() -> None:
     assert set(settings) == PINNED_KEYS
     stay = settings["discrete_transition_type"].diagonal_values
     np.testing.assert_allclose(BIN_S / (1 - stay), [0.1, 0.1], rtol=1e-9)
+
+
+# --- Which class decodes each brain area -------------------------------------
+
+#: The class names and params types ``parameters.DETECTOR_CONFIG`` and
+#: ``CONTFRAG_DETECTOR_CONFIG`` held as strings before the classes moved to
+#: ``decoding.config``.
+_CLASS_NAMES = {
+    "bandit": {
+        "HPC": ("NonLocalClusterlessDetector", "clusterless"),
+        "mPFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
+        "OFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
+    },
+    "contfrag": {
+        "HPC": ("ContFragClusterlessClassifier", "clusterless"),
+        "mPFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
+        "OFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
+    },
+}
+
+
+@pytest.mark.parametrize(
+    ("decoder", "classes"),
+    [("bandit", nonlocal_detector_classes), ("contfrag", contfrag_classifier_classes)],
+)
+def test_each_decoder_decodes_each_brain_area_with_the_named_class(
+    decoders, decoder, classes
+) -> None:
+    """The runner's classes are ``decoding.config``'s, the library's own exports,
+    with the names and params types the string config gave."""
+    mapping = classes()
+
+    assert decoders[decoder].RUNNER.detector_classes == mapping
+    assert {
+        area: (cls.__name__, param_type) for area, (cls, param_type) in mapping.items()
+    } == _CLASS_NAMES[decoder]
+    for cls, _ in mapping.values():
+        assert getattr(non_local_detector, cls.__name__) is cls

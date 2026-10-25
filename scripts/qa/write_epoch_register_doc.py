@@ -38,7 +38,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     read_register,
     reason_status,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 REPO = Path(__file__).resolve().parents[2]
 DOC = REPO / "docs" / "epoch_register.md"

@@ -169,8 +169,8 @@ from continuum_swr_replay.analysis.inventory_comparison.swr_matrix import (
 from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epoch_ids,
 )
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
 from continuum_swr_replay.decoding.files import decode_paths
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.intervals import (
     contains,
     total_duration,

@@ -32,18 +32,11 @@ BLOCK_SIZE : int
 LOCAL_POSITION_STD : float
     Gaussian kernel standard deviation (2.5 cm) for the non-local detector's
     Local-state spatial representation. ``> 0`` gives a multi-bin Local state.
-DETECTOR_CONFIG : dict
-    Maps brain area names to detector class names and types.
 PROBABILITY_THRESHOLDS : list
     Probability thresholds for posterior analysis [0.50, 0.80, 0.95].
 DEFAULT_NON_LOCAL_THRESHOLD : float
     Default probability threshold (0.8) for classifying non-local events; the
     canonical decode's ``data_over_time`` file is named for it.
-
-Classes
--------
-TrainingType
-    Enum for training data selection strategies (ALL or NO_RIPPLE).
 
 Notes
 -----
@@ -55,19 +48,18 @@ See Also
 continuum_swr_replay.data_types : TypedDict definitions for data structures
 continuum_swr_replay.data_loaders.constants : Task-specific constants
 continuum_swr_replay.visualization.palettes : COLORS, the event-type colours
+continuum_swr_replay.decoding.config : the detector class decoding each brain area
+continuum_swr_replay.decoding.identifiers : TrainingType and the decode identifier
 
 Examples
 --------
->>> from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D, TrainingType
+>>> from continuum_swr_replay.parameters import PLACE_BIN_SIZE_1D
 >>> PLACE_BIN_SIZE_1D
 2.0
->>> TrainingType.NO_RIPPLE.value
-'no_ripple'
 
 """
 
 import os
-from enum import Enum
 from pathlib import Path
 from typing import Final
 
@@ -106,62 +98,10 @@ BLOCK_SIZE: Final[int] = 2**10  # GPU processing block size (1024)
 # (rather than single-bin) position representation in the non-local detector.
 LOCAL_POSITION_STD: Final[float] = 2.5
 
-# Detector configuration by brain area
-# Maps brain area to (detector_class_name, detector_type_string)
-# Actual detector classes must be imported from non_local_detector in analysis scripts
-DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
-    "HPC": ("NonLocalClusterlessDetector", "clusterless"),
-    "mPFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
-    "OFC": ("NonLocalSortedSpikesDetector", "sorted_spikes"),
-}
-
-# Continuous-Fragmented classifier configuration by brain area
-# 2-state model: [Continuous (RandomWalk), Fragmented (Uniform)]
-CONTFRAG_DETECTOR_CONFIG: Final[dict[str, tuple[str, str]]] = {
-    "HPC": ("ContFragClusterlessClassifier", "clusterless"),
-    "mPFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
-    "OFC": ("ContFragSortedSpikesClassifier", "sorted_spikes"),
-}
-
-
 PROBABILITY_THRESHOLDS: Final[list[float]] = [0.50, 0.80, 0.95]
 
 DEFAULT_NON_LOCAL_THRESHOLD: Final[float] = 0.8
 """Default probability threshold for classifying non-local events (0-1)."""
-
-
-class TrainingType(str, Enum):
-    """Types of training data selection for decoder.
-
-    Attributes
-    ----------
-    ALL : str
-        Use all time points for training (no exclusions)
-    NO_RIPPLE : str
-        Exclude ripple times from training data
-
-    Notes
-    -----
-    Inherits from str to allow direct string comparisons and JSON serialization.
-    Use .value to get the underlying string value.
-
-    Examples
-    --------
-    >>> TrainingType.ALL
-    <TrainingType.ALL: 'all'>
-    >>> TrainingType.ALL.value
-    'all'
-    >>> TrainingType.ALL == "all"
-    True
-
-    """
-
-    ALL = "all"
-    NO_RIPPLE = "no_ripple"
-
-    def __str__(self) -> str:
-        """Return string value for easy formatting."""
-        return self.value
 
 
 __all__ = [
@@ -186,8 +126,4 @@ __all__ = [
     "WAVEFORM_STD",
     "BLOCK_SIZE",
     "LOCAL_POSITION_STD",
-    "DETECTOR_CONFIG",
-    "CONTFRAG_DETECTOR_CONFIG",
-    # Enums
-    "TrainingType",
 ]

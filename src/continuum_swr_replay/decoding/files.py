@@ -5,9 +5,10 @@ A decode writes four files into its folder, each named
 in percent, or for none in a ContFrag decode), ``results.nc``, ``detector.pkl``
 and ``environment.pkl``. The decode runners write these names
 (``scripts/decoding/_decode_runner.py``) and every reader builds them through
-:func:`decode_paths`, so a reader names what was written. The identifier's run
-suffixes (ripple detector, non-stationary, training type) are appended by
-:func:`decode_identifier`, for the runners and ``load_results`` alike.
+:func:`decode_paths`, so a reader names what was written. The identifier itself,
+with its run suffixes (ripple detector, non-stationary, training type), is built
+and read back by ``decoding.identifiers``, for the runners and ``load_results``
+alike.
 
 A leaf module: it imports only the standard library and ``parameters``, so an
 offline table builder or figure that reads a decode folder does not pull in the
@@ -51,51 +52,6 @@ def data_over_time_suffix(
     if threshold_percent is None:
         return "_data_over_time.pkl"
     return f"_{threshold_percent}_data_over_time.pkl"
-
-
-def decode_identifier(
-    epoch_stem: str,
-    *,
-    ripple_detector_name: str = "Kay",
-    non_stationary: bool = False,
-    training_type: str = "no_ripple",
-) -> str:
-    """A decode's full identifier: `epoch_stem` and its run suffixes.
-
-    The suffixes follow in this order: ``_{ripple_detector_name}`` unless it is
-    ``"Kay"``, ``_non_stationary`` when `non_stationary`, and
-    ``_{training_type}`` unless it is ``"no_ripple"``. The canonical decode
-    (Kay, stationary, no_ripple) is `epoch_stem` alone.
-    ``data_loaders.utils.parse_epoch_identifier`` reads them back in the same
-    order. Only Kay is decodable today (``data_loaders.lfp`` refuses any other
-    ripple detector), so no decode currently writes the detector suffix.
-
-    Parameters
-    ----------
-    epoch_stem : str
-        Epoch identifier before the run suffixes, such as
-        ``"chimi20200212_02_r1_HPC"`` or ``"chimi20200212_02_r1_HPC_contfrag"``.
-    ripple_detector_name : str, optional
-        The SWR detector the decode's training mask used, by default ``"Kay"``.
-    non_stationary : bool, optional
-        Whether the decode used non-stationary discrete transitions.
-    training_type : str, optional
-        The decode's training regime, by default ``"no_ripple"``.
-
-    Returns
-    -------
-    str
-        The identifier every file of the decode is named for
-        (:func:`decode_paths`).
-    """
-    epoch_identifier = epoch_stem
-    if ripple_detector_name != "Kay":
-        epoch_identifier += f"_{ripple_detector_name}"
-    if non_stationary:
-        epoch_identifier += "_non_stationary"
-    if training_type != "no_ripple":
-        epoch_identifier += f"_{training_type}"
-    return epoch_identifier
 
 
 class DecodePaths(NamedTuple):

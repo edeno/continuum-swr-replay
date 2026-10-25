@@ -45,14 +45,18 @@ from continuum_swr_replay.data_loaders import (
     get_training_timepoints,
     load_data,
 )
-from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.data_types import SessionData
 from continuum_swr_replay.decoding.config import DecodingConfig
 from continuum_swr_replay.decoding.files import (
-    decode_identifier,
     decode_paths,
     non_local_threshold_percent,
     results_exist,
+)
+from continuum_swr_replay.decoding.identifiers import (
+    DEFAULT_SWR_DEFINITION,
+    DEFAULT_TRAINING_TYPE,
+    decode_identifier,
+    format_epoch_identifier,
 )
 from continuum_swr_replay.decoding.transitions import NON_STATIONARY_REFUSAL
 from continuum_swr_replay.parameters import (
@@ -349,9 +353,9 @@ def run_decode(
     epoch_name: str,
     log_directory: str = "",
     overwrite: bool = False,
-    training_type: str = "no_ripple",
+    training_type: str = DEFAULT_TRAINING_TYPE,
     non_stationary: bool = False,
-    ripple_detector_name: str = "Kay",
+    ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     brain_area: str = "HPC",
     save_dir: Path = PROCESSED_DATA_DIR,
     release_nwb: bool = False,

@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
 )
 from continuum_swr_replay.data_loaders.constants import NWB_FILES
 from continuum_swr_replay.data_loaders.epoch_register import read_register
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import read_table, write_table
 from tests.unit._swr_inventory_fixtures import RUN_ID, write_swr_inventory

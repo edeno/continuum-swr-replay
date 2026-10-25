@@ -42,7 +42,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.likelihood im
     ENCODING_KEY,
 )
 from continuum_swr_replay.data_loaders import spikes
-from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier
+from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier
 from continuum_swr_replay.parameters import ROOT_DIR
 from continuum_swr_replay.runs import batch
 from continuum_swr_replay.runs.provenance import provenance_record

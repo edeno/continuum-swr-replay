@@ -86,11 +86,11 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_decode_files,
     analysed_epoch_ids,
 )
-from continuum_swr_replay.data_loaders.utils import (
+from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
+from continuum_swr_replay.decoding.identifiers import (
     format_epoch_identifier,
     parse_nwb_filename,
 )
-from continuum_swr_replay.decoding.files import data_over_time_suffix, decode_paths
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
     TWO_COLUMN,

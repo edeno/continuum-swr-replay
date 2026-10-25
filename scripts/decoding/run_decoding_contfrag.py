@@ -36,21 +36,20 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
-from non_local_detector import (
-    ContFragClusterlessClassifier,
-    ContFragSortedSpikesClassifier,
-)
-
 from continuum_swr_replay.analysis.contfrag import (
     get_contfrag_data_over_time,
     load_contfrag_results,
 )
-from continuum_swr_replay.decoding.config import DecodingConfig
-from continuum_swr_replay.decoding.transitions import contfrag_transition_settings
-from continuum_swr_replay.parameters import (
-    CONTFRAG_DETECTOR_CONFIG,
-    PROCESSED_DATA_DIR,
+from continuum_swr_replay.decoding.config import (
+    DecodingConfig,
+    contfrag_classifier_classes,
 )
+from continuum_swr_replay.decoding.identifiers import (
+    DEFAULT_SWR_DEFINITION,
+    DEFAULT_TRAINING_TYPE,
+)
+from continuum_swr_replay.decoding.transitions import contfrag_transition_settings
+from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.runs.batch import run_batch
 from continuum_swr_replay.runs.cli import add_common_args
 
@@ -60,11 +59,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.decoding import _decode_runner  # noqa: E402
 
 warnings.filterwarnings("ignore")
-
-_CLASSIFIER_CLASSES_BY_NAME = {
-    cls.__name__: cls
-    for cls in (ContFragClusterlessClassifier, ContFragSortedSpikesClassifier)
-}
 
 
 def contfrag_detector_kwargs(config: DecodingConfig) -> dict[str, Any]:
@@ -78,10 +72,7 @@ def contfrag_detector_kwargs(config: DecodingConfig) -> dict[str, Any]:
 
 
 RUNNER = _decode_runner.DecodeRunner(
-    detector_classes={
-        brain_area: (_CLASSIFIER_CLASSES_BY_NAME[class_name], param_type)
-        for brain_area, (class_name, param_type) in CONTFRAG_DETECTOR_CONFIG.items()
-    },
+    detector_classes=contfrag_classifier_classes(),
     config_class=DecodingConfig,
     detector_kwargs=contfrag_detector_kwargs,
     aggregate=get_contfrag_data_over_time,
@@ -103,9 +94,9 @@ def run_decode(
     epoch_name: str,
     log_directory: str = "",
     overwrite: bool = False,
-    training_type: str = "no_ripple",
+    training_type: str = DEFAULT_TRAINING_TYPE,
     non_stationary: bool = False,
-    ripple_detector_name: str = "Kay",
+    ripple_detector_name: str = DEFAULT_SWR_DEFINITION,
     brain_area: str = "HPC",
     save_dir: Path = PROCESSED_DATA_DIR,
     release_nwb: bool = False,

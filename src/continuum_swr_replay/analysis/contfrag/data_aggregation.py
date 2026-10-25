@@ -33,8 +33,8 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
     validate_results_position_time_alignment,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_decode_files
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
 from continuum_swr_replay.decoding.files import data_over_time_suffix
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 from ...data_types import SessionData
 from ..hippocampus.posterior_analysis import get_map_step_distance, get_posterior_stats

@@ -69,7 +69,7 @@ from continuum_swr_replay.analysis.events.eligibility import (
     event_drop_reasons,
     excluded_time,
 )
-from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
+from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import subtract_intervals
 from continuum_swr_replay.paths import ARTIFACT_INTERVALS_DIR, SWR_INVENTORY_ROOT
 from continuum_swr_replay.runs.io import sha256_file

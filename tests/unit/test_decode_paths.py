@@ -15,7 +15,6 @@ import pytest
 from continuum_swr_replay.decoding.files import (
     DEFAULT_NON_LOCAL_THRESHOLD_PERCENT,
     data_over_time_suffix,
-    decode_identifier,
     decode_paths,
     non_local_threshold_percent,
     results_exist,
@@ -83,24 +82,3 @@ def test_results_exist_reads_the_three_saved_files(tmp_path):
     assert results_exist(tmp_path, epoch_id, overwrite=False)
     assert not results_exist(tmp_path, epoch_id, overwrite=True)
     assert not paths.data_over_time.exists()
-
-
-@pytest.mark.parametrize(
-    ("kwargs", "expected"),
-    [
-        ({}, "chimi20200212_02_r1_HPC"),
-        ({"ripple_detector_name": "Karlsson"}, "chimi20200212_02_r1_HPC_Karlsson"),
-        ({"non_stationary": True}, "chimi20200212_02_r1_HPC_non_stationary"),
-        ({"training_type": "all"}, "chimi20200212_02_r1_HPC_all"),
-        (
-            {
-                "ripple_detector_name": "Karlsson",
-                "non_stationary": True,
-                "training_type": "all",
-            },
-            "chimi20200212_02_r1_HPC_Karlsson_non_stationary_all",
-        ),
-    ],
-)
-def test_decode_identifier_appends_each_non_default_setting_in_order(kwargs, expected):
-    assert decode_identifier("chimi20200212_02_r1_HPC", **kwargs) == expected

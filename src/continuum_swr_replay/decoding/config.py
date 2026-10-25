@@ -1,9 +1,13 @@
-"""The decoders' encoding-likelihood configuration.
+"""The decoders' encoding-likelihood configuration and detector classes.
 
 ``run_decoding_bandit.py`` (the NonLocal 4-state detector) decodes with
 :class:`NonLocalDecodingConfig` and ``run_decoding_contfrag.py`` (the ContFrag
 2-state classifier) with :class:`DecodingConfig`. Their values are
-``parameters``'.
+``parameters``'. Which class decodes each brain area is
+:func:`nonlocal_detector_classes` and :func:`contfrag_classifier_classes`.
+
+``non_local_detector`` (JAX) is imported only inside those two functions, so
+importing this module loads no JAX.
 """
 
 from dataclasses import dataclass
@@ -60,3 +64,55 @@ class NonLocalDecodingConfig(DecodingConfig):
     """
 
     local_position_std: float = LOCAL_POSITION_STD
+
+
+def nonlocal_detector_classes() -> dict[str, tuple[type, str]]:
+    """Brain area -> (NonLocal 4-state detector class, its algorithm-params type).
+
+    HPC decodes clusterless (spike waveform features), mPFC and OFC sorted
+    spikes. The params type names the detector's ``*_algorithm_params``
+    argument (``"clusterless"`` or ``"sorted_spikes"``).
+
+    Returns
+    -------
+    dict of str to (type, str)
+        ``{"HPC": (NonLocalClusterlessDetector, "clusterless"),
+        "mPFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
+        "OFC": (NonLocalSortedSpikesDetector, "sorted_spikes")}``.
+    """
+    from non_local_detector import (
+        NonLocalClusterlessDetector,
+        NonLocalSortedSpikesDetector,
+    )
+
+    return {
+        "HPC": (NonLocalClusterlessDetector, "clusterless"),
+        "mPFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
+        "OFC": (NonLocalSortedSpikesDetector, "sorted_spikes"),
+    }
+
+
+def contfrag_classifier_classes() -> dict[str, tuple[type, str]]:
+    """Brain area -> (ContFrag 2-state classifier class, its algorithm-params type).
+
+    The 2-state model is [Continuous (RandomWalk), Fragmented (Uniform)]. As in
+    :func:`nonlocal_detector_classes`, HPC is clusterless and mPFC and OFC are
+    sorted spikes.
+
+    Returns
+    -------
+    dict of str to (type, str)
+        ``{"HPC": (ContFragClusterlessClassifier, "clusterless"),
+        "mPFC": (ContFragSortedSpikesClassifier, "sorted_spikes"),
+        "OFC": (ContFragSortedSpikesClassifier, "sorted_spikes")}``.
+    """
+    from non_local_detector import (
+        ContFragClusterlessClassifier,
+        ContFragSortedSpikesClassifier,
+    )
+
+    return {
+        "HPC": (ContFragClusterlessClassifier, "clusterless"),
+        "mPFC": (ContFragSortedSpikesClassifier, "sorted_spikes"),
+        "OFC": (ContFragSortedSpikesClassifier, "sorted_spikes"),
+    }

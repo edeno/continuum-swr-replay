@@ -101,7 +101,7 @@ _LAZY_IMPORTS: list[str] = [
     "from continuum_swr_replay.data_loaders.events import convert_dio_events_to_start_stop_times",
     "from continuum_swr_replay.data_loaders.position import get_interpolated_position_info",
     # The one epoch-identifier parser, read by offline decode-file readers.
-    "from continuum_swr_replay.data_loaders.utils import parse_epoch_identifier",
+    "from continuum_swr_replay.decoding.identifiers import parse_epoch_identifier",
     # The one decode-file naming rule, read by the same offline readers.
     "from continuum_swr_replay.decoding.files import decode_paths",
     # ``analysis/*`` leaf modules. The hippocampus leaves used to drag

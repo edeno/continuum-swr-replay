@@ -180,7 +180,7 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import git_hash
 from continuum_swr_replay.data_loaders.epoch_register import epochs_to_run
-from continuum_swr_replay.data_loaders.utils import (
+from continuum_swr_replay.decoding.identifiers import (
     EpochKey,
     parse_epoch_identifier,
     parse_nwb_filename,
