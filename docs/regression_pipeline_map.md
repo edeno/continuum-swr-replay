@@ -640,13 +640,13 @@ Across-session and across-animal summaries, contrasts and model comparison over 
 
 Per-model cohort / drop-profile audit records.
 
-`cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
+`is_qvals_gap_column`, `cohort_record`, `classify_drops`, `event_drop_buckets`, `stop_own_missing`, `drop_profile`, `escape_note_field`, `estimator_skip_note`, `records_from_common_cohort_provenance`, `write_cohort_audit`, `term_diagnostics`
 
 ### `src/continuum_swr_replay/analysis/replay/contrast_aggregation.py`
 
 Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
-`load_per_sd_scale`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
+`load_per_sd_scale`, `load_fit_time_sd_reference`, `std_factor`, `sd_covariate`, `separated_for_term`, `unidentified_for_term`, `TermSessionGate`, `gate_term_sessions`, `session_se`, `typical_session_se`, `pct_significant_sessions`, `aggregate_contrast`, `specs_from_ladder`, `select_outcome_stratum`, `prepare_cohorts`, `assemble_arm`, `assemble_patch`, `prepare_session`
 
 ### `src/continuum_swr_replay/analysis/replay/learning.py`
 
