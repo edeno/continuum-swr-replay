@@ -336,7 +336,8 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     """Event-grain cohort record. The per-session ``dropna`` over PREDICTORS silently
     removed the qvals-tail events (qvals-derived predictors NaN on the left join); this
     attributes them to ``n_drop_qvals_gap`` (mechanism B), the other predictor/response
-    NaNs to own, and the <30-event session gate to excluded."""
+    NaNs to own, and the <30-event session gate to excluded. ``n_modeled`` is the
+    fitter's own count, the sum of ``coefs["n_events"]``."""
     n_in = len(df)
     # Raises if the timing columns are absent, so ``event_start_s`` below
     # needs no membership guard: reaching this point means it exists.
@@ -360,11 +361,9 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     )
     omask = pd.Series(omask, index=df.index) & ~qmask
     complete = ~(qmask | omask)
-    post_outcome = complete & pd.Series(selected, index=df.index)
-    valid = df[post_outcome]
     fit_keys = {tuple(r) for r in coefs[SC].to_numpy()} if len(coefs) else set()
-    vbs = valid.groupby(SC, sort=False).size()
-    n_modeled = int(sum(int(vbs.get(k, 0)) for k in fit_keys))
+    # The fitter reports how many events each fitted session kept.
+    n_modeled = int(coefs["n_events"].sum()) if len(coefs) else 0
     n_qvals, n_own = int(qmask.sum()), int(omask.sum())
     records = [
         cohort_record(

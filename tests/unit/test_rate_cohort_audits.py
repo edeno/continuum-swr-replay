@@ -205,10 +205,11 @@ def test_swr_power_records_split_qvals_and_own():
     )
     df.loc[0:9, "reward_belief_mean_chosen_arm_preoutcome"] = np.nan
     df.loc[100:104, "known_reward_outcome_lag_1"] = np.nan  # 5 own-predictor NaN -> own
+    # The events each session keeps: 100 less its 10 qvals / 5 own NaN rows.
     coefs = pd.DataFrame(
         [
-            {"animal": "a", "session_date": 1, "epoch": "e", "n_events": 85},
-            {"animal": "b", "session_date": 1, "epoch": "e", "n_events": 90},
+            {"animal": "a", "session_date": 1, "epoch": "e", "n_events": 90},
+            {"animal": "b", "session_date": 1, "epoch": "e", "n_events": 95},
         ]
     )
     recs = mod._cohort_records(df, coefs)
@@ -217,6 +218,59 @@ def test_swr_power_records_split_qvals_and_own():
     assert r["n_drop_qvals_gap"] == 10
     assert r["n_drop_own_predictor_missing"] == 5
     assert r["n_in"] == n
+    assert r["n_modeled"] == 185
+    assert r["n_excluded_session"] == 0
+
+
+def test_swr_power_n_modeled_is_the_fitters_count():
+    """``n_modeled`` read from the fit equals the old recount of kept events.
+
+    The record used to recount the fitted sessions' complete, post-outcome,
+    outcome-balanced events; it now sums the fitter's ``n_events``. The frame
+    exercises every way an event or session leaves the fit: qvals and own NaN,
+    a pre-outcome event, a session under 30 events, and a session left with
+    one outcome.
+    """
+    from scripts.coupling import fit_swr_power_model as mod
+
+    rng = np.random.default_rng(3)
+    sizes = {"a": 60, "b": 50, "c": 20, "d": 40}
+    n = sum(sizes.values())
+    df = pd.DataFrame(
+        {
+            "animal": np.repeat(list(sizes), list(sizes.values())),
+            "session_date": 1,
+            "epoch": "e",
+            **{c: rng.normal(size=n) for c in mod.PREDICTORS},
+            mod.POWER_COL: rng.normal(size=n),
+            "event_start_s": 10.0,
+            "outcome_known_time": 5.0,
+            "trial_reward": np.tile([0.0, 1.0], n // 2),
+        }
+    )
+    df.loc[0:4, "reward_belief_mean_chosen_arm_preoutcome"] = np.nan  # qvals gap
+    df.loc[60:62, "known_reward_outcome_lag_1"] = np.nan  # own
+    df.loc[63:66, "event_start_s"] = 1.0  # pre-outcome
+    # Session d keeps only rewarded events: unbalanced, so not fit.
+    d_rows = df.index[df.animal == "d"]
+    df.loc[d_rows[df.loc[d_rows, "trial_reward"] == 0.0], "event_start_s"] = 1.0
+
+    coefs = mod.fit_power_model(df)
+    assert set(coefs.animal) == {"a", "b"}  # c: < 30 events; d: one outcome
+
+    # The old recount, kept here as the reference.
+    _, _, selected, _ = mod._balanced_post_outcome_selection(df)
+    qp = [c for c in mod._QVALS_PREDICTORS if c in df.columns]
+    op = [c for c in (*mod.PREDICTORS, mod.POWER_COL, "event_start_s") if c not in qp]
+    complete = np.isfinite(df[qp + op].to_numpy(dtype=float)).all(axis=1)
+    kept = df[complete & selected].groupby(SC, sort=False).size()
+    fit_keys = {tuple(r) for r in coefs[SC].to_numpy()}
+    old_n_modeled = int(sum(int(kept.get(k, 0)) for k in fit_keys))
+
+    rec = mod._cohort_records(df, coefs)[0]
+    assert rec["n_modeled"] == old_n_modeled == 55 + 43
+    assert _reconciles(rec)
+    assert mod._cohort_records(df, coefs.iloc[0:0])[0]["n_modeled"] == 0
 
 
 def test_swr_power_missing_timing_is_attributed_not_absorbed():
