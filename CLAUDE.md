@@ -250,14 +250,15 @@ gating and **must be re-derived** before being cited.
 
 The replay-content `build_event_table` in
 `analysis/replay/tables_event.py` builds on
-top of this. The classified columns are merged in on `event_id`; the
-classified pass's timing columns arrive renamed `label_event_start` /
-`_end` / `_duration` / `_midpoint_time`, are checked bit-for-bit against
-the builder pass's canonical `event_start_s` / `event_end_s` /
-`event_duration_s` / `event_midpoint_s`, and are then dropped — the shipped
-table carries only the `event_*_s` names. `label_event_*` survives solely
-in `covariate_registry.py`, as a legacy-spelling alias resolving to those
-same canonical columns.
+top of this. The classified columns are merged in on `event_id`
+(`_merge_classified_event_facts`). Event timing is derived once, by the
+classified pass: its `event_start` / `event_end` / `event_duration` /
+`event_midpoint_time` are renamed to the canonical `event_start_s` /
+`event_end_s` / `event_duration_s` / `event_midpoint_s` and merged in; the
+builder pass does not recompute them. The shipped table carries only the
+`event_*_s` names. The old `label_event_*` spellings survive solely in
+`tables/covariate_registry.py:LEGACY_COLUMN_NAMES`, the deny-list that
+`assert_canonical_vocabulary` uses to reject them.
 
 Changing the eligible cohort renumbers non-local labels, so `event_id`
 hashes shift. `event_table`, `event_arm_table`, `event_sequence_table`,

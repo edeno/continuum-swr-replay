@@ -1,12 +1,21 @@
-# ruff: noqa  -- vendored verbatim from Alison's rl_helpers.py; do not relint/reformat
-"""Beta-Bernoulli decision-variable covariates — VENDORED VERBATIM from
+# ruff: noqa  -- vendored from Alison's rl_helpers.py with six marked edits; do not relint/reformat
+"""Beta-Bernoulli decision-variable covariates — VENDORED from
 Alison Comrie's `rl_helpers.py` (LorenFrankLab/SpatialBanditTask analysis code,
 /home/alison/Src/alison_spyglass/rl_helpers.py).
 
-Copied unchanged via AST extraction (no edits) because the source module imports
-her julia/spyglass stack at import time and cannot be loaded here. These are the
-exact functions she used to build the big_df DV columns; we run them on our
-complete per-stop DataJoint pull and cross-check against her big_df output.
+Copied via AST extraction because the source module imports her julia/spyglass
+stack at import time and cannot be loaded here. These are the functions she used
+to build the big_df DV columns; we run them on our complete per-stop DataJoint
+pull and cross-check against her big_df output.
+
+The copy is verbatim except for six edits, each marked inline, none of which
+changes a computed value:
+
+- ``df = df.copy()`` perf shims (defragment before a ``.loc`` loop), added at
+  two points in ``add_ak_style_cols_to_RL_output`` and one each in
+  ``add_dvs_beta``, ``add_switch_advantage_beta`` and ``add_stem_q_dvs_beta``;
+- ``group_keys=False`` on the ``groupby(...).apply(set_nan_at_max2)`` call in
+  ``add_periswitch_cols`` (a pandas-compat shim).
 
 Entry point: make_full_beta_bernoulli_dv_df(df) -> df + DV columns
 (switch_advantage_mu_preoutcome_sess = ΔV; *_mu_update_abs_postoutcome_sess = U;

@@ -1052,38 +1052,35 @@ def simulate_full_pipeline(
     track_graph=None,
     predictors: Sequence[str] | None = None,
     seed: int | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
-    """Run synthetic data through the *real* transformation chain.
+) -> tuple[pd.DataFrame, dict]:
+    """Run synthetic per-timebin MAP estimates through the production arm counter.
 
-    Generates a per-timebin synthetic ``data_over_time``-shaped frame with
-    all columns the production pipeline reads, then routes it through the
-    actual ``map_estimate_to_arm`` → ``compute_arm_counts`` →
-    ``collapse_to_events`` → ``make_long_format_arm`` → ``add_event_uid``
-    sequence used in ``data_preparation.py``. This is the only simulator
-    that exercises every transformation step, so any bug in column joins,
-    event-onset semantics, junction-bin handling, or wide↔long melts will
-    surface here as biased recovery.
+    Generates synthetic per-timebin MAP linear positions, maps each to an arm
+    with the production :func:`~.spatial_mapping.map_estimate_to_arm`, drops
+    junction bins (NaN arm) the way ``build_event_arm_table`` does, and counts
+    per (event, arm) with the production :func:`~.summaries.arm_count_hard`
+    (``threshold=0.0``, as ``build_event_arm_table`` calls it). Those two
+    functions are the only production code it exercises. The long-format
+    (event, arm) frame is assembled here, with the known design indicators,
+    rather than by ``build_event_arm_table``: that builder needs an
+    ``event_table`` and a decode-shaped ``dot`` frame that this simulator does
+    not fabricate. Biased recovery here therefore points at MAP-to-arm mapping,
+    junction-bin handling or hard counting, not at the builder's joins.
 
     Generative model: per event, an animal is "stopped" at a leaf well
-    chosen uniformly at random (this becomes ``track_segment_id``,
-    matching real-data semantics where the modal arm equals the well).
-    The previous trial's from_well, the next trial's to_well, and the
-    last_rewarded_well are independently drawn from leaf wells (allowing
-    coincidence). For each timebin within the event, a chosen arm is
-    sampled from softmax(X β_true), and a MAP linear position is drawn
-    from N(arm midpoint, σ) before being mapped back to an arm by the
-    production ``map_estimate_to_arm``.
+    chosen uniformly at random (the current arm). The previous trial's
+    from_well, the next trial's to_well, and the last_rewarded_well are
+    independently drawn from leaf wells (allowing coincidence). For each
+    timebin within the event, a chosen arm is sampled from softmax(X β_true),
+    and a MAP linear position is drawn from N(arm midpoint, σ) before being
+    mapped back to an arm by ``map_estimate_to_arm``.
 
     .. note::
-       Trial-context columns (``prev_trial_from_well``, ``next_trial_to_well``,
-       ``last_rewarded_well``) are injected directly per timebin rather than
-       derived from a synthetic ``trials`` frame via ``add_trial_context``.
-       That means this simulator validates the count-aggregation chain
-       (``compute_arm_counts`` → ``collapse_to_events`` → ``make_long_format_arm``
-       → ``add_event_uid``) but does **not** exercise the trial-context
-       computation in ``add_trial_context`` (the ``searchsorted`` "in-progress
-       trip" semantics). A dedicated trial-context simulator would be a
-       useful complement.
+       The binary indicators come from the drawn wells directly rather than
+       from a synthetic ``trials`` frame via ``add_trial_context``, so the
+       trial-context computation (the ``searchsorted`` "in-progress trip"
+       semantics) is not exercised. A dedicated trial-context simulator would
+       be a useful complement.
 
     Parameters mirror ``simulate_posterior_bumps``; ``track_graph`` defaults
     to the real bandit topology via ``make_bandit_track_graph()``.
@@ -1091,11 +1088,10 @@ def simulate_full_pipeline(
     Returns
     -------
     long_count : pd.DataFrame
-        Output of ``make_long_format_arm`` with ``event_id``,
-        ``arm_count_hard``, and the binary indicator predictors. Ready to pass
-        to ``fit_conditional_poisson``.
-    events : pd.DataFrame
-        Output of ``collapse_to_events`` (one row per event, modal arm).
+        One row per (event, arm), nine per event, with ``event_id``,
+        ``arm_id``, ``arm_count_hard`` and the binary indicator predictors;
+        events whose every timebin fell on a junction bin are dropped. Ready
+        to pass to ``fit_conditional_poisson``.
     diagnostics : dict
         ``fraction_on_chosen``, ``mean_arms_per_event`` (mean number of
         arms with arm_count > 0 — compare to real data to gauge the
@@ -1115,10 +1111,8 @@ def simulate_full_pipeline(
     next_well = rng.choice(leaf_wells, size=n_events)
     rewarded_well = rng.choice(leaf_wells, size=n_events)
 
-    # Build the design tensor consistent with the well draws so that the
-    # binary indicators *during the fit* match the trial-context columns
-    # *during collapse_to_events*. This is the contract the real pipeline
-    # relies on.
+    # Build the design tensor from the well draws; these indicators are both
+    # the generative design and the predictors written to ``long_count``.
     n_arms = len(ALL_ARMS)
     arm_grid = np.arange(n_arms)[None, :]
     feature_cols: dict[str, np.ndarray] = {
@@ -1218,19 +1212,9 @@ def simulate_full_pipeline(
 
     mean_arms_per_event = float((counts > 0).sum(axis=1).mean())
 
-    # Minimal events frame for backward compat with callers that
-    # inspect the second return value.
-    events = pd.DataFrame(
-        {
-            "non_local_event": ids_sorted,
-            "total_count": counts.sum(axis=1),
-        }
-    )
-    events = events[events["total_count"] > 0].copy()
-
     diagnostics = {
         "fraction_on_chosen": fraction_on_chosen,
         "mean_arms_per_event": mean_arms_per_event,
-        "n_events_used": int(len(events)),
+        "n_events_used": int((counts.sum(axis=1) > 0).sum()),
     }
-    return long_count, events, diagnostics
+    return long_count, diagnostics

@@ -18,7 +18,7 @@ Event, arm, patch, stop and time-bin tables built from the decoded session, plus
 
 ### `src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py`
 
-Beta-Bernoulli decision-variable covariates — VENDORED VERBATIM from Alison Comrie's `rl_helpers.py` (LorenFrankLab/SpatialBanditTask analysis code, /home/alison/Src/alison_spyglass/rl_helpers.py).
+Beta-Bernoulli decision-variable covariates — VENDORED from Alison Comrie's `rl_helpers.py` (LorenFrankLab/SpatialBanditTask analysis code, /home/alison/Src/alison_spyglass/rl_helpers.py).
 
 `set_nan_at_max2`, `add_ak_style_cols_to_RL_output`, `add_periswitch_cols`, `add_dvs_beta`, `add_switch_advantage_beta`, `add_stem_q_dvs_beta`, `make_full_beta_bernoulli_dv_df`
 

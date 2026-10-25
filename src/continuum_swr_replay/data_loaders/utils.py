@@ -408,9 +408,10 @@ def get_epoch_info() -> pd.DataFrame:
 def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
     """Create event labels for each time point.
 
-    Uses vectorized binary search (np.searchsorted) for efficient labeling
-    of large datasets. Complexity is O(n_events * log(n_times)) instead of
-    O(n_events * n_times) with explicit boolean masking.
+    Loops over events; each event's index range is found by binary search
+    (``np.searchsorted``) and labelled with one slice assignment, so the cost
+    is O(n_events * log(n_times)) searches plus one write per labelled time
+    point, rather than an O(n_times) boolean mask per event.
 
     Parameters
     ----------
@@ -435,7 +436,7 @@ def get_labels(times: pd.DataFrame, time: pd.Index) -> pd.DataFrame:
 
     time_array = time.to_numpy()
 
-    # Vectorized labeling using binary search (O(n_events * log(n_times)))
+    # Per-event binary search for the index range, then one slice write.
     for i, (start, end) in enumerate(
         zip(times["start_time"], times["end_time"], strict=True), start=1
     ):

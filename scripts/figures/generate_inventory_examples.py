@@ -179,8 +179,8 @@ def use_memoryless_device() -> None:
 
     Near-tied window centers are broken by the device's rounding, so a CPU
     moves more of them than the check allows. The GPU is set over any
-    ``JAX_PLATFORMS``, since modules imported here pin the CPU when imported
-    (``scripts/detection/run_state_evidence.py``); with no GPU, JAX raises. Call
+    ``JAX_PLATFORMS``, since a module imported here pins the CPU when imported
+    (``scripts/detection/run_inventory_comparison.py``); with no GPU, JAX raises. Call
     before JAX starts its backend, which reads ``XLA_FLAGS`` once.
     """
     os.environ["XLA_FLAGS"] = memoryless_runner.xla_flags()

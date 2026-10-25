@@ -276,7 +276,7 @@ class TestSpatialSmearingAttenuates:
         assert fit_smeared["coef_is_current_arm"] < beta["is_current_arm"]
 
 
-# ── Full-pipeline tests: real compute_arm_count_hards → make_long_format_arm chain ──
+# ── Full-pipeline tests: production map_estimate_to_arm → arm_count_hard ──
 
 
 class TestFullPipelineRecovery:
@@ -284,7 +284,7 @@ class TestFullPipelineRecovery:
 
     def test_pipeline_produces_expected_shape(self):
         beta = {"is_current_arm": 0.5}
-        long_df, events, diag = simulate_full_pipeline(
+        long_df, diag = simulate_full_pipeline(
             beta, n_events=50, L_e=20, sigma=0.0, seed=1
         )
         assert diag["n_events_used"] > 40
@@ -298,7 +298,7 @@ class TestFullPipelineRecovery:
         """If replays preferentially visit the previously-departed arm, the
         full pipeline should recover a positive is_prev coefficient."""
         beta = {"is_current_arm": 0.0, "is_prev_arm": 0.8, "is_next_arm": 0.0}
-        long_df, _, _ = simulate_full_pipeline(
+        long_df, _ = simulate_full_pipeline(
             beta, n_events=400, L_e=25, sigma=0.0, seed=11
         )
         fit = fit_conditional_poisson(long_df, predictors=list(beta))
@@ -312,7 +312,7 @@ class TestFullPipelineRecovery:
     def test_recovers_future_arm_influence(self):
         """Symmetric: prospective replay (toward next arm) should recover."""
         beta = {"is_current_arm": 0.0, "is_prev_arm": 0.0, "is_next_arm": 0.8}
-        long_df, _, _ = simulate_full_pipeline(
+        long_df, _ = simulate_full_pipeline(
             beta, n_events=400, L_e=25, sigma=0.0, seed=12
         )
         fit = fit_conditional_poisson(long_df, predictors=list(beta))
@@ -330,7 +330,7 @@ class TestFullPipelineRecovery:
         distribution even when each coefficient is well-estimated.
         """
         beta = {"is_current_arm": 0.3, "is_prev_arm": 0.9, "is_next_arm": 0.4}
-        long_df, _, _ = simulate_full_pipeline(
+        long_df, _ = simulate_full_pipeline(
             beta, n_events=600, L_e=30, sigma=0.0, seed=13
         )
         fit = fit_conditional_poisson(long_df, predictors=list(beta))

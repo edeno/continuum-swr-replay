@@ -8,7 +8,7 @@ keyed by `stop_id` (joins to `stop_table.parquet`).
   — run `uv run python scripts/behavior/build_qvals_table.py --write`.
 - **Output:** `Processed-Data/replay_content/qvals_table.parquet`
   (gitignored data artifact; regenerate from the script).
-- **Decision-variable functions:** vendored verbatim from Alison Comrie's
+- **Decision-variable functions:** vendored, with six marked value-neutral edits, from Alison Comrie's
   `rl_helpers.py` →
   [`src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py`](../src/continuum_swr_replay/analysis/behavior/_spatial_bandit_rl.py).
 - **Paper:** Comrie et al., *Hippocampal representations of alternative

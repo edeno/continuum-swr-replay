@@ -141,9 +141,9 @@ _EVENT_TABLE_BUILD_COLUMNS: tuple[str, ...] = (
     "n_unique_arms",
     "stop_idx",
     "stop_id",
-    # Compatibility timing aliases + SWR classification from
-    # build_classified_nonlocal_event_table. Atomic label validation makes
-    # these timings identical to event_start/end/duration/midpoint above.
+    # Canonical event timing + speed summaries + SWR classification, all from
+    # build_classified_nonlocal_event_table (its event_start/end/duration/
+    # midpoint_time renamed to the *_s names; see _merge_classified_event_facts).
     "event_start_s",
     "event_end_s",
     "event_duration_s",
