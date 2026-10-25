@@ -12,6 +12,8 @@ Brain Regions
 
 Functions
 ---------
+AreaNotRecordedError
+    Raised by the loaders when a session has no data for a brain area.
 detect_coincident_spikes
     Identify and remove artifact spikes that fire simultaneously across tetrodes.
 get_electrode_group_info
@@ -64,6 +66,16 @@ logger = logging.getLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
 warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
 warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
+
+
+class AreaNotRecordedError(ValueError):
+    """The session has no spike data for a brain area.
+
+    Raised by :func:`get_hpc_marks` and :func:`get_pfc_spike_times` where the
+    database shows the area is absent; :func:`get_spike_data` catches only this,
+    so any other error in loading a recorded area propagates. A ``ValueError``
+    subclass, so callers that caught ``ValueError`` before still catch it.
+    """
 
 
 def detect_coincident_spikes(
@@ -240,8 +252,8 @@ def _get_tetrode_sort_group_ids(
     )
     # Empty DataJoint fetch yields a DataFrame with no columns, so accessing
     # "sort_group_id" would raise KeyError. The caller (get_hpc_marks) treats
-    # an empty tetrode set as "no HPC" via ValueError, so return early here
-    # and let it raise the descriptive ValueError that get_spike_data catches.
+    # an empty tetrode set as "no HPC", so return early here and let it raise
+    # the AreaNotRecordedError that get_spike_data catches.
     if unit_mark_keys.empty:
         return set()
     sort_group_ids = unit_mark_keys["sort_group_id"].unique()
@@ -284,6 +296,11 @@ def get_hpc_marks(
         - spike_times: list of arrays with spike times per tetrode
         - spike_waveform_features: list of arrays with waveform features
 
+    Raises
+    ------
+    AreaNotRecordedError
+        The session has no tetrode clusterless marks.
+
     """
     from spyglass.decoding.v0.clusterless import UnitMarks
 
@@ -314,7 +331,9 @@ def get_hpc_marks(
     # Filter to tetrode sort groups only
     tetrode_sg_ids = _get_tetrode_sort_group_ids(nwb_file_name, restriction)
     if not tetrode_sg_ids:
-        raise ValueError(f"No tetrode sort groups found for {nwb_file_name!r}")
+        raise AreaNotRecordedError(
+            f"No tetrode sort groups found for {nwb_file_name!r}"
+        )
 
     tetrode_restriction = [
         {**restriction, "sort_group_id": sg_id} for sg_id in sorted(tetrode_sg_ids)
@@ -323,7 +342,7 @@ def get_hpc_marks(
     # Fetch data once with the correct parameter
     marks = (UnitMarks & tetrode_restriction).fetch_dataframe()
     if len(marks) == 0:
-        raise ValueError(
+        raise AreaNotRecordedError(
             f"No UnitMarks found for {nwb_file_name!r} with either "
             "'clusterless_fixed' or 'default_clusterless' sorter_params_name"
         )
@@ -361,6 +380,12 @@ def get_pfc_spike_times(
     list
         List of arrays with spike times per unit
 
+    Raises
+    ------
+    AreaNotRecordedError
+        The session has no curated sorting, or none of its sort groups
+        targets ``brain_area``.
+
     """
     from spyglass.spikesorting.v0 import CuratedSpikeSorting, SortGroup
 
@@ -375,7 +400,7 @@ def get_pfc_spike_times(
 
     curation_ids = (CuratedSpikeSorting & restriction).fetch("curation_id")
     if len(curation_ids) == 0:
-        raise ValueError(
+        raise AreaNotRecordedError(
             f"No CuratedSpikeSorting rows found for {nwb_file_name!r} "
             f"with brain_area={brain_area!r}"
         )
@@ -401,7 +426,7 @@ def get_pfc_spike_times(
     # Guard: DataJoint treats `table & []` as an unrestricted query (NOT empty),
     # so an empty keys list here would silently fetch the entire table.
     if not spikesorting_keys:
-        raise ValueError(
+        raise AreaNotRecordedError(
             f"No {brain_area} sort groups found for {nwb_file_name!r} after "
             "electrode-group filter"
         )
@@ -442,7 +467,7 @@ def get_spike_data(nwb_file_name: str) -> SpikeDataDict:
         spike_times["HPC"], spike_waveform_features["HPC"] = get_hpc_marks(
             nwb_file_name
         )
-    except ValueError as e:
+    except AreaNotRecordedError as e:
         logger.debug("No HPC data available for %s: %s", nwb_file_name, e)
 
     for brain_area in ["mPFC", "OFC"]:
@@ -450,7 +475,7 @@ def get_spike_data(nwb_file_name: str) -> SpikeDataDict:
             spike_times[brain_area] = get_pfc_spike_times(nwb_file_name, brain_area)
             if len(spike_times[brain_area]) < 1:
                 del spike_times[brain_area]
-        except ValueError as e:
+        except AreaNotRecordedError as e:
             logger.debug(
                 "No %s data available for %s: %s", brain_area, nwb_file_name, e
             )

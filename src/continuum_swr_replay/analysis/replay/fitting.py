@@ -28,6 +28,7 @@ from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 from ._fit_diagnostics import (
+    EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
@@ -963,8 +964,8 @@ def fit_conditional_poisson(
         diag = _compute_conditional_diagnostics(X, predictors)
         output.update(diag)
         _warn_on_collinear_design(diag, predictors)
-    except Exception as exc:
-        logger.debug("VIF/conditional diagnostics skipped: %s", exc)
+    except EXPECTED_FIT_ERRORS:
+        logger.warning("VIF/conditional diagnostics skipped", exc_info=True)
 
     return output
 
@@ -1305,7 +1306,7 @@ def fit_conditional_logit(
         with capture_fit_warnings() as caught:
             model = ConditionalLogit(y, X, groups=groups)
             result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
-    except Exception:
+    except EXPECTED_FIT_ERRORS:
         logger.warning(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True
         )
@@ -1452,7 +1453,8 @@ def _compute_conditional_diagnostics(
     for i, pred in enumerate(predictors):
         try:
             result[f"vif_{pred}"] = variance_inflation_factor(X_with_const, i + 1)
-        except Exception:
+        except EXPECTED_FIT_ERRORS:
+            logger.warning("VIF of %s not computed", pred, exc_info=True)
             result[f"vif_{pred}"] = np.nan
 
     return result

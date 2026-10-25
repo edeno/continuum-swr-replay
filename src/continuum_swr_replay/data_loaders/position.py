@@ -132,6 +132,43 @@ def get_interpolated_position_info(
     )
 
 
+def _track_graph_name(nwb_file_name: str, linearized_graph_names: list[str]) -> str:
+    """The track graph an interval's position is linearized on.
+
+    The linearization key leaves the track graph free, so an interval can be
+    linearized on several graphs: senor20201030_ 02_r1 has the session-named
+    graph and an unrelated "6 arm" graph.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name; its part before the first ``_`` names the session's graph.
+    linearized_graph_names : list of str
+        ``track_graph_name`` of every ``IntervalLinearizedPosition`` row of the
+        interval.
+
+    Returns
+    -------
+    str
+        The one linearized graph; otherwise the session-named graph, when there
+        is no linearization or it is among several.
+
+    Raises
+    ------
+    ValueError
+        Several linearized graphs, none of them the session-named graph.
+    """
+    session_graph_name = nwb_file_name.split("_")[0]
+    if len(linearized_graph_names) == 1:
+        return linearized_graph_names[0]
+    if not linearized_graph_names or session_graph_name in linearized_graph_names:
+        return session_graph_name
+    raise ValueError(
+        f"{nwb_file_name} is linearized on several track graphs "
+        f"{sorted(linearized_graph_names)}, none of them {session_graph_name!r}"
+    )
+
+
 def get_position_info(
     nwb_file_name: str, epoch_name: str, pos_name: str
 ) -> PositionInfoDict:
@@ -177,8 +214,11 @@ def get_position_info(
     then restricted to " noPrePostTrialTimes" intervals if available (excludes
     pre-trial and post-trial periods).
 
-    Track graph is loaded based on linearization parameters or inferred from
-    the animal name (first part of NWB filename).
+    Track graph is the one the interval was linearized on. With no
+    linearization, or with several of which one is the session-named graph
+    (first part of the NWB filename), the session-named graph is used; several
+    without it raise ``ValueError``, as do several DLC position entries for the
+    epoch.
 
     See Also
     --------
@@ -198,7 +238,6 @@ def get_position_info(
     # at import time. Keeping these inside the function lets pure
     # helpers (e.g. ``get_interpolated_position_info``) import cleanly
     # offline.
-    from datajoint import DataJointError
     from spyglass.common import IntervalList
     from spyglass.common.common_position import IntervalPositionInfo
     from spyglass.linearization.v0.main import (
@@ -220,12 +259,12 @@ def get_position_info(
         "linearization_param_name": "default",
     }
 
-    try:
-        track_graph_name = (IntervalLinearizedPosition() & linearization_key).fetch1(
-            "track_graph_name"
-        )
-    except DataJointError:
-        track_graph_name = nwb_file_name.split("_")[0]
+    track_graph_name = _track_graph_name(
+        nwb_file_name,
+        list(
+            (IntervalLinearizedPosition() & linearization_key).fetch("track_graph_name")
+        ),
+    )
 
     track_graph = (
         TrackGraph() & {"track_graph_name": track_graph_name}
@@ -236,21 +275,24 @@ def get_position_info(
     linear_edge_order = track_graph_params["linear_edge_order"]
     linear_edge_spacing = track_graph_params["linear_edge_spacing"]
 
-    try:
-        epoch = int(epoch_name.split("_")[0])
-        pos_merge_id = str(
-            (
-                PositionOutput().merge_restrict()
-                & {
-                    "nwb_file_name": nwb_file_name,
-                    "source": "DLCPosV1",
-                    "epoch": epoch,
-                }
-            ).fetch1("merge_id")
+    epoch = int(epoch_name.split("_")[0])
+    dlc_merge_ids = (
+        PositionOutput().merge_restrict()
+        & {
+            "nwb_file_name": nwb_file_name,
+            "source": "DLCPosV1",
+            "epoch": epoch,
+        }
+    ).fetch("merge_id")
+    if len(dlc_merge_ids) > 1:
+        raise ValueError(
+            f"{len(dlc_merge_ids)} DLCPosV1 position entries for {nwb_file_name} "
+            f"epoch {epoch}; expected at most one"
         )
+    if len(dlc_merge_ids) == 1:
         position_info = (
             (
-                (PositionOutput() & {"merge_id": pos_merge_id})
+                (PositionOutput() & {"merge_id": str(dlc_merge_ids[0])})
                 .fetch1_dataframe()
                 .dropna()
             )
@@ -258,20 +300,24 @@ def get_position_info(
             .add_prefix("head_")
         )
         time = (IntervalPositionInfo() & position_key).fetch1_dataframe().dropna().index
-
-    except DataJointError:
+    else:
         position_info = (
             (IntervalPositionInfo() & position_key).fetch1_dataframe().dropna()
         )
         time = position_info.index
-    try:
-        valid_interval_times = (
-            IntervalList
-            & {
-                "nwb_file_name": nwb_file_name,
-                "interval_list_name": epoch_name + " noPrePostTrialTimes",
-            }
-        ).fetch1("valid_times")
+
+    # nwb_file_name and interval_list_name are IntervalList's whole primary key,
+    # so this is zero rows or one.
+    valid_interval_key = {
+        "nwb_file_name": nwb_file_name,
+        "interval_list_name": epoch_name + " noPrePostTrialTimes",
+    }
+    if len(IntervalList & valid_interval_key) == 0:
+        logger.debug(
+            "No noPrePostTrialTimes interval for %s %s", nwb_file_name, epoch_name
+        )
+    else:
+        valid_interval_times = (IntervalList & valid_interval_key).fetch1("valid_times")
         # Slice both axes to the valid interval — position_info is the
         # raw DLC frame, ``time`` is the interpolation grid. They come
         # from independent Spyglass tables, so each must be trimmed
@@ -281,13 +327,6 @@ def get_position_info(
         t_start, t_end = valid_interval_times[0][0], valid_interval_times[-1][1]
         position_info = position_info.loc[t_start:t_end]
         time = time[(time >= t_start) & (time <= t_end)]
-    except DataJointError as e:
-        logger.debug(
-            "No noPrePostTrialTimes interval for %s %s: %s",
-            nwb_file_name,
-            epoch_name,
-            e,
-        )
 
     position_info = get_interpolated_position_info(
         position_info,

@@ -25,9 +25,26 @@ import warnings
 from collections.abc import Collection, Sequence
 
 import numpy as np
+from patsy import PatsyError
 from statsmodels.tools.sm_exceptions import (
     ConvergenceWarning,
+    PerfectSeparationError,
     PerfectSeparationWarning,
+)
+
+# Numerical failures we expect from a per-session fit/predict and treat as a
+# skipped cell (-> None): rank-deficient/ill-conditioned designs, spline knots
+# the held-out fold extrapolates past (patsy), perfect separation, optimizer
+# failures. Anything else (e.g. a NameError in a spec formula, an offset shape
+# mismatch) is a coding bug and is left to propagate rather than be swallowed as
+# "fit failed" for every session. Every fitter that skips a failed fit catches
+# exactly these.
+EXPECTED_FIT_ERRORS = (
+    np.linalg.LinAlgError,
+    ValueError,
+    RuntimeError,
+    PerfectSeparationError,
+    PatsyError,
 )
 
 # Fallback threshold, used only when the caller cannot supply predictor scales. It

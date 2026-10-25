@@ -28,6 +28,7 @@ from continuum_swr_replay.data_loaders.constants import WELL_ARMS
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 from ._fit_diagnostics import (
+    EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
@@ -530,8 +531,8 @@ def fit_choice_model(
         with capture_fit_warnings() as caught:
             model = ConditionalLogit(y, X, groups=groups)
             result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
-    except Exception:
-        logger.warning("ConditionalLogit failed for %s", predictors)
+    except EXPECTED_FIT_ERRORS:
+        logger.warning("ConditionalLogit failed for %s", predictors, exc_info=True)
         return None
     predictor_sd = X.std(axis=0)
     status = fit_status(

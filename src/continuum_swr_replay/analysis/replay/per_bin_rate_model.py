@@ -40,10 +40,9 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-from patsy import PatsyError
-from statsmodels.tools.sm_exceptions import PerfectSeparationError
 
 from ._fit_diagnostics import (
+    EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
@@ -57,20 +56,6 @@ from .model_specs import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Numerical failures we expect from a per-session GLM fit/predict and treat as a
-# skipped cell (-> None): rank-deficient/ill-conditioned designs, spline knots
-# the held-out fold extrapolates past (patsy), perfect separation, optimizer
-# failures. Anything else (e.g. a NameError in a spec formula, an offset shape
-# mismatch) is a coding bug and is left to propagate rather than be swallowed as
-# "fit failed" for every session.
-_EXPECTED_FIT_ERRORS = (
-    np.linalg.LinAlgError,
-    ValueError,
-    RuntimeError,
-    PerfectSeparationError,
-    PatsyError,
-)
 
 
 def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
@@ -375,7 +360,7 @@ def fit_per_bin_rate_model(
                 family=sm.families.Poisson(),
                 offset=offset,
             ).fit()
-    except _EXPECTED_FIT_ERRORS as exc:
+    except EXPECTED_FIT_ERRORS as exc:
         logger.warning("Per-bin GLM failed for %s: %r", spec.name, exc)
         return None
     # Effect-scale separation: the per-bin design carries spline bases whose columns
@@ -516,7 +501,7 @@ def cross_validate_per_bin_rate_model(
             ).fit()
             mu = np.asarray(res.predict(te, offset=off_te), dtype=float)
             mu0 = np.asarray(res0.predict(te, offset=off_te), dtype=float)
-        except _EXPECTED_FIT_ERRORS as exc:
+        except EXPECTED_FIT_ERRORS as exc:
             logger.debug("CV %s: fold fit/predict failed: %r", spec.name, exc)
             return None
         # Fold counts as nonconverged/separated if EITHER the model or its baseline

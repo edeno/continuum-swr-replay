@@ -43,6 +43,7 @@ import pandas as pd
 import statsmodels.api as sm
 
 from ._fit_diagnostics import (
+    EXPECTED_FIT_ERRORS,
     NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
@@ -172,8 +173,10 @@ def fit_per_stop_rate_model(
         with capture_fit_warnings() as caught:
             model = sm.GLM(y, X, family=sm.families.Poisson(), offset=offset)
             result = model.fit(disp=0)
-    except Exception:
-        logger.warning("Poisson GLM failed for predictors %s", predictors)
+    except EXPECTED_FIT_ERRORS:
+        logger.warning(
+            "Poisson GLM failed for predictors %s", predictors, exc_info=True
+        )
         return None
     predictor_sd = np.asarray(X, dtype=float).std(axis=0)
     # The constant column carries the formula-style name "Intercept", so the
@@ -272,7 +275,10 @@ def cross_validate_per_stop_rate_model(
             res = sm.GLM(
                 y[train], X[train], family=sm.families.Poisson(), offset=offset[train]
             ).fit(disp=0)
-        except Exception:
+        except EXPECTED_FIT_ERRORS:
+            logger.debug(
+                "CV fold fit failed for predictors %s", predictors, exc_info=True
+            )
             return None
         status = fit_status(
             res,

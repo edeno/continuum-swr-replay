@@ -13,7 +13,12 @@ import numpy as np
 import pandas as pd
 from statsmodels.discrete.conditional_models import ConditionalPoisson
 
-from ._fit_diagnostics import NUISANCE_TERMS, capture_fit_warnings, fit_status
+from ._fit_diagnostics import (
+    EXPECTED_FIT_ERRORS,
+    NUISANCE_TERMS,
+    capture_fit_warnings,
+    fit_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +135,10 @@ def cross_validate_conditional_poisson(
                 with capture_fit_warnings() as caught:
                     model = ConditionalPoisson(y_train, X_train, groups=groups_train)
                     result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
-            except Exception:
+            except EXPECTED_FIT_ERRORS:
+                logger.debug(
+                    "CV fold fit failed for predictors %s", predictors, exc_info=True
+                )
                 return None
             status = fit_status(
                 result,
