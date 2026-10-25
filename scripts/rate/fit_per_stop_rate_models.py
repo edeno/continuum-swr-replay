@@ -42,9 +42,7 @@ Outputs: ``models_per_stop_rate/all_models{sfx}.pkl`` (one row per (outcome,
 model, session) for R0-R1), its ``.provenance.json`` sidecar, and
 ``all_models{sfx}_cohort_audit.csv``; ``sfx`` is empty for the default
 ``at_well`` cohort, ``_allstops`` / ``_intransit`` otherwise, with ``_smoke``
-appended in smoke mode. Family B writes
-``models_per_bin_rate/all_models{sfx}.pkl`` and
-``per_bin_rate_cohort_audit{sfx}.csv``.
+appended in smoke mode.
 
 Usage:
     uv run python scripts/rate/fit_per_stop_rate_models.py                    # full

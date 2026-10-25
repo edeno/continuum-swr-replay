@@ -115,6 +115,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     CURVE_SOURCES,
     NESTED_MODEL_PAIRS,
     REPORT_HALF_WINDOW_S,
+    curve_coefficients,
     is_separated,
     peak_log_modulation,
     peak_modulation_se,
@@ -692,17 +693,15 @@ def maximum_likelihood_comparison(
     }
 
     columns: dict[str, NDArray] = {}
-    for curve, (model, block) in CURVE_SOURCES.items():
-        start = 1 + block * n_basis
+    for curve in CURVE_SOURCES:
+        model, block = curve_coefficients(curve, n_basis)
         result = unpenalised[model]
         raw_params = np.asarray(result.params)
         model_separated = is_separated(raw_params[:, 1:])
         converged = np.asarray(result.converged, dtype=bool)
         usable = converged & ~model_separated
-        params = raw_params[:, start : start + n_basis].copy()
-        covariance = np.asarray(result.covariance)[
-            :, start : start + n_basis, start : start + n_basis
-        ].copy()
+        params = raw_params[:, block].copy()
+        covariance = np.asarray(result.covariance)[:, block, block].copy()
         params[~usable] = np.nan
         covariance[~usable] = np.nan
         mle = peak_log_modulation(params, spline_basis, lag_time)

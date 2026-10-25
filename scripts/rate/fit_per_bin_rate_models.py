@@ -34,25 +34,16 @@ The four outcomes (``POPULATIONS``) are detected SWR, all non-local, and the
 non-local SWR / no-SWR split — the pooled ``non_local`` is the one-population
 null tested against its split.
 
-How Family A (``fit_per_stop_rate_models.py``) and Family B (this script) differ
-on the same stop. Family A gives the stop one row: its whole-stop event count
-from ``stop_table``, a ``log(immobility_duration_s)`` offset, and the
-reward-history basis evaluated once at bout start. Family B never reads the
-dense ``stop_timebin_table``: ``aggregate_to_timebins`` cuts the stop into
-``BIN_S`` = 15 ms bins over its first ``TMAX`` = 4 s only, counts the onsets of
-``event_onset_table`` per bin with a ``log(exposure)`` offset, and in the bins at
-or past the stop's outcome boundary (``outcome_known_time_s``) shifts the
-reward-history lag vector by one, so those bins see the trip's own reward or
-omission (a bout that spans a well arrival is never shifted). Onsets after the
-first 4 s count toward A but not toward B.
+How this family (B) differs from Family A on the same stop is in the
+``fit_per_stop_rate_models.py`` docstring. Family B never reads the dense
+``stop_timebin_table``: ``aggregate_to_timebins`` builds the 15 ms bins from
+``stop_table`` and ``event_onset_table``.
 
 Outputs: ``models_per_bin_rate/all_models{sfx}.pkl`` (one row per (session,
 outcome, model)), its ``.provenance.json`` sidecar, and
 ``per_bin_rate_cohort_audit{sfx}.csv``; ``sfx`` is empty for the default
 ``at_well`` cohort, ``_allstops`` / ``_intransit`` otherwise, with ``_smoke``
-appended in smoke mode. Family A writes
-``models_per_stop_rate/all_models{sfx}.pkl`` and
-``all_models{sfx}_cohort_audit.csv``.
+appended in smoke mode.
 
 Inference note. The self-history block absorbs within-stop autocorrelation, so
 the per-bin likelihood is better calibrated than a naive independent-bin count

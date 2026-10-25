@@ -126,14 +126,10 @@ NON_LOCAL_PROB_THRESHOLD = DEFAULT_NON_LOCAL_THRESHOLD
 NON_LOCAL_MINIMUM_DURATION_S = 0.015
 """The project's non-local event threshold and nominal minimum, applied with a
 timestamp-span test (:func:`non_local_intervals`): non-local probability above
-0.8 with a first-to-last span of at least 15 ms. That is not
-``analysis/events/nonlocal_detection.get_confident_times``' rule, which counts
-samples (``ripple_detection.core.minimum_sample_count``, round half up of
-15 ms over the median step). On the sweep's 2 ms grid (the 1500 Hz simulation
-strided by 3) the span test needs 9 samples (a 16 ms span), where the sample
-count would need 8; on the real decode grid get_confident_times keeps 7 (see
-``docs/known_issues/nonlocal_minimum_duration_rounding.md``). The span test
-is kept so the published sweep numbers do not change."""
+0.8 over a first-to-last span of at least 15 ms, i.e. 9 samples on the sweep's
+2 ms grid. ``get_confident_times`` counts samples instead (7 on the real decode
+grid; ``docs/known_issues/nonlocal_minimum_duration_rounding.md``). The span
+test is kept so the published sweep numbers do not change."""
 
 SAME_PLACE_CM = 15.0
 

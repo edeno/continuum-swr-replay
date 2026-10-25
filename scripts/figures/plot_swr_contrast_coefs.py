@@ -36,6 +36,7 @@ from continuum_swr_replay.analysis.events.analysed_time import require_swr_sourc
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
     load_per_sd_scale,
+    sd_covariate,
 )
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     std_factor as audited_std_factor,
@@ -169,15 +170,11 @@ def std_factor(term, sd):
     rendering at raw scale under a "per 1 SD" axis.
     """
     factor, unit = audited_std_factor(term, sd)
-    if unit != "per_SD" or any(
-        term in (cov, f"swr_x_{cov}", f"is_swr:{cov}") for cov in sd
-    ):
-        return factor, unit
     # Interaction terms (content/patch `*_x_*`) are built from z-scored scalars at
     # fit time, so factor 1.0 is correct. Continuous MAIN-effect terms, by contrast,
     # must be in SD — so a renamed main effect (not an interaction) raises here rather
     # than silently plotting at raw scale under a "per 1 SD" axis.
-    if "_x_" in term:
+    if unit != "per_SD" or sd_covariate(term, sd) is not None or "_x_" in term:
         return factor, unit
     raise KeyError(
         f"plot term {term!r} resolves to no SD entry and is not a binary, a "

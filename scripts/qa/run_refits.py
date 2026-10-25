@@ -34,16 +34,9 @@ a complete stop table (one with the SWR split), so a rebuild runs on a data root
 that has none (``CSR_PROCESSED_DATA_DIR``); in a root that has one it fails at
 once and blocks every run after it.
 
-Prerequisites, not run here (GPUs or hours each), in this order:
-
-1. ``scripts/detection/run_artifact_detection.py``: the artifact mask;
-2. ``scripts/detection/run_swr_detection.py``: the SWR inventories, masked with
-   that artifact run;
-3. pin both runs, ``ARTIFACT_INTERVALS_RUN_ID`` and ``SWR_INVENTORY_RUN_ID`` in
-   ``analysis/events/swr_source.py``;
-4. ``scripts/decoding/run_decoding_bandit.py``: the HPC non-local decodes;
-5. ``scripts/decoding/run_decoding_contfrag.py``: the ContFrag decodes, for
-   ``tables.contfrag.*``.
+The prerequisites, not run here (GPUs or hours each), are listed in order in
+``PREREQUISITES``: artifact detection, SWR detection, pinning both run IDs in
+``analysis/events/swr_source.py``, then the HPC and ContFrag decodes.
 
 Before a table run starts, a preflight checks they are on disk: both pinned run
 folders, the inventory masked with the pinned artifact run
@@ -142,10 +135,13 @@ _CF = "scripts/tables/prepare_contfrag_replay_content_data.py"
 _QV = "tables.qvals"
 # The table runs a fit reads: the replay-content tables (with qvals_table, which
 # they need), the event-onset table, and the ContFrag SWR or MUA tables.
-_RT = ("tables.replay_content",)
-_RTB = (*_RT, "tables.timebin")
-_CFS = ("tables.contfrag.swr",)
-_CFM = ("tables.contfrag.mua",)
+_TRC = "tables.replay_content"
+_TCS = "tables.contfrag.swr"
+_TCM = "tables.contfrag.mua"
+_RT = (_TRC,)
+_RTB = (_TRC, "tables.timebin")
+_CFS = (_TCS,)
+_CFM = (_TCM,)
 
 # Cores: a run's worker count, or its thread cap for a run without workers.
 # The at_well cohort is the shipped one; all_stops and in_transit are sensitivities.
@@ -154,10 +150,10 @@ RUNS: tuple[Run, ...] = (
     # Tables, opt-in (--with-tables). Each builder runs serially over the sessions.
     _run("tables.stop_bootstrap", f"{_PR} --stop-only", 1),
     _run(_QV, "scripts/behavior/build_qvals_table.py --write", 1, ["tables.stop_bootstrap"]),
-    _run(_RT[0], _PR, 1, [_QV]),
+    _run(_TRC, _PR, 1, [_QV]),
     _run("tables.timebin", "scripts/tables/build_timebin_tables.py", 1),
-    _run(_CFS[0], f"{_CF} --event-source SWR", 1, [_QV]),
-    _run(_CFM[0], f"{_CF} --event-source MUA", 1, [_QV]),
+    _run(_TCS, f"{_CF} --event-source SWR", 1, [_QV]),
+    _run(_TCM, f"{_CF} --event-source MUA", 1, [_QV]),
     # Q2 rate. The per-bin conditional intensity (Family B) is the main model; the
     # per-stop Poisson (Family A) is the literature-comparable one.
     _run("rate.per_bin.at_well", f"{_PB} --stop-cohort at_well --workers 16", 16, _RTB),
@@ -285,30 +281,27 @@ def select(
                     f"no run is named {name!r} or starts with it; see --dry-run"
                 )
             chosen |= {r.name for r in matches if wanted(r, name)}
-    if with_dependents:
-        grew = True
-        while grew:
-            more = {
-                r.name
-                for r in RUNS
-                if r.name not in chosen
-                and (needed := set(r.deps) & chosen)
-                and (wanted(r, None) or any(BY_NAME[d].optional for d in needed))
-            }
+
+    def dependents(chosen: set[str]) -> set[str]:
+        return {
+            r.name
+            for r in RUNS
+            if (needed := set(r.deps) & chosen)
+            and (wanted(r, None) or any(BY_NAME[d].optional for d in needed))
+        }
+
+    def tables(chosen: set[str]) -> set[str]:
+        return {
+            d
+            for r in RUNS
+            if r.name in chosen
+            for d in r.deps
+            if BY_NAME[d].question == TABLES
+        }
+
+    for enabled, grow in ((with_dependents, dependents), (with_tables, tables)):
+        while enabled and (more := grow(chosen) - chosen):
             chosen |= more
-            grew = bool(more)
-    if with_tables:
-        grew = True
-        while grew:
-            more = {
-                d
-                for r in RUNS
-                if r.name in chosen
-                for d in r.deps
-                if d not in chosen and BY_NAME[d].question == TABLES
-            }
-            chosen |= more
-            grew = bool(more)
     return [r for r in RUNS if r.name in chosen]
 
 
@@ -366,8 +359,9 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
         require_hpc_decode_sources()
     except ValueError as error:
         problems.append(str(error))
+    # kind -> (epoch-id suffix, decode_paths naming, the files it needs)
     decodes = {"HPC": ("", {}, ("data_over_time", "environment", "results"))}
-    if names & {*_CFS, *_CFM}:
+    if names & {_TCS, _TCM}:
         decodes["ContFrag"] = (
             "_contfrag",
             {"threshold_percent": None},
@@ -375,16 +369,14 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
         )
     epoch_ids = analysed_epoch_ids()
     for kind, (suffix, naming, needed) in decodes.items():
-        missing = [
-            path.name
-            for epoch_id in epoch_ids
-            for name, path in decode_paths(
-                epoch_id + suffix, PROCESSED_DATA_DIR, **naming
-            )
-            ._asdict()
-            .items()
-            if name in needed and not path.exists()
-        ]
+        missing = []
+        for epoch_id in epoch_ids:
+            paths = decode_paths(epoch_id + suffix, PROCESSED_DATA_DIR, **naming)
+            missing += [
+                getattr(paths, name).name
+                for name in needed
+                if not getattr(paths, name).exists()
+            ]
         if missing:
             problems.append(
                 f"{len(missing)} {kind} decode files of the {len(epoch_ids)} "

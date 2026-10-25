@@ -85,43 +85,22 @@ def test_results_exist_reads_the_three_saved_files(tmp_path):
     assert not paths.data_over_time.exists()
 
 
-def _legacy_identifier(stem, ripple_detector_name, non_stationary, training_type):
-    """The suffix rule as _decode_runner.run_decode and load_results wrote it."""
-    epoch_identifier = stem
-    if ripple_detector_name != "Kay":
-        epoch_identifier += f"_{ripple_detector_name}"
-    if non_stationary:
-        epoch_identifier += "_non_stationary"
-    if training_type != "no_ripple":
-        epoch_identifier += f"_{training_type}"
-    return epoch_identifier
-
-
 @pytest.mark.parametrize(
-    "stem", ["chimi20200212_02_r1_HPC", "a20200101_02_r1_mPFC_contfrag"]
+    ("kwargs", "expected"),
+    [
+        ({}, "chimi20200212_02_r1_HPC"),
+        ({"ripple_detector_name": "Karlsson"}, "chimi20200212_02_r1_HPC_Karlsson"),
+        ({"non_stationary": True}, "chimi20200212_02_r1_HPC_non_stationary"),
+        ({"training_type": "all"}, "chimi20200212_02_r1_HPC_all"),
+        (
+            {
+                "ripple_detector_name": "Karlsson",
+                "non_stationary": True,
+                "training_type": "all",
+            },
+            "chimi20200212_02_r1_HPC_Karlsson_non_stationary_all",
+        ),
+    ],
 )
-@pytest.mark.parametrize("ripple_detector_name", ["Kay", "Karlsson"])
-@pytest.mark.parametrize("non_stationary", [False, True])
-@pytest.mark.parametrize("training_type", ["no_ripple", "all"])
-def test_decode_identifier_matches_the_rule_the_runners_wrote(
-    stem, ripple_detector_name, non_stationary, training_type
-):
-    kwargs = {
-        "ripple_detector_name": ripple_detector_name,
-        "non_stationary": non_stationary,
-        "training_type": training_type,
-    }
-    assert decode_identifier(stem, **kwargs) == _legacy_identifier(stem, **kwargs)
-
-
-def test_the_canonical_decode_identifier_is_the_stem_alone():
-    assert decode_identifier("chimi20200212_02_r1_HPC") == "chimi20200212_02_r1_HPC"
-    assert (
-        decode_identifier(
-            "a20200101_02_r1_HPC",
-            ripple_detector_name="Karlsson",
-            non_stationary=True,
-            training_type="all",
-        )
-        == "a20200101_02_r1_HPC_Karlsson_non_stationary_all"
-    )
+def test_decode_identifier_appends_each_non_default_setting_in_order(kwargs, expected):
+    assert decode_identifier("chimi20200212_02_r1_HPC", **kwargs) == expected

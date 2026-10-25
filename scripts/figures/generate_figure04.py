@@ -94,13 +94,12 @@ from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
 from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
-    penalty_sigma_suffix,
     significant_fraction,
 )
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
-    CURVE_SOURCES,
     REPORT_HALF_WINDOW_S,
+    curve_coefficients,
 )
 from continuum_swr_replay.figure_utilities import (
     PAGE_HEIGHT,
@@ -218,9 +217,8 @@ def plot_single_neuron_overlay(
     n_basis = spline_basis.shape[1]
     drawn = []
     for cfg in model_configs:
-        model, block = CURVE_SOURCES[cfg["curve"]]
+        model, coefficients = curve_coefficients(cfg["curve"], n_basis)
         result = glm_results[model]
-        coefficients = slice(1 + block * n_basis, 1 + (block + 1) * n_basis)
         params = np.asarray(result.params)[coefficients]
         covariance = np.asarray(result.covariance)[coefficients, coefficients]
         modulation = spline_basis @ params
@@ -521,11 +519,9 @@ def generate_figure(
         population bundle was fit with, and the only one with a penalised path.
     penalty_sigma : float
         Prior standard deviation of an event-basis coefficient, on the log-rate
-        scale. Panel a is refit under it, and panels b-d read the bundle fit
-        under it (``penalty_sigma_suffix``) and check its provenance records
-        it. Only the canonical prior's bundle carries the matched-control null
-        panel d draws: the runner writes a sensitivity bundle with
-        ``n_control_draws = 0``.
+        scale. Only the canonical prior is accepted: the runner writes a
+        sensitivity bundle with ``n_control_draws = 0``, so it has no
+        matched-control null for panel d.
 
     Returns
     -------
@@ -537,11 +533,10 @@ def generate_figure(
         If ``penalty_sigma`` is not the canonical prior, before anything is
         loaded or fit: that bundle has no held-out p-values for panel d.
     """
-    sigma_suffix = penalty_sigma_suffix(penalty_sigma)
-    if sigma_suffix:
+    if float(penalty_sigma) != DEFAULT_PENALTY_SIGMA:
         raise ValueError(
-            f"penalty_sigma={penalty_sigma} names the '{sigma_suffix}' "
-            "sensitivity bundle, which run_pfc_analysis_bandit.py writes without "
+            f"penalty_sigma={penalty_sigma} names a sensitivity bundle, which "
+            "run_pfc_analysis_bandit.py writes without "
             "the matched-control null (n_control_draws=0), so panel d has no "
             f"held-out p-values to draw. Figure 4 is drawn at the canonical "
             f"prior ({DEFAULT_PENALTY_SIGMA})."
@@ -692,8 +687,7 @@ def generate_figure(
     pop_df, modulations, pop_lag_time = load_population_data(
         data_dir,
         min_firing_rate=1.0,
-        artifact_suffix=stop_cohort_suffix(stop_cohort) + sigma_suffix,
-        expected_penalty_sigma=penalty_sigma,
+        artifact_suffix=stop_cohort_suffix(stop_cohort),
     )
 
     return assemble_figure(

@@ -124,14 +124,8 @@ def main():
         logging.info("Saved %s", path)
 
     # ── Figure 3: Coefficient forest plots for key models ──
-    key_models = ["M2", "M4", "M6", "M7"]
+    key_models = ["M2", "M4", "M6"]
     for model_name in key_models:
-        if model_name not in MODEL_HIERARCHY:
-            logging.warning(
-                "Skipping coefficient forest for %s: not in MODEL_HIERARCHY",
-                model_name,
-            )
-            continue
         mdf = all_results[all_results["model"] == model_name]
         if len(mdf) == 0:
             continue

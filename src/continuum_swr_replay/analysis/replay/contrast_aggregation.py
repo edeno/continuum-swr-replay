@@ -207,10 +207,18 @@ def std_factor(term: str, sd: dict) -> tuple[float, str]:
         return 1.0, "per_category"
     if term in PER_UNIT_TERMS:
         return 1.0, "per_unit"
-    for cov, s in sd.items():
-        if term in (cov, f"swr_x_{cov}", f"is_swr:{cov}"):
-            return (s, "per_SD") if s > 0 else (1.0, "per_SD")
+    cov = sd_covariate(term, sd)
+    if cov is not None and sd[cov] > 0:
+        return sd[cov], "per_SD"
     return 1.0, "per_SD"
+
+
+def sd_covariate(term: str, sd: dict) -> str | None:
+    """The covariate in ``sd`` that ``term`` is, or is an SWR product of; else None."""
+    for cov in sd:
+        if term in (cov, f"swr_x_{cov}", f"is_swr:{cov}"):
+            return cov
+    return None
 
 
 def separated_for_term(fits: pd.DataFrame, term: str) -> pd.Series:
@@ -335,16 +343,10 @@ class TermSessionGate:
 def gate_term_sessions(fits: pd.DataFrame, term: str) -> TermSessionGate:
     """Apply the per-term identifiability filter and the emission gates.
 
-    A session is excluded from a term's aggregate when the fitters named that
-    term in ``separated_terms``, or when its coefficient ran away past the
-    magnitude backstop without tripping that flag (``n_dropped``). The
-    backstop is read on the effect scale, ``|coef_<term>| * sd_<term> >=
-    SEPARATION_COEF_ABS``, using the fit's own persisted predictor SD; frames
-    with no ``sd_<term>`` column (legacy artifacts) fall back to
-    ``|coef_<term>| >= SEPARATION_COEF_ABS``. A session whose fit names the
-    term in ``unidentified_terms`` (NaN coefficient) is counted in
-    ``n_unidentified``. Both counts enter the :data:`MAX_UNIDENTIFIED_SHARE`
-    gate (:attr:`TermSessionGate.refusal`).
+    Separated or runaway sessions are counted in ``n_dropped``, sessions that
+    cannot inform the term in ``n_unidentified``; both enter
+    :attr:`TermSessionGate.refusal`. The runaway backstop reads the fit's own
+    ``sd_<term>``, which an ``is_swr:<covariate>`` product also carries.
 
     Parameters
     ----------
@@ -493,12 +495,7 @@ def aggregate_contrast(
         Per-session fits: columns ``model``, ``population``, ``animal`` and
         ``coef_<term>`` (optionally ``bse_<term>``, ``pval_<term>``,
         ``sd_<term>``). Which sessions a term keeps, and whether its row is
-        emitted at all, is :func:`gate_term_sessions` (separated / runaway
-        sessions counted in ``n_dropped``, sessions that cannot inform the term
-        in ``n_unidentified``, both entering the ``MAX_UNIDENTIFIED_SHARE``
-        gate). The runaway backstop uses the fit's own ``sd_<term>`` --
-        including for an ``is_swr:<covariate>`` product, which carries its own
-        ``sd_`` column.
+        emitted at all, is :func:`gate_term_sessions`.
     specs : list of (model, population, term)
         One aggregated row per spec (in order).
     level : str
@@ -534,7 +531,6 @@ def aggregate_contrast(
                 gate.n_unidentified,
             )
             continue
-        n_dropped, n_unidentified = gate.n_dropped, gate.n_unidentified
         s = s_all[gate.kept]
         coef = s[ccol]
         se_per_session, se_source = session_se(s, term)
@@ -564,10 +560,10 @@ def aggregate_contrast(
                 "model": model,
                 "population": pop,
                 "term": term,
-                "n_sessions": len(s),
+                "n_sessions": gate.n_kept,
                 "n_animals": int(per_animal.size),
-                "n_dropped": n_dropped,
-                "n_unidentified": n_unidentified,
+                "n_dropped": gate.n_dropped,
+                "n_unidentified": gate.n_unidentified,
                 "n_sessions_flagged_nonconverged": n_nonconverged,
                 "n_sessions_flagged_separated": n_separated,
                 "coef_animal_median": float(per_animal.median()),

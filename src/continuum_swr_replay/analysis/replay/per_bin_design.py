@@ -662,13 +662,6 @@ def aggregate_to_timebins(
     # Optional per-bin clocks / outcome-boundary shift: both are gated on the
     # stop frame actually carrying their inputs, so a stop table built before
     # the arrival clocks existed produces exactly the design it produced before.
-    emit_clocks = all(c in stop_table.columns for c in _ARRIVAL_CLOCK_STOP_COLUMNS)
-    shift_at_outcome = reward_basis and all(
-        c in stop_table.columns
-        for c in (*_OUTCOME_SHIFT_STOP_COLUMNS, *_ARRIVAL_SPAN_STOP_COLUMNS)
-    )
-    # Both branches switch off without a word when their inputs are absent, so
-    # say which ran: a design built without them is a different design.
     missing_clock = [
         c for c in _ARRIVAL_CLOCK_STOP_COLUMNS if c not in stop_table.columns
     ]
@@ -679,17 +672,21 @@ def aggregate_to_timebins(
         )
         if c not in stop_table.columns
     ]
+    emit_clocks = not missing_clock
+    shift_at_outcome = reward_basis and not missing_shift
+    # Both branches switch off without a word when their inputs are absent, so
+    # say which ran: a design built without them is a different design.
+    if not reward_basis:
+        shift_status = "not requested (reward_basis=False)"
+    elif missing_shift:
+        shift_status = f"skipped (stop table lacks {missing_shift})"
+    else:
+        shift_status = "applied"
     logger.debug(
         "aggregate_to_timebins: per-bin arrival/outcome clocks %s; "
         "outcome-boundary reward-history shift %s",
-        "applied" if emit_clocks else f"skipped (stop table lacks {missing_clock})",
-        "applied"
-        if shift_at_outcome
-        else (
-            f"skipped (stop table lacks {missing_shift})"
-            if reward_basis
-            else "not requested (reward_basis=False)"
-        ),
+        f"skipped (stop table lacks {missing_clock})" if missing_clock else "applied",
+        shift_status,
     )
     if excluded_intervals is None:
         excluded_intervals = excluded_intervals_by_session(stop_table)

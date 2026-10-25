@@ -236,8 +236,8 @@ def prior_binds(
 #: classes in. Reading it by the name is the swap that mislabelled both of that
 #: model's curves in every bundle written before 2026-09-15.
 #:
-#: Read by the runner's ``maximum_likelihood_comparison`` and by Figure 4's
-#: example neuron; ``session._modulation_curves`` slices the same blocks.
+#: Read through :func:`curve_coefficients`; ``session._modulation_curves``
+#: slices the same blocks.
 CURVE_SOURCES = {
     "SWR": ("SWR + non_local_no_SWR", 0),
     "no_SWR": ("SWR + non_local_no_SWR", 1),
@@ -245,6 +245,17 @@ CURVE_SOURCES = {
     "non_local_no_SWR": ("non_local_SWR + non_local_no_SWR", 0),
     "matched_control": ("matched_control + non_local_no_SWR", 0),
 }
+
+
+def curve_coefficients(curve: str, n_basis: int) -> tuple[str, slice]:
+    """The model a :data:`CURVE_SOURCES` curve is read from, and its parameter slice.
+
+    Parameter 0 is the intercept; basis block ``b`` is the ``n_basis``
+    parameters after it, starting at ``1 + b * n_basis``.
+    """
+    model, block = CURVE_SOURCES[curve]
+    start = 1 + block * n_basis
+    return model, slice(start, start + n_basis)
 
 
 #: Nested ``(full, reduced)`` model pairs the comparisons are reported for.
