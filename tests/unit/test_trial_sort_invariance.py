@@ -248,13 +248,11 @@ class TestNoPastTrialsContract:
         assert context.loc[2.2, "is_rewarded_outcome"] == 1.0
         assert context.loc[2.2, "last_rewarded_well"] == 2.0
 
-    def test_history_cutoffs_falls_back_to_end_time_when_goal_arrival_time_missing(
-        self,
-    ):
+    def test_history_cutoffs_fall_back_to_end_time_without_arrival_column(self):
         """When ``trials`` lacks ``destination_first_poke_in_time`` (older
         pipelines), the helpers must fall back to ``end_time``
         cutoffs without crashing — preserving the legacy contract."""
-        trials = _toy_trials().drop(columns=[])  # no destination_first_poke_in_time
+        trials = _toy_trials()
         assert "destination_first_poke_in_time" not in trials.columns
         event_times = np.array([0.5, 2.5, 4.5])
         # Just confirm they run and return the expected shape.
@@ -265,7 +263,7 @@ class TestNoPastTrialsContract:
         assert cr.shape == (3, 9)
         assert rrr.shape == (3, 9)
 
-    def test_add_trial_context_per_row_fallback_for_nan_goal_arrival_time(self):
+    def test_add_trial_context_per_row_fallback_for_nan_arrival(self):
         """``add_trial_context`` must apply the same per-row
         ``destination_first_poke_in_time`` → ``end_time`` fallback that the
         history helpers use, so all four trial-derived columns
@@ -329,7 +327,7 @@ class TestNoPastTrialsContract:
         assert cr[0, 1] == 1.0
         assert vr[0, 1] == 1.0  # 1 trial ago
 
-    def test_history_cutoffs_per_row_fallback_for_nan_goal_arrival_time(self):
+    def test_history_cutoffs_per_row_fallback_for_nan_arrival(self):
         """Per-row NaN ``destination_first_poke_in_time`` falls back to
         ``end_time`` for that trial — matches
         ``add_trial_context``'s same-condition fallback."""

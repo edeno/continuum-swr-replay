@@ -352,7 +352,7 @@ fig, ax = plt.subplots(figsize=(15, 3.5))
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["start_time"], trial["end_time"],
+        trial["movement_start_time"], trial["end_time"],
         color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
@@ -366,21 +366,21 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["start_time"], well_linear[from_well],
+        trial["movement_start_time"], well_linear[from_well],
         marker="s", ms=6, mfc="none",
         mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
-    # arrival: circle at goal_arrival_time, filled iff rewarded
+    # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["goal_arrival_time"], well_linear[to_well],
+        trial["destination_first_poke_in_time"], well_linear[to_well],
         marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
         mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["start_time"], 0.97, marker="v", ms=6, color="black",
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
             transform=blend, zorder=5,
         )
 
@@ -431,14 +431,14 @@ plot_graph_as_1D(
 patch_from = trials["from_well"].map(WELL_PATCH_MAPPING)
 patch_to = trials["to_well"].map(WELL_PATCH_MAPPING)
 print("max |duration - (end - start)| :",
-      float((trials["duration"] - (trials["end_time"] - trials["start_time"])).abs().max()))
+      float((trials["duration"] - (trials["end_time"] - trials["movement_start_time"])).abs().max()))
 print("from_patch/to_patch match wells:",
       bool((patch_from == trials["from_patch"]).all() and (patch_to == trials["to_patch"]).all()))
 print("is_patch_change matches patches:",
       bool(((patch_from != patch_to) == trials["is_patch_change"]).all()))
-print("goal_arrival_time inside trial :",
-      bool(((trials["goal_arrival_time"] >= trials["start_time"])
-            & (trials["goal_arrival_time"] <= trials["end_time"])).all()))
+print("destination_first_poke_in_time inside trial :",
+      bool(((trials["destination_first_poke_in_time"] >= trials["movement_start_time"])
+            & (trials["destination_first_poke_in_time"] <= trials["end_time"])).all()))
 print("wells chain (to[i] == from[i+1]):",
       bool((trials["to_well"].values[:-1] == trials["from_well"].values[1:]).all()))
 
@@ -479,7 +479,7 @@ fig, ax = plt.subplots(figsize=(15, 3.5))
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["start_time"], trial["end_time"],
+        trial["movement_start_time"], trial["end_time"],
         color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
@@ -493,21 +493,21 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["start_time"], well_linear[from_well],
+        trial["movement_start_time"], well_linear[from_well],
         marker="s", ms=6, mfc="none",
         mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
-    # arrival: circle at goal_arrival_time, filled iff rewarded
+    # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["goal_arrival_time"], well_linear[to_well],
+        trial["destination_first_poke_in_time"], well_linear[to_well],
         marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
         mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["start_time"], 0.97, marker="v", ms=6, color="black",
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
             transform=blend, zorder=5,
         )
 
@@ -715,7 +715,7 @@ ax = axs[0]
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["start_time"], trial["end_time"],
+        trial["movement_start_time"], trial["end_time"],
         color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
@@ -729,21 +729,21 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["start_time"], well_linear[from_well],
+        trial["movement_start_time"], well_linear[from_well],
         marker="s", ms=6, mfc="none",
         mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
-    # arrival: circle at goal_arrival_time, filled iff rewarded
+    # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["goal_arrival_time"], well_linear[to_well],
+        trial["destination_first_poke_in_time"], well_linear[to_well],
         marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
         mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["start_time"], 0.97, marker="v", ms=6, color="black",
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
             transform=blend, zorder=5,
         )
 
@@ -861,7 +861,7 @@ ax = axs[0]
 # spreadsheet-style alternating grey bands, one per trial
 for row, (_, trial) in enumerate(trials.iterrows()):
     ax.axvspan(
-        trial["start_time"], trial["end_time"],
+        trial["movement_start_time"], trial["end_time"],
         color="0.85" if row % 2 else "0.95", linewidth=0, zorder=0,
     )
 
@@ -875,21 +875,21 @@ for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
     # departure: open square at from_well, colored by from_patch
     ax.plot(
-        trial["start_time"], well_linear[from_well],
+        trial["movement_start_time"], well_linear[from_well],
         marker="s", ms=6, mfc="none",
         mec=PATCH_COLORS[WELL_PATCH_MAPPING[from_well]], mew=1.5, zorder=4,
     )
-    # arrival: circle at goal_arrival_time, filled iff rewarded
+    # arrival: circle at destination_first_poke_in_time, filled iff rewarded
     dest_color = PATCH_COLORS[WELL_PATCH_MAPPING[to_well]]
     ax.plot(
-        trial["goal_arrival_time"], well_linear[to_well],
+        trial["destination_first_poke_in_time"], well_linear[to_well],
         marker="o", ms=7,
         mfc=dest_color if trial["is_reward"] else "none",
         mec=dest_color, mew=1.5, zorder=4,
     )
     if trial["is_patch_change"]:
         ax.plot(
-            trial["start_time"], 0.97, marker="v", ms=6, color="black",
+            trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
             transform=blend, zorder=5,
         )
 
@@ -1376,20 +1376,20 @@ fig, axes = plt.subplots(
 # ---- panel 1: position + trials ------------------------------------------
 ax = axes[0]
 for row_i, (_, trial) in enumerate(trials.iterrows()):
-    ax.axvspan(trial["start_time"], trial["end_time"],
+    ax.axvspan(trial["movement_start_time"], trial["end_time"],
                color="0.85" if row_i % 2 else "0.95", linewidth=0, zorder=0)
 ax.scatter(position_info.index, position_info["linear_position"], s=1,
            color="magenta", rasterized=True, zorder=2)
 blend = ax.get_xaxis_transform()
 for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
-    ax.plot(trial["start_time"], well_linear[from_well], marker="s", ms=6,
+    ax.plot(trial["movement_start_time"], well_linear[from_well], marker="s", ms=6,
             mfc="none", mec=WELL_COLORS[from_well], mew=1.5, zorder=4)
-    ax.plot(trial["goal_arrival_time"], well_linear[to_well], marker="o", ms=7,
+    ax.plot(trial["destination_first_poke_in_time"], well_linear[to_well], marker="o", ms=7,
             mfc=WELL_COLORS[to_well] if trial["is_reward"] else "none",
             mec=WELL_COLORS[to_well], mew=1.5, zorder=4)
     if trial["is_patch_change"]:
-        ax.plot(trial["start_time"], 0.97, marker="v", ms=6, color="black",
+        ax.plot(trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
                 transform=blend, zorder=5)
 ax.set(ylabel="linear position (cm)",
        title=f"{SESSION_ID}: behavior and Beta-model beliefs")
@@ -1557,20 +1557,20 @@ fig, axes = plt.subplots(
 # ---- panel 1: position + trials ------------------------------------------
 ax = axes[0]
 for row_i, (_, trial) in enumerate(trials.iterrows()):
-    ax.axvspan(trial["start_time"], trial["end_time"],
+    ax.axvspan(trial["movement_start_time"], trial["end_time"],
                color="0.85" if row_i % 2 else "0.95", linewidth=0, zorder=0)
 ax.scatter(position_info.index, position_info["linear_position"], s=1,
            color="magenta", rasterized=True, zorder=2)
 blend = ax.get_xaxis_transform()
 for _, trial in trials.iterrows():
     from_well, to_well = int(trial["from_well"]), int(trial["to_well"])
-    ax.plot(trial["start_time"], well_linear[from_well], marker="s", ms=6,
+    ax.plot(trial["movement_start_time"], well_linear[from_well], marker="s", ms=6,
             mfc="none", mec=WELL_COLORS[from_well], mew=1.5, zorder=4)
-    ax.plot(trial["goal_arrival_time"], well_linear[to_well], marker="o", ms=7,
+    ax.plot(trial["destination_first_poke_in_time"], well_linear[to_well], marker="o", ms=7,
             mfc=WELL_COLORS[to_well] if trial["is_reward"] else "none",
             mec=WELL_COLORS[to_well], mew=1.5, zorder=4)
     if trial["is_patch_change"]:
-        ax.plot(trial["start_time"], 0.97, marker="v", ms=6, color="black",
+        ax.plot(trial["movement_start_time"], 0.97, marker="v", ms=6, color="black",
                 transform=blend, zorder=5)
 ax.set(ylabel="linear position (cm)",
        title=f"{SESSION_ID}: behavior and Beta-model beliefs")

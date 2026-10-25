@@ -86,9 +86,7 @@ PATH_PROGRESS_EPSILON: float = 1e-10
 # Omission shifts: look back N trials to check for reward omissions
 DEFAULT_OMISSION_SHIFTS: tuple[int, ...] = tuple(range(1, 6))  # (1, 2, 3, 4, 5)
 # Patch change shifts: look N trials relative to current (-5 to +5)
-DEFAULT_PATCH_CHANGE_SHIFTS: tuple[int, ...] = tuple(
-    range(-5, 6)
-)  # (-5, -4, ..., 4, 5)
+DEFAULT_PATCH_CHANGE_SHIFTS: tuple[int, ...] = tuple(range(-5, 6))  # (-5, -4, ..., 4, 5)
 
 
 def path_progress_for_run_segment(
