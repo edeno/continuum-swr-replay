@@ -42,24 +42,14 @@ from continuum_swr_replay.data_loaders.constants import N_PORTS
 # ---------------------------------------------------------------------------
 # rename       : one current column -> one canonical name, value unchanged
 #                (migration expects bit-for-bit equality).
-# alias        : several byte-identical current columns collapse to one
-#                canonical name; migration keeps one, drops the rest, and
-#                asserts bit-for-bit equality across them.
 # canonicalize : several current columns are the SAME quantity by separate
 #                numerical paths (NOT proven byte-identical); collapse to one
 #                canonical family under a declared float tolerance.
-# retire       : a disendorsed column removed entirely, not carried forward
-#                under any name (e.g. an interaction on a retired predictor).
 # drop         : a dead model output (constant because its model is disabled).
-# derive       : an exact complement of a stored primitive; do not store it,
-#                derive it in a design matrix (``derive_expr``).
-# audit        : a selection invariant / diagnostic; move to ``destination``
-#                (metadata or an event-keyed audit), do not delete.
-ACTIONS = frozenset(
-    {"rename", "alias", "canonicalize", "retire", "drop", "derive", "audit"}
-)
-_COLLAPSE = frozenset({"alias", "canonicalize"})  # many current -> one canonical
-_RENAMING = frozenset({"rename", "alias", "canonicalize"})  # produce a canonical
+# The published ledger (docs/design/2026-08-21-covariate-naming-scheme.md) also
+# used ``alias``, ``retire``, ``derive`` and ``audit``; no surviving row does.
+ACTIONS = frozenset({"rename", "canonicalize", "drop"})
+_RENAMING = frozenset({"rename", "canonicalize"})  # produce a canonical
 
 # Letter-then-digit is disallowed in a canonical name (`port0`) except inside a
 # window/norm/percentile idiom where the number reads as part of the word.
@@ -131,20 +121,15 @@ def row_keys(*, table: str) -> tuple[str, ...]:
 class Entry:
     """One migration decision.
 
-    ``current`` holds every legacy name that maps here (>= 2 for alias /
-    canonicalize; exactly 1 otherwise). Exactly one action-appropriate target
-    is set: ``canonical`` (rename/alias/canonicalize), ``primitive`` +
-    ``derive_expr`` (derive), ``destination`` (audit); ``retire`` and ``drop``
-    set none.
+    ``current`` holds every legacy name that maps here (>= 2 for
+    canonicalize; exactly 1 otherwise). ``canonical`` is set for rename and
+    canonicalize, and not for drop.
     """
 
     current: tuple[str, ...]
     action: str
     table: str
     canonical: str | None = None
-    primitive: str | None = None
-    derive_expr: str | None = None
-    destination: str | None = None
     role: str = ""
     notes: str = ""
 
@@ -452,11 +437,6 @@ def _entries_for(table: str) -> tuple[Entry, ...]:
     return tuple(e for e in REGISTRY if e.table == table)
 
 
-def derived_columns(*, table: str | None = None) -> tuple[Entry, ...]:
-    entries = REGISTRY if table is None else _entries_for(table)
-    return tuple(e for e in entries if e.action == "derive")
-
-
 def canonical_names(*, table: str | None = None) -> frozenset[str]:
     """Every canonical name, globally or for one explicit table/grain."""
     entries = REGISTRY if table is None else _entries_for(table)
@@ -494,8 +474,7 @@ def validate() -> None:
     Checks: known action; action-appropriate target present and correct arity;
     each current name claimed once; each canonical produced by one entry;
     canonical names are snake_case identifiers obeying the digit-boundary rule;
-    no canonical collides with a surviving legacy name; every derived complement
-    references a stored primitive.
+    no canonical collides with a surviving legacy name.
     """
     seen_current: dict[tuple[str, str], Entry] = {}
     seen_canonical: dict[tuple[str, str], Entry] = {}
@@ -515,7 +494,7 @@ def validate() -> None:
         if e.action in _RENAMING:
             if not e.canonical:
                 raise RegistryError(f"{e.action} without canonical: {e.current}")
-            if e.action in _COLLAPSE and len(e.current) < 2:
+            if e.action == "canonicalize" and len(e.current) < 2:
                 raise RegistryError(
                     f"{e.action} must collapse >=2 columns: {e.current}"
                 )
@@ -534,15 +513,8 @@ def validate() -> None:
                 raise RegistryError(
                     f"canonical {e.canonical!r} glues a digit outside an idiom"
                 )
-        elif e.action == "derive":
-            if not e.primitive or not e.derive_expr:
-                raise RegistryError(f"derive without primitive/expr: {e.current}")
-        elif e.action == "audit":
-            if not e.destination:
-                raise RegistryError(f"audit without destination: {e.current}")
-        else:  # retire, drop
-            if e.canonical:
-                raise RegistryError(f"{e.action} must not set canonical: {e.current}")
+        elif e.canonical:  # drop
+            raise RegistryError(f"{e.action} must not set canonical: {e.current}")
 
     # A canonical name must not collide with any legacy column name — otherwise
     # the new name shadows a column still present (or renamed elsewhere) at
@@ -554,40 +526,25 @@ def validate() -> None:
             f"{sorted(collisions)}"
         )
 
-    # Every derived complement must resolve to a stored primitive.
-    stored_by_table = {
-        table: canonical_names(table=table) for table in {e.table for e in REGISTRY}
-    }
-    for e in derived_columns():
-        if e.primitive not in stored_by_table[e.table]:
-            raise RegistryError(
-                f"derived {e.current} references unknown primitive {e.primitive!r} "
-                f"for table {e.table!r}"
-            )
-
 
 @dataclass(frozen=True)
 class RenamePlan:
     """A concrete plan to migrate one frame's columns.
 
     ``rename`` maps a surviving legacy column to its canonical name.
-    ``drop`` lists columns removed from this frame: redundant alias twins
-    (the survivor is renamed instead), retired and dead columns, and derived
-    complements (recomputed in a design matrix, not stored). ``audit`` columns
-    are intentionally left in place here; relocating them to metadata / an
-    audit artifact is a separate, destination-aware step.
+    ``drop`` lists columns removed from this frame: redundant canonicalize
+    twins (the survivor is renamed instead) and dead columns.
     """
 
     rename: dict[str, str]
     drop: tuple[str, ...]
-    audit_present: tuple[str, ...]
 
 
 def plan_rename(columns: Iterable[str], *, table: str) -> RenamePlan:
     """Compute the migration plan for a frame with these columns.
 
-    Pure and pandas-free: it decides names, not values. For an alias /
-    canonicalize group it keeps the first present member and drops the rest.
+    Pure and pandas-free: it decides names, not values. For a canonicalize
+    group it keeps the first present member and drops the rest.
     Raises :class:`RegistryError` if applying the plan would collide two
     columns onto one name.
     """
@@ -595,7 +552,6 @@ def plan_rename(columns: Iterable[str], *, table: str) -> RenamePlan:
     pset = set(present)
     rename: dict[str, str] = {}
     drop: list[str] = []
-    audit_present: list[str] = []
     for e in _entries_for(table):
         here = [c for c in e.current if c in pset]
         if not here:
@@ -603,18 +559,16 @@ def plan_rename(columns: Iterable[str], *, table: str) -> RenamePlan:
         if e.action in _RENAMING:
             assert e.canonical is not None
             rename[here[0]] = e.canonical
-            drop.extend(here[1:])  # collapse redundant alias twins
-        elif e.action in ("retire", "drop", "derive"):
+            drop.extend(here[1:])  # collapse redundant canonicalize twins
+        else:  # drop
             drop.extend(here)
-        elif e.action == "audit":
-            audit_present.extend(here)
 
     dropset = set(drop)
     outputs = [rename.get(c, c) for c in present if c not in dropset]
     if len(outputs) != len(set(outputs)):
         dupes = sorted({o for o in outputs if outputs.count(o) > 1})
         raise RegistryError(f"rename plan collides columns onto: {dupes}")
-    return RenamePlan(rename, tuple(drop), tuple(audit_present))
+    return RenamePlan(rename, tuple(drop))
 
 
 # ---------------------------------------------------------------------------
@@ -627,45 +581,22 @@ def plan_rename(columns: Iterable[str], *, table: str) -> RenamePlan:
 
 
 def apply_rename(df, *, table: str):  # type: ignore[no-untyped-def]
-    """Apply the mechanical rename to a frame: 1:1 renames and byte-identical
-    alias collapses only.
+    """Apply the mechanical rename to a frame: 1:1 renames only.
 
-    Numerically invariant. Each alias group is checked with ``Series.equals``
-    -- value-equal with a matching NaN mask and dtype -- before its redundant
-    twins are dropped and the survivor is renamed, so every output column holds
-    exactly the input values. Does NOT
-    touch numerical-path ``canonicalize`` families, ``retire`` / ``drop`` /
-    ``derive`` columns, or ``audit`` relocations -- those are separate steps
-    (:func:`canonicalize_numerical_paths`, :func:`plan_rename`'s ``drop`` /
-    ``audit_present``). Raises :class:`RegistryError` on an alias mismatch or a
+    Numerically invariant: every output column holds exactly the input values.
+    Does NOT touch numerical-path ``canonicalize`` families or ``drop``
+    columns -- those are separate steps (:func:`canonicalize_numerical_paths`,
+    :func:`plan_rename`'s ``drop``). Raises :class:`RegistryError` on a
     resulting name collision.
     """
     validate()
     present = set(df.columns)
     rename: dict[str, str] = {}
-    drop: list[str] = []
     for e in _entries_for(table):
         here = [c for c in e.current if c in present]
-        if not here:
-            continue
-        if e.action == "rename":
+        if here and e.action == "rename":
             rename[here[0]] = e.canonical  # type: ignore[assignment]
-        elif e.action == "alias":
-            # Some producer families naturally materialize only one spelling
-            # (for example ContFrag events have no separate classifier-label
-            # timestamp).  A lone member is therefore a plain rename.  When
-            # two or more aliases are present, equality is mandatory before
-            # collapsing them.
-            survivor = here[0]
-            for twin in here[1:]:
-                if not df[survivor].equals(df[twin]):
-                    raise RegistryError(
-                        f"alias twins are not bit-for-bit equal: {survivor!r} "
-                        f"vs {twin!r} (canonical {e.canonical!r})"
-                    )
-            rename[survivor] = e.canonical  # type: ignore[assignment]
-            drop.extend(here[1:])
-    out = df.drop(columns=drop).rename(columns=rename)
+    out = df.rename(columns=rename)
     if out.columns.duplicated().any():
         dupes = sorted(out.columns[out.columns.duplicated()])
         raise RegistryError(f"rename collides output columns onto: {dupes}")
