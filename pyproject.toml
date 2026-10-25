@@ -16,7 +16,6 @@ dependencies = [
 
     # Machine learning & JAX (CPU by default; install `cuda` extra for GPU)
     "jax>=0.4.4",
-    "optax",
 
     # Statistical analysis
     "statsmodels>=0.14.0",
@@ -29,8 +28,8 @@ dependencies = [
     "non_local_detector @ git+https://github.com/LorenFrankLab/non_local_detector.git",
     "spyglass-neuro @ git+https://github.com/LorenFrankLab/spyglass.git",
     "ripple-detection",       # pinned to a commit in [tool.uv.sources]
-    "kachery",                # database access
-    "kachery-client",
+    # spyglass.spikesorting.v0 imports kachery_cloud at import time, but
+    # Spyglass lists it only under an extra.
     "kachery-cloud>=0.4.0",
 
     # Visualization
@@ -56,6 +55,7 @@ dev = [
     "mypy>=1.0.0",
     "ruff>=0.4.0",
     "hypothesis>=6.0.0",
+    "pytest-cov>=7.1.0",
 ]
 
 # CUDA-accelerated JAX (Linux-only wheels). The plugin is named directly, not
@@ -68,7 +68,7 @@ cuda = [
 
 # GPU acceleration for Dask (optional, Linux-only)
 gpu = [
-    "jax-cuda12-plugin[with-cuda]==0.8.0; sys_platform == 'linux'",
+    "continuum-swr-replay[cuda]",
     "dask-cuda>=24.12.0",
     "cuda-bindings>=12.0.0",  # Required by dask-cuda but not declared as dependency
 ]
@@ -131,11 +131,6 @@ markers = [
 [build-system]
 requires = ["uv_build>=0.8.23,<0.9.0"]
 build-backend = "uv_build"
-
-[dependency-groups]
-dev = [
-    "pytest-cov>=7.1.0",
-]
 
 [tool.uv]
 # Spyglass HEAD pins numpy<2 / scipy<1.13 / jax<0.7.2 with

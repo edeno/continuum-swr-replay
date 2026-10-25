@@ -18,15 +18,6 @@ overrides = [
 ]
 
 [[package]]
-name = "absl-py"
-version = "2.3.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/10/2a/c93173ffa1b39c1d0395b7e842bbdc62e556ca9d8d3b5572926f3e4ca752/absl_py-2.3.1.tar.gz", hash = "sha256:a97820526f7fbfd2ec1bce83f3f25e3a14840dac0d8e02a0b71cd75db3f77fc9", size = 116588, upload-time = "2025-07-03T09:31:44.05Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/aa/ba0014cc4659328dc818a28827be78e6d97312ab0cb98105a770924dc11e/absl_py-2.3.1-py3-none-any.whl", hash = "sha256:eeecf07f0c2a93ace0772c92e596ace6d3d3996c042b2128459aaae2a76de11d", size = 135811, upload-time = "2025-07-03T09:31:42.253Z" },
-]
-
-[[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
 source = { registry = "https://pypi.org/simple" }
@@ -484,23 +475,6 @@ wheels = [
 ]
 
 [[package]]
-name = "chex"
-version = "0.1.91"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "absl-py" },
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "numpy" },
-    { name = "toolz" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/7d/812f01e7b2ddf28a0caa8dde56bd951a2c8f691c9bbfce38d469458d1502/chex-0.1.91.tar.gz", hash = "sha256:65367a521415ada905b8c0222b0a41a68337fcadf79a1fb6fc992dbd95dd9f76", size = 90302, upload-time = "2025-09-01T21:49:32.834Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/0c/96102c01dd02ae740d4afc3644d5c7d7fc51d3feefd67300a2aa1ddbf7cb/chex-0.1.91-py3-none-any.whl", hash = "sha256:6fc4cbfc22301c08d4a7ef706045668410100962eba8ba6af03fa07f4e5dcf9b", size = 100965, upload-time = "2025-09-01T21:49:31.141Z" },
-]
-
-[[package]]
 name = "click"
 version = "8.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -558,15 +532,12 @@ dependencies = [
     { name = "holoviews" },
     { name = "jax" },
     { name = "joblib" },
-    { name = "kachery" },
-    { name = "kachery-client" },
     { name = "kachery-cloud" },
     { name = "matplotlib" },
     { name = "netcdf4" },
     { name = "networkx" },
     { name = "non-local-detector" },
     { name = "numpy" },
-    { name = "optax" },
     { name = "pandas" },
     { name = "panel" },
     { name = "patsy" },
@@ -590,6 +561,7 @@ dev = [
     { name = "jupyterlab" },
     { name = "mypy" },
     { name = "pytest" },
+    { name = "pytest-cov" },
     { name = "ruff" },
 ]
 gpu = [
@@ -598,13 +570,9 @@ gpu = [
     { name = "jax-cuda12-plugin", extra = ["with-cuda"], marker = "sys_platform == 'linux'" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest-cov" },
-]
-
 [package.metadata]
 requires-dist = [
+    { name = "continuum-swr-replay", extras = ["cuda"], marker = "extra == 'gpu'" },
     { name = "cuda-bindings", marker = "extra == 'gpu'", specifier = ">=12.0.0" },
     { name = "dask", specifier = ">=2023.1.0" },
     { name = "dask", extras = ["distributed"] },
@@ -614,11 +582,8 @@ requires-dist = [
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "jax", specifier = ">=0.4.4" },
     { name = "jax-cuda12-plugin", extras = ["with-cuda"], marker = "sys_platform == 'linux' and extra == 'cuda'", specifier = "==0.8.0" },
-    { name = "jax-cuda12-plugin", extras = ["with-cuda"], marker = "sys_platform == 'linux' and extra == 'gpu'", specifier = "==0.8.0" },
     { name = "joblib", specifier = ">=1.3.0" },
     { name = "jupyterlab", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "kachery" },
-    { name = "kachery-client" },
     { name = "kachery-cloud", specifier = ">=0.4.0" },
     { name = "matplotlib", specifier = ">=3.7.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0.0" },
@@ -626,12 +591,12 @@ requires-dist = [
     { name = "networkx", specifier = ">=3.0" },
     { name = "non-local-detector", git = "https://github.com/LorenFrankLab/non_local_detector.git" },
     { name = "numpy", specifier = ">=1.24.0" },
-    { name = "optax" },
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "panel", specifier = ">=1.2.0" },
     { name = "patsy", specifier = ">=0.5.3" },
     { name = "pyarrow", specifier = ">=14.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0" },
     { name = "ripple-detection", git = "https://github.com/Eden-Kramer-Lab/ripple_detection.git?rev=9766fd4875ff2372ebe94f27182af0f7c9f4db5e" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
     { name = "scikit-learn", specifier = ">=1.3.0" },
@@ -643,9 +608,6 @@ requires-dist = [
     { name = "xarray", specifier = ">=2023.1.0" },
 ]
 provides-extras = ["dev", "cuda", "gpu"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest-cov", specifier = ">=7.1.0" }]
 
 [[package]]
 name = "contourpy"
@@ -1480,17 +1442,6 @@ wheels = [
 ]
 
 [[package]]
-name = "jinjaroot"
-version = "0.0.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "jinja2" },
-    { name = "pyyaml" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/58/14/bbc3706191af5f459a3c0083f22d956939811b2eda23b610dd7c0e5a2293/jinjaroot-0.0.6.tar.gz", hash = "sha256:d62bdfbb03e67ae8747cf0ecdb4c9e6a1f997334f136f2c18d9a6a8aff5f4c1a", size = 4855, upload-time = "2021-06-17T14:39:38.821Z" }
-
-[[package]]
 name = "joblib"
 version = "1.5.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1734,19 +1685,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/02/b2/b2a139d00b56a47e0
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/4c/e92a909b0352e52387144fd21189e01584905fedc06b9d44392b06e4ed78/kachery-2.0.2-py3-none-any.whl", hash = "sha256:06145778294e1fc5d3f041deb5bc07f026b16451230ab53b1cac319cfa9f320e", size = 18886, upload-time = "2024-11-28T14:44:31.015Z" },
 ]
-
-[[package]]
-name = "kachery-client"
-version = "1.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "click" },
-    { name = "cryptography" },
-    { name = "jinjaroot" },
-    { name = "requests" },
-    { name = "simplejson" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/83/e7/f445d10a80fdf759179cd63a1b763085fb3b41f7e29575834a6e906dc459/kachery_client-1.2.0.tar.gz", hash = "sha256:b88b6fa8a1c834761bdd0b3bfc02bd0b3789ef28e7e2d962f8765ec57d252178", size = 37139, upload-time = "2022-03-08T22:15:01.452Z" }
 
 [[package]]
 name = "kachery-cloud"
@@ -2559,22 +2497,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/8c/b9/2ac072041e899a52f20cf9510850ff58295003aa75525e58343591b0cbfb/opt_einsum-3.4.0.tar.gz", hash = "sha256:96ca72f1b886d148241348783498194c577fa30a8faac108586b14f1ba4473ac", size = 63004, upload-time = "2024-09-26T14:33:24.483Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl", hash = "sha256:69bb92469f86a1565195ece4ac0323943e83477171b91d24c35afe028a90d7cd", size = 71932, upload-time = "2024-09-26T14:33:23.039Z" },
-]
-
-[[package]]
-name = "optax"
-version = "0.2.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "absl-py" },
-    { name = "chex" },
-    { name = "jax" },
-    { name = "jaxlib" },
-    { name = "numpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6d/3b/90c11f740a3538200b61cd2b7d9346959cb9e31e0bdea3d2f886b7262203/optax-0.2.6.tar.gz", hash = "sha256:ba8d1e12678eba2657484d6feeca4fb281b8066bdfd5efbfc0f41b87663109c0", size = 269660, upload-time = "2025-09-15T22:41:24.76Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b8/ec/19c6cc6064c7fc8f0cd6d5b37c4747849e66040c6ca98f86565efc2c227c/optax-0.2.6-py3-none-any.whl", hash = "sha256:f875251a5ab20f179d4be57478354e8e21963373b10f9c3b762b94dcb8c36d91", size = 367782, upload-time = "2025-09-15T22:41:22.825Z" },
 ]
 
 [[package]]
