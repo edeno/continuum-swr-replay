@@ -52,7 +52,6 @@ from ._fit_diagnostics import (
 from .model_specs import (
     ARRIVAL_CLOCK_COLUMN,
     REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_INCOMPLETE,
     TMAX_ARRIVAL,
     PerBinRateModelSpec,
 )
@@ -75,36 +74,12 @@ _EXPECTED_FIT_ERRORS = (
 
 
 def _design_columns(spec: PerBinRateModelSpec) -> list[str]:
-    """Columns the spec's formula references (besides the offset's ``exposure``)."""
-    cols = ["count"]
-    if spec.time_clock == "arrival":
-        # An arrival rung lives on the arrival clock whether or not it splines
-        # it: the runner windows it on that column, so a bin without one is not
-        # in the rung's support and must leave the ladder's common cohort.
-        cols.append(ARRIVAL_CLOCK_COLUMN)
-    if spec.time_spline or spec.reward_time_interaction:
-        cols.append("tc" if spec.time_clock == "stop" else ARRIVAL_CLOCK_COLUMN)
-    if spec.reward_basis:
-        cols += [
-            *REWARD_HISTORY_COLUMNS[: spec.reward_basis],
-            REWARD_HISTORY_INCOMPLETE,
-        ]
-    if spec.reward_time_interaction and not spec.reward_basis:
-        cols.append(REWARD_HISTORY_COLUMNS[0])
-    if spec.reward_rate:
-        cols.append("reward_fraction_last10_known_trials")
-    if spec.self_history_basis:
-        cols += [f"hist_rcos_{k}" for k in range(spec.self_history_basis)]
-    else:
-        cols += [f"onset_lag{j}" for j in range(1, spec.self_history_lags + 1)]
-    if spec.cross_history_basis:
-        cols += [f"cross_hist_rcos_{k}" for k in range(spec.cross_history_basis)]
-    else:
-        cols += [f"cross_lag{j}" for j in range(1, spec.cross_history_lags + 1)]
-    # spec.switch is retired: the per-bin switch main effect (M8) was removed,
-    # so is_after_switch is never built into a per-bin design.
-    cols += list(spec.extra_covariates)
-    return list(dict.fromkeys(cols))  # de-duplicate, preserve order
+    """Columns the spec's formula references (besides the offset's ``exposure``).
+
+    :meth:`PerBinRateModelSpec.design_columns`, read from the same term list
+    as the spec's formula.
+    """
+    return spec.design_columns()
 
 
 def freeze_per_bin_cohort(

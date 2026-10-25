@@ -296,6 +296,12 @@ Visit-recency covariates: how recently (and whether ever) each arm was visited, 
 
 `center_visit_recency_within_event`, `spline_visit_recency_within_event`, `visit_recency_all_events`, `arm_never_visited_all_events`, `visit_recency_and_never_visited_all_events`
 
+### `src/continuum_swr_replay/analysis/replay/covariates/interactions.py`
+
+The interaction (product) design columns, each declared once with its factors.
+
+`factor_source`, `interaction_product`, `attach_interactions`
+
 ### `src/continuum_swr_replay/analysis/replay/spatial.py`
 
 Graph-spatial helpers for per-arm predictors and QC metrics.
@@ -346,7 +352,7 @@ _No module-level public symbols._
 
 Model definitions for replay content analysis.
 
-`ModelSpec`, `default_content_model_names`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`
+`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`
 
 ## Fitters
 

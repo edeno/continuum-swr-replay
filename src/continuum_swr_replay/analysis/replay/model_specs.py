@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import pandas as pd
 
@@ -97,6 +98,7 @@ __all__ = [
     "POST_OUTCOME_RATE_RUNGS",
     "PRIMARY_COHORT",
     "PerBinRateModelSpec",
+    "PerBinTerm",
     "RECENCY_SPLINE_BOUNDS",
     "RECENCY_SPLINE_COLUMNS",
     "RECENCY_SPLINE_KNOTS",
@@ -530,6 +532,69 @@ _ARRIVAL_SPLINE = (
     f"bs({ARRIVAL_CLOCK_COLUMN}, knots={ARRIVAL_SPLINE_KNOTS}, "
     f"lower_bound=0.0, upper_bound={TMAX_ARRIVAL})"
 )
+
+
+class PerBinTerm(NamedTuple):
+    """One additive term of a per-bin formula and the design columns it reads.
+
+    A per-bin rung is a list of these: its patsy formula joins the ``term``
+    strings and its design columns are the ``columns`` in order, so the two
+    cannot disagree.
+
+    Attributes
+    ----------
+    term : str
+        The term as written in the patsy formula.
+    columns : tuple of str
+        The design columns the term reads (a spline reads its clock column).
+    history_lags : int
+        Bins of event history (the stop's own events, or a cross stream's) the
+        term looks back over; 0 for a term that reads no event history. Sets
+        the ladder's history window.
+    """
+
+    term: str
+    columns: tuple[str, ...]
+    history_lags: int = 0
+
+
+def _spline_term(time_clock: str) -> PerBinTerm:
+    """The time-course spline on the stop clock (``tc``) or the arrival clock."""
+    if time_clock == "arrival":
+        return PerBinTerm(_ARRIVAL_SPLINE, (ARRIVAL_CLOCK_COLUMN,))
+    return PerBinTerm(_SPLINE, ("tc",))
+
+
+def _column_terms(columns: Iterable[str], history_lags: int = 0) -> list[PerBinTerm]:
+    """One plain linear term per design column."""
+    return [PerBinTerm(column, (column,), history_lags) for column in columns]
+
+
+def _interaction(*factors: PerBinTerm) -> PerBinTerm:
+    """The patsy ``a:b`` interaction of ``factors``; reads all their columns."""
+    columns = tuple(dict.fromkeys(c for factor in factors for c in factor.columns))
+    return PerBinTerm(":".join(factor.term for factor in factors), columns)
+
+
+def _reward_basis_terms(n_basis: int) -> list[PerBinTerm]:
+    """The first ``n_basis`` reward-history features plus the missingness flag."""
+    return _column_terms((*REWARD_HISTORY_COLUMNS[:n_basis], REWARD_HISTORY_INCOMPLETE))
+
+
+def _history_terms(prefix: str, n_lags: int, n_basis: int) -> list[PerBinTerm]:
+    """An event-history block over ``n_lags`` bins.
+
+    ``{prefix}hist_rcos_{k}`` raised-cosine features when ``n_basis > 0``, else
+    the per-lag ``onset_lag{j}`` (self) / ``cross_lag{j}`` (cross) dummies.
+    """
+    if n_basis:
+        columns = [f"{prefix}hist_rcos_{k}" for k in range(n_basis)]
+    else:
+        lag = f"{prefix}lag" if prefix else "onset_lag"
+        columns = [f"{lag}{j}" for j in range(1, n_lags + 1)]
+    return _column_terms(columns, n_lags)
+
+
 # Per-stop covariates the shipped ladder needs beyond the reward-history basis
 # and the self-history lags — carried into the per-bin design by
 # aggregate_to_timebins. Shared by the fitter orchestrator and the
@@ -546,8 +611,9 @@ class PerBinRateModelSpec:
     Parallel to :class:`ModelSpec` (kept separate so the simpler arm/patch/
     per-stop families are unaffected). The toggle fields drive both
     :func:`per_bin_design.aggregate_to_timebins` (which columns to build) and
-    :meth:`formula` (the patsy formula), so the spec is the single source of
-    truth for each model.
+    :meth:`terms`, the one list of (term, columns) that :meth:`formula` (the
+    patsy formula), :meth:`design_columns` and :meth:`history_lags` are read
+    from, so the spec is the single source of truth for each model.
 
     Attributes
     ----------
@@ -647,33 +713,56 @@ class PerBinRateModelSpec:
                 "re-enable it; use a dedicated switch analysis instead."
             )
 
-    def formula(self) -> str:
-        """patsy formula (response ``count``; the offset is applied at fit time)."""
-        spline = _ARRIVAL_SPLINE if self.time_clock == "arrival" else _SPLINE
-        terms: list[str] = []
+    def terms(self) -> list[PerBinTerm]:
+        """The rung's formula terms, in formula order, each with its columns.
+
+        The one statement of what a rung fits: :meth:`formula`,
+        :meth:`design_columns` and :meth:`history_lags` all read it.
+        """
+        spline = _spline_term(self.time_clock)
+        terms: list[PerBinTerm] = []
         if self.time_spline:
             terms.append(spline)
         if self.reward_basis:
-            terms += [
-                *REWARD_HISTORY_COLUMNS[: self.reward_basis],
-                REWARD_HISTORY_INCOMPLETE,
-            ]
+            terms += _reward_basis_terms(self.reward_basis)
         if self.reward_rate:
-            terms.append("reward_fraction_last10_known_trials")
-        if self.self_history_basis:
-            terms += [f"hist_rcos_{k}" for k in range(self.self_history_basis)]
-        else:
-            terms += [f"onset_lag{j}" for j in range(1, self.self_history_lags + 1)]
-        if self.cross_history_basis:
-            terms += [f"cross_hist_rcos_{k}" for k in range(self.cross_history_basis)]
-        else:
-            terms += [f"cross_lag{j}" for j in range(1, self.cross_history_lags + 1)]
+            terms += _column_terms(("reward_fraction_last10_known_trials",))
+        terms += _history_terms("", self.self_history_lags, self.self_history_basis)
+        terms += _history_terms(
+            "cross_", self.cross_history_lags, self.cross_history_basis
+        )
         # ``switch`` is retired (see the field docstring); the completed-trip
         # switch flag is never added to a per-bin model.
         if self.reward_time_interaction:
-            terms.append(f"{REWARD_HISTORY_COLUMNS[0]}:{spline}")
-        terms += list(self.extra_covariates)
+            (immediate,) = _column_terms(REWARD_HISTORY_COLUMNS[:1])
+            terms.append(_interaction(immediate, spline))
+        terms += _column_terms(self.extra_covariates)
+        return terms
+
+    def formula(self) -> str:
+        """patsy formula (response ``count``; the offset is applied at fit time)."""
+        terms = [term.term for term in self.terms()]
         return "count ~ " + (" + ".join(terms) if terms else "1")
+
+    def design_columns(self) -> list[str]:
+        """Columns the rung's formula references (besides the offset's ``exposure``).
+
+        ``count``, then (for an arrival rung) the arrival clock, then each
+        term's columns in formula order, without repeats.
+        """
+        cols = ["count"]
+        if self.time_clock == "arrival":
+            # An arrival rung lives on the arrival clock whether or not it
+            # splines it: the runner windows it on that column, so a bin without
+            # one is not in the rung's support and must leave the ladder's
+            # common cohort.
+            cols.append(ARRIVAL_CLOCK_COLUMN)
+        cols += [column for term in self.terms() for column in term.columns]
+        return list(dict.fromkeys(cols))
+
+    def history_lags(self) -> int:
+        """Bins of event history the rung's longest-reaching term looks back."""
+        return max((term.history_lags for term in self.terms()), default=0)
 
 
 _NB = REWARD_HISTORY_N_BASIS
@@ -1003,57 +1092,83 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
 # scripts/content/fit_swr_contrast_content.py
 # so this module is the single source of truth for every model family. The runners
 # import the SWR_CONTRAST_* exports below and keep only their data-assembly/fit code.
-# Reuses the module-level _SPLINE / N_REWARD_LAGS / N_HISTORY_BASIS defined above.
+# Built from the same term helpers as PerBinRateModelSpec.terms.
 
 # --- Rate is_swr-contrast ladder (per-bin Poisson: G0-G8 stratified, S0-S10 contrast) ---
-_REWBASIS = " + ".join(REWARD_HISTORY_COLUMNS)
-_HISTCOS = " + ".join(f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS))
-_BLOCK_F = {
-    "BASE": f"{_SPLINE} + {_REWBASIS} + {_HISTCOS}",
-    "PERISWITCH": (
-        "periswitch_index_trials + is_periswitch_post + "
-        "periswitch_index_trials:is_periswitch_post"
+# Each block is a tuple of formula terms with their columns. BASE is the time
+# spline + the full reward-history basis + the raised-cosine self-history.
+_BLOCKS: dict[str, tuple[PerBinTerm, ...]] = {
+    "BASE": (
+        _spline_term("stop"),
+        *_reward_basis_terms(REWARD_HISTORY_N_BASIS),
+        *_history_terms("", N_HISTORY_LAGS, N_HISTORY_BASIS),
     ),
-    "BLOCK": "trials_since_block_change",
-    "SWITCHRATE": "patch_switch_fraction_last5_completed_trips",
+    "PERISWITCH": (
+        *_column_terms(("periswitch_index_trials", "is_periswitch_post")),
+        _interaction(*_column_terms(("periswitch_index_trials", "is_periswitch_post"))),
+    ),
+    "BLOCK": tuple(_column_terms(("trials_since_block_change",))),
+    "SWITCHRATE": tuple(
+        _column_terms(("patch_switch_fraction_last5_completed_trips",))
+    ),
     # beta relative value DeltaV. Sign convention: Switch - Stay; ~= -(current stay value), r = -0.952 with stay_sibling_mu_preoutcome_sess and -0.890 with q_chosen, so a POSITIVE coefficient means the current option's value is LOW.
     # An earlier "Stay-vs-Switch" label here had it backwards.
-    "VALUE": "relative_value_switch_minus_stay_preoutcome",
-    "RPE": "rpe_postoutcome",  # beta reward prediction error (reward - q_chosen)
-    "UNCERT": "reward_belief_differential_entropy_leaf_mean_preoutcome",  # beta belief entropy (per-leaf Beta differential entropy)
-    "UPDATE": "reward_belief_mean_update_l1_all_ports_postoutcome",  # beta value-update magnitude
+    "VALUE": tuple(_column_terms(("relative_value_switch_minus_stay_preoutcome",))),
+    # beta reward prediction error (reward - q_chosen)
+    "RPE": tuple(_column_terms(("rpe_postoutcome",))),
+    # beta belief entropy (per-leaf Beta differential entropy)
+    "UNCERT": tuple(
+        _column_terms(("reward_belief_differential_entropy_leaf_mean_preoutcome",))
+    ),
+    # beta value-update magnitude
+    "UPDATE": tuple(
+        _column_terms(("reward_belief_mean_update_l1_all_ports_postoutcome",))
+    ),
     # immediate reward-history component x within-stop time course (dwell-shape)
-    "REWXTIME": f"{REWARD_HISTORY_COLUMNS[0]}:{_SPLINE}",
+    "REWXTIME": (
+        _interaction(*_column_terms(REWARD_HISTORY_COLUMNS[:1]), _spline_term("stop")),
+    ),
 }
-_BLOCK_COLS = {
-    "BASE": [
-        "tc",
-        *REWARD_HISTORY_COLUMNS,
-        REWARD_HISTORY_INCOMPLETE,
-        *[f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)],
-    ],
-    "PERISWITCH": ["periswitch_index_trials", "is_periswitch_post"],
-    "BLOCK": ["trials_since_block_change"],
-    "SWITCHRATE": ["patch_switch_fraction_last5_completed_trips"],
-    "VALUE": ["relative_value_switch_minus_stay_preoutcome"],
-    "RPE": ["rpe_postoutcome"],
-    "UNCERT": ["reward_belief_differential_entropy_leaf_mean_preoutcome"],
-    "UPDATE": ["reward_belief_mean_update_l1_all_ports_postoutcome"],
-    "REWXTIME": [REWARD_HISTORY_COLUMNS[0], "tc"],
-}
+
+
+def _block_formula(block: str) -> str:
+    """A block's formula fragment.
+
+    ``REWARD_HISTORY_INCOMPLETE`` is left out: it is a structural-missingness
+    nuisance main effect that every rung appends once, outside any ``is_swr *
+    (...)`` expansion, while the block's columns still carry it.
+    """
+    return " + ".join(
+        term.term for term in _BLOCKS[block] if term.term != REWARD_HISTORY_INCOMPLETE
+    )
+
+
+def _block_cols(block: str) -> list[str]:
+    """A block's design columns, in term order, without repeats."""
+    return list(dict.fromkeys(c for term in _BLOCKS[block] for c in term.columns))
+
+
 SWR_CONTRAST_RATE_STOP_COVARS = tuple(
     c
     for b in ("PERISWITCH", "BLOCK", "SWITCHRATE", "VALUE", "RPE", "UNCERT", "UPDATE")
-    for c in _BLOCK_COLS[b]
+    for c in _block_cols(b)
 )
+# Bins of event history each column's term looks back over, from the blocks.
+_CONTRAST_HISTORY_LAGS = {
+    c: term.history_lags
+    for terms in _BLOCKS.values()
+    for term in terms
+    if term.history_lags
+    for c in term.columns
+}
 
 
 def _blocks_formula(blocks):
-    return " + ".join(_BLOCK_F[b] for b in blocks)
+    return " + ".join(_block_formula(b) for b in blocks)
 
 
 def _blocks_cols(blocks):
-    return [c for b in blocks for c in _BLOCK_COLS[b]]
+    return [c for b in blocks for c in _block_cols(b)]
 
 
 def _g_specs():
@@ -1079,14 +1194,11 @@ def _g_specs():
 
 def _s_specs():
     """is_swr-contrast rungs; see :func:`_g_specs` for the indicator."""
-    b = _BLOCK_F
-    base, peri, blk, swr = b["BASE"], b["PERISWITCH"], b["BLOCK"], b["SWITCHRATE"]
+    base, peri, blk, swr = (
+        _block_formula(b) for b in ("BASE", "PERISWITCH", "BLOCK", "SWITCHRATE")
+    )
     val, rpe, unc, upd, rxt = (
-        b["VALUE"],
-        b["RPE"],
-        b["UNCERT"],
-        b["UPDATE"],
-        b["REWXTIME"],
+        _block_formula(b) for b in ("VALUE", "RPE", "UNCERT", "UPDATE", "REWXTIME")
     )
     raw = {
         "S0_rate": (f"is_swr + {base}", ["BASE"]),
@@ -1125,10 +1237,11 @@ def longest_history_window_s(
     A ladder is fit on one frozen cohort, so its bins are dropped by the
     window of its longest-reaching rung: a bin whose window touches the
     artifact mask reads unobserved time (``per_bin_design.aggregate_to_timebins``,
-    ``history_window_s``). A rung's window is its self- or cross-history lags
-    times ``BIN_S``; an is_swr-contrast rung (``(formula, columns)``) reaches
-    back ``N_HISTORY_LAGS`` bins when it carries the self-history basis. The
-    reward-history block reads trial outcomes, not neural time, and adds none.
+    ``history_window_s``). A rung's window is the longest ``history_lags`` of
+    its terms (:class:`PerBinTerm`) times ``BIN_S``; an is_swr-contrast rung
+    (``(formula, columns)``) reaches as far as the block terms its columns come
+    from. The reward-history block reads trial outcomes, not neural time, and
+    adds none.
 
     Parameters
     ----------
@@ -1144,11 +1257,10 @@ def longest_history_window_s(
     n_lags = 0
     for rung in rungs:
         if isinstance(rung, PerBinRateModelSpec):
-            n_lags = max(n_lags, rung.self_history_lags, rung.cross_history_lags)
+            n_lags = max(n_lags, rung.history_lags())
         else:
             _, columns = rung
-            if any(str(c).startswith(("hist_rcos_", "onset_lag")) for c in columns):
-                n_lags = max(n_lags, N_HISTORY_LAGS)
+            n_lags = max([n_lags, *(_CONTRAST_HISTORY_LAGS.get(c, 0) for c in columns)])
     return n_lags * BIN_S
 
 
