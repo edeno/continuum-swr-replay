@@ -65,7 +65,7 @@ ALL_MODELS = MODEL_DIR / "all_models.pkl"
 # The table fit_replay_content_models.py fit the canonical arm bundle on.
 # Checked against each artifact's provenance sidecar before plotting, so a
 # figure cannot be rendered from coefficients that predate the table on disk.
-ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC, fmt="pkl")}
+ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC)}
 OUTPUT_DIR = figure_dir("replay_content")
 
 

@@ -952,14 +952,14 @@ def test_runner_smoke():
     )
 
     rc = REPLAY_CONTENT_DIR
-    qvals_path = table_path("qvals_table", rc, fmt="pkl")
+    qvals_path = table_path("qvals_table", rc)
     if not table_exists(qvals_path):
         pytest.fail(
             "qvals_table not present (run "
             "`uv run python scripts/behavior/build_qvals_table.py --write` first)"
         )
 
-    stop = read_table(table_path("stop_table", rc, fmt="pkl"))
+    stop = read_table(table_path("stop_table", rc))
     canonical_columns = {
         "completed_trial_id",
         "completed_trial_arm",
@@ -969,8 +969,8 @@ def test_runner_smoke():
     }
     if not canonical_columns.issubset(stop.columns):
         pytest.fail("canonical stop_table.pkl has not been regenerated")
-    onset_table = read_table(table_path("event_onset_table", rc, fmt="pkl"))
-    event_table = read_table(table_path("event_table", rc, fmt="pkl"))
+    onset_table = read_table(table_path("event_onset_table", rc))
+    event_table = read_table(table_path("event_table", rc))
     # The helper freezes the shared natural-session cohort and warns about any
     # independently regenerated onset-only/event-only sessions. Unit tests pin
     # that warning/audit; this slow smoke should continue across the shared

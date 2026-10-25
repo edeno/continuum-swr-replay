@@ -34,9 +34,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 
 def main() -> None:
-    ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
-    et = read_table(table_path("event_table", RC, fmt="pkl"))
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    ea = read_table(table_path("event_arm_table", RC))
+    et = read_table(table_path("event_table", RC))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(ea, table="event_arm")
     require_covariate_schema(et, table="event")
     require_covariate_schema(stop, table="stop")

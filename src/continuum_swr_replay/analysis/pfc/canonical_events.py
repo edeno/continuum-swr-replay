@@ -168,9 +168,7 @@ def load_session_canonical_events(
         .sort_values("start_time")
         .reset_index(drop=True)
     )
-    # Hash the file ``read_table`` resolved, not the parquet name: a directory
-    # still holding the pickle form would otherwise be hashed at a path that
-    # does not exist.
+    # Hash the file ``read_table`` opened (a suffix-less path names its parquet).
     return events, sha256_file(resolved_table_path(path))
 
 

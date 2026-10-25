@@ -36,7 +36,7 @@ from continuum_swr_replay.paths import (
     REPLAY_CONTENT_DIR,
     table_path,
 )
-from continuum_swr_replay.tables.io import parquet_path, table_exists
+from continuum_swr_replay.tables.io import parquet_path
 
 _SIDECAR_SUFFIX = ".provenance.json"
 DEFAULT_ROOT = REPLAY_CONTENT_DIR
@@ -69,15 +69,20 @@ def resolve_input(name: str, sidecar: Path, root: Path) -> Path | None:
     (:data:`~continuum_swr_replay.paths.CANONICAL_TABLE_BASENAMES`) is looked up
     at the ``replay_content`` root only, so a copy or a symlink at an old place
     beside the sidecar cannot stand in for it. Any other input is an
-    aggregate-only run's fit, looked up beside the sidecar, then at the root.
-    Returns the first candidate that exists in either table form.
+    aggregate-only run's fit (a pickle) or a non-canonical table (parquet, such
+    as a ContFrag table), looked up beside the sidecar, then at the root, the
+    parquet first in each. Returns the first candidate that exists.
     """
     if name in CANONICAL_TABLE_BASENAMES:
-        candidates: tuple[Path, ...] = (table_path(name, root, fmt="pkl"),)
+        candidates: tuple[Path, ...] = (table_path(name, root),)
     else:
-        candidates = (sidecar.parent / f"{name}.pkl", root / f"{name}.pkl")
+        candidates = tuple(
+            folder / f"{name}{suffix}"
+            for folder in (sidecar.parent, root)
+            for suffix in (".parquet", ".pkl")
+        )
     for candidate in candidates:
-        if table_exists(candidate):
+        if candidate.exists():
             return candidate
     return None
 

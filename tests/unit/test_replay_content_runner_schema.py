@@ -15,6 +15,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import check_fit_proven
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
+from continuum_swr_replay.tables.io import write_table
 from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     save_reference,
@@ -136,7 +137,7 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
             "is_candidate_arm_never_visited",
         ]
     )
-    stale.to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(stale, input_dir / "event_arm_table.parquet")
 
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("schema validation must run before model fitting")
@@ -194,7 +195,7 @@ def test_a_table_from_another_swr_source_is_refused(tmp_path, monkeypatch):
     input_dir.mkdir()
     frame = _canonical_arm_table()
     frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
-    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(frame, input_dir / "event_arm_table.parquet")
 
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("the source check must run before model fitting")
@@ -213,7 +214,7 @@ def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypa
     """A complete canonical request reaches the real fitter and canonical outputs."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -234,7 +235,7 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     frame = _canonical_arm_table()
-    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(frame, input_dir / "event_arm_table.parquet")
     requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
     calls = []
 
@@ -273,8 +274,9 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
 def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().drop(columns="swr_x_is_current_arm").to_pickle(
-        input_dir / "event_arm_table.pkl"
+    write_table(
+        _canonical_arm_table().drop(columns="swr_x_is_current_arm"),
+        input_dir / "event_arm_table.parquet",
     )
 
     def _fit_must_not_run(*args, **kwargs):
@@ -307,7 +309,7 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
     frame, legacy = attach_standardized(
         frame, ["reward_belief_variance_candidate_arm_preoutcome"]
     )
-    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(frame, input_dir / "event_arm_table.parquet")
     # Simulate the shipped pre-fix sidecar: right mean/SD keys, no scientific
     # support metadata, and moments computed over all nine candidates.
     (input_dir / "standardization_reference.json").write_text(
@@ -368,7 +370,7 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     frame.loc[event_mask, "at_well"] = False
     frame.loc[event_mask, ["occupancy_well_id", "occupancy_well_arm"]] = np.nan
     frame.loc[event_mask, "is_current_arm"] = 0.0
-    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(frame, input_dir / "event_arm_table.parquet")
 
     def _fit_must_not_run(*args, **kwargs):
         pytest.fail("location contract validation must run before fitting")
@@ -526,7 +528,7 @@ def test_each_session_event_requires_the_exact_candidate_set():
 def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _fit_with_empty_late_rung(long_df, model_name, predictors, **kwargs):
         if model_name == "M1":
@@ -563,7 +565,7 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
     output_dir.mkdir(parents=True)
     sentinel = output_dir / "previous_complete_run.txt"
     sentinel.write_text("unchanged")
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _fit_then_raise(long_df, model_name, predictors, **kwargs):
         if model_name == "M1":
@@ -600,7 +602,7 @@ def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatc
     output_dir = _partial_ladder_dir(input_dir, "M0")
     output_dir.mkdir(parents=True)
     (output_dir / "M7.pkl").write_bytes(b"stale later rung")
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -614,7 +616,7 @@ def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatc
 def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _wrong_cohort_size(long_df, model_name, predictors, **kwargs):
         return pd.DataFrame(
@@ -646,7 +648,7 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
     input_dir.mkdir()
     frame = _canonical_arm_table(n_events=4)
     frame.loc[frame["event_id"].ge(2), "animal"] = "b"
-    frame.to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(frame, input_dir / "event_arm_table.parquet")
 
     def _fit_with_one_late_session_failure(long_df, model_name, predictors, **kwargs):
         rows = []
@@ -696,7 +698,7 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     # Two events are enough for the null primary fit but not 5-fold CV.
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys,
@@ -715,7 +717,7 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
 def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _primary_without_cv(long_df, model_name, predictors, **kwargs):
         assert kwargs["run_cv"] is True
@@ -750,7 +752,9 @@ def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypat
     input_dir.mkdir()
     # Five-fold CV requires at least ten events; exercise the real null-model
     # fit and CV path rather than only a mocked result dictionary.
-    _canonical_arm_table(n_events=10).to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(
+        _canonical_arm_table(n_events=10), input_dir / "event_arm_table.parquet"
+    )
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys,
@@ -783,7 +787,7 @@ def _one_session_primary_result(long_df, model_name):
 def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -809,7 +813,7 @@ def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch
 def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -848,8 +852,8 @@ def test_published_bundle_carries_the_hash_of_the_table_it_was_fit_on(
     """The sidecar is what lets a reader refuse a fit whose table has moved."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    table = input_dir / "event_arm_table.pkl"
-    _canonical_arm_table().to_pickle(table)
+    table = input_dir / "event_arm_table.parquet"
+    write_table(_canonical_arm_table(), table)
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
@@ -872,7 +876,7 @@ def test_count_run_publishes_beside_the_fraction_bundle(tmp_path, monkeypatch):
     """A count fit is on a different scale, so it gets a different directory."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    _canonical_arm_table().to_pickle(input_dir / "event_arm_table.pkl")
+    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
         sys,

@@ -78,7 +78,7 @@ def _pool(coefs_by_pred):
 
 def main():
     # Arm: arm FE + one predictor (conditional Poisson on arm counts).
-    arm_tbl = read_table(table_path("event_arm_table", RC, fmt="pkl"))
+    arm_tbl = read_table(table_path("event_arm_table", RC))
     require_covariate_schema(arm_tbl, table="event_arm")
     arm_tbl = add_arm_fixed_effects(arm_tbl)
     logging.info("arm univariate fits...")
@@ -88,7 +88,7 @@ def main():
     ))
 
     # Patch: one predictor alone (3-category conditional Poisson).
-    patch_tbl = read_table(table_path("event_patch_table", RC, fmt="pkl"))
+    patch_tbl = read_table(table_path("event_patch_table", RC))
     require_covariate_schema(patch_tbl, table="event_patch")
     logging.info("patch univariate fits...")
     patch_uni = _pool(_univariate(
@@ -97,7 +97,7 @@ def main():
     ))
 
     # Rate: intercept + one predictor (Poisson w/ log-immobility offset).
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     logging.info("rate univariate fits...")
     rate_uni = _pool(_univariate(stop, RATE_P, lambda g, p: fit_rate_model(g, [p])))

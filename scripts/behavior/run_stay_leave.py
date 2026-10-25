@@ -81,9 +81,9 @@ INPUT_DIR = REPLAY_CONTENT_DIR
 #: The canonical tables the per-stop summary is built from, hashed into every
 #: provenance sidecar this script writes.
 FIT_INPUTS = {
-    "stop_table": table_path("stop_table", INPUT_DIR, fmt="pkl"),
-    "event_table": table_path("event_table", INPUT_DIR, fmt="pkl"),
-    "event_arm_table": table_path("event_arm_table", INPUT_DIR, fmt="pkl"),
+    "stop_table": table_path("stop_table", INPUT_DIR),
+    "event_table": table_path("event_table", INPUT_DIR),
+    "event_arm_table": table_path("event_arm_table", INPUT_DIR),
 }
 
 #: Populations Stage 6 may be read on. ``at_well`` is the canonical shared

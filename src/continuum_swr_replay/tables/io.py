@@ -160,15 +160,24 @@ def parquet_path(path: str | Path) -> Path:
 
 
 def resolved_table_path(path: str | Path) -> Path:
-    """Return the file :func:`read_table` would actually open for `path`.
+    """Return the parquet file :func:`read_table` opens for `path`.
 
-    Parquet wins when it exists, otherwise the pickle sibling. Callers that
-    hash the table they read must resolve it through this function rather than
-    assume parquet: a directory still holding the pickle form would otherwise
-    be hashed at a path that does not exist.
+    A suffix-less path (a table basename such as ``root / "stop_table"``) or a
+    ``.parquet`` path names the parquet file. A ``.pkl`` path is refused: the
+    tables are parquet, and an archived pickle is read with
+    ``pandas.read_pickle``, explicitly.
+
+    Raises
+    ------
+    ValueError
+        If `path` ends in ``.pkl``.
     """
-    parquet = parquet_path(path)
-    return parquet if parquet.exists() else Path(path).with_suffix(".pkl")
+    if Path(path).suffix == ".pkl":
+        raise ValueError(
+            f"{path} is a pickle path, but the canonical tables are parquet: pass "
+            "the .parquet path (read an archived pickle with pandas.read_pickle)"
+        )
+    return parquet_path(path)
 
 
 def write_table(frame: pd.DataFrame, path: str | Path, **kwargs: Any) -> Path:
@@ -247,20 +256,14 @@ def write_atomically(path: Path, write: Callable[[Path], object]) -> None:
 
 
 def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFrame:
-    """Read a canonical table, preferring parquet and falling back to pickle.
-
-    Callers pass whichever path they have written historically -- typically
-    ``...table.pkl``. If the parquet sibling exists it wins, so a directory can
-    be migrated a table at a time without touching every reader at once.
+    """Read a canonical table from parquet, restoring its ``attrs``.
 
     Parameters
     ----------
     path : str or Path
-        Table path, with either suffix.
+        Table path, ``.parquet`` or without a suffix (:func:`resolved_table_path`).
     columns : list of str, optional
-        Read only these columns. Parquet reads them without touching the rest
-        of the file; the pickle fallback loads everything and then subsets, so
-        the speedup only applies once the table is migrated.
+        Read only these columns, without touching the rest of the file.
 
     Returns
     -------
@@ -269,19 +272,17 @@ def read_table(path: str | Path, columns: list[str] | None = None) -> pd.DataFra
     Raises
     ------
     FileNotFoundError
-        If neither the parquet nor the pickle form exists.
+        If the parquet file does not exist.
+    ValueError
+        If `path` ends in ``.pkl``.
     """
-    parquet = parquet_path(path)
+    parquet = resolved_table_path(path)
     if not parquet.exists():
-        pickle = Path(path).with_suffix(".pkl")
-        if not pickle.exists():
-            raise FileNotFoundError(
-                f"no table at {parquet} or {pickle} -- was it built? "
-                "The canonical tables are produced by "
-                "scripts/tables/prepare_replay_content_data.py"
-            )
-        frame = pd.read_pickle(pickle)
-        return frame if columns is None else frame[columns]
+        raise FileNotFoundError(
+            f"no table at {parquet} -- was it built? "
+            "The canonical tables are produced by "
+            "scripts/tables/prepare_replay_content_data.py"
+        )
 
     table = pq.read_table(parquet, columns=columns)
     frame = table.to_pandas()
@@ -305,7 +306,7 @@ def read_attrs(path: str | Path) -> dict[str, Any]:
     Parameters
     ----------
     path : str or Path
-        Table path, with either suffix.
+        Table path, ``.parquet`` or without a suffix (:func:`resolved_table_path`).
 
     Returns
     -------
@@ -315,23 +316,22 @@ def read_attrs(path: str | Path) -> dict[str, Any]:
     Raises
     ------
     FileNotFoundError
-        If neither the parquet nor the pickle form exists.
+        If the parquet file does not exist.
+    ValueError
+        If `path` ends in ``.pkl``.
     """
-    parquet = parquet_path(path)
+    parquet = resolved_table_path(path)
     if not parquet.exists():
-        pickle = Path(path).with_suffix(".pkl")
-        if not pickle.exists():
-            raise FileNotFoundError(f"no table at {parquet} or {pickle}")
-        return dict(pd.read_pickle(pickle).attrs)
+        raise FileNotFoundError(f"no table at {parquet}")
     return _attrs_from_metadata(pq.read_schema(parquet).metadata)
 
 
 def table_exists(path: str | Path) -> bool:
-    """Whether a table is on disk in either format.
+    """Whether the parquet file of table `path` is on disk.
 
-    Callers that guard on a table's presence -- to raise a helpful error, or to
-    skip a test that needs materialized data -- must not test the pickle path
-    alone once a directory is migrated, or they silently report "missing" for a
-    table that is sitting right there in parquet.
+    Raises
+    ------
+    ValueError
+        If `path` ends in ``.pkl``.
     """
-    return parquet_path(path).exists() or Path(path).with_suffix(".pkl").exists()
+    return resolved_table_path(path).exists()

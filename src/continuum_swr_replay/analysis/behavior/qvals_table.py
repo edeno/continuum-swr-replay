@@ -1012,7 +1012,7 @@ def run_build_qvals_table(args: argparse.Namespace) -> None:
 
     beh = dj.create_virtual_module("alison_behav", "alison_behav")
     rl = dj.create_virtual_module("alison_rlmodel", "alison_rlmodel")
-    st_all = read_table(table_path("stop_table", replay_content_dir, fmt="pkl"))
+    st_all = read_table(table_path("stop_table", replay_content_dir))
     require_covariate_schema(st_all, table="stop")
 
     parts = []

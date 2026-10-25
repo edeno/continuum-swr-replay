@@ -196,7 +196,7 @@ def main() -> None:
         )
     stop = pd.concat(tables, ignore_index=True)
 
-    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
+    event_table = read_table(table_path("event_table", RC))
     require_covariate_schema(event_table, table="event")
     # The split joins the shipped event table's is_swr onto stops whose SWR
     # columns were just built from the live source: both must be one source.

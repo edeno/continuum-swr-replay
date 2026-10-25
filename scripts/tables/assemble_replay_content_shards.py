@@ -172,9 +172,7 @@ def assemble_replay_content_shards(
     }
     for frame in tables.values():
         stamp_swr_source(frame)
-    contingency = load_contingency(
-        table_path("qvals_table", contingency_dir, fmt="pkl")
-    )
+    contingency = load_contingency(table_path("qvals_table", contingency_dir))
     _assert_value_block_matches_source(tables["event_arm_table"], contingency)
 
     output_dir.mkdir(parents=True, exist_ok=True)

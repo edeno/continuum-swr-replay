@@ -218,9 +218,7 @@ def refresh_contfrag_behavioral_covariates(
     ):
         require_swr_source(frame, what=f"{source_dir / basenames[name]}")
     validate_event_arm_table(old_arm_all, event_table=old_event_all)
-    contingency = load_contingency(
-        table_path("qvals_table", replay_content_dir, fmt="pkl")
-    )
+    contingency = load_contingency(table_path("qvals_table", replay_content_dir))
     replay_prepare_data.SESSION_CACHE_DIR = replay_content_dir / "_session_cache"
     source_sessions = set(
         old_event_all.loc[:, SESSION_COLUMNS].itertuples(index=False, name=None)

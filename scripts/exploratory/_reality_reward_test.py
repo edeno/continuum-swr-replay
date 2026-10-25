@@ -39,7 +39,7 @@ def main() -> None:
     ev = pd.read_parquet(PARQUET)
     if "start_time" not in ev.columns:
         raise SystemExit("parquet lacks start_time — re-run the engine with the patch")
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     stop = stop.assign(
         epoch_id=stop["animal"].astype(str) + stop["session_date"].astype(str)

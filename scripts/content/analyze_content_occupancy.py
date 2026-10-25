@@ -232,7 +232,7 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     Returns a (9-arm x {nonSWR, SWR}) fraction table, or None if the canonical
     ``replay_content/event_arm_table.pkl`` is unavailable.
     """
-    f = table_path("event_arm_table", REPLAY_CONTENT_DIR, fmt="pkl")
+    f = table_path("event_arm_table", REPLAY_CONTENT_DIR)
     if not table_exists(f):
         return None
     ea = read_table(f)

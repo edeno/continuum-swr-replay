@@ -726,10 +726,10 @@ MIN_EVENTS = 18
 # readers of those artifacts check the same mapping, so a regenerated table
 # cannot be read through coefficients that predate it.
 CONTENT_FIT_INPUTS = {
-    "event_arm_table": table_path("event_arm_table", REPLAY_CONTENT_DIR, fmt="pkl"),
-    "event_patch_table": table_path("event_patch_table", REPLAY_CONTENT_DIR, fmt="pkl"),
-    "stop_table": table_path("stop_table", REPLAY_CONTENT_DIR, fmt="pkl"),
-    "qvals_table": table_path("qvals_table", REPLAY_CONTENT_DIR, fmt="pkl"),
+    "event_arm_table": table_path("event_arm_table", REPLAY_CONTENT_DIR),
+    "event_patch_table": table_path("event_patch_table", REPLAY_CONTENT_DIR),
+    "stop_table": table_path("stop_table", REPLAY_CONTENT_DIR),
+    "qvals_table": table_path("qvals_table", REPLAY_CONTENT_DIR),
 }
 
 

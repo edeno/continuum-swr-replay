@@ -35,9 +35,11 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
+
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import git_commit, git_dirty
-from continuum_swr_replay.tables.io import parquet_path, read_attrs, resolved_table_path
+from continuum_swr_replay.tables.io import read_attrs, resolved_table_path
 
 __all__ = [
     "fit_provenance_path",
@@ -127,28 +129,36 @@ def git_hash() -> str:
 
 
 def _resolve_input(path: str | Path) -> Path:
-    """Return the file ``read_table`` would have read for `path`.
+    """Return the file a fit read for input `path`.
+
+    A ``.pkl`` input is a fitted bundle an aggregate-only run read (fitted
+    models stay pickled), hashed as it is; any other input is a table, hashed
+    at its parquet file (``tables.io.resolved_table_path``).
 
     Raises
     ------
     FileNotFoundError
-        If neither the parquet nor the pickle form exists.
+        If that file does not exist.
     """
-    resolved = resolved_table_path(path)
+    path = Path(path)
+    resolved = path if path.suffix == ".pkl" else resolved_table_path(path)
     if not resolved.exists():
-        raise FileNotFoundError(f"no input table at {parquet_path(path)} or {resolved}")
+        raise FileNotFoundError(f"no input at {resolved}")
     return resolved
 
 
 def _input_record(path: str | Path) -> InputRecord:
-    """Hash, mtime, covariate schema version and hash time of one input table."""
+    """Hash, mtime, covariate schema version and hash time of one input."""
     resolved = _resolve_input(path)
+    attrs = (
+        pd.read_pickle(resolved).attrs
+        if resolved.suffix == ".pkl"
+        else read_attrs(resolved)
+    )
     return {
         "sha256": sha256_file(resolved),
         "mtime": resolved.stat().st_mtime,
-        "covariate_schema_version": read_attrs(resolved).get(
-            "covariate_schema_version"
-        ),
+        "covariate_schema_version": attrs.get("covariate_schema_version"),
         "hashed_at": datetime.now(UTC).isoformat(),
     }
 
@@ -164,9 +174,8 @@ def record_inputs(inputs: dict[str, Path]) -> dict[str, InputRecord]:
     Parameters
     ----------
     inputs : dict of str to Path
-        Display name -> path of each table the fit was built from. A ``.pkl``
-        path is resolved through ``tables.io.parquet_path`` so the hashed file
-        is the one ``read_table`` actually read.
+        Display name -> path of each table (``.parquet``) or fitted bundle
+        (``.pkl``) the fit was built from.
 
     Returns
     -------

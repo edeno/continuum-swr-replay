@@ -197,9 +197,9 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
 
 
 def main() -> None:
-    onset = read_table(table_path("event_onset_table", RC, fmt="pkl"))
-    ev = read_table(table_path("event_table", RC, fmt="pkl"))
-    st = read_table(table_path("stop_table", RC, fmt="pkl"))
+    onset = read_table(table_path("event_onset_table", RC))
+    ev = read_table(table_path("event_table", RC))
+    st = read_table(table_path("stop_table", RC))
     require_covariate_schema(onset, table="event_onset")
     require_covariate_schema(ev, table="event")
     require_covariate_schema(st, table="stop")

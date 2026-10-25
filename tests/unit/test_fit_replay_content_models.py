@@ -521,11 +521,11 @@ def test_scale_label_refuses_to_claim_a_scale_it_does_not_know() -> None:
 
 def test_fit_inputs_name_the_table_the_ladder_reads() -> None:
     inputs = mod.content_fit_inputs(CONTENT_IN, "event_arm_table")
-    assert inputs == {"event_arm_table": CONTENT_IN / "event_arm_table.pkl"}
+    assert inputs == {"event_arm_table": CONTENT_IN / "event_arm_table.parquet"}
 
 
 def test_bundle_writes_a_provenance_sidecar_beside_every_pickle(tmp_path) -> None:
-    table = tmp_path / "event_arm_table.pkl"
+    table = tmp_path / "event_arm_table.parquet"
     write_table(_canonical_arm_table(), table)
     fit_inputs = record_inputs({"event_arm_table": table})
     frame = pd.DataFrame({"model": ["X"], "coef_is_current_arm": [0.5]})
@@ -778,7 +778,7 @@ def test_partially_defined_event_has_no_total_to_rescale_by() -> None:
 
 
 def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
-    table = tmp_path / "event_arm_table.pkl"
+    table = tmp_path / "event_arm_table.parquet"
     write_table(_canonical_arm_table(), table)
     frame = pd.DataFrame({"model": ["X"], "coef_is_current_arm": [0.5]})
     output_dir = tmp_path / "models_leaf"

@@ -187,7 +187,7 @@ def test_stop_before_first_block_is_dropped():
 @pytest.mark.slow
 @pytest.mark.real_data
 def test_real_session_parse():
-    stop_table_path = table_path("stop_table", fmt="pkl")
+    stop_table_path = table_path("stop_table")
     if not table_exists(stop_table_path):
         pytest.fail("canonical stop table not materialized")
     stop_table = read_table(stop_table_path)

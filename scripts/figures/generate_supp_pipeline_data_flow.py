@@ -59,7 +59,7 @@ RC = REPLAY_CONTENT_DIR
 # The panel draws the fitted M3 arm model, so it is gated on the same table the
 # content ladder recorded when it fit M3.
 M3_PATH = model_dir("content_arm", RC) / "M3.pkl"
-ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC, fmt="pkl")}
+ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC)}
 
 # The event's long-format rows, as panel E shows them.
 INDICATOR_COLUMNS = [
@@ -498,14 +498,12 @@ def main() -> None:
     args = build_parser().parse_args()
 
     dot, env = load_session(args.animal, args.day, args.epoch)
-    long_count = read_table(table_path("event_arm_table", RC, fmt="pkl"))
-    events = read_table(table_path("event_table", RC, fmt="pkl"))
+    long_count = read_table(table_path("event_arm_table", RC))
+    events = read_table(table_path("event_table", RC))
     require_covariate_schema(long_count, table="event_arm")
     require_covariate_schema(events, table="event")
-    require_swr_source(
-        long_count, what=str(table_path("event_arm_table", RC, fmt="pkl"))
-    )
-    require_swr_source(events, what=str(table_path("event_table", RC, fmt="pkl")))
+    require_swr_source(long_count, what=str(table_path("event_arm_table", RC)))
+    require_swr_source(events, what=str(table_path("event_table", RC)))
     require_fresh_inputs(M3_PATH, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     m3_fits = pd.read_pickle(M3_PATH)
 

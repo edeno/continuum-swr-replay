@@ -356,7 +356,7 @@ def main() -> None:
     p.add_argument("--dpi", type=int, default=150)
     args = p.parse_args()
 
-    st = read_table(table_path("stop_table", RC_DIR, fmt="pkl"))
+    st = read_table(table_path("stop_table", RC_DIR))
     require_covariate_schema(st, table="stop")
     sub = st[
         (st.animal == args.animal)

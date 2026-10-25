@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
+from continuum_swr_replay.tables.io import write_table
 from scripts.exploratory import _verify_harmonization_parity as parity
 
 
@@ -27,10 +28,11 @@ def _write_pair(
     baseline: pd.DataFrame,
     regenerated: pd.DataFrame,
 ):
-    baseline_path = tmp_path / "baseline.pkl"
-    regenerated_path = tmp_path / "regenerated.pkl"
-    baseline.to_pickle(baseline_path)
-    stamp_covariate_schema(regenerated, table="stop").to_pickle(regenerated_path)
+    baseline_path = write_table(baseline, tmp_path / "baseline.parquet")
+    regenerated_path = write_table(
+        stamp_covariate_schema(regenerated, table="stop"),
+        tmp_path / "regenerated.parquet",
+    )
     return baseline_path, regenerated_path
 
 
@@ -69,8 +71,8 @@ def test_main_fails_when_no_table_pair_was_checked(tmp_path, monkeypatch):
             (
                 "replay stop",
                 "stop",
-                tmp_path / "missing-old.pkl",
-                tmp_path / "missing-new.pkl",
+                tmp_path / "missing-old.parquet",
+                tmp_path / "missing-new.parquet",
             )
         ],
     )

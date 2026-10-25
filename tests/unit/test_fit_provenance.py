@@ -73,7 +73,7 @@ def fit_dir(tmp_path: Path) -> Path:
     for name, version in (("stop_table", "v9"), ("event_table", "v9")):
         frame = pd.DataFrame({"stop_id": [0, 1, 2], "count": [1, 0, 4]})
         frame.attrs["covariate_schema_version"] = version
-        write_table(frame, tmp_path / f"{name}.pkl")
+        write_table(frame, tmp_path / f"{name}.parquet")
     (tmp_path / "all_models.pkl").write_bytes(b"fitted-model-bytes")
     return tmp_path
 
@@ -81,8 +81,8 @@ def fit_dir(tmp_path: Path) -> Path:
 @pytest.fixture()
 def inputs(fit_dir: Path) -> dict[str, Path]:
     return {
-        "stop_table": fit_dir / "stop_table.pkl",
-        "event_table": fit_dir / "event_table.pkl",
+        "stop_table": fit_dir / "stop_table.parquet",
+        "event_table": fit_dir / "event_table.parquet",
     }
 
 
@@ -132,19 +132,21 @@ def test_sidecar_refuses_extras_that_would_overwrite_its_own_fields(fit_dir, inp
     assert not fit_provenance_path(fit_dir / "all_models.pkl").exists()
 
 
-def test_sidecar_hashes_the_parquet_a_pkl_path_resolves_to(fit_dir, inputs):
-    """``read_table`` reads the parquet sibling, so the parquet is what is hashed."""
-    (fit_dir / "stop_table.pkl").write_bytes(b"a stale pickle nobody reads")
+def test_a_pkl_input_is_the_fitted_bundle_hashed_as_it_is(fit_dir):
+    """An aggregate-only run reads a fitted bundle, which stays pickled."""
+    bundle = fit_dir / "swr_contrast_rate.pkl"
+    pd.DataFrame({"coef": [0.1]}).to_pickle(bundle)
 
-    write_fit_provenance(fit_dir / "all_models.pkl", inputs, "poisson_glm", ["fit.py"])
+    write_fit_provenance(
+        fit_dir / "all_models.pkl",
+        {"swr_contrast_rate": bundle},
+        "poisson_glm",
+        ["fit.py"],
+    )
 
     recorded = json.loads(fit_provenance_path(fit_dir / "all_models.pkl").read_text())
-    assert recorded["inputs"]["stop_table"]["sha256"] == _sha256(
-        fit_dir / "stop_table.parquet"
-    )
-    assert recorded["inputs"]["stop_table"]["sha256"] != _sha256(
-        fit_dir / "stop_table.pkl"
-    )
+    assert recorded["inputs"]["swr_contrast_rate"]["sha256"] == _sha256(bundle)
+    assert recorded["inputs"]["swr_contrast_rate"]["covariate_schema_version"] is None
 
 
 def test_recorded_hashes_survive_a_table_regenerated_during_the_fit(fit_dir, inputs):
@@ -778,14 +780,14 @@ def sweep_tree(tmp_path: Path) -> Path:
     models.mkdir(parents=True)
     frame = pd.DataFrame({"stop_id": [0, 1, 2], "count": [1, 0, 4]})
     frame.attrs["covariate_schema_version"] = "v9"
-    write_table(frame, root / "stop_table.pkl")
-    inputs = {"stop_table": root / "stop_table.pkl"}
+    write_table(frame, root / "stop_table.parquet")
+    inputs = {"stop_table": root / "stop_table.parquet"}
 
     pd.DataFrame({"coef": [0.1]}).to_pickle(models / "stale.pkl")
     write_fit_provenance(models / "stale.pkl", inputs, "poisson_glm", ["fit.py"])
     # Regenerate the table between the two fits, as a rebuild would.
     frame["count"] = [2, 0, 4]
-    write_table(frame, root / "stop_table.pkl")
+    write_table(frame, root / "stop_table.parquet")
     pd.DataFrame({"coef": [0.2]}).to_pickle(models / "fresh.pkl")
     write_fit_provenance(models / "fresh.pkl", inputs, "poisson_glm", ["fit.py"])
     return root
@@ -876,7 +878,7 @@ def test_sweep_skips_backup_directories(sweep_tree, capsys):
     (backup / "stale.pkl").write_bytes(b"frozen")
     write_fit_provenance(
         backup / "stale.pkl",
-        {"stop_table": sweep_tree / "stop_table.pkl"},
+        {"stop_table": sweep_tree / "stop_table.parquet"},
         "poisson_glm",
         ["fit.py"],
     )
@@ -898,9 +900,14 @@ def test_a_canonical_input_resolves_at_the_root_not_beside_the_sidecar(tmp_path)
     sidecar = per_bin / "swr_contrast_rate_audited.provenance.json"
 
     assert module.resolve_input("qvals_table", sidecar, root) == (
-        root / "qvals_table.pkl"
+        root / "qvals_table.parquet"
     )
     # A non-canonical input (an aggregate-only run's fit) is the file beside it.
     assert module.resolve_input("swr_contrast_rate", sidecar, root) == (
         per_bin / "swr_contrast_rate.pkl"
+    )
+    # A non-canonical table (a ContFrag table) is its parquet at the root.
+    (root / "event_arm_table_swr_HPC.parquet").write_bytes(b"table")
+    assert module.resolve_input("event_arm_table_swr_HPC", sidecar, root) == (
+        root / "event_arm_table_swr_HPC.parquet"
     )

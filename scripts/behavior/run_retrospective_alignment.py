@@ -67,9 +67,9 @@ OUTPUT_PATH = INPUT_DIR / "stage5b_retrospective.pkl"
 
 #: The tables this analysis is cut from, hashed into the provenance sidecar.
 FIT_INPUTS = {
-    "event_table": table_path("event_table", INPUT_DIR, fmt="pkl"),
-    "event_arm_table": table_path("event_arm_table", INPUT_DIR, fmt="pkl"),
-    "event_sequence_table": table_path("event_sequence_table", INPUT_DIR, fmt="pkl"),
+    "event_table": table_path("event_table", INPUT_DIR),
+    "event_arm_table": table_path("event_arm_table", INPUT_DIR),
+    "event_sequence_table": table_path("event_sequence_table", INPUT_DIR),
 }
 
 #: The only population these metrics are defined on. A retrospective metric

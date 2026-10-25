@@ -33,7 +33,7 @@ from continuum_swr_replay.tables.standardization import load_reference
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 _RC = REPLAY_CONTENT_DIR
-_EVENT_ARM = table_path("event_arm_table", _RC, fmt="pkl")
+_EVENT_ARM = table_path("event_arm_table", _RC)
 _EVENT_ARM_REF = _RC / "standardization_reference.json"
 
 _ENCODED_COL = "reward_fraction_candidate_arm_last10_visits"

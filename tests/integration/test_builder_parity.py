@@ -45,9 +45,9 @@ from continuum_swr_replay.tables.standardization import (
 pytestmark = [pytest.mark.slow, pytest.mark.integration, pytest.mark.real_data]
 
 _RC = REPLAY_CONTENT_DIR
-_EVENT_ARM = table_path("event_arm_table", _RC, fmt="pkl")
+_EVENT_ARM = table_path("event_arm_table", _RC)
 _EVENT_ARM_REF = _RC / "standardization_reference.json"
-_QVALS = table_path("qvals_table", _RC, fmt="pkl")
+_QVALS = table_path("qvals_table", _RC)
 _QVALS_REF = _RC / "qvals_standardization_reference.json"
 
 

@@ -343,7 +343,7 @@ def session_slice():
     Only ``real_data`` tests may request it.
     """
     paths = {
-        name: RC / f"{name}.pkl"
+        name: RC / f"{name}.parquet"
         for name in ("event_onset_table", "event_table", "stop_table")
     }
     for p in paths.values():

@@ -1617,7 +1617,7 @@ def build_report(
     )
     add(_md(reward_boundary_shift_table(old_bin, new_bin), floatfmt="{:.3f}"))
 
-    stop_path = table_path("stop_table", RC, fmt="pkl")
+    stop_path = table_path("stop_table", RC)
     if table_exists(stop_path):
         add(
             "\nWhich stops the shift applies to, on the canonical stop table. A "

@@ -34,7 +34,7 @@ BIN_EDGES = np.arange(-3.0, 14.01, 0.5)
 
 
 def main():
-    et = read_table(PD / "replay_content" / "event_table.pkl")
+    et = read_table(PD / "replay_content" / "event_table.parquet")
     require_covariate_schema(et, table="event")
     sessions = list(et.groupby(["animal", "session_date", "epoch"]))
 

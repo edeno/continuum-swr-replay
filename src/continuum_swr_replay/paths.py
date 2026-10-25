@@ -185,7 +185,9 @@ def table_path(
     root : Path, optional
         The replay-content root; :data:`REPLAY_CONTENT_DIR` by default.
     fmt : str, optional
-        The file suffix without its dot (``"parquet"`` or ``"pkl"``).
+        The file suffix without its dot: ``"parquet"``, or ``"pkl"`` for a
+        retired pickle (only ``scripts/tables/convert_tables_to_parquet.py``
+        reads those, with ``pandas.read_pickle``).
 
     Returns
     -------

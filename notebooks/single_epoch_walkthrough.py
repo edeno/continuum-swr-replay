@@ -41,7 +41,7 @@
 # `*_data_over_time.pkl`). We *show* the decode call for reference but **load**
 # its outputs. Building the posterior-weighted tables is still memory-intensive.
 # The externally fitted behavioral model is likewise **loaded, not re-fit**:
-# `qvals_table.pkl` carries its pre-outcome trial beliefs, and the persisted
+# `qvals_table.parquet` carries its pre-outcome trial beliefs, and the persisted
 # all-session reference supplies the correct global standardization.
 #
 # **Current canonical assembly.** Table construction mirrors
@@ -221,7 +221,7 @@ SESSION_ID = f"{NWB_FILE_NAME.replace('_.nwb', '')}_{EPOCH_NAME}_{BRAIN_AREA}"
 DOT_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_80_data_over_time.pkl"
 ENV_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_environment.pkl"
 RESULTS_FILE = PROCESSED_DATA_DIR / f"{SESSION_ID}_results.nc"
-QVALS_FILE = table_path("qvals_table", fmt="pkl")
+QVALS_FILE = table_path("qvals_table")
 ARM_Z_REFERENCE_FILE = REPLAY_CONTENT_DIR / "standardization_reference.json"
 HORSERACE_COEFS_FILE = (
     REPLAY_CONTENT_DIR

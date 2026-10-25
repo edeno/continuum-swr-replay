@@ -467,7 +467,7 @@ def main() -> None:
                    help="raster DPI (heatmaps/scatter are rasterized)")
     args = p.parse_args()
 
-    event_arm = read_table(table_path("event_arm_table", RC_DIR, fmt="pkl"))
+    event_arm = read_table(table_path("event_arm_table", RC_DIR))
     require_covariate_schema(event_arm, table="event_arm")
     # Stop table + RL value-state block, assembled as the SWR-contrast runners
     # do: recent_switch_rate via add_uncertainty_covariates (default
@@ -477,10 +477,10 @@ def main() -> None:
     # absent from qvals are kept and shown masked, rather than dropped by the
     # rate runner's inner join; and covariates are shown raw, not z-scored as
     # the fitters standardize them.
-    stops = read_table(table_path("stop_table", RC_DIR, fmt="pkl"))
+    stops = read_table(table_path("stop_table", RC_DIR))
     require_covariate_schema(stops, table="stop")
     stops = add_uncertainty_covariates(stops)
-    qvals = read_table(table_path("qvals_table", RC_DIR, fmt="pkl"))
+    qvals = read_table(table_path("qvals_table", RC_DIR))
     require_covariate_schema(qvals, table="qvals")
     value_state = [
         "periswitch_index_trials",

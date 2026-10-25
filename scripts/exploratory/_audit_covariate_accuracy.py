@@ -74,8 +74,8 @@ def _within_epoch_pos(df: pd.DataFrame) -> pd.Series:
 
 
 def main(reconstruct_n: int = 0) -> None:
-    q = read_table(table_path("qvals_table", RC, fmt="pkl"))
-    st = read_table(table_path("stop_table", RC, fmt="pkl"))
+    q = read_table(table_path("qvals_table", RC))
+    st = read_table(table_path("stop_table", RC))
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(st, table="stop")
     fur = _fur()
@@ -116,7 +116,7 @@ def main(reconstruct_n: int = 0) -> None:
     print("  expect dV|switch > dV|stay and r_pb > 0")
 
     # ---- #2 leakage exposure ----
-    ons = read_table(table_path("event_onset_table", RC, fmt="pkl"))
+    ons = read_table(table_path("event_onset_table", RC))
     require_covariate_schema(ons, table="event_onset")
     rew = ons[ons["is_reward_stop"]]
     tsp = rew["t_since_pump"].dropna()
@@ -181,8 +181,8 @@ def _reconstruct_reward_rate_arm(n_sessions: int) -> None:
     from continuum_swr_replay.data_loaders import load_data
     from continuum_swr_replay.data_types import SessionDataKeys
 
-    ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
-    et = read_table(table_path("event_table", RC, fmt="pkl"))
+    ea = read_table(table_path("event_arm_table", RC))
+    et = read_table(table_path("event_table", RC))
     require_covariate_schema(ea, table="event_arm")
     require_covariate_schema(et, table="event")
     tcol = "event_midpoint_s"
@@ -262,7 +262,7 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
     here against a stop-sequence oracle
     would mismatch on grain, not correctness -- so they are intentionally omitted.
     """
-    ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
+    ea = read_table(table_path("event_arm_table", RC))
     require_covariate_schema(ea, table="event_arm")
     print(
         "\n=== non-RL: occupancy_well_arm cross-source (event_arm vs stop_table) ==="

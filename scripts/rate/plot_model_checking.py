@@ -71,9 +71,9 @@ ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
 # The tables fit_per_bin_rate_models.py fit all_models.pkl on; checked against the
 # artifact's provenance sidecar before the fitted GOF columns are read.
 ALL_MODELS_INPUTS = {
-    "stop_table": table_path("stop_table", RC, fmt="pkl"),
-    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
-    "event_table": table_path("event_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC),
+    "event_onset_table": table_path("event_onset_table", RC),
+    "event_table": table_path("event_table", RC),
 }
 FIGS = figure_dir("rate")
 SC = list(SESSION_COLUMNS)
@@ -439,9 +439,9 @@ def main() -> None:
         )
 
     # --- example-session diagnostic quartets (inline refit) ---
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
-    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
-    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
+    onset_table = read_table(table_path("event_onset_table", RC))
+    event_table = read_table(table_path("event_table", RC))
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")

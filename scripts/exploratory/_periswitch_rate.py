@@ -82,7 +82,7 @@ def rr_table(res, terms):
 
 
 def main():
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     df = prep(stop)
     n_sess = df["session"].nunique()

@@ -100,18 +100,18 @@ def _bimodality_coef(x: np.ndarray) -> float:
 
 
 def _assemble() -> pd.DataFrame:
-    ev = read_table(table_path("event_table", RC, fmt="pkl"))
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    ev = read_table(table_path("event_table", RC))
+    stop = read_table(table_path("stop_table", RC))
     # qvals_table (exact stop-start alignment). These are the behavioral
     # model's experienced value and RPE, replacing retired nominal/leaky-Q
     # stand-ins. Keep their canonical names through fitting and persistence.
-    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
+    cont = read_table(table_path("qvals_table", RC))
     require_covariate_schema(ev, table="event")
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(cont, table="qvals")
     # is_swr and ripple_power_z must come from the configured SWR source
-    require_swr_source(ev, what=str(table_path("event_table", RC, fmt="pkl")))
-    require_swr_source(stop, what=str(table_path("stop_table", RC, fmt="pkl")))
+    require_swr_source(ev, what=str(table_path("event_table", RC)))
+    require_swr_source(stop, what=str(table_path("stop_table", RC)))
     stop = add_uncertainty_covariates(stop)
     # Many events per stop, one row per stop on both right-hand tables.
     # Without validate= a duplicated stop_id would silently multiply

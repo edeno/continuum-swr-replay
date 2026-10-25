@@ -190,9 +190,9 @@ def main() -> None:
     p.add_argument("--write", action="store_true")
     args = p.parse_args()
 
-    stop_path = table_path("stop_table", RC, fmt="pkl")
-    onset_path = table_path("event_onset_table", RC, fmt="pkl")
-    event_path = table_path("event_table", RC, fmt="pkl")
+    stop_path = table_path("stop_table", RC)
+    onset_path = table_path("event_onset_table", RC)
+    event_path = table_path("event_table", RC)
     stop = read_table(stop_path)
     onset_table = read_table(onset_path)
     event_table = read_table(event_path)

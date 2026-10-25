@@ -47,13 +47,13 @@ COLORS = {"detected SWR": "k", "non-local w/ SWR": "C3", "non-local NO SWR": "C0
 
 
 def main() -> None:
-    dense = read_table(table_path("stop_timebin_table", RC, fmt="pkl"))
+    dense = read_table(table_path("stop_timebin_table", RC))
     require_covariate_schema(dense, table="stop_timebin")
     exp_h, _ = np.histogram(dense.t_since_pump.dropna().to_numpy(), TBINS)
     sec = exp_h * BIN_S  # seconds of immobility exposure per t-bin
 
-    onset_source = read_table(table_path("event_onset_table", RC, fmt="pkl"))
-    events = read_table(table_path("event_table", RC, fmt="pkl"))
+    onset_source = read_table(table_path("event_onset_table", RC))
+    events = read_table(table_path("event_table", RC))
     require_covariate_schema(onset_source, table="event_onset")
     require_covariate_schema(events, table="event")
     onset = attach_is_swr_to_onsets(onset_source, events)

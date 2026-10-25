@@ -187,7 +187,7 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
         ("event_arm_table", "event_arm_table"),
         ("stop_table", "stop_table"),
     ]:
-        path = d / f"{base}{suffix}.pkl"
+        path = d / f"{base}{suffix}.parquet"
         tables[short] = read_table(path)
         require_covariate_schema(
             tables[short],

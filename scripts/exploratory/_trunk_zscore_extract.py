@@ -24,8 +24,8 @@ TRUNK = {6, 7, 8}
 
 
 def main():
-    eat = read_table(PD / "replay_content" / "event_arm_table.pkl")
-    et = read_table(PD / "replay_content" / "event_table.pkl")
+    eat = read_table(PD / "replay_content" / "event_arm_table.parquet")
+    et = read_table(PD / "replay_content" / "event_table.parquet")
     require_covariate_schema(eat, table="event_arm")
     require_covariate_schema(et, table="event")
 

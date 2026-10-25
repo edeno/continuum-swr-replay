@@ -25,6 +25,7 @@ from continuum_swr_replay.tables import event_ids
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
+from continuum_swr_replay.tables.io import write_table
 from tests.unit._port_experience_fixtures import port_experiences_from_trials
 
 # Scientific definitions must have one owning module.  ``_helpers`` is for
@@ -250,8 +251,7 @@ def test_value_block_rejects_noncanonical_arm_ids(bad_arm):
 
 def test_load_contingency_present_returns_frame(tmp_path, caplog):
     df = stamp_covariate_schema(pd.DataFrame({"stop_id": [1, 2, 3]}), table="qvals")
-    path = tmp_path / "qvals_table.pkl"
-    df.to_pickle(path)
+    path = write_table(df, tmp_path / "qvals_table.parquet")
     with caplog.at_level(logging.INFO):
         out = covariates.load_contingency(path)
     pd.testing.assert_frame_equal(out, df)
@@ -259,7 +259,7 @@ def test_load_contingency_present_returns_frame(tmp_path, caplog):
 
 
 def test_load_contingency_absent_returns_none_and_warns(tmp_path, caplog):
-    missing = tmp_path / "does_not_exist.pkl"
+    missing = tmp_path / "does_not_exist.parquet"
     with caplog.at_level(logging.WARNING):
         out = covariates.load_contingency(missing)
     assert out is None
@@ -272,7 +272,7 @@ def test_load_contingency_absent_returns_none_and_warns(tmp_path, caplog):
 def test_load_contingency_absent_yields_all_nan_value_block(tmp_path):
     """End-to-end fallback contract: a missing artifact -> None -> the value
     block is all-NaN (drops uniformly at fit time), never a spurious 0.0."""
-    cont = covariates.load_contingency(tmp_path / "nope.pkl")
+    cont = covariates.load_contingency(tmp_path / "nope.parquet")
     p, q = covariates.attach_contingency_value_block(
         np.array([0, 6]), np.array([1, 2]), cont
     )

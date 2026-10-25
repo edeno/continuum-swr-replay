@@ -274,7 +274,8 @@ Three tiers:
    their standardization references (`standardization_reference.json`,
    `qvals_standardization_reference.json`). They
    are **parquet**; read and write them through `continuum_swr_replay.tables.io`
-   (`read_table` / `write_table`), never `pd.read_pickle`. Fitted-model artifacts
+   (`read_table` / `write_table`), never `pd.read_pickle`; `read_table`,
+   `read_attrs` and `table_exists` refuse a `.pkl` path. Fitted-model artifacts
    (`all_models.pkl` and friends) hold live statsmodels objects and stay pickled.
    Superseded table pickles are kept under `_pickle_archive/`; nothing reads them.
    Code spells these locations through `continuum_swr_replay.paths`

@@ -442,7 +442,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
     rc = REPLAY_CONTENT_DIR
-    stop_table = read_table(table_path("stop_table", rc, fmt="pkl"))
+    stop_table = read_table(table_path("stop_table", rc))
     require_covariate_schema(stop_table, table="stop")
 
     session_cols = ["animal", "session_date", "epoch"]

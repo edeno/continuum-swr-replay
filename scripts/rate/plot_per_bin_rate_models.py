@@ -68,9 +68,9 @@ ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
 # the artifact's provenance sidecar before plotting, so a figure cannot be
 # rendered from coefficients that predate the tables on disk.
 ALL_MODELS_INPUTS = {
-    "stop_table": table_path("stop_table", RC, fmt="pkl"),
-    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
-    "event_table": table_path("event_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC),
+    "event_onset_table": table_path("event_onset_table", RC),
+    "event_table": table_path("event_table", RC),
 }
 FIGS = figure_dir("rate")
 SC = list(SESSION_COLUMNS)

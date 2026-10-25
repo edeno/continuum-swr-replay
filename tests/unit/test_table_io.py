@@ -3,8 +3,8 @@
 Every canonical table now goes through :mod:`continuum_swr_replay.tables.io`, so
 a silent fidelity loss here corrupts every downstream fit at once. These tests
 pin the properties the analysis code actually relies on: values, dtypes and
-``attrs`` survive a round-trip; a parquet table wins over a stale pickle beside
-it; and a missing table raises rather than returning something empty.
+``attrs`` survive a round-trip; a pickle path is refused rather than redirected;
+and a missing table raises rather than returning something empty.
 """
 
 from __future__ import annotations
@@ -21,7 +21,9 @@ from continuum_swr_replay.analysis.events.analysed_time import publish_swr_table
 from continuum_swr_replay.tables.io import (
     parquet_path,
     publish_canonical,
+    read_attrs,
     read_table,
+    resolved_table_path,
     table_exists,
     umask_file_mode,
     write_table,
@@ -82,35 +84,35 @@ def test_non_default_index_is_preserved(tmp_path):
     assert loaded.index.name == "string"
 
 
-def test_parquet_wins_over_a_stale_pickle_sibling(tmp_path):
-    """A leftover pickle beside a parquet must never be the one that is read.
+@pytest.mark.parametrize(
+    "read", [read_table, read_attrs, resolved_table_path, table_exists]
+)
+def test_a_pickle_path_is_refused_even_beside_its_parquet(tmp_path, read):
+    """A ``.pkl`` path raises; it is never redirected to the parquet or read.
 
-    This is the migration's central hazard: the directories held both formats
-    for a while, and a reader that picked the pickle would silently serve the
-    pre-migration table.
+    The tables are parquet. A caller still holding a pickle path must say
+    ``.parquet``, and an archived pickle is read with ``pandas.read_pickle``.
     """
-    fresh = pd.DataFrame({"x": [1, 2, 3]})
-    stale = pd.DataFrame({"x": [999, 999, 999]})
-    write_table(fresh, tmp_path / "t")
-    stale.to_pickle(tmp_path / "t.pkl")
-    assert (tmp_path / "t.pkl").exists()  # the condition under test
+    write_table(pd.DataFrame({"x": [1, 2, 3]}), tmp_path / "t")
+    pd.DataFrame({"x": [999]}).to_pickle(tmp_path / "t.pkl")
 
-    assert read_table(tmp_path / "t.pkl")["x"].tolist() == [1, 2, 3]
-
-
-def test_falls_back_to_pickle_when_no_parquet(tmp_path):
-    """Un-migrated directories (the historical backups) stay readable."""
-    df = pd.DataFrame({"x": [1, 2, 3]})
-    df.to_pickle(tmp_path / "t.pkl")
-    assert not parquet_path(tmp_path / "t").exists()  # the condition under test
-
-    assert read_table(tmp_path / "t.pkl").equals(df)
+    with pytest.raises(ValueError, match="pickle path"):
+        read(tmp_path / "t.pkl")
 
 
 def test_missing_table_raises_rather_than_returning_empty(tmp_path):
     """A missing table must fail loudly; an empty frame would fit silently."""
     with pytest.raises(FileNotFoundError, match="no table at"):
-        read_table(tmp_path / "absent.pkl")
+        read_table(tmp_path / "absent.parquet")
+
+
+def test_a_pickle_alone_is_not_a_table(tmp_path):
+    """No parquet beside it: the pickle is not read in its place."""
+    pd.DataFrame({"x": [1]}).to_pickle(tmp_path / "t.pkl")
+
+    assert not table_exists(tmp_path / "t")
+    with pytest.raises(FileNotFoundError, match="no table at"):
+        read_table(tmp_path / "t")
 
 
 def test_column_subset_reads_only_the_requested_columns(tmp_path):
@@ -123,19 +125,9 @@ def test_column_subset_reads_only_the_requested_columns(tmp_path):
     assert loaded["int64"].tolist() == df["int64"].tolist()
 
 
-def test_column_subset_works_on_the_pickle_fallback(tmp_path):
-    """Same contract in both formats, so callers need not know which they hit."""
-    df = _mixed_frame()
-    df.to_pickle(tmp_path / "t.pkl")
-
-    loaded = read_table(tmp_path / "t.pkl", columns=["int64", "string"])
-
-    assert list(loaded.columns) == ["int64", "string"]
-
-
-@pytest.mark.parametrize("suffix", [".pkl", ".parquet", ""])
-def test_table_exists_finds_either_format_from_any_suffix(tmp_path, suffix):
-    """Callers guard with whichever path they historically held."""
+@pytest.mark.parametrize("suffix", [".parquet", ""])
+def test_table_exists_finds_the_parquet_from_its_name_or_basename(tmp_path, suffix):
+    """A table is named by its ``.parquet`` path or by its suffix-less basename."""
     assert not table_exists(tmp_path / f"t{suffix}")
     write_table(pd.DataFrame({"x": [1]}), tmp_path / "t")
     assert table_exists(tmp_path / f"t{suffix}")

@@ -60,10 +60,10 @@ SWR_CONTRAST_RATE = model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl"
 # provenance sidecar here, before any table or fit is read, so a figure cannot be
 # drawn from coefficients that predate the tables on disk.
 SWR_CONTRAST_RATE_INPUTS = {
-    "stop_table": table_path("stop_table", RC, fmt="pkl"),
-    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
-    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
-    "event_table": table_path("event_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC),
+    "qvals_table": table_path("qvals_table", RC),
+    "event_onset_table": table_path("event_onset_table", RC),
+    "event_table": table_path("event_table", RC),
 }
 # The per-SD units the audited rate table states its coefficients in: SDs over
 # the at-well stop cohort the fits name, recorded by the rate fitter beside the
@@ -88,10 +88,10 @@ SWR_CONTRAST_CONTENT_PATCH = (
 # The tables fit_swr_contrast_content.py fit those two artifacts on, gated the
 # same way as the rate half.
 SWR_CONTRAST_CONTENT_INPUTS = {
-    "event_arm_table": table_path("event_arm_table", RC, fmt="pkl"),
-    "event_patch_table": table_path("event_patch_table", RC, fmt="pkl"),
-    "stop_table": table_path("stop_table", RC, fmt="pkl"),
-    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
+    "event_arm_table": table_path("event_arm_table", RC),
+    "event_patch_table": table_path("event_patch_table", RC),
+    "stop_table": table_path("stop_table", RC),
+    "qvals_table": table_path("qvals_table", RC),
 }
 
 

@@ -64,7 +64,7 @@ def lagged_rewards(query_times: np.ndarray, trials: pd.DataFrame, k: int) -> np.
 
 def main() -> None:
     n_per = int(sys.argv[1]) if len(sys.argv) > 1 else 2
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     sessions = find_sessions(max_per_animal=n_per)
     preds = [f"known_reward_outcome_lag_{j}" for j in range(1, K + 1)]

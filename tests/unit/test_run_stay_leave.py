@@ -26,7 +26,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_p
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
-from continuum_swr_replay.tables.io import read_table
+from continuum_swr_replay.tables.io import read_table, write_table
 from scripts.behavior import run_stay_leave as runner
 
 SESSION = {"animal": "a", "session_date": 1, "epoch": "02_r1"}
@@ -100,8 +100,9 @@ def _write_tables(input_dir):
         (event, "event"),
         (event_arm, "event_arm"),
     ):
-        stamp_swr_source(stamp_covariate_schema(frame, table=table)).to_pickle(
-            input_dir / f"{table}_table.pkl"
+        write_table(
+            stamp_swr_source(stamp_covariate_schema(frame, table=table)),
+            input_dir / f"{table}_table.parquet",
         )
 
 
@@ -114,9 +115,9 @@ def stage6(tmp_path, monkeypatch):
         runner,
         "FIT_INPUTS",
         {
-            "stop_table": tmp_path / "stop_table.pkl",
-            "event_table": tmp_path / "event_table.pkl",
-            "event_arm_table": tmp_path / "event_arm_table.pkl",
+            "stop_table": tmp_path / "stop_table.parquet",
+            "event_table": tmp_path / "event_table.parquet",
+            "event_arm_table": tmp_path / "event_arm_table.parquet",
         },
     )
     return tmp_path
@@ -240,11 +241,11 @@ class TestProvenance:
         tables it read are the tables on disk.
         """
         _run(monkeypatch)
-        stop_table = read_table(stage6 / "stop_table.pkl")
+        stop_table = read_table(stage6 / "stop_table.parquet")
         regenerated = stop_table.copy()
         regenerated.attrs = dict(stop_table.attrs)
         regenerated["immobility_duration_s"] = 6.0
-        regenerated.to_pickle(stage6 / "stop_table.pkl")
+        write_table(regenerated, stage6 / "stop_table.parquet")
 
         monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="different generation of stop_table"):

@@ -192,10 +192,10 @@ RC = REPLAY_CONTENT_DIR
 
 # The tables `_load` reads; recorded in each artifact's provenance sidecar.
 FIT_INPUTS = {
-    "stop_table": table_path("stop_table", RC, fmt="pkl"),
-    "qvals_table": table_path("qvals_table", RC, fmt="pkl"),
-    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
-    "event_table": table_path("event_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC),
+    "qvals_table": table_path("qvals_table", RC),
+    "event_onset_table": table_path("event_onset_table", RC),
+    "event_table": table_path("event_table", RC),
 }
 STRATA = ("non_local", "non_local_swr", "non_local_no_swr")
 MIN_BINS, MIN_EVENTS = 200, 20
@@ -564,10 +564,10 @@ def _mask_post_outcome_covariates(
 
 
 def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
-    q = read_table(table_path("qvals_table", RC, fmt="pkl"))
-    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
-    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
+    q = read_table(table_path("qvals_table", RC))
+    onset_table = read_table(table_path("event_onset_table", RC))
+    event_table = read_table(table_path("event_table", RC))
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(onset_table, table="event_onset")

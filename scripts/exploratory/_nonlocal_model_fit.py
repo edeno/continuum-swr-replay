@@ -333,7 +333,7 @@ def main() -> None:
     p.add_argument("--dpi", type=int, default=150)
     args = p.parse_args()
 
-    ev = read_table(table_path("event_arm_table", RC_DIR, fmt="pkl"))
+    ev = read_table(table_path("event_arm_table", RC_DIR))
     require_covariate_schema(ev, table="event_arm")
     sub = ev[(ev.animal == args.animal) & (ev.session_date == args.day)
              & (ev.epoch == args.epoch)]

@@ -270,12 +270,12 @@ def test_arm_uncertainty_z_is_unit_sd_on_the_support_that_identifies_it():
     contribute zero information to the slope while still setting its reporting
     unit. The coefficient is therefore quoted per 1.62 leaf-SDs, not per 1 SD.
     """
-    tables = Path("Processed-Data/replay_content/event_arm_table.pkl")
+    tables = Path("Processed-Data/replay_content/event_arm_table.parquet")
     reference_path = Path(
         "Processed-Data/replay_content/standardization_reference.json"
     )
     if not table_exists(tables):
-        pytest.fail("materialized event_arm_table.pkl not available")
+        pytest.fail("materialized event_arm_table.parquet not available")
     if not reference_path.exists():
         pytest.fail("leaf-support standardization reference not available")
     reference = load_reference(reference_path)

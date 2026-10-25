@@ -968,7 +968,7 @@ def run_prepare_data(args: argparse.Namespace) -> None:
     # per port to the corresponding candidate-arm fields. The belief mean is
     # the fitted Beta reward belief, not the separate local leaky-Q history.
     # Absent qvals rows leave those fields NaN.
-    contingency_path = table_path("qvals_table", contingency_dir, fmt="pkl")
+    contingency_path = table_path("qvals_table", contingency_dir)
     contingency = load_contingency(contingency_path)
 
     # Warn if the output directory still holds artifacts from the

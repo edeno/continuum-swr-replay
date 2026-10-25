@@ -23,7 +23,7 @@ RC = REPLAY_CONTENT_DIR
 
 
 def main() -> None:
-    pt = read_table(table_path("event_patch_table", RC, fmt="pkl"))
+    pt = read_table(table_path("event_patch_table", RC))
     require_covariate_schema(pt, table="event_patch")
     tot = pt.groupby("event_id")["patch_count_hard"].transform("sum")
     pt = pt[tot > 0].copy()

@@ -286,9 +286,9 @@ def content_fit_inputs(input_dir: Path, table_name: str) -> dict[str, Path]:
     Returns
     -------
     dict of str to Path
-        ``{table_name: <input_dir>/<table_name>.pkl}``.
+        ``{table_name: <input_dir>/<table_name>.parquet}``.
     """
-    return {table_name: Path(input_dir) / f"{table_name}.pkl"}
+    return {table_name: Path(input_dir) / f"{table_name}.parquet"}
 
 
 def prepare_canonical_fit_request(

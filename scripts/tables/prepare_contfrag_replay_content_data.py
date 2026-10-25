@@ -490,7 +490,7 @@ def main():
     # Shared per-stop value artifact (qvals_table, exact poke_out alignment).
     # ContFrag's own stop_id mixes in brain_area/event_source, so the builder
     # recomputes the plain (animal,day,epoch,stop_idx) hash for the join.
-    contingency_path = table_path("qvals_table", replay_content_dir, fmt="pkl")
+    contingency_path = table_path("qvals_table", replay_content_dir)
     contingency = load_contingency(contingency_path)
 
     skipped: list[tuple[str, str, str]] = []

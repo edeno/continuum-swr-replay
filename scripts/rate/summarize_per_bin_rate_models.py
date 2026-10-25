@@ -56,9 +56,9 @@ ALL_MODELS = model_dir("per_bin_rate", RC) / "all_models.pkl"
 # the artifact's provenance sidecar before anything is summarized, so a table
 # regenerated after the fit cannot be reported through the old coefficients.
 ALL_MODELS_INPUTS = {
-    "stop_table": table_path("stop_table", RC, fmt="pkl"),
-    "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
-    "event_table": table_path("event_table", RC, fmt="pkl"),
+    "stop_table": table_path("stop_table", RC),
+    "event_onset_table": table_path("event_onset_table", RC),
+    "event_table": table_path("event_table", RC),
 }
 
 SC = list(SESSION_COLUMNS)

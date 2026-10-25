@@ -66,7 +66,7 @@ def mu_inputs(data_dir: Path) -> dict[str, Path]:
     summarized, so an uncertainty result cannot be built from a rung that
     predates the event-arm table it is being described against.
     """
-    return {"event_arm_table": table_path("event_arm_table", data_dir, fmt="pkl")}
+    return {"event_arm_table": table_path("event_arm_table", data_dir)}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -314,9 +314,9 @@ def main() -> None:
         format="%(asctime)s [%(levelname)s] %(message)s",
         datefmt="%H:%M:%S",
     )
-    event_arm_path = table_path("event_arm_table", args.data_dir, fmt="pkl")
-    stop_path = table_path("stop_table", args.data_dir, fmt="pkl")
-    qvals_path = table_path("qvals_table", args.data_dir, fmt="pkl")
+    event_arm_path = table_path("event_arm_table", args.data_dir)
+    stop_path = table_path("stop_table", args.data_dir)
+    qvals_path = table_path("qvals_table", args.data_dir)
     standardization_path = args.data_dir / STANDARDIZATION_REFERENCE
     models_dir = resolve_models_dir(args.data_dir, args.models_dir)
     mu_path = models_dir / "Mu.pkl"

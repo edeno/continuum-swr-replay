@@ -55,7 +55,7 @@ def main() -> int:
         return np.nanmin(v) >= -tol and np.nanmax(v) <= 1 + tol
 
     # ================= stop_table =================
-    st = read_table(table_path("stop_table", RC, fmt="pkl"))
+    st = read_table(table_path("stop_table", RC))
     require_covariate_schema(st, table="stop")
     print("\n### stop_table (per-stop rate A / rate B input) ###")
     lags = [f"known_reward_outcome_lag_{i}" for i in range(1, 11)]
@@ -91,7 +91,7 @@ def main() -> int:
         check("S", "patch switch fraction in [0,1]", False, f"could not recompute: {e}")
 
     # ================= event_arm_table =================
-    ea = read_table(table_path("event_arm_table", RC, fmt="pkl"))
+    ea = read_table(table_path("event_arm_table", RC))
     require_covariate_schema(ea, table="event_arm")
     print("\n### event_arm_table (content arm + choice) ###")
     arm = ea["candidate_arm"].to_numpy()
@@ -164,7 +164,7 @@ def main() -> int:
           (ea["arm_count_hard"].to_numpy() >= 0).all(), "")
 
     # ================= event_patch_table =================
-    ep = read_table(table_path("event_patch_table", RC, fmt="pkl"))
+    ep = read_table(table_path("event_patch_table", RC))
     require_covariate_schema(ep, table="event_patch")
     print("\n### event_patch_table (content patch) ###")
     check("H", "3 patches/event", abs(len(ep) / ep["event_id"].nunique() - 3) < 1e-9, "")
@@ -182,7 +182,7 @@ def main() -> int:
     check("H", "patch_count_hard >= 0", (ep["patch_count_hard"].to_numpy() >= 0).all(), "")
 
     # ================= qvals_table value block =================
-    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
+    cont = read_table(table_path("qvals_table", RC))
     require_covariate_schema(cont, table="qvals")
     print("\n### qvals_table (nominal + model value block) ###")
     check("H", "stop_id unique", cont["stop_id"].is_unique,

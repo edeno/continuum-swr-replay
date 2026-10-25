@@ -38,8 +38,8 @@ VAR = [f"reward_belief_variance_port_{i}" for i in range(6)]
 
 
 def main() -> int:
-    q = read_table(table_path("qvals_table", RC, fmt="pkl"))
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    q = read_table(table_path("qvals_table", RC))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(q, table="qvals")
     require_covariate_schema(stop, table="stop")
     st = stop[

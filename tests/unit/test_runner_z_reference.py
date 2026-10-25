@@ -23,6 +23,7 @@ from continuum_swr_replay.analysis.replay import contrast_aggregation
 from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
+from continuum_swr_replay.tables.io import write_table
 from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     load_reference,
@@ -150,7 +151,7 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(tmp_path):
         }
     )
     frame = stamp_swr_source(stamp_covariate_schema(frame, table="event_arm"))
-    frame.to_pickle(tmp_path / "event_arm_table.pkl")
+    write_table(frame, tmp_path / "event_arm_table.parquet")
     (tmp_path / "standardization_reference.json").write_text(
         json.dumps(
             {
@@ -163,7 +164,7 @@ def test_swr_content_assembly_rejects_legacy_uncertainty_reference(tmp_path):
     )
     fit_inputs = {
         **contrast_aggregation.CONTENT_FIT_INPUTS,
-        "event_arm_table": tmp_path / "event_arm_table.pkl",
+        "event_arm_table": tmp_path / "event_arm_table.parquet",
     }
 
     with pytest.raises(ValueError, match="stale or invalid"):
@@ -178,10 +179,10 @@ def test_swr_content_assembly_refuses_a_table_from_another_swr_source(
     """Its is_swr would be another source's."""
     frame = pd.DataFrame({"event_id": [1], "candidate_arm": [0]})
     frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
-    frame.to_pickle(tmp_path / "event_arm_table.pkl")
+    write_table(frame, tmp_path / "event_arm_table.parquet")
     fit_inputs = {
         **contrast_aggregation.CONTENT_FIT_INPUTS,
-        "event_arm_table": tmp_path / "event_arm_table.pkl",
+        "event_arm_table": tmp_path / "event_arm_table.parquet",
     }
     monkeypatch.setattr(
         contrast_aggregation, "require_covariate_schema", lambda *a, **k: None

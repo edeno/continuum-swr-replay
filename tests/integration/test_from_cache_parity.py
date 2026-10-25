@@ -34,7 +34,7 @@ def test_process_session_cache_parity(tmp_path, monkeypatch):
     # Isolate the cache so the test never touches the canonical _session_cache.
     monkeypatch.setattr(pdm, "SESSION_CACHE_DIR", tmp_path)
     try:
-        cont = load_contingency(pdm.OUTPUT_DIR / "qvals_table.pkl")
+        cont = load_contingency(pdm.OUTPUT_DIR / "qvals_table.parquet")
     except ValueError as exc:
         stale = ("legacy or mismatched covariate schema", "covariate schema version")
         if not any(reason in str(exc) for reason in stale):

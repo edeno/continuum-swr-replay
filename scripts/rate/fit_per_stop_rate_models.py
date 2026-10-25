@@ -102,7 +102,7 @@ logger = logging.getLogger(__name__)
 RC = REPLAY_CONTENT_DIR
 
 # The table this family is fit on; recorded in the artifact's provenance sidecar.
-FIT_INPUTS = {"stop_table": table_path("stop_table", RC, fmt="pkl")}
+FIT_INPUTS = {"stop_table": table_path("stop_table", RC)}
 # Per-stop count outcomes (canonical stop_table columns), tagged by `outcome`.
 RESPONSE_COLS = PER_STOP_RATE_OUTCOMES
 OFFSET_COL = "immobility_duration_s"
@@ -275,7 +275,7 @@ def main() -> None:
     for spec in MODEL_PER_STOP_RATE.values():
         assert_predictor_timing(spec.predictors)
 
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     # Its SWR counts (is_swr_stop, n_swr_events, ...) must come from the
     # configured source, artifact run included.

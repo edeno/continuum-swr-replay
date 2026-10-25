@@ -140,10 +140,10 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
 
 
 def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
+    stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     stop = add_uncertainty_covariates(stop)
-    cont = read_table(table_path("qvals_table", RC, fmt="pkl"))
+    cont = read_table(table_path("qvals_table", RC))
     require_covariate_schema(cont, table="qvals")
     stop = stop.merge(
         cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
@@ -154,8 +154,8 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     )
     merged = stop.merge(first, on=list(SESSION_COLUMNS), how="left", indicator=True)
     stop = stop[merged["_merge"].to_numpy() == "left_only"]
-    onset_table = read_table(table_path("event_onset_table", RC, fmt="pkl"))
-    event_table = read_table(table_path("event_table", RC, fmt="pkl"))
+    onset_table = read_table(table_path("event_onset_table", RC))
+    event_table = read_table(table_path("event_table", RC))
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
     onsets = attach_is_swr_to_onsets(onset_table, event_table)
