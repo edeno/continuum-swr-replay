@@ -114,7 +114,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, figure_dir
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import (  # noqa: E402
     SESSION_COLUMNS,
@@ -129,10 +129,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 SC = list(SESSION_COLUMNS)
-REPO_ROOT = Path(__file__).resolve().parents[2]
 RC = REPLAY_CONTENT_DIR
 DEFAULT_OUTPUT_DIR = RC / "content_estimator_comparison"
-DEFAULT_FIGURES_DIR = REPO_ROOT / "paper" / "figures" / "content_estimators"
+DEFAULT_FIGURES_DIR = figure_dir("content_estimators")
 
 COEFFICIENTS_BASENAME = "content_estimator_comparison"
 SUMMARY_BASENAME = "content_estimator_comparison_summary"

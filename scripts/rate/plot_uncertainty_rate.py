@@ -43,7 +43,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
-from continuum_swr_replay.paths import model_dir
+from continuum_swr_replay.paths import figure_dir, model_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Single source of truth: the curated covariate set is part of the MU_uncertainty
@@ -193,8 +193,7 @@ def main() -> None:
 
     report(models)
 
-    out_dir = Path(__file__).resolve().parents[2] / "paper" / "figures" / "rate"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = figure_dir("rate")
     out_dir.mkdir(parents=True, exist_ok=True)
     plot(models, out_dir / "uncertainty_rate_by_population.png")
 

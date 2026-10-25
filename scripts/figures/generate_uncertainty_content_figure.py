@@ -33,10 +33,10 @@ from continuum_swr_replay.figure_utilities import (
     save_figure,
     set_figure_defaults,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR
+from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, figure_dir
 
 DEFAULT_RESULTS_DIR = REPLAY_CONTENT_DIR / "uncertainty_content"
-DEFAULT_OUTPUT_DIR = Path("paper/figures/uncertainty_content")
+DEFAULT_OUTPUT_DIR = figure_dir("uncertainty_content")
 ANIMAL_ORDER = list(analysed_animals())
 ANIMAL_COLORS = dict(zip(ANIMAL_ORDER, [WONG[i] for i in [1, 2, 3, 5, 7]], strict=True))
 ANIMAL_MARKERS = dict(zip(ANIMAL_ORDER, ["o", "s", "^", "D", "P"], strict=True))

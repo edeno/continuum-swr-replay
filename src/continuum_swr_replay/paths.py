@@ -33,6 +33,7 @@ __all__ = [
     "REPLAY_CONTENT_DIR",
     "STANDARDIZATION_REFERENCE",
     "SWR_INVENTORY_ROOT",
+    "figure_dir",
     "model_dir",
     "table_path",
 ]
@@ -111,6 +112,31 @@ def model_dir(key: str, root: Path = REPLAY_CONTENT_DIR) -> Path:
             f"{tuple(MODEL_SUBDIRS)}"
         )
     return root / MODEL_SUBDIRS[key]
+
+
+def figure_dir(topic: str, root: Path | None = None) -> Path:
+    """Return the figure directory for `topic` beside data root `root`.
+
+    Figures land at ``<root>.parent / "paper" / "figures" / <topic>``, beside
+    the data they were drawn from, not at ``parameters.FIGURE_DIR``. On the
+    default root the two are the same folder; a run on another root
+    (``CSR_PROCESSED_DATA_DIR``, e.g. a ``run_refits`` staging run) then
+    writes its figures beside that root and cannot overwrite the paper's.
+
+    Parameters
+    ----------
+    topic : str
+        The figure topic subdirectory, e.g. ``"rate"``.
+    root : Path, optional
+        The processed-data root;
+        :data:`~continuum_swr_replay.parameters.PROCESSED_DATA_DIR` by default,
+        bound at import, as for :func:`model_dir`.
+
+    Returns
+    -------
+    Path
+    """
+    return (root or PROCESSED_DATA_DIR).parent / "paper" / "figures" / topic
 
 
 CANONICAL_TABLES: tuple[str, ...] = (

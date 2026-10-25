@@ -18,7 +18,6 @@ Usage:
 import argparse
 import logging
 import pickle
-from pathlib import Path
 
 import matplotlib
 
@@ -38,7 +37,12 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_HIERARCHY,
 )
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import (
+    REPLAY_CONTENT_DIR,
+    figure_dir,
+    model_dir,
+    table_path,
+)
 from continuum_swr_replay.visualization.palettes import COLORS
 from continuum_swr_replay.visualization.replay_content_plots import (
     plot_behavior_prediction_results,
@@ -62,7 +66,7 @@ ALL_MODELS = MODEL_DIR / "all_models.pkl"
 # Checked against each artifact's provenance sidecar before plotting, so a
 # figure cannot be rendered from coefficients that predate the table on disk.
 ALL_MODELS_INPUTS = {"event_arm_table": table_path("event_arm_table", RC, fmt="pkl")}
-OUTPUT_DIR = Path("paper/figures/replay_content")
+OUTPUT_DIR = figure_dir("replay_content")
 
 
 def build_parser() -> argparse.ArgumentParser:

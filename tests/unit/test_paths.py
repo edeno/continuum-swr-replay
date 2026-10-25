@@ -7,12 +7,15 @@ stale artifact, so every constant is pinned to the literal it replaced, and
 
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from continuum_swr_replay import paths
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.parameters import FIGURE_DIR, PROCESSED_DATA_DIR, ROOT_DIR
 
 RC = PROCESSED_DATA_DIR / "replay_content"
 
@@ -178,3 +181,67 @@ def test_the_qvals_builder_writes_beside_the_other_canonical_tables(monkeypatch)
         "table": paths.table_path("qvals_table", root),
         "ref": root / "qvals_standardization_reference.json",
     }
+
+
+@pytest.mark.parametrize("topic", ["rate", "replay_content", "qc_diagnosis"])
+def test_figure_dir_on_the_default_root_is_the_paper_figure_dir(topic):
+    assert paths.figure_dir(topic) == FIGURE_DIR / topic
+
+
+def test_figure_dir_on_a_staging_root_sits_beside_it():
+    root = Path("/staging/Processed-Data")
+    assert paths.figure_dir("rate", root) == Path("/staging/paper/figures/rate")
+
+
+# Each run_refits figure script, and the module-level default it writes to.
+# ``plot_uncertainty_rate`` builds its directory inside ``main``, so it is
+# not listed; it calls ``figure_dir("rate")`` directly.
+FIGURE_SCRIPT_DEFAULTS = {
+    "scripts/rate/plot_per_bin_rate_models.py": ("FIGS", "rate"),
+    "scripts/rate/plot_per_bin_rate_summary.py": ("FIGS", "rate"),
+    "scripts/rate/plot_model_checking.py": ("FIGS", "rate"),
+    "scripts/figures/generate_uncertainty_content_figure.py": (
+        "DEFAULT_OUTPUT_DIR",
+        "uncertainty_content",
+    ),
+    "scripts/content/generate_replay_content_figures.py": (
+        "OUTPUT_DIR",
+        "replay_content",
+    ),
+    "scripts/figures/generate_supp_pipeline_data_flow.py": (
+        "build_parser().parse_args([]).output_dir",
+        "qc_diagnosis",
+    ),
+}
+
+_PRINT_DEFAULTS = """
+import importlib.util, sys
+from pathlib import Path
+for rel, attr in zip(sys.argv[1::2], sys.argv[2::2]):
+    spec = importlib.util.spec_from_file_location(Path(rel).stem, rel)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    print(eval("mod." + attr))
+"""
+
+
+def test_figure_scripts_write_beside_a_staging_data_root(tmp_path):
+    # A run on another root (run_refits on a staging root, cwd the repo) must
+    # not write into the paper's figures. The env var is read at import, so
+    # the scripts are imported in a fresh interpreter.
+    root = tmp_path / "Processed-Data"
+    argv = [a for rel, (attr, _) in FIGURE_SCRIPT_DEFAULTS.items() for a in (rel, attr)]
+    env = {**os.environ, "CSR_PROCESSED_DATA_DIR": str(root), "MPLBACKEND": "Agg"}
+    out = subprocess.run(
+        [sys.executable, "-c", _PRINT_DEFAULTS, *argv],
+        cwd=ROOT_DIR,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    expected = [
+        str(tmp_path / "paper" / "figures" / topic)
+        for _, topic in FIGURE_SCRIPT_DEFAULTS.values()
+    ]
+    assert out == expected

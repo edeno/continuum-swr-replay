@@ -44,7 +44,12 @@ from continuum_swr_replay.analysis.replay.spatial_mapping import (
 )
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
+from continuum_swr_replay.paths import (
+    REPLAY_CONTENT_DIR,
+    figure_dir,
+    model_dir,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
@@ -480,9 +485,7 @@ def build_parser() -> argparse.ArgumentParser:
     # well arm 5). The old default, 14, is off-well under the current covariate
     # contract, so its is_current_arm is NaN.
     parser.add_argument("--event-id", type=int, default=275)
-    parser.add_argument(
-        "--output-dir", type=Path, default=Path("paper/figures/qc_diagnosis")
-    )
+    parser.add_argument("--output-dir", type=Path, default=figure_dir("qc_diagnosis"))
     parser.add_argument(
         "--allow-stale",
         action="store_true",
