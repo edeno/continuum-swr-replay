@@ -83,10 +83,10 @@ from ..data_types import MultiunitData, RippleBandInputs, RippleData, ThetaData
 # — stay offline-importable on machines without VPN.
 from ..intervals import interval_mask, overlaps_intervals
 from ..parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     HSE_CLOSE_EVENT_THRESHOLD_SEC,
     HSE_MINIMUM_DURATION_SEC,
     HSE_ZSCORE_THRESHOLD,
-    MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
 
 KAY_SMOOTHING_SIGMA_S = 0.004
@@ -831,7 +831,7 @@ def get_multiunit_hse(
         multiunit_spikes,
         speed,
         sampling_frequency,
-        speed_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         minimum_duration=HSE_MINIMUM_DURATION_SEC,
         zscore_threshold=HSE_ZSCORE_THRESHOLD,
         close_event_threshold=HSE_CLOSE_EVENT_THRESHOLD_SEC,

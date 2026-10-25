@@ -53,8 +53,8 @@ from continuum_swr_replay.figure_utilities import (
     set_figure_defaults,
 )
 from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     LOCAL_POSITION_STD,
-    MAX_SPEED_THRESHOLD_CM_PER_SEC,
 )
 from continuum_swr_replay.visualization.palettes import COLORS
 
@@ -961,7 +961,7 @@ def plot_speed(ax, time, speed):
     """Speed trace with immobility threshold."""
     ax.fill_between(time, speed, alpha=0.5, color="#888888", linewidth=0)
     ax.axhline(
-        MAX_SPEED_THRESHOLD_CM_PER_SEC,
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         color="black",
         linewidth=0.5,
         linestyle=":",
@@ -969,8 +969,8 @@ def plot_speed(ax, time, speed):
     )
     ax.text(
         time[-1],
-        MAX_SPEED_THRESHOLD_CM_PER_SEC + 0.5,
-        f"{MAX_SPEED_THRESHOLD_CM_PER_SEC:g} cm/s",
+        DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC + 0.5,
+        f"{DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:g} cm/s",
         ha="right",
         va="bottom",
         fontsize=5,

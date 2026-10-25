@@ -131,7 +131,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
 from continuum_swr_replay.parameters import (
-    MAX_SPEED_THRESHOLD_CM_PER_SEC,
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
@@ -796,7 +796,7 @@ def run_analysis(
     epoch_name: str,
     brain_area: str = "mPFC",
     sampling_frequency: int = SAMPLING_FREQUENCY,
-    immobility_threshold: float = MAX_SPEED_THRESHOLD_CM_PER_SEC,
+    immobility_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     log_directory: str | Path = "logs",
     overwrite: bool = False,
     git_hash: str | None = None,
@@ -1727,7 +1727,7 @@ def main() -> None:
                 epoch_name=epoch.Index[1],
                 brain_area=args.brain_area,
                 sampling_frequency=SAMPLING_FREQUENCY,
-                immobility_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
+                immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
                 log_directory=args.log_directory,
                 overwrite=args.overwrite,
                 git_hash=git_hash,
@@ -1759,7 +1759,7 @@ def main() -> None:
                     epoch_name=epoch.Index[1],
                     brain_area=args.brain_area,
                     sampling_frequency=SAMPLING_FREQUENCY,
-                    immobility_threshold=MAX_SPEED_THRESHOLD_CM_PER_SEC,
+                    immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
                     log_directory=args.log_directory,
                     overwrite=args.overwrite,
                     git_hash=git_hash,

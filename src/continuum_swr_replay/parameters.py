@@ -8,7 +8,7 @@ Constants
 ---------
 SAMPLING_FREQUENCY : int
     Decoding sampling frequency (500 Hz). All temporal analyses use this rate.
-MAX_SPEED_THRESHOLD_CM_PER_SEC : float
+DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC : float
     Whole-event speed threshold (4.0 cm/s) shared by Non-Local, SWR, and MUA
     analysis cohorts. Every event sample must be finite and strictly below it.
 ROOT_DIR : Path
@@ -78,7 +78,7 @@ SAMPLING_FREQUENCY = 500
 
 # Canonical whole-event immobility threshold for Non-Local, SWR, and MUA
 # analysis events (cm/s). Every event-bin speed must be strictly below it.
-MAX_SPEED_THRESHOLD_CM_PER_SEC = 4.0
+DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC = 4.0
 
 # Data directories and definitions
 # ROOT_DIR is the project root (continuum-swr-replay/), not src/
@@ -91,7 +91,9 @@ FIGURE_DIR = ROOT_DIR / "paper" / "figures"
 # Multiunit High Synchrony Event (HSE) detection parameters
 HSE_MINIMUM_DURATION_SEC: Final[float] = 0.015  # 15 ms minimum event duration
 HSE_ZSCORE_THRESHOLD: Final[float] = 2.0  # Z-score threshold for event detection
-HSE_CLOSE_EVENT_THRESHOLD_SEC: Final[float] = 0.0  # Gap to merge adjacent events (0 = no merging)
+HSE_CLOSE_EVENT_THRESHOLD_SEC: Final[float] = (
+    0.0  # Gap to merge adjacent events (0 = no merging)
+)
 
 # Spatial binning parameters (in cm)
 PLACE_BIN_SIZE_1D: Final[float] = 2.0
@@ -167,7 +169,7 @@ class TrainingType(str, Enum):
 __all__ = [
     # Sampling and thresholds
     "SAMPLING_FREQUENCY",
-    "MAX_SPEED_THRESHOLD_CM_PER_SEC",
+    "DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC",
     "PROBABILITY_THRESHOLDS",
     "DEFAULT_NON_LOCAL_THRESHOLD",
     # HSE detection parameters

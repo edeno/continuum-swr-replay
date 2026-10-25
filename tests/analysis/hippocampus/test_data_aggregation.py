@@ -35,7 +35,7 @@ def mock_position_info(mock_time):
         {
             "head_position_x": np.linspace(0, 100, n),
             "head_position_y": np.zeros(n),
-            "head_speed": np.full(n, 2.0),  # Below MAX_SPEED_THRESHOLD
+            "head_speed": np.full(n, 2.0),  # Below the 4 cm/s immobility threshold
             "head_orientation": np.zeros(n),
             "linear_position": np.linspace(0, 100, n),
             "projected_x_position": np.linspace(0, 100, n),
@@ -214,9 +214,7 @@ class TestGetDataOverTimeValidation:
     ):
         """Missing data keys should raise KeyError with helpful message."""
         incomplete_data = {
-            "position_info": pd.DataFrame(
-                {"head_speed": [1.0]}, index=[0.0]
-            ),
+            "position_info": pd.DataFrame({"head_speed": [1.0]}, index=[0.0]),
             # Missing: ripple_times, hse_times, theta_phase, etc.
         }
 
@@ -229,8 +227,9 @@ class TestGetDataOverTimeValidation:
                 "02_r1",
             )
 
-    def test_missing_single_key_names_it(self, mock_session_data_for_aggregation,
-                                          mock_results, mock_environment):
+    def test_missing_single_key_names_it(
+        self, mock_session_data_for_aggregation, mock_results, mock_environment
+    ):
         """Error message should name the specific missing key."""
         data = dict(mock_session_data_for_aggregation)
         del data["theta_phase"]
@@ -279,9 +278,13 @@ class TestGetDataOverTimeValidation:
         validate_required_session_data_keys(
             mock_session_data_for_aggregation,
             required_keys=[
-                "position_info", "ripple_times", "hse_times",
-                "theta_phase", "theta_power",
-                "zscored_ripple_consensus_trace", "multiunit_rate_zscore",
+                "position_info",
+                "ripple_times",
+                "hse_times",
+                "theta_phase",
+                "theta_power",
+                "zscored_ripple_consensus_trace",
+                "multiunit_rate_zscore",
             ],
         )
 

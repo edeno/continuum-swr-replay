@@ -24,16 +24,19 @@ import numpy as np
 
 from continuum_swr_replay.data_loaders.constants import OMISSION_KNOWN_LATENCY_SEC
 from continuum_swr_replay.parameters import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC as DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+from continuum_swr_replay.parameters import (
     DEFAULT_NON_LOCAL_THRESHOLD as DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.parameters import (
-    MAX_SPEED_THRESHOLD_CM_PER_SEC,
     SAMPLING_FREQUENCY,
 )
 
-# Event detection thresholds: DEFAULT_NON_LOCAL_THRESHOLD is
-# :data:`continuum_swr_replay.parameters.DEFAULT_NON_LOCAL_THRESHOLD`, re-exported
-# here for the analysis code that reads it from this module.
+# Event detection thresholds: DEFAULT_NON_LOCAL_THRESHOLD and
+# DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC (the whole-event immobility speed
+# threshold, cm/s) are the :mod:`continuum_swr_replay.parameters` values,
+# re-exported here for the analysis code that reads them from this module.
 
 # The omission latency itself is a loading-side task constant (see
 # ``data_loaders.constants``); the semantics string that reports it is an
@@ -43,12 +46,6 @@ OUTCOME_TIME_SEMANTICS: str = (
     f"{OMISSION_KNOWN_LATENCY_SEC:.2f} s, destination final poke-out) for omissions"
 )
 """Canonical physical availability rule for a trial's realized outcome."""
-
-DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC: float = float(MAX_SPEED_THRESHOLD_CM_PER_SEC)
-"""Default speed threshold for classifying immobile periods (cm/s).
-
-Derived from :data:`continuum_swr_replay.parameters.MAX_SPEED_THRESHOLD_CM_PER_SEC`.
-"""
 
 # SAMPLING_FREQUENCY is int in parameters.py; cast to float for use in
 # arithmetic that expects float division (e.g., duration / sampling_frequency).

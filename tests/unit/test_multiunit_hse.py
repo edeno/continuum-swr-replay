@@ -183,11 +183,13 @@ class TestGetMultiunitHSE:
 
     def test_uses_max_speed_threshold_from_parameters(self):
         """Verify speed_threshold matches the centralized parameter."""
-        from continuum_swr_replay.parameters import MAX_SPEED_THRESHOLD_CM_PER_SEC
+        from continuum_swr_replay.parameters import (
+            DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+        )
 
-        # The function uses MAX_SPEED_THRESHOLD_CM_PER_SEC internally
+        # The function uses DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC internally
         # Verify the parameter value is what we expect
-        assert MAX_SPEED_THRESHOLD_CM_PER_SEC == 4.0
+        assert DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC == 4.0
 
 
 class TestArtifactIntervals:
