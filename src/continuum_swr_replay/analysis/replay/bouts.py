@@ -26,6 +26,7 @@ from continuum_swr_replay.intervals import (
 
 from ._helpers import (
     arm_to_patch,
+    arms_of_wells,
     safe_mode,
     single_arm_from_well,
     stay_indicator_from_patches,
@@ -274,28 +275,6 @@ _FIRST_ROW_WELL_ARMS = {
 }
 
 
-def _arms_of_wells(wells: np.ndarray, track_graph: nx.Graph) -> np.ndarray:
-    """``single_arm_from_well`` of each well, ``NaN`` for a ``NaN`` well.
-
-    Parameters
-    ----------
-    wells : np.ndarray, shape (n,)
-        Well node IDs as floats.
-    track_graph : nx.Graph
-        Session track graph.
-
-    Returns
-    -------
-    np.ndarray, shape (n,)
-        Arm IDs as floats.
-    """
-    arm_of = {
-        well: single_arm_from_well(well, track_graph)
-        for well in np.unique(wells[~np.isnan(wells)])
-    }
-    return pd.Series(wells).map(arm_of).to_numpy(dtype=float)
-
-
 def bout_start_context(
     bout_rows: pd.DataFrame,
     n_bouts: int,
@@ -360,7 +339,7 @@ def bout_start_context(
         context[column] = location[column]
 
     for arm_column, well_column in _FIRST_ROW_WELL_ARMS.items():
-        context[arm_column] = _arms_of_wells(
+        context[arm_column] = arms_of_wells(
             first_row[well_column].to_numpy(dtype=float, na_value=np.nan),
             track_graph,
         )

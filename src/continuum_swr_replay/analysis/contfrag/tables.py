@@ -38,12 +38,13 @@ from ..replay._helpers import (
     align_count_matrix,
     align_posterior_to_dot,
     arm_to_patch,
+    arms_of_wells,
     assert_event_label_alignment,
     assert_single_session_alignment,
+    first_row_floats,
     safe_mode,
     single_arm_from_well,
     stay_indicator,
-    strict_first,
 )
 from ..replay.bouts import (
     assign_bout,
@@ -99,6 +100,15 @@ _CONTFRAG_TRAJECTORY_COLUMNS = tuple(
     c
     for c in SHARED_TRAJECTORY_COLUMNS
     if c not in ("continuous_prob_mean", "fragmented_prob_mean")
+)
+
+#: Trial-context columns each event reads at its first timebin, as floats.
+_EVENT_FIRST_ROW_COLUMNS = (
+    "prev_well",
+    "next_well",
+    "last_rewarded_well",
+    "did_last_completed_trip_switch_patch",
+    "is_rewarded_outcome",
 )
 
 
@@ -326,7 +336,15 @@ def build_contfrag_event_table(
     groups = ev.groupby(event_col, sort=True)
     event_records: list[dict] = []
 
-    for ev_id, g in groups:
+    # Trial-derived context at each event's first timebin, NaN kept, so an
+    # event that begins before any trial has no trial context (as in the
+    # stop tables).
+    first = first_row_floats(groups, _EVENT_FIRST_ROW_COLUMNS)
+    prev_arms = arms_of_wells(first["prev_well"], track_graph)
+    next_arms = arms_of_wells(first["next_well"], track_graph)
+    last_rewarded_arms = arms_of_wells(first["last_rewarded_well"], track_graph)
+
+    for i, (ev_id, g) in enumerate(groups):
         times = g.index.to_numpy()
         arm_series = g["decoded_arm"]
         real_arm_mask = arm_series.isin(ALL_ARMS)
@@ -348,25 +366,9 @@ def build_contfrag_event_table(
         location_well = float(location["occupancy_well_id"])
         location_arm = single_arm_from_well(location_well, track_graph)
         current_arm = location_arm
-        # Trial-derived context columns are NaN at every dot timebin
-        # before the first trial start (see ``add_trial_context``).
-        # A NaN-skipping "first" would skip leading NaNs and return the next
-        # trial's context, leaking future state into events whose first
-        # timebin had no trial active. The stop-table builder already
-        # uses the strict semantics for the same hazard — match it
-        # here so trial-derived event-level fields propagate NaN when
-        # the event begins before any trial.
-        prev_arm = single_arm_from_well(strict_first(g["prev_well"]), track_graph)
-        next_arm = single_arm_from_well(strict_first(g["next_well"]), track_graph)
-        last_rewarded_arm = single_arm_from_well(
-            strict_first(g["last_rewarded_well"]), track_graph
-        )
-
-        is_after_switch = strict_first(g["did_last_completed_trip_switch_patch"])
-        # reward_outcome and is_after_reward are the same source array; persist
-        # one canonical is_rewarded_outcome. Stay/omission complements derived
-        # downstream, not persisted.
-        is_rewarded_outcome = strict_first(g["is_rewarded_outcome"])
+        prev_arm = prev_arms[i]
+        next_arm = next_arms[i]
+        last_rewarded_arm = last_rewarded_arms[i]
 
         # ContFrag-specific: state composition during event. Defer to
         # ``_summarize_event_state`` for NaN-safe semantics — the
@@ -424,8 +426,13 @@ def build_contfrag_event_table(
             "current_patch": arm_to_patch(current_arm),
             "prev_patch": arm_to_patch(prev_arm),
             "next_patch": arm_to_patch(next_arm),
-            "did_last_completed_trip_switch_patch": is_after_switch,
-            "is_rewarded_outcome": is_rewarded_outcome,
+            "did_last_completed_trip_switch_patch": first[
+                "did_last_completed_trip_switch_patch"
+            ][i],
+            # reward_outcome and is_after_reward are the same source array;
+            # persist one canonical is_rewarded_outcome. Stay/omission
+            # complements derived downstream, not persisted.
+            "is_rewarded_outcome": first["is_rewarded_outcome"][i],
             "is_stay": stay_indicator(next_arm, current_arm),
             "n_timebins": len(g),
             # Counts bins with no real-arm ``decoded_arm``; since

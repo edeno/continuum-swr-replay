@@ -15,6 +15,8 @@ behavioral context, and behavioral-history covariates live in
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -35,6 +37,28 @@ def single_arm_from_well(well: float, track_graph: nx.Graph) -> float:
     if len(arms) == 0:
         return np.nan
     return float(min(arms))
+
+
+def arms_of_wells(wells: np.ndarray, track_graph: nx.Graph) -> np.ndarray:
+    """:func:`single_arm_from_well` of each well, ``NaN`` for a ``NaN`` well.
+
+    Parameters
+    ----------
+    wells : np.ndarray, shape (n,)
+        Well node IDs as floats.
+    track_graph : nx.Graph
+        Session track graph.
+
+    Returns
+    -------
+    np.ndarray, shape (n,)
+        Arm IDs as floats.
+    """
+    arm_of = {
+        well: single_arm_from_well(well, track_graph)
+        for well in np.unique(wells[~np.isnan(wells)])
+    }
+    return pd.Series(wells, dtype=float).map(arm_of).to_numpy(dtype=float)
 
 
 def arm_to_patch(arm: float) -> float:
@@ -123,22 +147,35 @@ def safe_mode(series: pd.Series) -> float:
     return float(valid.mode().iloc[0])
 
 
-def strict_first(series: pd.Series) -> float:
-    """First row's value as-is — NaN propagates.
+def first_row_floats(
+    groups: pd.api.typing.DataFrameGroupBy, columns: Sequence[str]
+) -> dict[str, np.ndarray]:
+    """Each group's first-row value of each column, as a float, NaN kept.
 
-    Use this when extracting event-level / bout-level context columns
-    that come from ``add_trial_context``: those columns are NaN at every
-    timebin before the first trial start. Taking the first non-NaN value
-    would silently skip leading NaNs and inherit the *next* trial's context, leaking
-    future state into events that started before any trial existed.
-    ``strict_first`` returns the first row's value as-is (NaN stays
-    NaN), so before-trial events surface as missing context instead of
-    fabricated post-hoc values.
+    Trial-derived context columns are NaN at every timebin before the first
+    trial start (see ``add_trial_context``). A NaN-skipping first would skip
+    those leading NaNs and return the next trial's context, leaking future
+    state into a group whose first row had no trial active, so the first row
+    is read as-is (``first(skipna=False)``). The later rows are not checked
+    against it.
+
+    Parameters
+    ----------
+    groups : DataFrameGroupBy
+        The frame grouped by event or bout.
+    columns : Sequence[str]
+        Numeric, boolean or nullable columns to read.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Column -> array of shape ``(n_groups,)``, in the groups' order.
     """
-    if len(series) == 0:
-        return np.nan
-    v = series.iloc[0]
-    return float(v) if pd.notna(v) else np.nan
+    first = groups[list(columns)].first(skipna=False)
+    return {
+        column: first[column].to_numpy(dtype=float, na_value=np.nan)
+        for column in columns
+    }
 
 
 def strict_mean(series: pd.Series) -> float:

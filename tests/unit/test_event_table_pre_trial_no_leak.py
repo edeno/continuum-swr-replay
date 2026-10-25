@@ -8,9 +8,9 @@ e.g. an event spanning t=0..2 on a session whose first trial starts
 at t=1 inherited trial 1's ``is_rewarded_outcome`` / ``occupancy_well_arm`` /
 ``is_rewarded_outcome`` even though t=0 had no trial active.
 
-Fix: replace ``safe_first`` with NaN-strict ``strict_first`` for the
-trial-derived fields so a before-trial event surfaces missing context
-explicitly. The stop-table builder already uses the strict semantics
+Fix: read the trial-derived fields at the event's first timebin as-is
+(``_helpers.first_row_floats``, ``first(skipna=False)``) so a before-trial
+event surfaces missing context explicitly. The stop-table builder already uses the strict semantics
 for the same hazard (see ``test_stop_table_bout_start_no_leak.py``).
 """
 

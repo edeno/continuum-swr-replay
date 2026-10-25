@@ -368,7 +368,7 @@ Shared fit-diagnostics helpers: convergence, separation, warning capture.
 
 Small shared primitives for the event-table builders.
 
-`single_arm_from_well`, `arm_to_patch`, `stay_indicator_from_patches`, `stay_indicator`, `align_posterior_to_dot`, `safe_mode`, `strict_first`, `strict_mean`, `strict_sum`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`
+`single_arm_from_well`, `arms_of_wells`, `arm_to_patch`, `stay_indicator_from_patches`, `stay_indicator`, `align_posterior_to_dot`, `safe_mode`, `first_row_floats`, `strict_mean`, `strict_sum`, `eq_indicator`, `eq_indicator_or_nan`, `align_count_matrix`, `assert_event_label_alignment`, `assert_single_session_alignment`, `add_arm_fixed_effects`, `build_well_to_arm_map`
 
 ### `src/continuum_swr_replay/analysis/replay/choice_prediction.py`
 

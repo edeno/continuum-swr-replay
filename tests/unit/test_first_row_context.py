@@ -1,15 +1,23 @@
-"""``bouts.bout_start_context`` equals the per-bout loop it replaced.
+"""Reading a group's first row vectorized equals the ``strict_first`` loops.
 
-Both stop builders read the trial context and the previous, next,
-last-rewarded and last-visited wells at each bout's first row. They used to
-iterate the bout groups and call ``strict_first`` (the first row's value as a
-float, NaN kept) per well; ``bout_start_context`` reads the same first row with
-``groupby.first(skipna=False)``. ``strict_first`` checks no agreement within a
-bout: it is the first row's value whatever the later rows hold, so neither does
-the helper. The reference below is the pre-helper builder code, verbatim but
-for its names. The frame covers single-row bouts, all-NaN bouts, bouts whose
-rows disagree (a NaN first row before a finite one, and the reverse), and bool,
-object and categorical columns.
+The stop and event builders read trial context at a group's first row (a bout's
+for a stop, the first timebin's for an event), NaN kept: a NaN-skipping first
+would surface a later row's value and leak the next trial's context. They used
+to iterate the groups and call ``strict_first`` (the first row's value as a
+float, NaN kept; reproduced below as ``_strict_first``). Now:
+
+- both stop builders call ``bouts.bout_start_context``, which reads the first
+  row with ``groupby.first(skipna=False)``;
+- the stop clocks and the two event builders read
+  ``groupby[columns].first(skipna=False).to_numpy(dtype=float, na_value=nan)``
+  and map wells to arms with ``_helpers.arms_of_wells``.
+
+``strict_first`` checked no agreement within a group: it is the first row's
+value whatever the later rows hold, so neither does the replacement. The
+references below are the pre-change builder code, verbatim but for its names.
+The frame covers single-row groups, all-NaN groups, groups whose rows disagree
+(a NaN first row before a finite one, and the reverse), and bool, object,
+nullable-integer and categorical columns.
 """
 
 from __future__ import annotations
@@ -21,9 +29,10 @@ import pytest
 
 from continuum_swr_replay.analysis.replay._helpers import (
     arm_to_patch,
+    arms_of_wells,
+    first_row_floats,
     single_arm_from_well,
     stay_indicator_from_patches,
-    strict_first,
 )
 from continuum_swr_replay.analysis.replay.bouts import (
     bout_start_context,
@@ -32,6 +41,14 @@ from continuum_swr_replay.analysis.replay.bouts import (
 from continuum_swr_replay.analysis.replay.simulation import make_bandit_track_graph
 
 WELL_COLUMNS = ("prev_well", "next_well", "last_rewarded_well", "last_visited_well")
+
+
+def _strict_first(series: pd.Series) -> float:
+    """``_helpers.strict_first`` as it was (removed with its last caller)."""
+    if len(series) == 0:
+        return np.nan
+    v = series.iloc[0]
+    return float(v) if pd.notna(v) else np.nan
 
 
 def _reference(
@@ -68,16 +85,16 @@ def _reference(
     completed_trial_arm_vals = np.full(n_bouts, np.nan)
     for bi, (_, g) in enumerate(grouped):
         prev_arm_vals[bi] = single_arm_from_well(
-            strict_first(g["prev_well"]), track_graph
+            _strict_first(g["prev_well"]), track_graph
         )
         next_arm_vals[bi] = single_arm_from_well(
-            strict_first(g["next_well"]), track_graph
+            _strict_first(g["next_well"]), track_graph
         )
         last_rew_vals[bi] = single_arm_from_well(
-            strict_first(g["last_rewarded_well"]), track_graph
+            _strict_first(g["last_rewarded_well"]), track_graph
         )
         completed_trial_arm_vals[bi] = single_arm_from_well(
-            strict_first(g["last_visited_well"]), track_graph
+            _strict_first(g["last_visited_well"]), track_graph
         )
 
     per_bout["prev_arm"] = prev_arm_vals
@@ -190,3 +207,57 @@ def test_first_row_is_read_as_is() -> None:
     # Bout 5 switches patch, bout 6 stays.
     assert context.loc[5, "is_stay"] == 0.0
     assert context.loc[6, "is_stay"] == 1.0
+
+
+# The columns the stop clocks and the event builders read with
+# ``first_row_floats``, and the dtypes they arrive in here: float with NaN
+# (wells, clocks), object bools with None, nullable Int64 with NA, numpy bool,
+# and (with ``categorical_wells``) categorical wells.
+FIRST_ROW_COLUMNS = (
+    *WELL_COLUMNS,
+    "completed_trial_id",
+    "did_last_completed_trip_switch_patch",
+    "is_rewarded_outcome",
+    "_goal_arrival_time",
+    "_outcome_known_time",
+    "_numpy_bool",
+)
+
+
+def _grouped_rows(categorical_wells: bool) -> pd.DataFrame:
+    frame = _bout_rows(categorical_wells)
+    frame["_goal_arrival_time"] = np.where(
+        frame["prev_well"].astype(float).isna(), NAN, frame.index - 0.05
+    )
+    frame["_outcome_known_time"] = frame["_goal_arrival_time"] + 0.5
+    frame["_numpy_bool"] = np.arange(len(frame)) % 2 == 0
+    return frame
+
+
+@pytest.mark.parametrize("categorical_wells", [False, True])
+def test_first_row_floats_matches_strict_first(categorical_wells: bool) -> None:
+    """The stop clocks' and the event builders' reads, old loop vs new."""
+    groups = _grouped_rows(categorical_wells).groupby("_bout_idx", sort=True)
+    got = first_row_floats(groups, FIRST_ROW_COLUMNS)
+    for column in FIRST_ROW_COLUMNS:
+        expected = np.array([_strict_first(g[column]) for _, g in groups])
+        np.testing.assert_array_equal(got[column], expected, strict=True)
+    # The comparison is not vacuous: bout 3's NaN first row stays NaN, bout
+    # 4's first row wins over its later rows.
+    assert np.isnan(got["prev_well"][3]) and got["prev_well"][4] == 4.0
+    assert got["did_last_completed_trip_switch_patch"][4] == 1.0
+
+
+@pytest.mark.parametrize("categorical_wells", [False, True])
+def test_arms_of_wells_matches_single_arm_loop(categorical_wells: bool) -> None:
+    """The event builders' well -> arm step, old loop vs new."""
+    graph = make_bandit_track_graph()
+    groups = _grouped_rows(categorical_wells).groupby("_bout_idx", sort=True)
+    first = first_row_floats(groups, WELL_COLUMNS)
+    for column in WELL_COLUMNS:
+        expected = np.array(
+            [single_arm_from_well(_strict_first(g[column]), graph) for _, g in groups]
+        )
+        np.testing.assert_array_equal(
+            arms_of_wells(first[column], graph), expected, strict=True
+        )

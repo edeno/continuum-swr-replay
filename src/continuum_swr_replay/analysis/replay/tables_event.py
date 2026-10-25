@@ -40,6 +40,12 @@ from ._helpers import (
     arm_to_patch as _arm_to_patch,
 )
 from ._helpers import (
+    arms_of_wells as _arms_of_wells,
+)
+from ._helpers import (
+    first_row_floats as _first_row_floats,
+)
+from ._helpers import (
     safe_mode as _safe_mode,
 )
 from ._helpers import (
@@ -47,9 +53,6 @@ from ._helpers import (
 )
 from ._helpers import (
     stay_indicator as _stay_indicator,
-)
-from ._helpers import (
-    strict_first as _strict_first,
 )
 from ._tables_common import (
     _EVENT_SEQUENCE_TABLE_BUILD_COLUMNS,
@@ -98,6 +101,16 @@ _NONLOCAL_STATE_COLS = {
     "continuous_prob_mean": "Non-Local_Continuous_prob",
     "fragmented_prob_mean": "Non-Local_Fragmented_prob",
 }
+
+#: Trial-context columns each event reads at its first timebin, as floats.
+_EVENT_FIRST_ROW_COLUMNS = (
+    "prev_well",
+    "next_well",
+    "last_rewarded_well",
+    "completed_trial_id",
+    "did_last_completed_trip_switch_patch",
+    "is_rewarded_outcome",
+)
 
 # ── Shared prep for the event / event-sequence builders ──
 
@@ -189,7 +202,15 @@ def _aggregate_event_features(
     groups = nl.groupby("non_local_event", sort=True)
     event_records: list[dict] = []
 
-    for ev_id, g in groups:
+    # Trial-derived context at each event's first timebin, NaN kept, so an
+    # event that begins before any trial has no trial context (as in the
+    # stop tables).
+    first = _first_row_floats(groups, _EVENT_FIRST_ROW_COLUMNS)
+    prev_arms = _arms_of_wells(first["prev_well"], track_graph)
+    next_arms = _arms_of_wells(first["next_well"], track_graph)
+    last_rewarded_arms = _arms_of_wells(first["last_rewarded_well"], track_graph)
+
+    for i, (ev_id, g) in enumerate(groups):
         times = g.index.to_numpy()
         arm_series = g["decoded_arm"]
         real_arm_mask = arm_series.isin(ALL_ARMS)
@@ -219,31 +240,9 @@ def _aggregate_event_features(
         location_well = float(location["occupancy_well_id"])
         location_arm = _single_arm_from_well(location_well, track_graph)
         current_arm = location_arm
-        # Trial-derived context columns are NaN at every dot timebin
-        # before the first trial start (see ``add_trial_context``).
-        # Taking the first non-NaN value would skip those leading NaNs and
-        # return the next trial's context, leaking future state into
-        # events whose first timebin had no trial active. The
-        # stop-table builder already uses the strict semantics for the
-        # same hazard — match it here so trial-derived event-level
-        # fields propagate NaN when the event begins before any trial.
-        prev_arm = _single_arm_from_well(_strict_first(g["prev_well"]), track_graph)
-        next_arm = _single_arm_from_well(_strict_first(g["next_well"]), track_graph)
-        last_rewarded_arm = _single_arm_from_well(
-            _strict_first(g["last_rewarded_well"]), track_graph
-        )
-
-        # Completion-order ID of the trip completed by the event start.
-        # Two visits to the same well inside one long immobility bout are
-        # separated only by this ID, so downstream visit-grain grouping
-        # cannot tell them apart without it.
-        completed_trial_id = _strict_first(g["completed_trial_id"])
-        is_after_switch = _strict_first(g["did_last_completed_trip_switch_patch"])
-        # The native trial reward/outcome indicators share one source array
-        # (see _helpers); persist one canonical ``is_rewarded_outcome``. The
-        # ``is_omitted_outcome`` complement and the stay flag are derived
-        # downstream, so neither is persisted here.
-        is_rewarded_outcome = _strict_first(g["is_rewarded_outcome"])
+        prev_arm = prev_arms[i]
+        next_arm = next_arms[i]
+        last_rewarded_arm = last_rewarded_arms[i]
 
         context_time = float(times[0])
         last_port_entry = g["_goal_arrival_time"].iloc[0]
@@ -274,9 +273,21 @@ def _aggregate_event_features(
                 "current_patch": _arm_to_patch(current_arm),
                 "prev_patch": _arm_to_patch(prev_arm),
                 "next_patch": _arm_to_patch(next_arm),
-                "completed_trial_id": completed_trial_id,
-                "did_last_completed_trip_switch_patch": is_after_switch,
-                "is_rewarded_outcome": is_rewarded_outcome,
+                # Completion-order ID of the trip completed by the event
+                # start. Two visits to the same well inside one long
+                # immobility bout are separated only by this ID, so
+                # downstream visit-grain grouping cannot tell them apart
+                # without it.
+                "completed_trial_id": first["completed_trial_id"][i],
+                "did_last_completed_trip_switch_patch": first[
+                    "did_last_completed_trip_switch_patch"
+                ][i],
+                # The native trial reward/outcome indicators share one source
+                # array (see _helpers); persist one canonical
+                # ``is_rewarded_outcome``. The ``is_omitted_outcome``
+                # complement and the stay flag are derived downstream, so
+                # neither is persisted here.
+                "is_rewarded_outcome": first["is_rewarded_outcome"][i],
                 "is_stay": _stay_indicator(next_arm, current_arm),
                 "n_undecoded_bins": n_junction,
                 "n_unique_arms": int(arms_real.nunique()),

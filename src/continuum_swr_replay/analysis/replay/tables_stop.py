@@ -20,7 +20,7 @@ from continuum_swr_replay.tables.event_ids import (
 )
 
 from ._helpers import (
-    strict_first as _strict_first,
+    first_row_floats as _first_row_floats,
 )
 from ._tables_common import (
     _STOP_TABLE_BUILD_COLUMNS,
@@ -187,23 +187,14 @@ def build_stop_table(
 
     # Absolute bout-start clocks: when the animal arrived at the well it is
     # sitting at, and when that trip's outcome became observable. Both come
-    # from the bout's first row via ``_strict_first``, so a bout that spans an
-    # arrival keeps the clock it started under rather than inheriting the
-    # later trip's, and a bout with no completed trip yet stays NaN. The
+    # from the bout's first row as-is (``first(skipna=False)``), so a bout that
+    # spans an arrival keeps the clock it started under rather than inheriting
+    # the later trip's, and a bout with no completed trip yet stays NaN. The
     # outcome clock is a boundary, not an outcome-gated value: it is finite
     # from arrival onward, including bins that precede the boundary.
-    per_bout["last_well_arrival_time_s"] = (
-        grouped["_goal_arrival_time"]
-        .apply(_strict_first)
-        .reindex(np.arange(n_bouts))
-        .to_numpy(dtype=float)
-    )
-    per_bout["outcome_known_time_s"] = (
-        grouped["_outcome_known_time"]
-        .apply(_strict_first)
-        .reindex(np.arange(n_bouts))
-        .to_numpy(dtype=float)
-    )
+    clocks = _first_row_floats(grouped, ("_goal_arrival_time", "_outcome_known_time"))
+    per_bout["last_well_arrival_time_s"] = clocks["_goal_arrival_time"]
+    per_bout["outcome_known_time_s"] = clocks["_outcome_known_time"]
 
     per_bout["is_swr_stop"] = (
         grouped["SWR_event"]
