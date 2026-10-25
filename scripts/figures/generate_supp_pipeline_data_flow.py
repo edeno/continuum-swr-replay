@@ -364,7 +364,7 @@ def make_figure(
     ax.set_xlabel("time relative to event onset (s)")
     ax.set_title(
         f"(C) Per-timebin replay_arm — event {event_id} only\n"
-        f"{len(ev_rows)} timebins; this is what compute_arm_counts sums"
+        f"{len(ev_rows)} timebins; this is what arm_count_hard sums"
     )
     ax.axhline(track_seg, color="#444", ls=":", lw=0.8, alpha=0.5)
     ax.text(

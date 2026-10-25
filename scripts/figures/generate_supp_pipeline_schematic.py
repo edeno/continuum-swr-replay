@@ -43,17 +43,17 @@ STEPS = [
         "assumption": "Thresholds cleanly separate non-local from local; immobility is required.",
     },
     {
-        "title": "4. Collapse to events  (collapse_to_events)",
+        "title": "4. Collapse to events  (build_event_table)",
         "shape": "E events  (modal arm/well + first-row onset flags)",
         "assumption": "Modal arm represents the event;  onset flags use the first timebin.\nReal data: 0.12 % of events straddle a trial boundary  →  modal-context is unambiguous.",
     },
     {
-        "title": "5. Compute arm counts  (compute_arm_counts)",
+        "title": "5. Compute arm counts  (arm_count_hard)",
         "shape": "E × (arm_count_0 ... arm_count_8, total_count L_e)",
         "assumption": "Each timebin contributes 1 count to 1 arm  (MAP-collapse, hard assignment).\nReal data: median fragmentation = 0  →  events sit on a single arm.",
     },
     {
-        "title": "6. Long format  (make_long_format_arm)",
+        "title": "6. Long format  (build_event_arm_table)",
         "shape": "E·9 rows × {is_current, is_prev, is_next, is_last_rewarded, ...}",
         "assumption": "9 arms are the candidate set for every event. Trunk arms (6,7,8) are 'neutral' to well-derived indicators.",
     },
@@ -63,12 +63,12 @@ STEPS = [
         "assumption": "Event-level scalars cancel in conditioning; identifiable only as interactions.",
     },
     {
-        "title": "8. Pool sessions / animals  (concat + add_event_uid)",
-        "shape": "Σ_sessions  events × 9 arms  with globally unique event_uid",
+        "title": "8. Pool sessions / animals  (concat; event_id from hash_event_id)",
+        "shape": "Σ_sessions  events × 9 arms  with globally unique event_id",
         "assumption": "Events are exchangeable across animals (no per-animal random effect).\n→ Tested: pooled SE under-covers if per-animal β truly differs.",
     },
     {
-        "title": "9. Fit ConditionalPoisson  (statsmodels)",
+        "title": "9. Fit conditional Poisson  (fit_conditional_poisson)",
         "shape": "β̂ , SE, p, AIC, BIC, VIF  per predictor",
         "assumption": "Within-event timebins independent  (multinomial).  Events independent.\n→ Tested: nominal SE under-covers under within-event autocorrelation (ρ≈0.94 on real data).",
     },
