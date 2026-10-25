@@ -52,48 +52,48 @@ python run_pfc_analysis_bandit.py --brain_area mPFC --n_workers 1 \
 import hashlib
 import json
 import logging
-import os
 import sys
 import warnings
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+from pathlib import Path
+from typing import Any
+
+from continuum_swr_replay.runs.threads import pin_blas_threads
 
 # Pin BLAS/OpenMP threads to 1 per process to prevent thread oversubscription
 # when running multiple Dask workers. Each worker runs one session serially,
 # and statsmodels GLM (IRLS) is single-threaded anyway.
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
-os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
-os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
-from pathlib import Path
-from typing import Any
+pin_blas_threads("NUMEXPR_NUM_THREADS")
 
-import dask
-import numpy as np
-import pandas as pd
-from dask.distributed import Client, LocalCluster
-from numpy.typing import NDArray
+import dask  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+from dask.distributed import Client, LocalCluster  # noqa: E402
+from numpy.typing import NDArray  # noqa: E402
 
-from continuum_swr_replay.analysis.events.cohort_selection import stop_cohort_suffix
-from continuum_swr_replay.analysis.pfc import run_session
-from continuum_swr_replay.analysis.pfc.batched_glm import (
+from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
+    stop_cohort_suffix,
+)
+from continuum_swr_replay.analysis.pfc import run_session  # noqa: E402
+from continuum_swr_replay.analysis.pfc.batched_glm import (  # noqa: E402
     DEFAULT_PENALTY_SIGMA,
     fit_poisson_glms,
     implied_prior_sd,
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
-from continuum_swr_replay.analysis.pfc.canonical_events import (
+from continuum_swr_replay.analysis.pfc.canonical_events import (  # noqa: E402
     IS_SWR_DEFINITION,
     canonical_event_input_hashes,
 )
-from continuum_swr_replay.analysis.pfc.cohort import (
+from continuum_swr_replay.analysis.pfc.cohort import (  # noqa: E402
     DEFAULT_STOP_TABLE_PATH,
     load_session_stop_cohort,
 )
-from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
-from continuum_swr_replay.analysis.pfc.fit import model_penalties
-from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
-from continuum_swr_replay.analysis.pfc.heldout import (
+from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES  # noqa: E402
+from continuum_swr_replay.analysis.pfc.fit import model_penalties  # noqa: E402
+from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu  # noqa: E402
+from continuum_swr_replay.analysis.pfc.heldout import (  # noqa: E402
     BEST_MODEL_CANDIDATES,
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -107,11 +107,13 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     null_draw_seeds,
     required_usable_null_draws,
 )
-from continuum_swr_replay.analysis.pfc.load_population import penalty_sigma_suffix
-from continuum_swr_replay.analysis.pfc.matched_control import (
+from continuum_swr_replay.analysis.pfc.load_population import (  # noqa: E402
+    penalty_sigma_suffix,
+)
+from continuum_swr_replay.analysis.pfc.matched_control import (  # noqa: E402
     MATCHED_CONTROL_PLACEMENT_METHOD,
 )
-from continuum_swr_replay.analysis.pfc.modulation import (
+from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     CURVE_SOURCES,
     NESTED_MODEL_PAIRS,
     REPORT_HALF_WINDOW_S,
@@ -121,27 +123,31 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     peak_modulation_se,
     prior_binds,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import (
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     fit_provenance_path,
     write_fit_provenance,
 )
-from continuum_swr_replay.analysis.replay.fit_provenance import (
+from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     git_hash as loaded_commit,
 )
-from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
-from continuum_swr_replay.data_loaders.utils import format_epoch_identifier
-from continuum_swr_replay.parameters import (
+from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
+    analysed_epochs,
+)
+from continuum_swr_replay.data_loaders.utils import (  # noqa: E402
+    format_epoch_identifier,
+)
+from continuum_swr_replay.parameters import (  # noqa: E402
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     PROCESSED_DATA_DIR,
     SAMPLING_FREQUENCY,
 )
-from continuum_swr_replay.runs.batch import (
+from continuum_swr_replay.runs.batch import (  # noqa: E402
     raise_open_file_limit,
     release_nwb_files,
     setup_logger,
 )
-from continuum_swr_replay.runs.provenance import produced_by
-from continuum_swr_replay.tables.io import write_atomically
+from continuum_swr_replay.runs.provenance import produced_by  # noqa: E402
+from continuum_swr_replay.tables.io import write_atomically  # noqa: E402
 
 #: Populations the PFC GLMs may be fit on. ``at_well`` is the canonical shared
 #: cohort and publishes the unsuffixed artifact names; ``all_stops`` applies no

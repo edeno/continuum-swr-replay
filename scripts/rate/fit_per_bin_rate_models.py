@@ -62,13 +62,12 @@ Usage:
 
 from __future__ import annotations
 
-import os
+from continuum_swr_replay.runs.threads import pin_blas_threads
 
 # Pin BLAS to one thread per process BEFORE numpy is imported: with the
 # per-session process fan-out (--workers), multi-threaded BLAS would
 # oversubscribe the cores and run far slower than single-threaded workers.
-for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
-    os.environ.setdefault(_v, "1")
+pin_blas_threads()
 
 import argparse  # noqa: E402
 import logging  # noqa: E402

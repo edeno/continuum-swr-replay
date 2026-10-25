@@ -38,11 +38,10 @@ Usage::
 
 from __future__ import annotations
 
-import os
+from continuum_swr_replay.runs.threads import pin_blas_threads
 
 # Pin BLAS to one thread BEFORE numpy import (matches the Family B orchestrator).
-for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
-    os.environ.setdefault(_v, "1")
+pin_blas_threads()
 
 import argparse  # noqa: E402
 import logging  # noqa: E402

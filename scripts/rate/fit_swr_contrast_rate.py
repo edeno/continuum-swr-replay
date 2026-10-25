@@ -47,10 +47,9 @@ Usage:
 
 from __future__ import annotations
 
-import os
+from continuum_swr_replay.runs.threads import pin_blas_threads
 
-for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
-    os.environ.setdefault(_v, "1")
+pin_blas_threads()
 
 import argparse  # noqa: E402
 import json  # noqa: E402

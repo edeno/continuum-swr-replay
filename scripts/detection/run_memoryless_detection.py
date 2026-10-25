@@ -201,6 +201,7 @@ from continuum_swr_replay.runs.batch import run_epochs as batch_run_epochs
 from continuum_swr_replay.runs.cli import parse_run_id
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import produced_by, provenance_record
+from continuum_swr_replay.runs.threads import BLAS_THREAD_VARIABLES
 from continuum_swr_replay.tables.io import write_atomically, write_table
 
 OUTPUT_ROOT = MEMORYLESS_ROOT
@@ -775,7 +776,7 @@ def _describe(record: dict) -> str:
     return _counts(record)
 
 
-THREAD_VARIABLES = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+THREAD_VARIABLES = BLAS_THREAD_VARIABLES
 """The BLAS and OpenMP thread counts dask's nanny sets to 1 in each worker it
 spawns (``distributed.nanny.pre-spawn-environ``). Set before the worker starts,
 since numpy reads them when it is imported."""
