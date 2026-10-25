@@ -33,6 +33,7 @@ from .history import (
     visit_recency_and_never_visited_all_events,
 )
 from .history._common import _prepare_port_experiences
+from .interactions import attach_interactions
 
 
 def broadcast_candidate_arms(event_table: pd.DataFrame) -> pd.DataFrame:
@@ -253,77 +254,48 @@ def attach_candidate_arm_covariates(
             )
         )
 
-    time_since_stop = output["time_since_stop_start_s"].to_numpy()
-    is_swr = output["is_swr"].astype(int).to_numpy()
-    is_mua = output["is_mua"].astype(int).to_numpy()
     rewarded = output["is_rewarded_outcome"].to_numpy(dtype=float)
-    omitted = np.where(np.isfinite(rewarded), 1.0 - rewarded, np.nan)
-    is_current = output["is_current_arm"].to_numpy()
-    is_prev = output["is_prev_arm"].to_numpy()
-    is_next = output["is_next_arm"].to_numpy()
-    is_last_rewarded = output["is_last_rewarded_arm"].to_numpy()
 
     # Interaction (product) predictors. Each ``a_x_b`` column is ``a * b`` so a
     # model coefficient on it tests whether the effect of ``a`` differs by ``b``
-    # (equivalently, whether ``b``'s effect differs by ``a``). Grouped by the
-    # question each family answers.
-
-    # Does the current arm being *also* the last-rewarded arm change its
-    # representation (beyond the two main effects)?
-    output["is_current_arm_x_is_last_rewarded_arm"] = is_current * is_last_rewarded
-
-    # Does representation of the current / previous / next arm rise or fall over
-    # the course of the stop (its time-since-stop slope)?
-    output["time_since_stop_start_s_x_is_current_arm"] = time_since_stop * is_current
-    output["time_since_stop_start_s_x_is_prev_arm"] = time_since_stop * is_prev
-    output["time_since_stop_start_s_x_is_next_arm"] = time_since_stop * is_next
-
-    # Does SWR replay concentrate on the current / previous / next / last-rewarded
-    # arm more (or less) than non-SWR non-local activity does?
-    output["swr_x_is_current_arm"] = is_swr * is_current
-    output["swr_x_is_prev_arm"] = is_swr * is_prev
-    output["swr_x_is_next_arm"] = is_swr * is_next
-    output["swr_x_is_last_rewarded_arm"] = is_swr * is_last_rewarded
-
-    # Does SWR replay shift toward arms with a high recent reward fraction
-    # (fraction rewarded over that arm's last 10 visits)?
-    output["swr_x_reward_fraction_candidate_arm_last10_visits"] = (
-        is_swr * output["reward_fraction_candidate_arm_last10_visits"].to_numpy()
-    )
-
-    # Does SWR replay shift with how recently the arm was visited (centered term
-    # + the spline basis capturing nonlinear recency)?
-    output["swr_x_visit_recency_trials_event_leaf_centered"] = (
-        is_swr * output["visit_recency_trials_event_leaf_centered"].to_numpy()
-    )
-    for column in RECENCY_SPLINE_COLUMNS:
-        output[f"swr_x_{column}"] = is_swr * output[column].to_numpy()
-
-    # Does SWR replay favor never-visited arms (novelty)?
-    output["swr_x_is_candidate_arm_never_visited"] = (
-        is_swr * output["is_candidate_arm_never_visited"].to_numpy()
-    )
-
-    # Does SWR replay avoid the last-rewarded arm specifically when it is not the
-    # current arm?
-    output["swr_x_is_last_rewarded_noncurrent_arm"] = (
-        is_swr * output["is_last_rewarded_noncurrent_arm"].to_numpy()
-    )
-
-    # Does SWR replay shift with reward uncertainty (pre-outcome belief variance)?
+    # (equivalently, whether ``b``'s effect differs by ``a``). The factors, and
+    # the question each family answers, are declared in ``interactions.py``.
+    # Columns are read in their own dtype, the event flags as integers, so a
+    # product of integer factors stays integer.
+    products = [
+        "is_current_arm_x_is_last_rewarded_arm",
+        "time_since_stop_start_s_x_is_current_arm",
+        "time_since_stop_start_s_x_is_prev_arm",
+        "time_since_stop_start_s_x_is_next_arm",
+        "swr_x_is_current_arm",
+        "swr_x_is_prev_arm",
+        "swr_x_is_next_arm",
+        "swr_x_is_last_rewarded_arm",
+        "swr_x_reward_fraction_candidate_arm_last10_visits",
+        "swr_x_visit_recency_trials_event_leaf_centered",
+        *(f"swr_x_{column}" for column in RECENCY_SPLINE_COLUMNS),
+        "swr_x_is_candidate_arm_never_visited",
+        "swr_x_is_last_rewarded_noncurrent_arm",
+    ]
     if include_belief_variance:
-        output["swr_x_reward_belief_variance_candidate_arm_preoutcome"] = (
-            is_swr
-            * output["reward_belief_variance_candidate_arm_preoutcome"].to_numpy()
-        )
-
-    # MUA mirror: the same current/prev/next/last-rewarded questions for
-    # multi-unit-activity events, as a control cohort against the SWR terms.
-    output["mua_x_is_current_arm"] = is_mua * is_current
-    output["mua_x_is_prev_arm"] = is_mua * is_prev
-    output["mua_x_is_next_arm"] = is_mua * is_next
-    output["mua_x_is_last_rewarded_arm"] = is_mua * is_last_rewarded
-
-    # Does an *omitted* outcome change representation of the last-rewarded arm?
-    output["is_omitted_outcome_x_is_last_rewarded_arm"] = omitted * is_last_rewarded
+        products.append("swr_x_reward_belief_variance_candidate_arm_preoutcome")
+    products += [
+        "mua_x_is_current_arm",
+        "mua_x_is_prev_arm",
+        "mua_x_is_next_arm",
+        "mua_x_is_last_rewarded_arm",
+        "is_omitted_outcome_x_is_last_rewarded_arm",
+    ]
+    attach_interactions(
+        output,
+        products,
+        dtype=None,
+        factor_values={
+            "is_swr": output["is_swr"].astype(int).to_numpy(),
+            "is_mua": output["is_mua"].astype(int).to_numpy(),
+            "is_omitted_outcome": np.where(
+                np.isfinite(rewarded), 1.0 - rewarded, np.nan
+            ),
+        },
+    )
     return output

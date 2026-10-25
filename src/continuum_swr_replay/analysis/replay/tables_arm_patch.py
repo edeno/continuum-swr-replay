@@ -42,6 +42,7 @@ from .covariates.candidate_arm import (
     attach_candidate_arm_covariates,
     broadcast_candidate_arms,
 )
+from .covariates.interactions import attach_interactions
 from .summaries import (
     arm_count_hard,
     arm_count_soft,
@@ -446,14 +447,17 @@ def build_event_patch_table(
             f"build_event_patch_table: {n_unmatched} patch rows have an "
             "event_id absent from event_table; is_swr cannot be assigned."
         )
-    is_swr_i = patch_eat["is_swr"].astype(int).to_numpy()
-    patch_eat["swr_x_is_current_patch"] = (
-        is_swr_i * patch_eat["is_current_patch"].to_numpy()
+    # Factors declared in covariates.interactions; columns in their own dtype.
+    attach_interactions(
+        patch_eat,
+        [
+            "swr_x_is_current_patch",
+            "swr_x_is_last_rewarded_noncurrent_patch",
+            "swr_x_is_prev_patch",
+        ],
+        dtype=None,
+        factor_values={"is_swr": patch_eat["is_swr"].astype(int).to_numpy()},
     )
-    patch_eat["swr_x_is_last_rewarded_noncurrent_patch"] = (
-        is_swr_i * patch_eat["is_last_rewarded_noncurrent_patch"].to_numpy()
-    )
-    patch_eat["swr_x_is_prev_patch"] = is_swr_i * patch_eat["is_prev_patch"].to_numpy()
 
     # Broadcast event-level identity/location so patch analyses can apply the
     # same explicit at-well/in-transit/mixed cohort filters as arm analyses.

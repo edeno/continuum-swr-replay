@@ -37,6 +37,7 @@ import pandas as pd
 from continuum_swr_replay.data_loaders.constants import ALL_ARMS, WELL_ARMS
 
 from .covariates import center_visit_recency_within_event
+from .covariates.interactions import interaction_product
 from .model_specs import ARM_FE_PREDICTORS
 from .spatial_mapping import map_estimate_to_arm
 from .summaries import arm_count_hard as _arm_count_hard_fn
@@ -49,57 +50,25 @@ DEFAULT_PREDICTORS: tuple[str, ...] = (
 )
 
 
-# Predictor name → ("base" arm-varying, "event" event-level) decomposition.
-# Used by ``simulate_with_event_covariates`` to construct interaction columns
-# the same way ``add_interaction_columns`` and ``add_temporal_interactions``
-# do in the production pipeline.
-_INTERACTION_FACTORS: dict[str, tuple[str, str]] = {
-    "swr_x_is_current_arm": ("is_current_arm", "is_swr"),
-    "swr_x_is_prev_arm": ("is_prev_arm", "is_swr"),
-    "swr_x_is_next_arm": ("is_next_arm", "is_swr"),
-    "swr_x_is_last_rewarded_arm": ("is_last_rewarded_arm", "is_swr"),
-    "swr_x_reward_fraction_candidate_arm_last10_visits": (
-        "reward_fraction_candidate_arm_last10_visits",
-        "is_swr",
-    ),
-    "swr_x_visit_recency_trials_event_leaf_centered": (
-        "visit_recency_trials_event_leaf_centered",
-        "is_swr",
-    ),
-    "swr_x_is_candidate_arm_never_visited": (
-        "is_candidate_arm_never_visited",
-        "is_swr",
-    ),
-    "swr_x_is_last_rewarded_noncurrent_arm": (
-        "is_last_rewarded_noncurrent_arm",
-        "is_swr",
-    ),
-    "mua_x_is_last_rewarded_arm": ("is_last_rewarded_arm", "is_mua"),
-    "is_omitted_outcome_x_is_last_rewarded_arm": (
-        "is_last_rewarded_arm",
-        "is_omitted_outcome",
-    ),
-    "time_since_stop_start_s_x_is_current_arm": (
-        "is_current_arm",
-        "time_since_stop_start_s",
-    ),
-    "time_since_stop_start_s_x_is_prev_arm": (
-        "is_prev_arm",
-        "time_since_stop_start_s",
-    ),
-    "time_since_stop_start_s_x_is_next_arm": (
-        "is_next_arm",
-        "time_since_stop_start_s",
-    ),
-}
-
-# Arm-level × arm-level interactions (both factors vary across arms).
-_ARM_ARM_INTERACTIONS: dict[str, tuple[str, str]] = {
-    "is_current_arm_x_is_last_rewarded_arm": (
-        "is_current_arm",
-        "is_last_rewarded_arm",
-    ),
-}
+# The products the simulator builds, in output order. Their factors are declared
+# once, in ``covariates.interactions``, and the event-arm table is built from the
+# same declaration.
+_SIMULATED_INTERACTIONS: tuple[str, ...] = (
+    "swr_x_is_current_arm",
+    "swr_x_is_prev_arm",
+    "swr_x_is_next_arm",
+    "swr_x_is_last_rewarded_arm",
+    "swr_x_reward_fraction_candidate_arm_last10_visits",
+    "swr_x_visit_recency_trials_event_leaf_centered",
+    "swr_x_is_candidate_arm_never_visited",
+    "swr_x_is_last_rewarded_noncurrent_arm",
+    "mua_x_is_last_rewarded_arm",
+    "is_omitted_outcome_x_is_last_rewarded_arm",
+    "time_since_stop_start_s_x_is_current_arm",
+    "time_since_stop_start_s_x_is_prev_arm",
+    "time_since_stop_start_s_x_is_next_arm",
+    "is_current_arm_x_is_last_rewarded_arm",
+)
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:
@@ -353,10 +322,9 @@ def simulate_with_event_covariates(
     Per event we sample event-level covariates (``is_swr``,
     ``is_omitted_outcome`` and ``time_since_stop_start_s``) and
     arm-varying base predictors as in ``sample_arm_design``. Interaction
-    columns are then constructed by element-wise product of their base
-    arm-varying predictor and their event-level scalar — exactly the
-    construction in ``event_collapsing.add_interaction_columns`` and
-    ``predictors.add_temporal_interactions``. Counts are drawn from
+    columns are then the element-wise product of the factors declared for them
+    in ``covariates.interactions.INTERACTION_FACTORS`` -- the declaration the
+    event-arm table is built from. Counts are drawn from
     ``Multinomial(L_e, softmax(X β_true))`` over the requested predictor
     set.
 
@@ -465,14 +433,11 @@ def _sample_event_covariate_columns(
         k: np.tile(v[:, None], (1, n_arms)) for k, v in event_scalars.items()
     }
 
-    # Interaction columns from the canonical decomposition.
-    interaction_cols: dict[str, np.ndarray] = {}
-    for name, (base, ev) in _INTERACTION_FACTORS.items():
-        interaction_cols[name] = arm_features[base] * event_broadcast[ev]
-
-    # Arm × arm interactions (both factors vary across arms).
-    for name, (left, right) in _ARM_ARM_INTERACTIONS.items():
-        interaction_cols[name] = arm_features[left] * arm_features[right]
+    # Interaction columns from the declared factors.
+    factors = {**arm_features, **event_broadcast}
+    interaction_cols = {
+        name: interaction_product(name, factors) for name in _SIMULATED_INTERACTIONS
+    }
 
     return {
         **arm_features,

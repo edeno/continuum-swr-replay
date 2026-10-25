@@ -64,6 +64,7 @@ from ..replay.covariates.candidate_arm import (
     attach_candidate_arm_covariates,
     broadcast_candidate_arms,
 )
+from ..replay.covariates.interactions import attach_interactions
 from ..replay.design_constants import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_INCOMPLETE,
@@ -693,19 +694,16 @@ def build_contfrag_event_arm_table(
         include_belief_variance=False,
     )
 
-    # ContFrag-specific interactions
-    cont_mean = long["continuous_prob_mean"].to_numpy()
-    long["continuous_replay_score_mean_x_is_current_arm"] = (
-        cont_mean * long["is_current_arm"].to_numpy()
-    )
-    long["continuous_replay_score_mean_x_is_prev_arm"] = (
-        cont_mean * long["is_prev_arm"].to_numpy()
-    )
-    long["continuous_replay_score_mean_x_is_next_arm"] = (
-        cont_mean * long["is_next_arm"].to_numpy()
-    )
-    long["continuous_x_last_rewarded"] = (
-        cont_mean * long["is_last_rewarded_arm"].to_numpy()
+    # ContFrag-specific interactions, declared in covariates.interactions.
+    attach_interactions(
+        long,
+        [
+            "continuous_replay_score_mean_x_is_current_arm",
+            "continuous_replay_score_mean_x_is_prev_arm",
+            "continuous_replay_score_mean_x_is_next_arm",
+            "continuous_x_last_rewarded",
+        ],
+        dtype=None,
     )
 
     validate_event_arm_table(long, event_table=event_table)

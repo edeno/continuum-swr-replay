@@ -21,7 +21,8 @@ Derived and interaction columns resolve to their **source atoms**. A product
 column (the canonical current-arm belief-update product,
 ``swr_x_reward_belief_mean_candidate_arm_preoutcome``) resolves to the source of
 each factor declared for it in
-:data:`~.covariates.interactions.INTERACTION_FACTORS`; a patsy interaction
+:data:`~.covariates.interactions.INTERACTION_FACTORS` (except the products no
+ladder fits, which stay unresolved and are refused); a patsy interaction
 (``is_swr:rpe_postoutcome``) to the sources of its operands; any other derived
 column through :data:`DERIVED_COVARIATE_SOURCES`. Both mappings are explicit
 because product spelling is not an information-time model, so the completeness
@@ -36,7 +37,11 @@ from .covariates.definitions import (
     POST_CHOICE_COVARIATES,
     Availability,
 )
-from .covariates.interactions import INTERACTION_FACTORS, factor_source
+from .covariates.interactions import (
+    INTERACTION_FACTORS,
+    UNFITTED_PRODUCTS,
+    factor_source,
+)
 from .model_specs import N_REWARD_LAGS
 
 # Timing classification is derived from the scientific definition catalog so a
@@ -139,8 +144,12 @@ assert (PRE_OUTCOME_SAFE | POST_OUTCOME | FUTURE_REFERENCING) == KNOWN_ATOMS, (
 
 
 def _column_sources(column: str) -> list[str]:
-    """Source atoms of one design column: a product's factors', else its own."""
-    if column in INTERACTION_FACTORS:
+    """Source atoms of one design column: a product's factors', else its own.
+
+    A product in :data:`~.covariates.interactions.UNFITTED_PRODUCTS` is left
+    unresolved, so the timing check refuses it as an unclassified atom.
+    """
+    if column in INTERACTION_FACTORS and column not in UNFITTED_PRODUCTS:
         return [
             factor_source(factor)
             for factor in INTERACTION_FACTORS[column]

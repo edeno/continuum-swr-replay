@@ -1,17 +1,20 @@
 """Interaction products: one declaration builds them and answers timing and qvals-gap.
 
-``covariates.interactions.INTERACTION_FACTORS`` replaced three hand-kept copies
+``covariates.interactions.INTERACTION_FACTORS`` replaced the hand-kept copies
 (at 436c4538): the products written out one by one in ``contrast_aggregation``,
-the product entries of ``covariate_timing.DERIVED_COVARIATE_SOURCES``, and the
-``_x_`` name split in ``cohort_audit``. These tests pin that the declaration
-reproduces all three:
+the canonical table builders and the simulator, the product entries of
+``covariate_timing.DERIVED_COVARIATE_SOURCES``, and the ``_x_`` name split in
+``cohort_audit``. These tests pin that the declaration reproduces them:
 
-* the built columns, bit for bit, against copies of the old builders
-  (synthetic frames here; the canonical tables under ``-m real_data``);
+* the fit-time and simulator columns, bit for bit, against copies of the old
+  code (synthetic frames here; the canonical fit cohorts under
+  ``-m real_data``). The canonical tables' products are checked by the
+  table-parity slice (``scripts/qa/table_parity.py``), not here;
 * every covariate-timing verdict and every qvals answer, for every column of the
   table-parity slice's tables and fit cohorts, every ladder predictor and every
   catalogued covariate, against ``data/interaction_provenance_answers.json`` --
-  the answers the code gave at 436c4538;
+  the answers the code gave at 436c4538. That includes the 13 table products no
+  ladder fits (:data:`UNFITTED_PRODUCTS`), which the timing check still refuses;
 * the one intended difference: ``timing_of`` now lists every factor of a
   product, so eleven products whose old entry left out the arm or patch
   indicator gain it. The indicators are pre-outcome, so no verdict moves.
@@ -30,8 +33,11 @@ import pytest
 from continuum_swr_replay.analysis.replay import cohort_audit as coh
 from continuum_swr_replay.analysis.replay import contrast_aggregation as ca
 from continuum_swr_replay.analysis.replay import covariate_timing as ct
+from continuum_swr_replay.analysis.replay import simulation as sim
 from continuum_swr_replay.analysis.replay.covariates.interactions import (
     INTERACTION_FACTORS,
+    LEGACY_PRODUCT_NAMES,
+    UNFITTED_PRODUCTS,
     factor_source,
 )
 from continuum_swr_replay.tables.io import read_table
@@ -248,22 +254,32 @@ def _synthetic_patch_frame() -> pd.DataFrame:
 # --- The declaration ------------------------------------------------------------
 
 
+_ABBREVIATIONS = {"is_swr": "swr", "is_mua": "mua"}
+
+
 def test_each_product_name_spells_its_declared_factors():
     for name, factors in INTERACTION_FACTORS.items():
-        spelled = "_x_".join("swr" if f == "is_swr" else f for f in factors)
+        if name in LEGACY_PRODUCT_NAMES:
+            assert factors[0] == "continuous_prob_mean", name
+            continue
+        spelled = "_x_".join(_ABBREVIATIONS.get(f, f) for f in factors)
         assert spelled == name
 
 
 def test_every_fitted_product_is_declared():
     products = {p for p in _all_ladder_predictors() if "_x_" in p}
     assert products - set(INTERACTION_FACTORS) == set()
+    assert products & UNFITTED_PRODUCTS == set()
+    assert UNFITTED_PRODUCTS <= set(INTERACTION_FACTORS)
     built = (*ca._ARM_INTERACTIONS, *ca._PATCH_INTERACTIONS)
     assert len(set(built)) == len(built)
     assert set(built) <= set(INTERACTION_FACTORS)
 
 
 def test_every_factor_resolves_to_a_catalogued_covariate():
-    for factors in INTERACTION_FACTORS.values():
+    for name, factors in INTERACTION_FACTORS.items():
+        if name in UNFITTED_PRODUCTS:
+            continue
         for factor in factors:
             assert factor in ct.SAFE_MODIFIERS or factor_source(factor) in (
                 ct.KNOWN_ATOMS
@@ -297,12 +313,67 @@ def test_patch_products_match_the_old_builder(monkeypatch):
     assert list(new.columns).index("swr_x_is_current_patch") == 7
 
 
+# The simulator's (arm-varying, event-level) pairs at 436c4538, multiplied in
+# that order.
+_OLD_SIMULATOR_PAIRS = {
+    "swr_x_is_current_arm": ("is_current_arm", "is_swr"),
+    "swr_x_is_prev_arm": ("is_prev_arm", "is_swr"),
+    "swr_x_is_next_arm": ("is_next_arm", "is_swr"),
+    "swr_x_is_last_rewarded_arm": ("is_last_rewarded_arm", "is_swr"),
+    "swr_x_reward_fraction_candidate_arm_last10_visits": (
+        "reward_fraction_candidate_arm_last10_visits",
+        "is_swr",
+    ),
+    "swr_x_visit_recency_trials_event_leaf_centered": (
+        "visit_recency_trials_event_leaf_centered",
+        "is_swr",
+    ),
+    "swr_x_is_candidate_arm_never_visited": (
+        "is_candidate_arm_never_visited",
+        "is_swr",
+    ),
+    "swr_x_is_last_rewarded_noncurrent_arm": (
+        "is_last_rewarded_noncurrent_arm",
+        "is_swr",
+    ),
+    "mua_x_is_last_rewarded_arm": ("is_last_rewarded_arm", "is_mua"),
+    "is_omitted_outcome_x_is_last_rewarded_arm": (
+        "is_last_rewarded_arm",
+        "is_omitted_outcome",
+    ),
+    "time_since_stop_start_s_x_is_current_arm": (
+        "is_current_arm",
+        "time_since_stop_start_s",
+    ),
+    "time_since_stop_start_s_x_is_prev_arm": ("is_prev_arm", "time_since_stop_start_s"),
+    "time_since_stop_start_s_x_is_next_arm": ("is_next_arm", "time_since_stop_start_s"),
+    "is_current_arm_x_is_last_rewarded_arm": (
+        "is_current_arm",
+        "is_last_rewarded_arm",
+    ),
+}
+
+
+@pytest.mark.parametrize("seed", [0, 7])
+def test_simulator_products_match_the_old_simulator(seed):
+    columns = sim._sample_event_covariate_columns(30, np.random.default_rng(seed))
+    names = [c for c in columns if c in INTERACTION_FACTORS]
+    assert names == list(_OLD_SIMULATOR_PAIRS)
+    for name, (left, right) in _OLD_SIMULATOR_PAIRS.items():
+        old = columns[left] * columns[right]
+        assert columns[name].dtype == old.dtype
+        assert np.array_equal(columns[name].view(np.uint64), old.view(np.uint64))
+
+
 # --- Timing and qvals answers ---------------------------------------------------
 
 
 def test_timing_and_qvals_answers_match_436c4538():
     frozen = json.loads(ANSWERS_436C4538.read_text())
     assert set(INDICATOR_ADDED) <= set(frozen)
+    # Every declared product -- the unfitted table products included -- has a
+    # frozen answer, so none of them can change silently.
+    assert set(INTERACTION_FACTORS) <= set(frozen)
     for name, old in frozen.items():
         new_atoms = ct.timing_of(name)
         if name in INDICATOR_ADDED:
@@ -343,11 +414,15 @@ def test_products_match_the_old_builders_on_the_canonical_tables(monkeypatch):
         frame = read_table(inputs[table])
         declared = [c for c in frame.columns if c in INTERACTION_FACTORS]
         assert declared, table
-        for name in declared:
-            expected = np.prod(
-                [frame[f].to_numpy(dtype=float) for f in INTERACTION_FACTORS[name]],
-                axis=0,
+        needed = {f for name in declared for f in INTERACTION_FACTORS[name]}
+        factors = {c: frame[c].to_numpy(dtype=float) for c in needed & {*frame}}
+        # The table carries the realized outcome; the omission flag is built from it.
+        if "is_omitted_outcome" in needed - set(frame.columns):
+            factors["is_omitted_outcome"] = 1.0 - frame["is_rewarded_outcome"].to_numpy(
+                dtype=float
             )
+        for name in declared:
+            expected = np.prod([factors[f] for f in INTERACTION_FACTORS[name]], axis=0)
             np.testing.assert_array_equal(
                 frame[name].to_numpy(dtype=float), expected, err_msg=name
             )
