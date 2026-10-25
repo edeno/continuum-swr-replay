@@ -43,15 +43,14 @@ from ..replay._helpers import (
     safe_mode,
     single_arm_from_well,
     stay_indicator,
-    stay_indicator_from_patches,
     strict_first,
 )
 from ..replay.bouts import (
     assign_bout,
     bout_exposure_s,
+    bout_start_context,
     immobility_bout_intervals,
     nearest_well_distance_cm,
-    summarize_bout_location,
     time_since_stop,
 )
 from ..replay.covariates import (
@@ -728,7 +727,7 @@ def build_contfrag_stop_table(
     ``immobility_duration_s`` is the stop's span less the excluded time
     inside it, and the stop's location, segment and distance summaries read
     only its rows outside excluded time, as in the NonLocal stop table (one
-    helper, ``bouts.summarize_bout_location``).
+    helper, ``bouts.bout_start_context``).
 
     The table carries every column the shared per-stop rate ladder
     (``MODEL_PER_STOP_RATE``) reads: the reward-history basis
@@ -862,71 +861,11 @@ def build_contfrag_stop_table(
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_selected_events"] = n_events_per_bout
 
-    # Trial context at bout start. ``skipna=False`` is critical:
-    # the default ``first()`` skips leading NaNs and surfaces the
-    # first valid mid-bout row, leaking trial context into stops
-    # that span a trial boundary (the post-boundary trial's
-    # a later finite ``is_rewarded_outcome`` would attach to a bout whose
-    # actual start had no observable outcome).
-    bout_first_row = grouped.first(skipna=False)
-    for col in (
-        "did_last_completed_trip_switch_patch",
-        "patch_switch_fraction_last5_completed_trips",
-        "leaky_q_value_diff",
-    ):
-        per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
-
-    # reward_outcome / is_after_reward are one source array; persist one
-    # canonical is_rewarded_outcome (stay/omission derived downstream).
-    per_bout["is_rewarded_outcome"] = (
-        bout_first_row["is_rewarded_outcome"].reindex(np.arange(n_bouts)).to_numpy()
-    )
-
-    per_bout["completed_trial_id"] = pd.array(
-        bout_first_row["completed_trial_id"].reindex(np.arange(n_bouts)),
-        dtype="Int64",
-    )
-
-    # Behavioral location, modal physical segment and distances over the
-    # bout's rows outside excluded time, as in the NonLocal stop table (one
-    # helper). The at-well occupancy arm (occupancy_well_arm) is NaN off a
-    # single well.
-    location = summarize_bout_location(bout_rows, n_bouts, track_graph, excluded)
-    for column in location.columns:
-        per_bout[column] = location[column]
-    current_arm_vals = location["occupancy_well_arm"].to_numpy()
-
-    # The contextual wells at the bout's first row: the state at the stop's
-    # start, not a summary over its bins, so read whether or not that row is
-    # in excluded time.
-    prev_arm_vals = np.full(n_bouts, np.nan)
-    next_arm_vals = np.full(n_bouts, np.nan)
-    last_rew_vals = np.full(n_bouts, np.nan)
-    completed_trial_arm_vals = np.full(n_bouts, np.nan)
-    for bi, (_, g) in enumerate(grouped):
-        prev_arm_vals[bi] = single_arm_from_well(
-            strict_first(g["prev_well"]), track_graph
-        )
-        next_arm_vals[bi] = single_arm_from_well(
-            strict_first(g["next_well"]), track_graph
-        )
-        last_rew_vals[bi] = single_arm_from_well(
-            strict_first(g["last_rewarded_well"]), track_graph
-        )
-        completed_trial_arm_vals[bi] = single_arm_from_well(
-            strict_first(g["last_visited_well"]), track_graph
-        )
-
-    per_bout["prev_arm"] = prev_arm_vals
-    per_bout["next_arm"] = next_arm_vals
-    per_bout["last_rewarded_arm"] = last_rew_vals
-    per_bout["completed_trial_arm"] = completed_trial_arm_vals
-    cur_patch = np.array([arm_to_patch(a) for a in current_arm_vals])
-    nxt_patch = np.array([arm_to_patch(a) for a in next_arm_vals])
-    per_bout["current_patch"] = cur_patch
-    per_bout["prev_patch"] = [arm_to_patch(a) for a in prev_arm_vals]
-    per_bout["next_patch"] = nxt_patch
-    per_bout["is_stay"] = stay_indicator_from_patches(nxt_patch, cur_patch)
+    # The context at the stop's start (its first row, NaN included) and where
+    # the stop was, as in the NonLocal stop table (one helper).
+    context = bout_start_context(bout_rows, n_bouts, track_graph, excluded)
+    for column in context.columns:
+        per_bout[column] = context[column]
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)

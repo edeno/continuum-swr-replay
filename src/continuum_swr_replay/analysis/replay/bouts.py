@@ -6,7 +6,8 @@ timestamp, and their time since the bout began is the point-process clock the
 per-bin rate models are built on. ``nearest_well_distance_cm`` is the physical
 companion: how far the animal actually was from a reward port while stopped.
 ``summarize_bout_location`` is where a stop was, over its rows outside excluded
-time, for both stop tables.
+time, and ``bout_start_context`` adds the trial context at the stop's first row;
+both stop tables read them.
 """
 
 from __future__ import annotations
@@ -23,12 +24,18 @@ from continuum_swr_replay.intervals import (
     interval_mask,
 )
 
-from ._helpers import safe_mode, single_arm_from_well
+from ._helpers import (
+    arm_to_patch,
+    safe_mode,
+    single_arm_from_well,
+    stay_indicator_from_patches,
+)
 from .covariates.context import summarize_behavioral_location
 
 __all__ = [
     "assign_bout",
     "bout_exposure_s",
+    "bout_start_context",
     "immobility_bout_intervals",
     "nearest_well_distance_cm",
     "summarize_bout_location",
@@ -248,6 +255,125 @@ def summarize_bout_location(
             "occupancy_well_arm": arms,
         }
     )
+
+
+#: Trial-context columns read as-is from each bout's first row.
+_FIRST_ROW_COLUMNS = (
+    "did_last_completed_trip_switch_patch",
+    "patch_switch_fraction_last5_completed_trips",
+    "leaky_q_value_diff",
+    "is_rewarded_outcome",
+)
+
+#: Arm column -> the well column at the bout's first row it is the arm of.
+_FIRST_ROW_WELL_ARMS = {
+    "prev_arm": "prev_well",
+    "next_arm": "next_well",
+    "last_rewarded_arm": "last_rewarded_well",
+    "completed_trial_arm": "last_visited_well",
+}
+
+
+def _arms_of_wells(wells: np.ndarray, track_graph: nx.Graph) -> np.ndarray:
+    """``single_arm_from_well`` of each well, ``NaN`` for a ``NaN`` well.
+
+    Parameters
+    ----------
+    wells : np.ndarray, shape (n,)
+        Well node IDs as floats.
+    track_graph : nx.Graph
+        Session track graph.
+
+    Returns
+    -------
+    np.ndarray, shape (n,)
+        Arm IDs as floats.
+    """
+    arm_of = {
+        well: single_arm_from_well(well, track_graph)
+        for well in np.unique(wells[~np.isnan(wells)])
+    }
+    return pd.Series(wells).map(arm_of).to_numpy(dtype=float)
+
+
+def bout_start_context(
+    bout_rows: pd.DataFrame,
+    n_bouts: int,
+    track_graph: nx.Graph,
+    excluded: pd.DataFrame,
+) -> pd.DataFrame:
+    """The per-stop context both stop tables share.
+
+    The trial context and the previous, next, last-rewarded and last-visited
+    wells are read at each bout's first row as-is, NaN included
+    (``first(skipna=False)``): the state at the stop's start, whether or not
+    that row is in excluded time. Skipping a leading NaN would surface a later
+    row's value and leak the post-boundary trial's context into a bout that
+    spans a trial boundary. The location, segment and distance columns are
+    :func:`summarize_bout_location`'s, over the bout's rows outside excluded
+    time. The patches map from the arms, and ``is_stay`` (will the next trip
+    stay in the current patch; post-hoc) from the patches.
+
+    Parameters
+    ----------
+    bout_rows : pd.DataFrame
+        The session frame's rows that lie in a bout, time-indexed (seconds),
+        with ``_bout_idx`` (0 .. ``n_bouts - 1``, from :func:`assign_bout`),
+        the trial-context columns of ``add_trial_context`` and the columns
+        :func:`summarize_bout_location` reads.
+    n_bouts : int
+        Number of bouts.
+    track_graph : nx.Graph
+        Session track graph.
+    excluded : pd.DataFrame
+        The epoch's excluded time (``analysed_time.excluded_intervals``):
+        ``start_time`` and ``end_time``, closed.
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_bouts, 21)
+        Indexed 0 .. ``n_bouts - 1``: ``did_last_completed_trip_switch_patch``,
+        ``patch_switch_fraction_last5_completed_trips``,
+        ``leaky_q_value_diff``, ``is_rewarded_outcome``,
+        ``completed_trial_id`` (``Int64``); :func:`summarize_bout_location`'s
+        eight columns; ``prev_arm``, ``next_arm``, ``last_rewarded_arm``,
+        ``completed_trial_arm``; ``current_patch``, ``prev_patch``,
+        ``next_patch`` and ``is_stay``.
+    """
+    bouts = np.arange(n_bouts)
+    first_row = (
+        bout_rows.groupby("_bout_idx", sort=True)[
+            [*_FIRST_ROW_COLUMNS, "completed_trial_id", *_FIRST_ROW_WELL_ARMS.values()]
+        ]
+        .first(skipna=False)
+        .reindex(bouts)
+    )
+    context = pd.DataFrame(index=pd.RangeIndex(n_bouts))
+    for column in _FIRST_ROW_COLUMNS:
+        context[column] = first_row[column].to_numpy()
+    context["completed_trial_id"] = pd.array(
+        first_row["completed_trial_id"], dtype="Int64"
+    )
+
+    location = summarize_bout_location(bout_rows, n_bouts, track_graph, excluded)
+    for column in location.columns:
+        context[column] = location[column]
+
+    for arm_column, well_column in _FIRST_ROW_WELL_ARMS.items():
+        context[arm_column] = _arms_of_wells(
+            first_row[well_column].to_numpy(dtype=float, na_value=np.nan),
+            track_graph,
+        )
+
+    current_patch = np.array(
+        [arm_to_patch(a) for a in location["occupancy_well_arm"].to_numpy()]
+    )
+    next_patch = np.array([arm_to_patch(a) for a in context["next_arm"].to_numpy()])
+    context["current_patch"] = current_patch
+    context["prev_patch"] = [arm_to_patch(a) for a in context["prev_arm"].to_numpy()]
+    context["next_patch"] = next_patch
+    context["is_stay"] = stay_indicator_from_patches(next_patch, current_patch)
+    return context
 
 
 def time_since_stop(

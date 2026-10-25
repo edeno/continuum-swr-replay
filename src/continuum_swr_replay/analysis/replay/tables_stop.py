@@ -20,15 +20,6 @@ from continuum_swr_replay.tables.event_ids import (
 )
 
 from ._helpers import (
-    arm_to_patch as _arm_to_patch,
-)
-from ._helpers import (
-    single_arm_from_well as _single_arm_from_well,
-)
-from ._helpers import (
-    stay_indicator_from_patches as _stay_indicator_from_patches,
-)
-from ._helpers import (
     strict_first as _strict_first,
 )
 from ._tables_common import (
@@ -42,13 +33,13 @@ from .bouts import (
     bout_exposure_s as _bout_exposure_s,
 )
 from .bouts import (
+    bout_start_context as _bout_start_context,
+)
+from .bouts import (
     immobility_bout_intervals as _immobility_bout_intervals,
 )
 from .bouts import (
     nearest_well_distance_cm as _nearest_well_distance_cm,
-)
-from .bouts import (
-    summarize_bout_location as _summarize_bout_location,
 )
 from .covariates import (
     add_trial_context,
@@ -86,10 +77,10 @@ def build_stop_table(
     The stop's location, segment and distance summaries (``occupancy_state``,
     ``at_well``, ``occupancy_well_id``, ``modal_observed_track_segment_id``,
     ``nearest_well_distance_cm_*`` and the columns derived from them) read only
-    its rows outside excluded time (``bouts.summarize_bout_location``): a stop
-    wholly inside it is ``unknown``, with NaN well, segment and distances, so it
-    is in no well-anchored cohort. The bout-start context columns read the
-    stop's first row, as before.
+    its rows outside excluded time (``bouts.summarize_bout_location``, through
+    ``bouts.bout_start_context``): a stop wholly inside it is ``unknown``, with
+    NaN well, segment and distances, so it is in no well-anchored cohort. The
+    bout-start context columns read the stop's first row, as before.
 
     The ``stop_id`` column is a 63-bit hash of
     ``(animal, day, epoch, stop_idx)`` and matches
@@ -262,75 +253,18 @@ def build_stop_table(
     per_bout["has_replay"] = n_events_per_bout > 0
     per_bout["n_selected_events"] = n_events_per_bout
 
-    # Trial-context at bout start: first in-bout row's trial-derived
-    # values. ``skipna=False`` is critical — the default ``first()``
-    # silently skips NaNs and surfaces the first valid row anywhere
-    # in the bout, which leaks future trial context into stops whose
-    # actual bout start had no trial active yet (e.g. a bout
-    # spanning a trial boundary inherits the post-boundary trial's outcome).
-    bout_first_row = grouped.first(skipna=False)
-    for col in (
-        "did_last_completed_trip_switch_patch",
-        "completed_trial_reward",
-        "patch_switch_fraction_last5_completed_trips",
-        "leaky_q_value_diff",
-    ):
-        per_bout[col] = bout_first_row[col].reindex(np.arange(n_bouts)).to_numpy()
-
-    # Persist one canonical ``is_rewarded_outcome``. The stay/omission
-    # complements are derived downstream, not persisted here.
-    per_bout["is_rewarded_outcome"] = (
-        bout_first_row["is_rewarded_outcome"].reindex(np.arange(n_bouts)).to_numpy()
+    # The context at the stop's start (its first row, NaN included) and where
+    # the stop was, as in the ContFrag stop table (one helper).
+    # ``completed_trial_reward`` is read the same way; only this table has it.
+    context = _bout_start_context(bout_rows, n_bouts, track_graph, excluded)
+    for column in context.columns:
+        per_bout[column] = context[column]
+    per_bout["completed_trial_reward"] = (
+        grouped["completed_trial_reward"]
+        .first(skipna=False)
+        .reindex(np.arange(n_bouts))
+        .to_numpy()
     )
-
-    per_bout["completed_trial_id"] = pd.array(
-        bout_first_row["completed_trial_id"].reindex(np.arange(n_bouts)),
-        dtype="Int64",
-    )
-
-    # Behavioral-location, physical-segment and distance fields summarise the
-    # bout's rows outside excluded time (the stop's exposure's intervals); a
-    # bout wholly inside it is ``unknown``, with NaN well, segment and
-    # distances. ``occupancy_well_arm`` is defined only for strict at-well
-    # occupancy; a trunk/in-transit/mixed bout is never rewritten as a
-    # destination leaf arm.
-    location = _summarize_bout_location(bout_rows, n_bouts, track_graph, excluded)
-    for column in location.columns:
-        per_bout[column] = location[column]
-    current_arm_vals = location["occupancy_well_arm"].to_numpy()
-
-    # ``_strict_first`` reads the contextual previous/next/rewarded wells at
-    # the bout's first row: the state at the stop's start, not a summary over
-    # its bins, so it reads that row whether or not it is in excluded time.
-    prev_arm_vals = np.full(n_bouts, np.nan)
-    next_arm_vals = np.full(n_bouts, np.nan)
-    last_rew_vals = np.full(n_bouts, np.nan)
-    completed_trial_arm_vals = np.full(n_bouts, np.nan)
-    for bi, (_, g) in enumerate(grouped):
-        prev_arm_vals[bi] = _single_arm_from_well(
-            _strict_first(g["prev_well"]), track_graph
-        )
-        next_arm_vals[bi] = _single_arm_from_well(
-            _strict_first(g["next_well"]), track_graph
-        )
-        last_rew_vals[bi] = _single_arm_from_well(
-            _strict_first(g["last_rewarded_well"]), track_graph
-        )
-        completed_trial_arm_vals[bi] = _single_arm_from_well(
-            _strict_first(g["last_visited_well"]), track_graph
-        )
-
-    per_bout["prev_arm"] = prev_arm_vals
-    per_bout["next_arm"] = next_arm_vals
-    per_bout["last_rewarded_arm"] = last_rew_vals
-    per_bout["completed_trial_arm"] = completed_trial_arm_vals
-    cur_patch = np.array([_arm_to_patch(a) for a in current_arm_vals])
-    nxt_patch = np.array([_arm_to_patch(a) for a in next_arm_vals])
-    per_bout["current_patch"] = cur_patch
-    per_bout["prev_patch"] = [_arm_to_patch(a) for a in prev_arm_vals]
-    per_bout["next_patch"] = nxt_patch
-    # is_stay: will the next trip be within the same patch? Post-hoc.
-    per_bout["is_stay"] = _stay_indicator_from_patches(nxt_patch, cur_patch)
 
     per_bout.insert(0, "animal", animal)
     per_bout.insert(1, "session_date", day)
