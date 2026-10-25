@@ -1252,15 +1252,15 @@ def run_analysis_then_release(
     process can still be reading those files (``release_nwb_files``). The release
     wraps ``run_analysis`` rather than living in it because that returns early
     and turns most failures into a log line: here it runs whether the session
-    is fit, skipped, failed or raised. How many files were closed goes to the
-    session's log.
+    is fit, skipped, failed or raised. Whether the files were closed goes to
+    the session's log.
     """
     try:
         run_analysis(nwb_file_name, epoch_name, brain_area=brain_area, **kwargs)
     finally:
         logging.getLogger(
             session_identifier(nwb_file_name, epoch_name, brain_area)
-        ).info("closed %d NWB files Spyglass held open", release_nwb_files())
+        ).info("NWB files Spyglass held open closed: %s", release_nwb_files())
 
 
 def get_command_line_arguments() -> Namespace:

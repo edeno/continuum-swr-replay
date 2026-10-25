@@ -1704,12 +1704,12 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
     tmp_path, monkeypatch, outcome
 ):
     """A worker runs one epoch at a time, so when its epoch ends, pass or fail,
-    it closes the NWB files Spyglass cached for it and logs how many."""
+    it closes the NWB files Spyglass cached for it and logs that it did."""
     closed = []
 
     def release_nwb_files():
         closed.append(True)
-        return 14
+        return True
 
     def run_epoch(nwb_file_name, epoch_name, **kwargs):
         if outcome == "raises":
@@ -1736,7 +1736,7 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
     assert closed == [True]
     log = tmp_path / "logs" / f"{epoch_id(NWB_FILE_NAME, EPOCH_NAME)}_swr.log"
     assert any(
-        line.endswith("closed 14 NWB files Spyglass held open")
+        line.endswith("NWB files Spyglass held open closed: True")
         for line in log.read_text().splitlines()
     )
 

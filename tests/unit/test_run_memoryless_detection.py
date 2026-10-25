@@ -1488,9 +1488,9 @@ class TestMain:
         """Replace ``release_nwb_files``; return the list each call appends to."""
         closed: list[bool] = []
 
-        def release_nwb_files() -> int:
+        def release_nwb_files() -> bool:
             closed.append(True)
-            return 14
+            return True
 
         # an epoch task closes them through runs.batch.run_epoch_logged; the
         # in-process loop through the runner's own import
@@ -1503,7 +1503,7 @@ class TestMain:
         self, tmp_path, monkeypatch, outcome
     ):
         """A GPU worker runs one epoch at a time, so when its epoch ends, pass or
-        fail, it closes the NWB files Spyglass cached for it and logs how many."""
+        fail, it closes the NWB files Spyglass cached for it and logs that it did."""
         closed = self.recording_release(monkeypatch)
 
         def run_one(epoch_id, **kwargs):
@@ -1523,7 +1523,7 @@ class TestMain:
         assert closed == [True]
         log = (tmp_path / "logs" / f"{EPOCH_ID}_memoryless.log").read_text()
         assert any(
-            line.endswith("closed 14 NWB files Spyglass held open")
+            line.endswith("NWB files Spyglass held open closed: True")
             for line in log.splitlines()
         )
 
@@ -1567,7 +1567,7 @@ class TestMain:
 
         assert closed == [True, True]
         log = (output_root / "cli-run" / "run.log").read_text().splitlines()
-        assert sum(line.endswith("closed 14 NWB files Spyglass held open")
+        assert sum(line.endswith("NWB files Spyglass held open closed: True")
                    for line in log) == 2  # fmt: skip
 
     @pytest.mark.parametrize(("inherited", "expected"), XLA_FLAGS_CASES)

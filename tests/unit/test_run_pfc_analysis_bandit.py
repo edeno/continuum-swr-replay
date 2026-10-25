@@ -1348,9 +1348,9 @@ def _recording_release(monkeypatch) -> list[bool]:
     """Replace ``release_nwb_files``; return the list each call appends to."""
     closed: list[bool] = []
 
-    def release_nwb_files() -> int:
+    def release_nwb_files() -> bool:
         closed.append(True)
-        return 14
+        return True
 
     monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
     return closed
@@ -1362,7 +1362,7 @@ def test_each_session_closes_the_nwb_files_spyglass_opened(
 ):
     """A worker runs one session at a time, so when its session ends -- fit,
     failed inside ``run_analysis`` (which logs and returns) or raised out of it
-    (no free card) -- it closes the NWB files Spyglass cached and logs how many."""
+    (no free card) -- it closes the NWB files Spyglass cached and logs that it did."""
     monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     closed = _recording_release(monkeypatch)
     if outcome == "fit_fails":
@@ -1398,7 +1398,7 @@ def test_each_session_closes_the_nwb_files_spyglass_opened(
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
     assert artifact.exists() == (outcome == "fit")
     log = (tmp_path / "logs" / "wilbur20210329_02_r1_mPFC.log").read_text()
-    assert log.splitlines()[-1].endswith("closed 14 NWB files Spyglass held open")
+    assert log.splitlines()[-1].endswith("NWB files Spyglass held open closed: True")
 
 
 class _Client:
@@ -1441,7 +1441,7 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
 
     def release_nwb_files():
         events.append("release")
-        return 14
+        return True
 
     monkeypatch.setattr(
         runner.sys,
@@ -1512,7 +1512,7 @@ def test_main_hands_every_session_the_commit_it_loaded(
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
     monkeypatch.setattr(runner, "run_analysis", run_analysis)
-    monkeypatch.setattr(runner, "release_nwb_files", lambda: 0)
+    monkeypatch.setattr(runner, "release_nwb_files", lambda: True)
     monkeypatch.setattr(runner, "LocalCluster", lambda **kwargs: object())
     monkeypatch.setattr(runner, "Client", _Client)
     monkeypatch.setattr(
@@ -1569,7 +1569,7 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(runner, "_filter_to_sorted_sessions", sorted_sessions_only)
     monkeypatch.setattr(runner, "run_analysis", run_analysis)
-    monkeypatch.setattr(runner, "release_nwb_files", lambda: 0)
+    monkeypatch.setattr(runner, "release_nwb_files", lambda: True)
 
     runner.main()
 

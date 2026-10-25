@@ -83,7 +83,7 @@ def test_an_epoch_task_logs_its_outcome_and_closes_the_nwb_files(
     tmp_path, monkeypatch, log_provenance, status
 ):
     closed = []
-    monkeypatch.setattr(batch, "release_nwb_files", lambda: closed.append(1) or 3)
+    monkeypatch.setattr(batch, "release_nwb_files", lambda: closed.append(1) or True)
     record = {
         "status": status,
         "provenance": {"commit": "abc", "dirty": False},
@@ -111,7 +111,7 @@ def test_an_epoch_task_logs_its_outcome_and_closes_the_nwb_files(
     messages = [line.split(" - ", 3)[-1] for line in lines]
     expected = [
         "e_HPC: run {'output_dir': 'x'}",
-        "closed 3 NWB files Spyglass held open",
+        "NWB files Spyglass held open closed: True",
         *(['PROVENANCE {"commit": "abc", "dirty": false}'] if log_provenance else []),
         f"{status}: described",
     ]
@@ -124,7 +124,7 @@ def test_an_epoch_task_logs_its_outcome_and_closes_the_nwb_files(
 
 def test_an_epoch_task_that_raises_still_closes_the_nwb_files(tmp_path, monkeypatch):
     closed = []
-    monkeypatch.setattr(batch, "release_nwb_files", lambda: closed.append(1) or 0)
+    monkeypatch.setattr(batch, "release_nwb_files", lambda: closed.append(1) or True)
 
     def run(log):
         raise RuntimeError("simulated")

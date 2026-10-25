@@ -1107,7 +1107,7 @@ def main(argv: list[str] | None = None) -> None:
             finally:
                 # one epoch at a time in this process: nothing else reads them
                 log.info(
-                    "    closed %d NWB files Spyglass held open", release_nwb_files()
+                    "    NWB files Spyglass held open closed: %s", release_nwb_files()
                 )
             write_manifest(manifest_path, manifest())
     else:

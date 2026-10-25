@@ -1,7 +1,7 @@
 """The batch runners' two guards against running out of file descriptors.
 
-Spyglass caches every NWB file it opens in ``spyglass.utils.nwb_helper_fn``'s
-module-level ``__open_nwb_files`` and never closes one, so a long-lived dask
+Spyglass caches every NWB file it opens in ``spyglass.utils.nwb_helper_fn``
+and never closes one, so a long-lived dask
 worker leaks one descriptor per distinct file it reads (Spyglass issue #1442).
 ``release_nwb_files`` closes them after an epoch; ``raise_open_file_limit``
 lifts the soft limit a tmux session hands down (often 1024) before any worker
@@ -33,26 +33,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _stub_spyglass(
-    monkeypatch, open_files: dict | None, close_error: Exception | None = None
+    monkeypatch, open_files: dict, close_error: Exception | None = None
 ) -> list[str]:
-    """Stub ``spyglass.utils.nwb_helper_fn`` with `open_files` as its cache.
-
-    `open_files` None leaves the cache's name out, as a Spyglass that renamed
-    it would; `close_error` is raised by ``close_nwb_files``. Returns the list
+    """Stub ``spyglass.utils.nwb_helper_fn``, whose ``close_nwb_files`` empties
+    `open_files`, or raises `close_error` when one is given. Returns the list
     ``close_nwb_files`` appends to on each call.
     """
     calls: list[str] = []
     helper = types.ModuleType("spyglass.utils.nwb_helper_fn")
-    if open_files is not None:
-        # Set through vars(): at module level the name is not mangled, as in Spyglass.
-        vars(helper)["__open_nwb_files"] = open_files
 
     def close_nwb_files() -> None:
         calls.append("close_nwb_files")
         if close_error is not None:
             raise close_error
-        if open_files is not None:
-            open_files.clear()
+        open_files.clear()
 
     helper.close_nwb_files = close_nwb_files
     utils = types.ModuleType("spyglass.utils")
@@ -65,19 +59,19 @@ def _stub_spyglass(
     return calls
 
 
-def test_release_closes_spyglass_cache_and_returns_how_many(monkeypatch):
+def test_release_closes_the_spyglass_cache_and_says_so(monkeypatch):
     open_files = {f"/data/file_{i}.nwb": ("io", "nwbfile") for i in range(3)}
     calls = _stub_spyglass(monkeypatch, open_files)
 
-    assert batch.release_nwb_files() == 3
+    assert batch.release_nwb_files() is True
     assert calls == ["close_nwb_files"]
     assert open_files == {}
 
-    assert batch.release_nwb_files() == 0
+    assert batch.release_nwb_files() is True
     assert calls == ["close_nwb_files"] * 2
 
 
-def test_a_release_that_fails_warns_and_returns_minus_one(monkeypatch, caplog):
+def test_a_release_that_fails_warns_and_returns_false(monkeypatch, caplog):
     """Cleanup: its failure is logged, never raised over the epoch's result."""
     open_files = {"/data/file_0.nwb": ("io", "nwbfile")}
     calls = _stub_spyglass(
@@ -85,27 +79,12 @@ def test_a_release_that_fails_warns_and_returns_minus_one(monkeypatch, caplog):
     )
 
     with caplog.at_level(logging.WARNING, logger=batch.__name__):
-        assert batch.release_nwb_files() == -1
+        assert batch.release_nwb_files() is False
 
     assert calls == ["close_nwb_files"]
     (record,) = caplog.records
     assert record.levelno == logging.WARNING
     assert "simulated: close failed" in record.getMessage()
-
-
-def test_a_missing_cache_name_warns_once_and_still_closes(monkeypatch, caplog):
-    """If Spyglass renames its private cache, the count is unknown (-1), but the
-    files are still closed through its public ``close_nwb_files``."""
-    monkeypatch.setattr(batch, "_warned_cache_name_missing", False)
-    calls = _stub_spyglass(monkeypatch, None)
-
-    with caplog.at_level(logging.WARNING, logger=batch.__name__):
-        assert batch.release_nwb_files() == -1
-        assert batch.release_nwb_files() == -1
-
-    assert calls == ["close_nwb_files"] * 2
-    (record,) = caplog.records
-    assert "__open_nwb_files" in record.getMessage()
 
 
 def _limits_after(monkeypatch, soft: int, hard: int, target: int) -> tuple:
@@ -160,7 +139,7 @@ def _open_descriptors_to(path: Path) -> int:
     not Path("/proc/self/fd").is_dir(), reason="needs /proc to count descriptors"
 )
 def test_release_closes_a_file_the_installed_spyglass_cached(tmp_path):
-    """Against the installed Spyglass: the cache's name and its close are real."""
+    """Against the installed Spyglass: the file it cached is really closed."""
     pynwb = pytest.importorskip("pynwb")
     nwb_helper_fn = pytest.importorskip("spyglass.utils.nwb_helper_fn")
 
@@ -176,11 +155,9 @@ def test_release_closes_a_file_the_installed_spyglass_cached(tmp_path):
     batch.release_nwb_files()  # start from an empty cache
     nwb_helper_fn.get_nwb_file(str(path))
     assert _open_descriptors_to(path) == 1
-    assert str(path) in vars(nwb_helper_fn)["__open_nwb_files"]
 
-    assert batch.release_nwb_files() == 1
+    assert batch.release_nwb_files() is True
     assert _open_descriptors_to(path) == 0
-    assert vars(nwb_helper_fn)["__open_nwb_files"] == {}
 
 
 _LIMITS = """

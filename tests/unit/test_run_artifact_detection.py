@@ -506,7 +506,7 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
 
     def release_nwb_files():
         closed.append(True)
-        return 9
+        return True
 
     def run_epoch(nwb_file_name, epoch_name, **kwargs):
         if outcome == "raises":
@@ -529,7 +529,7 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
 
     assert closed == [True]
     log = tmp_path / "logs" / f"{EPOCH_ID}_artifacts.log"
-    assert "closed 9 NWB files Spyglass held open" in log.read_text()
+    assert "NWB files Spyglass held open closed: True" in log.read_text()
 
 
 def test_main_raises_the_open_file_limit_before_its_cluster(

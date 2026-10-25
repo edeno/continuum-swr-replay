@@ -596,7 +596,7 @@ def test_the_loader_builds_the_decodes_masks_from_the_swr_source(
 
     # Set in the package's namespace directly: ``monkeypatch.setattr`` reads the
     # old value first, and the lazy ``data_loaders.load_data`` would import
-    # ``bandit_task``, which connects to the Spyglass database.
+    # ``bandit_task`` for nothing.
     monkeypatch.setitem(vars(data_loaders), "load_data", load_data)
 
     loaded = runner.load_marks_and_training_mask(EPOCH)
@@ -902,13 +902,13 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
     tmp_path, monkeypatch, outcome
 ):
     """A worker runs one epoch at a time, so when its epoch ends, pass or fail,
-    it closes the NWB files ``load_data`` opened through Spyglass and logs how
-    many."""
+    it closes the NWB files ``load_data`` opened through Spyglass and logs that
+    it did."""
     closed = []
 
     def release_nwb_files():
         closed.append(True)
-        return 14
+        return True
 
     def run_epoch(epoch_id, **kwargs):
         if outcome == "raises":
@@ -929,7 +929,9 @@ def test_each_epoch_task_closes_the_nwb_files_spyglass_opened(
 
     assert closed == [True]
     log = (tmp_path / "logs" / f"{EPOCH}.log").read_text().splitlines()
-    assert any(line.endswith("closed 14 NWB files Spyglass held open") for line in log)
+    assert any(
+        line.endswith("NWB files Spyglass held open closed: True") for line in log
+    )
 
 
 class _WorkersStarted(Exception):

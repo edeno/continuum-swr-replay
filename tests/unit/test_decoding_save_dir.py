@@ -10,9 +10,8 @@ because the reopened ``results.nc`` is still open lazily (Review Focus 1 of the
 full-refresh plan). A fresh save stamps the epoch's provenance into
 ``results.nc``, and every file is written atomically.
 
-Offline: both scripts import ``bandit_task``, which imports Spyglass at import
-time, so they are imported with ``spyglass`` stubbed in ``sys.modules``, as
-``test_events.py`` does. No test starts a CUDA cluster, and each test that
+Offline: both scripts are imported with ``spyglass`` stubbed in ``sys.modules``,
+as ``test_events.py`` does, so nothing they import reaches the database. No test starts a CUDA cluster, and each test that
 depends on ``HAS_CUDA`` sets it, since whether ``dask_cuda`` imports depends on
 the environment.
 
@@ -164,9 +163,9 @@ class Decoders:
 def decoders(monkeypatch, tmp_path):
     """Both decoder scripts, imported offline with ``spyglass`` stubbed.
 
-    ``bandit_task`` imports ``spyglass.common.PositionIntervalMap`` at import
-    time, which opens a DataJoint connection. The modules imported here that
-    bind the stub are forgotten afterwards, so a later import gets the real ones.
+    The stub keeps anything they import from reaching the database. The
+    modules imported here that bind the stub are forgotten afterwards, so a
+    later import gets the real ones.
 
     Each script's ``PROCESSED_DATA_DIR`` global, and the shared flow's, is
     pointed at an empty folder under
@@ -957,15 +956,14 @@ def test_epoch_log_has_one_provenance_line(decoders, monkeypatch, tmp_path, key)
 
 
 class _ReleaseRecorder:
-    """Stands in for ``release_nwb_files``: counts its calls, returns `n_closed`."""
+    """Stands in for ``release_nwb_files``: counts its calls, reports success."""
 
-    def __init__(self, n_closed: int = 14) -> None:
-        self.n_closed = n_closed
+    def __init__(self) -> None:
         self.calls = 0
 
-    def __call__(self) -> int:
+    def __call__(self) -> bool:
         self.calls += 1
-        return self.n_closed
+        return True
 
 
 @pytest.mark.parametrize("outcome", ["ok", "fails"])
@@ -974,7 +972,7 @@ def test_run_decode_closes_spyglass_nwb_files_when_asked(
     decoders, monkeypatch, tmp_path, key, outcome
 ):
     """With ``release_nwb`` an epoch closes the NWB files Spyglass cached, pass or
-    fail, and its log ends with how many."""
+    fail, and its log ends saying so."""
     decoder, module = DECODERS[key], decoders.modules[key]
     release = _ReleaseRecorder()
     monkeypatch.setattr(decoders.flow, "release_nwb_files", release)
@@ -996,7 +994,7 @@ def test_run_decode_closes_spyglass_nwb_files_when_asked(
     assert failed == (None if outcome == "ok" else decoder.epoch_identifier)
     assert release.calls == 1
     log = _log(tmp_path, decoder).splitlines()
-    assert log[-1].endswith("closed 14 NWB files Spyglass held open")
+    assert log[-1].endswith("NWB files Spyglass held open closed: True")
 
 
 @pytest.mark.parametrize("key", list(DECODERS))
@@ -1028,7 +1026,6 @@ def test_a_failed_release_leaves_the_epochs_result(
     stub whose ``close_nwb_files`` fails."""
     decoder, module = DECODERS[key], decoders.modules[key]
     helper = types.ModuleType("spyglass.utils.nwb_helper_fn")
-    vars(helper)["__open_nwb_files"] = {"/data/file_0.nwb": ("io", "nwbfile")}
 
     def close_nwb_files() -> None:
         raise OSError("simulated: close failed")
@@ -1049,7 +1046,7 @@ def test_a_failed_release_leaves_the_epochs_result(
     assert (save_dir / f"{decoder.epoch_identifier}_results.nc").exists()
     log = _log(tmp_path, decoder).splitlines()
     assert any(line.endswith("Done!") for line in log)
-    assert log[-1].endswith("closed -1 NWB files Spyglass held open")
+    assert log[-1].endswith("NWB files Spyglass held open closed: False")
 
 
 # --------------------------------------------------------------------------

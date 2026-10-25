@@ -380,9 +380,10 @@ def run_decode(
     (``require_saved_decode_masks``).
 
     With ``release_nwb``, the epoch ends, pass or fail, by closing the NWB files
-    Spyglass holds open in this process (``release_nwb_files``) and logging how
-    many. Only for a process that runs one epoch at a time, as ``run_batch``'s
-    GPU workers do: another task in the process could still be reading them.
+    Spyglass holds open in this process (``release_nwb_files``) and logging
+    whether that worked. Only for a process that runs one epoch at a time, as
+    ``run_batch``'s GPU workers do: another task in the process could still be
+    reading them.
 
     ``non_local_threshold`` and ``create_figurl`` are the NonLocal runner's
     alone (see :class:`DecodeRunner`).
@@ -550,7 +551,7 @@ def run_decode(
         return epoch_identifier  # Sentinel: run_batch treats non-None as failure.
     finally:
         if release_nwb:
-            logger.info(f"closed {release_nwb_files()} NWB files Spyglass held open")
+            logger.info(f"NWB files Spyglass held open closed: {release_nwb_files()}")
 
 
 def parse_decode_args(parser: ArgumentParser) -> Namespace:
