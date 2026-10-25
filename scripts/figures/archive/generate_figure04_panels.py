@@ -305,7 +305,7 @@ def main() -> None:
         event_times,
         model_list=["non_local_no_SWR"],
     )
-    save_figure("figure04_panel_a", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
+    save_figure(plt.gcf(), "figure04_panel_a", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_a")
     if not args.show_plots:
         plt.close(fig1)
@@ -319,7 +319,7 @@ def main() -> None:
         event_times,
         model_list=["non_local_no_SWR", "SWR"],
     )
-    save_figure("figure04_panel_b", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
+    save_figure(plt.gcf(), "figure04_panel_b", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_b")
     if not args.show_plots:
         plt.close(fig2)
@@ -332,7 +332,7 @@ def main() -> None:
         "non_local",
     ]
     fig3, _ = plot_AICs(glm_results, model_list=model_list_for_aic)
-    save_figure("figure04_panel_c", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
+    save_figure(plt.gcf(), "figure04_panel_c", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_c")
     if not args.show_plots:
         plt.close(fig3)

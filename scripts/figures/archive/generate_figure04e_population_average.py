@@ -71,7 +71,7 @@ def plot_population_average(
     ax.tick_params(axis="both", which="both", length=3, direction="out")
     ax.set_title(f"Population average (n={modulations['SWR'].shape[1]:,})")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     print(f"Saved: {figure_name}")
 

@@ -198,7 +198,7 @@ def plot_event_duration_distribution(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
         plt.close(fig)
         logging.info(f"Saved: {figure_name}")
 
@@ -249,7 +249,7 @@ def plot_hpd_distribution(
     sns.despine(ax=ax)
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -300,7 +300,7 @@ def plot_distance_distribution(
     sns.despine(ax=ax)
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -357,7 +357,7 @@ def plot_mean_hpd_per_event(
     sns.despine(ax=ax)
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -407,7 +407,7 @@ def plot_position_animal_vs_replay(
 
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -554,7 +554,7 @@ def plot_triggered_averages(
     axes[-1].set_xlim(-1.0, 1.0)
 
     if standalone:
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
         plt.close(fig)
         logging.info(f"Saved: {figure_name}")
 
@@ -628,7 +628,7 @@ def plot_replay_position_by_swr(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
         plt.close(fig)
         logging.info(f"Saved: {figure_name}")
 
@@ -693,7 +693,7 @@ def plot_swr_zscore_by_state(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
         plt.close(fig)
         logging.info(f"Saved: {figure_name}")
 
@@ -762,7 +762,7 @@ def plot_replay_speed_by_swr(
     if standalone:
         sns.despine(ax=ax)
         plt.tight_layout()
-        save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+        save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
         plt.close(fig)
         logging.info(f"Saved: {figure_name}")
 

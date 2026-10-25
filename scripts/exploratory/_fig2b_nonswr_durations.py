@@ -19,6 +19,7 @@ from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
 from continuum_swr_replay.analysis.hippocampus import load_data_over_time
+from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
@@ -121,7 +122,7 @@ def main() -> None:
     ax.set_title("Non-SWR non-local event durations by animal")
     ax.legend()
     fig.tight_layout()
-    fig.savefig(OUT / "nonswr_durations.png", dpi=140, bbox_inches="tight")
+    save_figure(fig, "nonswr_durations", base_dir=OUT, dpi=140, formats=["png"], transparent=False)
 
     (OUT / "nonswr_durations_summary.txt").write_text("\n".join(lines))
     emit(f"\nWrote nonswr_durations_per_animal.csv, nonswr_longest_events.csv, "

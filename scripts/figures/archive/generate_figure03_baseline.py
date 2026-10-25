@@ -127,7 +127,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Event Duration (ms)")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_01", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_01", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -147,7 +147,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("HPD")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_02", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_02", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -168,7 +168,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Distance from Animal (cm)")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_03", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_03", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -190,7 +190,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Normalized Animal Position")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_04", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_04", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -211,7 +211,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Replay Speed")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_05", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_05", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -233,7 +233,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Normalized Replay Position")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_06", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_06", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -254,7 +254,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Non-Local Cont. Prob.")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_07", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_07", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -275,7 +275,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Non-Local Frag. Prob.")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_08", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_08", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -296,7 +296,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Local Prob.")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_09", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_09", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -317,7 +317,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("No-Spike Prob.")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_10", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_10", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -338,7 +338,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("Local Prob.")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_11", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_11", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, axes = plt.subplots(1, 2, figsize=(8, 3), sharex=True, sharey=True)
@@ -366,7 +366,7 @@ for event_type, ax in zip(
     ax.set_ylabel("Normalized Replay Position")
     ax.set_title(event_type)
 
-save_figure("figure03_panel_12", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_12", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 fig, ax = plt.subplots(figsize=(4, 3))
@@ -387,7 +387,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_xlabel("HPD proportion of track covered")
     ax.set_ylabel("Density")
 
-save_figure("figure03_panel_13", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_13", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 
@@ -418,7 +418,7 @@ for event_type in ("non_local_immobile", "non_local_immobile_no_overlap_SWR"):
     ax.set_ylabel("Density")
 
 
-save_figure("figure03_panel_14", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_14", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 
 
@@ -720,7 +720,7 @@ for ax, (no_overlap_mean, overlap_mean, no_overlap_sem, overlap_sem) in zip(
 
 plt.xlim((-1.0, 1.0))
 
-save_figure("figure03_panel_15", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_15", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 non_local_start_end_time = get_event_start_end(
@@ -1023,7 +1023,7 @@ plt.xlabel("Replay Speed (cm/s)")
 plt.ylabel("Density")
 sns.despine(offset=5)
 
-save_figure("figure03_panel_16", base_dir=OUTPUT_DIR, dpi=300)
+save_figure(plt.gcf(), "figure03_panel_16", base_dir=OUTPUT_DIR, dpi=300)
 plt.close()
 # %%
 # what are the spike amplitudes during these events

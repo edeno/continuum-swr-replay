@@ -19,6 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     REPLAY_CONTENT_DIR,  # noqa: E402
@@ -109,7 +110,7 @@ def main() -> None:
     fig.tight_layout()
     out = P.parent / ".claude" / "research" / "event_raster_outputs" / "event_rasters_triptych.png"
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    save_figure(fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False)
     print("saved", out)
     for name, src in pops.items():
         print(f"  {name}: {len(src):,} onsets, {src.stop_id.nunique():,} stops")

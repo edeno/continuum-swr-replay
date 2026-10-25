@@ -19,6 +19,8 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 
+from continuum_swr_replay.figure_utilities import save_figure
+
 STEPS = [
     {
         "title": "0. Decoder output",
@@ -185,13 +187,22 @@ def draw_schematic(output_dir: Path) -> None:
         fontsize=8.5,
     )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    for ext in ["png", "pdf"]:
-        fig.savefig(
-            output_dir / f"pipeline_schematic.{ext}",
-            dpi=200 if ext == "png" else None,
-            bbox_inches="tight",
-        )
+    # The PNG at 200 dpi, the PDF at the figure's own dpi.
+    save_figure(
+        fig,
+        "pipeline_schematic",
+        base_dir=output_dir,
+        dpi=200,
+        formats=["png"],
+        transparent=False,
+    )
+    save_figure(
+        fig,
+        "pipeline_schematic",
+        base_dir=output_dir,
+        formats=["pdf"],
+        transparent=False,
+    )
     plt.close(fig)
 
 

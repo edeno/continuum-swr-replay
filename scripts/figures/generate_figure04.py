@@ -908,7 +908,7 @@ def main(argv: Sequence[str] | None = None):
         record = configure_jax_gpu(gpu=args.gpu, allow_cpu=args.allow_cpu)
         print(f"JAX device: {record}")
 
-    generate_figure(
+    fig = generate_figure(
         nwb_file_name=args.nwb_file_name,
         epoch_name=args.epoch_name,
         neuron_ind=args.neuron_ind,
@@ -919,7 +919,7 @@ def main(argv: Sequence[str] | None = None):
     )
 
     print(f"Saving to {args.output_dir}...")
-    save_figure("figure04", base_dir=args.output_dir)
+    save_figure(fig, "figure04", base_dir=args.output_dir)
 
     if args.show:
         plt.show()

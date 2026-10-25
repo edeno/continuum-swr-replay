@@ -168,7 +168,7 @@ def plot_triggered_average_mean(
     axes[-1].set_xlabel(xlabel, labelpad=2)
     plt.subplots_adjust(hspace=0.15)
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -275,7 +275,7 @@ def plot_triggered_average_percentiles(
     )
     plt.subplots_adjust(hspace=0.15)
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 

@@ -83,7 +83,7 @@ def plot_significance_bars(
     sns.despine(ax=ax)
     ax.tick_params(axis="both", which="both", length=3, direction="out")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     print(f"Saved: {figure_name}")
 
@@ -139,7 +139,7 @@ def plot_aic_model_selection(
     for ax in (ax1, ax2):
         ax.tick_params(axis="both", which="both", length=3, direction="out")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     print(f"Saved: {figure_name}")
 

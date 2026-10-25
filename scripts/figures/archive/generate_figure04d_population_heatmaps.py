@@ -94,7 +94,7 @@ def plot_population_heatmaps(
     cbar.set_ticks([vmin, 0, vmax])
     cbar.set_ticklabels(["0.5x", "1x", "2x"])
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     print(f"Saved: {figure_name}")
 

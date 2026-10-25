@@ -105,7 +105,7 @@ def plot_event_duration_distribution(
         sns.despine(ax=ax)
         plt.tight_layout()
         if figure_name is not None:
-            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
 
@@ -334,7 +334,7 @@ def plot_triggered_averages(
 
     if standalone:
         if figure_name is not None:
-            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
 
@@ -403,7 +403,7 @@ def plot_swr_zscore_by_state(
         sns.despine(ax=ax)
         plt.tight_layout()
         if figure_name is not None:
-            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
 
@@ -478,7 +478,7 @@ def plot_replay_speed_by_swr(
         sns.despine(ax=ax)
         plt.tight_layout()
         if figure_name is not None:
-            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
 
@@ -544,7 +544,7 @@ def plot_replay_position_by_swr(
         sns.despine(ax=ax)
         plt.tight_layout()
         if figure_name is not None:
-            save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+            save_figure(fig, figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
             logging.info(f"Saved: {figure_name}")
         plt.close(fig)
 

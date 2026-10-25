@@ -49,6 +49,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     reward_kernel_rate_ratios,
     self_history_rate_ratios,
 )
+from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     covered_seconds,
 )
@@ -423,7 +424,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     fig.tight_layout()
     out = FIGS / "per_bin_rate_ladder_summary.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
+    )
     plt.close(fig)
     print(f"saved {out}")
 

@@ -60,7 +60,7 @@ Paper figure:
 ...                        constrained_layout=True)
 >>> ax.plot(x, y, color=WONG[1], linewidth=1.5)
 >>> ax.set_xlabel('Time (s)', fontsize=7)
->>> save_figure("figure_1")
+>>> save_figure(fig, "figure_1")
 
 Presentation figure:
 
@@ -69,7 +69,7 @@ Presentation figure:
 ...                        constrained_layout=True)
 >>> ax.plot(x, y, color=WONG[1], linewidth=4)
 >>> ax.set_xlabel('Time (s)', fontsize=24, fontweight='bold')
->>> save_figure("slide_figure")
+>>> save_figure(fig, "slide_figure")
 
 """
 
@@ -84,6 +84,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from matplotlib.typing import ColorType
 
 from continuum_swr_replay.parameters import FIGURE_DIR
@@ -573,6 +574,7 @@ def set_figure_defaults(
 
 
 def save_figure(
+    fig: Figure,
     figure_name: str,
     *,
     base_dir: str | Path | None = None,
@@ -581,13 +583,16 @@ def save_figure(
     dpi: int | None = None,
     formats: list[str] | None = None,
 ) -> None:
-    """Save figure in multiple formats with proper DPI settings.
+    """Save `fig` in multiple formats with proper DPI settings.
 
     Saves both vector (PDF) and raster (PNG) formats by default. Useful for
-    submissions that require both formats.
+    submissions that require both formats. Every format is cropped to the
+    figure's tight bounding box (``bbox_inches="tight"``).
 
     Parameters
     ----------
+    fig : Figure
+        The figure to save. It need not be pyplot's current figure.
     figure_name : str
         Base filename (without extension). Can include directory path relative
         to base_dir.
@@ -595,7 +600,7 @@ def save_figure(
         Base directory for saving figures. If None, uses FIGURE_DIR from
         parameters. Accepts both string paths and Path objects.
     facecolor : ColorType, optional
-        Background color. If None, uses current figure facecolor.
+        Background color. If None, uses the figure's facecolor.
         Accepts any matplotlib color: name, hex string, RGB(A) tuple, etc.
         Use "#1a1a1a" for dark backgrounds.
     transparent : bool or None, optional
@@ -624,23 +629,23 @@ def save_figure(
     --------
     Save to default FIGURE_DIR:
 
-    >>> save_figure("figure_1")  # Creates FIGURE_DIR/figure_1.pdf and .png
+    >>> save_figure(fig, "figure_1")  # Creates FIGURE_DIR/figure_1.pdf and .png
 
     Save to custom directory:
 
-    >>> save_figure("figure_1", base_dir="/path/to/output")
+    >>> save_figure(fig, "figure_1", base_dir="/path/to/output")
 
     Dark background figure (auto-detects transparency):
 
-    >>> save_figure("dark_fig", facecolor="#1a1a1a")  # Auto: transparent=False
+    >>> save_figure(fig, "dark_fig", facecolor="#1a1a1a")  # Auto: transparent=False
 
     Explicitly control transparency:
 
-    >>> save_figure("dark_fig", facecolor="#1a1a1a", transparent=False)
+    >>> save_figure(fig, "dark_fig", facecolor="#1a1a1a", transparent=False)
 
     Custom formats:
 
-    >>> save_figure("fig", formats=["pdf", "svg", "png"])
+    >>> save_figure(fig, "fig", formats=["pdf", "svg", "png"])
 
     """
     if formats is None:
@@ -654,7 +659,6 @@ def save_figure(
             f"Valid formats are: {valid_list}"
         )
 
-    fig = plt.gcf()
     if not fig.get_axes():
         raise ValueError(
             "Cannot save empty figure with no axes. "
@@ -691,7 +695,7 @@ def save_figure(
 
     for fmt in formats:
         output_file = output_path.with_suffix(f".{fmt}")
-        plt.savefig(
+        fig.savefig(
             output_file,
             format=fmt,
             dpi=dpi,
@@ -699,6 +703,10 @@ def save_figure(
             facecolor=facecolor,
             transparent=transparent,
         )
+        # Redraw after each save, as pyplot.savefig does. A layout engine
+        # (constrained layout) moves the axes a little on every draw, so
+        # without this the second format would come out different.
+        fig.canvas.draw_idle()
 
 
 # ==============================================================================
@@ -944,7 +952,7 @@ def validate_figure_quality(context: str | None = None) -> bool:
     ...                        constrained_layout=True)
     >>> ax.plot(x, y)
     >>> if validate_figure_quality(context="paper"):
-    ...     save_figure("figure_1")
+    ...     save_figure(fig, "figure_1")
 
     """
     fig = plt.gcf()

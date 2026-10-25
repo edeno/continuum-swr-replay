@@ -565,8 +565,7 @@ def _validate_and_save(fig: plt.Figure, name: str, output_dir: Path) -> None:
     if caught:
         messages = "; ".join(str(item.message) for item in caught)
         raise RuntimeError(f"figure layout emitted warnings: {messages}")
-    plt.figure(fig.number)
-    save_figure(name, base_dir=output_dir)
+    save_figure(fig, name, base_dir=output_dir)
 
 
 def make_main_figure(results: dict, output_dir: Path) -> plt.Figure:

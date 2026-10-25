@@ -352,14 +352,14 @@ def main(argv: Sequence[str] | None = None):
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    generate_figure(
+    fig = generate_figure(
         nwb_file_name=args.nwb_file_name,
         epoch_name=args.epoch_name,
         data_dir=args.data_dir,
     )
 
     logging.info(f"Saving to {args.output_dir}...")
-    save_figure("figure03", base_dir=args.output_dir)
+    save_figure(fig, "figure03", base_dir=args.output_dir)
 
     if args.show:
         plt.show()

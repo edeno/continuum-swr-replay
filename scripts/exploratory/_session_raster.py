@@ -24,6 +24,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 warnings.filterwarnings("ignore")
+from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR as P  # noqa: E402
 from continuum_swr_replay.paths import (  # noqa: E402
     REPLAY_CONTENT_DIR,  # noqa: E402
@@ -192,7 +193,7 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     fig.suptitle(title, x=0.5, y=0.998, fontsize=10)
     out = P.parent / ".claude" / "research" / "session_raster_outputs" / out_name
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    save_figure(fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False)
     print("saved", out)
 
 

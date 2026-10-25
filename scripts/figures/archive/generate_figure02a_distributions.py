@@ -137,7 +137,7 @@ def plot_overall_distribution(
     )
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -200,7 +200,7 @@ def plot_per_animal_distributions(
     fig.suptitle("Distribution of Non-Local Probability (Immobile Periods)")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -263,7 +263,7 @@ def plot_per_animal_running_distributions(
     fig.suptitle("Distribution of Non-Local Probability (Run Periods)")
     plt.tight_layout(rect=(0, 0, 1, 0.96))
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -332,7 +332,7 @@ def plot_local_distribution(
     )
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -401,7 +401,7 @@ def plot_nospike_distribution(
     )
     plt.tight_layout()
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 

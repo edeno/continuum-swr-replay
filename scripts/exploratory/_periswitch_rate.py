@@ -36,6 +36,7 @@ import statsmodels.api as sm
 from statsmodels.genmod.cov_struct import Independence
 from statsmodels.genmod.generalized_estimating_equations import GEE
 
+from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
@@ -142,7 +143,7 @@ def main():
     fig.tight_layout()
     SCRATCH.mkdir(exist_ok=True)
     out = SCRATCH / "periswitch_rate.png"
-    fig.savefig(out, dpi=140, bbox_inches="tight")
+    save_figure(fig, out.stem, base_dir=out.parent, dpi=140, formats=["png"], transparent=False)
     logging.info("Saved %s", out)
 
 

@@ -5,6 +5,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from continuum_swr_replay.figure_utilities import save_figure
+
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/fig2b_outputs"
 s = pd.read_csv(OUT / "per_session_dated.csv")
 animals = sorted(s["animal"].unique())
@@ -34,5 +36,5 @@ for j, animal in enumerate(animals):
 fig.suptitle("Non-local activity & SWR rate over dates, per animal "
              "(grey=session, red=day-mean)", y=1.0)
 fig.tight_layout()
-fig.savefig(OUT / "dates_trends.png", dpi=140, bbox_inches="tight")
+save_figure(fig, "dates_trends", base_dir=OUT, dpi=140, formats=["png"], transparent=False)
 print("wrote", OUT / "dates_trends.png")

@@ -38,6 +38,7 @@ import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -267,7 +268,7 @@ def main():
     fig.tight_layout()
     SCRATCH.mkdir(exist_ok=True)
     out = SCRATCH / "modelfit_summary.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    save_figure(fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False)
     logging.info("Saved %s", out)
 
 

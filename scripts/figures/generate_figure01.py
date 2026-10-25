@@ -1164,10 +1164,10 @@ def main(argv: Sequence[str] | None = None):
     args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    _ = generate_figure(n_neurons=args.n_neurons, seed=args.seed)
+    fig = generate_figure(n_neurons=args.n_neurons, seed=args.seed)
 
     print(f"Saving to {args.output_dir}...")
-    save_figure("figure01", base_dir=args.output_dir, dpi=args.dpi)
+    save_figure(fig, "figure01", base_dir=args.output_dir, dpi=args.dpi)
 
     if args.show:
         plt.show()

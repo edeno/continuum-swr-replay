@@ -55,6 +55,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     longest_history_window_s,
 )
+from continuum_swr_replay.figure_utilities import save_figure  # noqa: E402
 from continuum_swr_replay.paths import (
     REPLAY_CONTENT_DIR,  # noqa: E402
     figure_dir,
@@ -225,7 +226,9 @@ def plot_gof_ladder(df: pd.DataFrame) -> None:
     )
     fig.tight_layout()
     out = FIGS / "model_checking_ladder.png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
+    )
     plt.close(fig)
     print(f"saved {out}")
 
@@ -351,7 +354,9 @@ def plot_example_quartet(
     fig.suptitle(title, y=1.0)
     fig.tight_layout()
     out = FIGS / fname
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
+    )
     plt.close(fig)
     print(f"saved {out}")
 

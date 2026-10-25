@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
+from continuum_swr_replay.figure_utilities import save_figure
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, table_path
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
@@ -86,7 +87,7 @@ def main() -> None:
     ax.legend(frameon=False, fontsize=9, loc="upper left")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    fig.savefig(OUT / "peri_departure_rate.png", dpi=140, bbox_inches="tight")
+    save_figure(fig, "peri_departure_rate", base_dir=OUT, dpi=140, formats=["png"], transparent=False)
     pd.DataFrame(table).to_csv(OUT / "peri_departure_rate.csv", index=False)
     print("wrote", OUT / "peri_departure_rate.png")
     print("wrote", OUT / "peri_departure_rate.csv")

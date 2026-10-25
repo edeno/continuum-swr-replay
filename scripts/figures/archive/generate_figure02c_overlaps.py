@@ -159,7 +159,7 @@ def plot_duration_histograms_separate(
         ax.xaxis.set_minor_locator(mticker.MultipleLocator(10))
         ax.set_xlim(0, 250)
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -236,7 +236,7 @@ def plot_duration_histograms_overlaid(
     ax.xaxis.set_major_locator(mticker.MultipleLocator(50))
     ax.xaxis.set_minor_locator(mticker.MultipleLocator(10))
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -366,7 +366,7 @@ def plot_overlap_bar_chart(
     ax.set_xticklabels(labels)
     ax.set_title("Event Overlap: Model vs. SWR/MUA", pad=12)
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -468,7 +468,7 @@ def plot_venn_diagram_timepoints(
     ax.axis("off")
     ax.set_title("Percent of Immobile Time")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -576,7 +576,7 @@ def plot_venn_diagram_events(
     ax.axis("off")
     ax.set_title("Number of Events")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
@@ -640,7 +640,7 @@ def plot_nonlocal_prob_during_events(
         ax.set_axisbelow(True)
         ax.tick_params(axis="both", which="both", length=3, direction="out")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 

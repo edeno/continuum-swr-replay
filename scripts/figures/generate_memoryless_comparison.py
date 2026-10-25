@@ -2146,7 +2146,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     fig, decoded = make_figure(args.n_neurons, config, summary, controls, heldout)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    save_figure("memoryless_comparison", base_dir=args.output_dir)
+    save_figure(fig, "memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
     write_caption(
         decoded,

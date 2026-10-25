@@ -180,7 +180,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            save_figure("test_figure", base_dir=tmpdir)
+            save_figure(fig, "test_figure", base_dir=tmpdir)
 
             # Check both formats were created
             assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -188,13 +188,80 @@ class TestSaveFigure:
 
             plt.close(fig)
 
+    def test_saves_the_given_figure_not_the_current_one(self, tmp_path):
+        """The figure passed is saved even when another figure is current.
+
+        Default style, so a layout engine left on by another test cannot move
+        the axes between the two saves.
+        """
+        with mpl.style.context("default"):
+            fig, ax = plt.subplots(figsize=(2, 1), dpi=100)
+            ax.plot([0, 1], [0, 1])
+            fig.savefig(
+                tmp_path / "direct.png",
+                dpi=100,
+                bbox_inches="tight",
+                facecolor=fig.get_facecolor(),
+                transparent=False,
+            )
+            current = plt.figure()  # empty, and now pyplot's current figure
+
+            save_figure(
+                fig, "given", base_dir=tmp_path, dpi=100, formats=["png"], transparent=False
+            )
+
+        saved = (tmp_path / "given.png").read_bytes()
+        assert saved == (tmp_path / "direct.png").read_bytes()
+        plt.close(fig)
+        plt.close(current)
+
+    def test_each_format_matches_pyplot_savefig(self, tmp_path, monkeypatch):
+        """Each format is drawn as pyplot.savefig drew it, redraw included.
+
+        Constrained layout moves the axes on every draw, so the PNG saved after
+        the PDF matches the old pyplot.savefig sequence only if the figure is
+        redrawn after each save, as pyplot.savefig does.
+        """
+        monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")  # fixed PDF CreationDate
+
+        def make_figure():
+            fig, axes = plt.subplots(2, 2, figsize=(4, 3), dpi=100, layout="constrained")
+            for ax in axes.flat:
+                ax.plot([0, 1], [0, 1])
+                ax.set_title("a long panel title " * 2)
+                ax.set_ylabel("y label")
+            fig.suptitle("suptitle")
+            return fig
+
+        with mpl.style.context("default"):
+            old = make_figure()
+            for fmt in ("pdf", "png"):
+                plt.savefig(
+                    tmp_path / f"old.{fmt}",
+                    format=fmt,
+                    dpi=300,
+                    bbox_inches="tight",
+                    facecolor=old.get_facecolor(),
+                    transparent=True,
+                )
+            plt.close(old)
+
+            new = make_figure()
+            plt.figure()  # pyplot's current figure is not the one saved
+            save_figure(new, "new", base_dir=tmp_path, dpi=300)
+            plt.close("all")
+
+        for fmt in ("pdf", "png"):
+            new_bytes = (tmp_path / f"new.{fmt}").read_bytes()
+            assert new_bytes == (tmp_path / f"old.{fmt}").read_bytes(), fmt
+
     def test_save_with_custom_formats(self):
         """Test saving figure with custom formats."""
         with tempfile.TemporaryDirectory() as tmpdir:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            save_figure("test_figure", base_dir=tmpdir, formats=["pdf", "svg"])
+            save_figure(fig, "test_figure", base_dir=tmpdir, formats=["pdf", "svg"])
 
             # Check only requested formats were created
             assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -218,7 +285,7 @@ class TestSaveFigure:
 
             # This should work without type errors
             # fig.get_facecolor() returns a tuple of floats (RGBA)
-            save_figure("test_figure", base_dir=tmpdir, facecolor=None)
+            save_figure(fig, "test_figure", base_dir=tmpdir, facecolor=None)
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -229,7 +296,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            save_figure("test_figure", base_dir=tmpdir, facecolor="#ffffff")
+            save_figure(fig, "test_figure", base_dir=tmpdir, facecolor="#ffffff")
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -241,7 +308,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # RGBA tuple should be accepted
-            save_figure("test_figure", base_dir=tmpdir, facecolor=(1.0, 1.0, 1.0, 1.0))
+            save_figure(fig, "test_figure", base_dir=tmpdir, facecolor=(1.0, 1.0, 1.0, 1.0))
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -252,7 +319,7 @@ class TestSaveFigure:
             fig, ax = plt.subplots()
             ax.plot([0, 1], [0, 1])
 
-            save_figure("test_figure", base_dir=tmpdir, dpi=300)
+            save_figure(fig, "test_figure", base_dir=tmpdir, dpi=300)
 
             assert (Path(tmpdir) / "test_figure.png").exists()
             plt.close(fig)
@@ -272,7 +339,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # This should work without type errors, even though rcParams has float
-            save_figure("test_figure", base_dir=tmpdir)
+            save_figure(fig, "test_figure", base_dir=tmpdir)
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -293,10 +360,10 @@ class TestSaveFigure:
 
             # Invalid format should raise ValueError
             with pytest.raises(ValueError, match="Invalid format"):
-                save_figure("test_figure", base_dir=tmpdir, formats=["invalid"])
+                save_figure(fig, "test_figure", base_dir=tmpdir, formats=["invalid"])
 
             with pytest.raises(ValueError, match="Invalid format"):
-                save_figure("test_figure", base_dir=tmpdir, formats=["pdf", "bad_format"])
+                save_figure(fig, "test_figure", base_dir=tmpdir, formats=["pdf", "bad_format"])
 
             plt.close(fig)
 
@@ -308,7 +375,7 @@ class TestSaveFigure:
 
             # Common valid formats should work
             for fmt in ["pdf", "png", "svg", "eps", "jpg"]:
-                save_figure("test_figure", base_dir=tmpdir, formats=[fmt])
+                save_figure(fig, "test_figure", base_dir=tmpdir, formats=[fmt])
                 assert (Path(tmpdir) / f"test_figure.{fmt}").exists()
                 (Path(tmpdir) / f"test_figure.{fmt}").unlink()
 
@@ -322,7 +389,7 @@ class TestSaveFigure:
 
             # Error message should mention valid formats
             with pytest.raises(ValueError) as exc_info:
-                save_figure("test_figure", base_dir=tmpdir, formats=["xyz"])
+                save_figure(fig, "test_figure", base_dir=tmpdir, formats=["xyz"])
 
             error_msg = str(exc_info.value)
             # Should mention the invalid format
@@ -352,7 +419,7 @@ class TestSaveFigure:
                 ax.plot([0, 1], [0, 1])
 
                 # Save with base_dir=None (should use FIGURE_DIR)
-                save_figure("test_figure", base_dir=None)
+                save_figure(fig, "test_figure", base_dir=None)
 
                 # Check files were created in FIGURE_DIR
                 assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -371,7 +438,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # Save with string base_dir
-            save_figure("test_figure", base_dir=tmpdir)
+            save_figure(fig, "test_figure", base_dir=tmpdir)
 
             # Check files were created in specified directory
             assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -386,7 +453,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # Save with Path base_dir
-            save_figure("test_figure", base_dir=Path(tmpdir))
+            save_figure(fig, "test_figure", base_dir=Path(tmpdir))
 
             # Check files were created in specified directory
             assert (Path(tmpdir) / "test_figure.pdf").exists()
@@ -401,7 +468,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # Save with subdirectory in figure_name
-            save_figure("subfolder/test_figure", base_dir=tmpdir)
+            save_figure(fig, "subfolder/test_figure", base_dir=tmpdir)
 
             # Check files were created in base_dir/subfolder
             assert (Path(tmpdir) / "subfolder" / "test_figure.pdf").exists()
@@ -424,7 +491,7 @@ class TestSaveFigure:
                 ax.plot([0, 1], [0, 1])
 
                 # Save with subdirectory and base_dir=None
-                save_figure("subfolder/test_figure", base_dir=None)
+                save_figure(fig, "subfolder/test_figure", base_dir=None)
 
                 # Check files were created in FIGURE_DIR/subfolder
                 assert (Path(tmpdir) / "subfolder" / "test_figure.pdf").exists()
@@ -449,7 +516,7 @@ class TestSaveFigure:
 
             # Should raise ValueError for empty figure
             with pytest.raises(ValueError, match="no axes"):
-                save_figure("empty_figure", base_dir=tmpdir)
+                save_figure(fig, "empty_figure", base_dir=tmpdir)
 
             plt.close(fig)
 
@@ -461,7 +528,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # Should not raise
-            save_figure("valid_figure", base_dir=tmpdir)
+            save_figure(fig, "valid_figure", base_dir=tmpdir)
 
             assert (Path(tmpdir) / "valid_figure.pdf").exists()
             plt.close(fig)
@@ -472,7 +539,7 @@ class TestSaveFigure:
             fig = plt.figure()
 
             with pytest.raises(ValueError) as exc_info:
-                save_figure("empty_figure", base_dir=tmpdir)
+                save_figure(fig, "empty_figure", base_dir=tmpdir)
 
             error_msg = str(exc_info.value).lower()
             # Should mention the problem and suggest a solution
@@ -498,7 +565,7 @@ class TestSaveFigure:
 
             # Save with transparent=None (auto-detect)
             # This should detect dark background and set transparent=False
-            save_figure("dark_figure", base_dir=tmpdir, transparent=None)
+            save_figure(fig, "dark_figure", base_dir=tmpdir, transparent=None)
 
             assert (Path(tmpdir) / "dark_figure.pdf").exists()
             plt.close(fig)
@@ -513,7 +580,7 @@ class TestSaveFigure:
 
             # Save with transparent=None (auto-detect)
             # This should detect light background and set transparent=True
-            save_figure("light_figure", base_dir=tmpdir, transparent=None)
+            save_figure(fig, "light_figure", base_dir=tmpdir, transparent=None)
 
             assert (Path(tmpdir) / "light_figure.pdf").exists()
             plt.close(fig)
@@ -527,7 +594,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # Explicit transparent=True should be honored even on dark background
-            save_figure("dark_transparent", base_dir=tmpdir, transparent=True)
+            save_figure(fig, "dark_transparent", base_dir=tmpdir, transparent=True)
 
             assert (Path(tmpdir) / "dark_transparent.pdf").exists()
             plt.close(fig)
@@ -541,7 +608,7 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # Explicit transparent=False should be honored even on light background
-            save_figure("light_opaque", base_dir=tmpdir, transparent=False)
+            save_figure(fig, "light_opaque", base_dir=tmpdir, transparent=False)
 
             assert (Path(tmpdir) / "light_opaque.pdf").exists()
             plt.close(fig)

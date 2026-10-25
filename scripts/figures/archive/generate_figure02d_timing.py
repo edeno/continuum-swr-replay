@@ -272,7 +272,7 @@ def plot_timing_histogram(
     # Legend
     ax.legend(frameon=False, loc="upper left")
 
-    save_figure(figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
+    save_figure(plt.gcf(), figure_name, base_dir=output_dir, dpi=dpi, formats=formats)
     plt.close(fig)
     logging.info(f"Saved: {figure_name}")
 
