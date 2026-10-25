@@ -57,9 +57,14 @@ from continuum_swr_replay.tables.covariate_registry import (
 )
 from continuum_swr_replay.tables.io import read_table
 
-plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42,
-                     "font.family": "sans-serif",
-                     "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"]})
+plt.rcParams.update(
+    {
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+    }
+)
 
 RC_DIR = REPLAY_CONTENT_DIR
 DEFAULT_OUT_DIR = ROOT_DIR / ".claude/research/nonlocal_rate_fit_outputs"
@@ -72,8 +77,12 @@ OUTCOMES = {
 
 # Non-reward-lag predictors -> track spec.
 RATE_PANEL = {
-    "reward_fraction_last10_known_trials": ("heat", "reward_fraction_last10_known_trials", "reward rate trial",
-                              "viridis"),
+    "reward_fraction_last10_known_trials": (
+        "heat",
+        "reward_fraction_last10_known_trials",
+        "reward rate trial",
+        "viridis",
+    ),
 }
 
 
@@ -82,8 +91,9 @@ def _vlims(x):
     return (0.0, 1.0) if x.size == 0 else (float(x.min()), float(x.max()))
 
 
-def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
-                 title_stub: str):
+def build_figure(
+    sub: pd.DataFrame, model_name: str, response_col: str, title_stub: str
+):
     """Fit ``model_name`` on one session's stops; draw predictors + obs/pred/resid."""
     spec = MODEL_PER_STOP_RATE[model_name]
     predictors = list(spec.predictors)
@@ -95,8 +105,9 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
     n_stops = len(sub)
     x = np.arange(n_stops)
 
-    fit = fit_per_stop_rate_model(sub, predictors, response_col=response_col,
-                                  offset_col="immobility_duration_s")
+    fit = fit_per_stop_rate_model(
+        sub, predictors, response_col=response_col, offset_col="immobility_duration_s"
+    )
     if fit is None:
         raise SystemExit(
             f"Rate model {model_name} did not fit for this session "
@@ -124,17 +135,28 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
         elif p in RATE_PANEL and p not in seen:
             seen.add(p)
             panels.append(RATE_PANEL[p])
-    panels += [("counts", None, "events / stop"),
-               ("rate", None, "intensity (events/s)"),
-               ("cumresid", None, "cumulative\nresidual")]
+    panels += [
+        ("counts", None, "events / stop"),
+        ("rate", None, "intensity (events/s)"),
+        ("cumresid", None, "cumulative\nresidual"),
+    ]
 
-    H = {"heat": 0.5, "binary": 0.5, "kernel": 2.4, "counts": 3.2, "rate": 2.6,
-         "cumresid": 2.6}
+    H = {
+        "heat": 0.5,
+        "binary": 0.5,
+        "kernel": 2.4,
+        "counts": 3.2,
+        "rate": 2.6,
+        "cumresid": 2.6,
+    }
     heights = [H[p[0]] for p in panels]
-    fig = plt.figure(figsize=(max(11, n_stops * 0.035), 0.42 * sum(heights) + 1.4),
-                     constrained_layout=True)
-    gs = GridSpec(len(panels), 2, figure=fig, height_ratios=heights,
-                  width_ratios=[60, 1])
+    fig = plt.figure(
+        figsize=(max(11, n_stops * 0.035), 0.42 * sum(heights) + 1.4),
+        constrained_layout=True,
+    )
+    gs = GridSpec(
+        len(panels), 2, figure=fig, height_ratios=heights, width_ratios=[60, 1]
+    )
     axes, ax0 = [], None
     for i in range(len(panels)):
         ax = fig.add_subplot(gs[i, 0], sharex=ax0)
@@ -158,13 +180,34 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
         if kind == "binary":
             v = sub[p[1]].to_numpy(float)
             no, yes, miss = v == 0, v == 1, ~np.isfinite(v)
-            ax.scatter(x[no], np.zeros(no.sum()), s=8, marker="s", c="0.85",
-                       edgecolors="none", rasterized=True)
-            ax.scatter(x[yes], np.zeros(yes.sum()), s=8, marker="s", c="#222",
-                       edgecolors="none", rasterized=True)
+            ax.scatter(
+                x[no],
+                np.zeros(no.sum()),
+                s=8,
+                marker="s",
+                c="0.85",
+                edgecolors="none",
+                rasterized=True,
+            )
+            ax.scatter(
+                x[yes],
+                np.zeros(yes.sum()),
+                s=8,
+                marker="s",
+                c="#222",
+                edgecolors="none",
+                rasterized=True,
+            )
             if miss.any():
-                ax.scatter(x[miss], np.zeros(miss.sum()), s=6, marker="x", c="0.6",
-                           linewidths=0.5, rasterized=True)
+                ax.scatter(
+                    x[miss],
+                    np.zeros(miss.sum()),
+                    s=6,
+                    marker="x",
+                    c="0.6",
+                    linewidths=0.5,
+                    rasterized=True,
+                )
             track_style(ax, p[1] if len(p) < 3 else p[2])
         elif kind == "heat":
             _, col, label, cmap_name = p
@@ -172,31 +215,48 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
             cmap = plt.get_cmap(cmap_name).copy()
             cmap.set_bad("0.9")
             vmin, vmax = _vlims(sub[col].to_numpy(float))
-            im = ax.imshow(M, aspect="auto", cmap=cmap, vmin=vmin, vmax=vmax,
-                           extent=(-0.5, n_stops - 0.5, 0.5, -0.5),
-                           interpolation="nearest", rasterized=True)
+            im = ax.imshow(
+                M,
+                aspect="auto",
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+                extent=(-0.5, n_stops - 0.5, 0.5, -0.5),
+                interpolation="nearest",
+                rasterized=True,
+            )
             track_style(ax, label)
             cbar(i, im, ticks=[round(vmin, 1), round(vmax, 1)])
         elif kind == "kernel":
             K = np.ma.masked_invalid(
-                np.vstack([sub[c].to_numpy(float) for c in lag_cols]))
+                np.vstack([sub[c].to_numpy(float) for c in lag_cols])
+            )
             cmap = plt.get_cmap("Greys").copy()
             cmap.set_bad("0.9")
-            im = ax.imshow(K, aspect="auto", cmap=cmap, vmin=0, vmax=1,
-                           extent=(-0.5, n_stops - 0.5, N_REWARD_LAGS - 0.5, -0.5),
-                           interpolation="nearest", rasterized=True)
+            im = ax.imshow(
+                K,
+                aspect="auto",
+                cmap=cmap,
+                vmin=0,
+                vmax=1,
+                extent=(-0.5, n_stops - 0.5, N_REWARD_LAGS - 0.5, -0.5),
+                interpolation="nearest",
+                rasterized=True,
+            )
             ax.set_yticks(range(N_REWARD_LAGS))
             ax.set_yticklabels([str(j + 1) for j in range(N_REWARD_LAGS)], fontsize=5)
-            ax.set_ylabel(p[2], fontsize=8, rotation=0, ha="right", va="center",
-                          labelpad=20)
+            ax.set_ylabel(
+                p[2], fontsize=8, rotation=0, ha="right", va="center", labelpad=20
+            )
             ax.tick_params(axis="both", length=0)
             for s in ("top", "right", "left", "bottom"):
                 ax.spines[s].set_visible(False)
             cbar(i, im, ticks=[0, 1])
         elif kind == "counts":
             ax.bar(x, obs, width=1.0, color="0.75", label="observed", zorder=1)
-            ax.plot(x, pred, color="crimson", lw=1.0, label="predicted E[count]",
-                    zorder=2)
+            ax.plot(
+                x, pred, color="crimson", lw=1.0, label="predicted E[count]", zorder=2
+            )
             ax.set_ylabel("events / stop", fontsize=8)
             ax.set_ylim(0, max(np.nanmax(obs), np.nanmax(pred)) * 1.1)
             ax.legend(loc="upper right", fontsize=7, frameon=False)
@@ -212,8 +272,14 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
             num = pd.Series(obs).rolling(w, center=True, min_periods=1).sum()
             den = pd.Series(expo).rolling(w, center=True, min_periods=1).sum()
             roll_rate = (num / den).to_numpy()
-            ax.plot(x, roll_rate, color="0.45", lw=1.2,
-                    label=f"observed rate (rolling {w})", zorder=1)
+            ax.plot(
+                x,
+                roll_rate,
+                color="0.45",
+                lw=1.2,
+                label=f"observed rate (rolling {w})",
+                zorder=1,
+            )
             ax.plot(x, lam, color="#117a3f", lw=1.2, label="predicted λ", zorder=2)
             ax.set_ylabel("intensity\n(events/s)", fontsize=8)
             ax.set_ylim(0, np.nanmax([np.nanmax(lam), np.nanmax(roll_rate)]) * 1.2)
@@ -227,10 +293,19 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
             fin = np.isfinite(resid)
             cum = np.cumsum(np.where(fin, resid, 0.0))
             band = 2.0 * np.sqrt(np.cumsum(np.where(fin, pred, 0.0)))
-            ax.fill_between(x, -band, band, color="0.8", alpha=0.6, lw=0,
-                            label="±2σ (Poisson)", zorder=1)
-            ax.plot(x, cum, color="#8e44ad", lw=1.3,
-                    label="cumulative obs − pred", zorder=2)
+            ax.fill_between(
+                x,
+                -band,
+                band,
+                color="0.8",
+                alpha=0.6,
+                lw=0,
+                label="±2σ (Poisson)",
+                zorder=1,
+            )
+            ax.plot(
+                x, cum, color="#8e44ad", lw=1.3, label="cumulative obs − pred", zorder=2
+            )
             ax.axhline(0, color="0.5", lw=0.5)
             ax.set_ylabel("cumulative\nresidual", fontsize=8)
             ax.legend(loc="upper left", fontsize=7, frameon=False)
@@ -246,24 +321,36 @@ def build_figure(sub: pd.DataFrame, model_name: str, response_col: str,
         f"{title_stub}  —  per-stop rate model {model_name} fit  "
         f"(outcome={response_col}, n_stops={fit['n_stops']}, "
         f"AIC={fit['aic']:.0f}, corr(obs,pred)={corr:.2f}, "
-        f"converged={fit['converged']})", fontsize=11)
+        f"converged={fit['converged']})",
+        fontsize=11,
+    )
     axes[-1].set_xlim(-0.5, n_stops - 0.5)
     axes[-1].set_xlabel(
         "immobility period (stop, time-ordered)  —  exposure + predictors of "
-        f"{model_name}, then observed vs predicted event count", fontsize=9)
+        f"{model_name}, then observed vs predicted event count",
+        fontsize=9,
+    )
     return fig, n_stops
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--animal", default="chimi")
     p.add_argument("--day", type=int, default=20200227)
     p.add_argument("--epoch", default="04_r2")
-    p.add_argument("--rate-model", default="R2",
-                   help=f"MODEL_PER_STOP_RATE rung ({', '.join(MODEL_PER_STOP_RATE)})")
-    p.add_argument("--outcome", default="non_local", choices=list(OUTCOMES),
-                   help="which count to model")
+    p.add_argument(
+        "--rate-model",
+        default="R2",
+        help=f"MODEL_PER_STOP_RATE rung ({', '.join(MODEL_PER_STOP_RATE)})",
+    )
+    p.add_argument(
+        "--outcome",
+        default="non_local",
+        choices=list(OUTCOMES),
+        help="which count to model",
+    )
     p.add_argument("--out", default=None)
     p.add_argument("--pdf", action="store_true")
     p.add_argument("--dpi", type=int, default=150)
@@ -271,18 +358,27 @@ def main() -> None:
 
     st = read_table(table_path("stop_table", RC_DIR, fmt="pkl"))
     require_covariate_schema(st, table="stop")
-    sub = st[(st.animal == args.animal) & (st.session_date == args.day)
-             & (st.epoch == args.epoch)]
+    sub = st[
+        (st.animal == args.animal)
+        & (st.session_date == args.day)
+        & (st.epoch == args.epoch)
+    ]
     if sub.empty:
         raise SystemExit(f"No stops for {args.animal} {args.day} {args.epoch}.")
 
-    fig, n = build_figure(sub, args.rate_model, OUTCOMES[args.outcome],
-                          f"{args.animal} {args.day} {args.epoch}")
+    fig, n = build_figure(
+        sub,
+        args.rate_model,
+        OUTCOMES[args.outcome],
+        f"{args.animal} {args.day} {args.epoch}",
+    )
     out = args.out
     if out is None:
         os.makedirs(DEFAULT_OUT_DIR, exist_ok=True)
-        out = str(DEFAULT_OUT_DIR / f"{args.animal}{args.day}_{args.epoch}_"
-                  f"{args.rate_model}_{args.outcome}_fit.png")
+        out = str(
+            DEFAULT_OUT_DIR / f"{args.animal}{args.day}_{args.epoch}_"
+            f"{args.rate_model}_{args.outcome}_fit.png"
+        )
     fig.savefig(out, dpi=args.dpi, bbox_inches="tight")
     written = [out]
     if args.pdf:

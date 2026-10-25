@@ -8,6 +8,7 @@ stops would all corrupt the conclusions.
 
 Pin recovery on synthetic data where the truth is known.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -71,9 +72,7 @@ class TestInterceptOnlyRecovery:
         of immobility. Generate at λ = 2 events/sec, fit intercept
         only, and check exp(coef_Intercept) is within a few SE of 2.0."""
         true_rate = 2.0
-        df = _simulate_stops(
-            n_stops=400, log_intercept=np.log(true_rate), seed=42
-        )
+        df = _simulate_stops(n_stops=400, log_intercept=np.log(true_rate), seed=42)
         fit = fit_per_stop_rate_model(df, predictors=[])
         assert fit is not None
         recovered_rate = fit["rr_Intercept"]
@@ -86,9 +85,7 @@ class TestInterceptOnlyRecovery:
         """``rr_*`` columns must literally be ``exp(coef_*)``."""
         df = _simulate_stops(n_stops=200, log_intercept=np.log(1.0), seed=0)
         fit = fit_per_stop_rate_model(df, predictors=[])
-        assert fit["rr_Intercept"] == pytest.approx(
-            np.exp(fit["coef_Intercept"])
-        )
+        assert fit["rr_Intercept"] == pytest.approx(np.exp(fit["coef_Intercept"]))
 
     def test_bic_uses_log_likelihood_formula(self):
         """BIC should be on the same LLF scale as AIC/model comparisons."""
@@ -149,9 +146,7 @@ class TestPredictorCoefficientRecovery:
         fit = fit_per_stop_rate_model(df, predictors=["is_after_omission"])
         assert fit is not None
         z = fit["coef_is_after_omission"] / fit["bse_is_after_omission"]
-        assert abs(z) < 3, (
-            f"null predictor recovered as significant: z={z:.2f}"
-        )
+        assert abs(z) < 3, f"null predictor recovered as significant: z={z:.2f}"
 
     def test_recovers_two_predictors_simultaneously(self):
         """With two independent binary predictors, both coefficients
@@ -190,16 +185,20 @@ class TestImmobilityTimeOffset:
         (and double the recovered raw counts)."""
         true_rate = 1.5
         df_a = _simulate_stops(
-            n_stops=400, log_intercept=np.log(true_rate),
-            duration_range=(10.0, 10.0), seed=0,
+            n_stops=400,
+            log_intercept=np.log(true_rate),
+            duration_range=(10.0, 10.0),
+            seed=0,
         )
         df_b = df_a.copy()
         df_b["immobility_duration_s"] *= 2.0
         # Counts also need to double under the new "true" exposure for
         # the rate to stay the same; resimulate with the doubled time.
         df_b = _simulate_stops(
-            n_stops=400, log_intercept=np.log(true_rate),
-            duration_range=(20.0, 20.0), seed=0,
+            n_stops=400,
+            log_intercept=np.log(true_rate),
+            duration_range=(20.0, 20.0),
+            seed=0,
         )
         fit_a = fit_per_stop_rate_model(df_a, predictors=[])
         fit_b = fit_per_stop_rate_model(df_b, predictors=[])
@@ -218,9 +217,7 @@ class TestImmobilityTimeOffset:
         with pytest.raises(ValueError, match="10 stop"):
             fit_per_stop_rate_model(df, predictors=[])
         # With those stops removed by the caller, the fit proceeds on the rest.
-        fit = fit_per_stop_rate_model(
-            df[df.immobility_duration_s > 0], predictors=[]
-        )
+        fit = fit_per_stop_rate_model(df[df.immobility_duration_s > 0], predictors=[])
         assert fit["n_stops"] == 90
 
     def test_negative_immobility_time_is_refused(self):
@@ -339,8 +336,10 @@ class TestEdgeCases:
         ladder must not have.
         """
         df = _simulate_stops(
-            n_stops=100, log_intercept=0.0,
-            coefs={"is_after_reward": 0.0}, seed=0,
+            n_stops=100,
+            log_intercept=0.0,
+            coefs={"is_after_reward": 0.0},
+            seed=0,
         )
         df.loc[:9, "is_after_reward"] = np.nan
         with pytest.raises(ValueError, match="'is_after_reward': 10"):
@@ -370,9 +369,7 @@ class TestCrossValidateRateModel:
 
     def test_informative_predictor_improves_held_out_ll(self):
         # A strong true effect should give higher held-out LL than the null.
-        df = _simulate_stops(
-            n_stops=600, log_intercept=-1.0, coefs={"x": 1.5}, seed=2
-        )
+        df = _simulate_stops(n_stops=600, log_intercept=-1.0, coefs={"x": 1.5}, seed=2)
         null = cross_validate_per_stop_rate_model(df, predictors=[])
         full = cross_validate_per_stop_rate_model(df, predictors=["x"])
         assert null is not None and full is not None
@@ -384,7 +381,9 @@ class TestCrossValidateRateModel:
 
     def test_missing_column_returns_none(self):
         df = _simulate_stops(n_stops=200, log_intercept=0.0, seed=4)
-        assert cross_validate_per_stop_rate_model(df, predictors=["not_a_column"]) is None
+        assert (
+            cross_validate_per_stop_rate_model(df, predictors=["not_a_column"]) is None
+        )
 
     def test_one_bad_fold_invalidates_metric_without_dropping_fold(self, monkeypatch):
         """A single nonconverged/separated fold must invalidate the whole CV metric
