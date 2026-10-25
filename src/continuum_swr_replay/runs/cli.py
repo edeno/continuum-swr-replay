@@ -45,7 +45,23 @@ def parse_run_id(value: str) -> str:
 
 
 def filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame:
-    """Filter the epoch_info DataFrame based on command line arguments."""
+    """Keep the epochs that ``--animal``, ``--date`` and ``--epoch`` name.
+
+    Parameters
+    ----------
+    epoch_info : pd.DataFrame
+        ``get_epoch_info``'s frame (or a subset of its rows), indexed by
+        ``(nwb_file_name, interval_list_name)``.
+    args : Namespace
+        Parsed arguments with ``animal``, ``date`` and ``epoch``; ``None``
+        leaves that filter off. ``epoch`` is the full epoch name, such as
+        ``"02_r1"``, matched exactly against ``interval_list_name``.
+
+    Returns
+    -------
+    pd.DataFrame
+        The matching rows, in their order.
+    """
     is_epoch = np.ones(len(epoch_info), dtype=bool)
 
     if args.animal is not None:
@@ -55,15 +71,10 @@ def filter_epoch_info(epoch_info: pd.DataFrame, args: Namespace) -> pd.DataFrame
         is_epoch = np.logical_and(epoch_info.date == args.date, is_epoch)
 
     if args.epoch is not None:
-        epoch = int(args.epoch.split("_")[0])
-        is_epoch = np.logical_and(epoch_info.epoch == epoch, is_epoch)
+        epoch_names = epoch_info.index.get_level_values("interval_list_name")
+        is_epoch = np.logical_and(epoch_names == args.epoch, is_epoch)
 
-    epoch_info = epoch_info.loc[is_epoch, :]
-
-    if isinstance(epoch_info, pd.Series):
-        epoch_info = epoch_info.to_frame().T
-
-    return epoch_info
+    return epoch_info.loc[is_epoch, :]
 
 
 def add_common_args(parser: ArgumentParser) -> ArgumentParser:
