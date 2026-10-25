@@ -347,8 +347,8 @@ All data is time-aligned and can be indexed/sliced consistently:
 ```python
 # All time-indexed DataFrames use seconds as the index
 trial = data["trials"].iloc[0]
-trial_position = data["position_info"].loc[trial.start_time:trial.end_time]
-trial_task_vars = data["task_variables"].loc[trial.start_time:trial.end_time]
+trial_position = data["position_info"].loc[trial.movement_start_time:trial.end_time]
+trial_task_vars = data["task_variables"].loc[trial.movement_start_time:trial.end_time]
 ```
 
 ## Dependencies and JAX
