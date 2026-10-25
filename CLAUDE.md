@@ -81,8 +81,8 @@ src/continuum_swr_replay/
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
-├── parameters.py          # global parameters, PROCESSED_DATA_DIR
-├── paths.py               # output locations, canonical table names, table_path()
+├── parameters.py          # global parameters
+├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
@@ -445,7 +445,7 @@ Multiple sessions are processed in parallel using `dask.delayed` and `dask.compu
 
 ### Output Files
 
-Results are saved to `PROCESSED_DATA_DIR` (defined in `continuum_swr_replay.parameters`):
+Results are saved to `--save_dir`, by default `paths.processed_data_dir()` (`$CSR_PROCESSED_DATA_DIR`, else the checkout's `Processed-Data/`):
 
 - `{epoch_identifier}_results.nc` - Decoding results (xarray Dataset)
 - `{epoch_identifier}_detector.pkl` - Fitted detector model
@@ -463,6 +463,7 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 5. **Interval naming**: Spyglass uses " noPrePostTrialTimes" suffix for trimmed intervals
 6. **Track graph**: NetworkX graph of 10 nodes, where nodes 0–5 are wells (6–8 patch junctions, 9 the center) and edges are track segments
 7. **Index/time alignment**: Use `.loc[start:end]` for time-based slicing, not `.iloc`
+8. **Data roots**: every root is read at call time from `$CSR_PROCESSED_DATA_DIR` through `paths`. In tests that variable is the one patch point (the `processed_data_root` fixture); the suite starts with a sentinel root that cannot be read or written
 
 ## Notes on Data Quality
 
