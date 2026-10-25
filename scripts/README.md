@@ -277,6 +277,12 @@ them importable.
 - `freeze_regression_baseline.py`, `compare_to_golden_baseline.py` — freeze the
   canonical tables and model outputs as a read-only golden baseline (with a sha256
   manifest), and diff a regenerated root against it.
+- `table_parity.py` — `regen` rebuilds every canonical table (replay, time-bin and
+  ContFrag) into a new scratch root with the builders and order of the 2026-10-11
+  rebuild, for the whole cohort or for a few epochs (`--sessions`, by running each
+  builder against a copy of the epoch register with the other epochs excluded);
+  `diff` compares two roots table by table on each row key, exactly, and reports
+  every table (`--restrict` cuts a full reference down to the candidate's sessions).
 - `mutation_check.py` — AST mutation check on the covariate builders; the measured
   floor is recorded in `docs/design/builder_test_floor.md`.
 - `summarize_cohort_audits.py` — rolls the per-run `*_cohort_audit.csv` files into
