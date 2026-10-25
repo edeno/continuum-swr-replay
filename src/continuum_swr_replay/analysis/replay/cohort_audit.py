@@ -25,6 +25,7 @@ from .covariates.definitions import (
     QVALS_ROW_GATED_COVARIATES,
     QVALS_SOURCED_COVARIATES,
 )
+from .covariates.interactions import INTERACTION_FACTORS, factor_source
 
 # Row-level drop buckets, in the schema's PRIORITY order. Each dropped unit is
 # attributed to exactly the first bucket it hits, so the reconciliation closes even
@@ -80,41 +81,50 @@ _DERIVED_SUFFIXES = ("_z", "_patch")
 HAS_QVALS_ROW = "has_qvals_row"
 
 
-def _factor_forms(name: str) -> Iterator[str]:
-    """Each ``_x_`` factor of ``name``, then every form of it with suffixes removed.
+def _suffix_forms(name: str) -> Iterator[str]:
+    """``name``, then every form of it with suffixes removed.
 
     Suffixes are removed one at a time from the end, in whatever order they
     were applied, so ``<base>_patch_z`` and ``<base>_z_patch`` both reach
     ``<base>``. Every intermediate form is yielded, so a base name that itself
     ends in a suffix is still found.
     """
-    for factor in name.split("_x_"):
-        yield factor
-        stripped = True
-        while stripped:
-            stripped = False
-            for suffix in _DERIVED_SUFFIXES:
-                if factor.endswith(suffix) and factor != suffix:
-                    factor = factor.removesuffix(suffix)
-                    yield factor
-                    stripped = True
+    yield name
+    stripped = True
+    while stripped:
+        stripped = False
+        for suffix in _DERIVED_SUFFIXES:
+            if name.endswith(suffix) and name != suffix:
+                name = name.removesuffix(suffix)
+                yield name
+                stripped = True
 
 
 def _is_built_from(name: object, bases: frozenset[str]) -> bool:
-    """Whether any factor of design column ``name`` is one of ``bases``."""
+    """Whether design column ``name`` is, or is a product of, one of ``bases``.
+
+    A product declared in :data:`~.covariates.interactions.INTERACTION_FACTORS`
+    is judged on the source covariate of each of its factors; any other column
+    on its own name with its suffixes removed. A product nobody declared is not
+    split -- it cannot be fitted either, because the timing check refuses it.
+    """
     if not isinstance(name, str):
         return False
-    return any(form in bases for form in _factor_forms(name))
+    factors = INTERACTION_FACTORS.get(name)
+    if factors is not None:
+        return any(factor_source(factor) in bases for factor in factors)
+    return any(form in bases for form in _suffix_forms(name))
 
 
 def is_qvals_sourced_column(name: object) -> bool:
     """Whether design column ``name`` is built from a ``qvals_table`` covariate.
 
-    A column qualifies when one of its factors is catalogued as
+    A column qualifies when it, or one of its factors, is catalogued as
     ``qvals_sourced`` (:data:`QVALS_SOURCED_COVARIATES`), so it is NaN on every
-    stop with no qvals row. Factors are the ``_x_``-separated parts of the name
-    (``swr_x_<base>``, ``<base>_z_x_is_current_arm``), each optionally carrying
-    ``_z`` and/or ``_patch`` suffixes. A product is NaN wherever any factor is.
+    stop with no qvals row. A product's factors are the ones declared for it in
+    :data:`~.covariates.interactions.INTERACTION_FACTORS` (``swr_x_<base>``,
+    ``<base>_z_x_is_current_arm``); any other column may carry ``_z`` and/or
+    ``_patch`` suffixes over its base. A product is NaN wherever any factor is.
 
     Parameters
     ----------
@@ -133,9 +143,9 @@ def is_qvals_gap_column(name: object) -> bool:
     """Whether a NaN in design column ``name`` alone means the stop has no qvals row.
 
     The qvals gap (mechanism B) is the set of stops with no ``qvals_table``
-    row. A column is in it when one of its factors is a covariate catalogued
-    as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`); factors and
-    suffixes are parsed as in :func:`is_qvals_sourced_column`. The drop
+    row. A column is in it when it, or one of its factors, is a covariate
+    catalogued as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`);
+    factors and suffixes are resolved as in :func:`is_qvals_sourced_column`. The drop
     buckets do not use this: they book the gap per row from
     :data:`HAS_QVALS_ROW`. It names the columns whose NaN can stand in for that
     flag (:func:`attach_has_qvals_row`).
@@ -185,7 +195,8 @@ def attach_has_qvals_row(
     frame : pandas.DataFrame
         Long design frame, one row per event x candidate.
     from_column : str
-        A row-gated base covariate (no ``_x_`` product), present in ``frame``.
+        A row-gated base covariate (not an interaction product), present in
+        ``frame``.
     event_col : str, optional
         The event key. Every event belongs to one stop, so the flag must be
         constant within it.
@@ -205,7 +216,7 @@ def attach_has_qvals_row(
         If ``from_column`` is absent: the flag cannot be inferred, and is not
         guessed.
     """
-    if "_x_" in from_column or not is_qvals_gap_column(from_column):
+    if from_column in INTERACTION_FACTORS or not is_qvals_gap_column(from_column):
         raise ValueError(
             f"{from_column!r} is not a qvals-row-gated base covariate; its NaN "
             "does not say whether the stop has a qvals row"

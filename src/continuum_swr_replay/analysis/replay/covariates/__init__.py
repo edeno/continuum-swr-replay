@@ -20,6 +20,9 @@ Reading order for a newcomer tracing how a covariate is derived:
    (offline learner, no catalogued covariate);
    ``candidate_arm.py`` is the shared nine-arm predictor block.
 5. Pre/post-outcome timing lives in ``../covariate_timing.py``.
+6. ``interactions.py`` declares the factors of every interaction product a
+   ladder fits; the fit-time products are built from it, and timing and the
+   qvals gap read it.
 """
 
 from . import candidate_arm, clocks, context, definitions, history

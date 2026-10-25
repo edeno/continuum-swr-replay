@@ -17,13 +17,15 @@ get two distinct remedies (see :func:`assert_predictor_timing`):
   **No temporal gate makes it predictive-safe** — only ``descriptive=True`` (peri-switch
   alignment) or a strictly past-only replacement (e.g. ``trials_since_last_switch``).
 
-Derived/interaction columns (the canonical current-arm belief-update product,
-``is_swr:rpe_postoutcome``, and
-``swr_x_reward_belief_mean_candidate_arm_preoutcome``)
-resolve to their **source atoms** through :data:`DERIVED_COVARIATE_SOURCES`; the
-mapping is explicit because product spelling is not an information-time model, so
-the completeness test asserts every ladder predictor resolves into
-:data:`KNOWN_ATOMS`.
+Derived and interaction columns resolve to their **source atoms**. A product
+column (the canonical current-arm belief-update product,
+``swr_x_reward_belief_mean_candidate_arm_preoutcome``) resolves to the source of
+each factor declared for it in
+:data:`~.covariates.interactions.INTERACTION_FACTORS`; a patsy interaction
+(``is_swr:rpe_postoutcome``) to the sources of its operands; any other derived
+column through :data:`DERIVED_COVARIATE_SOURCES`. Both mappings are explicit
+because product spelling is not an information-time model, so the completeness
+test asserts every ladder predictor resolves into :data:`KNOWN_ATOMS`.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ from .covariates.definitions import (
     POST_CHOICE_COVARIATES,
     Availability,
 )
+from .covariates.interactions import INTERACTION_FACTORS, factor_source
 from .model_specs import N_REWARD_LAGS
 
 # Timing classification is derived from the scientific definition catalog so a
@@ -76,7 +79,9 @@ ABSOLUTE_SESSION_CLOCKS = frozenset(
     if definition.units == ABSOLUTE_SECONDS_UNITS
 )
 
-DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covariate atom(s)
+# Derived, pre-materialized column -> source covariate atom(s). Interaction
+# products are not listed: their factors are declared in INTERACTION_FACTORS.
+DERIVED_COVARIATE_SOURCES = {
     # Stop-local summaries. Omission streak is a deterministic reduction of the
     # causal reward-lag vector. WSLS uses the eventual outbound choice and is
     # therefore future-referencing even after the current outcome is known.
@@ -110,101 +115,16 @@ DERIVED_COVARIATE_SOURCES = {  # derived/pre-materialized column -> source covar
     "replay_fraction": ["replay_fraction"],
     "replay_fraction_swr": ["replay_fraction_swr"],
     "replay_fraction_non_swr": ["replay_fraction_non_swr"],
-    # Content products: each name exposes every canonical factor.
-    "rpe_postoutcome_z_x_is_current_arm": ["rpe_postoutcome"],
-    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm": [
-        "relative_value_switch_minus_stay_preoutcome"
-    ],
-    "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm": [
-        "reward_belief_differential_entropy_leaf_mean_preoutcome"
-    ],
-    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm": [
-        "reward_belief_mean_update_l1_all_ports_postoutcome"
-    ],
-    "periswitch_index_trials_z_x_is_current_arm": ["periswitch_index_trials"],
-    "is_periswitch_post_x_is_current_arm": ["is_periswitch_post"],
-    "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm": [
-        "periswitch_index_trials",
-        "is_periswitch_post",
-    ],
-    "trials_since_block_change_z_x_is_current_arm": ["trials_since_block_change"],
-    "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm": [
-        "patch_switch_fraction_last5_completed_trips"
-    ],
-    "log1p_time_since_stop_start_s_z_x_is_current_arm": [
-        "time_since_stop_start_s",
-        "is_current_arm",
-    ],
-    # Event-length control: z(log n_nonlocal_bins) crossed with the arm/patch
-    # indicator it modulates. Both factors are exposed so neither hides.
-    "log_n_nonlocal_bins_z_x_is_current_arm": [
-        "n_nonlocal_bins",
-        "is_current_arm",
-    ],
-    "log_n_nonlocal_bins_z_x_is_prev_arm": [
-        "n_nonlocal_bins",
-        "is_prev_arm",
-    ],
-    # pre-materialized swr_x_* columns used directly in the CS-rungs (model_specs.py)
-    "swr_x_is_current_arm": ["is_current_arm"],
-    "swr_x_is_prev_arm": ["is_prev_arm"],
-    "swr_x_is_next_arm": ["is_next_arm"],  # FUTURE_REFERENCING
-    "swr_x_is_last_rewarded_arm": ["is_last_rewarded_arm"],
-    "swr_x_is_last_rewarded_noncurrent_arm": ["is_last_rewarded_noncurrent_arm"],
-    "swr_x_reward_fraction_candidate_arm_last10_visits": [
-        "reward_fraction_candidate_arm_last10_visits"
-    ],
-    "swr_x_visit_recency_trials_event_leaf_centered": [
-        "visit_recency_trials_event_leaf_centered"
-    ],
-    "swr_x_visit_recency_trials_event_leaf_centered_spline_1": [
-        "visit_recency_trials_event_leaf_centered_spline_1"
-    ],
-    "swr_x_visit_recency_trials_event_leaf_centered_spline_2": [
-        "visit_recency_trials_event_leaf_centered_spline_2"
-    ],
-    "swr_x_visit_recency_trials_event_leaf_centered_spline_3": [
-        "visit_recency_trials_event_leaf_centered_spline_3"
-    ],
-    "swr_x_is_candidate_arm_never_visited": ["is_candidate_arm_never_visited"],
-    "swr_x_reward_belief_mean_candidate_arm_preoutcome": [
-        "reward_belief_mean_candidate_arm_preoutcome"
-    ],
     # Beta belief variance is qvals-dependent and standardized on leaf support;
     # the raw variance has SD ~0.02, much smaller than the belief mean.
     "reward_belief_variance_candidate_arm_preoutcome_z": [
         "reward_belief_variance_candidate_arm_preoutcome"
     ],
-    "swr_x_reward_belief_variance_candidate_arm_preoutcome": [
-        "reward_belief_variance_candidate_arm_preoutcome"
-    ],
-    "swr_x_reward_belief_variance_candidate_arm_preoutcome_z": [
-        "reward_belief_variance_candidate_arm_preoutcome"
-    ],
-    # patch-cohort pre-materialized interactions (content patch ladder)
-    "swr_x_is_current_patch": ["is_current_patch"],
-    "swr_x_is_last_rewarded_noncurrent_patch": ["is_last_rewarded_noncurrent_patch"],
-    "swr_x_is_prev_patch": ["is_prev_patch"],
-    "periswitch_index_trials_z_x_is_current_patch": ["periswitch_index_trials"],
-    "log1p_time_since_stop_start_s_z_x_is_current_patch": [
-        "time_since_stop_start_s",
-        "is_current_patch",
-    ],
-    "log_n_nonlocal_bins_z_x_is_current_patch": [
-        "n_nonlocal_bins",
-        "is_current_patch",
-    ],
-    "log_n_nonlocal_bins_z_x_is_prev_patch": [
-        "n_nonlocal_bins",
-        "is_prev_patch",
-    ],
-    "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch": [
-        "patch_switch_fraction_last5_completed_trips"
-    ],
 }
 
 # Universe every source atom must fall in. Derived columns resolve to these
-# atoms through ``DERIVED_COVARIATE_SOURCES`` before enforcement.
+# atoms through ``DERIVED_COVARIATE_SOURCES`` (products through their declared
+# factors) before enforcement.
 KNOWN_ATOMS = frozenset(COVARIATE_DEFINITIONS)
 
 # Load-bearing consistency check (keeps PRE_OUTCOME_SAFE from silently rotting):
@@ -218,22 +138,33 @@ assert (PRE_OUTCOME_SAFE | POST_OUTCOME | FUTURE_REFERENCING) == KNOWN_ATOMS, (
 )
 
 
+def _column_sources(column: str) -> list[str]:
+    """Source atoms of one design column: a product's factors', else its own."""
+    if column in INTERACTION_FACTORS:
+        return [
+            factor_source(factor)
+            for factor in INTERACTION_FACTORS[column]
+            if factor not in SAFE_MODIFIERS
+        ]
+    return list(DERIVED_COVARIATE_SOURCES.get(column, [column]))
+
+
 def timing_of(predictor: str) -> list[str]:
-    """Resolve a predictor (plain, patsy interaction, or pre-materialized ``swr_x_*``) to
+    """Resolve a predictor (plain, patsy interaction, or pre-materialized product) to
     its source atoms.
 
     Splits ALL ``:`` operands (not just the first), drops safe gating modifiers, and
-    expands each remaining operand through :data:`DERIVED_COVARIATE_SOURCES` so a
-    post-outcome operand can't hide behind a safe left operand
+    expands each remaining operand -- a declared product through the sources of
+    its factors (:data:`~.covariates.interactions.INTERACTION_FACTORS`), any
+    other column through :data:`DERIVED_COVARIATE_SOURCES` -- so a post-outcome
+    operand can't hide behind a safe left operand
     (``is_swr:rpe -> ['rpe_postoutcome']``, not ``['is_swr']``).
     """
-    if predictor in DERIVED_COVARIATE_SOURCES:
-        return list(DERIVED_COVARIATE_SOURCES[predictor])
     atoms: list[str] = []
     for op in predictor.split(":"):
         if op in SAFE_MODIFIERS:
             continue
-        atoms.extend(DERIVED_COVARIATE_SOURCES.get(op, [op]))
+        atoms.extend(_column_sources(op))
     return atoms
 
 

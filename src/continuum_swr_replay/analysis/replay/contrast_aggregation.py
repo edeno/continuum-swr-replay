@@ -68,6 +68,11 @@ from ._fit_diagnostics import SEPARATION_COEF_ABS
 from ._helpers import add_arm_fixed_effects
 from .cohort_audit import HAS_QVALS_ROW, qvals_gap_event_ids
 from .covariates.history.value_uncertainty import validate_uncertainty_inputs
+from .covariates.interactions import (
+    LOG1P_STOP_TIME,
+    LOG_EVENT_LENGTH,
+    attach_interactions,
+)
 from .fitting import parse_unidentified_terms
 from .model_specs import LEAF_ONLY_N_CATEGORIES, REWARD_HISTORY_COLUMNS
 
@@ -751,8 +756,9 @@ _FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
 # trajectory visits more arms, so ``swr_x_is_current_arm`` partly reads "longer
 # events leave the current arm" unless event length is in the design. The control
 # is z(log n_nonlocal_bins) crossed with the indicator it modulates.
-LOG_EVENT_LENGTH = "log_n_nonlocal_bins"
-_LOG1P_STOP_TIME = "log1p_time_since_stop_start_s"
+# ``LOG_EVENT_LENGTH`` and the within-stop-time ``LOG1P_STOP_TIME`` are declared
+# with the products they enter, in ``covariates.interactions``.
+_LOG1P_STOP_TIME = LOG1P_STOP_TIME
 
 _ARM_Z_SOURCES = (*_ZSCALARS, _LOG1P_STOP_TIME, LOG_EVENT_LENGTH)
 _PATCH_Z_SOURCES = (
@@ -760,6 +766,33 @@ _PATCH_Z_SOURCES = (
     "patch_switch_fraction_last5_completed_trips",
     _LOG1P_STOP_TIME,
     LOG_EVENT_LENGTH,
+)
+
+# The interaction products each cohort's design carries, in build order. What
+# each one multiplies is declared once, in ``covariates.interactions``.
+_ARM_INTERACTIONS = (
+    "rpe_postoutcome_z_x_is_current_arm",
+    "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+    "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
+    "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+    "periswitch_index_trials_z_x_is_current_arm",
+    "is_periswitch_post_x_is_current_arm",
+    "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
+    "trials_since_block_change_z_x_is_current_arm",
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_arm",
+    "log1p_time_since_stop_start_s_z_x_is_current_arm",
+    "log_n_nonlocal_bins_z_x_is_current_arm",
+    "log_n_nonlocal_bins_z_x_is_prev_arm",
+    "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+)
+_PATCH_INTERACTIONS = (
+    "periswitch_index_trials_z_x_is_current_patch",
+    "log1p_time_since_stop_start_s_z_x_is_current_patch",
+    "log_n_nonlocal_bins_z_x_is_current_patch",
+    "log_n_nonlocal_bins_z_x_is_prev_patch",
+    "patch_switch_fraction_last5_completed_trips_z_x_is_current_patch",
+    "swr_x_is_current_patch",
 )
 
 # Current outcome strata. Rewarded and omitted events differ in their SWR share, so
@@ -1082,52 +1115,7 @@ def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     ev[_LOG1P_STOP_TIME] = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
     _attach_log_event_length(ev)
     ev, z_reference = _standardize(ev, _ARM_Z_SOURCES)
-    cur = ev["is_current_arm"].to_numpy(dtype=float)
-    prev = ev["is_prev_arm"].to_numpy(dtype=float)
-    swr = ev["is_swr"].to_numpy(dtype=float)
-    # State-modulation interactions spell out both canonical factors.
-    ev["rpe_postoutcome_z_x_is_current_arm"] = cur * ev["rpe_postoutcome_z"]
-    ev["relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm"] = (
-        cur * ev["relative_value_switch_minus_stay_preoutcome_z"]
-    )
-    ev["reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm"] = (
-        cur * ev["reward_belief_differential_entropy_leaf_mean_preoutcome_z"]
-    )
-    ev["reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm"] = (
-        cur * ev["reward_belief_mean_update_l1_all_ports_postoutcome_z"]
-    )
-    # context interactions
-    ev["periswitch_index_trials_z_x_is_current_arm"] = (
-        cur * ev["periswitch_index_trials_z"]
-    )
-    ev["is_periswitch_post_x_is_current_arm"] = cur * ev["is_periswitch_post"].to_numpy(
-        dtype=float
-    )
-    ev["periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm"] = (
-        cur
-        * ev["periswitch_index_trials_z"]
-        * ev["is_periswitch_post"].to_numpy(dtype=float)
-    )
-    ev["trials_since_block_change_z_x_is_current_arm"] = (
-        cur * ev["trials_since_block_change_z"]
-    )
-    ev["patch_switch_fraction_last5_completed_trips_z_x_is_current_arm"] = (
-        cur * ev["patch_switch_fraction_last5_completed_trips_z"]
-    )
-    # within-stop-time duration control (z(log1p t) : is_current)
-    ev["log1p_time_since_stop_start_s_z_x_is_current_arm"] = (
-        cur * ev[f"{_LOG1P_STOP_TIME}_z"]
-    )
-    # event-length control (z(log n bins) : is_current / : is_prev)
-    ev["log_n_nonlocal_bins_z_x_is_current_arm"] = cur * ev[f"{LOG_EVENT_LENGTH}_z"]
-    ev["log_n_nonlocal_bins_z_x_is_prev_arm"] = prev * ev[f"{LOG_EVENT_LENGTH}_z"]
-    # SWR interactions inherit the canonical base-covariate spelling.
-    ev["swr_x_reward_belief_mean_candidate_arm_preoutcome"] = swr * ev[
-        "reward_belief_mean_candidate_arm_preoutcome"
-    ].to_numpy(dtype=float)
-    ev["swr_x_reward_belief_variance_candidate_arm_preoutcome_z"] = swr * ev[
-        "reward_belief_variance_candidate_arm_preoutcome_z"
-    ].to_numpy(dtype=float)
+    attach_interactions(ev, _ARM_INTERACTIONS)
     return ev, z_reference
 
 
@@ -1203,22 +1191,7 @@ def _attach_patch_design_columns(pt: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     pt[_LOG1P_STOP_TIME] = np.log1p(pt["time_since_stop_start_s"].to_numpy(dtype=float))
     _attach_log_event_length(pt)
     pt, z_reference = _standardize(pt, _PATCH_Z_SOURCES)
-    cp = pt["is_current_patch"].to_numpy(float)
-    pp = pt["is_prev_patch"].to_numpy(float)
-    swr = pt["is_swr"].to_numpy(float)
-    pt["periswitch_index_trials_z_x_is_current_patch"] = (
-        cp * pt["periswitch_index_trials_z"]
-    )
-    # Patch analogues of the arm within-stop-time and event-length controls.
-    pt["log1p_time_since_stop_start_s_z_x_is_current_patch"] = (
-        cp * pt[f"{_LOG1P_STOP_TIME}_z"]
-    )
-    pt["log_n_nonlocal_bins_z_x_is_current_patch"] = cp * pt[f"{LOG_EVENT_LENGTH}_z"]
-    pt["log_n_nonlocal_bins_z_x_is_prev_patch"] = pp * pt[f"{LOG_EVENT_LENGTH}_z"]
-    pt["patch_switch_fraction_last5_completed_trips_z_x_is_current_patch"] = (
-        cp * pt["patch_switch_fraction_last5_completed_trips_z"]
-    )
-    pt["swr_x_is_current_patch"] = swr * cp
+    attach_interactions(pt, _PATCH_INTERACTIONS)
     return pt, z_reference
 
 
