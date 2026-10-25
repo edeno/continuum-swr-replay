@@ -232,15 +232,42 @@ def event_drop_reasons(
     -------
     ndarray of object, shape (n_events,)
         A :class:`DropReason` value per dropped event, None per kept one.
+
+    Raises
+    ------
+    ValueError
+        As ``filter_event_intervals_by_speed``: `speed_threshold` not finite
+        and positive; `time` and `speed` not one-dimensional or of unequal
+        length; `time` not finite or not strictly increasing; an event bound
+        not finite, or an event ending before it starts.
     """
+    threshold = float(speed_threshold)
+    if not np.isfinite(threshold) or threshold <= 0:
+        raise ValueError(
+            f"speed_threshold must be finite and positive, got {speed_threshold!r}"
+        )
     time = np.asarray(time, dtype=np.float64)
     values = np.asarray(speed, dtype=np.float64)
+    if time.ndim != 1 or values.ndim != 1:
+        raise ValueError("time and speed must be one-dimensional")
+    if len(time) != len(values):
+        raise ValueError(
+            f"time and speed must have equal length, got {len(time)} and {len(values)}"
+        )
+    if not np.isfinite(time).all():
+        raise ValueError("time must contain only finite values")
+    if not (np.diff(time) > 0).all():
+        raise ValueError("time must be strictly increasing")
     starts = events["start_time"].to_numpy(dtype=np.float64)
     ends = events["end_time"].to_numpy(dtype=np.float64)
+    if not (np.isfinite(starts).all() and np.isfinite(ends).all()):
+        raise ValueError("event start_time and end_time must be finite")
+    if (ends < starts).any():
+        raise ValueError("event end_time must be greater than or equal to start_time")
     first = np.searchsorted(time, starts, side="left")
     stop = np.searchsorted(time, ends, side="right")
     finite = np.isfinite(values)
-    fast = finite & (values >= speed_threshold)
+    fast = finite & (values >= threshold)
 
     def _in_event(flags: NDArray[np.bool_]) -> NDArray[np.int64]:
         cumulative = np.concatenate([[0], np.cumsum(flags, dtype=np.int64)])

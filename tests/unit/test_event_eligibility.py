@@ -437,3 +437,84 @@ class TestTheSpeedRuleMatchesTheLoop:
         new, old = self._both(events, speed)
         assert new == old
         assert {"moving", "speed_unknown", "no_speed_sample", None} <= set(new)
+
+
+class TestMalformedInputsAreRefused:
+    """Each input the loop refused is still refused, with its ValueError."""
+
+    TIME = np.arange(0.0, 1.0, 0.1)
+
+    def _call(self, events=((0.2, 0.4),), speed=None, time=None, threshold=4.0):
+        time = self.TIME if time is None else time
+        speed = np.zeros(len(time)) if speed is None else speed
+        return event_drop_reasons(
+            pd.DataFrame(list(events), columns=["start_time", "end_time"]),
+            speed=speed,
+            time=time,
+            artifacts=NO_MASK,
+            speed_threshold=threshold,
+        )
+
+    def test_well_formed_inputs_are_read(self):
+        assert self._call().tolist() == [None]
+
+    @pytest.mark.parametrize("threshold", [0.0, -1.0, np.nan, np.inf])
+    def test_a_threshold_not_finite_and_positive(self, threshold):
+        with pytest.raises(ValueError, match="finite and positive"):
+            self._call(threshold=threshold)
+
+    def test_arrays_not_one_dimensional(self):
+        with pytest.raises(ValueError, match="one-dimensional"):
+            self._call(speed=np.zeros((len(self.TIME), 1)))
+
+    def test_arrays_of_unequal_length(self):
+        with pytest.raises(ValueError, match="equal length"):
+            self._call(speed=np.zeros(len(self.TIME) - 1))
+
+    def test_time_not_finite(self):
+        time = self.TIME.copy()
+        time[3] = np.nan
+        with pytest.raises(ValueError, match="only finite values"):
+            self._call(time=time)
+
+    @pytest.mark.parametrize("time", [[0.0, 0.1, 0.1, 0.3], [0.0, 0.2, 0.1, 0.3]])
+    def test_time_not_strictly_increasing(self, time):
+        with pytest.raises(ValueError, match="strictly increasing"):
+            self._call(time=np.asarray(time))
+
+    @pytest.mark.parametrize(
+        "event", [(np.nan, 0.4), (0.2, np.nan), (0.2, np.inf), (-np.inf, 0.4)]
+    )
+    def test_a_bound_not_finite(self, event):
+        with pytest.raises(ValueError, match="must be finite"):
+            self._call(events=[event])
+
+    def test_an_event_ending_before_it_starts(self):
+        with pytest.raises(ValueError, match="greater than or equal"):
+            self._call(events=[(0.2, 0.4), (0.5, 0.45)])
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"threshold": 0.0},
+            {"speed": np.zeros(9)},
+            {"time": np.array([0.0, 0.1, 0.1, 0.3]), "speed": np.zeros(4)},
+            {"events": [(0.5, 0.45)]},
+            {"events": [(np.nan, 0.4)]},
+        ],
+    )
+    def test_the_frozen_loop_refused_the_same_inputs(self, kwargs):
+        events = kwargs.pop("events", ((0.2, 0.4),))
+        time = kwargs.pop("time", self.TIME)
+        speed = kwargs.pop("speed", np.zeros(len(time)))
+        threshold = kwargs.pop("threshold", 4.0)
+        frame = pd.DataFrame(list(events), columns=["start_time", "end_time"])
+        for function in (event_drop_reasons, _frozen_event_drop_reasons):
+            with pytest.raises(ValueError):
+                function(
+                    frame,
+                    speed=speed,
+                    time=time,
+                    artifacts=NO_MASK,
+                    speed_threshold=threshold,
+                )
