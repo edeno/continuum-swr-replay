@@ -13,7 +13,7 @@ set -euo pipefail
 
 REPO="LorenFrankLab/SpatialBanditTask"
 COMMIT="96dfed1b7efbce1c2d478968396f729b0e437a85"   # pinned 2026-06-28
-DEST="${PROCESSED_DATA_DIR:-Processed-Data}/spatial_bandit_behavior"
+DEST="${CSR_PROCESSED_DATA_DIR:-Processed-Data}/spatial_bandit_behavior"
 BASE="https://raw.githubusercontent.com/${REPO}/${COMMIT}"
 
 mkdir -p "$DEST"

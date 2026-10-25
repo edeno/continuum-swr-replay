@@ -26,23 +26,19 @@ from __future__ import annotations
 
 import argparse
 import logging
-import sys
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-
-from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
+from continuum_swr_replay.analysis.events.analysed_time import (
     require_swr_source,
 )
-from continuum_swr_replay.analysis.events.swr_source import (  # noqa: E402
+from continuum_swr_replay.analysis.events.swr_source import (
     swr_source_name,
 )
-from continuum_swr_replay.analysis.replay import (  # noqa: E402
+from continuum_swr_replay.analysis.replay import (
     BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
@@ -54,12 +50,12 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
-from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
 )
 from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
-from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
+from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table
