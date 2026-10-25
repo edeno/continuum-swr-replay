@@ -1,13 +1,12 @@
 """Data loading module for the spatial bandit task.
 
 Loader functions (``load_data``, ``get_epoch_info``,
-``get_training_timepoints``, ``get_labels``) live in submodules that
-import ``spyglass.common`` at module top level, which opens a
-DataJoint connection. We expose them here via PEP 562 ``__getattr__``
-so that callers who only need the leaf-level constants
-(``TRACK_SEGMENT_TO_PATCH`` etc., consumed by analysis modules) can
-import this package without paying that cost — and without hanging
-on a machine that has no DataJoint reachable.
+``get_training_timepoints``, ``get_labels``) are exposed here via PEP 562
+``__getattr__``, so callers who only need the leaf-level constants
+(``TRACK_SEGMENT_TO_PATCH`` etc., consumed by analysis modules) import
+this package without importing the loader modules. The loaders import
+Spyglass, which opens a DataJoint connection, only inside the functions
+that read through it, so importing a loader module needs no database.
 """
 
 from __future__ import annotations

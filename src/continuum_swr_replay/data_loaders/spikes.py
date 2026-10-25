@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import itertools
 import logging
-import warnings
 
 import numpy as np
 import pandas as pd
@@ -59,13 +58,9 @@ from numpy.typing import NDArray
 # pure helpers (``detect_coincident_spikes``, ``filter_spike_times``)
 # stay offline-importable for unit tests on machines without VPN.
 from ..data_types import SpikeDataDict
+from .utils import quiet_spyglass
 
 logger = logging.getLogger(__name__)
-
-# Ignore warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
-warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
-warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
 
 
 class AreaNotRecordedError(ValueError):
@@ -182,6 +177,8 @@ def get_electrode_group_info(nwb_file_name: str) -> pd.DataFrame:
     from spyglass.common import Nwbfile
     from spyglass.utils.nwb_helper_fn import get_nwb_file
 
+    quiet_spyglass()
+
     nwb_file_abspath = Nwbfile.get_abs_path(nwb_file_name)
     nwb_file = get_nwb_file(nwb_file_abspath)
     electrode_group_df = []
@@ -247,6 +244,8 @@ def _get_tetrode_sort_group_ids(
     from spyglass.decoding.v0.clusterless import UnitMarks
     from spyglass.spikesorting.v0 import SortGroup
 
+    quiet_spyglass()
+
     unit_mark_keys = pd.DataFrame(
         (UnitMarks & restriction).fetch("sort_group_id", as_dict=True)
     )
@@ -303,6 +302,8 @@ def get_hpc_marks(
 
     """
     from spyglass.decoding.v0.clusterless import UnitMarks
+
+    quiet_spyglass()
 
     # Base restriction shared by both parameter options
     restriction_base = {
@@ -388,6 +389,8 @@ def get_pfc_spike_times(
 
     """
     from spyglass.spikesorting.v0 import CuratedSpikeSorting, SortGroup
+
+    quiet_spyglass()
 
     restriction = {
         "nwb_file_name": nwb_file_name,

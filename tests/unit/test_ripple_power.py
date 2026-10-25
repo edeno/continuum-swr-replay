@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import sys
-import types
 
 import numpy as np
 import pandas as pd
@@ -274,19 +272,9 @@ class TestTheLoader:
 
 
 @pytest.fixture
-def bandit_task(monkeypatch):
-    """``bandit_task``, imported offline with ``spyglass.common`` stubbed, as
-    ``test_multiunit_hse.py`` imports it."""
-    common = types.ModuleType("spyglass.common")
-    common.PositionIntervalMap = type("PositionIntervalMap", (), {})
-    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
-    monkeypatch.setitem(sys.modules, "spyglass.common", common)
-    name = "continuum_swr_replay.data_loaders.bandit_task"
-    fresh = name not in sys.modules
-    yield importlib.import_module(name)
-    if fresh:
-        sys.modules.pop(name, None)
-        vars(sys.modules["continuum_swr_replay.data_loaders"]).pop("bandit_task", None)
+def bandit_task():
+    """``data_loaders.bandit_task``; it imports Spyglass only inside its loaders."""
+    return importlib.import_module("continuum_swr_replay.data_loaders.bandit_task")
 
 
 @pytest.mark.parametrize("given", [True, False])

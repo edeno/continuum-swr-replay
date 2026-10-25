@@ -60,7 +60,6 @@ Examples
 
 """
 
-import warnings
 from collections.abc import Iterable, Mapping
 
 import numpy as np
@@ -92,6 +91,7 @@ from ..parameters import (
     HSE_MINIMUM_DURATION_SEC,
     HSE_ZSCORE_THRESHOLD,
 )
+from .utils import quiet_spyglass
 
 KAY_SMOOTHING_SIGMA_S = 0.004
 """The Kay consensus's Gaussian smoothing, in seconds: the SWR runner's
@@ -102,11 +102,6 @@ KAY_MINIMUM_DURATION_S = 0.015
 """Kay's minimum event duration, in seconds: a gap-free block shorter than this
 is missing to the detector (``DETECTOR_SETTINGS["kay"]["minimum_duration"]``,
 held equal by the same test)."""
-
-# Ignore warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
-warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
-warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
 
 
 def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
@@ -129,6 +124,8 @@ def get_theta(nwb_file_name: str, epoch_name: str) -> ThetaData:
 
     """
     from spyglass.lfp.analysis.v1.lfp_band import LFPBandV1
+
+    quiet_spyglass()
 
     theta_lfp_key = {
         "nwb_file_name": nwb_file_name,
@@ -219,6 +216,8 @@ def get_ripple(
     from spyglass.lfp.lfp_merge import LFPOutput
     from spyglass.ripple.v1 import RippleTimesV1
 
+    quiet_spyglass()
+
     # Ripples. The Kay detector's parameter set, "default", is the only one.
     if ripple_detector_name != "Kay":
         raise ValueError("Invalid ripple detector name")
@@ -293,6 +292,8 @@ def ripple_band_electrode_ids(nwb_file_name: str, epoch_name: str) -> NDArray[np
     NDArray of int, shape (n_channels,)
     """
     from spyglass.lfp.analysis.v1.lfp_band import LFPBandSelection, LFPBandV1
+
+    quiet_spyglass()
 
     _, lfp_band_restriction = _ripple_keys(nwb_file_name, epoch_name)
     band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")
@@ -488,6 +489,8 @@ def get_spyglass_kay_inputs(
 
     from .position import get_merge_position_info
 
+    quiet_spyglass()
+
     ripple_key, _ = _ripple_keys(nwb_file_name, epoch_name)
     key = (RippleTimesV1 & ripple_key).fetch1("KEY")
     ripple_param_dict: dict = (
@@ -613,6 +616,8 @@ def get_ripple_band_inputs(nwb_file_name: str, epoch_name: str) -> RippleBandInp
     from spyglass.lfp.lfp_merge import LFPOutput
     from spyglass.ripple.v1 import RippleLFPSelection
     from spyglass.utils.nwb_helper_fn import get_electrode_indices
+
+    quiet_spyglass()
 
     ripple_key, lfp_band_restriction = _ripple_keys(nwb_file_name, epoch_name)
     band_key = (LFPBandV1 & lfp_band_restriction).fetch1("KEY")

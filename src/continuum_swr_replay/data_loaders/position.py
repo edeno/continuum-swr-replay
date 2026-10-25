@@ -29,7 +29,6 @@ trials : Trial construction that depends on position data
 from __future__ import annotations
 
 import logging
-import warnings
 
 import networkx as nx
 import numpy as np
@@ -39,13 +38,9 @@ from track_linearization import get_linearized_position
 
 from ..data_types import PositionInfoDict
 from .constants import TRACK_SEGMENT_TO_PATCH
+from .utils import quiet_spyglass
 
 logger = logging.getLogger(__name__)
-
-# Ignore warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
-warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
-warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
 
 
 def get_interpolated_position_info(
@@ -246,6 +241,8 @@ def get_position_info(
     )
     from spyglass.position import PositionOutput
 
+    quiet_spyglass()
+
     position_key = {
         "nwb_file_name": nwb_file_name,
         "interval_list_name": pos_name,
@@ -374,6 +371,8 @@ def get_merge_position_info(pos_merge_id: str) -> pd.DataFrame:
     """
     from spyglass.position import PositionOutput
 
+    quiet_spyglass()
+
     output = PositionOutput()
     restriction = {"merge_id": pos_merge_id}
     source = (output & restriction).fetch1("source")
@@ -406,6 +405,8 @@ def get_epoch_position_info(nwb_file_name: str, epoch_name: str) -> PositionInfo
 
     """
     from spyglass.common import PositionIntervalMap
+
+    quiet_spyglass()
 
     position_interval_name = (
         PositionIntervalMap

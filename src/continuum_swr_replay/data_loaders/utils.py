@@ -30,7 +30,8 @@ Features
 Notes
 -----
 - All database queries use Spyglass DataJoint tables (Session, IntervalList, etc.)
-- Warning filters suppress verbose pynwb/hdmf/datajoint logging
+- ``quiet_spyglass`` hides pynwb/hdmf/datajoint warnings and Spyglass logging;
+  every Spyglass-reading loader calls it once it has imported Spyglass
 - Cached results persist for the entire Python session
 - Time indices are always in seconds
 
@@ -55,6 +56,7 @@ Examples
 
 from __future__ import annotations
 
+import logging
 import warnings
 from functools import cache
 from typing import TYPE_CHECKING
@@ -81,10 +83,23 @@ from .constants import (
     REGULAR_SESSION_DESCRIPTION,
 )
 
-# Ignore warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
-warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
-warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
+
+@cache
+def quiet_spyglass() -> None:
+    """Hide pynwb, hdmf and DataJoint UserWarnings and Spyglass logging below ERROR.
+
+    Every loader that reads through Spyglass calls this right after it imports
+    Spyglass, so a process is quieted when it first reads, not when a loader
+    module is imported. It runs once per process; later calls return at once.
+
+    Call it only after a Spyglass import: the first import of any Spyglass
+    module runs ``spyglass.utils.logging``, which sets the ``spyglass`` logger's
+    level from DataJoint's ``loglevel`` and would undo a level set before it.
+    """
+    for module in ("pynwb", "hdmf", "datajoint"):
+        warnings.filterwarnings("ignore", category=UserWarning, module=module)
+    logging.getLogger("spyglass.utils").setLevel(logging.ERROR)
+    logging.getLogger("spyglass").setLevel(logging.ERROR)
 
 
 def session_restriction() -> list[dict[str, str]]:
@@ -144,6 +159,8 @@ def get_epoch_info() -> pd.DataFrame:
     # at import time, which we don't want to incur for callers that
     # only need ``get_labels`` / constants from this module.
     from spyglass.common import IntervalList, PositionIntervalMap, Session
+
+    quiet_spyglass()
 
     epoch_info = (
         pd.DataFrame((Session & session_restriction()) * PositionIntervalMap)

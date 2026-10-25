@@ -7,8 +7,6 @@ and the artifact intervals ``load_data`` passes it, with Spyglass stubbed.
 from __future__ import annotations
 
 import importlib
-import sys
-import types
 
 import numpy as np
 import pandas as pd
@@ -331,20 +329,9 @@ class TestArtifactIntervals:
 
 
 @pytest.fixture
-def bandit_task(monkeypatch):
-    """``bandit_task``, imported offline with ``spyglass.common`` stubbed, as
-    ``test_position.py`` imports it; forgotten afterwards if imported here."""
-    common = types.ModuleType("spyglass.common")
-    common.PositionIntervalMap = type("PositionIntervalMap", (), {})
-    monkeypatch.setitem(sys.modules, "spyglass", types.ModuleType("spyglass"))
-    monkeypatch.setitem(sys.modules, "spyglass.common", common)
-
-    name = "continuum_swr_replay.data_loaders.bandit_task"
-    fresh = name not in sys.modules
-    yield importlib.import_module(name)
-    if fresh:
-        sys.modules.pop(name, None)
-        vars(sys.modules["continuum_swr_replay.data_loaders"]).pop("bandit_task", None)
+def bandit_task():
+    """``data_loaders.bandit_task``; it imports Spyglass only inside its loaders."""
+    return importlib.import_module("continuum_swr_replay.data_loaders.bandit_task")
 
 
 def test_load_data_masks_the_mua_of_the_areas_it_is_given(bandit_task, monkeypatch):

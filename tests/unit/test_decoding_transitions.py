@@ -8,9 +8,8 @@ and, for the ContFrag classifier, the values C0 constructed. C0 is commit
 ``de15650``, the decode code just before this pin. The last tests pin which
 class decodes each brain area (``decoding.config``).
 
-Offline: both decoder scripts import ``bandit_task``, which imports Spyglass at
-import time, so they are imported with ``spyglass`` stubbed, as
-``test_decoding_save_dir.py`` does. No detector is fitted (``estimate_parameters``
+Offline: both decoder scripts are imported with ``spyglass`` stubbed, as
+``test_decoding_save_dir.py`` does, so nothing they import reaches the database. No detector is fitted (``estimate_parameters``
 is replaced), nothing reads ``Processed-Data`` and nothing is written.
 """
 

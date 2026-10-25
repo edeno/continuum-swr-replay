@@ -24,6 +24,7 @@ from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.data_loaders.trial_clocks import (
     outcome_known_time_from_task_visit,
 )
+from continuum_swr_replay.data_loaders.utils import quiet_spyglass
 from continuum_swr_replay.paths import (
     QVALS_STANDARDIZATION_REFERENCE,
     REPLAY_CONTENT_DIR,
@@ -43,9 +44,6 @@ from continuum_swr_replay.tables.standardization import (
 )
 
 from ._spatial_bandit_rl import make_full_beta_bernoulli_dv_df
-
-# the vendored DV pipeline inserts many columns one-by-one (Alison's style)
-warnings.filterwarnings("ignore", category=pd.errors.PerformanceWarning)
 
 RC = REPLAY_CONTENT_DIR
 # stop_table uses lowercase animal labels; BehaviorModel capitalizes Senor.
@@ -480,6 +478,8 @@ def _fetch_model_df(rl: Any, subject: str, key: dict) -> pd.DataFrame:
     from spyglass.common import AnalysisNwbfile
     from spyglass.utils.nwb_helper_fn import get_nwb_file
 
+    quiet_spyglass()
+
     sel = rl.BehaviorModelResults & {"subject_id": subject, **key}
     # Resolve the AnalysisNwbfile by hand rather than via ``fetch_nwb``. The
     # helper only exists on Spyglass mixin tables, and ``rl`` is a virtual
@@ -749,7 +749,10 @@ def _per_trial(animal: str, beh: Any, rl: Any) -> tuple[pd.DataFrame, list[str]]
     subject = ANIMAL_SUBJECT[animal]
     vals = _fetch_model_df(rl, subject, MODEL_KEY)
     _validate_trial_keys(vals, source="model", require_consecutive=False)
-    vals = make_full_beta_bernoulli_dv_df(vals)
+    with warnings.catch_warnings():
+        # the vendored DV pipeline inserts many columns one-by-one (Alison's style)
+        warnings.simplefilter("ignore", category=pd.errors.PerformanceWarning)
+        vals = make_full_beta_bernoulli_dv_df(vals)
     vals = add_experienced_value_columns(vals)  # q_chosen / arm / rpe
     vals = add_beta_belief_entropy(vals)  # beta_reward_entropy (from betadist_α/β)
     vals = canonicalize_behavior_model_columns(vals)

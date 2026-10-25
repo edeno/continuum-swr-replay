@@ -1,11 +1,11 @@
 """Regression tests for the lazy-import contract.
 
-The package's two top-level ``__init__.py`` files re-export functions
-from submodules that pull in ``spyglass.common`` at module top level
-(opening a DataJoint connection at import time). Those re-exports are
-lazy via PEP 562 ``__getattr__`` so that pure-analysis leaf imports
-(e.g. ``continuum_swr_replay.analysis.replay.fitting``) finish without
-touching Spyglass — keeping the offline test slice fast.
+The package's two top-level ``__init__.py`` files re-export loader
+functions lazily via PEP 562 ``__getattr__``, and the loaders import
+``spyglass`` (which opens a DataJoint connection at import time) only
+inside the functions that read through it, so that pure-analysis leaf
+imports (e.g. ``continuum_swr_replay.analysis.replay.fitting``) finish
+without touching Spyglass — keeping the offline test slice fast.
 
 A regression here would re-introduce the hang that
 ``timeout 8 uv run python -c "from continuum_swr_replay.analysis.replay.fitting import fit_conditional_poisson"``
@@ -96,6 +96,8 @@ _LAZY_IMPORTS: list[str] = [
     # offline-importable.
     "from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH",
     "from continuum_swr_replay.data_loaders import NWB_FILES",
+    # The loaders import Spyglass only inside the functions that read through it.
+    "from continuum_swr_replay.data_loaders import load_data",
     "from continuum_swr_replay.data_loaders.spikes import detect_coincident_spikes, filter_spike_times",
     "from continuum_swr_replay.data_loaders.lfp import get_multiunit, get_multiunit_hse, filter_ripple_lfp_time",
     "from continuum_swr_replay.data_loaders.events import convert_dio_events_to_start_stop_times",
@@ -156,9 +158,6 @@ _FOUNDATION_MODULES = sorted(
 #: Foundation modules the JAX-free check does not import, and why.
 NOT_JAX_FREE = {
     "decoding.transitions": "imports non_local_detector",
-    "data_loaders.bandit_task": (
-        "imports spyglass.common, which connects to DataJoint at import"
-    ),
 }
 
 # Leaf modules other packages import for a row key, a cohort rule, a column

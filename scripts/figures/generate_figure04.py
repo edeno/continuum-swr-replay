@@ -546,8 +546,6 @@ def generate_figure(
     results_hpc, _, _ = load_results(
         nwb_file_name, epoch_name, decoding_brain_area="HPC"
     )
-    # Imported here: data_loaders.load_data imports Spyglass, which opens a
-    # DataJoint connection, and the module must import on a host without one.
     from continuum_swr_replay.data_loaders import load_data
 
     # the ripple trace is the source's (the Kay consensus over R-T's tetrodes)

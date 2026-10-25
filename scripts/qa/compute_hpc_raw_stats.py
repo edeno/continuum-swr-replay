@@ -78,8 +78,6 @@ def _compute_one_session(
     epoch_name: str,
 ) -> dict[str, float]:
     """Compute all raw stats + transition matrix for one epoch."""
-    # Imported here, not at module top: ``bandit_task`` connects to the Spyglass
-    # database on import, and the session list is built without it.
     from continuum_swr_replay.data_loaders.bandit_task import load_data
 
     row: dict[str, float] = _nan_row()

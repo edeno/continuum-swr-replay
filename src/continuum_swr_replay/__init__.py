@@ -7,9 +7,9 @@ visualization utilities.
 The public re-exports below are loaded **lazily** via PEP 562
 ``__getattr__``. Importing a leaf module
 (e.g. ``continuum_swr_replay.analysis.replay.fitting``) used to drag in
-``data_loaders.bandit_task`` here, which itself does
+``data_loaders.bandit_task`` here, which then did
 ``from spyglass.common import PositionIntervalMap`` at module top level
-and opens a DataJoint connection at import time. That made every
+and so opened a DataJoint connection at import time. That made every
 "offline" unit test fragile against a missing VPN. Lazy loading keeps
 ``from continuum_swr_replay import load_data`` working while letting
 ``import continuum_swr_replay.analysis.replay.fitting`` finish without

@@ -27,20 +27,10 @@ get_training_timepoints : Select time points for decoder training
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
-
-# Unused here since get_epoch_position_info took over the lookup, but kept: it
-# imports Spyglass before the setLevel calls below, which Spyglass's first
-# import would otherwise undo (spyglass.utils.logging sets its logger's level).
-from spyglass.common import PositionIntervalMap  # noqa: F401
-
-# Suppress Spyglass warnings
-logging.getLogger("spyglass.utils").setLevel(logging.ERROR)
-logging.getLogger("spyglass").setLevel(logging.ERROR)
 
 if TYPE_CHECKING:
     import numpy as np

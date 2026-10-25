@@ -65,17 +65,11 @@ Examples
 
 """
 
-import warnings
-
 import numpy as np
 import pandas as pd
 
 from ..data_types import DIOEventData
-
-# Ignore warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="pynwb")
-warnings.filterwarnings("ignore", category=UserWarning, module="hdmf")
-warnings.filterwarnings("ignore", category=UserWarning, module="datajoint")
+from .utils import quiet_spyglass
 
 
 def convert_dio_events_to_start_stop_times(
@@ -166,6 +160,8 @@ def _load_dio_event_type(
     # like ``convert_dio_events_to_start_stop_times`` import cleanly
     # offline.
     from spyglass.common import DIOEvents
+
+    quiet_spyglass()
 
     events = {
         nwb_file["dio_event_name"]: pd.DataFrame(nwb_file["dio"].data)
