@@ -121,6 +121,7 @@ BINARY_TERMS = frozenset(
     {
         "is_current_arm",
         "swr_x_is_current_arm",
+        "is_last_rewarded_noncurrent_arm",
         "swr_x_is_prev_arm",
         "swr_x_is_last_rewarded_noncurrent_arm",
         "is_current_patch",
@@ -193,15 +194,85 @@ def load_per_sd_scale(provenance_path: str | Path, cohort: str) -> dict[str, flo
     return {cov: float(value) for cov, value in scale[cohort].items()}
 
 
+def load_fit_time_sd_reference(meta_path: str | Path) -> dict[str, float]:
+    """Per-SD units the rate contrast's audited table states its coefficients in.
+
+    ``scripts/rate/fit_swr_contrast_rate.py`` takes one SD per raw-scale rate
+    covariate over the stop cohort its per-session fits name (at-well for the
+    canonical bundle), aggregates with it, and records it in the run's meta
+    JSON. Readers must take the unit from there: the same covariates measured
+    over the full tables differ by up to ~7 %, which would restate every
+    per-SD rate effect in a unit the audited table does not use.
+
+    Parameters
+    ----------
+    meta_path : str or Path
+        The rate runner's meta JSON (``swr_contrast_rate_meta*.json``).
+
+    Returns
+    -------
+    dict of str to float
+        Covariate -> SD, ready to pass as ``aggregate_contrast``'s ``sd``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the meta record is absent.
+    KeyError
+        If it carries no ``fit_time_sd_reference`` -- the unit the audited
+        table's ``std_*`` columns are stated in is then unknown.
+    """
+    path = Path(meta_path)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} is required for the per-SD unit the rate fit's coefficients "
+            "are stated in; re-run the fitter (or its --aggregate-only path) to "
+            "write it."
+        )
+    reference = json.loads(path.read_text()).get("fit_time_sd_reference")
+    if not reference:
+        raise KeyError(
+            f"{path} records no fit_time_sd_reference, so the unit its audited "
+            "table is stated in is unknown; re-run the fitter rather than "
+            "recomputing an SD here."
+        )
+    return {cov: float(value) for cov, value in reference.items()}
+
+
 def std_factor(term: str, sd: dict) -> tuple[float, str]:
     """SD multiplier + unit label to convert a raw coef to standardized units.
 
-    Continuous predictor -> (SD of the predictor, "per_SD"); the term may be the bare
-    covariate, its ``swr_x_<cov>`` product, or its ``is_swr:<cov>`` product. Binary ->
-    (1.0, "per_category"). Reward-history basis feature -> (1.0, "per_unit"), checked
-    before the ``sd`` lookup so a pooled SD computed for some other purpose cannot
-    silently rescale a fraction-valued coefficient. A term whose covariate is not in
-    ``sd`` is assumed already z-scored at fit time -> (1.0, "per_SD").
+    Resolved in order:
+
+    1. Binary (:data:`BINARY_TERMS`) -> ``(1.0, "per_category")``.
+    2. Reward-history basis feature (:data:`PER_UNIT_TERMS`) ->
+       ``(1.0, "per_unit")``, checked before the ``sd`` lookup so a pooled SD
+       computed for some other purpose cannot silently rescale a
+       fraction-valued coefficient.
+    3. Continuous covariate in ``sd`` -> ``(SD, "per_SD")``; the term may be the
+       bare covariate, its ``swr_x_<cov>`` product, or its ``is_swr:<cov>``
+       product.
+    4. Z-scored at fit time -> ``(1.0, "per_SD")``: a ``_z`` column or an SWR
+       product of one (the term ends in ``_z``), or a product with a ``_z``
+       factor (the term contains ``_z_x_``). Its coefficient is already per SD.
+
+    Parameters
+    ----------
+    term : str
+        The aggregated term.
+    sd : dict
+        Covariate -> SD the fit's per-SD effects are stated in.
+
+    Returns
+    -------
+    (float, str)
+        The factor and its unit label.
+
+    Raises
+    ------
+    KeyError
+        If ``term`` is none of the above: a raw-scale continuous term with no
+        SD would be reported at raw scale under a "per SD" label.
     """
     if term in BINARY_TERMS:
         return 1.0, "per_category"
@@ -210,7 +281,15 @@ def std_factor(term: str, sd: dict) -> tuple[float, str]:
     cov = sd_covariate(term, sd)
     if cov is not None and sd[cov] > 0:
         return sd[cov], "per_SD"
-    return 1.0, "per_SD"
+    if term.endswith("_z") or "_z_x_" in term:
+        return 1.0, "per_SD"
+    raise KeyError(
+        f"term {term!r} is not binary, not a reward-history basis feature, not "
+        "z-scored at fit time (no '_z' suffix or '_z_x_' factor), and resolves "
+        "to no SD entry; it would be reported at raw scale under a 'per SD' "
+        "label. Pass its SD from the fit's own record, or add it to "
+        "BINARY_TERMS / PER_UNIT_TERMS if that is what it is."
+    )
 
 
 def sd_covariate(term: str, sd: dict) -> str | None:
@@ -506,11 +585,13 @@ def aggregate_contrast(
     sd = sd or {}
     rows = []
     for model, pop, term in specs:
-        factor, unit = std_factor(term, sd)
         ccol, pcol = f"coef_{term}", f"pval_{term}"
         s_all = res[(res.model == model) & (res.population == pop)]
         if ccol not in s_all.columns:
             continue
+        # Resolved only for a term the fits carry: a spec with no coefficient
+        # column emits no row, so it needs no unit.
+        factor, unit = std_factor(term, sd)
         gate = gate_term_sessions(s_all, term)
         if gate.refusal == "too_few_sessions":
             continue

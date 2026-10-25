@@ -12,10 +12,11 @@ weighted reward fractions in [0, 1] (marked with a double dagger); their coeffic
 are per unit of the fraction -- the effect of a fully rewarded recent history versus a
 fully unrewarded one -- and are likewise not standardized.
 
-Per-arm covariate SDs are read from the content fit's provenance record, so this
-figure states its arm effects in exactly the per-leaf-arm SD unit the audited
-table uses; the rate ladder's per-stop covariate SDs are computed here from the
-source tables. Content state-modulation rungs (rpe/relval/entropy/
+Per-SD units are read from each fit's own record, never recomputed here: the
+per-arm covariate SDs from the content fit's provenance (the per-leaf-arm unit),
+and the rate covariate SDs from the rate fit's meta (the at-well stop-cohort
+unit), so this figure states its effects in exactly the units the audited tables
+use. Content state-modulation rungs (rpe/relval/entropy/
 update/tss/block/switchrate x current) are already z-scored at fit time, so their
 standardization factor is 1.0.
 
@@ -23,7 +24,6 @@ standardization factor is 1.0.
 """
 
 import argparse
-from pathlib import Path
 
 import matplotlib
 
@@ -32,14 +32,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
+    load_fit_time_sd_reference,
     load_per_sd_scale,
-    sd_covariate,
-)
-from continuum_swr_replay.analysis.replay.contrast_aggregation import (
-    std_factor as audited_std_factor,
+    std_factor,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import require_fresh_inputs
 from continuum_swr_replay.analysis.replay.model_specs import (
@@ -48,14 +45,15 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     PRIMARY_COHORT,
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
-from continuum_swr_replay.paths import REPLAY_CONTENT_DIR, model_dir, table_path
-from continuum_swr_replay.tables.covariate_registry import (
-    require_covariate_schema,
+from continuum_swr_replay.paths import (
+    REPLAY_CONTENT_DIR,
+    figure_dir,
+    model_dir,
+    table_path,
 )
-from continuum_swr_replay.tables.io import read_table
 
 RC = REPLAY_CONTENT_DIR
-OUT = Path("paper/figures/swr_contrast")
+OUT = figure_dir("swr_contrast")
 
 SWR_CONTRAST_RATE = model_dir("per_bin_rate", RC) / "swr_contrast_rate.pkl"
 # The tables fit_swr_contrast_rate.py fit that artifact on; checked against its
@@ -67,6 +65,10 @@ SWR_CONTRAST_RATE_INPUTS = {
     "event_onset_table": table_path("event_onset_table", RC, fmt="pkl"),
     "event_table": table_path("event_table", RC, fmt="pkl"),
 }
+# The per-SD units the audited rate table states its coefficients in: SDs over
+# the at-well stop cohort the fits name, recorded by the rate fitter beside the
+# audited table. The full-table SDs differ by up to ~7 %.
+SWR_CONTRAST_RATE_META = model_dir("per_bin_rate", RC) / "swr_contrast_rate_meta.json"
 
 # The per-SD units the audited contrast table states its arm coefficients in.
 # They are frozen by the fitter over the six leaf arms and are NOT recomputable
@@ -107,49 +109,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _global_sd(covariates):
-    """Global (pooled) SD of each continuous covariate from its source table."""
-    from continuum_swr_replay.analysis.replay.covariates import (
-        add_uncertainty_covariates,
-    )
-
-    arm = read_table(table_path("event_arm_table", RC, fmt="pkl"))
-    qv = read_table(table_path("qvals_table", RC, fmt="pkl"))
-    stop = read_table(table_path("stop_table", RC, fmt="pkl"))
-    require_covariate_schema(arm, table="event_arm")
-    require_covariate_schema(qv, table="qvals")
-    require_covariate_schema(stop, table="stop")
-    require_swr_source(arm, what=str(table_path("event_arm_table", RC, fmt="pkl")))
-    require_swr_source(stop, what=str(table_path("stop_table", RC, fmt="pkl")))
-    stop = add_uncertainty_covariates(stop)
-    sd = {}
-    for c in covariates:
-        for src in (arm, qv, stop):
-            if c in src.columns:
-                sd[c] = float(np.nanstd(src[c].to_numpy(dtype=float)))
-                break
-    return sd
-
-
 def _per_sd_units():
     """Covariate -> SD the figure states its per-SD effects in.
 
-    Rate-ladder covariates are per-stop quantities with no candidate-arm support
-    question, so their pooled SD is computed here from the source tables. The
-    per-arm covariates come from the fit's own frozen units instead.
+    Both sets come from the fits' own records: the rate covariates from the rate
+    meta's ``fit_time_sd_reference``, the per-arm covariates from the content
+    provenance's ``per_sd_scale``. The two key sets are disjoint.
     """
     return {
-        **_global_sd(
-            [
-                "relative_value_switch_minus_stay_preoutcome",
-                "rpe_postoutcome",
-                "reward_belief_differential_entropy_leaf_mean_preoutcome",
-                "reward_belief_mean_update_l1_all_ports_postoutcome",
-                "periswitch_index_trials",
-                "trials_since_block_change",
-                "patch_switch_fraction_last5_completed_trips",
-            ]
-        ),
+        **load_fit_time_sd_reference(SWR_CONTRAST_RATE_META),
         **load_per_sd_scale(SWR_CONTRAST_CONTENT_PROVENANCE, "arm_cohort"),
     }
 
@@ -157,31 +125,6 @@ def _per_sd_units():
 ANIM = list(analysed_animals())
 CMAP = dict(zip(ANIM, plt.cm.tab10(np.linspace(0, 0.5, 5)), strict=True))
 RNG = np.random.default_rng(0)
-
-
-def std_factor(term, sd):
-    """Scaling to standardized units; ``(factor, unit)``.
-
-    The audited table's own rule
-    (``analysis.replay.contrast_aggregation.std_factor``: ``"per_category"``
-    for its binary terms, ``"per_unit"`` for the reward-history basis features,
-    ``"per_SD"`` otherwise), with one addition: a continuous term that resolves
-    to no entry of `sd` and is not a ``*_x_*`` interaction raises rather than
-    rendering at raw scale under a "per 1 SD" axis.
-    """
-    factor, unit = audited_std_factor(term, sd)
-    # Interaction terms (content/patch `*_x_*`) are built from z-scored scalars at
-    # fit time, so factor 1.0 is correct. Continuous MAIN-effect terms, by contrast,
-    # must be in SD — so a renamed main effect (not an interaction) raises here rather
-    # than silently plotting at raw scale under a "per 1 SD" axis.
-    if unit != "per_SD" or sd_covariate(term, sd) is not None or "_x_" in term:
-        return factor, unit
-    raise KeyError(
-        f"plot term {term!r} resolves to no SD entry and is not a binary, a "
-        f"reward-history basis feature, or a z-scored-at-fit interaction (`*_x_*`) — "
-        f"a main-effect rename would silently mis-scale it. Add it to the SD "
-        f"(_global_sd) list."
-    )
 
 
 def sessions(df, mod, pop, term, sd):

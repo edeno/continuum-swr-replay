@@ -58,8 +58,46 @@ def test_continuous_covariate_is_scaled_by_its_pooled_sd() -> None:
     assert std_factor("swr_x_rpe_postoutcome", SD) == (2.0, "per_SD")
 
 
-def test_unknown_term_is_assumed_z_scored_at_fit_time() -> None:
-    assert std_factor("rpe_postoutcome_z_x_is_current_arm", SD) == (1.0, "per_SD")
+@pytest.mark.parametrize(
+    "term",
+    [
+        "rpe_postoutcome_z_x_is_current_arm",
+        "periswitch_index_trials_z_x_is_current_patch",
+        "reward_belief_variance_candidate_arm_preoutcome_z",
+        "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
+        "log_phi_log_n_nonlocal_bins_z",
+    ],
+)
+def test_a_term_z_scored_at_fit_time_is_already_per_sd(term) -> None:
+    """A ``_z`` column, an SWR product of one, or a ``_z_x_`` product."""
+    assert std_factor(term, SD) == (1.0, "per_SD")
+
+
+@pytest.mark.parametrize(
+    "term",
+    [
+        "trials_since_block_change",
+        "is_swr:trials_since_block_change",
+        # An SWR product of a raw covariate is not exempt just for its ``_x_``.
+        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    ],
+)
+def test_a_raw_term_without_an_sd_is_refused(term) -> None:
+    """Without its SD it would be reported at raw scale under a per-SD label."""
+    with pytest.raises(KeyError, match=term.replace(":", ".")):
+        std_factor(term, SD)
+
+
+def test_a_raw_term_without_an_sd_is_refused_by_the_aggregation() -> None:
+    fits = _session_fits()
+
+    with pytest.raises(KeyError, match="rpe_postoutcome"):
+        aggregate_contrast(fits, SPECS, level="rate", sd={})
+
+
+def test_the_last_rewarded_arm_indicator_is_per_category() -> None:
+    """A 0/1 indicator, like its SWR product and its patch analogue."""
+    assert std_factor("is_last_rewarded_noncurrent_arm", SD) == (1.0, "per_category")
 
 
 def _session_fits(**overrides) -> pd.DataFrame:
@@ -83,6 +121,9 @@ def _session_fits(**overrides) -> pd.DataFrame:
 
 
 SPECS = [("G5_rpe", "non_local", "rpe_postoutcome")]
+# Resolves every synthetic term the session-gate tests aggregate. Those tests are
+# about which sessions a term keeps; ``std_factor`` refuses a raw term with no SD.
+_GATE_SD = {**SD, "q_arm": 1.0, "is_swr": 1.0, "hist_rcos_2": 1.0, "h": 1.0}
 
 
 def test_imprecise_but_identified_session_is_kept() -> None:
@@ -96,7 +137,7 @@ def test_imprecise_but_identified_session_is_kept() -> None:
     fits.loc[0, "coef_rpe_postoutcome"] = 0.01
     fits.loc[0, "bse_rpe_postoutcome"] = 0.5
 
-    out = aggregate_contrast(fits, SPECS, level="rate")
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=_GATE_SD)
 
     assert len(out) == 1
     row = out.iloc[0]
@@ -111,7 +152,7 @@ def test_separated_session_is_dropped() -> None:
     fits = _session_fits()
     fits.loc[0, "separated"] = True
 
-    out = aggregate_contrast(fits, SPECS, level="rate")
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=_GATE_SD)
 
     row = out.iloc[0]
     assert row["n_sessions"] == 7
@@ -130,7 +171,7 @@ def test_legacy_frame_without_predictor_sds_uses_the_raw_coefficient() -> None:
     assert "sd_rpe_postoutcome" not in fits.columns
     fits.loc[0, "coef_rpe_postoutcome"] = 42.0
 
-    out = aggregate_contrast(fits, SPECS, level="rate")
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=_GATE_SD)
 
     row = out.iloc[0]
     assert row["n_sessions"] == 7
@@ -147,7 +188,7 @@ def test_large_coefficient_on_a_tiny_sd_predictor_is_kept() -> None:
     fits = _session_fits(sd_rpe_postoutcome=[0.01] * 8)
     fits.loc[0, "coef_rpe_postoutcome"] = 12.0
 
-    out = aggregate_contrast(fits, SPECS, level="rate")
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=_GATE_SD)
 
     row = out.iloc[0]
     assert row["n_sessions"] == 8
@@ -161,7 +202,7 @@ def test_large_coefficient_on_a_unit_sd_predictor_is_dropped() -> None:
     fits = _session_fits(sd_rpe_postoutcome=[1.0] * 8)
     fits.loc[0, "coef_rpe_postoutcome"] = 12.0
 
-    out = aggregate_contrast(fits, SPECS, level="rate")
+    out = aggregate_contrast(fits, SPECS, level="rate", sd=_GATE_SD)
 
     row = out.iloc[0]
     assert row["n_sessions"] == 7
@@ -189,6 +230,7 @@ def test_product_backstop_reads_the_products_own_sd() -> None:
             ("S4_value", "contrast", "is_swr"),
         ],
         level="rate",
+        sd=_GATE_SD,
     ).set_index("term")
 
     assert out.loc["is_swr:q_arm", "n_dropped"] == 0
@@ -235,6 +277,7 @@ def test_separation_drops_only_the_term_it_holds_for() -> None:
             ("S1_rew", "contrast", "reward_history_rcos_0"),
         ],
         level="rate",
+        sd=_GATE_SD,
     ).set_index("term")
 
     assert out.loc["hist_rcos_2", "n_sessions"] == 7
@@ -274,6 +317,7 @@ def test_a_term_a_session_cannot_inform_is_counted_as_unidentified() -> None:
             ("S1_rew", "contrast", "reward_history_rcos_0"),
         ],
         level="rate",
+        sd=_GATE_SD,
     ).set_index("term")
 
     assert out.loc["hist_rcos_2", "n_sessions"] == 7
@@ -313,7 +357,9 @@ def test_a_term_half_the_sessions_cannot_inform_is_withheld(caplog) -> None:
     fits.loc[: n // 2 - 1, ["bse_h", "bse_cluster_h"]] = float("inf")
 
     with caplog.at_level("WARNING"):
-        out = aggregate_contrast(fits, [("CS1", "all", "h")], "candidate_arm")
+        out = aggregate_contrast(
+            fits, [("CS1", "all", "h")], "candidate_arm", sd=_GATE_SD
+        )
 
     assert out.empty
     assert any("20 of 40" in r.getMessage() for r in caplog.records)
@@ -356,6 +402,7 @@ def test_product_term_does_not_inherit_its_factors_separation() -> None:
             ("S4_value", "contrast", "is_swr"),
         ],
         level="rate",
+        sd=_GATE_SD,
     ).set_index("term")
 
     # The product keeps every session: neither factor's separation touches it.
@@ -374,7 +421,7 @@ def test_product_term_is_dropped_when_the_product_itself_separates() -> None:
     fits = _product_fits(["", "is_swr:q_arm", ""] + [""] * 9)
 
     out = aggregate_contrast(
-        fits, [("S4_value", "contrast", "is_swr:q_arm")], level="rate"
+        fits, [("S4_value", "contrast", "is_swr:q_arm")], level="rate", sd=_GATE_SD
     )
 
     assert out.iloc[0]["n_sessions"] == 11
@@ -547,32 +594,63 @@ def test_a_record_without_the_frozen_units_is_refused(tmp_path: Path) -> None:
         load_per_sd_scale(tmp_path / "absent.json", "arm_cohort")
 
 
-def test_the_contrast_figure_takes_its_arm_units_from_the_fit() -> None:
-    """No recomputation path survives in the figure for the per-arm covariates.
+_RATE_UNITS = {
+    "periswitch_index_trials": 11.012232609424599,
+    "patch_switch_fraction_last5_completed_trips": 0.12789700553254071,
+}
 
-    The figure's own ``_global_sd`` pools over all nine candidate arms, where the
-    three trunks are structural zeros for every per-arm belief covariate, so a
-    recomputed unit is 2.1x the audited table's per-leaf-arm one.
+
+def test_rate_units_are_returned_verbatim(tmp_path: Path) -> None:
+    """The rate meta's frozen SDs are the reader's factors, to the bit."""
+    path = tmp_path / "swr_contrast_rate_meta.json"
+    path.write_text(json.dumps({"fit_time_sd_reference": _RATE_UNITS}))
+
+    sd = contrast_aggregation.load_fit_time_sd_reference(path)
+
+    assert sd == _RATE_UNITS
+    for covariate, unit in _RATE_UNITS.items():
+        assert std_factor(covariate, sd) == (unit, "per_SD")
+        assert std_factor(f"is_swr:{covariate}", sd) == (unit, "per_SD")
+
+
+@pytest.mark.parametrize("record", [{}, {"fit_time_sd_reference": {}}])
+def test_a_rate_meta_without_the_frozen_units_is_refused(
+    record, tmp_path: Path
+) -> None:
+    path = tmp_path / "swr_contrast_rate_meta.json"
+    path.write_text(json.dumps(record))
+
+    with pytest.raises(KeyError, match="fit_time_sd_reference"):
+        contrast_aggregation.load_fit_time_sd_reference(path)
+
+
+def test_an_absent_rate_meta_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        contrast_aggregation.load_fit_time_sd_reference(tmp_path / "absent.json")
+
+
+def test_the_contrast_figure_takes_every_unit_from_the_fits() -> None:
+    """No SD is recomputed in the figure, for either ladder.
+
+    A recomputed per-arm unit pools over all nine candidate arms (the trunks are
+    structural zeros), 2.1x the audited per-leaf-arm one; a recomputed rate unit
+    pools over all stops rather than the at-well cohort the rate fit names, up
+    to ~7 % off the audited table's.
     """
-    tree = ast.parse(_CONTRAST_FIGURE.read_text())
-    recomputed = {
-        element.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_global_sd"
-        for argument in node.args
-        if isinstance(argument, ast.List)
-        for element in argument.elts
-        if isinstance(element, ast.Constant)
-    }
+    source = _CONTRAST_FIGURE.read_text()
+    tree = ast.parse(source)
     called = {
-        getattr(node.func, "id", None)
+        getattr(node.func, "id", None) or getattr(node.func, "attr", None)
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
     }
 
-    assert recomputed, "the rate ladder's own SDs are still computed in the figure"
-    assert not recomputed & set(_ARM_UNITS)
-    assert "load_per_sd_scale" in called
+    assert {"load_per_sd_scale", "load_fit_time_sd_reference"} <= called
+    assert not called & {"_global_sd", "nanstd", "std", "read_table"}
+    assert (
+        'SWR_CONTRAST_RATE_META = model_dir("per_bin_rate", RC) / '
+        '"swr_contrast_rate_meta.json"' in source
+    )
 
 
 # --- Dirichlet-multinomial concentration terms ---------------------------------
