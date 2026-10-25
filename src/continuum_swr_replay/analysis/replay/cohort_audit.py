@@ -21,6 +21,8 @@ from collections.abc import Container, Iterable
 import numpy as np
 import pandas as pd
 
+from .covariates.definitions import QVALS_ROW_GATED_COVARIATES
+
 # Row-level drop buckets, in the schema's PRIORITY order. Each dropped unit is
 # attributed to exactly the first bucket it hits, so the reconciliation closes even
 # when a unit fails several checks.
@@ -66,36 +68,58 @@ TERM_DIAGNOSTICS_COLUMNS = (
 # Matches contrast_aggregation.py's quasi-separation filter and _fit_diagnostics.
 _QUASI_SEP_ABS = 10.0
 
-# Covariates that are NaN on the trailing "qvals gap" (mechanism B): the ~896-event /
-# 2056-stop tail with no fitted beta value state. When one of these is a model's
-# required predictor, an event/stop it drops is attributed to ``n_drop_qvals_gap`` (with
-# priority over generic own-predictor missingness), keeping mechanism B distinguishable
-# from mechanism A (e.g. candidate-arm reward history's early-session NaN).
-# Candidate-arm belief mean, variance (raw and ``_z``), and task probability share one
-# identical missingness mask (verified 2026-10-24 on the canonical event_arm table:
-# 8676 event-arm rows / 964 events); the stop-level beta scalars and their
-# current-arm interactions come off the same qvals table and share the tail.
-QVALS_GAP_COLS = frozenset(
-    {
-        # per-arm value / uncertainty / contingency (identical missingness)
-        "reward_belief_mean_candidate_arm_preoutcome",
-        "task_reward_probability_candidate_arm",
-        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
-        "reward_belief_variance_candidate_arm_preoutcome",
-        "reward_belief_variance_candidate_arm_preoutcome_z",
-        "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
-        # stop-level beta scalars from qvals_table (same trailing tail)
-        "rpe_postoutcome",
-        "relative_value_switch_minus_stay_preoutcome",
-        "reward_belief_differential_entropy_leaf_mean_preoutcome",
-        "reward_belief_mean_update_l1_all_ports_postoutcome",
-        # content current-arm interactions built from those scalars
-        "rpe_postoutcome_z_x_is_current_arm",
-        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
-        "reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm",
-        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
-    }
-)
+#: Name modifiers a design column may carry over its base covariate: the fit-time
+#: ``_z`` standardization and the leaf-mean ``_patch`` aggregate.
+_DERIVED_SUFFIXES = ("_z", "_patch")
+
+
+def is_qvals_gap_column(name: object) -> bool:
+    """Whether a NaN in design column ``name`` means the stop has no qvals row.
+
+    The qvals gap (mechanism B) is the set of stops with no ``qvals_table``
+    row. A column is in it when one of its factors is a covariate catalogued
+    as ``qvals_row_gated`` (:data:`QVALS_ROW_GATED_COVARIATES`). Factors are
+    the ``_x_``-separated parts of the name, so ``swr_x_<base>`` and
+    ``<base>_z_x_is_current_arm`` qualify, and each factor may carry a ``_z``
+    or ``_patch`` suffix. A product is NaN wherever any factor is NaN.
+
+    Parameters
+    ----------
+    name : object
+        A design-column name.
+
+    Returns
+    -------
+    bool
+        True when ``name`` is built from a qvals-row-gated covariate.
+    """
+    if not isinstance(name, str):
+        return False
+    for factor in name.split("_x_"):
+        for suffix in _DERIVED_SUFFIXES:
+            factor = factor.removesuffix(suffix)
+        if factor in QVALS_ROW_GATED_COVARIATES:
+            return True
+    return False
+
+
+class _QvalsGapColumns(Container[str]):
+    """Membership view of :func:`is_qvals_gap_column` for ``name in ...`` tests."""
+
+    def __contains__(self, name: object) -> bool:
+        return is_qvals_gap_column(name)
+
+    def __repr__(self) -> str:
+        return f"QVALS_GAP_COLS(bases={sorted(QVALS_ROW_GATED_COVARIATES)})"
+
+
+# When a qvals-gap column is a model's required predictor, an event/stop it drops
+# is attributed to ``n_drop_qvals_gap`` (with priority over generic own-predictor
+# missingness), keeping mechanism B distinguishable from mechanism A (e.g.
+# candidate-arm reward history's early-session NaN). Derived from the covariate
+# catalog rather than listed, so a new qvals covariate and its variants join the
+# gap once its definition is flagged.
+QVALS_GAP_COLS: Container[str] = _QvalsGapColumns()
 
 
 def cohort_record(

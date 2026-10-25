@@ -54,7 +54,16 @@ class QueryClock(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class CovariateDefinition:
-    """Scientific contract for one canonical model-facing quantity."""
+    """Scientific contract for one canonical model-facing quantity.
+
+    ``qvals_row_gated`` is True when the value is joined from ``qvals_table``
+    by ``stop_id`` and is NaN exactly when the stop has no qvals row, so a fit
+    that drops it has hit the qvals gap. It is False for a qvals column that is
+    also NaN on stops that do have a row: the switch-minus-stay value and the
+    belief-update magnitudes, which ``qvals_table`` masks next to a gap in the
+    behavioral model's trials. The peri-switch fields would also be NaN in an
+    epoch with no patch switch; no analysed epoch lacks one (checked 2026-10-24).
+    """
 
     name: str
     description: str
@@ -67,6 +76,7 @@ class CovariateDefinition:
     missingness: str
     structural_zero: str | None
     producer: str
+    qvals_row_gated: bool = False
 
 
 def _definition(
@@ -82,6 +92,7 @@ def _definition(
     window: str | None = None,
     missingness: str = "unavailable at the declared query clock",
     structural_zero: str | None = None,
+    qvals_row_gated: bool = False,
 ) -> CovariateDefinition:
     return CovariateDefinition(
         name=name,
@@ -95,6 +106,7 @@ def _definition(
         missingness=missingness,
         structural_zero=structural_zero,
         producer=producer,
+        qvals_row_gated=qvals_row_gated,
     )
 
 
@@ -263,6 +275,7 @@ _DEFINITIONS = [
         producer="analysis.behavior.qvals_table (Beta-Bernoulli fit) -> joined by covariates.history.attach_contingency_value_block",
         missingness="no qvals row for the stop",
         structural_zero="trunk arms when the qvals row is present",
+        qvals_row_gated=True,
     ),
     _definition(
         "reward_belief_mean_candidate_arm_preoutcome",
@@ -275,6 +288,7 @@ _DEFINITIONS = [
         producer="analysis.behavior.qvals_table (Beta-Bernoulli fit) -> joined by covariates.history.attach_contingency_value_block",
         missingness="no qvals row for the stop",
         structural_zero="trunk arms when the qvals row is present",
+        qvals_row_gated=True,
     ),
     _definition(
         "reward_belief_variance_candidate_arm_preoutcome",
@@ -287,6 +301,7 @@ _DEFINITIONS = [
         producer="analysis.behavior.qvals_table (Beta-Bernoulli fit) -> joined by covariates.history.attach_arm_uncertainty",
         missingness="no qvals row for the stop",
         structural_zero="trunk arms when the qvals row is present",
+        qvals_row_gated=True,
     ),
     _definition(
         "reward_fraction_last10_known_trials",
@@ -368,6 +383,7 @@ _DEFINITIONS = [
         support="qvals-mapped stops",
         producer="analysis.behavior.qvals_table.add_experienced_value_columns",
         missingness="behavioral model or current outcome unavailable",
+        qvals_row_gated=True,
     ),
     _definition(
         "reward_belief_mean_update_l1_all_ports_postoutcome",
@@ -401,6 +417,7 @@ _DEFINITIONS = [
         support="qvals-mapped stops",
         producer="analysis.behavior.qvals_table.add_beta_belief_entropy",
         missingness="behavioral model unavailable",
+        qvals_row_gated=True,
     ),
     _definition(
         "periswitch_index_trials",
@@ -412,6 +429,7 @@ _DEFINITIONS = [
         support="sessions with at least one patch switch",
         producer="analysis.behavior.qvals_table.peri_switch_index",
         missingness="session contains no patch switch",
+        qvals_row_gated=True,
     ),
     _definition(
         "is_periswitch_post",
@@ -423,6 +441,7 @@ _DEFINITIONS = [
         support="sessions with at least one patch switch",
         producer="analysis.behavior.qvals_table.peri_switch_index",
         missingness="session contains no patch switch",
+        qvals_row_gated=True,
     ),
     _definition(
         "is_stay",
@@ -568,6 +587,7 @@ _DEFINITIONS.extend(
             support="qvals-mapped stops",
             producer="analysis.behavior.qvals_table",
             missingness="behavioral model block metadata unavailable",
+            qvals_row_gated=True,
         ),
         _definition(
             "task_reward_probability_patch_mean_gap_best_vs_second",
@@ -579,6 +599,7 @@ _DEFINITIONS.extend(
             support="qvals-mapped stops",
             producer="analysis.behavior.qvals_table",
             missingness="task contingency unavailable",
+            qvals_row_gated=True,
         ),
         _definition(
             "reward_belief_mean_chosen_arm_preoutcome",
@@ -590,6 +611,7 @@ _DEFINITIONS.extend(
             support="qvals-mapped stops after choice arrival",
             producer="analysis.behavior.qvals_table.add_experienced_value_columns",
             missingness="destination or behavioral-model row unavailable",
+            qvals_row_gated=True,
         ),
         _definition(
             "task_reward_probability_chosen_arm",
@@ -601,6 +623,7 @@ _DEFINITIONS.extend(
             support="qvals-mapped stops after choice arrival",
             producer="analysis.behavior.qvals_table.add_experienced_value_columns",
             missingness="destination or task contingency unavailable",
+            qvals_row_gated=True,
         ),
         _definition(
             "reward_belief_mean_update_l1_alternative_patches_postoutcome",
@@ -948,6 +971,13 @@ COVARIATE_DEFINITIONS: dict[str, CovariateDefinition] = {
 }
 if len(COVARIATE_DEFINITIONS) != len(_DEFINITIONS):
     raise RuntimeError("duplicate canonical names in COVARIATE_DEFINITIONS")
+
+#: Canonical covariates that are NaN exactly when the stop has no qvals row.
+QVALS_ROW_GATED_COVARIATES: frozenset[str] = frozenset(
+    name
+    for name, definition in COVARIATE_DEFINITIONS.items()
+    if definition.qvals_row_gated
+)
 
 
 def definition_for(name: str) -> CovariateDefinition:

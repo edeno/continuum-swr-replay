@@ -350,7 +350,76 @@ def test_every_contrast_belief_predictor_is_booked_to_the_qvals_gap():
     }
 
     assert "swr_x_reward_belief_variance_candidate_arm_preoutcome_z" in belief
-    assert belief <= QVALS_GAP_COLS
+    assert all(predictor in QVALS_GAP_COLS for predictor in belief)
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        "task_reward_probability_candidate_arm",
+        "reward_belief_variance_candidate_arm_preoutcome_z",
+        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+        "reward_belief_mean_candidate_arm_preoutcome_patch",
+        "rpe_postoutcome_z_x_is_current_arm",
+        "trials_since_block_change_z_x_is_current_arm",
+        "periswitch_index_trials_z_x_is_current_patch",
+        "periswitch_index_trials_z_x_is_periswitch_post_x_is_current_arm",
+    ],
+)
+def test_qvals_gap_includes_every_variant_of_a_gated_covariate(column):
+    """``_z``, ``swr_x_``, ``_patch`` and ``_x_`` products of a gated base are in."""
+    from continuum_swr_replay.analysis.replay.cohort_audit import QVALS_GAP_COLS
+
+    assert column in QVALS_GAP_COLS
+
+
+@pytest.mark.parametrize(
+    "column",
+    [
+        # qvals columns that are also NaN on stops that HAVE a qvals row (masked
+        # next to a behavioral-model trial gap): such a drop is not a qvals gap.
+        "relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm",
+        "reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm",
+        # not from qvals_table at all
+        "reward_fraction_candidate_arm_last10_visits",
+        "swr_x_is_current_arm",
+        "is_current_patch",
+        None,
+    ],
+)
+def test_qvals_gap_excludes_columns_missing_for_other_reasons(column):
+    from continuum_swr_replay.analysis.replay.cohort_audit import QVALS_GAP_COLS
+
+    assert column not in QVALS_GAP_COLS
+
+
+def test_every_qvals_produced_covariate_declares_its_gap_status():
+    """A new qvals covariate must be classified, not silently left out of the gap.
+
+    Every catalogued covariate whose producer is the qvals pipeline is either
+    ``qvals_row_gated`` or named here with the reason it is not.
+    """
+    from continuum_swr_replay.analysis.replay.covariates.definitions import (
+        COVARIATE_DEFINITIONS,
+        QVALS_ROW_GATED_COVARIATES,
+    )
+
+    not_gated = {
+        # masked on qvals rows next to a behavioral-model trial gap
+        "relative_value_switch_minus_stay_preoutcome",
+        "reward_belief_mean_update_l1_all_ports_postoutcome",
+        "reward_belief_mean_update_l1_alternative_patches_postoutcome",
+        # NaN until the current outcome is known, qvals row or not
+        "is_rewarded_outcome",
+        "is_omitted_outcome",
+    }
+    qvals_produced = {
+        name
+        for name, definition in COVARIATE_DEFINITIONS.items()
+        if "qvals" in definition.producer
+    }
+    assert QVALS_ROW_GATED_COVARIATES <= qvals_produced
+    assert qvals_produced - not_gated == QVALS_ROW_GATED_COVARIATES
 
 
 def test_records_from_common_cohort_provenance():
