@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -121,10 +122,10 @@ def freeze(label: str) -> Path:
     return out
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--label", default="v5", help="baseline label (dir suffix)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     freeze(args.label)
 
 

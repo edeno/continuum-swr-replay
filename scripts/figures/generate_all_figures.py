@@ -22,6 +22,7 @@ import logging
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 logging.basicConfig(
@@ -99,7 +100,7 @@ def run_figure_script(
         return False, elapsed
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main script execution."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -123,7 +124,7 @@ def main() -> None:
         help="Only generate specific figure(s) (e.g., --only figure02 figure03)",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Determine which figures to generate
     if args.only:

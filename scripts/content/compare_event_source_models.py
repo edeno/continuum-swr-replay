@@ -30,6 +30,7 @@ import argparse
 import hashlib
 import logging
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -565,7 +566,7 @@ def run_switch_aligned(tables: dict[str, pd.DataFrame]) -> pd.DataFrame:
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--event-source", choices=list(_SOURCES), default="non_local")
     parser.add_argument(
@@ -574,7 +575,7 @@ def main() -> None:
         help="Brain area for ContFrag sources (SWR/MUA); ignored for "
         "non_local (HPC-only). Default: HPC.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     src = args.event_source
 
     tables = _load_tables(src, args.brain_area)

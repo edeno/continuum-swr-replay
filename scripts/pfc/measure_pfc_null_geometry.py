@@ -43,7 +43,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -522,7 +522,7 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
     return text + _md(corpus), table
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--data-dir",
@@ -555,7 +555,7 @@ def main() -> None:
         help="Inclusion gate on the immobility firing rate, as the audit uses.",
     )
     parser.add_argument("--out", type=Path, default=None, help="Write the report here.")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     sections = ["# Geometry of the mPFC held-out null\n"]
     sections.append(

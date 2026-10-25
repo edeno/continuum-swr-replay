@@ -123,17 +123,13 @@ def stage6(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _run(monkeypatch, *cli: str) -> None:
-    monkeypatch.setattr(
-        "sys.argv",
-        ["run_stay_leave.py", "--min-stops", "5", "--rebuild-summary", *cli],
-    )
-    runner.main()
+def _run(*cli: str) -> None:
+    runner.main(["--min-stops", "5", "--rebuild-summary", *cli])
 
 
 class TestStopCohort:
-    def test_at_well_run_excludes_in_transit_stops(self, stage6, monkeypatch):
-        _run(monkeypatch)
+    def test_at_well_run_excludes_in_transit_stops(self, stage6):
+        _run()
 
         summary = pd.read_pickle(stage6 / "stop_replay_summary.pkl")
         assert len(summary) == N_AT_WELL + N_MIXED
@@ -141,10 +137,8 @@ class TestStopCohort:
         assert set(summary["stop_id"]) == set(range(N_AT_WELL + N_MIXED))
         assert summary.attrs["stop_cohort"] == "at_well"
 
-    def test_all_stops_run_keeps_every_stop_under_its_own_name(
-        self, stage6, monkeypatch
-    ):
-        _run(monkeypatch, "--stop-cohort", "all_stops")
+    def test_all_stops_run_keeps_every_stop_under_its_own_name(self, stage6):
+        _run("--stop-cohort", "all_stops")
 
         assert not (stage6 / "stop_replay_summary.pkl").exists()
         summary = pd.read_pickle(stage6 / "stop_replay_summary_allstops.pkl")
@@ -154,9 +148,9 @@ class TestStopCohort:
         # The canonical names stay free for the canonical population.
         assert not (stage6 / "stage6_is_stay_logistic.pkl").exists()
 
-    def test_both_cohorts_can_be_published_side_by_side(self, stage6, monkeypatch):
-        _run(monkeypatch)
-        _run(monkeypatch, "--stop-cohort", "all_stops")
+    def test_both_cohorts_can_be_published_side_by_side(self, stage6):
+        _run()
+        _run("--stop-cohort", "all_stops")
 
         at_well = pd.read_pickle(stage6 / "stage6_is_stay_logistic.pkl")
         all_stops = pd.read_pickle(stage6 / "stage6_is_stay_logistic_allstops.pkl")
@@ -164,22 +158,22 @@ class TestStopCohort:
         assert set(all_stops["stop_cohort"]) == {"all_stops"}
         assert at_well["n_stops"].max() < all_stops["n_stops"].max()
 
-    def test_stratified_outputs_carry_both_qualifiers(self, stage6, monkeypatch):
-        _run(monkeypatch, "--content-stratum", "swr", "--stop-cohort", "all_stops")
+    def test_stratified_outputs_carry_both_qualifiers(self, stage6):
+        _run("--content-stratum", "swr", "--stop-cohort", "all_stops")
 
         assert (stage6 / "stage6_is_stay_logistic_swr_allstops.pkl").exists()
         assert (stage6 / "stage6_is_stay_pooled_gee_swr_allstops.pkl").exists()
 
-    def test_gee_rows_state_the_cohort(self, stage6, monkeypatch):
-        _run(monkeypatch)
+    def test_gee_rows_state_the_cohort(self, stage6):
+        _run()
 
         gee = pd.read_pickle(stage6 / "stage6_is_stay_pooled_gee.pkl")
         assert set(gee["stop_cohort"]) == {"at_well"}
 
 
 class TestProvenance:
-    def test_sidecar_names_the_cohort_and_the_tables(self, stage6, monkeypatch):
-        _run(monkeypatch)
+    def test_sidecar_names_the_cohort_and_the_tables(self, stage6):
+        _run()
 
         sidecar = fit_provenance_path(stage6 / "stage6_is_stay_logistic.pkl")
         record = json.loads(sidecar.read_text())
@@ -189,9 +183,9 @@ class TestProvenance:
         assert record["stop_table_sha256"] == record["inputs"]["stop_table"]["sha256"]
         assert record["n_stops"] == N_AT_WELL + N_MIXED
 
-    def test_the_cached_summary_carries_its_own_sidecar(self, stage6, monkeypatch):
+    def test_the_cached_summary_carries_its_own_sidecar(self, stage6):
         """The summary is reused across strata, so it states its own population."""
-        _run(monkeypatch)
+        _run()
 
         record = json.loads(
             fit_provenance_path(stage6 / "stop_replay_summary.pkl").read_text()
@@ -201,64 +195,58 @@ class TestProvenance:
         assert record["stop_cohort_report"]["n_stops_after"] == N_AT_WELL + N_MIXED
         assert record["stop_table_sha256"] == record["inputs"]["stop_table"]["sha256"]
 
-    def test_cached_summary_from_another_cohort_is_refused(self, stage6, monkeypatch):
+    def test_cached_summary_from_another_cohort_is_refused(self, stage6):
         """The canonical name is unsuffixed, so the cache must be checked.
 
         A summary built on every stop and one built on the well-anchored stops
         would otherwise be interchangeable on disk under that one name.
         """
-        _run(monkeypatch, "--stop-cohort", "all_stops")
+        _run("--stop-cohort", "all_stops")
         # Stage the all-stops summary under the canonical at-well name, the
         # exact situation a pre-cohort artifact leaves behind.
         summary = pd.read_pickle(stage6 / "stop_replay_summary_allstops.pkl")
         summary.to_pickle(stage6 / "stop_replay_summary.pkl")
 
-        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="not 'at_well'"):
-            runner.main()
+            runner.main(["--min-stops", "5"])
 
-    def test_cached_summary_that_states_no_cohort_is_refused(self, stage6, monkeypatch):
+    def test_cached_summary_that_states_no_cohort_is_refused(self, stage6):
         """A pre-cohort artifact names no population, so it cannot be this one.
 
         It sits at exactly the canonical unsuffixed path and looks current in
         every other respect, which is the whole reason the attribute is checked
         rather than the file name.
         """
-        _run(monkeypatch)
+        _run()
         summary = pd.read_pickle(stage6 / "stop_replay_summary.pkl")
         del summary.attrs["stop_cohort"]
         summary.to_pickle(stage6 / "stop_replay_summary.pkl")
 
-        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="cohort None, not 'at_well'"):
-            runner.main()
+            runner.main(["--min-stops", "5"])
 
-    def test_cached_summary_cut_from_moved_tables_is_refused(self, stage6, monkeypatch):
+    def test_cached_summary_cut_from_moved_tables_is_refused(self, stage6):
         """The cohort names a population; the hashes name the bytes.
 
         A regenerated stop table changes which stops the summary holds without
         changing its name or its cohort, so the cache is only usable while the
         tables it read are the tables on disk.
         """
-        _run(monkeypatch)
+        _run()
         stop_table = read_table(stage6 / "stop_table.parquet")
         regenerated = stop_table.copy()
         regenerated.attrs = dict(stop_table.attrs)
         regenerated["immobility_duration_s"] = 6.0
         write_table(regenerated, stage6 / "stop_table.parquet")
 
-        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
         with pytest.raises(ValueError, match="different generation of stop_table"):
-            runner.main()
+            runner.main(["--min-stops", "5"])
 
-    def test_cached_summary_is_reused_when_the_tables_have_not_moved(
-        self, stage6, monkeypatch
-    ):
+    def test_cached_summary_is_reused_when_the_tables_have_not_moved(self, stage6):
         """The staleness check must not reject a cache that is simply current."""
-        _run(monkeypatch)
+        _run()
         stamp = (stage6 / "stop_replay_summary.pkl").stat().st_mtime_ns
 
-        monkeypatch.setattr("sys.argv", ["run_stay_leave.py", "--min-stops", "5"])
-        runner.main()
+        runner.main(["--min-stops", "5"])
 
         assert (stage6 / "stop_replay_summary.pkl").stat().st_mtime_ns == stamp

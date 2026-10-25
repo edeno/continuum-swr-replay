@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -160,11 +161,11 @@ def validate(stop: pd.DataFrame) -> None:
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-per-animal", type=int, default=None, help="smoke subset")
     ap.add_argument("--no-save", action="store_true", help="build + validate only")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     sessions = find_sessions(max_per_animal=args.max_per_animal)
     logger.info("building stop tables for %d sessions...", len(sessions))

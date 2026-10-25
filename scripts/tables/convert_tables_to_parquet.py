@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import logging
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -110,14 +111,14 @@ def convert(path: Path, *, apply: bool) -> tuple[bool, str]:
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--apply",
         action="store_true",
         help="perform the conversion (default is a dry run)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     if not args.apply:

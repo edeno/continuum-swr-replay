@@ -25,6 +25,7 @@ import ast
 import subprocess
 import sys
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -127,11 +128,11 @@ def check(targets: tuple[str, ...], tests: tuple[str, ...]) -> int:
     return 0
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--targets", nargs="+", default=list(_DEFAULT_TARGETS))
     parser.add_argument("--tests", nargs="+", default=list(_DEFAULT_TESTS))
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     sys.exit(check(tuple(args.targets), tuple(args.tests)))
 
 

@@ -35,6 +35,7 @@ import argparse
 import logging
 import sys
 import time
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -126,7 +127,7 @@ def _retrospective_status(
     return "partial_movable_families" if any(movable) else "no_movable_family"
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--n-shuffles",
@@ -174,7 +175,7 @@ def main() -> None:
         default=None,
         help="Analyse only the first N sessions (smoke runs; writes a partial table).",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.swr_only and args.non_swr_only:
         raise SystemExit("Pick at most one of --swr-only / --non-swr-only.")

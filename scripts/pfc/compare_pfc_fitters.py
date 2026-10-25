@@ -49,7 +49,7 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -626,7 +626,7 @@ def build_report(
     return "\n".join(lines)
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--statsmodels-dir",
@@ -668,7 +668,7 @@ def main() -> int:
         default=None,
         help="Write the report here instead of stdout.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     statsmodels_sessions = bundle_stems(args.statsmodels_dir, args.artifact_suffix)
     jax_sessions = bundle_stems(args.jax_dir, args.artifact_suffix)

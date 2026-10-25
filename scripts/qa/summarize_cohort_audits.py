@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -70,7 +71,7 @@ def flag(df: pd.DataFrame, *, min_retained: float) -> pd.DataFrame:
     return out
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--root", type=Path, default=PROCESSED_DATA_DIR,
@@ -81,7 +82,7 @@ def main() -> None:
         help="flag rows whose n_modeled/n_in falls below this (default 0.9)",
     )
     ap.add_argument("--out", type=Path, default=None, help="optional combined-CSV path")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     df = load_all(args.root)
     if df.empty:

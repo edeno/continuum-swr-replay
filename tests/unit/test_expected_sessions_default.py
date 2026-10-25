@@ -10,7 +10,6 @@ or written but the stand-in.
 from __future__ import annotations
 
 import importlib
-import sys
 from pathlib import Path
 
 import pandas as pd
@@ -91,10 +90,9 @@ def test_the_default_expected_sessions_is_the_registers_analysed_count(
         raise _Stop
 
     monkeypatch.setattr(module, function, record)
-    monkeypatch.setattr(sys, "argv", [script, *argv])
 
     with pytest.raises(_Stop):
-        module.main()
+        module.main(argv)
 
     assert seen["expected_sessions"] == 2
 
@@ -104,9 +102,7 @@ def test_the_help_says_the_default_is_the_hpc_cohort(script, monkeypatch, capsys
     """For ``--brain-area mPFC`` or ``OFC`` the default is not the area's count."""
     monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
     module = importlib.import_module(f"scripts.tables.{script}")
-    monkeypatch.setattr(sys, "argv", [script, "--help"])
-
     with pytest.raises(SystemExit):
-        module.main()
+        module.main(["--help"])
 
     assert "analysed epochs (HPC cohort)" in " ".join(capsys.readouterr().out.split())

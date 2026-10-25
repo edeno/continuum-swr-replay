@@ -47,6 +47,8 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from continuum_swr_replay.runs.threads import pin_blas_threads
 
 pin_blas_threads()
@@ -1068,7 +1070,7 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--max-per-animal", type=int, default=None, help="smoke: N sessions/animal"
@@ -1095,7 +1097,7 @@ def main() -> None:
             "audited table, term diagnostics and meta JSON"
         ),
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
     if args.aggregate_only:

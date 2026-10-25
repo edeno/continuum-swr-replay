@@ -34,6 +34,7 @@ Usage:
 
 import argparse
 import time as clock
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -651,7 +652,7 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
@@ -668,7 +669,7 @@ def main() -> None:
         help="Where the aggregates go. Point a pilot elsewhere so it does not "
         "overwrite the committed summary.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     started = clock.time()
     recording = build_recording()

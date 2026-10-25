@@ -19,6 +19,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -27,7 +28,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.replay.learning import cross_session_role_summary
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "bundles",
@@ -41,7 +42,7 @@ def main() -> None:
         default=None,
         help="Also write the summarized rows (with a 'bundle' column) here.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     frames = []
     for bundle in args.bundles:

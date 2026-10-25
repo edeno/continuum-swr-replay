@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import pandas as pd
 
 import scripts.qa.run_quality_metrics as quality_script
@@ -36,13 +34,7 @@ def test_main_converts_filename_threshold_and_forwards_it(monkeypatch, tmp_path)
     monkeypatch.setattr(quality_script, "print_summary", lambda _: None)
     monkeypatch.setattr(quality_script, "plot_diagnostics", _plot_diagnostics)
     monkeypatch.setattr(quality_script, "PROCESSED_DATA_DIR", tmp_path)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["run_quality_metrics.py", "--threshold", "50"],
-    )
-
-    quality_script.main()
+    quality_script.main(["--threshold", "50"])
 
     assert calls["load"] == (None, 50)
     received, summary_kwargs = calls["summary"]

@@ -10,6 +10,7 @@ Usage:
 
 import argparse
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -69,7 +70,7 @@ def plot_theta_vs_replay(
     print(f"Saved: {figure_name}")
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -78,7 +79,7 @@ def main() -> None:
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     formats = [args.format] if args.format else None

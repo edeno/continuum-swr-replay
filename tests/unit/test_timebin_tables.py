@@ -308,17 +308,13 @@ def test_output_dir_receives_both_tables(timebin_script, monkeypatch, tmp_path):
 
     monkeypatch.setattr(script, "publish_swr_table", record)
 
-    monkeypatch.setattr(
-        sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
-    )
-    script.main()
+    script.main(["--output-dir", str(tmp_path)])
     assert published == [(tmp_path, "event_onset"), (tmp_path, "stop_timebin")]
 
     canonical = tmp_path / "canonical"
     monkeypatch.setattr(script, "RC", canonical)
     published.clear()
-    monkeypatch.setattr(sys, "argv", ["build_timebin_tables.py"])
-    script.main()
+    script.main([])
     assert published == [(canonical, "event_onset"), (canonical, "stop_timebin")]
 
 
@@ -364,10 +360,7 @@ def test_published_dense_table_keeps_its_stamp_and_sums_the_excluded_onsets(
         return Path(path) / f"{basename}.parquet"
 
     monkeypatch.setattr(script, "publish_swr_table", record)
-    monkeypatch.setattr(
-        sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
-    )
-    script.main()
+    script.main(["--output-dir", str(tmp_path)])
 
     assert checked == [{"SWR": 3, "non_local": 0}]
     dense = published["stop_timebin"]

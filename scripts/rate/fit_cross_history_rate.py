@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -179,7 +180,7 @@ def _summary(models: pd.DataFrame) -> None:
                 )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--max-per-animal",
@@ -188,7 +189,7 @@ def main() -> None:
         help="smoke: cap sessions per animal",
     )
     p.add_argument("--write", action="store_true")
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     stop_path = table_path("stop_table", RC)
     onset_path = table_path("event_onset_table", RC)

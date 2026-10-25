@@ -1865,9 +1865,9 @@ def run_content_fit(args: argparse.Namespace) -> None:
     _audit_compare_and_publish(args, config, cohort, model_results, estimator_skips)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = _build_arg_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     run_content_fit(args)
 
 

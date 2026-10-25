@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 
 import numpy as np
 import pandas as pd
@@ -144,10 +143,9 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     with pytest.raises(ValueError, match="current-location/novelty schema"):
-        runner.main()
+        runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -160,10 +158,9 @@ def test_legacy_file_is_not_an_implicit_canonical_fallback(tmp_path, monkeypatch
         input_dir / "long_count.pkl"
     )
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     with pytest.raises(FileNotFoundError, match="Legacy fallback is disabled"):
-        runner.main()
+        runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -202,10 +199,9 @@ def test_a_table_from_another_swr_source_is_refused(tmp_path, monkeypatch):
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     with pytest.raises(SwrSourceError, match="another_run"):
-        runner.main()
+        runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -216,9 +212,8 @@ def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypa
     input_dir.mkdir()
     write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
-    runner.main()
+    runner.main(["--models", "M0"])
 
     output_dir = _partial_ladder_dir(input_dir, "M0")
     assert (output_dir / "M0.pkl").exists()
@@ -260,9 +255,8 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
     monkeypatch.setattr(
         runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
     )
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py"])
 
-    runner.main()
+    runner.main([])
 
     output_dir = input_dir / "models"
     assert tuple(calls) == requested
@@ -284,14 +278,9 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M5,M6"],
-    )
 
     with pytest.raises(ValueError, match=r"M6=.*swr_x_is_current_arm"):
-        runner.main()
+        runner.main(["--models", "M5,M6"])
 
     assert not (_partial_ladder_dir(input_dir, "M5", "M6")).exists()
 
@@ -332,10 +321,9 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "Mu"])
 
     with pytest.raises(ValueError, match="stale or invalid"):
-        runner.main()
+        runner.main(["--models", "Mu"])
     assert not (_partial_ladder_dir(input_dir, "Mu")).exists()
 
 
@@ -377,10 +365,9 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_must_not_run)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     with pytest.raises(ValueError, match="one-hot at wells and NaN off-well"):
-        runner.main()
+        runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -547,14 +534,9 @@ def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypa
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_with_empty_late_rung)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0,M1"],
-    )
 
     with pytest.raises(RuntimeError, match="M1.*no session fits"):
-        runner.main()
+        runner.main(["--models", "M0,M1"])
 
     assert not (_partial_ladder_dir(input_dir, "M0", "M1")).exists()
 
@@ -584,14 +566,9 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _fit_then_raise)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0,M1"],
-    )
 
     with pytest.raises(RuntimeError, match="late numerical failure"):
-        runner.main()
+        runner.main(["--models", "M0,M1"])
 
     assert sentinel.read_text() == "unchanged"
     assert sorted(path.name for path in output_dir.iterdir()) == [sentinel.name]
@@ -604,9 +581,8 @@ def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatc
     (output_dir / "M7.pkl").write_bytes(b"stale later rung")
     write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
-    runner.main()
+    runner.main(["--models", "M0"])
 
     assert not (output_dir / "M7.pkl").exists()
     assert (output_dir / "M0.pkl").exists()
@@ -633,10 +609,9 @@ def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _wrong_cohort_size)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
     with pytest.raises(RuntimeError, match="expected 2 from the frozen cohort"):
-        runner.main()
+        runner.main(["--models", "M0"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -673,13 +648,8 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
     monkeypatch.setattr(
         runner, "run_full_hierarchy_comparison", lambda *args, **kwargs: pd.DataFrame()
     )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0,M1"],
-    )
 
-    runner.main()
+    runner.main(["--models", "M0,M1"])
 
     output_dir = _partial_ladder_dir(input_dir, "M0", "M1")
     for model_name in ("M0", "M1"):
@@ -700,16 +670,11 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
     # Two events are enough for the null primary fit but not 5-fold CV.
     write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0", "--cv"],
-    )
 
     # The primary fit now survives a failed CV, so the abort comes from CV
     # scoring nothing at all -- which means CV is broken, not marginal.
     with pytest.raises(RuntimeError, match="no scored session"):
-        runner.main()
+        runner.main(["--models", "M0", "--cv"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -735,14 +700,9 @@ def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch)
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(runner, "fit_model_per_session", _primary_without_cv)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0", "--cv"],
-    )
 
     with pytest.raises(RuntimeError, match="CV result.*missing column"):
-        runner.main()
+        runner.main(["--models", "M0", "--cv"])
 
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
@@ -756,13 +716,8 @@ def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypat
         _canonical_arm_table(n_events=10), input_dir / "event_arm_table.parquet"
     )
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0", "--cv"],
-    )
 
-    runner.main()
+    runner.main(["--models", "M0", "--cv"])
 
     result = pd.read_pickle(_partial_ladder_dir(input_dir, "M0") / "M0.pkl")
     assert result["n_events"].tolist() == [10]
@@ -798,14 +753,9 @@ def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch
         ),
     )
     monkeypatch.setattr(runner, "fit_conditional_logit", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M1", "--logit"],
-    )
 
     with pytest.raises(RuntimeError, match="logit robustness fit failed"):
-        runner.main()
+        runner.main(["--models", "M1", "--logit"])
 
     assert not (_partial_ladder_dir(input_dir, "M1")).exists()
 
@@ -831,13 +781,8 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
             "estimator": "conditional_logit_dominant",
         },
     )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M1", "--logit"],
-    )
 
-    runner.main()
+    runner.main(["--models", "M1", "--logit"])
 
     output_dir = _partial_ladder_dir(input_dir, "M1")
     assert (output_dir / "M1.pkl").exists()
@@ -855,9 +800,8 @@ def test_published_bundle_carries_the_hash_of_the_table_it_was_fit_on(
     table = input_dir / "event_arm_table.parquet"
     write_table(_canonical_arm_table(), table)
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(sys, "argv", ["fit_replay_content_models.py", "--models", "M0"])
 
-    runner.main()
+    runner.main(["--models", "M0"])
 
     output_dir = _partial_ladder_dir(input_dir, "M0")
     inputs = {"event_arm_table": table}
@@ -878,13 +822,8 @@ def test_count_run_publishes_beside_the_fraction_bundle(tmp_path, monkeypatch):
     input_dir.mkdir()
     write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["fit_replay_content_models.py", "--models", "M0", "--response", "hard_count"],
-    )
 
-    runner.main()
+    runner.main(["--models", "M0", "--response", "hard_count"])
 
     fraction_bundle = _partial_ladder_dir(input_dir, "M0")
     count_bundle = input_dir / "models_hard_count_M0"

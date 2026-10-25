@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import joblib
@@ -402,7 +403,7 @@ def render(
 
 
 # --- CLI ----------------------------------------------------------------------
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     g = parser.add_mutually_exclusive_group(required=True)
     g.add_argument(
@@ -411,7 +412,7 @@ def main() -> None:
     g.add_argument("--animal", help="all HPC sessions for this animal")
     g.add_argument("--all", action="store_true", help="every HPC session")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.epoch_identifier:
         sessions = [args.epoch_identifier]

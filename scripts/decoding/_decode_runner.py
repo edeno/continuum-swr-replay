@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import logging
 from argparse import ArgumentParser, Namespace
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -554,14 +554,16 @@ def run_decode(
             logger.info(f"NWB files Spyglass held open closed: {release_nwb_files()}")
 
 
-def parse_decode_args(parser: ArgumentParser) -> Namespace:
+def parse_decode_args(
+    parser: ArgumentParser, argv: Sequence[str] | None = None
+) -> Namespace:
     """Parse a runner's command line, refusing what no decode may run.
 
     ``--non_stationary`` is refused (``NON_STATIONARY_REFUSAL``), and an HPC
     batch is refused before any cluster starts unless the SWR source names
     both of its runs (``require_hpc_decode_sources``).
     """
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.non_stationary:
         parser.error(NON_STATIONARY_REFUSAL)
     if args.brain_area == "HPC":

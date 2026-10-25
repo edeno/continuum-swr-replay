@@ -15,7 +15,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 from collections.abc import Callable
 from pathlib import Path
 from types import ModuleType
@@ -795,12 +794,7 @@ def sweep_tree(tmp_path: Path) -> Path:
 
 def _run_sweep(argv: list[str], capsys) -> tuple[int, str]:
     module = _load_script(QA / "check_fit_provenance.py")
-    saved = sys.argv
-    sys.argv = ["check_fit_provenance.py", *argv]
-    try:
-        code = module.main()
-    finally:
-        sys.argv = saved
+    code = module.main(argv)
     return code, capsys.readouterr().out
 
 

@@ -390,13 +390,10 @@ def stubbed_run(monkeypatch, tmp_path):
     return seen, tmp_path
 
 
-def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
-    monkeypatch, stubbed_run
-):
+def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(fprm.sys, "argv", ["fit_per_bin_rate_models.py"])
 
-    fprm.main()
+    fprm.main([])
 
     # Only the well-anchored stops reached the fitter -- the 'mixed' stop s4 is
     # one of them (an at-well bout whose first samples read as in-transit).
@@ -410,21 +407,10 @@ def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
     assert provenance["stop_cohort"] == "at_well"
 
 
-def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run):
+def test_all_stops_cohort_publishes_the_suffixed_bundle(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(
-        fprm.sys,
-        "argv",
-        [
-            "fit_per_bin_rate_models.py",
-            "--stop-cohort",
-            "all_stops",
-            "--max-per-animal",
-            "1",
-        ],
-    )
 
-    fprm.main()
+    fprm.main(["--stop-cohort", "all_stops", "--max-per-animal", "1"])
 
     # No occupancy restriction: every stop is fit.
     assert seen["stop_ids"] == [f"s{i}" for i in range(6)]
@@ -436,29 +422,18 @@ def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run
     assert list(pd.read_pickle(out)["stop_cohort"]) == ["all_stops"]
 
 
-def test_in_transit_cohort_publishes_its_own_bundle(monkeypatch, stubbed_run):
+def test_in_transit_cohort_publishes_its_own_bundle(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(
-        fprm.sys,
-        "argv",
-        ["fit_per_bin_rate_models.py", "--stop-cohort", "in_transit"],
-    )
 
-    fprm.main()
+    fprm.main(["--stop-cohort", "in_transit"])
 
     assert seen["stop_ids"] == ["s2", "s3"]
     assert (tmp_path / "models_per_bin_rate" / "all_models_intransit.pkl").exists()
 
 
-def test_unknown_cohort_is_refused_by_the_parser(monkeypatch, capsys):
-    monkeypatch.setattr(
-        fprm.sys,
-        "argv",
-        ["fit_per_bin_rate_models.py", "--stop-cohort", "at_the_well"],
-    )
-
+def test_unknown_cohort_is_refused_by_the_parser(capsys):
     with pytest.raises(SystemExit) as excinfo:
-        fprm.main()
+        fprm.main(["--stop-cohort", "at_the_well"])
 
     assert excinfo.value.code == 2
     assert "at_the_well" in capsys.readouterr().err
@@ -469,11 +444,10 @@ def test_tables_from_another_swr_source_are_refused(monkeypatch, stubbed_run):
     made under another source (another artifact run, say) would mix two masks."""
     from continuum_swr_replay.analysis.events import swr_source
 
-    monkeypatch.setattr(fprm.sys, "argv", ["fit_per_bin_rate_models.py"])
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", "another_run")
 
     with pytest.raises(swr_source.SwrSourceError, match="another_run"):
-        fprm.main()
+        fprm.main([])
 
 
 # ── Row order of the saved frame (task 27) ──

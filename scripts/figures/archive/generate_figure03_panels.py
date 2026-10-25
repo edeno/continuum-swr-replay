@@ -16,6 +16,7 @@ Usage:
 import argparse
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -766,7 +767,7 @@ def plot_replay_speed_by_swr(
         logging.info(f"Saved: {figure_name}")
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for figure generation."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -797,7 +798,7 @@ def main() -> None:
         help=f"Directory containing processed data (default: {PROCESSED_DATA_DIR})",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)

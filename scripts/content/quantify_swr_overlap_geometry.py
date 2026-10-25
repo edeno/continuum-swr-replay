@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -176,7 +177,7 @@ def print_report(geom: pd.DataFrame, session_label: str) -> None:
         print(f"{coarse:>{coarse_col}} {n:>6} {pct:>6.1f}%   {label}")
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--nwb",
@@ -190,7 +191,7 @@ def main() -> None:
         default=None,
         help="Optional: save per-event geometry CSV to this path",
     )
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     geom = quantify_session(args.nwb, args.epoch)
     session_label = f"{args.nwb.replace('_.nwb', '')} {args.epoch}"

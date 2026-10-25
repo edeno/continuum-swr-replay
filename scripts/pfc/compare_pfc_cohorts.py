@@ -53,6 +53,7 @@ import argparse
 import json
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -2492,7 +2493,7 @@ def build_estimator_report(
     return "\n".join(lines)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--before-dir",
@@ -2572,7 +2573,7 @@ def main() -> None:
         default=None,
         help="Write the report here instead of stdout.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     sidecars = read_sidecars(args.after_dir, args.artifact_suffix)
     comparison = args.comparison

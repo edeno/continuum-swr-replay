@@ -54,6 +54,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -248,7 +249,7 @@ def fit_per_stop_rate_hierarchy(
     return pd.DataFrame(rows), records
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--max-per-animal",
@@ -268,7 +269,7 @@ def main() -> None:
         ),
     )
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Causal-hygiene gate: R1 uses the past-only reward-history basis, so the
     # per-stop ladder is pre-outcome throughout; a future leak fails loud.

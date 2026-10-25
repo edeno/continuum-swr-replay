@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -160,7 +161,7 @@ def log_cross_session_role_summary(summary: pd.DataFrame) -> None:
         )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--content-stratum",
@@ -192,7 +193,7 @@ def main() -> None:
             "applies no occupancy restriction and publishes '_allstops' names."
         ),
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     cache_path = summary_path(args.stop_cohort)
     if not cache_path.exists() or args.rebuild_summary:

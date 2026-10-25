@@ -31,6 +31,7 @@ Usage:
 import argparse
 import os
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 os.environ["JAX_PLATFORMS"] = "cpu"
@@ -1140,7 +1141,7 @@ def generate_figure(n_neurons=30, seed=0):
     return fig
 
 
-def main():
+def main(argv: Sequence[str] | None = None):
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1160,7 +1161,7 @@ def main():
     parser.add_argument("--dpi", type=int, default=450)
     parser.add_argument("--show", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     _ = generate_figure(n_neurons=args.n_neurons, seed=args.seed)

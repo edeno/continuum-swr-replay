@@ -32,6 +32,7 @@ Usage:
 import argparse
 import time as clock
 import zlib
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -456,14 +457,14 @@ def summarize(table: pd.DataFrame) -> pd.DataFrame:
     return summary
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--n-seeds", type=int, default=8)
     parser.add_argument("--folds", nargs="+", default=["A", "B", "C"])
     parser.add_argument("--n-recordings", type=int, default=sweep_controls.N_RECORDINGS)
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     started = clock.time()
     rows = []

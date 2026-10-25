@@ -11,7 +11,6 @@ by faking ``load_data`` and pointing the cache at ``tmp_path``.
 from __future__ import annotations
 
 import pickle
-import sys
 
 import networkx as nx
 import pandas as pd
@@ -366,10 +365,9 @@ def test_canonical_build_aborts_instead_of_publishing_a_partial_session_set(
         raise ValueError("physical-poke chain mismatch")
 
     monkeypatch.setattr(pdm, "_process_session", fail_session)
-    monkeypatch.setattr(sys, "argv", ["prepare_replay_content_data.py"])
 
     with pytest.raises(RuntimeError, match="No scientific tables were written"):
-        prepare_cli.main()
+        prepare_cli.main([])
     assert not (tmp_path / "candidate").exists()
 
 

@@ -52,6 +52,7 @@ import argparse
 import hashlib
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import joblib
@@ -591,7 +592,7 @@ def _render_figure(inputs: dict, window_sec: float = 0.4):
     return fig
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -617,7 +618,7 @@ def main() -> None:
     )
     parser.add_argument("--show", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     generate_figure(

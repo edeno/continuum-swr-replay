@@ -43,6 +43,7 @@ qvals_standardization_reference.json beside it.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 from continuum_swr_replay.analysis.behavior.qvals_table import (
@@ -52,7 +53,7 @@ from continuum_swr_replay.analysis.behavior.qvals_table import (
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--animal", choices=analysed_animals(), default=None)
     p.add_argument("--write", action="store_true")
@@ -66,7 +67,7 @@ def main() -> None:
             "prepare_replay_content_data.py."
         ),
     )
-    args = p.parse_args()
+    args = p.parse_args(argv)
     run_build_qvals_table(args)
 
 

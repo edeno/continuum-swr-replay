@@ -62,6 +62,8 @@ Usage:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from continuum_swr_replay.runs.threads import pin_blas_threads
 
 # Pin BLAS to one thread per process BEFORE numpy is imported: with the
@@ -552,7 +554,7 @@ def _cohort_records(
     return recs
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--max-per-animal",
@@ -579,7 +581,7 @@ def main() -> None:
     )
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
     parser.add_argument("--no-gof", action="store_true", help="Skip goodness-of-fit.")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Causal-hygiene gate: the per-bin design basis (spline, reward kernel,
     # self-/cross-history) is backward/within-stop safe; a future leak fails loud.

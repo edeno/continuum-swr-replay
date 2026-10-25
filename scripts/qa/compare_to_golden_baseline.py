@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 from continuum_swr_replay.paths import (
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 RC = REPLAY_CONTENT_DIR
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", type=Path, default=RC)
     parser.add_argument("--baseline", type=Path, required=True)
@@ -77,7 +78,7 @@ def main() -> None:
         ),
     )
     parser.add_argument("--atol", type=float, default=0.0)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # Accept both `--expected-added-columns a b` and `--expected-added-columns a,b`
     # so a four-name declaration can be pasted as one token.
     expected_added_columns = tuple(

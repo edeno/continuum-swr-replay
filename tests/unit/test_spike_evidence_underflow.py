@@ -12,8 +12,6 @@ input here is synthetic: a straight track of 2 cm bins and a stand-in encoding.
 
 from __future__ import annotations
 
-import sys
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -192,14 +190,7 @@ def test_the_run_records_how_many_events_each_epoch_left_out(
         spike_evidence, "analyze_session", lambda *_a, **_k: (metrics, context)
     )
     out = tmp_path / "out"
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["analyze_event_spike_evidence.py", "--epoch-identifier", EPOCH_ID,
-         "--output-dir", str(out)],
-    )  # fmt: skip
-
-    spike_evidence.main()
+    spike_evidence.main(["--epoch-identifier", EPOCH_ID, "--output-dir", str(out)])
 
     left_out = pd.read_csv(out / "event_spike_evidence_left_out.csv")
     assert left_out.to_dict("records") == [

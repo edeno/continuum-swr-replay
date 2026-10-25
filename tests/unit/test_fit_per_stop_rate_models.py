@@ -42,11 +42,9 @@ def no_fitting(monkeypatch):
     return calls
 
 
-def test_help_exits_zero_without_fitting(monkeypatch, capsys, no_fitting):
-    monkeypatch.setattr(fpsr.sys, "argv", ["fit_per_stop_rate_models.py", "--help"])
-
+def test_help_exits_zero_without_fitting(capsys, no_fitting):
     with pytest.raises(SystemExit) as excinfo:
-        fpsr.main()
+        fpsr.main(["--help"])
 
     assert excinfo.value.code == 0
     assert no_fitting == []
@@ -56,29 +54,20 @@ def test_help_exits_zero_without_fitting(monkeypatch, capsys, no_fitting):
     assert "--stop-cohort" in help_text
 
 
-def test_unknown_flag_exits_two_without_fitting(monkeypatch, capsys, no_fitting):
-    monkeypatch.setattr(
-        fpsr.sys, "argv", ["fit_per_stop_rate_models.py", "--not-a-flag"]
-    )
-
+def test_unknown_flag_exits_two_without_fitting(capsys, no_fitting):
     with pytest.raises(SystemExit) as excinfo:
-        fpsr.main()
+        fpsr.main(["--not-a-flag"])
 
     assert excinfo.value.code == 2
     assert no_fitting == []
     assert "--not-a-flag" in capsys.readouterr().err
 
 
-def test_unknown_stop_cohort_exits_two_without_fitting(monkeypatch, capsys, no_fitting):
+def test_unknown_stop_cohort_exits_two_without_fitting(capsys, no_fitting):
     """A cohort name the rule does not define must not reach the fitter."""
-    monkeypatch.setattr(
-        fpsr.sys,
-        "argv",
-        ["fit_per_stop_rate_models.py", "--stop-cohort", "at_the_well"],
-    )
 
     with pytest.raises(SystemExit) as excinfo:
-        fpsr.main()
+        fpsr.main(["--stop-cohort", "at_the_well"])
 
     assert excinfo.value.code == 2
     assert no_fitting == []
@@ -137,13 +126,10 @@ def stubbed_run(monkeypatch, tmp_path):
     return seen, tmp_path
 
 
-def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
-    monkeypatch, stubbed_run
-):
+def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(fpsr.sys, "argv", ["fit_per_stop_rate_models.py"])
 
-    fpsr.main()
+    fpsr.main([])
 
     # Only the well-anchored stops reached the fitter -- the 'mixed' stop s4 is
     # one of them (an at-well bout whose first samples read as in-transit).
@@ -161,24 +147,18 @@ def test_a_stop_table_from_another_swr_source_is_refused(monkeypatch, stubbed_ru
     stop = _cohort_stop_table()
     stop.attrs["swr_source"] = "kay@another_run+artifacts@none"
     monkeypatch.setattr(fpsr, "read_table", lambda _path: stop)
-    monkeypatch.setattr(fpsr.sys, "argv", ["fit_per_stop_rate_models.py"])
 
     with pytest.raises(SwrSourceError, match="another_run"):
-        fpsr.main()
+        fpsr.main([])
 
     assert seen == {}
     assert not (tmp_path / "models_per_stop_rate").exists()
 
 
-def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run):
+def test_all_stops_cohort_publishes_the_suffixed_bundle(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(
-        fpsr.sys,
-        "argv",
-        ["fit_per_stop_rate_models.py", "--stop-cohort", "all_stops", "--no-cv"],
-    )
 
-    fpsr.main()
+    fpsr.main(["--stop-cohort", "all_stops", "--no-cv"])
 
     assert seen["stop_ids"] == [f"s{i}" for i in range(6)]
     out = tmp_path / "models_per_stop_rate" / "all_models_allstops.pkl"
@@ -187,15 +167,10 @@ def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run
     assert not (tmp_path / "models_per_stop_rate" / "all_models.pkl").exists()
 
 
-def test_in_transit_cohort_publishes_its_own_bundle(monkeypatch, stubbed_run):
+def test_in_transit_cohort_publishes_its_own_bundle(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(
-        fpsr.sys,
-        "argv",
-        ["fit_per_stop_rate_models.py", "--stop-cohort", "in_transit", "--no-cv"],
-    )
 
-    fpsr.main()
+    fpsr.main(["--stop-cohort", "in_transit", "--no-cv"])
 
     assert seen["stop_ids"] == ["s2", "s3"]
     assert (tmp_path / "models_per_stop_rate" / "all_models_intransit.pkl").exists()

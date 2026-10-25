@@ -38,6 +38,8 @@ Usage::
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from continuum_swr_replay.runs.threads import pin_blas_threads
 
 # Pin BLAS to one thread BEFORE numpy import (matches the Family B orchestrator).
@@ -566,7 +568,7 @@ def _write_outputs(
     return out
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--max-per-animal",
@@ -596,7 +598,7 @@ def main() -> None:
             "from the full trial stream."
         ),
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
 

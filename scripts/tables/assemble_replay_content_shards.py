@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -229,7 +230,7 @@ def assemble_replay_stop_shards(
     return stop_table
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("shard_dirs", nargs="+", type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
@@ -246,7 +247,7 @@ def main() -> None:
         action="store_true",
         help="Assemble only stop_table shards for the qvals bootstrap.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     shard_dirs = [path.resolve() for path in args.shard_dirs]
     if args.stop_only:

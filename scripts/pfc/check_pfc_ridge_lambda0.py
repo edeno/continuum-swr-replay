@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -391,7 +392,7 @@ def build_report(per_model: pd.DataFrame, diagnostics_dir: Path) -> str:
     return "\n".join(lines)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--diagnostics-dir",
@@ -421,7 +422,7 @@ def main() -> None:
         help="Permit the batched fitter to run on CPU when no GPU is free.",
     )
     parser.add_argument("--out", type=Path, default=None)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 

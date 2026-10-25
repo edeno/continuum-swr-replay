@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -141,7 +142,7 @@ def _build_session_list(animal: str | None, limit: int | None) -> pd.DataFrame:
     return df
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--output",
@@ -161,7 +162,7 @@ def main() -> None:
         default=None,
         help="Only process the first N sessions (for testing)",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     output_path = PROCESSED_DATA_DIR / args.output
     sessions = _build_session_list(args.animal, args.limit)

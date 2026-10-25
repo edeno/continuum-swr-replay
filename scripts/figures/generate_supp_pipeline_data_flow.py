@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -494,8 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
 
     dot, env = load_session(args.animal, args.day, args.epoch)
     long_count = read_table(table_path("event_arm_table", RC))

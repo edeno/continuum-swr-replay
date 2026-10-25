@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -178,7 +179,7 @@ def generate_figure(data_dir: Path = PROCESSED_DATA_DIR):
     return fig
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -189,7 +190,7 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, default=PROCESSED_DATA_DIR)
     parser.add_argument("--show", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     generate_figure(data_dir=args.data_dir)

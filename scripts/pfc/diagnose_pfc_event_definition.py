@@ -28,6 +28,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -286,7 +287,7 @@ def _print_summary(summary: dict) -> None:
     print("-" * (width + 24))
 
 
-def get_command_line_arguments() -> argparse.Namespace:
+def get_command_line_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -315,11 +316,11 @@ def get_command_line_arguments() -> argparse.Namespace:
         default=DEFAULT_NON_LOCAL_THRESHOLD,
         help="Posterior threshold the old construction detected events at",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> None:
-    args = get_command_line_arguments()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = get_command_line_arguments(argv)
     nwb_file_name = f"{args.animal}{args.date}_.nwb"
 
     per_event, summary = build_comparison(

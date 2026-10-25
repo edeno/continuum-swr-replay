@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
@@ -180,8 +181,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
 
     rc = model_dir("per_bin_rate")
     fname = "uncertainty_rate_smoke.pkl" if args.smoke else "uncertainty_rate.pkl"

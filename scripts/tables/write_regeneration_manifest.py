@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -587,7 +587,7 @@ def write_manifest(
     return manifest
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay-root", required=True, type=Path)
     parser.add_argument("--contfrag-root", required=True, type=Path)
@@ -608,7 +608,7 @@ def main() -> None:
         help="Columns the candidate is expected to change vs --baseline-replay; "
         "any other drift fails the parity gate.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     write_manifest(
         replay_root=args.replay_root.resolve(),
         contfrag_root=args.contfrag_root.resolve(),

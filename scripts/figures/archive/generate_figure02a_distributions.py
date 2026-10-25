@@ -18,6 +18,7 @@ Usage:
 import argparse
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -405,7 +406,7 @@ def plot_nospike_distribution(
     logging.info(f"Saved: {figure_name}")
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for figure generation."""
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -436,7 +437,7 @@ def main() -> None:
         help="Directory containing processed data (default: /cumulus/edeno/non_local_paper/Processed-Data)",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)

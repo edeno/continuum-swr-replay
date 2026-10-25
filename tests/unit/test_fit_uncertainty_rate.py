@@ -101,13 +101,10 @@ def stubbed_run(monkeypatch, tmp_path):
     return seen, tmp_path
 
 
-def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
-    monkeypatch, stubbed_run
-):
+def test_default_cohort_is_at_well_and_publishes_the_canonical_names(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(mod.sys, "argv", ["fit_uncertainty_rate.py"])
 
-    mod.main()
+    mod.main([])
 
     # Only the well-anchored stops of the non-exposure session reached the
     # fitter -- the 'mixed' stop s4 is one of them (an at-well bout whose first
@@ -122,13 +119,10 @@ def test_default_cohort_is_at_well_and_publishes_the_canonical_names(
     assert (out.parent / "uncertainty_rate_cohort_audit.csv").exists()
 
 
-def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run):
+def test_all_stops_cohort_publishes_the_suffixed_bundle(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(
-        mod.sys, "argv", ["fit_uncertainty_rate.py", "--stop-cohort", "all_stops"]
-    )
 
-    mod.main()
+    mod.main(["--stop-cohort", "all_stops"])
 
     assert seen["stop_ids"] == [f"s{i}" for i in range(6)]
     out = tmp_path / "models_per_bin_rate" / "uncertainty_rate_allstops.pkl"
@@ -137,13 +131,10 @@ def test_all_stops_cohort_publishes_the_suffixed_bundle(monkeypatch, stubbed_run
     assert not (tmp_path / "models_per_bin_rate" / "uncertainty_rate.pkl").exists()
 
 
-def test_in_transit_cohort_publishes_its_own_bundle(monkeypatch, stubbed_run):
+def test_in_transit_cohort_publishes_its_own_bundle(stubbed_run):
     seen, tmp_path = stubbed_run
-    monkeypatch.setattr(
-        mod.sys, "argv", ["fit_uncertainty_rate.py", "--stop-cohort", "in_transit"]
-    )
 
-    mod.main()
+    mod.main(["--stop-cohort", "in_transit"])
 
     assert seen["stop_ids"] == ["s2", "s3"]
     assert (
@@ -151,13 +142,9 @@ def test_in_transit_cohort_publishes_its_own_bundle(monkeypatch, stubbed_run):
     ).exists()
 
 
-def test_unknown_cohort_is_refused_by_the_parser(monkeypatch, capsys):
-    monkeypatch.setattr(
-        mod.sys, "argv", ["fit_uncertainty_rate.py", "--stop-cohort", "at_the_well"]
-    )
-
+def test_unknown_cohort_is_refused_by_the_parser(capsys):
     with pytest.raises(SystemExit) as excinfo:
-        mod.main()
+        mod.main(["--stop-cohort", "at_the_well"])
 
     assert excinfo.value.code == 2
     assert "at_the_well" in capsys.readouterr().err

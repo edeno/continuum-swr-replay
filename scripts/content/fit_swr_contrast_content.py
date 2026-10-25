@@ -72,6 +72,7 @@ import json
 import logging
 import sys
 import warnings
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -722,7 +723,7 @@ def _provenance(
     }
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--max-per-animal",
@@ -811,7 +812,7 @@ def main() -> None:
             "and write '_rewarded' / '_omitted' artifacts."
         ),
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     if args.concentration_length and args.estimator != "dirichlet_multinomial":
         # The conditional Poisson has no concentration parameter at all, so
         # there is nothing for a length term to enter; accepting the flag would

@@ -18,6 +18,7 @@ Usage:
 import argparse
 import logging
 import pickle
+from collections.abc import Sequence
 
 import matplotlib
 
@@ -83,8 +84,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None):
+    args = build_parser().parse_args(argv)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── Load results ──

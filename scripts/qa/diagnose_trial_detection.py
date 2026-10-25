@@ -20,6 +20,7 @@ Two figures:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -263,7 +264,7 @@ def figure_predictor_collapse(*, output_dir: Path) -> None:
     plt.close(fig)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--animal", default="wilbur")
     p.add_argument("--day", type=int, default=20210402)
@@ -273,7 +274,7 @@ def main() -> None:
     p.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/qc_diagnosis")
     )
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     figure_trial_sanity(
         animal=args.animal,

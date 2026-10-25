@@ -24,6 +24,7 @@ standardization factor is 1.0.
 """
 
 import argparse
+from collections.abc import Sequence
 
 import matplotlib
 
@@ -453,8 +454,8 @@ def content_patch_figure(P, sd):
     return fig
 
 
-def main() -> None:
-    allow_stale = build_parser().parse_args().allow_stale
+def main(argv: Sequence[str] | None = None) -> None:
+    allow_stale = build_parser().parse_args(argv).allow_stale
     # The provenance gate fires ahead of the first table read.
     require_fresh_inputs(
         SWR_CONTRAST_RATE, SWR_CONTRAST_RATE_INPUTS, allow_stale=allow_stale

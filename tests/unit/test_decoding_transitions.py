@@ -298,10 +298,8 @@ def test_non_stationary_flag_is_refused_before_any_work(
     """
     module = decoders[decoder]
     monkeypatch.setattr(module, "run_batch", _no_batch)
-    monkeypatch.setattr(sys, "argv", [f"{module.__name__}.py", "--non_stationary"])
-
     with pytest.raises(SystemExit) as refused:
-        module.main()
+        module.main(["--non_stationary"])
 
     assert refused.value.code == 2
     message = capsys.readouterr().err

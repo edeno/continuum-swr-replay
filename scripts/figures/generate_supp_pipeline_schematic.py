@@ -12,6 +12,7 @@ Output:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.patches as mpatches
@@ -194,14 +195,14 @@ def draw_schematic(output_dir: Path) -> None:
     plt.close(fig)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=Path("paper/figures/qc_diagnosis"),
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     draw_schematic(args.output_dir)
     print(f"Saved schematic to {args.output_dir}/pipeline_schematic.{{png,pdf}}")
 

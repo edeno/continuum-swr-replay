@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -115,8 +116,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _parse_args() -> argparse.Namespace:
-    return build_parser().parse_args()
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    return build_parser().parse_args(argv)
 
 
 def resolve_models_dir(data_dir: Path, models_dir: Path | None = None) -> Path:
@@ -307,8 +308,8 @@ def _write_summary(
     output_path.write_text("\n".join(lines))
 
 
-def main() -> None:
-    args = _parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = _parse_args(argv)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",

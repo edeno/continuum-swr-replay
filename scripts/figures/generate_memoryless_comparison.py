@@ -29,6 +29,7 @@ Usage:
 import argparse
 import string
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -2119,7 +2120,7 @@ def read_summary(path: Path, producer: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
@@ -2130,7 +2131,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/memoryless_comparison")
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
     summary = read_summary(

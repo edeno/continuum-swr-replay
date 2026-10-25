@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -444,7 +445,7 @@ def _plot_segment_error(data: pd.DataFrame, output_path) -> None:
     plt.close(fig)
 
 
-def main():
+def main(argv: Sequence[str] | None = None):
     parser = argparse.ArgumentParser(description="Compute decoding quality metrics")
     parser.add_argument(
         "--output",
@@ -481,7 +482,7 @@ def main():
             "is silently skipped."
         ),
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     data = load_all_sessions(animal=args.animal, threshold=args.threshold)
     non_local_threshold = args.threshold / 100.0

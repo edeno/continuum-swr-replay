@@ -24,6 +24,7 @@ Usage:
 import argparse
 import logging
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -329,7 +330,7 @@ def generate_figure(
     return fig
 
 
-def main():
+def main(argv: Sequence[str] | None = None):
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -348,7 +349,7 @@ def main():
     )
     parser.add_argument("--show", action="store_true")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     generate_figure(

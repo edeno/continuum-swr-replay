@@ -17,6 +17,7 @@ import argparse
 import ast
 import difflib
 import sys
+from collections.abc import Sequence
 from itertools import takewhile
 from pathlib import Path
 
@@ -284,14 +285,14 @@ def render() -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--check",
         action="store_true",
         help="Do not write; exit 1 if the committed map differs from the tree.",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     generated = render()
     if not args.check:

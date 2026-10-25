@@ -27,6 +27,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -175,7 +176,7 @@ def assert_matches_arm_fractions(
     return max_abs
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--reference", type=Path, required=True)
@@ -201,7 +202,7 @@ def main() -> None:
         ),
     )
     parser.add_argument("--report", type=Path, default=None)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     added = tuple(args.added_columns)
     candidate = read_table(args.candidate)

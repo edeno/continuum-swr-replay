@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
@@ -43,7 +44,7 @@ ANIMAL_MARKERS = dict(zip(ANIMAL_ORDER, ["o", "s", "^", "D", "P"], strict=True))
 SCOPE_COLORS = {"all": "#666666", "unchosen": WONG[5]}
 
 
-def _parse_args() -> argparse.Namespace:
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -65,7 +66,7 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Keep figures open after saving.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
@@ -938,8 +939,8 @@ are correlational.
     (output_dir / "uncertainty_content_caption.md").write_text(caption)
 
 
-def main() -> None:
-    args = _parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = _parse_args(argv)
     set_figure_defaults(context="paper")
     results = _load_results(args.results_dir)
     args.output_dir.mkdir(parents=True, exist_ok=True)

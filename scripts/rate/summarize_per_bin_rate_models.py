@@ -30,6 +30,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -227,8 +228,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None):
+    args = build_parser().parse_args(argv)
     require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     global df
     df = pd.read_pickle(ALL_MODELS)

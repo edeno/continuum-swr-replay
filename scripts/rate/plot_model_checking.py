@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 
 import matplotlib
 import numpy as np
@@ -396,8 +397,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
     require_fresh_inputs(ALL_MODELS, ALL_MODELS_INPUTS, allow_stale=args.allow_stale)
     df = pd.read_pickle(ALL_MODELS)
     FIGS.mkdir(parents=True, exist_ok=True)

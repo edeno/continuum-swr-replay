@@ -38,6 +38,7 @@ import argparse
 import logging
 import pickle
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -457,8 +458,8 @@ def configure_paths(args: argparse.Namespace) -> tuple[Path, Path]:
     return output_dir, replay_content_dir
 
 
-def main():
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None):
+    args = build_parser().parse_args(argv)
     output_dir, replay_content_dir = configure_paths(args)
 
     max_per_animal = 2 if args.test else args.max_per_animal

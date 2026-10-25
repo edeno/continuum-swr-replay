@@ -33,6 +33,7 @@ Saved to ``--save_dir`` (default PROCESSED_DATA_DIR) with ``_contfrag`` suffix:
 import sys
 import warnings
 from argparse import ArgumentParser
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -128,12 +129,12 @@ def run_decode(
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for batch ContFrag decoding."""
     parser = add_common_args(
         ArgumentParser(description="Run ContFrag decoding on spatial bandit data")
     )
-    args = _decode_runner.parse_decode_args(parser)
+    args = _decode_runner.parse_decode_args(parser, argv)
     run_batch(run_decode, args)
 
 

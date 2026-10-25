@@ -764,10 +764,7 @@ def stubbed_fan_out(monkeypatch, tmp_path):
 
     def run(workers: int, finish=lambda futures: list(futures)):
         monkeypatch.setattr(mod, "as_completed", finish)
-        monkeypatch.setattr(
-            mod.sys, "argv", ["fit_swr_contrast_rate.py", "--workers", str(workers)]
-        )
-        mod.main()
+        mod.main(["--workers", str(workers)])
         return saved.read_bytes(), pd.read_pickle(saved), aggregated[-1]
 
     return run

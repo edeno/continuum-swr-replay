@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -103,7 +104,7 @@ def validate(
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-per-animal", type=int, default=None)
     ap.add_argument("--no-save", action="store_true")
@@ -117,7 +118,7 @@ def main() -> None:
             "overwriting it."
         ),
     )
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     sessions = find_sessions(max_per_animal=args.max_per_animal)
     logger.info("building time-binned tables for %d sessions...", len(sessions))

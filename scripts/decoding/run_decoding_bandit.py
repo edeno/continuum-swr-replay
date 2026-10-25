@@ -40,6 +40,7 @@ import logging
 import sys
 import warnings
 from argparse import ArgumentParser
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -181,14 +182,14 @@ def run_decode(
     )
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for batch decoding analysis."""
     parser = add_common_args(ArgumentParser())
     parser.add_argument(
         "--non_local_threshold", type=float, default=DEFAULT_NON_LOCAL_THRESHOLD
     )
     parser.add_argument("--create_figurl", action="store_true")
-    args = _decode_runner.parse_decode_args(parser)
+    args = _decode_runner.parse_decode_args(parser, argv)
 
     run_batch(
         run_decode,

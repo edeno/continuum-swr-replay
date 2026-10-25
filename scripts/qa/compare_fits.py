@@ -3892,8 +3892,8 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
+def main(argv: Sequence[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
     if args.content and args.cohort_contrast:
         raise SystemExit("--content and --cohort-contrast are separate modes")
     if args.out is None:

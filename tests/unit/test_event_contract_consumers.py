@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-
 import pandas as pd
 import pytest
 
@@ -68,20 +66,10 @@ def test_spike_evidence_main_propagates_event_contract_error(monkeypatch, tmp_pa
             EventDefinitionError("stale event labels")
         ),
     )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            str(analyze_event_spike_evidence.__file__),
-            "--epoch-identifier",
-            "a_01_r1_HPC",
-            "--output-dir",
-            str(tmp_path),
-        ],
-    )
-
     with pytest.raises(EventDefinitionError, match="stale event labels"):
-        analyze_event_spike_evidence.main()
+        analyze_event_spike_evidence.main(
+            ["--epoch-identifier", "a_01_r1_HPC", "--output-dir", str(tmp_path)]
+        )
 
     assert list(tmp_path.iterdir()) == []
 

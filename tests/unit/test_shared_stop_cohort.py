@@ -221,13 +221,9 @@ def test_rate_runners_route_through_the_shared_rule(module):
 
 
 @pytest.mark.parametrize("module", RATE_RUNNERS, ids=lambda m: m.__name__)
-def test_rate_runners_offer_every_cohort_on_the_command_line(
-    module, monkeypatch, capsys
-):
-    monkeypatch.setattr(module.sys, "argv", [module.__name__, "--help"])
-
+def test_rate_runners_offer_every_cohort_on_the_command_line(module, capsys):
     with pytest.raises(SystemExit) as excinfo:
-        module.main()
+        module.main(["--help"])
 
     assert excinfo.value.code == 0
     help_text = capsys.readouterr().out
@@ -237,13 +233,9 @@ def test_rate_runners_offer_every_cohort_on_the_command_line(
 
 
 @pytest.mark.parametrize("module", RATE_RUNNERS, ids=lambda m: m.__name__)
-def test_rate_runners_refuse_an_unknown_cohort(module, monkeypatch, capsys):
-    monkeypatch.setattr(
-        module.sys, "argv", [module.__name__, "--stop-cohort", "at_the_well"]
-    )
-
+def test_rate_runners_refuse_an_unknown_cohort(module, capsys):
     with pytest.raises(SystemExit) as excinfo:
-        module.main()
+        module.main(["--stop-cohort", "at_the_well"])
 
     assert excinfo.value.code == 2
     assert "at_the_well" in capsys.readouterr().err

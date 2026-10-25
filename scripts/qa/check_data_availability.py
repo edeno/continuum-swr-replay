@@ -15,6 +15,7 @@ import argparse
 import logging
 import traceback
 import warnings
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -226,11 +227,11 @@ def check_session(nwb_file_name: str, epoch_name: str, animal: str, date: int) -
     return result
 
 
-def main():
+def main(argv: Sequence[str] | None = None):
     parser = argparse.ArgumentParser(description="Check data availability for all sessions")
     parser.add_argument("--animal", type=str, default=None, help="Filter to specific animal")
     parser.add_argument("--output", type=str, default=None, help="Save results to CSV")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     print("Loading epoch info...")
     # Every epoch Spyglass lists, not only the epoch register's analysed ones:

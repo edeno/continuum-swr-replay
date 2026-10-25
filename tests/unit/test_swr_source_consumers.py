@@ -600,11 +600,7 @@ def test_the_timebin_tables_are_published_with_the_sources_stamp(
             table, frame.attrs.get("swr_source")
         ),
     )
-    monkeypatch.setattr(
-        sys, "argv", ["build_timebin_tables.py", "--output-dir", str(tmp_path)]
-    )
-
-    script.main()
+    script.main(["--output-dir", str(tmp_path)])
 
     assert stamps == {
         "event_onset": swr_source.swr_source_name(),
@@ -623,10 +619,8 @@ def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
     monkeypatch.setattr(script, "build_one", lambda s: _stop_frame())
     monkeypatch.setattr(script, "read_table", lambda path: event_table)
     monkeypatch.setattr(script, "require_covariate_schema", lambda frame, table: None)
-    monkeypatch.setattr(sys, "argv", ["regenerate_stop_table.py", "--no-save"])
-
     with pytest.raises(SwrSourceError, match="an_earlier_run"):
-        script.main()
+        script.main(["--no-save"])
 
 
 @pytest.mark.parametrize("stale_shard", [False, True], ids=["current", "stale"])

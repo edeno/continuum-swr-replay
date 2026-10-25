@@ -30,6 +30,7 @@ Usage:
 
 import argparse
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -550,7 +551,7 @@ def sweep_totals(n_seeds: int) -> pd.DataFrame:
     return pd.DataFrame(totals).rename_axis("measure")
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     # the CPU unless JAX_PLATFORMS names another
     default_jax_platforms("cpu")
     parser = argparse.ArgumentParser(description=__doc__)
@@ -560,7 +561,7 @@ def main() -> None:
     )
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     parser.add_argument("--summary", type=Path, default=SUMMARY_PATH)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
     decoded = simulate_and_decode(args.n_neurons, config)

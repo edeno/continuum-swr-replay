@@ -55,6 +55,7 @@ import logging
 import sys
 import warnings
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -1263,7 +1264,7 @@ def run_analysis_then_release(
         ).info("NWB files Spyglass held open closed: %s", release_nwb_files())
 
 
-def get_command_line_arguments() -> Namespace:
+def get_command_line_arguments(argv: Sequence[str] | None = None) -> Namespace:
     parser = ArgumentParser(
         description=__doc__,
         formatter_class=RawDescriptionHelpFormatter,
@@ -1452,7 +1453,7 @@ def get_command_line_arguments() -> Namespace:
         ),
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.penalty_sigma <= 0:
         parser.error(
             f"--penalty-sigma {args.penalty_sigma} is not positive; it is a "
@@ -1676,9 +1677,9 @@ def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
     return epoch_info
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for batch PFC GLM analysis."""
-    args = get_command_line_arguments()
+    args = get_command_line_arguments(argv)
     # before any cluster starts: its worker processes inherit this limit
     old_soft, new_soft = raise_open_file_limit()
     print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)

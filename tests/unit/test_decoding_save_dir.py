@@ -1198,15 +1198,13 @@ def test_main_refuses_an_hpc_batch_without_both_runs(
     monkeypatch.setattr(module, "run_batch", lambda *args, **kw: batches.append(args))
     monkeypatch.setattr(swr_source, "ARTIFACT_INTERVALS_RUN_ID", None)
 
-    monkeypatch.setattr(sys, "argv", ["decoder"])
     with pytest.raises(SystemExit) as stopped:
-        module.main()
+        module.main([])
     assert stopped.value.code == 2
     assert "swr_source.ARTIFACT_INTERVALS_RUN_ID" in capsys.readouterr().err
     assert batches == []
 
-    monkeypatch.setattr(sys, "argv", ["decoder", "--brain_area", "mPFC"])
-    module.main()
+    module.main(["--brain_area", "mPFC"])
     assert len(batches) == 1
 
 

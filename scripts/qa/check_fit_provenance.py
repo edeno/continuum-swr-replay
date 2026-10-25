@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -178,7 +179,7 @@ def format_line(result: dict[str, object], root: Path) -> str:
     return f"STALE          {label}  (inherited: {names})"
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "artifacts",
@@ -195,7 +196,7 @@ def main() -> int:
     parser.add_argument(
         "--json", action="store_true", help="Emit the results as JSON instead."
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     root = args.root.resolve()
     if args.artifacts:

@@ -65,6 +65,7 @@ import argparse
 import logging
 import warnings
 import zlib
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
@@ -1743,7 +1744,7 @@ def render_epoch(
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -1765,7 +1766,7 @@ def main() -> None:
 
     sub.add_parser("list-epochs", help="Print epoch-ids present in the catalog.")
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.command == "catalog":
         build_catalog(args.data_dir, args.gallery_dir, args.n_per_category)

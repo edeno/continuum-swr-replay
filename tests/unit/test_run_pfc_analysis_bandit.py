@@ -31,10 +31,8 @@ runner = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(runner)
 
 
-def test_stop_cohort_defaults_to_the_canonical_at_well_population(monkeypatch):
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
-
-    args = runner.get_command_line_arguments()
+def test_stop_cohort_defaults_to_the_canonical_at_well_population():
+    args = runner.get_command_line_arguments([])
 
     assert args.stop_cohort == "at_well"
     assert args.output_dir == runner.PROCESSED_DATA_DIR
@@ -42,15 +40,9 @@ def test_stop_cohort_defaults_to_the_canonical_at_well_population(monkeypatch):
     assert args.n_control_draws == runner.DEFAULT_CONTROL_DRAWS == 1_000
 
 
-def test_an_unoffered_cohort_is_rejected(monkeypatch):
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
-        ["run_pfc_analysis_bandit.py", "--stop-cohort", "in_transit"],
-    )
-
+def test_an_unoffered_cohort_is_rejected():
     with pytest.raises(SystemExit) as excinfo:
-        runner.get_command_line_arguments()
+        runner.get_command_line_arguments(["--stop-cohort", "in_transit"])
 
     assert excinfo.value.code == 2
 
@@ -693,7 +685,7 @@ class TestSessionPartitionFile:
         with pytest.raises(ValueError, match="names no sessions"):
             runner.read_session_list(path)
 
-    def test_only_the_named_sessions_are_fit(self, tmp_path, monkeypatch):
+    def test_only_the_named_sessions_are_fit(self, tmp_path):
         keys = [
             ("chimi20200223_.nwb", "02_r1"),
             ("chimi20200223_.nwb", "06_r3"),
@@ -701,12 +693,7 @@ class TestSessionPartitionFile:
         ]
         path = tmp_path / "worker1.sessions"
         path.write_text("j1620210710_.nwb 02_r1\nchimi20200223_.nwb 06_r3\n")
-        monkeypatch.setattr(
-            runner.sys,
-            "argv",
-            ["run_pfc_analysis_bandit.py", "--sessions", str(path)],
-        )
-        args = runner.get_command_line_arguments()
+        args = runner.get_command_line_arguments(["--sessions", str(path)])
 
         filtered = runner._filter_epoch_info(_epoch_info(keys), args)
 
@@ -715,74 +702,47 @@ class TestSessionPartitionFile:
             ("chimi20200223_.nwb", "06_r3"),
         }
 
-    def test_a_session_that_does_not_exist_stops_the_worker(
-        self, tmp_path, monkeypatch
-    ):
+    def test_a_session_that_does_not_exist_stops_the_worker(self, tmp_path):
         # A mistyped partition line must not quietly shrink the batch: the
         # missing session would simply never be fit, and the shortfall would
         # only show up when the audit counted 70 bundles instead of 71.
         keys = [("chimi20200223_.nwb", "02_r1")]
         path = tmp_path / "worker2.sessions"
         path.write_text("chimi20200223_.nwb 99_r9\n")
-        monkeypatch.setattr(
-            runner.sys,
-            "argv",
-            ["run_pfc_analysis_bandit.py", "--sessions", str(path)],
-        )
-        args = runner.get_command_line_arguments()
+        args = runner.get_command_line_arguments(["--sessions", str(path)])
 
         with pytest.raises(ValueError, match="chimi20200223_.nwb 99_r9"):
             runner._filter_epoch_info(_epoch_info(keys), args)
 
-    def test_a_partition_composes_with_the_animal_filter(self, tmp_path, monkeypatch):
+    def test_a_partition_composes_with_the_animal_filter(self, tmp_path):
         keys = [
             ("chimi20200223_.nwb", "02_r1"),
             ("j1620210710_.nwb", "02_r1"),
         ]
         path = tmp_path / "worker3.sessions"
         path.write_text("chimi20200223_.nwb 02_r1\nj1620210710_.nwb 02_r1\n")
-        monkeypatch.setattr(
-            runner.sys,
-            "argv",
-            [
-                "run_pfc_analysis_bandit.py",
-                "--sessions",
-                str(path),
-                "--animal",
-                "chimi",
-            ],
+        args = runner.get_command_line_arguments(
+            ["--sessions", str(path), "--animal", "chimi"]
         )
-        args = runner.get_command_line_arguments()
 
         filtered = runner._filter_epoch_info(_epoch_info(keys), args)
 
         assert runner._session_keys(filtered) == [("chimi20200223_.nwb", "02_r1")]
 
 
-def test_one_card_cannot_be_handed_to_every_worker(monkeypatch, capsys):
+def test_one_card_cannot_be_handed_to_every_worker(capsys):
     # --gpu names one card; a multi-worker run would send every worker to it,
     # each claiming and preallocating a share of the same card while the
     # sidecars all named it. The layout that works is one process per card.
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
-        ["run_pfc_analysis_bandit.py", "--gpu", "3", "--n_workers", "6"],
-    )
 
     with pytest.raises(SystemExit):
-        runner.get_command_line_arguments()
+        runner.get_command_line_arguments(["--gpu", "3", "--n_workers", "6"])
 
     assert "every worker would be sent to that card" in capsys.readouterr().err
 
 
-def test_one_card_and_one_worker_is_the_supported_layout(monkeypatch):
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
-        ["run_pfc_analysis_bandit.py", "--gpu", "3", "--n_workers", "1"],
-    )
-
-    args = runner.get_command_line_arguments()
+def test_one_card_and_one_worker_is_the_supported_layout():
+    args = runner.get_command_line_arguments(["--gpu", "3", "--n_workers", "1"])
 
     assert (args.gpu, args.n_workers) == (3, 1)
 
@@ -977,29 +937,19 @@ def test_the_retired_statistics_are_dropped_before_the_bundle_is_written():
     ]
 
 
-def test_a_batch_cannot_be_launched_on_the_unpenalised_backend(monkeypatch):
+def test_a_batch_cannot_be_launched_on_the_unpenalised_backend():
     # The per-unit statsmodels IRLS has no penalised path, so a batch fit with
     # it would be an unpenalised ladder written under a sidecar claiming a
     # prior. It is not offered at all.
-    monkeypatch.setattr(
-        runner.sys, "argv", ["run_pfc_analysis_bandit.py", "--fitter", "statsmodels"]
-    )
-
     with pytest.raises(SystemExit) as excinfo:
-        runner.get_command_line_arguments()
+        runner.get_command_line_arguments(["--fitter", "statsmodels"])
 
     assert excinfo.value.code == 2
 
 
-def test_a_null_below_the_reporting_floor_is_rejected(monkeypatch):
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
-        ["run_pfc_analysis_bandit.py", "--n-control-draws", "19"],
-    )
-
+def test_a_null_below_the_reporting_floor_is_rejected():
     with pytest.raises(SystemExit) as excinfo:
-        runner.get_command_line_arguments()
+        runner.get_command_line_arguments(["--n-control-draws", "19"])
 
     assert excinfo.value.code == 2
 
@@ -1443,21 +1393,6 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
         events.append("release")
         return True
 
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
-        [
-            "run_pfc_analysis_bandit.py",
-            "--n_workers",
-            str(n_workers),
-            "--local_scratch_dir",
-            str(tmp_path / "scratch"),
-            "--log_directory",
-            str(tmp_path / "logs"),
-            "--output-dir",
-            str(tmp_path / "out"),
-        ],
-    )
     monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
     monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
@@ -1473,7 +1408,18 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
         ),
     )
 
-    runner.main()
+    runner.main(
+        [
+            "--n_workers",
+            str(n_workers),
+            "--local_scratch_dir",
+            str(tmp_path / "scratch"),
+            "--log_directory",
+            str(tmp_path / "logs"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ]
+    )
 
     sessions = ["run 02_r1", "release", "run 04_r2", "release"]
     assert events == ["limit", *(["cluster"] if n_workers > 1 else []), *sessions]
@@ -1492,21 +1438,6 @@ def test_main_hands_every_session_the_commit_it_loaded(
     def run_analysis(nwb_file_name, epoch_name, **kwargs):
         passed.append(kwargs["git_hash"])
 
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
-        [
-            "run_pfc_analysis_bandit.py",
-            "--n_workers",
-            str(n_workers),
-            "--local_scratch_dir",
-            str(tmp_path / "scratch"),
-            "--log_directory",
-            str(tmp_path / "logs"),
-            "--output-dir",
-            str(tmp_path / "out"),
-        ],
-    )
     monkeypatch.setattr(runner, "loaded_commit", lambda: "parent-commit-dirty")
     monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
@@ -1523,7 +1454,18 @@ def test_main_hands_every_session_the_commit_it_loaded(
         ),
     )
 
-    runner.main()
+    runner.main(
+        [
+            "--n_workers",
+            str(n_workers),
+            "--local_scratch_dir",
+            str(tmp_path / "scratch"),
+            "--log_directory",
+            str(tmp_path / "logs"),
+            "--output-dir",
+            str(tmp_path / "out"),
+        ]
+    )
 
     assert passed == ["parent-commit-dirty", "parent-commit-dirty"]
     cohort = json.loads((tmp_path / "out" / "pfc_cohort_mPFC.json").read_text())
@@ -1550,11 +1492,14 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
         names = epoch_info.index.get_level_values("nwb_file_name")
         return epoch_info[names == "chimi20200223_.nwb"]
 
-    monkeypatch.setattr(
-        runner.sys,
-        "argv",
+    monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
+    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
+    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", sorted_sessions_only)
+    monkeypatch.setattr(runner, "run_analysis", run_analysis)
+    monkeypatch.setattr(runner, "release_nwb_files", lambda: True)
+
+    runner.main(
         [
-            "run_pfc_analysis_bandit.py",
             "--n_workers",
             "1",
             "--local_scratch_dir",
@@ -1563,15 +1508,8 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
             str(tmp_path / "logs"),
             "--output-dir",
             str(tmp_path / "out"),
-        ],
+        ]
     )
-    monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
-    monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
-    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", sorted_sessions_only)
-    monkeypatch.setattr(runner, "run_analysis", run_analysis)
-    monkeypatch.setattr(runner, "release_nwb_files", lambda: True)
-
-    runner.main()
 
     assert ran == keys[:2]
     out = capsys.readouterr().out
