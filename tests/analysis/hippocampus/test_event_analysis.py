@@ -100,21 +100,6 @@ class TestGetImmobileEvents:
 
         assert 2 not in set(result["event"])
 
-    def test_mean_method_filters_correctly(self, mock_event_data):
-        """Mean method should filter based on mean speed during event."""
-        result = get_immobile_events(
-            mock_event_data, event_col="event", speed_threshold=4.0, method="mean"
-        )
-
-        # Event 1: mean ≈ 4.67 (fail) -> excluded
-        # Event 2: mean = 2.4 (pass) -> included
-        # Event 3: mean = 5.0 (fail) -> excluded
-
-        event_ids = result["event"].unique()
-        assert 2 in event_ids, "Event 2 should pass (mean < 4.0)"
-        assert 1 not in event_ids, "Event 1 should be filtered (mean > 4.0)"
-        assert 3 not in event_ids, "Event 3 should be filtered (mean > 4.0)"
-
     def test_empty_data_returns_empty(self):
         """Empty input should return empty DataFrame."""
         data = pd.DataFrame(
@@ -188,6 +173,56 @@ class TestGetImmobileEvents:
         # Same as endpoints test
         event_ids = result["event"].unique()
         assert 2 in event_ids
+
+
+def _event_start_end_times_reference(data, event_col, group_cols):
+    """The pre-delegation implementation, kept to pin the rewrite to it."""
+    event_times = (
+        data.reset_index(names="time")
+        .groupby(group_cols + [event_col])
+        .agg(start_time=("time", "min"), end_time=("time", "max"))
+        .reset_index()
+    )
+    event_times = event_times[event_times[event_col] > 0]
+    event_times["duration"] = event_times["end_time"] - event_times["start_time"]
+    return event_times
+
+
+def test_event_start_end_times_match_the_reference_implementation():
+    """Delegating to intervals_from_labels changes no value, dtype or order.
+
+    Two animals and two epochs on 500 Hz time axes that overlap in time, with
+    random event labels (IDs reused across sessions, gaps between IDs). Only
+    the index differs: the old one kept the labels of the dropped ID-0 rows.
+    """
+    rng = np.random.default_rng(0)
+    frames = []
+    for animal, day, epoch, t0 in [
+        ("b", 20200102, "04_r2", 10.0),
+        ("a", 20200101, "02_r1", 0.0),
+        ("a", 20200101, "04_r2", 5.0),
+    ]:
+        time = t0 + np.arange(2000) / 500.0
+        labels = np.zeros(time.size, dtype=np.int64)
+        for event_id in (1, 2, 4, 7):
+            start = rng.integers(0, time.size - 60)
+            labels[start : start + rng.integers(1, 60)] = event_id
+        frames.append(
+            pd.DataFrame(
+                {"animal": animal, "day": day, "epoch": epoch, "event": labels},
+                index=pd.Index(time, name="time"),
+            )
+        )
+    data = pd.concat(frames)
+    group_cols = ["animal", "day", "epoch"]
+
+    expected = _event_start_end_times_reference(data, "event", group_cols)
+    result = get_event_start_end_times(data, event_col="event")
+
+    assert len(result) > 0
+    pd.testing.assert_frame_equal(
+        result, expected.reset_index(drop=True), check_exact=True
+    )
 
 
 class TestGetEventStartEndTimes:

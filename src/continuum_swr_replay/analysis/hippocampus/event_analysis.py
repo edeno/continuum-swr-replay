@@ -15,7 +15,10 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 )
-from continuum_swr_replay.analysis.events.immobility import event_speeds_are_immobile
+from continuum_swr_replay.analysis.events.immobility import (
+    event_speeds_are_immobile,
+    intervals_from_labels,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +28,7 @@ def get_immobile_events(
     event_col: str,
     speed_col: str = "head_speed",
     speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
-    method: Literal["endpoints", "max", "mean"] = "max",
+    method: Literal["endpoints", "max"] = "max",
     group_cols: list[str] | None = None,
 ) -> pd.DataFrame:
     """Filter events to only include those during low-speed periods.
@@ -41,12 +44,11 @@ def get_immobile_events(
     speed_threshold : float
         Maximum speed threshold (cm/s). Events with speed exactly equal to
         threshold are considered mobile (uses strict < comparison).
-    method : {"endpoints", "max", "mean"}
+    method : {"endpoints", "max"}
         How to evaluate speed during event:
         - "endpoints": Both start and end must be below threshold
         - "max": Every speed during the event must be finite and below the
           threshold (default; canonical event-cohort rule)
-        - "mean": Mean speed during event must be below threshold
     group_cols : list[str] | None
         Grouping columns (default: ["animal", "day", "epoch"])
 
@@ -63,8 +65,8 @@ def get_immobile_events(
     Notes
     -----
     The default ``"max"`` method is the canonical cohort rule shared by
-    Non-Local, SWR, and MUA events. The endpoint and mean modes remain for
-    descriptive backward compatibility and should not define model cohorts.
+    Non-Local, SWR, and MUA events. The endpoints mode remains for the
+    archived figure scripts and should not define model cohorts.
 
     Examples
     --------
@@ -85,8 +87,8 @@ def get_immobile_events(
         raise ValueError(
             f"speed_threshold must be positive and finite, got {speed_threshold}"
         )
-    if method not in ["endpoints", "max", "mean"]:
-        raise ValueError(f"method must be 'endpoints', 'max', or 'mean', got {method}")
+    if method not in ["endpoints", "max"]:
+        raise ValueError(f"method must be 'endpoints' or 'max', got {method}")
 
     if event_col not in data.columns:
         raise ValueError(f"event_col '{event_col}' not found in data")
@@ -104,17 +106,8 @@ def get_immobile_events(
             return False
 
         if method == "endpoints":
-            return bool(
-                (speed[0] < speed_threshold)
-                and (speed[-1] < speed_threshold)
-            )
-        elif method == "max":
-            return event_speeds_are_immobile(
-                speed, speed_threshold=speed_threshold
-            )
-        elif method == "mean":
-            return bool(speed.mean() < speed_threshold)
-        return False
+            return bool((speed[0] < speed_threshold) and (speed[-1] < speed_threshold))
+        return event_speeds_are_immobile(speed, speed_threshold=speed_threshold)
 
     return (
         data.loc[data[event_col] > 0]
@@ -152,13 +145,18 @@ def get_event_start_end_times(
     Raises
     ------
     ValueError
-        If event_col is not found in data
+        If event_col is not found in data, or a session's index is not its
+        float, strictly increasing time axis
+        (:func:`~continuum_swr_replay.analysis.events.immobility.require_time_index`).
 
     Notes
     -----
     - Duration is in seconds (end_time - start_time)
     - Events with ID 0 (non-events) are automatically excluded
-    - Time values come from DataFrame index
+    - Each session's bounds come from
+      :func:`~continuum_swr_replay.analysis.events.immobility.intervals_from_labels`,
+      read on the frame's time index
+    - Rows are sorted by ``group_cols`` then event ID, with a fresh 0..n-1 index
 
     Examples
     --------
@@ -178,22 +176,21 @@ def get_event_start_end_times(
     if event_col not in data.columns:
         raise ValueError(f"event_col '{event_col}' not found in data")
 
-    # Extract start/end times for each event. Use ``names="time"`` so the
-    # reset column is always called ``"time"`` regardless of whether the
-    # input index was unnamed (default ``"index"``) or already named
-    # something like ``"time"`` — which is the case for time-indexed
-    # ``data_over_time`` frames in real callers.
+    # One session at a time: ``intervals_from_labels`` reads the bounds off
+    # the frame's time index, which is one epoch's time axis.
+    columns = [*group_cols, event_col, "start_time", "end_time"]
+    active = data.loc[data[event_col] > 0, [*group_cols, event_col]]
+    sessions = [
+        intervals_from_labels(session[[event_col]], event_col).assign(
+            **dict(zip(group_cols, key, strict=True))
+        )[columns]
+        for key, session in active.groupby(group_cols, sort=True)
+    ]
     event_times = (
-        data.reset_index(names="time")
-        .groupby(group_cols + [event_col])
-        .agg(start_time=("time", "min"), end_time=("time", "max"))
-        .reset_index()
+        pd.concat(sessions, ignore_index=True)
+        if sessions
+        else pd.DataFrame(columns=columns)
     )
-
-    # Remove non-events (event_col == 0)
-    event_times = event_times[event_times[event_col] > 0]
-
-    # Compute duration
     event_times["duration"] = event_times["end_time"] - event_times["start_time"]
 
     return event_times
