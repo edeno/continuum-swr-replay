@@ -284,14 +284,25 @@ def _contrast_artifacts(old_root, new_root, skip=()):
 
 def test_a_missing_contrast_artifact_fails_naming_its_directory(tmp_path):
     old_root, new_root = tmp_path / "backup", tmp_path / "live"
-    _contrast_artifacts(old_root, new_root, skip=_CONTRAST_STRATA[1:])
+    _contrast_artifacts(old_root, new_root)
+    (new_root / "models_swr_contrast" / _CONTRAST_BOTH_SIDES[0]).unlink()
 
     with pytest.raises(SystemExit) as exc:
         collect_content_inputs(old_root, new_root, ())
 
     message = str(exc.value)
-    assert "swr_contrast_content_audited_omitted.pkl" in message
+    assert _CONTRAST_BOTH_SIDES[0] in message
     assert str(new_root / "models_swr_contrast") in message
+
+
+def test_an_outcome_stratum_not_refit_yet_is_named_not_required(tmp_path):
+    old_root, new_root = tmp_path / "backup", tmp_path / "live"
+    _contrast_artifacts(old_root, new_root, skip=_CONTRAST_STRATA[1:])
+
+    _, contrast, _, missing = collect_content_inputs(old_root, new_root, ())
+
+    assert contrast["stratum_omitted"].empty
+    assert any("omitted" in line and _CONTRAST_STRATA[1] in line for line in missing)
 
 
 def test_contrast_artifacts_left_in_models_are_not_read(tmp_path):

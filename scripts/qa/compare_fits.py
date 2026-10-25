@@ -2584,8 +2584,9 @@ def collect_content_inputs(
 
     A bundle with only one side is still reported (the missing side shows as an
     empty frame) so a refit that has not run yet is visible in the audit rather
-    than silently omitted. The is_swr-contrast artifacts are required on both
-    sides (:func:`_read_swr_contrast`).
+    than silently omitted. The is_swr-contrast audited table and arm fits are
+    required on both sides (:func:`_read_swr_contrast`); a rewarded / omitted
+    stratum table missing from the new root is listed as absent.
 
     Returns
     -------
@@ -2636,9 +2637,15 @@ def collect_content_inputs(
         inputs[f"swr-content arm fits ({label})"] = path
     for stratum in CONTRAST_OUTCOME_STRATA:
         sfx = "" if stratum == "all" else f"_{stratum}"
-        contrast[f"stratum_{stratum}"], path = _read_swr_contrast(
-            new_root, f"swr_contrast_content_audited{sfx}.pkl"
-        )
+        name = f"swr_contrast_content_audited{sfx}.pkl"
+        path = model_dir("swr_contrast", new_root) / name
+        # Only the all-outcome table is required; a stratum not refit yet is
+        # listed as absent, like a one-sided bundle.
+        if stratum != "all" and not path.exists():
+            missing.append(f"`{stratum}` stratum: no refit audited table at `{path}`")
+            contrast[f"stratum_{stratum}"] = pd.DataFrame()
+            continue
+        contrast[f"stratum_{stratum}"], path = _read_swr_contrast(new_root, name)
         inputs[f"swr-content audited ({stratum})"] = path
     return bundles, contrast, inputs, missing
 

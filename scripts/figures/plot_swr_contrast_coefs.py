@@ -463,6 +463,16 @@ def main() -> None:
         require_fresh_inputs(
             content_fit, SWR_CONTRAST_CONTENT_INPUTS, allow_stale=allow_stale
         )
+    # The fitter writes the meta after the per-session fits, so a meta older
+    # than them states the units of an earlier fit (an aggregation that failed).
+    if not allow_stale and (
+        SWR_CONTRAST_RATE_META.stat().st_mtime < SWR_CONTRAST_RATE.stat().st_mtime
+    ):
+        raise RuntimeError(
+            f"{SWR_CONTRAST_RATE_META.name} predates {SWR_CONTRAST_RATE.name}, so "
+            "its per-SD units may belong to an earlier fit; re-run "
+            "scripts/rate/fit_swr_contrast_rate.py --aggregate-only"
+        )
     sd = _per_sd_units()
     OUT.mkdir(parents=True, exist_ok=True)
     rate_figure(pd.read_pickle(SWR_CONTRAST_RATE), sd).savefig(

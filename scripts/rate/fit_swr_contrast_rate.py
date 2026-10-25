@@ -800,7 +800,8 @@ def _covariate_sds(qv: pd.DataFrame, st: pd.DataFrame) -> dict[str, float]:
 
     Each name in :data:`_RATE_CONT_COVARS` is taken from whichever table carries
     it, qvals first; a name absent from both is omitted rather than recorded as
-    ``nan``, exactly as ``aggregate_contrast`` expects.
+    ``nan``. ``aggregate_contrast`` then refuses (``std_factor`` raises) any
+    fitted term whose covariate has no SD here.
 
     Parameters
     ----------

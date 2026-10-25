@@ -193,7 +193,8 @@ def test_figure_dir_on_a_staging_root_sits_beside_it():
     assert paths.figure_dir("rate", root) == Path("/staging/paper/figures/rate")
 
 
-# Each run_refits figure script, and the module-level default it writes to.
+# Each run_refits figure script (and compare_content_estimators, a fit that
+# also draws), and the module-level default it writes to.
 # ``plot_uncertainty_rate`` builds its directory inside ``main``, so it is
 # not listed; it calls ``figure_dir("rate")`` directly.
 FIGURE_SCRIPT_DEFAULTS = {
@@ -212,6 +213,11 @@ FIGURE_SCRIPT_DEFAULTS = {
         "build_parser().parse_args([]).output_dir",
         "qc_diagnosis",
     ),
+    "scripts/figures/plot_swr_contrast_coefs.py": ("OUT", "swr_contrast"),
+    "scripts/content/compare_content_estimators.py": (
+        "DEFAULT_FIGURES_DIR",
+        "content_estimators",
+    ),
 }
 
 _PRINT_DEFAULTS = """
@@ -220,6 +226,7 @@ from pathlib import Path
 for rel, attr in zip(sys.argv[1::2], sys.argv[2::2]):
     spec = importlib.util.spec_from_file_location(Path(rel).stem, rel)
     mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod  # a script's dataclasses look themselves up here
     spec.loader.exec_module(mod)
     print(eval("mod." + attr))
 """

@@ -120,8 +120,10 @@ def figure_dir(topic: str, root: Path | None = None) -> Path:
     Figures land at ``<root>.parent / "paper" / "figures" / <topic>``, beside
     the data they were drawn from, not at ``parameters.FIGURE_DIR``. On the
     default root the two are the same folder; a run on another root
-    (``CSR_PROCESSED_DATA_DIR``, e.g. a ``run_refits`` staging run) then
-    writes its figures beside that root and cannot overwrite the paper's.
+    (``CSR_PROCESSED_DATA_DIR``, e.g. a ``run_refits`` staging run) writes its
+    figures beside that root instead. That keeps the paper's figures only when
+    the staging root's parent is not the repository, and two roots that share
+    a parent share a figure folder.
 
     Parameters
     ----------
