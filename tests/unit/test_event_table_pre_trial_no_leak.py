@@ -138,7 +138,6 @@ class TestEventStartContextNoLeak:
             env,
             trials,
             graph,
-            speed_threshold=4.0,
             nonlocal_threshold=0.5,
         )
         assert len(out) == 1, f"expected 1 event row, got {len(out)}"
@@ -190,7 +189,6 @@ class TestEventStartContextNoLeak:
             env,
             trials,
             graph,
-            speed_threshold=4.0,
             nonlocal_threshold=0.5,
         )
         assert len(out) == 1

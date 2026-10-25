@@ -11,9 +11,6 @@ from continuum_swr_replay.analysis.constants import (
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
-from continuum_swr_replay.analysis.events.immobility import (
-    require_canonical_speed_threshold,
-)
 from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.event_ids import (
     hash_stop_id as _hash_stop_id,
@@ -60,14 +57,14 @@ def build_stop_table(
     port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
     *,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One row per immobility bout, **including zero-event bouts**.
 
     The stop-level canonical view of the session. Every contiguous
-    immobility bout (defined by ``head_speed < speed_threshold``) becomes a
-    row, regardless of whether any non-local event fired during it. The
+    immobility bout (``head_speed`` below
+    ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``, 4 cm/s) becomes a row,
+    regardless of whether any non-local event fired during it. The
     per-stop rate models (Family A) need the zero-event rows.
 
     ``immobility_duration_s`` is the stop's exposure: ``stop_end -
@@ -104,7 +101,7 @@ def build_stop_table(
 
     Parameters
     ----------
-    dot, trials, port_experiences, track_graph, speed_threshold, nonlocal_threshold
+    dot, trials, port_experiences, track_graph, nonlocal_threshold
         Same roles as in :func:`build_event_table`. ``env`` is not
         needed here — the stop table never touches the decoded arm of
         replay timebins.
@@ -113,14 +110,7 @@ def build_stop_table(
     -------
     pd.DataFrame
         Columns: see :data:`_STOP_TABLE_COLUMNS`.
-
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_stop_table")
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
     animal = str(dot["animal"].iloc[0])
@@ -132,14 +122,14 @@ def build_stop_table(
         dot["Non-Local_Continuous_prob"].to_numpy()
         + dot["Non-Local_Fragmented_prob"].to_numpy()
     )
-    nonlocal_event_mask = _in_event_mask(
-        dot, speed_threshold, nonlocal_threshold
-    ).to_numpy()
+    nonlocal_event_mask = _in_event_mask(dot, nonlocal_threshold).to_numpy()
     dot = add_trial_context(dot, trials, port_experiences)
     dot["nearest_well_distance_cm"] = _nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = _immobility_bout_intervals(
-        dot, speed_col="head_speed", speed_threshold=speed_threshold
+        dot,
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
     column_order = list(_STOP_TABLE_BUILD_COLUMNS)
     if bout_starts.size == 0:

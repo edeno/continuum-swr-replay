@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import pandas as pd
 
+from continuum_swr_replay.analysis.constants import (
+    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
 from continuum_swr_replay.analysis.events.immobility import (
     validate_nonlocal_event_probability_contract,
     validate_whole_event_immobility_contract,
@@ -59,11 +62,7 @@ def _prepare_dot(dot: pd.DataFrame, env) -> pd.DataFrame:
     return dot
 
 
-def _in_event_mask(
-    dot: pd.DataFrame,
-    speed_threshold: float,
-    nonlocal_threshold: float,
-) -> pd.Series:
+def _in_event_mask(dot: pd.DataFrame, nonlocal_threshold: float) -> pd.Series:
     """Return complete bins of Non-Local labels that satisfy their contract.
 
     Event labels are created upstream from probability-thresholded intervals
@@ -88,7 +87,9 @@ def _in_event_mask(
     )
 
     validate_whole_event_immobility_contract(
-        dot, "non_local_event", speed_threshold=speed_threshold
+        dot,
+        "non_local_event",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
 
     return pd.Series(active, index=dot.index)

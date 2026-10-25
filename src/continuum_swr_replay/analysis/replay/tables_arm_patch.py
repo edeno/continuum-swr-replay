@@ -7,11 +7,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import (
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
-)
-from continuum_swr_replay.analysis.events.immobility import (
-    require_canonical_speed_threshold,
 )
 from continuum_swr_replay.data_loaders.constants import (
     ALL_ARMS,
@@ -68,7 +64,6 @@ def build_event_arm_table(
     *,
     conditional_posterior=None,
     contingency: pd.DataFrame | None = None,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One row per (event, arm) — nine rows per event.
@@ -96,7 +91,7 @@ def build_event_arm_table(
     conditional_posterior : xr.DataArray, optional
         When supplied, the ``arm_posterior_mass`` column is populated
         via :func:`summaries.arm_posterior_mass`; otherwise it is NaN.
-    speed_threshold, nonlocal_threshold : float
+    nonlocal_threshold : float
         Kept in lockstep with :func:`build_event_table`. Any drift
         would invalidate the ``event_id`` join.
 
@@ -105,14 +100,7 @@ def build_event_arm_table(
     pd.DataFrame
         Columns: see :data:`_EVENT_ARM_TABLE_COLUMNS`. Empty (correct
         schema) if ``event_table`` is empty.
-
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_event_arm_table")
     canonical_column_order = list(_EVENT_ARM_TABLE_BUILD_COLUMNS)
     if len(event_table) == 0:
         return stamp_covariate_schema(
@@ -123,7 +111,7 @@ def build_event_arm_table(
     n_events = len(event_table)
 
     dot = _prepare_dot(dot, env)
-    in_event = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
+    in_event = _in_event_mask(dot, nonlocal_threshold)
     nl = dot.loc[in_event]
 
     # Arm-count responses via the shared helpers. Junction bins (NaN

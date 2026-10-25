@@ -242,7 +242,7 @@ def test_peak_prob(dot):
 
 
 def test_max_speed_vs_endpoints(dot):
-    table = build_classified_nonlocal_event_table(dot, speed_threshold=SPEED_THRESHOLD)
+    table = build_classified_nonlocal_event_table(dot)
     ev = _row(table, "01_r1", 6)
     assert ev["animal_max_speed_cm_s"] > SPEED_THRESHOLD
     assert ev["animal_start_speed_cm_s"] < SPEED_THRESHOLD

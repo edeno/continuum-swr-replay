@@ -1,14 +1,17 @@
-"""A builder's ``speed_threshold`` cannot split the speed cohorts.
+"""The speed threshold cannot split the speed cohorts.
 
 The read (``analysed_time.with_swr_source``) gates the SWR and MUA labels at the
 canonical 4 cm/s, once for every consumer. A table builder that gated its own
 events at another value would classify them against SWRs and MUA events gated
-at 4 cm/s, so every builder refuses a non-default value. The two filters that
-re-gate the read's SWRs themselves honour a stricter value and refuse only a
-looser one, which could not re-admit the SWRs the read dropped.
+at 4 cm/s, so no builder takes a speed threshold: each uses the canonical
+constant. The two filters that re-gate the read's SWRs themselves honour a
+stricter value and refuse only a looser one, which could not re-admit the SWRs
+the read dropped.
 """
 
 from __future__ import annotations
+
+import inspect
 
 import numpy as np
 import pandas as pd
@@ -16,6 +19,11 @@ import pytest
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
+)
+from continuum_swr_replay.analysis.contfrag.tables import (
+    build_contfrag_event_arm_table,
+    build_contfrag_event_table,
+    build_contfrag_stop_table,
 )
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
@@ -31,89 +39,38 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table i
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     load_session_swr_intervals,
 )
-from tests.unit import test_contfrag_straddling_event_n_events as contfrag
-from tests.unit import test_replay_tables as replay
+from continuum_swr_replay.analysis.pfc.session import run_session
+from continuum_swr_replay.analysis.replay.tables_arm_patch import (
+    build_event_arm_table,
+)
+from continuum_swr_replay.analysis.replay.tables_event import (
+    build_event_sequence_table,
+    build_event_table,
+)
+from continuum_swr_replay.analysis.replay.tables_stop import build_stop_table
 
 CANONICAL = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-NON_DEFAULT = (2.0, 5.0, float("nan"))
 
 
-def _session():
-    dot = replay._tiny_dot_with_two_events()
-    return dot, replay._EnvStub(), contfrag._empty_trials(), replay._bandit_graph()
-
-
-def _contfrag_dot() -> pd.DataFrame:
-    return contfrag._two_event_dot()
-
-
-def _call_builder(name: str, speed_threshold: float):
-    dot, env, trials, graph = _session()
-    cdot = _contfrag_dot()
-    cf_env, cf_graph = contfrag._EnvStub(), contfrag._bandit_graph()
-    builders = {
-        "build_classified_nonlocal_event_table": lambda: (
-            build_classified_nonlocal_event_table(dot, speed_threshold=speed_threshold)
-        ),
-        "build_event_table": lambda: replay.build_event_table(
-            dot, env, trials, graph, speed_threshold=speed_threshold
-        ),
-        "build_event_sequence_table": lambda: replay.build_event_sequence_table(
-            dot, env, replay._tiny_posterior(dot), speed_threshold=speed_threshold
-        ),
-        "build_event_arm_table": lambda: replay.build_event_arm_table(
-            replay.build_event_table(dot, env, trials, graph),
-            dot,
-            env,
-            trials,
-            graph,
-            speed_threshold=speed_threshold,
-        ),
-        "build_stop_table": lambda: replay.build_stop_table(
-            dot, trials, graph, speed_threshold=speed_threshold
-        ),
-        "build_contfrag_event_table": lambda: contfrag.build_contfrag_event_table(
-            cdot, cf_env, trials, cf_graph, speed_threshold=speed_threshold
-        ),
-        "build_contfrag_event_arm_table": lambda: (
-            contfrag.build_contfrag_event_arm_table(
-                contfrag.build_contfrag_event_table(cdot, cf_env, trials, cf_graph),
-                cdot,
-                cf_env,
-                trials,
-                cf_graph,
-                speed_threshold=speed_threshold,
-            )
-        ),
-        "build_contfrag_stop_table": lambda: contfrag.build_contfrag_stop_table(
-            cdot, trials, cf_graph, speed_threshold=speed_threshold
-        ),
-    }
-    return builders[name]()
-
-
-BUILDERS = (
-    "build_classified_nonlocal_event_table",
-    "build_event_table",
-    "build_event_sequence_table",
-    "build_event_arm_table",
-    "build_stop_table",
-    "build_contfrag_event_table",
-    "build_contfrag_event_arm_table",
-    "build_contfrag_stop_table",
+@pytest.mark.parametrize(
+    "builder",
+    (
+        build_classified_nonlocal_event_table,
+        build_event_table,
+        build_event_sequence_table,
+        build_event_arm_table,
+        build_stop_table,
+        build_contfrag_event_table,
+        build_contfrag_event_arm_table,
+        build_contfrag_stop_table,
+        run_session,
+    ),
+    ids=lambda builder: builder.__name__,
 )
-
-
-@pytest.mark.parametrize("name", BUILDERS)
-@pytest.mark.parametrize("speed_threshold", NON_DEFAULT)
-def test_a_builder_refuses_a_non_default_speed_threshold(name, speed_threshold):
-    with pytest.raises(ValueError, match=rf"{name}: .*the canonical 4 cm/s"):
-        _call_builder(name, speed_threshold)
-
-
-@pytest.mark.parametrize("name", BUILDERS)
-def test_a_builder_accepts_the_canonical_speed_threshold(name):
-    _call_builder(name, CANONICAL)
+def test_a_builder_takes_no_speed_threshold(builder):
+    parameters = inspect.signature(builder).parameters
+    assert "speed_threshold" not in parameters
+    assert "immobility_threshold" not in parameters
 
 
 def _swr_frame(n: int = 60) -> pd.DataFrame:

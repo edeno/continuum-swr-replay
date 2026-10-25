@@ -90,7 +90,6 @@ class TestBoutStartContextNoLeak:
             dot,
             trials,
             graph,
-            speed_threshold=4.0,
             nonlocal_threshold=0.5,
         )
         assert len(out) == 1

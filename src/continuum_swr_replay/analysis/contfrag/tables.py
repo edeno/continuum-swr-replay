@@ -23,7 +23,6 @@ from continuum_swr_replay.analysis.constants import (
 )
 from continuum_swr_replay.analysis.events.analysed_time import excluded_intervals_of
 from continuum_swr_replay.analysis.events.immobility import (
-    require_canonical_speed_threshold,
     whole_event_immobility_mask,
 )
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
@@ -146,7 +145,6 @@ def _resolve_event_col(event_source: str) -> str:
 
 def _in_contfrag_event_mask(
     dot: pd.DataFrame,
-    speed_threshold: float,
     event_source: str = "SWR",
 ) -> pd.Series:
     """Boolean mask for in-event timebins using external event detectors.
@@ -171,7 +169,7 @@ def _in_contfrag_event_mask(
     return whole_event_immobility_mask(
         dot,
         event_col,
-        speed_threshold=speed_threshold,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
 
 
@@ -256,7 +254,6 @@ def build_contfrag_event_table(
     event_source: str = "SWR",
     brain_area: str = "HPC",
     conditional_posterior=None,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     place_bin_size: float = PLACE_BIN_SIZE_1D,
 ) -> pd.DataFrame:
     """One row per externally-defined event with canonical event-level columns.
@@ -281,9 +278,6 @@ def build_contfrag_event_table(
         Which external event detector to use for event boundaries.
     conditional_posterior : xr.DataArray, optional
         Combined posterior for posterior-dependent columns.
-    speed_threshold : float
-        Head-speed threshold for immobility (cm/s). Only the canonical value
-        is accepted: the read gates the other detector's labels at it.
 
     Returns
     -------
@@ -292,14 +286,7 @@ def build_contfrag_event_table(
         plus ContFrag-specific: ``continuous_prob_mean``,
         ``fragmented_prob_mean``, ``dominant_state`` (ties go to
         Continuous), ``continuous_fraction``.
-
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_contfrag_event_table")
     if "animal" not in dot.columns:
         raise KeyError(
             "dot must carry 'animal' column (set by get_contfrag_data_over_time)"
@@ -321,10 +308,12 @@ def build_contfrag_event_table(
     dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = immobility_bout_intervals(
-        dot, speed_col="head_speed", speed_threshold=speed_threshold
+        dot,
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
 
-    in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
+    in_event = _in_contfrag_event_mask(dot, event_source)
     ev = dot.loc[in_event]
 
     column_order = _contfrag_event_table_build_columns(event_source)
@@ -573,7 +562,6 @@ def build_contfrag_event_arm_table(
     brain_area: str = "HPC",  # noqa: ARG001 — passed for API symmetry; event_id is inherited
     conditional_posterior=None,
     contingency: pd.DataFrame | None = None,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
     """One row per (event, arm) for externally-defined events.
 
@@ -587,21 +575,12 @@ def build_contfrag_event_arm_table(
         Which external event detector defines event boundaries.
     conditional_posterior : xr.DataArray, optional
         Combined posterior for arm_posterior_mass.
-    speed_threshold : float
-        Head-speed threshold for immobility; only the canonical value.
 
     Returns
     -------
     pd.DataFrame
         Columns: see ``_contfrag_event_arm_table_columns()``.
-
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_contfrag_event_arm_table")
     event_col = _resolve_event_col(event_source)
     canonical_column_order = _contfrag_event_arm_table_build_columns(event_source)
     if len(event_table) == 0:
@@ -613,7 +592,7 @@ def build_contfrag_event_arm_table(
     n_events = len(event_table)
 
     dot = _prepare_contfrag_dot(dot, env)
-    in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
+    in_event = _in_contfrag_event_mask(dot, event_source)
     ev = dot.loc[in_event]
 
     # Arm counts — weight = 1.0 for all timebins (both states decode position)
@@ -725,7 +704,6 @@ def build_contfrag_stop_table(
     *,
     event_source: str = "SWR",
     brain_area: str = "HPC",
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
 ) -> pd.DataFrame:
     """One row per immobility bout, including zero-event bouts.
 
@@ -759,21 +737,12 @@ def build_contfrag_stop_table(
         Session track graph.
     event_source : {"SWR", "MUA"}
         Which external detector defines events.
-    speed_threshold : float
-        Head-speed threshold for immobility; only the canonical value.
 
     Returns
     -------
     pd.DataFrame
         Columns: see ``_CONTFRAG_STOP_TABLE_COLUMNS``.
-
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_contfrag_stop_table")
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column")
     animal = str(dot["animal"].iloc[0])
@@ -788,7 +757,9 @@ def build_contfrag_stop_table(
     dot["nearest_well_distance_cm"] = nearest_well_distance_cm(dot, track_graph)
 
     bout_starts, bout_ends = immobility_bout_intervals(
-        dot, speed_col="head_speed", speed_threshold=speed_threshold
+        dot,
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
     column_order = list(_CONTFRAG_STOP_TABLE_BUILD_COLUMNS)
     if bout_starts.size == 0:
@@ -846,7 +817,7 @@ def build_contfrag_stop_table(
     # table and ``Σ stop.n_selected_events == len(event_table)`` holds by
     # construction. (All-immobile events cannot straddle bouts, but
     # counting by event_start keeps the two tables aligned regardless.)
-    in_event = _in_contfrag_event_mask(dot, speed_threshold, event_source)
+    in_event = _in_contfrag_event_mask(dot, event_source)
     event_rows = dot.loc[in_event]
     if len(event_rows) == 0:
         n_events_per_bout = np.zeros(n_bouts, dtype=np.int64)

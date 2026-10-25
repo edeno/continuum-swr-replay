@@ -802,7 +802,6 @@ def run_analysis(
     epoch_name: str,
     brain_area: str = "mPFC",
     sampling_frequency: int = SAMPLING_FREQUENCY,
-    immobility_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     log_directory: str | Path = "logs",
     overwrite: bool = False,
     git_hash: str | None = None,
@@ -830,8 +829,6 @@ def run_analysis(
         Brain area to analyze ("mPFC" or "OFC")
     sampling_frequency : int
         Sampling frequency in Hz
-    immobility_threshold : float
-        Speed threshold for immobility classification (cm/s)
     log_directory : str | Path
         Directory for log files
     overwrite : bool
@@ -975,7 +972,7 @@ def run_analysis(
         )
     logger.info(f"brain_area: {brain_area}")
     logger.info(f"sampling_frequency: {sampling_frequency}")
-    logger.info(f"immobility_threshold: {immobility_threshold}")
+    logger.info(f"immobility_threshold: {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC}")
     logger.info(f"stop_cohort: {stop_cohort}")
     logger.info(f"fitter: {fitter}")
     logger.info(f"penalty_sigma_log_rate: {penalty_sigma}")
@@ -1032,7 +1029,6 @@ def run_analysis(
             epoch_name,
             brain_area=brain_area,
             sampling_frequency=sampling_frequency,
-            immobility_threshold=immobility_threshold,
             run_parallel=False,
             stop_cohort=stop_cohort,
             cohort_stops=cohort_stops,
@@ -1733,7 +1729,6 @@ def main() -> None:
                 epoch_name=epoch.Index[1],
                 brain_area=args.brain_area,
                 sampling_frequency=SAMPLING_FREQUENCY,
-                immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
                 log_directory=args.log_directory,
                 overwrite=args.overwrite,
                 git_hash=git_hash,
@@ -1765,7 +1760,6 @@ def main() -> None:
                     epoch_name=epoch.Index[1],
                     brain_area=args.brain_area,
                     sampling_frequency=SAMPLING_FREQUENCY,
-                    immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
                     log_directory=args.log_directory,
                     overwrite=args.overwrite,
                     git_hash=git_hash,

@@ -15,9 +15,6 @@ from continuum_swr_replay.analysis.constants import (
 from continuum_swr_replay.analysis.events.classified_table import (
     build_classified_nonlocal_event_table,
 )
-from continuum_swr_replay.analysis.events.immobility import (
-    require_canonical_speed_threshold,
-)
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     event_strict_overlap_keys,
 )
@@ -135,7 +132,6 @@ def _annotate_dot_for_events(
     trials: pd.DataFrame,
     port_experiences: pd.DataFrame,
     track_graph: nx.Graph,
-    speed_threshold: float,
 ) -> tuple[pd.DataFrame, _SessionKey, set, np.ndarray, np.ndarray]:
     """Annotate the full dot frame and derive session identity + immobility bouts.
 
@@ -163,7 +159,9 @@ def _annotate_dot_for_events(
     # a bout. Both start and end timestamps are needed so events can be
     # mapped onto a stable ``stop_id`` (the hash of the bout index).
     bout_starts, bout_ends = _immobility_bout_intervals(
-        dot, speed_col="head_speed", speed_threshold=speed_threshold
+        dot,
+        speed_col="head_speed",
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
     session_key = _SessionKey(animal=animal, day=day, epoch=epoch)
     return dot, session_key, mua_overlap_keys, bout_starts, bout_ends
@@ -474,7 +472,6 @@ def _attach_stop_ids(
 def _merge_classified_event_facts(
     per_event: pd.DataFrame,
     dot: pd.DataFrame,
-    speed_threshold: float,
     nonlocal_threshold: float,
 ) -> pd.DataFrame:
     """Attach the canonical event timing and the SWR classification.
@@ -488,9 +485,7 @@ def _merge_classified_event_facts(
     have exactly one classified row.
     """
     classified = build_classified_nonlocal_event_table(
-        dot,
-        speed_threshold=speed_threshold,
-        nonlocal_threshold=nonlocal_threshold,
+        dot, nonlocal_threshold=nonlocal_threshold
     )
     classified = classified.rename(
         columns={
@@ -555,7 +550,6 @@ def build_event_table(
     track_graph: nx.Graph,
     *,
     conditional_posterior=None,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     place_bin_size: float = PLACE_BIN_SIZE_1D,
 ) -> pd.DataFrame:
@@ -620,9 +614,6 @@ def build_event_table(
         Movement context continues to use ``trials``.
     track_graph : networkx.Graph
         Session track graph; edges carry ``edge_id``.
-    speed_threshold : float
-        Head-speed threshold for immobility (cm/s). Only the project-wide
-        constant is accepted: the read gates the SWR and MUA labels at it.
     nonlocal_threshold : float
         Non-local state probability threshold. Default matches the
         project-wide constant.
@@ -633,12 +624,6 @@ def build_event_table(
         One row per event with the columns documented below. Empty
         frame (correct columns, zero rows) if the session has no
         qualifying events.
-
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
 
     Columns
     -------
@@ -708,15 +693,12 @@ def build_event_table(
     a trip. They are excluded from the content models because the well-visit
     construct is undefined there, not because the animal was running.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_event_table")
     dot, session_key, mua_overlap_keys, bout_starts, bout_ends = (
-        _annotate_dot_for_events(
-            dot, env, trials, port_experiences, track_graph, speed_threshold
-        )
+        _annotate_dot_for_events(dot, env, trials, port_experiences, track_graph)
     )
 
     # Filter to the in-event timebins the rest of the builder aggregates over.
-    in_event_mask = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
+    in_event_mask = _in_event_mask(dot, nonlocal_threshold)
     nl = dot.loc[in_event_mask]
 
     # Empty-output short-circuit — return a correctly-typed empty frame
@@ -757,9 +739,7 @@ def build_event_table(
 
     per_event = _attach_identifiers(per_event, session_key)
 
-    per_event = _merge_classified_event_facts(
-        per_event, dot, speed_threshold, nonlocal_threshold
-    )
+    per_event = _merge_classified_event_facts(per_event, dot, nonlocal_threshold)
 
     per_event = _attach_stop_ids(per_event, session_key, bout_starts, bout_ends)
 
@@ -771,7 +751,6 @@ def build_event_sequence_table(
     env,
     conditional_posterior,
     *,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One row per in-event timebin with the arm-marginal posterior.
@@ -794,9 +773,8 @@ def build_event_sequence_table(
         Shape ``(time, position)`` — from
         :func:`posterior_analysis.load_conditional_posterior`. Must have the
         same time length as ``dot``.
-    speed_threshold, nonlocal_threshold : float
-        Same defaults as :func:`build_event_table` (``speed_threshold``
-        accepts only the canonical value there and here). Keeping the two
+    nonlocal_threshold : float
+        Same default as :func:`build_event_table`. Keeping the two
         filters in lockstep is important: ``event_sequence_table`` and
         ``event_table`` must cover exactly the same in-event rows, or
         joins across them drift.
@@ -821,7 +799,6 @@ def build_event_sequence_table(
     :func:`build_event_table`'s posterior-dependent columns — no
     arithmetic difference can leak between the two tables.
     """
-    require_canonical_speed_threshold(speed_threshold, "build_event_sequence_table")
     if "animal" not in dot.columns:
         raise KeyError("dot must carry 'animal' column (set by get_data_over_time)")
     animal = str(dot["animal"].iloc[0])
@@ -829,7 +806,7 @@ def build_event_sequence_table(
     epoch = str(dot["epoch"].iloc[0])
 
     dot = _prepare_dot(dot, env)
-    in_event_mask = _in_event_mask(dot, speed_threshold, nonlocal_threshold)
+    in_event_mask = _in_event_mask(dot, nonlocal_threshold)
 
     column_order = list(_EVENT_SEQUENCE_TABLE_BUILD_COLUMNS)
     if not in_event_mask.any():

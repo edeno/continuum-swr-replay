@@ -64,7 +64,6 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 from .immobility import (
     event_speeds_are_immobile,
     intervals_from_labels,
-    require_canonical_speed_threshold,
     validate_nonlocal_event_probability_contract,
 )
 from .nonlocal_detection import (
@@ -177,7 +176,6 @@ def match_swr(
 def build_classified_nonlocal_event_table(
     dot: pd.DataFrame,
     *,
-    speed_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     nonlocal_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
 ) -> pd.DataFrame:
     """One row per non-local event with timing, overlap class, and per-event summaries.
@@ -191,10 +189,6 @@ def build_classified_nonlocal_event_table(
         carry ``animal``, ``day``, ``epoch``, ``non_local_event``,
         ``SWR_event``, ``head_speed``, ``Non-Local_Continuous_prob``,
         ``Non-Local_Fragmented_prob``.
-    speed_threshold : float
-        Immobility threshold (cm/s) used for the canonical whole-event flag
-        and the legacy endpoint diagnostic. Only the canonical value is
-        accepted: the SWRs are the read's, gated at it.
     nonlocal_threshold : float
         Minimum combined Non-Local posterior required at every labeled bin.
         This must match the threshold used to create or validate the primary
@@ -213,12 +207,6 @@ def build_classified_nonlocal_event_table(
         matched_swr_event, matched_swr_start, matched_swr_end``.
         Empty frame (correct columns, zero rows) if no events.
 
-    Raises
-    ------
-    ValueError
-        If `speed_threshold` is not the canonical
-        ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC``.
-
     Notes
     -----
     Events are built over the *full* set of timebins carrying each Non-Local
@@ -226,15 +214,14 @@ def build_classified_nonlocal_event_table(
     intervals, which the read restricted atomically by the canonical
     whole-event speed rule, are derived from ``dot["SWR_event"]`` labels via
     :func:`intervals_from_labels` and are session-scoped, so cross-session
-    leakage is impossible by construction.
+    leakage is impossible by construction. The two speed flags use the
+    canonical ``DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`` (4 cm/s), the
+    threshold the read gated the SWRs at.
 
     Units: all ``*_start`` / ``*_end`` / ``*_time`` columns and
     ``event_duration`` are in seconds; the four ``animal_*_speed_cm_s``
     columns are in cm/s.
     """
-    require_canonical_speed_threshold(
-        speed_threshold, "build_classified_nonlocal_event_table"
-    )
     missing = [c for c in _REQUIRED_DOT_COLUMNS if c not in dot.columns]
     if missing:
         raise KeyError(
@@ -294,10 +281,11 @@ def build_classified_nonlocal_event_table(
                     "animal_end_speed_cm_s": end_speed,
                     "whole_event_speed_eligible": event_speeds_are_immobile(
                         speed.to_numpy(dtype=float),
-                        speed_threshold=speed_threshold,
+                        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
                     ),
                     "endpoints_speed_below_thresh": bool(
-                        (start_speed < speed_threshold) & (end_speed < speed_threshold)
+                        (start_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
+                        & (end_speed < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC)
                     ),
                     "peak_nonlocal_prob": float(nonlocal_prob.max()),
                 }

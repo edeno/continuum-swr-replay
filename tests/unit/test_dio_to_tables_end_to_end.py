@@ -160,9 +160,7 @@ def session():
     trials = make_trials_df_from_well_visits(well_visits)
     port_experiences = make_port_experiences_df(well_visits, trials)
     dot = _data_over_time()
-    stop_table = build_stop_table(
-        dot, trials, port_experiences, graph, speed_threshold=4.0
-    )
+    stop_table = build_stop_table(dot, trials, port_experiences, graph)
     event_table = build_event_table(
         dot,
         _EnvStub(),

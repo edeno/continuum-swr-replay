@@ -812,7 +812,6 @@ def run_session(
     epoch_name: str,
     brain_area: str = "mPFC",
     sampling_frequency: float = 500,
-    immobility_threshold: float = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
     run_parallel: bool = True,
     stop_cohort: str = "at_well",
@@ -834,13 +833,6 @@ def run_session(
         Brain area to analyze ("mPFC" or "OFC").
     sampling_frequency : float
         Sampling frequency in Hz.
-    immobility_threshold : float
-        Speed threshold for immobility classification (cm/s). The rule is
-        strictly ``<``, on the fit mask and on the SWR speed gate alike. It
-        gates the SWR intervals the canonical ``is_swr`` column was computed
-        against, so a value other than
-        :data:`~continuum_swr_replay.analysis.constants.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`
-        is refused rather than silently applied to one side of the split only.
     non_local_threshold : float
         Probability threshold the events were cut at. It is not applied here:
         non-local events are read from the canonical event table, which is cut
@@ -939,9 +931,8 @@ def run_session(
     Raises
     ------
     ValueError
-        If ``non_local_threshold`` or ``immobility_threshold`` differs from the
-        threshold the canonical events were cut and speed-gated at; neither can
-        be re-cut at run time.
+        If ``non_local_threshold`` differs from the threshold the canonical
+        events were cut at; it cannot be re-cut at run time.
     UnconfiguredDeviceError
         With ``fitter="jax"``, if no JAX device was chosen first. Call
         :func:`~continuum_swr_replay.analysis.pfc.gpu.configure_jax_gpu` (the
@@ -956,14 +947,17 @@ def run_session(
     overlap with the SWR source's speed-gated ``SWR_event`` labels). Figure 4 therefore
     describes the same ``event_id``s as the content and rate families.
 
+    Immobility is ``head_speed`` strictly below
+    :data:`~continuum_swr_replay.analysis.constants.DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC`,
+    on the fit mask and on the SWR speed gate alike: the one threshold the
+    canonical events and the SWRs behind ``is_swr`` were speed-gated at.
+
     The matched non-event control is drawn here rather than by the caller so
     every fit on this path carries one, with the seed
     :func:`matched_control_seed` derives from the session key -- a refit of one
     session redraws the batch's control population exactly.
     """
-    _check_session_arguments(
-        fitter, penalty_sigma, immobility_threshold, non_local_threshold
-    )
+    _check_session_arguments(fitter, penalty_sigma, non_local_threshold)
 
     logger = logging.getLogger(
         format_epoch_identifier(nwb_file_name, epoch_name, brain_area)
@@ -988,7 +982,6 @@ def run_session(
         epoch_name,
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        immobility_threshold=immobility_threshold,
         logger=logger,
     )
 
@@ -1011,7 +1004,6 @@ def run_session(
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
         non_local_threshold=non_local_threshold,
-        immobility_threshold=immobility_threshold,
         logger=logger,
     )
     n_matched_control = int(len(control_draw.times))
@@ -1139,7 +1131,6 @@ def run_session(
 def _check_session_arguments(
     fitter: str,
     penalty_sigma: float | None,
-    immobility_threshold: float,
     non_local_threshold: float,
 ) -> None:
     """Refuse the :func:`run_session` arguments the canonical events cannot honour.
@@ -1148,24 +1139,14 @@ def _check_session_arguments(
     ------
     ValueError
         If ``penalty_sigma`` is given for a backend with no penalised path, or
-        either threshold differs from the one the canonical events were cut and
-        speed-gated at.
+        ``non_local_threshold`` differs from the one the canonical events were
+        cut at.
     """
     _check_fitter(fitter)
     if penalty_sigma is not None and fitter != "jax":
         raise ValueError(
             f"penalty_sigma={penalty_sigma!r} needs fitter='jax'; the "
             f"{fitter!r} backend fits unpenalised models only"
-        )
-    if immobility_threshold != DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC:
-        raise ValueError(
-            f"immobility_threshold={immobility_threshold!r} is not the "
-            "threshold the canonical events were speed-gated at "
-            f"({DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC}). The event table's "
-            "``is_swr`` column and the SWR intervals it was computed against "
-            "are cut at that one threshold, so re-gating the SWR population "
-            "here would split the events on a population the canonical column "
-            "never saw."
         )
     if non_local_threshold != DEFAULT_NON_LOCAL_THRESHOLD:
         raise ValueError(
@@ -1241,7 +1222,6 @@ def _session_fit_population(
     epoch_name: str,
     cohort_stops: pd.DataFrame | None,
     stop_cohort: str,
-    immobility_threshold: float,
     logger: logging.Logger,
 ) -> tuple[dict[str, Any], NDArray, pd.Series, pd.Series, dict[str, int]]:
     """The bins a session's models are fit on, and its excluded time.
@@ -1271,7 +1251,7 @@ def _session_fit_population(
         data["position_info"],
         cohort_stops=cohort_stops,
         stop_cohort=stop_cohort,
-        immobility_threshold=immobility_threshold,
+        immobility_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
         excluded_intervals=excluded,
         basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
     )
@@ -1311,7 +1291,6 @@ def _session_events(
     cohort_stops: pd.DataFrame | None,
     stop_cohort: str,
     non_local_threshold: float,
-    immobility_threshold: float,
     logger: logging.Logger,
 ) -> tuple[
     dict[str, pd.DataFrame],
@@ -1361,7 +1340,7 @@ def _session_events(
         nwb_file_name,
         epoch_name,
         non_local_threshold=non_local_threshold,
-        speed_threshold=immobility_threshold,
+        speed_threshold=DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     )
     swr_events_file = session_swr_events_file(nwb_file_name, epoch_name)
     event_provenance = canonical_event_provenance(
