@@ -41,7 +41,7 @@ def rolling_reward_count_all_events(
     ``cumsum[t] - cumsum[t - window]``, so a reward more than ``window`` trials
     back contributes nothing. It fills the persisted column
     ``reward_count_candidate_arm_last10_known_trials`` (shipped in
-    ``event_arm_table.pkl`` and consumed by the choice-prediction model); the column name is
+    ``event_arm_table`` and consumed by the choice-prediction model); the column name is
     frozen even though the function name now describes the window.
 
     ``NaN`` where no trial has completed yet -- unknown history, not zero

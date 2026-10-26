@@ -5,7 +5,7 @@ The rate models are ordinary Poisson GLMs on per-stop event counts with a
 ``log(immobility_duration_s)`` offset (see ``per_stop_rate_model.fit_per_stop_rate_model``) — a
 different model family from the conditional arm/patch hierarchies, so they
 live outside ``fit_replay_content_models.py``. This script fits R0-R1
-per session from the saved ``stop_table.pkl``, adds K-fold cross-validated
+per session from the saved ``stop_table``, adds K-fold cross-validated
 per-stop log-likelihood (``cross_validate_per_stop_rate_model``), and saves a tidy
 one-row-per-(outcome, model, session) table mirroring the arm/patch
 ``all_models.pkl``.

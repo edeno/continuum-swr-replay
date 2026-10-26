@@ -22,9 +22,9 @@ end; hashing at write time would certify a table the fit never saw. Each record
 carries its own ``hashed_at``, and the sidecar's ``written_at`` is the write
 time, so a reader can see the window the two bracket.
 
-The hashed file is the file that was *read*: ``read_table`` prefers the
-``.parquet`` sibling of a ``.pkl`` path, so the paths handed in here are
-resolved the same way before hashing.
+The hashed file is the file that was read: a table input is its ``.parquet``
+path (the readers refuse ``.pkl``); a ``.pkl`` input is a fitted bundle, hashed
+as it is.
 """
 
 from __future__ import annotations

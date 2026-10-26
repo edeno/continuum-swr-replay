@@ -13,8 +13,8 @@ migration is reversible; nothing reads them there, which is the point, since a
 pickle left beside its parquet is a stale read waiting to happen.
 
 Backup directories (``_prephase1_backup`` and friends) are deliberately left
-alone. They are historical snapshots, and ``read_table`` still falls back to
-pickle, so they stay readable exactly as they are.
+alone. They are historical snapshots; ``read_table`` reads only parquet, so
+read a backup's pickles with ``pd.read_pickle``.
 
 Usage
 -----

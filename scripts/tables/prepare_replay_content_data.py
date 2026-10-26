@@ -10,14 +10,14 @@ each session it loads the pre-saved ``data_over_time.pkl``,
 
 Outputs (under ``paths.replay_content_dir()``):
 
-- ``event_table.pkl`` — one row per non-local event
-- ``event_arm_table.pkl`` — one row per (event, arm)
-- ``event_patch_table.pkl`` — one row per (event, patch); collapsed from
+- ``event_table`` — one row per non-local event
+- ``event_arm_table`` — one row per (event, arm)
+- ``event_patch_table`` — one row per (event, patch); collapsed from
   ``event_arm_table`` via :func:`build_event_patch_table` so the
   ``--hierarchy patch`` path of ``fit_replay_content_models.py`` has its
   required input alongside the per-arm tables.
-- ``event_sequence_table.pkl`` — one row per in-event timebin
-- ``stop_table.pkl`` — one row per stopping period (incl. zero-event)
+- ``event_sequence_table`` — one row per in-event timebin
+- ``stop_table`` — one row per stopping period (incl. zero-event)
 
 Usage::
 

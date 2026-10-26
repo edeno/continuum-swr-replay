@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-"""Regenerate ``stop_table.pkl`` with the new count columns.
+"""Regenerate ``stop_table`` with the new count columns.
 
 Re-runs the canonical :func:`build_stop_table` per session (which emits
 ``n_swr_events`` / ``n_mua_events`` / ``n_selected_events``), then adds the
 canonical ``n_nonlocal_swr_events`` / ``n_nonlocal_non_swr_events`` split by joining
-the existing ``event_table.pkl``'s ``is_swr`` on ``stop_id``. This rebuilds only
+the existing ``event_table``'s ``is_swr`` on ``stop_id``. This rebuilds only
 the stop table — it does NOT rebuild the event/arm/patch tables — so it is much
 cheaper than a full ``prepare_replay_content_data.py`` run.
 

@@ -169,7 +169,7 @@ def _post_outcome_masks(df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     if missing:
         raise KeyError(
             "Post-outcome SWR-power gating requires physical timing column(s): "
-            f"{missing}. Regenerate event_table.pkl and qvals_table.pkl."
+            f"{missing}. Regenerate event_table and qvals_table."
         )
 
     event_start = df["event_start_s"].to_numpy(dtype=float)

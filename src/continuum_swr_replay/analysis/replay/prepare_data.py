@@ -384,7 +384,7 @@ def _process_session(
     non-local events still return a dict — with empty
     ``event_table`` / ``event_arm_table`` and a ``None``
     ``event_sequence_table``, but a fully populated ``stop_table``
-    that records the session's immobility bouts. ``stop_table.pkl``
+    that records the session's immobility bouts. ``stop_table``
     is documented to include zero-event bouts, and the rate model
     fits ``n_selected_events`` per stop over a denominator that must include
     those rows. Callers concatenate every non-``None`` return into
@@ -445,7 +445,7 @@ def _process_session(
 
     # Build the stop table first — it's a function of immobility
     # bouts, not non-local events, and the documented
-    # ``stop_table.pkl`` contract (this script's own docstring; the
+    # ``stop_table`` contract (this script's own docstring; the
     # builder's "**including zero-event bouts**" promise) keeps
     # zero-event sessions in the dataset. Returning early on an
     # empty event_table dropped those sessions silently and broke
@@ -558,7 +558,7 @@ def _assert_value_block_matches_source(
             f"event_arm reward_belief_mean_candidate_arm_preoutcome disagrees "
             f"with qvals_table on "
             f"{int(mismatched.sum())} leaf row(s) across {bad_stops} stop(s). "
-            "The value block is stale: rebuild qvals_table.pkl first, then "
+            "The value block is stale: rebuild qvals_table first, then "
             "rerun this script."
         )
 
@@ -822,10 +822,10 @@ def _assemble_canonical_tables(
     # from event_table.is_swr — an assembly-level join, like the retrospective
     # merge below, kept out of build_stop_table (which is event-table-independent).
     stop_table_all = add_nonlocal_swr_split(stop_table_all, event_table_all)
-    # Always materialize ``event_sequence_table.pkl`` — even when no
+    # Always materialize ``event_sequence_table`` — even when no
     # session contributed any sequence rows. The retrospective pass (the
     # retrospective-alignment step) does
-    # ``read_table(INPUT_DIR / "event_sequence_table.pkl")``
+    # ``read_table(table_path("event_sequence_table", INPUT_DIR))``
     # unconditionally, so a missing file would crash a posterior-
     # unavailable run with FileNotFoundError. The retrospective
     # helpers already treat an empty sequence frame as a legitimate

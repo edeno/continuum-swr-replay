@@ -115,7 +115,7 @@ def _visit_context_ids(event_table: pd.DataFrame) -> pd.Series:
     if missing:
         raise KeyError(
             "Retrospective visit contexts require event-grain column(s) "
-            f"{missing}; regenerate event_table.pkl with the current builder"
+            f"{missing}; regenerate event_table with the current builder"
         )
     if event_table.empty:
         return pd.Series(index=event_table.index, dtype=object)

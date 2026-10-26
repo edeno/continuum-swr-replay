@@ -152,7 +152,7 @@ def _completed_visit_context(stops: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise KeyError(
             "visit-grain uncertainty covariates require explicit completed "
-            f"trial context columns {missing}; regenerate stop_table.pkl"
+            f"trial context columns {missing}; regenerate stop_table"
         )
     if len(stops) == 0:
         return pd.DataFrame(columns=required)
@@ -360,7 +360,7 @@ def _validated_stop_table(
     if missing:
         raise KeyError(
             "uncertainty covariates require canonical stop-table columns "
-            f"{missing}; regenerate stop_table.pkl"
+            f"{missing}; regenerate stop_table"
         )
 
     out = stop_table.copy()

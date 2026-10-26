@@ -133,11 +133,10 @@ uv run pytest --cov=src/continuum_swr_replay --cov-report=html
 # open htmlcov/index.html
 ```
 
-Note: 0% coverage on `data_loaders/bandit_task.py` and 0–14% on most
-visualization modules is *expected*. `bandit_task.py` is the Spyglass entry
-point and is uncoverable offline; its pure orchestration helpers route into
-leaf modules (`spikes.py`, `lfp.py`, `position.py`) whose helpers *are*
-tested. Visualization modules are a deliberate non-target — plotting code is
+Note: 0–14% coverage on most visualization modules is *expected*.
+`bandit_task.py` imports Spyglass only inside its loaders; its orchestration
+is tested with faked loaders (`unit/test_position.py`), and its Spyglass reads
+need `-m real_data`. Visualization modules are a deliberate non-target — plotting code is
 low-ROI to test, and scientific correctness is verified through analysis
 tests upstream of the plotting layer.
 

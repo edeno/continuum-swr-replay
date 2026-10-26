@@ -230,7 +230,7 @@ def arm_occupancy(animal: str | None = None) -> pd.DataFrame | None:
     """Per-arm posterior-mass occupancy, normalized within SWR group.
 
     Returns a (9-arm x {nonSWR, SWR}) fraction table, or None if the canonical
-    ``replay_content/event_arm_table.pkl`` is unavailable.
+    ``replay_content/event_arm_table`` is unavailable.
     """
     f = table_path("event_arm_table")
     if not table_exists(f):

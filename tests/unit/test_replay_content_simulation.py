@@ -56,8 +56,7 @@ class TestSingleEffectRecovery:
         fit = _recover(beta, n_events=400, L_e=25, seed=42)
         z = _zscore(fit, predictor, truth)
         assert abs(z) < 3, (
-            f"{predictor}: coef={fit[f'coef_{predictor}']:.3f} "
-            f"truth={truth}, z={z:.2f}"
+            f"{predictor}: coef={fit[f'coef_{predictor}']:.3f} truth={truth}, z={z:.2f}"
         )
 
 
@@ -131,8 +130,12 @@ class TestContinuousPredictor:
             assert novelty.isin([0.0, 1.0]).all()
             if novelty.eq(1.0).any() and novelty.eq(0.0).any():
                 assert (
-                    event.loc[novelty.index[novelty.eq(1.0)], "visit_recency_trials"].min()
-                    > event.loc[novelty.index[novelty.eq(0.0)], "visit_recency_trials"].max()
+                    event.loc[
+                        novelty.index[novelty.eq(1.0)], "visit_recency_trials"
+                    ].min()
+                    > event.loc[
+                        novelty.index[novelty.eq(0.0)], "visit_recency_trials"
+                    ].max()
                 )
         np.testing.assert_array_equal(
             df["swr_x_is_candidate_arm_never_visited"],
@@ -164,9 +167,7 @@ class TestFractionalResponse:
             assert fit_int[f"coef_{p}"] == pytest.approx(
                 fit_float[f"coef_{p}"], rel=1e-9
             )
-            assert fit_int[f"bse_{p}"] == pytest.approx(
-                fit_float[f"bse_{p}"], rel=1e-9
-            )
+            assert fit_int[f"bse_{p}"] == pytest.approx(fit_float[f"bse_{p}"], rel=1e-9)
 
     def test_subunit_fractional_response_is_not_floored(self):
         """Responses in (0, 1) must influence the fit, not be floored to 0.
@@ -261,14 +262,10 @@ class TestSpatialSmearingAttenuates:
         df_smeared, diag_smeared = simulate_posterior_bumps(
             beta, n_events=600, L_e=30, sigma=20.0, seed=23
         )
-        fit_smeared = fit_conditional_poisson(
-            df_smeared, predictors=["is_current_arm"]
-        )
+        fit_smeared = fit_conditional_poisson(df_smeared, predictors=["is_current_arm"])
         assert diag_smeared["fraction_on_chosen"] < diag_clean["fraction_on_chosen"]
         # attenuation: smeared coef strictly smaller than clean coef
-        assert (
-            fit_smeared["coef_is_current_arm"] < fit_clean["coef_is_current_arm"]
-        ), (
+        assert fit_smeared["coef_is_current_arm"] < fit_clean["coef_is_current_arm"], (
             f"clean={fit_clean['coef_is_current_arm']:.3f} "
             f"smeared={fit_smeared['coef_is_current_arm']:.3f}"
         )
@@ -280,7 +277,9 @@ class TestSpatialSmearingAttenuates:
 
 
 class TestFullPipelineRecovery:
-    """End-to-end simulation through the production transformation chain."""
+    """Simulated events through the production MAP-to-arm mapping and hard arm
+    count (`simulate_full_pipeline`), then the production fitter.
+    """
 
     def test_pipeline_produces_expected_shape(self):
         beta = {"is_current_arm": 0.5}
@@ -549,9 +548,7 @@ class TestHardVsSoftBothAttenuateUnderSmearing:
         # to differ would still pass if a regression flipped the
         # ordering — exactly the case the docstring's "swapping MAP
         # for soft would *worsen* attenuation" claim hinges on.
-        assert (
-            fit_hard["coef_is_current_arm"] > fit_soft["coef_is_current_arm"]
-        ), (
+        assert fit_hard["coef_is_current_arm"] > fit_soft["coef_is_current_arm"], (
             f"hard β̂ = {fit_hard['coef_is_current_arm']:.3f}, "
             f"soft β̂ = {fit_soft['coef_is_current_arm']:.3f}, "
             f"truth = {truth} — hard MAP must attenuate less than soft "
@@ -574,9 +571,7 @@ class TestUnbiasedAcrossSeeds:
         mean = float(np.mean(coefs))
         sem = float(np.std(coefs, ddof=1) / np.sqrt(len(coefs)))
         # mean within ~3 SEM of truth
-        assert abs(mean - 0.6) < 3 * sem, (
-            f"mean={mean:.3f} truth=0.6 sem={sem:.3f}"
-        )
+        assert abs(mean - 0.6) < 3 * sem, f"mean={mean:.3f} truth=0.6 sem={sem:.3f}"
 
 
 class TestDirichletMultinomialSimulator:
@@ -687,8 +682,15 @@ class TestSharedDesignSamplerIsSeedPinned:
         "is_prev_arm": [0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
         "visit_recency_trials": [4.0, 7.0, 3.0, 1.0, 5.0, 2.0, 0.0, 0.0, 0.0],
         "distance_to_candidate_arm_cm": [
-            72.901512, 92.742393, 96.792619, 1.470630, 86.364009,
-            98.119504, 95.721018, 14.876401, 97.262881,
+            72.901512,
+            92.742393,
+            96.792619,
+            1.470630,
+            86.364009,
+            98.119504,
+            95.721018,
+            14.876401,
+            97.262881,
         ],
         "is_swr": [0.0] * 9,
         "time_since_stop_start_s": [1.208379] * 9,
@@ -712,7 +714,11 @@ class TestSharedDesignSamplerIsSeedPinned:
     def test_overdispersed_simulator_shares_that_design(self):
         df = self._first_event(
             simulate_dirichlet_multinomial_counts(
-                {"is_current_arm": 0.5}, log_phi_intercept=1.0, n_events=3, L_e=8, seed=0
+                {"is_current_arm": 0.5},
+                log_phi_intercept=1.0,
+                n_events=3,
+                L_e=8,
+                seed=0,
             )
         )
         for column, expected in self.GOLDEN.items():

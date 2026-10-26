@@ -628,7 +628,7 @@ Rebuild ContFrag tables while reusing immutable posterior aggregates.
 
 ### `scripts/tables/regenerate_stop_table.py`
 
-Regenerate ``stop_table.pkl`` with the new count columns.
+Regenerate ``stop_table`` with the new count columns.
 
 `build_one`, `validate`, `main`
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Per-stop RL-model values via DataJoint — canonical, complete, timestamp-aligned.
 
-Builds the per-stop behavioral-model covariate table (`qvals_table.pkl`),
+Builds the per-stop behavioral-model covariate table (`qvals_table`),
 sourcing everything from Alison's shared DataJoint schemas (read-only):
 
   * VALUES: `alison_rlmodel.BehaviorModelResults` (the `beta_stable_withleaf`

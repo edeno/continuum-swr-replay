@@ -955,7 +955,7 @@ MU_UNCERTAINTY_MODEL_VALUE_COVARIATES = (
     "rpe_postoutcome",  # reward - chosen-arm pre-outcome belief
 )
 
-# Real SpatialBanditTask decision variables (qvals_table.pkl, beta_stable_withleaf;
+# Real SpatialBanditTask decision variables (qvals_table, beta_stable_withleaf;
 # see docs/behavior_model_covariates.md). The paper's covariates: DeltaV, belief
 # entropy, absolute value-update magnitudes. The runner z-scores them
 # (disparate/tiny scale) -> per-SD rate ratios.

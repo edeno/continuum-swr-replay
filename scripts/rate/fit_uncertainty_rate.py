@@ -11,7 +11,7 @@ Per session: load ``stop_table``; validate its canonical
 ``patch_switch_fraction_last5_completed_trips``
 and derive stop-local summaries (:func:`add_uncertainty_covariates`); inner-merge
 the nominal value + real
-behavioral-model covariates from ``qvals_table.pkl`` on ``stop_id`` (one exactly
+behavioral-model covariates from ``qvals_table`` on ``stop_id`` (one exactly
 stop-start-aligned source -- no difflib CSV); drop the first (exposure) session per
 animal; attach the canonical ``is_swr`` to the onsets.
 Because the fitted block contains current-trip RPE/value updates, retain only
@@ -254,7 +254,7 @@ def _gate_bins_after_outcome(
     if missing:
         raise KeyError(
             "Post-outcome uncertainty-rate gating requires physical timing "
-            f"column(s): {missing}. Regenerate qvals_table.pkl and stop_table.pkl."
+            f"column(s): {missing}. Regenerate qvals_table and stop_table."
         )
 
     timing = design.groupby("stop_id", sort=False)[
