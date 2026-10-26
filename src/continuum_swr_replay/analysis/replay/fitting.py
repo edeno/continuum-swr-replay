@@ -1449,7 +1449,7 @@ def _compute_conditional_diagnostics(
         result["cond_number"] = float(np.linalg.cond(X / scale))
 
     # VIF (add constant for VIF computation)
-    X_with_const = sm.add_constant(X)
+    X_with_const = sm.add_constant(X, has_constant="add")
     for i, pred in enumerate(predictors):
         try:
             result[f"vif_{pred}"] = variance_inflation_factor(X_with_const, i + 1)

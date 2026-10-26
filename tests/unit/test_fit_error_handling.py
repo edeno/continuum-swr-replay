@@ -218,6 +218,27 @@ def test_vif_failure_is_nan(monkeypatch):
     assert np.isfinite(out["cond_number"])
 
 
+@pytest.mark.filterwarnings("ignore:divide by zero:RuntimeWarning")
+def test_vif_with_a_constant_column_keeps_each_name():
+    """A nonzero-constant column must not stop the intercept being added.
+
+    Left unaugmented, every VIF index shifts by one and the last raises
+    IndexError, which is not an expected fit error and so discards the fit.
+    """
+    rng = np.random.default_rng(0)
+    X = np.column_stack([rng.normal(size=30), np.full(30, 2.0), rng.normal(size=30)])
+    out = fitting._compute_conditional_diagnostics(X, ["a", "b", "c"])
+    assert {"vif_a", "vif_b", "vif_c"} <= out.keys()
+    reference = sm.add_constant(X[:, [0, 2]])
+    np.testing.assert_allclose(
+        [out["vif_a"], out["vif_c"]],
+        [
+            fitting.variance_inflation_factor(reference, 1),
+            fitting.variance_inflation_factor(reference, 2),
+        ],
+    )
+
+
 def test_vif_coding_error_propagates(monkeypatch):
     monkeypatch.setattr(fitting, "variance_inflation_factor", _raiser(_bug()))
     X = np.random.default_rng(0).normal(size=(30, 2))
