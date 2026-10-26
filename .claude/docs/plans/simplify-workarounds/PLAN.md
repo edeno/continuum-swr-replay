@@ -379,6 +379,57 @@ the scratch root (tmux session `simplify_parity`, commands from `parity.md`)
 and diff against the Task 0 reference. Run `uv run pytest -m real_data`.
 Report every difference; there must be none outside named output changes.
 
+## Phase G — the lead's answers to the final review (2026-10-26)
+
+The lead answered the final review's questions. Not changed, by the lead's
+answer: the senor20201030 linearization tie-break (leave alone), the
+memoryless sweeps (stay on the GPU when one is visible), the 4 regenerated
+`.claude/research` outputs (accepted). Every task keeps the Global
+Constraints; Tasks 22–26 change no canonical table.
+
+### Task 22: Hippocampus imports lazy again
+Restore a lazy-export `__init__` for `analysis.hippocampus` only, so
+`import continuum_swr_replay.analysis.hippocampus.<leaf>` no longer loads
+JAX/non_local_detector/statsmodels/dask for leaves that do not need them.
+Start from the layer Task 13 removed (`git show 7b5fec82`), but keep what
+Task 13 got right: no fallback that hides an ImportError, and the guard
+tests (`test_lazy_imports`, `test_import_layering`) pin the new behaviour.
+Measure a leaf import's time before and after.
+
+### Task 23: Provenance records the arguments main received
+Every writer that records `sys.argv` (fit sidecars via `write_fit_provenance`,
+`_invocation`, `scripts/qa/_report.py`, the PFC runner's `cli=`, about 12
+sites) records `[program, *argv]` where `argv` is what `main(argv)` parsed
+(`sys.argv[1:]` when `main` is called with `None`). A CLI run's sidecar stays
+byte-identical in that field; an in-process `main([...])` records its own
+arguments, not pytest's. Tests that patch `sys.argv` only to pin the recorded
+command line pass argv instead.
+
+### Task 24: The conditional-logit robustness ladder skips a failed session
+`scripts/content/fit_replay_content_models.py --logit` raises when one
+session's fit fails with an expected fit error (live: M4, senor20201106
+02_r1, "need covariance"). Skip such a session instead: log it with its
+reason, keep every logit rung on one common session set, publish the skipped
+sessions beside the logit fits, and keep the check that the logit sessions are
+a subset of the primary ladder's. An unexpected error still propagates. Run
+`--logit` on the full cohort into a scratch root (never the live one) and
+report the sessions skipped per rung.
+
+### Task 25: Archive figure-4 script imports; schematic names current columns
+`scripts/figures/archive/generate_figure04_panels.py` imports `plot_AICs`,
+renamed `plot_aics` in c2f73132: import the current name and confirm the
+script imports. In `scripts/figures/generate_supp_pipeline_schematic.py`,
+steps 5–7 name columns that no longer exist; name the current ones (from
+the event/event-arm table schemas and `model_specs.py`) and redraw the figure.
+
+### Task 26: Research scripts redirect through the data root
+`.claude/research` scripts (gitignored, the lead's) that redirect output by
+assigning a module root (`mod.RC = …`, `*.PROCESSED_DATA_DIR = …`,
+`swr_source.SWR_INVENTORY_ROOT = …`) have done nothing since Task 19, so they
+read and write the live root. Change each to set `$CSR_PROCESSED_DATA_DIR`
+before its first package read, as `scripts/exploratory/_content_cohort_control.py`
+does. Back up every file before editing; never run one.
+
 ## Ruled out of scope
 - Theta/run-speed re-normalization at read time (Ruling P1).
 - `fitting.py:280` `_rows_of_events_whose_response_varies` (statsmodels
