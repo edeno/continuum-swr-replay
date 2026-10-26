@@ -740,7 +740,10 @@ def _one_session_primary_result(long_df, model_name):
     )
 
 
-def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch):
+def test_a_logit_rung_with_no_fitted_session_aborts_without_publishing(
+    tmp_path, monkeypatch
+):
+    """A failed session is skipped, but a rung left with none still aborts."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
@@ -755,7 +758,7 @@ def test_requested_logit_failure_aborts_without_publishing(tmp_path, monkeypatch
     )
     monkeypatch.setattr(runner, "fit_conditional_logit", lambda *args, **kwargs: None)
 
-    with pytest.raises(RuntimeError, match="logit robustness fit failed"):
+    with pytest.raises(RuntimeError, match="produced no session fits"):
         runner.main(["--models", "M1", "--logit"])
 
     assert not (_partial_ladder_dir(input_dir, "M1")).exists()

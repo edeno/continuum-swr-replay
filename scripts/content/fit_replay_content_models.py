@@ -657,6 +657,7 @@ def _write_complete_output_bundle(
     comparison: pd.DataFrame,
     logit_results: Mapping[str, pd.DataFrame],
     fit_inputs: Mapping[str, object],
+    logit_skips: pd.DataFrame | None = None,
     estimator: str,
     cli: Sequence[str],
     response_renormalized: bool = False,
@@ -699,6 +700,13 @@ def _write_complete_output_bundle(
             logit_dir.mkdir()
             for model_name, result in logit_results.items():
                 _write(result, logit_dir / f"{model_name}_logit.pkl")
+            # Written even when empty, so "nothing was skipped" is on disk.
+            skips = (
+                logit_skips
+                if logit_skips is not None
+                else pd.DataFrame(columns=LOGIT_SKIP_COLUMNS)
+            )
+            skips.to_csv(logit_dir / "logit_skipped_sessions.csv", index=False)
         _publish_staged_directory(staged_dir, output_dir)
     finally:
         if staged_dir.exists():
@@ -1580,17 +1588,82 @@ def _fit_content_ladder(
     return model_results, estimator_skips
 
 
+# One row per (rung, session) the conditional-logit robustness fit refused.
+LOGIT_SKIP_COLUMNS = ("model", *SESSION_COLUMNS, "reason")
+
+
+class _RecordCollector(logging.Handler):
+    """Keep every log record emitted while attached."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.INFO)
+        self.records: list[logging.LogRecord] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+def _fit_conditional_logit_with_reason(
+    group: pd.DataFrame, **kwargs
+) -> tuple[dict | None, str]:
+    """Fit one session's conditional logit and say why when it returns None.
+
+    ``fit_conditional_logit`` returns None for an expected failure (too few
+    events, a rank-deficient design, or one of ``EXPECTED_FIT_ERRORS`` from the
+    optimizer) and states the reason only in its last log record, so that
+    record is captured here. Any other exception propagates.
+
+    Returns
+    -------
+    result : dict or None
+        The fitter's result.
+    reason : str
+        ``""`` for a fit; otherwise the exception (``"ValueError: ..."``) or
+        the message of the fitter's last log record.
+    """
+    fit_logger = logging.getLogger(fit_conditional_logit.__module__)
+    collector = _RecordCollector()
+    previous_level = fit_logger.level
+    fit_logger.setLevel(min(fit_logger.getEffectiveLevel(), logging.INFO))
+    fit_logger.addHandler(collector)
+    try:
+        result = fit_conditional_logit(group, **kwargs)
+    finally:
+        fit_logger.removeHandler(collector)
+        fit_logger.setLevel(previous_level)
+    if result is not None:
+        return result, ""
+    if not collector.records:
+        return None, "fit_conditional_logit returned None without a logged reason"
+    last = collector.records[-1]
+    if last.exc_info and last.exc_info[1] is not None:
+        error = last.exc_info[1]
+        return None, f"{type(error).__name__}: {error}"
+    return None, last.getMessage()
+
+
 def _fit_conditional_logit_robustness(
     args: argparse.Namespace,
     config: _RunConfig,
     cohort: _ContentCohort,
     model_results: dict[str, pd.DataFrame],
-) -> dict[str, pd.DataFrame]:
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Optional conditional-logit robustness fits on the dominant arm.
 
     Returns an empty mapping unless ``--logit`` is set; otherwise fits each
-    rung per session on the primary ladder's shared-session cohort and
-    validates that the logit sessions match it exactly.
+    rung per session on the primary ladder's shared-session cohort. A session
+    whose fit fails with an expected fit error is skipped and recorded with its
+    reason; matching then keeps every logit rung on the sessions all of them
+    fitted, which must be a subset of the primary ladder's. An unexpected
+    error still propagates.
+
+    Returns
+    -------
+    logit_outputs : dict[str, pd.DataFrame]
+        Matched per-rung logit fits.
+    logit_skips : pd.DataFrame
+        One row per rung and session the logit fitter refused, with columns
+        ``LOGIT_SKIP_COLUMNS``. Empty when nothing was skipped.
     """
     hierarchy = config.hierarchy
     long_df = cohort.long_df
@@ -1608,6 +1681,7 @@ def _fit_conditional_logit_robustness(
     long_session_index = pd.MultiIndex.from_frame(long_df[list(SESSION_COLUMNS)])
     matched_long_df = long_df.loc[long_session_index.isin(shared_sessions)]
     logit_outputs: dict[str, pd.DataFrame] = {}
+    logit_skips: list[dict] = []
     if args.logit:
         logging.info("Fitting conditional logit robustness checks...")
         expected_logit_models = tuple(
@@ -1628,17 +1702,27 @@ def _fit_conditional_logit_robustness(
                 # column on patch tables, and returned ``None`` for
                 # every session — producing an empty ``logit/`` dir
                 # with no robustness outputs.
-                r = fit_conditional_logit(
+                r, reason = _fit_conditional_logit_with_reason(
                     group,
                     predictors=predictors,
                     event_col=event_col,
                     response_col=response_col,
                 )
                 if r is None:
-                    raise RuntimeError(
-                        "Requested conditional-logit robustness fit failed for "
-                        f"{model_name}/{tuple(keys)}; no output will be published"
+                    logging.warning(
+                        "%s logit: no fit for session %s (%s)",
+                        model_name,
+                        "/".join(map(str, keys)),
+                        reason,
                     )
+                    logit_skips.append(
+                        {
+                            "model": model_name,
+                            **dict(zip(SESSION_COLUMNS, keys, strict=True)),
+                            "reason": reason,
+                        }
+                    )
+                    continue
                 r["model"] = model_name
                 r["response_col"] = response_col
                 r["response_renormalized"] = cohort.response_renormalized
@@ -1649,6 +1733,9 @@ def _fit_conditional_logit_robustness(
             logit_outputs[model_name] = pd.DataFrame(model_logit_results)
 
         if expected_logit_models:
+            # Matching keeps only the sessions every logit rung fitted, so a
+            # session skipped at one rung leaves them all and the rungs stay
+            # comparable like for like.
             logit_outputs = validate_and_match_fit_results(
                 logit_outputs,
                 requested_model_names=expected_logit_models,
@@ -1659,19 +1746,20 @@ def _fit_conditional_logit_robustness(
                 logit_sessions = set(
                     logit_df[list(SESSION_COLUMNS)].itertuples(index=False, name=None)
                 )
-                if logit_sessions != shared_sessions:
+                if not logit_sessions <= shared_sessions:
                     raise RuntimeError(
-                        "Requested conditional-logit robustness fits do not match "
-                        f"the primary cohort for {model_name}; no output will be "
-                        "published"
+                        "Requested conditional-logit robustness fits include "
+                        f"sessions outside the primary cohort for {model_name}; "
+                        "no output will be published"
                     )
                 logging.info(
-                    "  %s logit: %d matched sessions staged",
+                    "  %s logit: %d of %d primary sessions staged",
                     model_name,
                     len(logit_df),
+                    len(shared_sessions),
                 )
 
-    return logit_outputs
+    return logit_outputs, pd.DataFrame(logit_skips, columns=LOGIT_SKIP_COLUMNS)
 
 
 def _zero_response_event_ids(
@@ -1826,7 +1914,7 @@ def _audit_compare_and_publish(
         if headline:
             print("\n" + "\n".join(headline))
 
-    logit_outputs = _fit_conditional_logit_robustness(
+    logit_outputs, logit_skips = _fit_conditional_logit_robustness(
         args, config, cohort, model_results
     )
 
@@ -1847,6 +1935,7 @@ def _audit_compare_and_publish(
         cohort_audits=cohort_audits,
         comparison=comparison,
         logit_results=logit_outputs,
+        logit_skips=logit_skips,
         fit_inputs=cohort.fit_inputs,
         estimator=str(estimator),
         cli=cli,
