@@ -273,6 +273,69 @@ def test_swr_power_n_modeled_is_the_fitters_count():
     assert mod._cohort_records(df, coefs.iloc[0:0])[0]["n_modeled"] == 0
 
 
+def test_swr_power_excluded_session_splits_into_its_three_gates(tmp_path):
+    """The two written counts plus the <30-event remainder are ``n_excluded_session``.
+
+    Complete events (no qvals or own NaN) leave the fit by exactly one of: a
+    pre-outcome start, a session left with one outcome, or a session with fewer
+    than 30 outcome-balanced events. The CSV carries the first two after the
+    canonical columns and no longer carries the gate's constant fields.
+    """
+    from continuum_swr_replay.analysis.replay.cohort_audit import (
+        COHORT_COLUMNS,
+        write_cohort_audit,
+    )
+    from scripts.coupling import fit_swr_power_model as mod
+
+    rng = np.random.default_rng(3)
+    sizes = {"a": 60, "b": 50, "c": 20, "d": 40}
+    n = sum(sizes.values())
+    df = pd.DataFrame(
+        {
+            "animal": np.repeat(list(sizes), list(sizes.values())),
+            "session_date": 1,
+            "epoch": "e",
+            **{c: rng.normal(size=n) for c in mod.PREDICTORS},
+            mod.POWER_COL: rng.normal(size=n),
+            "event_start_s": 10.0,
+            "outcome_known_time": 5.0,
+            "trial_reward": np.tile([0.0, 1.0], n // 2),
+        }
+    )
+    df.loc[0:4, "reward_belief_mean_chosen_arm_preoutcome"] = np.nan  # qvals gap
+    df.loc[60:62, "known_reward_outcome_lag_1"] = np.nan  # own
+    df.loc[63:66, "event_start_s"] = 1.0  # 4 pre-outcome
+    # Session d's 20 omissions start pre-outcome; its 20 rewarded are unbalanced.
+    d_rows = df.index[df.animal == "d"]
+    df.loc[d_rows[df.loc[d_rows, "trial_reward"] == 0.0], "event_start_s"] = 1.0
+
+    coefs = mod.fit_power_model(df)
+    rec = mod._cohort_records(df, coefs)[0]
+    _, _, selected, _ = mod._balanced_post_outcome_selection(df)
+    session_gate = int(selected.sum()) - rec["n_modeled"]
+
+    assert rec["n_events_excluded_pre_outcome"] == 4 + 20
+    assert rec["n_events_excluded_outcome_imbalance"] == 20
+    assert session_gate == 20  # session c
+    assert rec["n_excluded_session"] == (
+        rec["n_events_excluded_pre_outcome"]
+        + rec["n_events_excluded_outcome_imbalance"]
+        + session_gate
+    )
+
+    out = tmp_path / "swr_power_cohort_audit.csv"
+    write_cohort_audit([rec], out, extra_columns=mod.COHORT_EXTRA_COLUMNS)
+    written = pd.read_csv(out)
+    assert list(written.columns) == [*COHORT_COLUMNS, *mod.COHORT_EXTRA_COLUMNS]
+    assert written["n_events_excluded_pre_outcome"].iloc[0] == 24
+    for gone in (
+        "post_outcome_gate",
+        "post_outcome_gate_rule",
+        "outcome_time_semantics",
+    ):
+        assert gone not in rec
+
+
 def test_swr_power_missing_timing_is_attributed_not_absorbed():
     """Both timing columns land in named buckets, never the residual.
 

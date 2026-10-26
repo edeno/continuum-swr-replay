@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.cohort_audit import (
+    COHORT_COLUMNS,
     classify_drops,
     cohort_record,
     drop_profile,
@@ -175,6 +176,23 @@ def test_write_cohort_audit_column_order(tmp_path):
     ]
     assert "n_sessions_flagged_separated" in reread.columns
     assert df["n_modeled"].iloc[0] == 10
+
+
+def test_write_cohort_audit_extra_columns_follow_the_canonical_ones(tmp_path):
+    rec = cohort_record(
+        "M0",
+        "all",
+        "event",
+        n_in=10,
+        n_modeled=10,
+        sessions_in=1,
+        sessions_modeled=1,
+        animals_modeled=1,
+    )
+    rec.update(n_b=2, n_a=1, not_written=3)
+    out = tmp_path / "run_cohort_audit.csv"
+    write_cohort_audit([rec], out, extra_columns=("n_b", "n_a"))
+    assert list(pd.read_csv(out).columns) == [*COHORT_COLUMNS, "n_b", "n_a"]
 
 
 def _long(events_cols: dict, n_arms: int = 3) -> pd.DataFrame:

@@ -321,6 +321,14 @@ def fit_power_model(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+#: The power record's own fields, written after the canonical cohort columns.
+#: With the session gate's remainder (outcome-balanced events in sessions under
+#: 30 events) they sum to ``n_excluded_session``.
+COHORT_EXTRA_COLUMNS = (
+    "n_events_excluded_pre_outcome",
+    "n_events_excluded_outcome_imbalance",
+)
+
 # Predictors sourced (via left join) from qvals_table -- NaN on the mechanism-B tail.
 _QVALS_PREDICTORS = (
     "outcome_known_time",
@@ -337,7 +345,9 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
     removed the qvals-tail events (qvals-derived predictors NaN on the left join); this
     attributes them to ``n_drop_qvals_gap`` (mechanism B), the other predictor/response
     NaNs to own, and the <30-event session gate to excluded. ``n_modeled`` is the
-    fitter's own count, the sum of ``coefs["n_events"]``."""
+    fitter's own count, the sum of ``coefs["n_events"]``. ``n_excluded_session`` is
+    split by the two :data:`COHORT_EXTRA_COLUMNS` (pre-outcome events, and events
+    of sessions left with one outcome); the rest of it is the <30-event gate."""
     n_in = len(df)
     # Raises if the timing columns are absent, so ``event_start_s`` below
     # needs no membership guard: reaching this point means it exists.
@@ -377,8 +387,8 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
             animals_modeled=len({k[0] for k in fit_keys}),
             drop_notes=(
                 "qvals-derived predictor NaN (left join) -> qvals_gap (mechanism B); "
-                "other predictor/response/timing NaN -> own; physical pre-outcome "
-                "event or <30-event session -> excluded"
+                "other predictor/response/timing NaN -> own; pre-outcome event, "
+                "one-outcome session or <30-event session -> excluded"
             ),
             n_drop_qvals_gap=n_qvals,
             n_drop_own_predictor_missing=n_own,
@@ -386,9 +396,6 @@ def _cohort_records(df: pd.DataFrame, coefs: pd.DataFrame) -> list[dict]:
         )
     ]
     records[0].update(
-        post_outcome_gate=True,
-        post_outcome_gate_rule=POST_OUTCOME_GATE_RULE,
-        outcome_time_semantics=OUTCOME_TIME_SEMANTICS,
         n_events_excluded_pre_outcome=int(
             (complete & ~pd.Series(eligible, index=df.index)).sum()
         ),
@@ -427,7 +434,11 @@ def _write_outputs(
         out_dir / f"swr_power_post_outcome_gate_audit{sfx}.csv",
         index=False,
     )
-    write_cohort_audit(cohort_records, out_dir / f"swr_power_cohort_audit{sfx}.csv")
+    write_cohort_audit(
+        cohort_records,
+        out_dir / f"swr_power_cohort_audit{sfx}.csv",
+        extra_columns=COHORT_EXTRA_COLUMNS,
+    )
     return out
 
 

@@ -16,7 +16,7 @@ the row reconciliation — they annotate the retained cohort, they do not remove
 
 from __future__ import annotations
 
-from collections.abc import Container, Iterable, Iterator
+from collections.abc import Container, Iterable, Iterator, Sequence
 
 import numpy as np
 import pandas as pd
@@ -609,13 +609,19 @@ def records_from_common_cohort_provenance(
     )
 
 
-def write_cohort_audit(records: list[dict], path) -> pd.DataFrame:
-    """Write cohort records to ``path`` as CSV in the canonical column order."""
+def write_cohort_audit(
+    records: list[dict], path, extra_columns: Sequence[str] = ()
+) -> pd.DataFrame:
+    """Write cohort records to ``path`` as CSV in the canonical column order.
+
+    ``extra_columns`` are a runner's own record fields, written after
+    ``COHORT_COLUMNS`` in the order given; every record must carry them.
+    """
     df = pd.DataFrame(records)
     for col in COHORT_COLUMNS:
         if col not in df.columns:
             df[col] = 0 if col not in ("drop_notes",) else ""
-    df = df[list(COHORT_COLUMNS)]
+    df = df[[*COHORT_COLUMNS, *extra_columns]]
     df.to_csv(path, index=False)
     return df
 
