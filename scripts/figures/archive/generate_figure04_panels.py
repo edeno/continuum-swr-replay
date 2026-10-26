@@ -63,7 +63,7 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.visualization.glm_plots import (
-    plot_AICs,
+    plot_aics,
     plot_hist_relative_to_event,
     plot_raster_relative_to_event,
 )
@@ -331,7 +331,7 @@ def main() -> None:
         "SWR + non_local_no_SWR",
         "non_local",
     ]
-    fig3, _ = plot_AICs(glm_results, model_list=model_list_for_aic)
+    fig3, _ = plot_aics(glm_results, model_list=model_list_for_aic)
     save_figure(plt.gcf(), "figure04_panel_c", base_dir=args.output_dir, dpi=args.dpi, formats=formats)
     print("Saved: figure04_panel_c")
     if not args.show_plots:

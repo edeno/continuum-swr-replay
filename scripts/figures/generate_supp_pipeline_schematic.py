@@ -35,7 +35,7 @@ STEPS = [
     {
         "title": "2. Add trial context  (add_trial_context)",
         "shape": "T × {prev_well, next_well, last_rewarded_well, switch/omission flags}",
-        "assumption": "In-progress trip semantics: latest start_time ≤ t.  Trials are non-overlapping.",
+        "assumption": "Context = latest trip that reached its goal ≤ t; reward waits for its outcome.",
     },
     {
         "title": "3. Filter to non-local immobile",
@@ -49,17 +49,17 @@ STEPS = [
     },
     {
         "title": "5. Compute arm counts  (arm_count_hard)",
-        "shape": "E × (arm_count_0 ... arm_count_8, total_count L_e)",
+        "shape": "E × 9 arm_count_hard  (+ arm_fraction;  total n_nonlocal_bins L_e)",
         "assumption": "Each timebin contributes 1 count to 1 arm  (MAP-collapse, hard assignment).\nReal data: median fragmentation = 0  →  events sit on a single arm.",
     },
     {
         "title": "6. Long format  (build_event_arm_table)",
-        "shape": "E·9 rows × {is_current, is_prev, is_next, is_last_rewarded, ...}",
+        "shape": "E·9 rows × {is_current_arm, is_prev_arm, is_next_arm, ...}",
         "assumption": "9 arms are the candidate set for every event. Trunk arms (6,7,8) are 'neutral' to well-derived indicators.",
     },
     {
         "title": "7. Add per-arm + interaction predictors",
-        "shape": "+ visit_recency, cumulative_reward, dist_to_arm, swr_×_*, time_×_*, switch_×_*",
+        "shape": "+ visit_recency_trials_*, reward_belief_mean/variance_*, swr_x_*, *_x_is_current_arm",
         "assumption": "Event-level scalars cancel in conditioning; identifiable only as interactions.",
     },
     {
