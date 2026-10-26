@@ -76,7 +76,7 @@ src/continuum_swr_replay/
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
 │   └── constants.py       #   analysis constants and defaults
 ├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
-├── runs/                  # run infrastructure: provenance, CLI, batch loops
+├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
 ├── tables/                # canonical tables: schema, row ids, parquet I/O, atomic writes, parity
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS
 ├── figure_utilities.py    # publication-figure helpers
