@@ -1,7 +1,9 @@
-# Reported values changed by the last emit (2026-10-26)
+# Reported values the emitter changed
 
-Each row is a number the emitter replaced in a doc: the text that was
-there, and the computed value now there.
+Each section is one emit that changed numbers: the text that was in each
+marker, and the computed value now there. Newest last.
+
+## 2026-10-26
 
 | Doc | Key | Was | Now |
 |---|---|---|---|

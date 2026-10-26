@@ -111,8 +111,11 @@ and others) already hold many typed numbers. They move one part at a time:
    one and listed for the lead (anti-goal above).
 3. A typed number that no current output can back (for example claim 19a's one-session "≈ 0.73") is replaced by
    a value computed from the current run of that analysis where one exists (for 19a, the 242-epoch spike-evidence
-   run). Where no analysis exists yet (claims marked "no script"), the number is replaced by a visible "not
-   computed" mark. Both kinds are listed for the lead. *(Decided by the lead: replace, and tell the lead.)*
+   run). Where no tracked analysis produces it (for example a duration-controlled GEE that was never re-derived),
+   the analysis and its number are **removed** from the doc, and listed for the lead. *(Decided by the lead,
+   2026-10-26: replace with the computed value, remove analyses that were never computed, and tell the lead.)*
+4. A value read from an output whose script is not tracked, or from a fit its provenance sidecar says is stale,
+   carries a `pending` note saying so.
 
 **Which docs move** *(the assistant's call)*: the claims table, and the living results docs in `docs/` that
 report fitted or measured numbers: `replay_rate_content_swr_synthesis.md`, `per_bin_rate_results.md`, and any

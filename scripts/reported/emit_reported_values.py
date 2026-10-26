@@ -4,7 +4,8 @@ Reads every summary file in ``paper/reported/`` (``summarize_part.py`` writes
 them), writes the LaTeX macros, and rewrites the number inside every
 ``<!--v:part{n}.key-->...<!--/v-->`` marker in the markdown under ``paper/``
 and ``docs/``. Every number it changes is listed on the screen and in
-``paper/reported/changes.md``, so a replaced number is never silent.
+``paper/reported/changes.md`` (a dated section is appended for each emit that
+changes numbers), so a replaced number is never silent.
 
 Usage::
 
@@ -37,18 +38,24 @@ def main(argv: Sequence[str] | None = None) -> None:
     docs = marked_docs(DOC_ROOTS)
     changes = emit(summaries, TEX_PATH, docs, ROOT_DIR)
     print(f"wrote {TEX_PATH.relative_to(ROOT_DIR)}; filled {len(docs)} docs")
-    lines = [
-        f"# Reported values changed by the last emit ({date.today().isoformat()})",
-        "",
-        "Each row is a number the emitter replaced in a doc: the text that was",
-        "there, and the computed value now there.",
-        "",
-        "| Doc | Key | Was | Now |",
-        "|---|---|---|---|",
-        *(f"| `{c.doc}` | `{c.key}` | {c.old} | {c.new} |" for c in changes),
-        "",
-    ]
-    CHANGES_PATH.write_text("\n".join(lines))
+    if changes:
+        if not CHANGES_PATH.exists():
+            CHANGES_PATH.write_text(
+                "# Reported values the emitter changed\n\n"
+                "Each section is one emit that changed numbers: the text that was in each\n"
+                "marker, and the computed value now there. Newest last.\n"
+            )
+        section = [
+            "",
+            f"## {date.today().isoformat()}",
+            "",
+            "| Doc | Key | Was | Now |",
+            "|---|---|---|---|",
+            *(f"| `{c.doc}` | `{c.key}` | {c.old} | {c.new} |" for c in changes),
+            "",
+        ]
+        with CHANGES_PATH.open("a") as f:
+            f.write("\n".join(section))
     for c in changes:
         print(f"  {c.doc}: {c.key}: {c.old!r} -> {c.new!r}")
     print(
