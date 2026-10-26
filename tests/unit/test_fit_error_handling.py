@@ -141,6 +141,11 @@ def test_conditional_logit_skips_expected_failure(monkeypatch, caplog):
     with caplog.at_level(logging.WARNING, logger=fitting.logger.name):
         assert fitting.fit_conditional_logit(_long_df(), predictors=["pred"]) is None
     assert _logged_with_traceback(caplog)
+    result, reason = fitting.conditional_logit_or_reason(
+        _long_df(), predictors=["pred"]
+    )
+    assert result is None
+    assert reason == "ValueError: simulated: deviance first guess is nan"
 
 
 def test_conditional_logit_propagates_coding_error(monkeypatch):

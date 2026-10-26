@@ -1203,8 +1203,7 @@ def fit_conditional_logit(
 ) -> dict | None:
     """Fit conditional logit on dominant arm (robustness check).
 
-    The response is binary: 1 for the arm with the highest count within
-    each event, 0 for all others. Ties broken by lowest arm_id.
+    The fit of :func:`conditional_logit_or_reason`, without the reason.
 
     Parameters
     ----------
@@ -1222,14 +1221,52 @@ def fit_conditional_logit(
     dict | None
         Coefficients and fit statistics, or None if fitting fails.
     """
+    return conditional_logit_or_reason(
+        long_df, predictors, response_col=response_col, event_col=event_col
+    )[0]
+
+
+def conditional_logit_or_reason(
+    long_df: pd.DataFrame,
+    predictors: list[str],
+    response_col: str = "arm_count_hard",
+    event_col: str = "event_id",
+) -> tuple[dict | None, str]:
+    """Fit conditional logit on dominant arm, or say why it was not fitted.
+
+    The response is binary: 1 for the arm with the highest count within
+    each event, 0 for all others. Ties broken by lowest arm_id.
+
+    Parameters
+    ----------
+    long_df : pd.DataFrame
+        Long-format data with arm counts and event identifiers.
+    predictors : list[str]
+        Arm-varying predictor columns.
+    response_col : str
+        Column with arm counts for determining dominant arm.
+    event_col : str
+        Column with globally unique event IDs.
+
+    Returns
+    -------
+    result : dict | None
+        Coefficients and fit statistics, or None if fitting fails.
+    reason : str
+        ``""`` for a fit; otherwise why there is none: the message logged for
+        a refused design, or ``"<ExceptionType>: <message>"`` for one of
+        ``EXPECTED_FIT_ERRORS`` raised by the optimizer. Any other exception
+        propagates.
+    """
     if len(predictors) == 0:
-        return None
+        return None, "no predictors"
 
     required = [event_col, response_col] + predictors
     missing = [c for c in required if c not in long_df.columns]
     if missing:
-        logger.warning("fit_conditional_logit missing columns: %s", missing)
-        return None
+        reason = f"fit_conditional_logit missing columns: {missing}"
+        logger.warning("%s", reason)
+        return None, reason
 
     arm_col = (
         "candidate_arm"
@@ -1281,13 +1318,12 @@ def fit_conditional_logit(
     groups = df[event_col].values
     n_events = len(np.unique(groups))
     if n_events < 2 * len(predictors):
-        logger.info(
-            "fit_conditional_logit: %d events < 2*%d predictors; not fitting %s",
-            n_events,
-            len(predictors),
-            predictors,
+        reason = (
+            f"fit_conditional_logit: {n_events} events < 2*{len(predictors)} "
+            f"predictors; not fitting {predictors}"
         )
-        return None
+        logger.info("%s", reason)
+        return None, reason
 
     X = df[predictors].values.astype(float)
 
@@ -1295,22 +1331,22 @@ def fit_conditional_logit(
     # fit_conditional_poisson): globally collinear or within-group-constant
     # predictors yield finite-but-meaningless coefficients/SEs.
     if not within_group_full_rank(X, groups):
-        logger.warning(
+        reason = (
             "fit_conditional_logit: rank-deficient or within-group-constant "
-            "design; not fitting %s",
-            predictors,
+            f"design; not fitting {predictors}"
         )
-        return None
+        logger.warning("%s", reason)
+        return None, reason
 
     try:
         with capture_fit_warnings() as caught:
             model = ConditionalLogit(y, X, groups=groups)
             result = model.fit(disp=0, maxiter=CONDITIONAL_FIT_MAXITER)
-    except EXPECTED_FIT_ERRORS:
+    except EXPECTED_FIT_ERRORS as error:
         logger.warning(
             "ConditionalLogit failed for predictors %s", predictors, exc_info=True
         )
-        return None
+        return None, f"{type(error).__name__}: {error}"
     predictor_sd = X.std(axis=0)
     status = fit_status(
         result,
@@ -1346,7 +1382,7 @@ def fit_conditional_logit(
         # "|"-joined so the tuple survives a round trip through pickle and CSV.
         "separated_terms": "|".join(status["separated_terms"]),
         "n_convergence_warnings": count_fit_quality_warnings(caught),
-    }
+    }, ""
 
 
 # ── Internal helpers ──

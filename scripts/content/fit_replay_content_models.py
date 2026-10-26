@@ -131,6 +131,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.fitting import (
+    conditional_logit_or_reason,
     fit_conditional_logit,
     fit_conditional_poisson,
     fit_null_model_conditional_logit,
@@ -1592,56 +1593,6 @@ def _fit_content_ladder(
 LOGIT_SKIP_COLUMNS = ("model", *SESSION_COLUMNS, "reason")
 
 
-class _RecordCollector(logging.Handler):
-    """Keep every log record emitted while attached."""
-
-    def __init__(self) -> None:
-        super().__init__(logging.INFO)
-        self.records: list[logging.LogRecord] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.records.append(record)
-
-
-def _fit_conditional_logit_with_reason(
-    group: pd.DataFrame, **kwargs
-) -> tuple[dict | None, str]:
-    """Fit one session's conditional logit and say why when it returns None.
-
-    ``fit_conditional_logit`` returns None for an expected failure (too few
-    events, a rank-deficient design, or one of ``EXPECTED_FIT_ERRORS`` from the
-    optimizer) and states the reason only in its last log record, so that
-    record is captured here. Any other exception propagates.
-
-    Returns
-    -------
-    result : dict or None
-        The fitter's result.
-    reason : str
-        ``""`` for a fit; otherwise the exception (``"ValueError: ..."``) or
-        the message of the fitter's last log record.
-    """
-    fit_logger = logging.getLogger(fit_conditional_logit.__module__)
-    collector = _RecordCollector()
-    previous_level = fit_logger.level
-    fit_logger.setLevel(min(fit_logger.getEffectiveLevel(), logging.INFO))
-    fit_logger.addHandler(collector)
-    try:
-        result = fit_conditional_logit(group, **kwargs)
-    finally:
-        fit_logger.removeHandler(collector)
-        fit_logger.setLevel(previous_level)
-    if result is not None:
-        return result, ""
-    if not collector.records:
-        return None, "fit_conditional_logit returned None without a logged reason"
-    last = collector.records[-1]
-    if last.exc_info and last.exc_info[1] is not None:
-        error = last.exc_info[1]
-        return None, f"{type(error).__name__}: {error}"
-    return None, last.getMessage()
-
-
 def _fit_conditional_logit_robustness(
     args: argparse.Namespace,
     config: _RunConfig,
@@ -1702,7 +1653,7 @@ def _fit_conditional_logit_robustness(
                 # column on patch tables, and returned ``None`` for
                 # every session — producing an empty ``logit/`` dir
                 # with no robustness outputs.
-                r, reason = _fit_conditional_logit_with_reason(
+                r, reason = conditional_logit_or_reason(
                     group,
                     predictors=predictors,
                     event_col=event_col,

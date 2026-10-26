@@ -20,6 +20,7 @@ from statsmodels.discrete.conditional_models import ConditionalPoisson
 
 from continuum_swr_replay.analysis.replay import fitting as fitting_mod
 from continuum_swr_replay.analysis.replay.fitting import (
+    conditional_logit_or_reason,
     event_clustered_covariance,
     fit_conditional_logit,
     fit_conditional_poisson,
@@ -214,6 +215,40 @@ def test_within_group_constant_predictor_is_rejected():
 
     assert fit_conditional_poisson(long_df, predictors=["ev_level"]) is None
     assert fit_conditional_logit(long_df, predictors=["ev_level"]) is None
+
+
+def test_conditional_logit_or_reason_names_why_there_is_no_fit():
+    """Each refusal hands back the reason it logs; a fit hands back ``""``
+    and the same result ``fit_conditional_logit`` returns."""
+    long_df = _make_long_df([[3, 1, 1]] * 6)
+    long_df["ev_level"] = long_df["event_id"].astype(float)
+
+    assert conditional_logit_or_reason(long_df, predictors=[]) == (
+        None,
+        "no predictors",
+    )
+    assert conditional_logit_or_reason(long_df, predictors=["absent"]) == (
+        None,
+        "fit_conditional_logit missing columns: ['absent']",
+    )
+    preds = ["is_prev_arm", "a", "b", "c"]
+    long_df[["a", "b", "c"]] = 0.0
+    assert conditional_logit_or_reason(long_df, predictors=preds) == (
+        None,
+        f"fit_conditional_logit: 6 events < 2*4 predictors; not fitting {preds}",
+    )
+    assert conditional_logit_or_reason(long_df, predictors=["ev_level"]) == (
+        None,
+        "fit_conditional_logit: rank-deficient or within-group-constant "
+        "design; not fitting ['ev_level']",
+    )
+
+    result, reason = conditional_logit_or_reason(long_df, predictors=["is_prev_arm"])
+    assert reason == ""
+    pd.testing.assert_series_equal(
+        pd.Series(result),
+        pd.Series(fit_conditional_logit(long_df, predictors=["is_prev_arm"])),
+    )
 
 
 # ── Collinearity diagnostics ──

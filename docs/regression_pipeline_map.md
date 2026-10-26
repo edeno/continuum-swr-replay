@@ -386,7 +386,7 @@ Dirichlet-multinomial fitter for replay content over candidate categories.
 
 Per-session model fitting for the replay content model hierarchy.
 
-`poisson_estimator_name`, `event_clustered_covariance`, `within_group_full_rank`, `fit_conditional_poisson`, `parse_unidentified_terms`, `conditional_linear_predictor`, `fit_null_model_conditional`, `fit_null_model_conditional_logit`, `fit_conditional_logit`
+`poisson_estimator_name`, `event_clustered_covariance`, `within_group_full_rank`, `fit_conditional_poisson`, `parse_unidentified_terms`, `conditional_linear_predictor`, `fit_null_model_conditional`, `fit_null_model_conditional_logit`, `fit_conditional_logit`, `conditional_logit_or_reason`
 
 ### `src/continuum_swr_replay/analysis/replay/per_bin_design.py`
 

@@ -250,12 +250,20 @@ def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
             {
                 "model": "swr_power",
                 "n_in": 1,
-                "n_events_excluded_pre_outcome": 0,
-                "n_events_excluded_outcome_imbalance": 0,
+                "n_events_excluded_pre_outcome": 2,
+                "n_events_excluded_outcome_imbalance": 3,
             }
         ],
         smoke=False,
     )
+    # The cohort CSV carries the power model's two split exclusion counts.
+    cohort = pd.read_csv(out_dir / "swr_power_cohort_audit.csv")
+    assert cohort[list(mod.COHORT_EXTRA_COLUMNS)].to_dict("records") == [
+        {
+            "n_events_excluded_pre_outcome": 2,
+            "n_events_excluded_outcome_imbalance": 3,
+        }
+    ]
     written = {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")}
     assert written == {
         "models_per_event_swr_power",

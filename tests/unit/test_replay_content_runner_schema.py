@@ -756,7 +756,11 @@ def test_a_logit_rung_with_no_fitted_session_aborts_without_publishing(
             long_df, model_name
         ),
     )
-    monkeypatch.setattr(runner, "fit_conditional_logit", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        runner,
+        "conditional_logit_or_reason",
+        lambda *args, **kwargs: (None, "refused"),
+    )
 
     with pytest.raises(RuntimeError, match="produced no session fits"):
         runner.main(["--models", "M1", "--logit"])
@@ -779,11 +783,14 @@ def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypat
     )
     monkeypatch.setattr(
         runner,
-        "fit_conditional_logit",
-        lambda group, **kwargs: {
-            "n_events": group["event_id"].nunique(),
-            "estimator": "conditional_logit_dominant",
-        },
+        "conditional_logit_or_reason",
+        lambda group, **kwargs: (
+            {
+                "n_events": group["event_id"].nunique(),
+                "estimator": "conditional_logit_dominant",
+            },
+            "",
+        ),
     )
 
     runner.main(["--models", "M1", "--logit"])
