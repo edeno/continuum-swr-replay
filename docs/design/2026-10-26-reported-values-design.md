@@ -1,6 +1,6 @@
 # Reported values: every number read from a computed file
 
-Date: 2026-10-26. Status: design, not built.
+Date: 2026-10-26. Status: Part 2 built (`paper/reported/part2.json`, `scripts/reported/`); Parts 1, 3 and 4 not yet.
 
 ## Why
 
@@ -12,7 +12,7 @@ computed, so that nothing can be stated that was not computed.
 
 The model is [edeno/statespacecheck-paper](https://github.com/edeno/statespacecheck-paper):
 - each figure's analysis writes a summary JSON at full precision;
-- `scripts/emit_reported_values.py` turns the summaries into `manuscript/reported_values.tex`, a file of
+- that repository's emitter script (`emit_reported_values.py`) turns the summaries into `manuscript/reported_values.tex`, a file of
   `\newcommand` macros;
 - the manuscript types no numbers;
 - all rounding lives in one module (`reported_values.py` and `number_format.py`), and a value that cannot be

@@ -118,8 +118,14 @@ them importable.
   memoryless run has no record for has `ms_*` missing and its memberships `unknown`. `--animal`,
   `--date`, `--epoch` or `--epoch-id` narrow the epochs; `--n-workers` sets the worker processes; a
   rerun skips the epochs already `ok` unless `--overwrite` is given. Built and tested on simulated
-  epochs; the one-epoch smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. The
+  epochs; the one-epoch smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run ran on all 242 epochs (run `30cf1cc432e9`, all `ok`). The
   Widloski columns and every `ms_*` feature are pending the Phase 2 pilot checks.
+- `add_state_shares.py` — adds each compared event's Local, No-Spike, non-local and uncertain shares (the
+  share of its decode-grid rows with that state above 0.8; uncertain when none is) to an event features
+  run, without rerunning it: `{epoch_id}_state_shares.parquet` beside the run's tables and a
+  `state_shares_manifest.json`. It refuses an epoch unless the decode's sha256 and grid are the run's and
+  the recomputed non-local share equals the stored `ss_frac_rows_nonlocal` exactly. Ran on run
+  `30cf1cc432e9` (242 `ok`, about a minute with 8 workers).
 - `report_event_features.py` — the features of one event features run, per session and per animal
   (sums of counts, never averages of proportions; quantiles of the events; `unknown` never counted as
   `unmatched`; the evidence beside the spikes per row, with no baseline). Tables go to `<features run>/report/` with a `report.md`;
@@ -364,6 +370,16 @@ them importable.
   per-model parameters and fit criteria, and the wall clock of both runs. The unit
   runner no longer offers the unpenalised per-neuron backend, so this compares two
   archived trees rather than two runs anyone can make now.
+
+## `reported/` — the reported values
+
+Every number the project reports is read from a summary file, one per part of the paper
+(`paper/reported/part{n}.json`); design `docs/design/2026-10-26-reported-values-design.md`.
+- `summarize_part.py --part N` — writes part N's summary from outputs the analyses already wrote
+  (`continuum_swr_replay.reported`); refits nothing. Part 2 only, so far.
+- `emit_reported_values.py` — writes `paper/reported_values.tex` (one LaTeX macro per value) and rewrites the
+  number inside every `<!--v:part{n}.key-->…<!--/v-->` marker in the markdown under `paper/` and `docs/`
+  (markers in code are left alone). Every number it changes is listed in `paper/reported/changes.md`.
 
 ## `exploratory/` — unsupported one-offs
 Scratch scripts (`_*.py`): diagnostics, ad-hoc plots, verification checks. Not part of the

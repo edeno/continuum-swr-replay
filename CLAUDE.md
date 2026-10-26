@@ -454,6 +454,19 @@ Results are saved to `--save_dir`, by default `paths.processed_data_dir()` (`$CS
 
 Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibility.
 
+## Reported numbers
+
+Every number the project reports is read from a summary file, `paper/reported/part{n}.json`, one per part
+of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_reported_values.py`; design
+`docs/design/2026-10-26-reported-values-design.md`). Part 2 is built; Parts 1, 3 and 4 are not yet.
+
+- When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
+  name the file and the key. If the number is in no summary, say it is not computed; do not compute it
+  inline or quote it from memory.
+- In a doc, write a reported number inside a marker, `<!--v:part{n}.key-->…<!--/v-->`, and let the
+  emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
+- A value with a `pending` note (for example the Widloski detector's) is not quoted as a finding.
+
 ## Important Conventions
 
 1. **Time units**: Always in seconds (never milliseconds)

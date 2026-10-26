@@ -1,0 +1,3102 @@
+{
+ "schema_version": 1,
+ "part": 2,
+ "title": "the events",
+ "produced_by": "scripts/reported/summarize_part.py",
+ "commit": "8522b316f47a",
+ "inputs": [
+  {
+   "path": "Processed-Data/replay_content/event_table.parquet",
+   "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_state_shares.parquet",
+   "n_files": 242,
+   "sha256": "715bc3b57216c0aa77016de5de5727bb9143d3c0f6fbea21c7c3f20bd86d9810"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_pair_membership.parquet",
+   "n_files": 242,
+   "sha256": "2040d219e96588591df50444ad8d8bfaee94190a750db062037f5bee7a2948de"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/directional_by_animal.csv",
+   "sha256": "19a36645f549d0fba071e773ba57f874df53e339b643d99dfd311d14f3094d6d"
+  },
+  {
+   "path": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet",
+   "sha256": "639a1326c972de9ac2bd4dc34b22b36e817fa6873bdab80604b17cc840f78049"
+  },
+  {
+   "path": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "sha256": "4e59295db93cd9b4f01e2e7a29a242e0ca8fcadbe775c73854c22017fd50f11c"
+  },
+  {
+   "path": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
+  }
+ ],
+ "values": {
+  "animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in the event table",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "animals_non_swr_majority": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in which more than half the events are non-SWR",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "animals_non_swr_more_at_well": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR content is at a well more often than their SWR content",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "animals_non_swr_plurality": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in which non-SWR is the largest of the three overlap classes",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "baseline_dll_per_spike_median": {
+   "value": 0.0018171760020777583,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows",
+   "claims": [
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "baseline_gpi_distance_median_cm": {
+   "value": 105.39721862517277,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "median track distance from the MAP of matched quiet windows to the ground-process intensity peak",
+   "claims": [
+    "7b"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "baseline_scored": {
+   "value": 5748,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "matched quiet windows scored (at most 30 per epoch)",
+   "claims": [
+    "6",
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "baseline_spikes_median": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes",
+   "description": "median spike count of matched quiet windows",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "baseline_tetrodes_median": {
+   "value": 5.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "tetrodes",
+   "description": "median number of tetrodes with a spike in matched quiet windows",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "carey_events": {
+   "value": 24084,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "carey events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_no_nonlocal_fraction": {
+   "value": 0.19789071582793555,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of carey events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_no_nonlocal_mixed_fraction": {
+   "value": 0.18275283256399497,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of carey events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_no_nonlocal_mostly_local_fraction": {
+   "value": 0.817247167436005,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of carey events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_all_nonlocal_fraction": {
+   "value": 0.1190081789005073,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of carey events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_any_local_fraction": {
+   "value": 0.3462573765400145,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of carey events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_any_no_spike_fraction": {
+   "value": 0.14665079200745418,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of carey events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_local_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over carey events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_nonlocal_share_median": {
+   "value": 0.8695652173913043,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "carey_overlap_uncertain_share_median": {
+   "value": 0.09090909090909091,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over carey events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "duration_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median event duration s is lower than their SWR median",
+   "claims": [
+    "18"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "duration_median_non_swr": {
+   "value": 48.000003814697266,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median event duration s of immobile non-SWR non-local events",
+   "claims": [
+    "18"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "duration_median_swr": {
+   "value": 94.00000762939453,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median event duration s of immobile SWR-overlapping non-local events",
+   "claims": [
+    "18"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "end_offset_median_ms": {
+   "value": -3.999948501586914,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median of event end minus matched SWR end",
+   "claims": [
+    "22"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2d"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs in the event table",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "evidence_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in the spike-evidence run",
+   "claims": [
+    "6",
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "evidence_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs in the spike-evidence run",
+   "claims": [
+    "6",
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "extent_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median spatial extent cm is lower than their SWR median",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "extent_median_non_swr": {
+   "value": 7.9678741520984016,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median spatial extent cm of immobile non-SWR non-local events",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "extent_median_swr": {
+   "value": 49.600363765349975,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median spatial extent cm of immobile SWR-overlapping non-local events",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "heldout_non_swr_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in that test",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_non_swr_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with a positive mean",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_non_swr_per_spike": {
+   "value": 0.2010162119243848,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_non_swr_per_spike_ci_high": {
+   "value": 0.2456243894670809,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_non_swr_per_spike_ci_low": {
+   "value": 0.1564080343816887,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_swr_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in that test",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_swr_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with a positive mean",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_swr_per_spike": {
+   "value": 0.5976333351694096,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_swr_per_spike_ci_high": {
+   "value": 0.7431123493144657,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "heldout_swr_per_spike_ci_low": {
+   "value": 0.4521543210243536,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+  },
+  "hpd_animals_in_direction": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median hpd coverage cm is lower than their SWR median",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "hpd_median_non_swr": {
+   "value": 44.16054975208596,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median hpd coverage cm of immobile non-SWR non-local events",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "hpd_median_swr": {
+   "value": 79.7291680551172,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median hpd coverage cm of immobile SWR-overlapping non-local events",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "karlsson_events": {
+   "value": 60472,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "karlsson events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_no_nonlocal_fraction": {
+   "value": 0.38153194867045903,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of karlsson events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_no_nonlocal_mixed_fraction": {
+   "value": 0.18021844660194175,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of karlsson events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_no_nonlocal_mostly_local_fraction": {
+   "value": 0.8095093619972261,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.010272191400832178,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of karlsson events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_all_nonlocal_fraction": {
+   "value": 0.1131283422459893,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of karlsson events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_any_local_fraction": {
+   "value": 0.4767379679144385,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of karlsson events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_any_no_spike_fraction": {
+   "value": 0.2246524064171123,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of karlsson events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_local_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over karlsson events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over karlsson events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_nonlocal_share_median": {
+   "value": 0.7714285714285715,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "karlsson_overlap_uncertain_share_median": {
+   "value": 0.125,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_events": {
+   "value": 41151,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "kay events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_no_nonlocal_fraction": {
+   "value": 0.17153896624626375,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of kay events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_no_nonlocal_fraction_animal_max": {
+   "value": 0.27984862819299905,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of kay events overlapping no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_no_nonlocal_fraction_animal_min": {
+   "value": 0.08077918539708484,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of kay events overlapping no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_no_nonlocal_mixed_fraction": {
+   "value": 0.25754356141096474,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of kay events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_no_nonlocal_mostly_local_fraction": {
+   "value": 0.7365065873353166,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.005949851253718657,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_all_nonlocal_fraction": {
+   "value": 0.1706558723454183,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of kay events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_any_local_fraction": {
+   "value": 0.32174703742813565,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of kay events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_any_no_spike_fraction": {
+   "value": 0.091663733427197,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of kay events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_local_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over kay events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_nonlocal_share_median": {
+   "value": 0.8778423772609819,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "kay_overlap_uncertain_share_median": {
+   "value": 0.08571428571428572,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over kay events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, other side of the overlap"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "max_step_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median step distance max cm is lower than their SWR median",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "max_step_median_non_swr": {
+   "value": 1.9878040388607758,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median step distance max cm of immobile non-SWR non-local events",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "max_step_median_swr": {
+   "value": 13.75527238384236,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median step distance max cm of immobile SWR-overlapping non-local events",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "mua_events": {
+   "value": 40732,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "mua events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_no_nonlocal_fraction": {
+   "value": 0.15164980850437002,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of mua events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_no_nonlocal_mixed_fraction": {
+   "value": 0.21612433220009714,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of mua events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_no_nonlocal_mostly_local_fraction": {
+   "value": 0.7838756677999029,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of mua events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_all_nonlocal_fraction": {
+   "value": 0.03808421357256547,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of mua events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_any_local_fraction": {
+   "value": 0.5134423383012588,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of mua events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_any_no_spike_fraction": {
+   "value": 0.10927506873100853,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of mua events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_local_share_median": {
+   "value": 0.011764705882352941,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over mua events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_nonlocal_share_median": {
+   "value": 0.807909604519774,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_overlap_uncertain_share_median": {
+   "value": 0.1282051282051282,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over mua events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "non_swr_close_animals_above_baseline": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median nonSWR-close event scores above their median quiet window, per spike",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_dll_per_spike_median": {
+   "value": 0.5125951170921326,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_epochs_above_baseline": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_epochs_scored": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with a scored nonSWR-close event",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_gpi_distance_median_cm": {
+   "value": 108.91992203378703,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "median track distance from the MAP of nonSWR-close events to the ground-process intensity peak",
+   "claims": [
+    "7b"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_scored": {
+   "value": 5435,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "nonSWR-close events scored (at most 30 per epoch)",
+   "claims": [
+    "6",
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_spikes_median": {
+   "value": 36.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes",
+   "description": "median spike count of nonSWR-close events",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_close_tetrodes_median": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "tetrodes",
+   "description": "median number of tetrodes with a spike in nonSWR-close events",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_content_at_well_fraction": {
+   "value": 0.5806250164206765,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "non_swr_content_near_off_fraction": {
+   "value": 0.009212420566029956,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "non_swr_content_own_well_fraction": {
+   "value": 0.1296509250482852,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "non_swr_content_remote_path_fraction": {
+   "value": 0.4101625630132935,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "non_swr_content_remote_well_fraction": {
+   "value": 0.4509740913723913,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "non_swr_fraction": {
+   "value": 0.5678757846052197,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of immobile non-local events overlapping no SWR, pooled over animals",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "non_swr_fraction_animal_max": {
+   "value": 0.65432256416805,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest per-animal share of non-SWR events",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "non_swr_fraction_animal_min": {
+   "value": 0.4654143496541435,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest per-animal share of non-SWR events",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "non_swr_remote_animals_above_baseline": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median nonSWR-remote event scores above their median quiet window, per spike",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_dll_per_spike_median": {
+   "value": 0.7147106528282166,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_epochs_above_baseline": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_epochs_scored": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with a scored nonSWR-remote event",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_gpi_distance_median_cm": {
+   "value": 95.67404393310467,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak",
+   "claims": [
+    "7b"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_scored": {
+   "value": 7239,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "nonSWR-remote events scored (at most 30 per epoch)",
+   "claims": [
+    "6",
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_spikes_median": {
+   "value": 33.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes",
+   "description": "median spike count of nonSWR-remote events",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "non_swr_remote_tetrodes_median": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "tetrodes",
+   "description": "median number of tetrodes with a spike in nonSWR-remote events",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "nonlocal_events": {
+   "value": 75675,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "immobile non-local events in the canonical event table (whole event below 4 cm/s)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "nonlocal_events_non_swr": {
+   "value": 42974,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, events overlapping no SWR (overlap_class non_swr)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "nonlocal_events_swr_contained": {
+   "value": 16037,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "events lying inside an SWR (overlap_class swr_contained)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "nonlocal_events_swr_partial": {
+   "value": 16664,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "events partly overlapping an SWR (overlap_class swr_partial)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "occupancy_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs in the content-occupancy table",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "pause_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median pause fraction is higher than their SWR median",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "pause_median_non_swr": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median pause fraction of immobile non-SWR non-local events",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "pause_median_swr": {
+   "value": 0.927536231884058,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median pause fraction of immobile SWR-overlapping non-local events",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "peak_animals_in_direction": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median posterior peak mean is higher than their SWR median",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "peak_median_non_swr": {
+   "value": 0.8954133860632694,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median posterior peak mean of immobile non-SWR non-local events",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "peak_median_swr": {
+   "value": 0.8175326265512943,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median posterior peak mean of immobile SWR-overlapping non-local events",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "reversals_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median n reversals is lower than their SWR median",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "reversals_median_non_swr": {
+   "value": 0.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "",
+   "description": "median n reversals of immobile non-SWR non-local events",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "reversals_median_swr": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "",
+   "description": "median n reversals of immobile SWR-overlapping non-local events",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "speed_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median replay speed median cm s is lower than their SWR median",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "speed_median_non_swr": {
+   "value": 320.7057491444677,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm/s",
+   "description": "median replay speed median cm s of immobile non-SWR non-local events",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "speed_median_swr": {
+   "value": 492.50930239459285,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm/s",
+   "description": "median replay speed median cm s of immobile SWR-overlapping non-local events",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "start_offset_median_ms": {
+   "value": 4.000186920166016,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median of event start minus matched SWR start",
+   "claims": [
+    "22"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2d"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "swr_content_at_well_fraction": {
+   "value": 0.2625390899355599,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR non-local time bins whose content is at well, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "swr_content_near_off_fraction": {
+   "value": 0.0035566166475723324,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR non-local time bins whose content is near off, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "swr_content_own_well_fraction": {
+   "value": 0.04841944468924332,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR non-local time bins whose content is own well, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "swr_content_remote_path_fraction": {
+   "value": 0.7339042934168676,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "swr_content_remote_well_fraction": {
+   "value": 0.21411964524631666,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions",
+   "claims": [
+    "14",
+    "13"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3, content occupancy"
+   ],
+   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "pending": null
+  },
+  "swr_overlapping_events": {
+   "value": 32701,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "immobile non-local events overlapping an SWR",
+   "claims": [
+    "22"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 2d"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "swr_remote_animals_above_baseline": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-remote event scores above their median quiet window, per spike",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_dll_per_spike_median": {
+   "value": 1.1356621980667114,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "nats per spike",
+   "description": "median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_epochs_above_baseline": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_epochs_scored": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with a scored SWR-remote event",
+   "claims": [
+    "7"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_gpi_distance_median_cm": {
+   "value": 82.16192077901111,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "median track distance from the MAP of SWR-remote events to the ground-process intensity peak",
+   "claims": [
+    "7b"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_scored": {
+   "value": 7251,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "SWR-remote events scored (at most 30 per epoch)",
+   "claims": [
+    "6",
+    "7",
+    "7c"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_spikes_median": {
+   "value": 109.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "spikes",
+   "description": "median spike count of SWR-remote events",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "swr_remote_tetrodes_median": {
+   "value": 14.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "tetrodes",
+   "description": "median number of tetrodes with a spike in SWR-remote events",
+   "claims": [
+    "6"
+   ],
+   "used_in": [
+    "paper",
+    "figure: spike support"
+   ],
+   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "pending": null
+  },
+  "widloski_criteria_events": {
+   "value": 4388,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "memoryless_criteria events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_no_nonlocal_fraction": {
+   "value": 0.03691886964448496,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless_criteria events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_no_nonlocal_mixed_fraction": {
+   "value": 0.48148148148148145,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_no_nonlocal_mostly_local_fraction": {
+   "value": 0.5123456790123457,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.006172839506172839,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_all_nonlocal_fraction": {
+   "value": 0.10837671557027923,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_any_local_fraction": {
+   "value": 0.5832938949361098,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_any_no_spike_fraction": {
+   "value": 0.27449124467581637,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_local_share_median": {
+   "value": 0.05194805194805195,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_nonlocal_share_median": {
+   "value": 0.7950262588816805,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_criteria_overlap_uncertain_share_median": {
+   "value": 0.08433734939759036,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_events": {
+   "value": 4092,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "memoryless events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_no_nonlocal_fraction": {
+   "value": 0.03372434017595308,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_no_nonlocal_mixed_fraction": {
+   "value": 0.4927536231884058,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of memoryless events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_no_nonlocal_mostly_local_fraction": {
+   "value": 0.5072463768115942,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_all_nonlocal_fraction": {
+   "value": 0.09661102680829539,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_any_local_fraction": {
+   "value": 0.5940819423368741,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_any_no_spike_fraction": {
+   "value": 0.2830045523520486,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_local_share_median": {
+   "value": 0.056338028169014086,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_nonlocal_share_median": {
+   "value": 0.7866666666666666,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "widloski_overlap_uncertain_share_median": {
+   "value": 0.0847457627118644,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "yu_events": {
+   "value": 125423,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "yu events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_no_nonlocal_fraction": {
+   "value": 0.5607902856732816,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of yu events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_no_nonlocal_mixed_fraction": {
+   "value": 0.16960020473157417,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of yu events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_no_nonlocal_mostly_local_fraction": {
+   "value": 0.8205470882620565,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.009852707006369426,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of yu events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_all_nonlocal_fraction": {
+   "value": 0.11982863470510284,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of yu events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_any_local_fraction": {
+   "value": 0.43146295859277145,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of yu events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_any_no_spike_fraction": {
+   "value": 0.13754606349955525,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of yu events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_local_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over yu events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over yu events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_nonlocal_share_median": {
+   "value": 0.7878787878787878,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "yu_overlap_uncertain_share_median": {
+   "value": 0.1308411214953271,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over yu events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_events": {
+   "value": 23934,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "zugaro events compared with the non-local detector",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_no_nonlocal_fraction": {
+   "value": 0.3510069357399515,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of zugaro events that overlap no non-local event",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_no_nonlocal_mixed_fraction": {
+   "value": 0.1814069753600762,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of zugaro events overlapping no non-local event, the share with neither state in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_no_nonlocal_mostly_local_fraction": {
+   "value": 0.8100226163551958,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_no_nonlocal_mostly_no_spike_fraction": {
+   "value": 0.008570408284728008,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of zugaro events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_all_nonlocal_fraction": {
+   "value": 0.741839953647074,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of zugaro events overlapping a non-local event whose every row is non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_any_local_fraction": {
+   "value": 0.0577480203437842,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of zugaro events overlapping a non-local event that hold at least one row with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_any_no_spike_fraction": {
+   "value": 0.014292152192107126,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of zugaro events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_local_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over zugaro events overlapping a non-local event of the share of their rows with Local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_no_spike_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_nonlocal_share_median": {
+   "value": 1.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "zugaro_overlap_uncertain_share_median": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8",
+   "claims": [
+    "23",
+    "4"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  }
+ }
+}

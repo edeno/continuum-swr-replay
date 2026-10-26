@@ -20,7 +20,8 @@ For each analysis, this page lists:
 - the rows of [../paper/claims_table.md](../paper/claims_table.md) it supports. The claims table is grouped into
   the same four parts.
 
-Current numbers live in the results docs ([replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
+Reported numbers are read from one summary file per part, `paper/reported/part{n}.json`
+(`scripts/reported/`; [design](design/2026-10-26-reported-values-design.md)); Part 2's is built. Other current numbers live in the results docs ([replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
 [per_bin_rate_results.md](per_bin_rate_results.md)) and in the claims table. Model formulas live in
 [models_table.md](models_table.md).
 
@@ -88,7 +89,7 @@ after a change to fitting code only, start at step 6.
 | Non-local probability and SWR z-score around non-local event starts, by SWR overlap | `figures/generate_figure02.py` | Figure 2c | — |
 | SWR power at Local against Non-Local times | `figures/generate_figure03.py` | Figure 3b | 24 |
 | The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 (its non-local side only) |
-| The other side of the overlap: how many of each detector's events (five SWR definitions, MUA, Widloski) overlap no non-local event, so the decoder judged them local throughout; and, in the ones that do overlap, how much of the event is not non-local | `detection/report_inventory_comparison.py` (`directional_by_animal.csv`, target `state_space`); `detection/report_event_features.py` (`features_ss_by_animal.csv`: `ss_frac_rows_nonlocal`, `ss_local_prob_mean`, population `matched_by:state_space`) | `<inventory run>/report/`; `<event features run>/report/` | 4, 23 |
+| The other side of the overlap: how many of each detector's events (five SWR definitions, MUA, Widloski) overlap no non-local event, and how those divide by state; and, in the ones that do overlap, each state's share of their time bins (Local, No-Spike, non-local above 0.8, or uncertain). Kay for the main figure, the rest supplement | `detection/add_state_shares.py` (the shares), then `reported/summarize_part.py --part 2` (`continuum_swr_replay.reported.part2`) | `<event features run>/*_state_shares.parquet`; `paper/reported/part2.json` | 4, 23 |
 
 ### 2b. Spike support: are the events backed by spikes?
 
