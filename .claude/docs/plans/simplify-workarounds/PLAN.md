@@ -430,6 +430,18 @@ read and write the live root. Change each to set `$CSR_PROCESSED_DATA_DIR`
 before its first package read, as `scripts/exploratory/_content_cohort_control.py`
 does. Back up every file before editing; never run one.
 
+### Task 27: The power model's cohort CSV splits its excluded events
+`scripts/coupling/fit_swr_power_model.py:_cohort_records` builds
+`n_events_excluded_pre_outcome` and `n_events_excluded_outcome_imbalance`, but
+`write_cohort_audit` writes only `COHORT_COLUMNS`, so neither reaches
+`swr_power_cohort_audit.csv`, whose `n_excluded_session` lumps them with the
+<30-event sessions. Let `write_cohort_audit` take extra columns written after
+the canonical ones, and have the power runner pass these two; no other
+runner's CSV changes. Drop `post_outcome_gate`, `post_outcome_gate_rule` and
+`outcome_time_semantics` from the cohort record (the per-session
+`swr_power_post_outcome_gate_audit.csv` carries them). On a smoke fit, the two
+counts plus the session-gate remainder add up to `n_excluded_session`.
+
 ## Ruled out of scope
 - Theta/run-speed re-normalization at read time (Ruling P1).
 - `fitting.py:280` `_rows_of_events_whose_response_varies` (statsmodels
