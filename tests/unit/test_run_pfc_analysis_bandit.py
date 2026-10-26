@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import sys
 import types
 from pathlib import Path
 
@@ -351,7 +352,6 @@ def fake_session(monkeypatch, tmp_path, replay_content_root):
 def test_the_sidecar_states_the_population_the_fit_was_read_on(
     tmp_path, fake_session, monkeypatch
 ):
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -361,6 +361,7 @@ def test_the_sidecar_states_the_population_the_fit_was_read_on(
         log_directory=tmp_path / "logs",
         stop_cohort="at_well",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
@@ -384,7 +385,6 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
     # A bundle that does not name its event definition cannot be told from one
     # fit on the retired run-time construction, which split events on a
     # separately detected ripple population.
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -394,6 +394,7 @@ def test_the_sidecar_states_the_event_definition_the_fit_was_read_on(
         log_directory=tmp_path / "logs",
         stop_cohort="at_well",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
@@ -428,7 +429,6 @@ def test_the_sidecar_records_the_commit_the_parent_passed_in(
 ):
     # A dask worker imports the code after the parent did; the checkout may
     # have moved on by then, so it records the parent's commit, not its own.
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -439,6 +439,7 @@ def test_the_sidecar_records_the_commit_the_parent_passed_in(
         git_hash="parent-commit-dirty",
         stop_cohort="at_well",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
@@ -455,7 +456,6 @@ def test_the_sidecar_records_the_commit_the_parent_passed_in(
 def test_a_session_run_on_its_own_records_the_commit_this_process_loaded(
     tmp_path, fake_session, monkeypatch
 ):
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -465,6 +465,7 @@ def test_a_session_run_on_its_own_records_the_commit_this_process_loaded(
         log_directory=tmp_path / "logs",
         stop_cohort="at_well",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
@@ -483,7 +484,6 @@ def test_a_worker_that_cannot_read_git_still_fits_under_the_parents_commit(
         raise RuntimeError("git could not be read at import")
 
     monkeypatch.setattr(runner, "loaded_commit", no_git)
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -494,6 +494,7 @@ def test_a_worker_that_cannot_read_git_still_fits_under_the_parents_commit(
         git_hash="parent-commit",
         stop_cohort="at_well",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
@@ -509,7 +510,6 @@ def test_a_session_run_on_its_own_needs_a_readable_commit(
         raise RuntimeError("git could not be read at import")
 
     monkeypatch.setattr(runner, "loaded_commit", no_git)
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
 
     with pytest.raises(RuntimeError, match="git could not be read"):
         runner.run_analysis(
@@ -518,6 +518,7 @@ def test_a_session_run_on_its_own_needs_a_readable_commit(
             log_directory=tmp_path / "logs",
             stop_cohort="at_well",
             output_dir=tmp_path,
+            cli=["run_pfc_analysis_bandit.py"],
         )
 
 
@@ -612,7 +613,6 @@ def test_a_bundle_fit_by_the_other_estimator_is_refit(tmp_path):
 def test_all_stops_fits_without_a_cohort_and_writes_the_suffixed_bundle(
     tmp_path, fake_session, monkeypatch
 ):
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -622,6 +622,7 @@ def test_all_stops_fits_without_a_cohort_and_writes_the_suffixed_bundle(
         log_directory=tmp_path / "logs",
         stop_cohort="all_stops",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation_allstops.pkl"
@@ -819,7 +820,6 @@ def test_a_bundle_produced_by_another_estimator_or_inference_is_refit(tmp_path, 
 def test_the_sidecar_states_the_estimator_and_the_inference(
     tmp_path, fake_session, monkeypatch
 ):
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -831,6 +831,7 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
         output_dir=output_dir,
         n_folds=5,
         n_control_draws=40,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl"
@@ -870,7 +871,6 @@ def test_the_sidecar_states_the_estimator_and_the_inference(
 def test_the_bundle_carries_the_heldout_columns_and_not_the_retired_ones(
     tmp_path, fake_session, monkeypatch
 ):
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -880,6 +880,7 @@ def test_the_bundle_carries_the_heldout_columns_and_not_the_retired_ones(
         log_directory=tmp_path / "logs",
         stop_cohort="at_well",
         output_dir=output_dir,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     table = pd.read_pickle(output_dir / "wilbur20210329_02_r1_mPFC_modulation.pkl")
@@ -895,7 +896,6 @@ def test_a_sensitivity_prior_writes_its_own_bundle_and_draws_no_null(
 ):
     # A null drawn under a prior nothing is shipped at is a null for nothing,
     # and it is the expensive half of the run.
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     output_dir = tmp_path / "out"
     output_dir.mkdir()
 
@@ -906,6 +906,7 @@ def test_a_sensitivity_prior_writes_its_own_bundle_and_draws_no_null(
         stop_cohort="at_well",
         output_dir=output_dir,
         penalty_sigma=2.0,
+        cli=["run_pfc_analysis_bandit.py"],
     )
 
     artifact = output_dir / "wilbur20210329_02_r1_mPFC_modulation_sigma2.pkl"
@@ -1314,7 +1315,6 @@ def test_each_session_closes_the_nwb_files_spyglass_opened(
     """A worker runs one session at a time, so when its session ends -- fit,
     failed inside ``run_analysis`` (which logs and returns) or raised out of it
     (no free card) -- it closes the NWB files Spyglass cached and logs that it did."""
-    monkeypatch.setattr(runner.sys, "argv", ["run_pfc_analysis_bandit.py"])
     closed = _recording_release(monkeypatch)
     if outcome == "fit_fails":
 
@@ -1337,6 +1337,7 @@ def test_each_session_closes_the_nwb_files_spyglass_opened(
             epoch_name="02_r1",
             log_directory=tmp_path / "logs",
             output_dir=output_dir,
+            cli=["run_pfc_analysis_bandit.py"],
         )
 
     if outcome == "raises":
@@ -1435,9 +1436,11 @@ def test_main_hands_every_session_the_commit_it_loaded(
     each session's sidecar records is the one ``main`` loaded, passed in."""
     keys = [("chimi20200223_.nwb", "02_r1"), ("chimi20200223_.nwb", "04_r2")]
     passed: list[str] = []
+    clis: list[list[str]] = []
 
     def run_analysis(nwb_file_name, epoch_name, **kwargs):
         passed.append(kwargs["git_hash"])
+        clis.append(kwargs["cli"])
 
     monkeypatch.setattr(runner, "loaded_commit", lambda: "parent-commit-dirty")
     monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
@@ -1455,20 +1458,22 @@ def test_main_hands_every_session_the_commit_it_loaded(
         ),
     )
 
-    runner.main(
-        [
-            "--n_workers",
-            str(n_workers),
-            "--local_scratch_dir",
-            str(tmp_path / "scratch"),
-            "--log_directory",
-            str(tmp_path / "logs"),
-            "--output-dir",
-            str(tmp_path / "out"),
-        ]
-    )
+    argv = [
+        "--n_workers",
+        str(n_workers),
+        "--local_scratch_dir",
+        str(tmp_path / "scratch"),
+        "--log_directory",
+        str(tmp_path / "logs"),
+        "--output-dir",
+        str(tmp_path / "out"),
+    ]
+
+    runner.main(argv)
 
     assert passed == ["parent-commit-dirty", "parent-commit-dirty"]
+    # Each sidecar records the arguments main was given, not pytest's.
+    assert clis == [[sys.argv[0], *argv]] * 2
     cohort = json.loads((tmp_path / "out" / "pfc_cohort_mPFC.json").read_text())
     assert cohort["git_hash"] == "parent-commit-dirty"
 

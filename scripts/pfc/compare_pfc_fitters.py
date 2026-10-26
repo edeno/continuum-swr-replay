@@ -668,6 +668,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="Write the report here instead of stdout.",
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
     statsmodels_sessions = bundle_stems(args.statsmodels_dir, args.artifact_suffix)
@@ -748,7 +749,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         timings=timings,
         statsmodels_dir=args.statsmodels_dir,
         jax_dir=args.jax_dir,
-        command=_invocation(),
+        command=_invocation(argv),
         notes=args.note,
     )
     if args.out is None:

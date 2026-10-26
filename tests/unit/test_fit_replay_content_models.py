@@ -1042,7 +1042,9 @@ def test_a_refused_dm_session_is_named_in_the_published_cohort_audit(tmp_path) -
     )
 
     model_results, estimator_skips = mod._fit_content_ladder(args, config, cohort)
-    mod._audit_compare_and_publish(args, config, cohort, model_results, estimator_skips)
+    mod._audit_compare_and_publish(
+        args, config, cohort, model_results, estimator_skips, cli=["fit.py"]
+    )
 
     # The refused session contributes no row to the fit frame.
     assert model_results["X"]["epoch"].tolist() == ["02_r1"]

@@ -2673,8 +2673,9 @@ def collect_content_inputs(
     return bundles, contrast, inputs, missing
 
 
-def run_content_mode(args: argparse.Namespace) -> None:
-    """Build and write the content-refit comparison."""
+def run_content_mode(args: argparse.Namespace, argv: Sequence[str]) -> None:
+    """Build and write the content-refit comparison; ``argv`` is the parsed
+    arguments, recorded in the report's command line."""
     bundles, contrast, inputs, missing = collect_content_inputs(
         args.old_content_root, args.new_content_root, args.content_bundles
     )
@@ -2689,7 +2690,7 @@ def run_content_mode(args: argparse.Namespace) -> None:
         inputs,
         note,
         CONTENT_FRAMINGS[args.content_framing],
-        _invocation(),
+        _invocation(argv),
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
@@ -3732,8 +3733,9 @@ def collect_cohort_inputs(
     return fits, contrast_fits, per_stop_fits, inputs
 
 
-def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
-    """Build and write the cohort comparison."""
+def run_cohort_contrast_mode(args: argparse.Namespace, argv: Sequence[str]) -> None:
+    """Build and write the cohort comparison; ``argv`` is the parsed arguments,
+    recorded in the report's command line."""
     fits, contrast, per_stop, inputs = collect_cohort_inputs(
         {
             "at_well": args.at_well_per_bin,
@@ -3758,7 +3760,7 @@ def run_cohort_contrast_mode(args: argparse.Namespace) -> None:
         if _audited_sibling(path).exists()
     }
     report = build_cohort_report(
-        fits, contrast, inputs, _invocation(), audited, per_stop
+        fits, contrast, inputs, _invocation(argv), audited, per_stop
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
@@ -3913,6 +3915,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = build_parser().parse_args(argv)
     if args.content and args.cohort_contrast:
         raise SystemExit("--content and --cohort-contrast are separate modes")
@@ -3925,10 +3928,10 @@ def main(argv: Sequence[str] | None = None) -> None:
             kind = "content" if args.content else "rate"
             args.out = reviews / f"{today}-{kind}-refit-comparison.md"
     if args.cohort_contrast:
-        run_cohort_contrast_mode(args)
+        run_cohort_contrast_mode(args, argv)
         return
     if args.content:
-        run_content_mode(args)
+        run_content_mode(args, argv)
         return
     inputs = {
         "per-bin (before)": args.old_per_bin,
@@ -3980,7 +3983,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.per_stop_note,
         termlevel,
         cv_audit_bin,
-        _invocation(),
+        _invocation(argv),
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)

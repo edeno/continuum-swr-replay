@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import shlex
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
@@ -16,14 +17,19 @@ import pandas as pd
 REPO = Path(__file__).resolve().parents[2]
 
 
-def _invocation() -> str:
-    """This run's command line, relative to the repo root and shell-quoted."""
+def _invocation(argv: Sequence[str]) -> str:
+    """This run's command line, relative to the repo root and shell-quoted.
+
+    The program is this process's ``sys.argv[0]``; ``argv`` is what the
+    script's ``main`` parsed, so a ``main([...])`` call reports its own
+    arguments.
+    """
     script = Path(sys.argv[0])
     try:
         script = script.resolve().relative_to(REPO)
     except ValueError:
         pass
-    return shlex.join(["uv", "run", "python", str(script), *sys.argv[1:]])
+    return shlex.join(["uv", "run", "python", str(script), *argv])
 
 
 def _cell(value: object, float_format: str) -> str:

@@ -811,7 +811,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             "and write '_rewarded' / '_omitted' artifacts."
         ),
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = ap.parse_args(argv)
+    cli = [sys.argv[0], *argv]
     if args.concentration_length and args.estimator != "dirichlet_multinomial":
         # The conditional Poisson has no concentration parameter at all, so
         # there is nothing for a length term to enter; accepting the flag would
@@ -908,7 +910,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     arm_path = model_dir("swr_contrast") / f"swr_contrast_content_arm{sfx}.pkl"
     arm.to_pickle(arm_path)
-    write_fit_provenance(arm_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
+    write_fit_provenance(arm_path, fit_inputs, estimator, cli, extra=fit_extra)
     save_reference(arm_z_reference, z_reference_path(arm_path))
 
     logger.info(
@@ -922,7 +924,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     patch_path = model_dir("swr_contrast") / f"swr_contrast_content_patch{sfx}.pkl"
     patch.to_pickle(patch_path)
-    write_fit_provenance(patch_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
+    write_fit_provenance(patch_path, fit_inputs, estimator, cli, extra=fit_extra)
     save_reference(patch_z_reference, z_reference_path(patch_path))
 
     # Cohort-audit table (one row per model x population; reconciles n_in - Σdrops =
@@ -986,7 +988,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     audited_path = model_dir("swr_contrast") / f"swr_contrast_content_audited{sfx}.pkl"
     agg.to_pickle(audited_path)
-    write_fit_provenance(audited_path, fit_inputs, estimator, sys.argv, extra=fit_extra)
+    write_fit_provenance(audited_path, fit_inputs, estimator, cli, extra=fit_extra)
     prov = _provenance(
         args,
         ev.groupby(SC).ngroups,

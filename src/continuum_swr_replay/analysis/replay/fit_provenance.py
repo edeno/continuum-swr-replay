@@ -206,7 +206,8 @@ def write_fit_provenance(
     estimator : str
         The estimator that produced the fits (e.g. ``"poisson_glm"``).
     cli : list of str
-        The command line that produced the artifact, typically ``sys.argv``.
+        The command line that produced the artifact: the program
+        (``sys.argv[0]``) and the arguments the script's ``main`` parsed.
     extra : Mapping of str to object, optional
         Further JSON-serializable facts about how the fit was produced, merged
         into the record (e.g. whether the response was rescaled to the fitted

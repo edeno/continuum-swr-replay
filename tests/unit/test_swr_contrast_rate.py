@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import functools
 import json
+import sys
 
 import numpy as np
 import pandas as pd
@@ -327,14 +328,18 @@ def test_aggregate_only_refuses_fits_without_per_term_flags(
     ).to_pickle(out_dir / "swr_contrast_rate.pkl")
 
     with pytest.raises(SystemExit, match="separated_terms"):
-        mod._aggregate_only(smoke=False, cohort="at_well")
+        mod._aggregate_only(
+            smoke=False, cohort="at_well", cli=["fit_swr_contrast_rate.py"]
+        )
 
 
 def test_aggregate_only_requires_the_per_session_fits(replay_content_root, monkeypatch):
     (replay_content_root / "models_per_bin_rate").mkdir(parents=True)
 
     with pytest.raises(SystemExit, match="no per-session fits"):
-        mod._aggregate_only(smoke=False, cohort="at_well")
+        mod._aggregate_only(
+            smoke=False, cohort="at_well", cli=["fit_swr_contrast_rate.py"]
+        )
 
 
 def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, replay_content_root):
@@ -345,12 +350,16 @@ def test_aggregate_only_reads_the_cohort_bundle(monkeypatch, replay_content_root
     """
 
     with pytest.raises(SystemExit) as excinfo:
-        mod._aggregate_only(smoke=False, cohort="all_stops")
+        mod._aggregate_only(
+            smoke=False, cohort="all_stops", cli=["fit_swr_contrast_rate.py"]
+        )
 
     assert "swr_contrast_rate_allstops.pkl" in str(excinfo.value)
 
     with pytest.raises(SystemExit) as canonical:
-        mod._aggregate_only(smoke=False, cohort="at_well")
+        mod._aggregate_only(
+            smoke=False, cohort="at_well", cli=["fit_swr_contrast_rate.py"]
+        )
 
     assert "swr_contrast_rate.pkl" in str(canonical.value)
 
@@ -453,7 +462,9 @@ def test_aggregate_only_records_the_bundle_it_read_by_name(
         lambda models, out, suffix, inputs, cli: recorded.update(inputs) or 0,
     )
 
-    mod._aggregate_only(smoke=False, cohort="all_stops")
+    mod._aggregate_only(
+        smoke=False, cohort="all_stops", cli=["fit_swr_contrast_rate.py"]
+    )
 
     assert list(recorded) == ["swr_contrast_rate_allstops"]
 
@@ -788,3 +799,32 @@ def test_saved_fits_do_not_depend_on_the_order_sessions_finish(
     pd.testing.assert_frame_equal(
         parallel, parallel.sort_values(key, ignore_index=True)
     )
+
+
+def test_main_records_the_arguments_it_was_given(monkeypatch, replay_content_root):
+    """An in-process ``main([...])`` records its own arguments after the program,
+    not the command line of the process that called it."""
+    out_dir = replay_content_root / "models_per_bin_rate"
+    out_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "population": ["contrast"],
+            "model": ["S1_rew"],
+            "cohort": [mod.PRIMARY_COHORT],
+            "animal": ["a"],
+            "separated": [False],
+            "separated_terms": [""],
+            "stop_cohort": ["all_stops"],
+        }
+    ).to_pickle(out_dir / "swr_contrast_rate_allstops.pkl")
+    recorded: list[list[str]] = []
+    monkeypatch.setattr(
+        mod,
+        "_write_aggregation",
+        lambda models, out, suffix, inputs, cli: recorded.append(cli) or 0,
+    )
+    argv = ["--aggregate-only", "--stop-cohort", "all_stops"]
+
+    mod.main(argv)
+
+    assert recorded == [[sys.argv[0], *argv]]

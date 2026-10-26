@@ -123,18 +123,20 @@ def write_summary_provenance(
     fit_inputs: dict[str, Any],
     stop_cohort: str,
     cohort_report: dict[str, Any],
+    cli: list[str],
 ) -> Path:
     """Write the per-stop summary's own provenance sidecar.
 
     The summary is an artifact in its own right -- it is cached, reused across
     strata, and read months later -- so it states the population it holds and
     the tables it was cut from without the reader having to open the pickle.
+    ``cli`` is the command line recorded in the sidecar.
     """
     return write_fit_provenance(
         cache_path,
         fit_inputs,
         "per_stop_summary",
-        sys.argv,
+        cli,
         extra={
             "stop_cohort": stop_cohort,
             "stop_cohort_report": cohort_report,
@@ -199,7 +201,9 @@ def main(argv: Sequence[str] | None = None) -> None:
             "applies no occupancy restriction and publishes '_allstops' names."
         ),
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
+    cli = [sys.argv[0], *argv]
 
     inputs = fit_input_paths()
     cache_path = summary_path(args.stop_cohort)
@@ -241,7 +245,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         summary.attrs["inputs"] = fit_inputs
         summary.to_pickle(cache_path)
         write_summary_provenance(
-            cache_path, fit_inputs, args.stop_cohort, cohort_report
+            cache_path, fit_inputs, args.stop_cohort, cohort_report, cli
         )
         logging.info("  saved %d rows → %s", len(summary), cache_path)
     else:
@@ -348,7 +352,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         out_path = fit_path("logistic", args.content_stratum, args.stop_cohort)
         out.to_pickle(out_path)
         write_fit_provenance(
-            out_path, fit_inputs, "logistic_glm", sys.argv, extra=provenance_extra
+            out_path, fit_inputs, "logistic_glm", cli, extra=provenance_extra
         )
         logging.info("Saved %d rows → %s", len(out), out_path)
 
@@ -357,7 +361,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         gee_path = fit_path("pooled_gee", args.content_stratum, args.stop_cohort)
         gee_df.to_pickle(gee_path)
         write_fit_provenance(
-            gee_path, fit_inputs, "binomial_gee", sys.argv, extra=provenance_extra
+            gee_path, fit_inputs, "binomial_gee", cli, extra=provenance_extra
         )
         logging.info("Saved pooled-GEE %d rows → %s", len(gee_df), gee_path)
 

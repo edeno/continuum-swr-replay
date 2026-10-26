@@ -333,8 +333,13 @@ def _md(frame: pd.DataFrame) -> str:
     return "\n".join([header, rule, *body]) + "\n"
 
 
-def build_report(per_model: pd.DataFrame, diagnostics_dir: Path) -> str:
-    """The audit markdown: the gate, the table, and what falls outside it."""
+def build_report(
+    per_model: pd.DataFrame, diagnostics_dir: Path, argv: Sequence[str]
+) -> str:
+    """The audit markdown: the gate, the table, and what falls outside it.
+
+    ``argv`` is the arguments ``main`` parsed, recorded in the command line.
+    """
     per_session = (
         per_model.groupby("session")
         .agg(
@@ -361,7 +366,7 @@ def build_report(per_model: pd.DataFrame, diagnostics_dir: Path) -> str:
         "statsmodels does, on real sessions -- which is what this checks, "
         "against the diagnostics stored when the batched fitter was first "
         "accepted.\n",
-        f"Command: `{_invocation()}`\n",
+        f"Command: `{_invocation(argv)}`\n",
         "**The design is rebuilt as it stood when the reference was fit** -- a "
         "cubic B-spline basis with only patsy's first boundary function "
         "dropped, 12 functions per event class rather than today's 11 -- from "
@@ -422,6 +427,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Permit the batched fitter to run on CPU when no GPU is free.",
     )
     parser.add_argument("--out", type=Path, default=None)
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
     from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
@@ -433,7 +439,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         [compare_session(session, args.diagnostics_dir) for session in args.sessions],
         ignore_index=True,
     )
-    report = build_report(per_model, args.diagnostics_dir)
+    report = build_report(per_model, args.diagnostics_dir, argv)
     if args.out is None:
         print(report)
     else:

@@ -180,6 +180,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=None,
         help="Analyse only the first N sessions (smoke runs; writes a partial table).",
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
     if args.swr_only and args.non_swr_only:
@@ -321,7 +322,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         output_path,
         fit_inputs,
         "retrospective_label_shuffle",
-        sys.argv,
+        [sys.argv[0], *argv],
         extra={
             "stop_cohort": args.stop_cohort,
             "cohort_grain": "event",

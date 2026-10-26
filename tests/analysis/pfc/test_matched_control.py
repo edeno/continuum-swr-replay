@@ -411,6 +411,7 @@ def test_a_real_session_writes_the_control_array_and_records_its_draw(tmp_path):
             n_control_draws=n_control_draws,
             # The suite pins JAX to CPU so no test takes a card on a shared host.
             allow_cpu=True,
+            cli=["run_pfc_analysis_bandit.py"],
         )
         epoch_identifier = (
             f"{session['nwb_file_name'].replace('_.nwb', '')}_"

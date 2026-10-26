@@ -1696,9 +1696,12 @@ def _audit_compare_and_publish(
     cohort: _ContentCohort,
     model_results: dict[str, pd.DataFrame],
     estimator_skips: dict[str, list[dict]] | None = None,
+    *,
+    cli: list[str],
 ) -> None:
     """Build the cohort audit, run nested comparisons and optional conditional-
-    logit robustness fits, then stage and publish the complete output bundle."""
+    logit robustness fits, then stage and publish the complete output bundle.
+    ``cli`` is the command line recorded in the provenance sidecars."""
     hierarchy = config.hierarchy
     output_dir = config.output_dir
     long_df_prefilter = cohort.long_df_prefilter
@@ -1846,7 +1849,7 @@ def _audit_compare_and_publish(
         logit_results=logit_outputs,
         fit_inputs=cohort.fit_inputs,
         estimator=str(estimator),
-        cli=sys.argv,
+        cli=cli,
         response_renormalized=cohort.response_renormalized,
     )
     logging.info(
@@ -1858,18 +1861,24 @@ def _audit_compare_and_publish(
     logging.info("Done!")
 
 
-def run_content_fit(args: argparse.Namespace) -> None:
-    """Load the content tables, fit the ladder, compare, and publish the bundle."""
+def run_content_fit(args: argparse.Namespace, cli: list[str]) -> None:
+    """Load the content tables, fit the ladder, compare, and publish the bundle.
+
+    ``cli`` is the command line recorded in the provenance sidecars.
+    """
     config = _resolve_run_config(args)
     cohort = _load_and_filter_cohort(args, config)
     model_results, estimator_skips = _fit_content_ladder(args, config, cohort)
-    _audit_compare_and_publish(args, config, cohort, model_results, estimator_skips)
+    _audit_compare_and_publish(
+        args, config, cohort, model_results, estimator_skips, cli=cli
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = _build_arg_parser()
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
-    run_content_fit(args)
+    run_content_fit(args, [sys.argv[0], *argv])
 
 
 if __name__ == "__main__":

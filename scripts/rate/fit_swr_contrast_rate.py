@@ -1023,7 +1023,7 @@ def _write_aggregation(
     return len(agg)
 
 
-def _aggregate_only(smoke: bool, cohort: str) -> None:
+def _aggregate_only(smoke: bool, cohort: str, cli: list[str]) -> None:
     """Re-derive the audited artifacts from the persisted per-session fits.
 
     Reads ``swr_contrast_rate<suffix>.pkl`` and rewrites the audited table, the
@@ -1037,6 +1037,8 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
         Read/write the ``_smoke`` artifacts.
     cohort : {"at_well", "all_stops", "in_transit"}
         Which cohort's bundle to re-aggregate; picks the artifact suffix.
+    cli : list of str
+        The command line to record in the audited sidecar.
 
     Raises
     ------
@@ -1067,7 +1069,7 @@ def _aggregate_only(smoke: bool, cohort: str) -> None:
         # bundle under the bare name would point it at the canonical fit and
         # report the aggregate as permanently stale.
         record_inputs({fits_path.stem: fits_path}),
-        sys.argv,
+        cli,
     )
     logger.info(
         "Re-aggregated %d per-session fits from %s -> %d audited rows",
@@ -1104,11 +1106,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             "audited table, term diagnostics and meta JSON"
         ),
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = ap.parse_args(argv)
+    cli = [sys.argv[0], *argv]
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
     if args.aggregate_only:
-        _aggregate_only(smoke, args.stop_cohort)
+        _aggregate_only(smoke, args.stop_cohort, cli)
         return
 
     # Causal-hygiene gate: each rung's covariates must be pre-outcome, or the
@@ -1213,7 +1217,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         out,
         fit_inputs,
         "poisson_glm",
-        sys.argv,
+        cli,
         extra={"stop_cohort": args.stop_cohort, "swr_source": swr_source_name()},
     )
 
@@ -1238,7 +1242,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         time.perf_counter() - t0,
     )
 
-    _write_aggregation(models, out_dir, csfx, fit_inputs, sys.argv)
+    _write_aggregation(models, out_dir, csfx, fit_inputs, cli)
 
 
 if __name__ == "__main__":

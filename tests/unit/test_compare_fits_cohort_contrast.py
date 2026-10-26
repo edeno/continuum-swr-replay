@@ -11,6 +11,7 @@ a real per-bin fit carries.
 from __future__ import annotations
 
 import json
+import shlex
 
 import numpy as np
 import pandas as pd
@@ -511,25 +512,26 @@ def test_cohort_contrast_mode_writes_a_report(cohort_fits, tmp_path):
     in_transit = tmp_path / "all_models_intransit.pkl"
     cohort_fits["in_transit"].to_pickle(in_transit)
     out = tmp_path / "audits" / "cohort.md"
-    args = build_parser().parse_args(
-        [
-            "--cohort-contrast",
-            "--at-well-per-bin",
-            str(at_well),
-            "--all-stops-per-bin",
-            str(tmp_path / "absent.pkl"),
-            "--in-transit-per-bin",
-            str(in_transit),
-            "--at-well-contrast",
-            str(tmp_path / "absent_contrast.pkl"),
-            "--all-stops-contrast",
-            str(tmp_path / "absent_contrast2.pkl"),
-            "--out",
-            str(out),
-        ]
-    )
-    run_cohort_contrast_mode(args)
+    argv = [
+        "--cohort-contrast",
+        "--at-well-per-bin",
+        str(at_well),
+        "--all-stops-per-bin",
+        str(tmp_path / "absent.pkl"),
+        "--in-transit-per-bin",
+        str(in_transit),
+        "--at-well-contrast",
+        str(tmp_path / "absent_contrast.pkl"),
+        "--all-stops-contrast",
+        str(tmp_path / "absent_contrast2.pkl"),
+        "--out",
+        str(out),
+    ]
+    args = build_parser().parse_args(argv)
+    run_cohort_contrast_mode(args, argv)
     text = out.read_text()
+    # The report's command line carries the arguments this call parsed.
+    assert shlex.join(argv) in text
     assert "Rate ladders across the three stop cohorts" in text
     # The cohort key names all three and says which bundle was supplied, so an
     # absent sensitivity fit reads as absent rather than as an empty result.

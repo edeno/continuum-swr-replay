@@ -1256,6 +1256,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Assemble the shipped at-well cohort, compare the estimators, write outputs."""
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = _parse_args(argv)
     rungs = resolve_rungs(
         [name.strip() for name in args.rungs.split(",") if name.strip()]
@@ -1323,7 +1324,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         coefficients_path,
         inputs,
         PROVENANCE_ESTIMATOR,
-        sys.argv,
+        [sys.argv[0], *argv],
         extra={
             "rungs": [rung.name for rung in rungs],
             "estimators": list(ESTIMATORS),

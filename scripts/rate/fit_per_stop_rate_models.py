@@ -273,6 +273,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         ),
     )
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
     # Causal-hygiene gate: R1 uses the past-only reward-history basis, so the
@@ -340,7 +341,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         out,
         fit_inputs,
         "poisson_glm",
-        sys.argv,
+        [sys.argv[0], *argv],
         extra={"stop_cohort": args.stop_cohort},
     )
     write_cohort_audit(cohort_audits, out_dir / f"all_models{sfx}_cohort_audit.csv")

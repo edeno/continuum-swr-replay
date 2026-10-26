@@ -816,6 +816,8 @@ def run_analysis(
     n_control_draws: int = DEFAULT_CONTROL_DRAWS,
     fold_seed: int | None = None,
     control_draw_seed: int | None = None,
+    *,
+    cli: list[str],
 ) -> None:
     """Run PFC GLM analysis for a single session.
 
@@ -875,6 +877,9 @@ def run_analysis(
         Seeds of the fold split and of the null draws. Derived from the session
         key when omitted, so a session refit on its own reproduces the batch's
         split and null exactly.
+    cli : list of str
+        The command line recorded in the sidecar: ``main``'s program and the
+        arguments it parsed.
 
     Notes
     -----
@@ -1142,7 +1147,7 @@ def run_analysis(
             if cohort_stops is not None
             else {},
             estimator=ESTIMATOR,
-            cli=sys.argv,
+            cli=cli,
             commit=git_hash,
             extra={
                 **(
@@ -1683,7 +1688,9 @@ def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for batch PFC GLM analysis."""
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = get_command_line_arguments(argv)
+    cli = [sys.argv[0], *argv]
     # before any cluster starts: its worker processes inherit this limit
     old_soft, new_soft = raise_open_file_limit()
     print(f"open-file soft limit {old_soft} -> {new_soft}", flush=True)
@@ -1748,6 +1755,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 n_control_draws=args.n_control_draws,
                 fold_seed=args.fold_seed,
                 control_draw_seed=args.control_draw_seed,
+                cli=cli,
             )
     else:
         cluster = LocalCluster(
@@ -1779,6 +1787,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     n_control_draws=args.n_control_draws,
                     fold_seed=args.fold_seed,
                     control_draw_seed=args.control_draw_seed,
+                    cli=cli,
                 )
                 for epoch in epoch_info.itertuples()
             ]

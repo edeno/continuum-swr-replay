@@ -587,6 +587,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument("--no-cv", action="store_true", help="Skip cross-validation.")
     parser.add_argument("--no-gof", action="store_true", help="Skip goodness-of-fit.")
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
     # Causal-hygiene gate: the per-bin design basis (spline, reward kernel,
@@ -663,7 +664,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         out,
         fit_inputs,
         "poisson_glm",
-        sys.argv,
+        [sys.argv[0], *argv],
         extra={"stop_cohort": args.stop_cohort, "swr_source": swr_source_name()},
     )
     write_cohort_audit(

@@ -2573,6 +2573,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=None,
         help="Write the report here instead of stdout.",
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
 
     sidecars = read_sidecars(args.after_dir, args.artifact_suffix)
@@ -2612,7 +2613,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "min_firing_rate": args.min_firing_rate,
         "alpha": args.alpha,
         "notes": args.note,
-        "command": _invocation(),
+        "command": _invocation(argv),
         "artifact_suffix": args.artifact_suffix,
         "worker_times": args.worker_times,
     }

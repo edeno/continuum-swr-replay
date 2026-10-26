@@ -601,6 +601,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "from the full trial stream."
         ),
     )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
     # `--max-per-animal 0` is still smoke mode, so test the flag, not its value.
     smoke = args.max_per_animal is not None
@@ -741,7 +742,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         gate_audit=gate_audit,
         cohort_records=audit_records,
         fit_inputs=fit_inputs,
-        argv=sys.argv,
+        argv=[sys.argv[0], *argv],
         smoke=smoke,
         stop_cohort=args.stop_cohort,
     )
