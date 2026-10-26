@@ -22,6 +22,12 @@ from continuum_swr_replay.figure_utilities import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _restore_rcparams():
+    with mpl.rc_context():
+        yield
+
+
 class TestConstants:
     """Test module constants."""
 
@@ -207,7 +213,12 @@ class TestSaveFigure:
             current = plt.figure()  # empty, and now pyplot's current figure
 
             save_figure(
-                fig, "given", base_dir=tmp_path, dpi=100, formats=["png"], transparent=False
+                fig,
+                "given",
+                base_dir=tmp_path,
+                dpi=100,
+                formats=["png"],
+                transparent=False,
             )
 
         saved = (tmp_path / "given.png").read_bytes()
@@ -225,7 +236,9 @@ class TestSaveFigure:
         monkeypatch.setenv("SOURCE_DATE_EPOCH", "0")  # fixed PDF CreationDate
 
         def make_figure():
-            fig, axes = plt.subplots(2, 2, figsize=(4, 3), dpi=100, layout="constrained")
+            fig, axes = plt.subplots(
+                2, 2, figsize=(4, 3), dpi=100, layout="constrained"
+            )
             for ax in axes.flat:
                 ax.plot([0, 1], [0, 1])
                 ax.set_title("a long panel title " * 2)
@@ -308,7 +321,9 @@ class TestSaveFigure:
             ax.plot([0, 1], [0, 1])
 
             # RGBA tuple should be accepted
-            save_figure(fig, "test_figure", base_dir=tmpdir, facecolor=(1.0, 1.0, 1.0, 1.0))
+            save_figure(
+                fig, "test_figure", base_dir=tmpdir, facecolor=(1.0, 1.0, 1.0, 1.0)
+            )
 
             assert (Path(tmpdir) / "test_figure.pdf").exists()
             plt.close(fig)
@@ -363,7 +378,9 @@ class TestSaveFigure:
                 save_figure(fig, "test_figure", base_dir=tmpdir, formats=["invalid"])
 
             with pytest.raises(ValueError, match="Invalid format"):
-                save_figure(fig, "test_figure", base_dir=tmpdir, formats=["pdf", "bad_format"])
+                save_figure(
+                    fig, "test_figure", base_dir=tmpdir, formats=["pdf", "bad_format"]
+                )
 
             plt.close(fig)
 
@@ -409,6 +426,7 @@ class TestSaveFigure:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Mock FIGURE_DIR to point to our temp directory
             from continuum_swr_replay import figure_utilities
+
             original_figure_dir = getattr(figure_utilities, "FIGURE_DIR", None)
 
             # Set FIGURE_DIR to temp directory
@@ -481,6 +499,7 @@ class TestSaveFigure:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Mock FIGURE_DIR to point to our temp directory
             from continuum_swr_replay import figure_utilities
+
             original_figure_dir = getattr(figure_utilities, "FIGURE_DIR", None)
 
             # Set FIGURE_DIR to temp directory

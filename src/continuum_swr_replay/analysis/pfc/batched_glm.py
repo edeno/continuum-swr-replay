@@ -146,6 +146,7 @@ def _in_float64(function: Callable[_P, _R]) -> Callable[_P, _R]:
 
     return run
 
+
 #: statsmodels' ``GLM.fit`` defaults, mirrored so both fitters stop at the
 #: same point (``statsmodels.genmod.generalized_linear_model.GLM.fit``:
 #: ``maxiter=100, tol=1e-8``, ``atol = tol``, ``rtol = 0``).
