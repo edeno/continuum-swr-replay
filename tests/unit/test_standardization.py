@@ -341,7 +341,14 @@ def test_runner_references_written(tmp_path):
         coefs=frame.copy(),
         z_reference={"chimi|20200212|02_r1": session_reference},
         gate_audit=empty_audit,
-        cohort_records=[{"model": "swr_power", "n_in": 1}],
+        cohort_records=[
+            {
+                "model": "swr_power",
+                "n_in": 1,
+                "n_events_excluded_pre_outcome": 0,
+                "n_events_excluded_outcome_imbalance": 0,
+            }
+        ],
         smoke=True,
     )
     assert power_out.name == "swr_power_model_smoke.pkl"

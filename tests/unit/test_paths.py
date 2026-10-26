@@ -246,7 +246,14 @@ def test_every_swr_power_output_resolves_under_its_own_model_dir(tmp_path):
         coefs=pd.DataFrame({"a": [1.0]}),
         z_reference={},
         gate_audit=pd.DataFrame({"animal": ["chimi"]}),
-        cohort_records=[{"model": "swr_power", "n_in": 1}],
+        cohort_records=[
+            {
+                "model": "swr_power",
+                "n_in": 1,
+                "n_events_excluded_pre_outcome": 0,
+                "n_events_excluded_outcome_imbalance": 0,
+            }
+        ],
         smoke=False,
     )
     written = {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*")}
