@@ -71,6 +71,9 @@ reads it as a ripple detector and not as a name no decode writes."""
 DEFAULT_TRAINING_TYPE = TrainingType.NO_RIPPLE.value
 """The training type a decode does not append to its identifier (``"no_ripple"``)."""
 
+CONTFRAG_SUFFIX = "_contfrag"
+"""The suffix a ContFrag classifier decode appends, first of the run suffixes."""
+
 
 def parse_nwb_filename(filename: str) -> tuple[str, int]:
     """Parse NWB filename to extract animal name and date.
@@ -275,7 +278,7 @@ def parse_epoch_identifier(epoch_id: str) -> EpochKey:
             f"optional decode suffixes."
         )
     stem, number, replicate, brain_area, *rest = parts
-    contfrag = rest[:1] == ["contfrag"]
+    contfrag = rest[:1] == [CONTFRAG_SUFFIX[1:]]
     rest = rest[1:] if contfrag else rest
     swr_definition = DEFAULT_SWR_DEFINITION
     if rest and rest[0] in OTHER_RIPPLE_DETECTORS:

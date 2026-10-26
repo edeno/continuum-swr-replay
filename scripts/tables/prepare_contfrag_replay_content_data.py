@@ -65,6 +65,7 @@ from continuum_swr_replay.analysis.replay.covariates import load_contingency
 from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import (
+    CONTFRAG_SUFFIX,
     format_epoch_identifier,
     parse_nwb_filename,
 )
@@ -191,7 +192,7 @@ def find_sessions(
     for nwb_file_name, epoch in analysed_epochs().index:
         animal = parse_nwb_filename(nwb_file_name)[0]
         session_id = format_epoch_identifier(
-            nwb_file_name, epoch, brain_area, "_contfrag"
+            nwb_file_name, epoch, brain_area, CONTFRAG_SUFFIX
         )
         paths = decode_paths(session_id, decode_dir, threshold_percent=None)
         dot_file = paths.data_over_time

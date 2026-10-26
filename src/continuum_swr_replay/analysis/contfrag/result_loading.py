@@ -8,6 +8,7 @@ from non_local_detector.environment import Environment
 
 from continuum_swr_replay.analysis.hippocampus.result_loading import _load_saved_decode
 from continuum_swr_replay.decoding.identifiers import (
+    CONTFRAG_SUFFIX,
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
     format_epoch_identifier,
@@ -62,7 +63,7 @@ def load_contfrag_results(
     """
     return _load_saved_decode(
         format_epoch_identifier(
-            nwb_file_name, epoch_name, decoding_brain_area, "_contfrag"
+            nwb_file_name, epoch_name, decoding_brain_area, CONTFRAG_SUFFIX
         ),
         ContFragClusterlessClassifier,
         load_detector=load_detector,

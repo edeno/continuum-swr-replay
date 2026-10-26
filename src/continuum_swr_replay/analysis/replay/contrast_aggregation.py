@@ -766,13 +766,11 @@ _FIT_SUPPORT_LABEL = "fit_cohort_all_rows"
 # is z(log n_nonlocal_bins) crossed with the indicator it modulates.
 # ``LOG_EVENT_LENGTH`` and the within-stop-time ``LOG1P_STOP_TIME`` are declared
 # with the products they enter, in ``covariates.interactions``.
-_LOG1P_STOP_TIME = LOG1P_STOP_TIME
-
-_ARM_Z_SOURCES = (*_ZSCALARS, _LOG1P_STOP_TIME, LOG_EVENT_LENGTH)
+_ARM_Z_SOURCES = (*_ZSCALARS, LOG1P_STOP_TIME, LOG_EVENT_LENGTH)
 _PATCH_Z_SOURCES = (
     "periswitch_index_trials",
     "patch_switch_fraction_last5_completed_trips",
-    _LOG1P_STOP_TIME,
+    LOG1P_STOP_TIME,
     LOG_EVENT_LENGTH,
 )
 
@@ -1124,7 +1122,7 @@ def _attach_arm_design_columns(ev: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         ``ev`` with the ``<col>_z`` columns and interaction products appended, and
         the standardization reference actually used (persisted beside the fit).
     """
-    ev[_LOG1P_STOP_TIME] = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
+    ev[LOG1P_STOP_TIME] = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
     _attach_log_event_length(ev)
     ev, z_reference = _standardize(ev, _ARM_Z_SOURCES)
     attach_interactions(ev, _ARM_INTERACTIONS)
@@ -1202,7 +1200,7 @@ def _attach_patch_design_columns(pt: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         ``pt`` with the ``<col>_z`` columns and interaction products appended, and
         the standardization reference actually used.
     """
-    pt[_LOG1P_STOP_TIME] = np.log1p(pt["time_since_stop_start_s"].to_numpy(dtype=float))
+    pt[LOG1P_STOP_TIME] = np.log1p(pt["time_since_stop_start_s"].to_numpy(dtype=float))
     _attach_log_event_length(pt)
     pt, z_reference = _standardize(pt, _PATCH_Z_SOURCES)
     attach_interactions(pt, _PATCH_INTERACTIONS)

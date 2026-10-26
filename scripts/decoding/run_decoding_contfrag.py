@@ -47,6 +47,7 @@ from continuum_swr_replay.decoding.config import (
     contfrag_classifier_classes,
 )
 from continuum_swr_replay.decoding.identifiers import (
+    CONTFRAG_SUFFIX,
     DEFAULT_SWR_DEFINITION,
     DEFAULT_TRAINING_TYPE,
 )
@@ -78,7 +79,7 @@ RUNNER = _decode_runner.DecodeRunner(
     detector_kwargs=contfrag_detector_kwargs,
     aggregate=get_contfrag_data_over_time,
     load_saved=load_contfrag_results,
-    file_suffix="_contfrag",
+    file_suffix=CONTFRAG_SUFFIX,
     # Unlike the NonLocal runner, the ContFrag decode does not keep its per-bin
     # log-likelihood in results.nc.
     hpc_log_likelihood=False,

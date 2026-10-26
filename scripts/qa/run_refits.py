@@ -344,6 +344,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     )
     from continuum_swr_replay.data_loaders.epoch_register import analysed_epoch_ids
     from continuum_swr_replay.decoding.files import decode_paths
+    from continuum_swr_replay.decoding.identifiers import CONTFRAG_SUFFIX
     from continuum_swr_replay.paths import processed_data_dir
 
     problems = [
@@ -362,7 +363,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     decodes = {"HPC": ("", {}, ("data_over_time", "environment", "results"))}
     if names & {_TCS, _TCM}:
         decodes["ContFrag"] = (
-            "_contfrag",
+            CONTFRAG_SUFFIX,
             {"threshold_percent": None},
             ("data_over_time", "environment"),
         )
