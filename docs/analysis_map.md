@@ -1,32 +1,36 @@
-# Analysis map: each question, the analyses that answer it, and where they live
+# Analysis map: the paper's four parts, the analyses under each, and where they live
 
-Every analysis here answers one of the paper's questions. For each, this page lists:
+The paper has four parts:
+
+1. **The model:** the non-local detector, how it works, and what it captures.
+2. **The events:** what the non-local detector's events are like, and how they compare with the events people
+   already detect (SWRs, and the Widloski & Foster sequence detector): where they agree and where they differ.
+3. **Behavior:** how the events relate to the task, and how SWR and non-SWR events differ there.
+4. **Other brain areas:** how other areas respond to the events, and how SWR and non-SWR events differ there.
+
+Parts 3 and 4 compare SWR with non-SWR events only, with the Kay detector's SWRs. The comparison with every
+other detector stays in Part 2.
+
+For each analysis, this page lists:
 
 - what is estimated;
 - the script;
 - the run name in `scripts/qa/run_refits.py`, for the CPU fits it reruns;
 - the figures;
-- the rows of [../paper/claims_table.md](../paper/claims_table.md) it supports.
+- the rows of [../paper/claims_table.md](../paper/claims_table.md) it supports. The claims table is grouped into
+  the same four parts.
 
 Current numbers live in the results docs ([replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
 [per_bin_rate_results.md](per_bin_rate_results.md)) and in the claims table. Model formulas live in
 [models_table.md](models_table.md).
 
-The claims table groups claims by goal:
-
-| Claims-table goal | Question here |
-|---|---|
-| 1, 2 and 4 | Q1 |
-| 3a | Q3a |
-| 3b | Q2, Q3b and Q4 |
-| 3c | Q5 |
-
 A claim marked "no script" has no tracked analysis yet.
 
-Run names read `<question>.<analysis>[.<variant>]`; `--dry-run` lists them under their question. The `at_well`
-cohort (well-anchored stops) is the shipped one. `all_stops` and `in_transit` are sensitivity cohorts.
-The uncited sensitivity runs (`rate.per_bin.in_transit` and `behavior.stay_leave.all_stops*`) are opt-in: a
-run skips them unless they are named in full or `--include-optional` is given.
+Run names read `<group>.<analysis>[.<variant>]`; `--dry-run` lists them under their group. Every group
+(`rate`, `coupling`, `content`, `behavior`) is in Part 3. The `at_well` cohort (well-anchored stops) is the
+shipped one. `all_stops` and `in_transit` are sensitivity cohorts. The uncited sensitivity runs
+(`rate.per_bin.in_transit` and `behavior.stay_leave.all_stops*`) are opt-in: a run skips them unless they are
+named in full or `--include-optional` is given.
 
 ## The flow
 
@@ -50,49 +54,89 @@ after a change to fitting code only, start at step 6.
       tables; needs `qvals_table`);
    5. `tables/build_timebin_tables.py`;
    6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
-5. **Q1 checks** on the decodes, and the decode-only figures (Figures 1–3, the supplements). See Q1 and Q3a below.
-6. **Fits and the figures that read them**, for Q2, Q3b and Q4: `qa/run_refits.py`.
-7. **PFC** for Q5: `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
+5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
+   the supplements).
+6. **Part 3 fits and the figures that read them:** `qa/run_refits.py`.
+7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
 
 `figures/generate_all_figures.py` draws Figures 1–4 in one go. Run it only after step 7.
 
-## Q1. Are the decoded non-local events real, including those outside SWRs?
+## Part 1. The model: how it works and what it captures
 
 | What it tests | Script | Output, figure | Claims |
 |---|---|---|---|
-| Example events per overlap class; how many non-local events have no SWR; NL against SWR start and end offsets; Local-state decoding error | `figures/generate_figure02.py` | Figure 2 (a, b, d, e) | 1, 2, 22, 10 |
-| Non-local probability and SWR z-score around non-local event starts, by SWR overlap | `figures/generate_figure02.py` | Figure 2c | — |
-| SWR power at Local against Non-Local times | `figures/generate_figure03.py` | Figure 3b | 24 |
 | The decoder on simulated data | `figures/generate_figure01.py` | Figure 1 | — |
-| The 0.8 threshold, state fractions, calibration, and theta and MUA triggered averages (all in sample) | `figures/generate_supp_decoder_validation.py` | supplement | 10, 5 |
+| The 0.8 threshold, state fractions, calibration, and theta and MUA triggered averages (all in sample) | `figures/generate_supp_decoder_validation.py` | supplement a–c, e | 10, 5 |
+| Decoding error in the Local state | `figures/generate_figure02.py` | Figure 2e | 10 |
 | Decoding quality per session | `qa/run_quality_metrics.py`, after `qa/compute_hpc_raw_stats.py` | `paper/figures/quality_metrics/` | 10 |
-| Each event's spikes support its decoded location better than a matched baseline | `detection/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
-| Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `detection/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
-| The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 (its non-local side only; SWRs without non-local content are 23, which has no script) |
-| Four SWR detectors from shared inputs | `detection/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
-| Carey's joint ripple-power and multiunit detector, a fifth SWR definition, on the same CA1 inputs (built and tested; it ran on all 242 epochs, run `fa6537e48bcf`) | `detection/run_carey_detection.py` | `Processed-Data/replay_detection_comparison/carey/` | — (an input to the detector comparison) |
-| A second sequence detector (Widloski & Foster) on the same decodes | `detection/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | — (a comparator for 21, 22, 25) |
-| That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `detection/sweep_memoryless_detection.py`, `detection/sweep_memoryless_controls.py`, `detection/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/_memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port) |
-| Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Built and tested; ran on all 242 analysed epochs (run `afeb897d850f`). Widloski columns pending the Phase 2 pilot checks | `detection/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | — |
-| That comparison's counts per session and per animal | `detection/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | — |
-| Sampled examples from each cell of that comparison, on one time axis | `figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` | — |
-| Event features on every compared event of the nine inventories (no baseline windows: dropped by the lead, 2026-10-18): timing, engagement, ripple and MUA on one trace, spatial features, context, and the common spike-evidence score; the populations (shared, unmatched, unknown); the memoryless rejection stage of each ours-only event. Built and tested; the smoke ran (run `68f51dabdb3c`), and the pilot ran on 5 epochs (run `86ed2e7fa90a`: 4 `ok`, and peanut, which failed there on a bug at its last window, re-checked `ok` under `f8a6984ae781`); the full run is pending. Widloski columns and every `ms_*` feature pending the Phase 2 pilot checks | `detection/run_event_features.py` | `Processed-Data/replay_detection_comparison/event_features/` | — |
-| That run's features per session and per animal (counts and quantiles, no verdicts) | `detection/report_event_features.py` | `<event features run>/report/`; `paper/figures/event_features/` | — |
-| Sampled comparator-only and ours-only events, with their spike evidence and spikes per row | `figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` | — |
-| Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
+| Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented): half the tetrodes choose the location, the other half score it. Ran on all 242 epochs (241 ok; chimi20200221_08_r4 fails its stored-likelihood check). At rest, Local, No-Spike and Non-Local Continuous are supported in 5/5 animals; Non-Local Continuous while running is not (0/5) | `detection/run_state_evidence.py` | `Processed-Data/_refresh_20261016/state_evidence/` | 7, 9 |
+| What our detector and the Widloski detector report on simulated replays of known shape, and where there is no replay; the port checked against an independent re-implementation of the reference code | `detection/sweep_memoryless_detection.py`, `detection/sweep_memoryless_controls.py`, `detection/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/_memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port; the simulated side of 12) |
 
 **No script:**
 - 3 (the threshold sweep);
-- 23 (the fraction of SWRs with local content);
 - 8 (a re-decode with a wider Local kernel);
 - 11 (held-out model selection);
-- 12 (the false-positive rate);
-- Goal 4's full detector comparison (its four scripts are built and in the table above; the run on the
-  canonical data is pending)
-  ([.claude/docs/plans/replay_detection_comparison/PLAN.md](../.claude/docs/plans/replay_detection_comparison/PLAN.md),
-  Phase 3).
+- 12 (the false-positive rate on real data).
 
-## Q2. How often do events occur, and what drives the rate, for SWR against non-SWR events?
+## Part 2. The events: what they are, and how they compare with SWRs and Widloski events
+
+### 2a. How common they are, and how they sit against SWRs
+
+| What it tests | Script | Output, figure | Claims |
+|---|---|---|---|
+| Example events per overlap class; how many non-local events have no SWR; NL against SWR start and end offsets | `figures/generate_figure02.py` | Figure 2 (a, b, d) | 1, 2, 22 |
+| Non-local probability and SWR z-score around non-local event starts, by SWR overlap | `figures/generate_figure02.py` | Figure 2c | — |
+| SWR power at Local against Non-Local times | `figures/generate_figure03.py` | Figure 3b | 24 |
+| The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 (its non-local side only) |
+| The other side of the overlap: how many of each detector's events (five SWR definitions, MUA, Widloski) overlap no non-local event, so the decoder judged them local throughout; and, in the ones that do overlap, how much of the event is not non-local | `detection/report_inventory_comparison.py` (`directional_by_animal.csv`, target `state_space`); `detection/report_event_features.py` (`features_ss_by_animal.csv`: `ss_frac_rows_nonlocal`, `ss_local_prob_mean`, population `matched_by:state_space`) | `<inventory run>/report/`; `<event features run>/report/` | 4, 23 |
+
+### 2b. Spike support: are the events backed by spikes?
+
+| What it tests | Script | Output, figure | Claims |
+|---|---|---|---|
+| Each event's spikes favor its decoded location over the animal's, against matched quiet windows. Not held out: the same spikes choose the location and score it. Ran on all 242 epochs, at most 30 events per group per epoch | `detection/analyze_event_spike_evidence.py --output-dir paper/figures/reality_r11` | `paper/figures/reality_r11/` (the default `paper/figures/reality/` holds the June prototype, 5 epochs) | 6, 7, 7b, 7c, 9 |
+| The held-out test above (Part 1), split by SWR: both kinds are supported, the non-SWR events less per spike | `.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py` (untracked; report `.claude/research/refresh_followup/f1_evidence_report.md`) | `.claude/research/refresh_followup/f1_outputs/` | 7 |
+
+### 2c. Their properties
+
+| What it measures | Script | Figure | Claims |
+|---|---|---|---|
+| Replay speed by SWR status | `figures/generate_figure03.py` | Figure 3c | 15 |
+| Where content sits relative to the animal and to reward wells | `content/analyze_content_occupancy.py` | `paper/figures/content_occupancy/` | 13, 14 |
+| Replayed position along the track, by SWR status | `figures/generate_figure03.py` | Figure 3d | — |
+| Event duration of non-local, SWR and MUA events | `figures/generate_supp_decoder_validation.py` | supplement d | — (18, non-SWR against SWR, has no panel) |
+
+**No tracked script:**
+- 16 (extent);
+- 16b (stationarity);
+- 17 (certainty);
+- the duration-controlled contrasts behind 15 and 18.
+
+The per-event trajectory columns they need (`pause_fraction` and others) are built in
+`src/continuum_swr_replay/analysis/replay/trajectory.py`. The event features run (2d) also has extent, HPD and
+distance per event, by duration stratum, but nothing cites it for these claims yet.
+
+### 2d. Against the other detectors
+
+| What it tests | Script | Output, figure | Claims |
+|---|---|---|---|
+| Four SWR detectors from shared inputs | `detection/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
+| Carey's joint ripple-power and multiunit detector, a fifth SWR definition, on the same CA1 inputs (ran on all 242 epochs, run `fa6537e48bcf`) | `detection/run_carey_detection.py` | `Processed-Data/replay_detection_comparison/carey/` | — (an input to the detector comparison) |
+| A second sequence detector (Widloski & Foster) on the same decodes | `detection/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | — (a comparator for 21, 22, 25) |
+| Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Ran on all 242 analysed epochs (run `afeb897d850f`) | `detection/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | 23 |
+| That comparison's counts per session and per animal | `detection/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | 23 |
+| Sampled examples from each cell of that comparison, on one time axis | `figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` | — |
+| Event features on every compared event of the nine inventories (no baseline windows: dropped by the lead, 2026-10-18): timing, engagement, ripple and MUA on one trace, spatial features, context, and the common spike-evidence score; the populations (shared, unmatched, unknown); the memoryless rejection stage of each ours-only event. Ran on all 242 epochs (run `30cf1cc432e9`, all `ok`) | `detection/run_event_features.py` | `Processed-Data/replay_detection_comparison/event_features/` | 23 |
+| That run's features per session and per animal (counts and quantiles, no verdicts) | `detection/report_event_features.py` | `<event features run>/report/`; `paper/figures/event_features/` | 23 |
+| Sampled comparator-only and ours-only events, with their spike evidence and spikes per row | `figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` | — |
+| Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
+
+Every Widloski column and every `ms_*` feature is pending the Phase 2 pilot checks
+([.claude/docs/plans/replay_detection_comparison/PLAN.md](../.claude/docs/plans/replay_detection_comparison/PLAN.md)).
+
+## Part 3. Behavior: how the events relate to the task, SWR against non-SWR
+
+### 3a. How often events occur, and what drives the rate
 
 There are two model families; see [rate_models.md](rate_models.md):
 
@@ -106,27 +150,9 @@ There are two model families; see [rate_models.md](rate_models.md):
 | How SWR and non-SWR rates differ, term by term, paired within session | `rate.swr_contrast.{at_well,all_stops}` | `rate/fit_swr_contrast_rate.py` | `content.fig.swr_contrast_coefs` | 19c, 19f |
 | Rate against arm uncertainty and value | `rate.uncertainty.at_well` | `rate/fit_uncertainty_rate.py` | `rate.fig.uncertainty` | — |
 | Whether one stream's history drives the other's rate | `rate.cross_history` | `rate/fit_cross_history_rate.py` | — (the fit is `models_per_bin_rate/cross_history_models.pkl`; no figure or write-up) | — |
+| SWR-coupling strength (ripple power as a continuous mark) against the behavioral covariates | `coupling.ripple_power` | `coupling/fit_swr_power_model.py` | — | — |
 
-## Q3a. What are the events like: location, speed, extent, certainty, duration, SWR coupling?
-
-| What it measures | Script | Figure | Claims |
-|---|---|---|---|
-| Replay speed by SWR status | `figures/generate_figure03.py` | Figure 3c | 15 |
-| Where content sits relative to the animal and to reward wells | `content/analyze_content_occupancy.py` | `paper/figures/content_occupancy/` | 13, 14 |
-| Replayed position along the track, by SWR status | `figures/generate_figure03.py` | Figure 3d | — |
-| Event duration of non-local, SWR and MUA events | `figures/generate_supp_decoder_validation.py` | supplement d | — (18, non-SWR against SWR, has no panel) |
-| SWR-coupling strength (ripple power as a continuous mark) against the behavioral covariates; run `coupling.ripple_power` | `coupling/fit_swr_power_model.py` | — | — |
-
-**No tracked script:**
-- 16 (extent);
-- 16b (stationarity);
-- 17 (certainty);
-- the duration-controlled contrasts behind 15 and 18.
-
-The per-event trajectory columns they need (`pause_fraction` and others) are built in
-`src/continuum_swr_replay/analysis/replay/trajectory.py`.
-
-## Q3b. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?
+### 3b. What the events represent (arm or patch), and what shapes it
 
 Every content model is conditional on the event: it asks which arm (or patch) an event's posterior mass falls on.
 
@@ -143,7 +169,7 @@ Every content model is conditional on the event: it asks which arm (or patch) an
 | Content against reward-belief uncertainty | `content.uncertainty` | `content/analyze_uncertainty_content.py` | `content.fig.uncertainty` | 19g |
 | Content of events found by SWR- or MUA-anchored detection (ContFrag) | `content.event_source.{swr,mua}_{arm,patch}` | `content/fit_replay_content_models.py --event-source` | — | — |
 
-## Q4. Does content relate to what the animal does next?
+### 3c. Whether content relates to what the animal does next
 
 | What it estimates | Run | Script | Claims |
 |---|---|---|---|
@@ -154,14 +180,16 @@ Every content model is conditional on the event: it asks which arm (or patch) an
 A decision-grain rebuild of the choice models is planned:
 [.claude/docs/plans/regression-integrity-fixes/phase-11-decision-models.md](../.claude/docs/plans/regression-integrity-fixes/phase-11-decision-models.md).
 
-## Q5. Does PFC respond to the events, SWR or not?
+## Part 4. Other brain areas: how they respond to the events, SWR against non-SWR
 
 | What it estimates | Script | Output, figure | Claims |
 |---|---|---|---|
 | Per-unit modulation by SWR and non-SWR non-local events (penalised GLM, held-out deviance) | `pfc/run_pfc_analysis_bandit.py` (GPU; about 14–17 h per card) | `Processed-Data/{epoch}_mPFC_modulation.pkl` | 20 |
 | Figure 4, drawn from those bundles | `figures/generate_figure04.py` | Figure 4 | 20 |
 
-## Supporting scripts (no question of their own)
+Only mPFC is fitted. The runner takes `--brain_area OFC`, but no OFC fits exist.
+
+## Supporting scripts (no part of their own)
 
 | Script | What it does |
 |---|---|
@@ -197,3 +225,16 @@ The 2026-10 refresh (its R6 and R7 stages) named runs by code:
 | C02 | `content.arm_ladder.leaf_arms` | C03 | `content.patch_ladder.all_events` |
 | C04, C05 | `content.arm_ladder.{swr_only,non_swr_only}` | C06, C07 | `content.patch_ladder.{swr_only,non_swr_only}` |
 | C08 | `content.arm_ladder.dirichlet_multinomial` | | |
+
+## Old question labels
+
+Until 2026-10-26 this page was grouped by question:
+
+| Old | Now |
+|---|---|
+| Q1 (are the events real) | Part 1 (the model, the held-out state evidence) and Part 2 (overlap with SWRs, spike support, the detector comparison) |
+| Q2 (rate) | Part 3a |
+| Q3a (what the events are like) | Part 2c; the ripple-power fit is in Part 3a |
+| Q3b (content) | Part 3b |
+| Q4 (next choice) | Part 3c |
+| Q5 (PFC) | Part 4 |

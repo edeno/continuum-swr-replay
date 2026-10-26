@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Rerun the CPU model fits and the figures that read them, in dependency order.
 
-Every run answers one of the paper's questions (``QUESTIONS``; the full map is
+Every run belongs to one part of the paper (``QUESTIONS``; the full map is
 ``docs/analysis_map.md``). A run's name says what it is:
-``<question>.<analysis>[.<variant>]``, for example ``rate.swr_contrast.at_well``.
+``<group>.<analysis>[.<variant>]``, for example ``rate.swr_contrast.at_well``.
 Each run is one command, the number of CPUs it gets and the runs it needs first.
 Selecting a run also selects every run that depends on it, so
 ``--only content.arm_ladder.all_arms`` redraws the figures that read the arm
@@ -51,7 +51,7 @@ command, its CPUs and environment, the commit, the data root, times and exit
 code) under ``--log-dir``; a run whose dependency failed gets a "blocked"
 record. Then ``check_fit_provenance.py`` checks every artifact the runs wrote.
 
-Not here: the prerequisites above, the Q1 checks, and the PFC unit GLM (Q5),
+Not here: the prerequisites above, the Part 1 and Part 2 checks, and the PFC unit GLM (Part 4),
 which runs on GPUs for 14-17 h per card under its own launcher; Figure 4 reads
 it and is drawn after it.
 
@@ -80,17 +80,18 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
-#: The questions this driver's runs answer; keys are the first part of a run's
-#: name. Q1 (are the events real) and Q5 (PFC) have no CPU fit here; of Q3a
-#: (what the events are like) only the SWR-coupling model is one. ``tables``
-#: answers none: it is the opt-in table rebuild every fit reads.
+#: The paper part each group of runs belongs to (docs/analysis_map.md); keys
+#: are the first part of a run's name. Every group is in Part 3 (behavior):
+#: Parts 1 and 2 (the model, the events) and Part 4 (other brain areas) have no
+#: CPU fit here. ``tables`` belongs to none: it is the opt-in table rebuild
+#: every fit reads.
 TABLES = "tables"
 QUESTIONS = {
     TABLES: "Tables (opt-in, --with-tables): the canonical tables the fits read.",
-    "rate": "Q2. How often do non-local events occur, and what drives the rate, for SWR against non-SWR events?",
-    "coupling": "Q3a. What are the events like: location, speed, extent, certainty, duration, SWR coupling?",
-    "content": "Q3b. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?",
-    "behavior": "Q4. Does content relate to what the animal does next?",
+    "rate": "Part 3a. How often do non-local events occur, and what drives the rate, for SWR against non-SWR events?",
+    "coupling": "Part 3a. How strongly do events couple to SWRs (ripple power), against the behavioral covariates?",
+    "content": "Part 3b. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?",
+    "behavior": "Part 3c. Does content relate to what the animal does next?",
 }
 
 
@@ -153,7 +154,7 @@ RUNS: tuple[Run, ...] = (
     _run("tables.timebin", "scripts/tables/build_timebin_tables.py", 1),
     _run(_TCS, f"{_CF} --event-source SWR", 1, [_QV]),
     _run(_TCM, f"{_CF} --event-source MUA", 1, [_QV]),
-    # Q2 rate. The per-bin conditional intensity (Family B) is the main model; the
+    # Part 3a rate. The per-bin conditional intensity (Family B) is the main model; the
     # per-stop Poisson (Family A) is the literature-comparable one.
     _run("rate.per_bin.at_well", f"{_PB} --stop-cohort at_well --workers 16", 16, _RTB),
     _run("rate.per_bin.all_stops", f"{_PB} --stop-cohort all_stops --workers 16", 16, _RTB),
@@ -172,7 +173,7 @@ RUNS: tuple[Run, ...] = (
     _fig("rate.fig.model_checking", "scripts/rate/plot_model_checking.py", ["rate.per_bin.at_well"]),
     _fig("rate.doc.per_bin_results", "scripts/rate/summarize_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
     _fig("rate.fig.uncertainty", "scripts/rate/plot_uncertainty_rate.py", ["rate.uncertainty.at_well"]),
-    # Q3b content. The arm ladder asks what shapes content; the SWR contrast asks how
+    # Part 3b content. The arm ladder asks what shapes content; the SWR contrast asks how
     # SWR content differs (paired within session); the breadth contrast is the
     # Dirichlet-multinomial fit of how widely an event spreads over arms.
     _run(_ARM, _CL, 2, _RT, threads=2),
@@ -201,13 +202,13 @@ RUNS: tuple[Run, ...] = (
     _run("content.event_source.swr_patch", f"{_CL} --event-source SWR --hierarchy patch --brain-area HPC", 2, _CFS, threads=2),
     _run("content.event_source.mua_arm", f"{_CL} --event-source MUA --brain-area HPC", 2, _CFM, threads=2),
     _run("content.event_source.mua_patch", f"{_CL} --event-source MUA --hierarchy patch --brain-area HPC", 2, _CFM, threads=2),
-    # Draws the Q2 rate contrast and the Q3b content contrast side by side.
+    # Draws the Part 3a rate contrast and the Part 3b content contrast side by side.
     _fig("content.fig.swr_contrast_coefs", "scripts/figures/plot_swr_contrast_coefs.py",
          ["rate.swr_contrast.at_well", "content.swr_contrast.all"]),
     _fig("content.fig.uncertainty", "scripts/figures/generate_uncertainty_content_figure.py", ["content.uncertainty"]),
     _fig("content.fig.ladder", "scripts/content/generate_replay_content_figures.py", [_ARM]),
     _fig("content.fig.pipeline_data_flow", "scripts/figures/generate_supp_pipeline_data_flow.py", [_ARM]),
-    # Q4 behaviour. One suite per event source: the choice prediction (claim 19d), plus
+    # Part 3c behaviour. One suite per event source: the choice prediction (claim 19d), plus
     # patch, per-stop rate, patch-switch and switch-aligned blocks on one common cohort.
     _run("behavior.event_source_suite.non_local", f"{_ES} --event-source non_local", 1, _RT),
     _run("behavior.event_source_suite.swr", f"{_ES} --event-source SWR", 1, _CFS),
@@ -248,7 +249,7 @@ def select(
     """The runs named (all when ``names`` is None), in list order.
 
     A name selects the run of that name and every run whose name extends it, so
-    ``content`` selects all of Q3b and ``content.swr_contrast`` its three strata.
+    ``content`` selects all of Part 3b and ``content.swr_contrast`` its three strata.
     With ``with_dependents``, every run that needs a selected run, directly or
     through another, is selected too.
 
