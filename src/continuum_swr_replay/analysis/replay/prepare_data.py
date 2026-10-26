@@ -823,9 +823,8 @@ def _assemble_canonical_tables(
     # merge below, kept out of build_stop_table (which is event-table-independent).
     stop_table_all = add_nonlocal_swr_split(stop_table_all, event_table_all)
     # Always materialize ``event_sequence_table`` — even when no
-    # session contributed any sequence rows. The retrospective pass (the
-    # retrospective-alignment step) does
-    # ``read_table(table_path("event_sequence_table", INPUT_DIR))``
+    # session contributed any sequence rows. Later readers (e.g.
+    # ``scripts/tables/write_regeneration_manifest.py``) read it
     # unconditionally, so a missing file would crash a posterior-
     # unavailable run with FileNotFoundError. The retrospective
     # helpers already treat an empty sequence frame as a legitimate
