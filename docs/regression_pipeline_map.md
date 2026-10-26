@@ -706,6 +706,12 @@ What the two detection-comparison reports share.
 
 `caption_with_pending`, `session_names`, `read_run`, `with_pending`, `ratio`, `pool_sessions`, `per_session`, `summed`
 
+### `scripts/detection/add_state_shares.py`
+
+Add each compared event's Local, No-Spike, non-local and uncertain shares to an event features run.
+
+`shares_path`, `epoch_state_shares`, `main`
+
 ### `scripts/detection/analyze_event_spike_evidence.py`
 
 Spike-evidence reality analysis for non-SWR non-local events.
