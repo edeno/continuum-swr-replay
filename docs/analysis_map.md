@@ -61,16 +61,17 @@ after a change to fitting code only, start at step 6.
 | What it tests | Script | Output, figure | Claims |
 |---|---|---|---|
 | Example events per overlap class; how many non-local events have no SWR; NL against SWR start and end offsets; Local-state decoding error | `figures/generate_figure02.py` | Figure 2 (a, b, d, e) | 1, 2, 22, 10 |
+| Non-local probability and SWR z-score around non-local event starts, by SWR overlap | `figures/generate_figure02.py` | Figure 2c | — |
 | SWR power at Local against Non-Local times | `figures/generate_figure03.py` | Figure 3b | 24 |
 | The decoder on simulated data | `figures/generate_figure01.py` | Figure 1 | — |
 | The 0.8 threshold, state fractions, calibration, and theta and MUA triggered averages (all in sample) | `figures/generate_supp_decoder_validation.py` | supplement | 10, 5 |
 | Decoding quality per session | `qa/run_quality_metrics.py`, after `qa/compute_hpc_raw_stats.py` | `paper/figures/quality_metrics/` | 10 |
 | Each event's spikes support its decoded location better than a matched baseline | `detection/analyze_event_spike_evidence.py` | `paper/figures/reality/` | 6, 7, 7b, 7c, 9 |
 | Held-out tetrodes support each decoder state (Local, No-Spike, Continuous, Fragmented) | `detection/run_state_evidence.py` | `Processed-Data/_refresh_<date>/state_evidence/` | 7, 9 |
-| The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 |
+| The sub-cases of SWR and non-local overlap (for Methods numbers) | `content/quantify_swr_overlap_geometry.py` | printed tables | 4 (its non-local side only; SWRs without non-local content are 23, which has no script) |
 | Four SWR detectors from shared inputs | `detection/run_swr_detection.py` | SWR inventories | — (the inputs to 23, 24) |
 | Carey's joint ripple-power and multiunit detector, a fifth SWR definition, on the same CA1 inputs (built and tested; it ran on all 242 epochs, run `fa6537e48bcf`) | `detection/run_carey_detection.py` | `Processed-Data/replay_detection_comparison/carey/` | — (an input to the detector comparison) |
-| A second sequence detector (Widloski & Foster) on the same decodes | `detection/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | 21, 22, 25 |
+| A second sequence detector (Widloski & Foster) on the same decodes | `detection/run_memoryless_detection.py` | `Processed-Data/replay_detection_comparison/memoryless/` | — (a comparator for 21, 22, 25) |
 | That detector on simulated replays of known shape, against an independent re-implementation of the reference code | `detection/sweep_memoryless_detection.py`, `detection/sweep_memoryless_controls.py`, `detection/sweep_memoryless_heldout.py`, `qa/compare_memoryless_to_reference.py` (with `qa/_memoryless_reference.py`), `figures/generate_memoryless_comparison.py` | `docs/design/replay_detection_comparison/*.csv`; supplement | — (validates the port) |
 | Nine inventories of each epoch (the five SWR definitions, MUA, the state-space detector, and the Widloski detector under two cohorts) on one substrate: overlap pairs, per-detector denominators, cells, the SWR label matrix. Built and tested; ran on all 242 analysed epochs (run `afeb897d850f`). Widloski columns pending the Phase 2 pilot checks | `detection/run_inventory_comparison.py` | `Processed-Data/replay_detection_comparison/inventory/` | — |
 | That comparison's counts per session and per animal | `detection/report_inventory_comparison.py` | `<inventory run>/report/`; `paper/figures/inventory_comparison/` | — |
@@ -104,15 +105,16 @@ There are two model families; see [rate_models.md](rate_models.md):
 | Rate per stop | `rate.per_stop.{at_well,all_stops}` | `rate/fit_per_stop_rate_models.py` | — | 19c |
 | How SWR and non-SWR rates differ, term by term, paired within session | `rate.swr_contrast.{at_well,all_stops}` | `rate/fit_swr_contrast_rate.py` | `content.fig.swr_contrast_coefs` | 19c, 19f |
 | Rate against arm uncertainty and value | `rate.uncertainty.at_well` | `rate/fit_uncertainty_rate.py` | `rate.fig.uncertainty` | — |
-| Whether one stream's history drives the other's rate | `rate.cross_history` | `rate/fit_cross_history_rate.py` | — (no result written yet) | — |
+| Whether one stream's history drives the other's rate | `rate.cross_history` | `rate/fit_cross_history_rate.py` | — (the fit is `models_per_bin_rate/cross_history_models.pkl`; no figure or write-up) | — |
 
 ## Q3a. What are the events like: location, speed, extent, certainty, duration, SWR coupling?
 
 | What it measures | Script | Figure | Claims |
 |---|---|---|---|
 | Replay speed by SWR status | `figures/generate_figure03.py` | Figure 3c | 15 |
-| Where content sits relative to the animal and to reward wells | `content/analyze_content_occupancy.py`; `figures/generate_figure03.py` | `paper/figures/content_occupancy/`; Figure 3d | 13, 14 |
-| Event duration by detector | `figures/generate_supp_decoder_validation.py` | supplement d | 18 |
+| Where content sits relative to the animal and to reward wells | `content/analyze_content_occupancy.py` | `paper/figures/content_occupancy/` | 13, 14 |
+| Replayed position along the track, by SWR status | `figures/generate_figure03.py` | Figure 3d | — |
+| Event duration of non-local, SWR and MUA events | `figures/generate_supp_decoder_validation.py` | supplement d | — (18, non-SWR against SWR, has no panel) |
 | SWR-coupling strength (ripple power as a continuous mark) against the behavioral covariates; run `coupling.ripple_power` | `coupling/fit_swr_power_model.py` | — | — |
 
 **No tracked script:**
