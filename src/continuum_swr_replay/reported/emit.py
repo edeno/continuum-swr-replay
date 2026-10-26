@@ -14,7 +14,8 @@ fails the LaTeX build rather than redefining anything.
 The text between them is replaced by the value printed in the marker's style
 (after ``|``) or the value's own. The prose around the markers stays
 hand-written. A marker naming a key no summary holds is an error, so a renamed
-value cannot leave a stale number behind.
+value cannot leave a stale number behind. Markers inside code (backticks or a
+fenced block) are examples and are left alone.
 """
 
 from __future__ import annotations
@@ -32,7 +33,20 @@ MARKER = re.compile(
     r"(?P<text>.*?)<!--/v-->",
     re.DOTALL,
 )
+_CODE = re.compile(r"```.*?```|`[^`\n]*`", re.DOTALL)
+"""Fenced code blocks and inline code spans: a marker shown in code is an
+example, not a value."""
 _PART_WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four"}
+
+
+def _outside_code(text: str, replace) -> str:
+    """``text`` with ``replace`` applied to every stretch outside code."""
+    pieces, last = [], 0
+    for code in _CODE.finditer(text):
+        pieces += [replace(text[last : code.start()]), code.group()]
+        last = code.end()
+    pieces.append(replace(text[last:]))
+    return "".join(pieces)
 
 
 def macro_name(part: int, key: str) -> str:
@@ -94,7 +108,7 @@ def fill_markers(
         style = f"|{match['style']}" if match["style"] else ""
         return f"<!--v:{key}{style}-->{new}<!--/v-->"
 
-    return MARKER.sub(replace, text), changes
+    return _outside_code(text, lambda part: MARKER.sub(replace, part)), changes
 
 
 def marked_docs(roots: Iterable[Path]) -> list[Path]:
@@ -103,7 +117,7 @@ def marked_docs(roots: Iterable[Path]) -> list[Path]:
         path
         for root in roots
         for path in root.rglob("*.md")
-        if MARKER.search(path.read_text())
+        if MARKER.search(_CODE.sub("", path.read_text()))
     )
 
 
