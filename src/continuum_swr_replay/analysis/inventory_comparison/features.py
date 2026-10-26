@@ -661,6 +661,74 @@ def ss_features(
     return pd.DataFrame(columns, index=intervals.index)
 
 
+STATE_SHARE_COLUMNS = (
+    "ss_frac_rows_local",
+    "ss_frac_rows_no_spike",
+    "ss_frac_rows_nonlocal",
+    "ss_frac_rows_uncertain",
+)
+"""The columns :func:`state_row_shares` returns, in order."""
+
+
+def state_row_shares(
+    posterior: PosteriorTraces, first: NDArray, n_rows: NDArray
+) -> pd.DataFrame:
+    """The share of each interval's rows in which one state is confident.
+
+    A row is Local, No-Spike or non-local when that state's probability is
+    above ``DEFAULT_NON_LOCAL_THRESHOLD`` (0.8), compared in float32 as
+    :func:`ss_features` compares the non-local sum; the non-local share is
+    therefore ``ss_frac_rows_nonlocal``. A row with no state above the
+    threshold is uncertain. The threshold is above one half, so no row is in
+    two states and the four shares of an interval sum to 1.
+
+    Parameters
+    ----------
+    posterior : PosteriorTraces
+        One epoch's posterior on the decode grid.
+    first, n_rows : NDArray of int, shape (n_intervals,)
+        Each interval's first grid row and its number of rows, as the
+        features table stores them (``first_row``, ``n_rows``).
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_intervals, 4)
+        :data:`STATE_SHARE_COLUMNS`, positionally indexed. NaN for an
+        interval with no row, and for one holding a row where a state
+        probability is NaN.
+    """
+    first = np.asarray(first, dtype=np.int64)
+    n_rows = np.asarray(n_rows, dtype=np.int64)
+    has_rows = n_rows > 0
+    threshold = np.float32(DEFAULT_NON_LOCAL_THRESHOLD)
+    local = posterior.local_prob.astype(np.float32) > threshold
+    no_spike = posterior.no_spike_prob.astype(np.float32) > threshold
+    non_local = posterior.nonlocal_prob > DEFAULT_NON_LOCAL_THRESHOLD
+    uncertain = ~(local | no_spike | non_local)
+    unknown = (
+        np.isnan(posterior.local_prob)
+        | np.isnan(posterior.no_spike_prob)
+        | np.isnan(posterior.nonlocal_prob)
+    )
+    known = has_rows.copy()
+    known[has_rows] = ~_over_rows(np.logical_or, unknown, first, n_rows)
+
+    def share(rows: NDArray[np.bool_]) -> NDArray[np.float64]:
+        count = np.zeros(first.shape, dtype=np.int64)
+        count[has_rows] = _over_rows(np.add, rows.astype(np.int64), first, n_rows)
+        return np.where(known, count / np.maximum(n_rows, 1), np.nan)
+
+    return pd.DataFrame(
+        dict(
+            zip(
+                STATE_SHARE_COLUMNS,
+                (share(local), share(no_spike), share(non_local), share(uncertain)),
+                strict=True,
+            )
+        )
+    )
+
+
 def ms_features(
     candidates: CandidateSequences,
     intervals: pd.DataFrame,

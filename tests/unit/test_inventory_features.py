@@ -28,8 +28,10 @@ from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.window_statis
 from continuum_swr_replay.analysis.inventory_comparison.evidence import animal_bins
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     DURATION_STRATA_S,
+    STATE_SHARE_COLUMNS,
     PosteriorTraces,
     RowTraces,
+    _grid_rows,
     _over_rows,
     duration_stratum,
     interval_features,
@@ -37,6 +39,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
     ms_features,
     neighbour_gaps,
     ss_features,
+    state_row_shares,
     stop_context,
 )
 from continuum_swr_replay.analysis.inventory_comparison.recount import (
@@ -634,6 +637,61 @@ def test_ss_features_of_an_interval_ending_on_the_last_sample_drop_that_row():
     alone = ss(intervals_of("kay", [[TIME[-1], TIME[-1]]]), row_posterior).iloc[0]
     assert pd.isna(alone["ss_local_prob_mean"])
     assert pd.isna(alone["ss_n_runs_nonlocal"])
+
+
+def test_state_row_shares_count_the_rows_of_each_confident_state():
+    # rows 100-109: 4 Local, 3 No-Spike, 2 non-local, 1 with no state above 0.8
+    local = np.full(TIME.size, 0.05)
+    no_spike = np.full(TIME.size, 0.05)
+    continuous = np.full(TIME.size, 0.85)
+    for rows, (lo, ns, nl) in (
+        (range(100, 104), (0.9, 0.05, 0.05)),
+        (range(104, 107), (0.05, 0.9, 0.05)),
+        (range(107, 109), (0.05, 0.05, 0.9)),
+        (range(109, 110), (0.4, 0.3, 0.3)),
+    ):
+        for row in rows:
+            local[row], no_spike[row], continuous[row] = lo, ns, nl
+    row_posterior = posterior(
+        **{
+            "Local_prob": local,
+            "No-Spike_prob": no_spike,
+            "Non-Local_Continuous_prob": continuous,
+            "Non-Local_Fragmented_prob": np.zeros(TIME.size),
+        }
+    )
+    shares = state_row_shares(row_posterior, np.array([100]), np.array([10])).iloc[0]
+    assert list(shares.index) == list(STATE_SHARE_COLUMNS)
+    np.testing.assert_allclose(shares.to_numpy(), [0.4, 0.3, 0.2, 0.1])
+
+
+def test_state_row_shares_sum_to_one_and_agree_with_ss_features():
+    rng = np.random.default_rng(11)
+    # peaked rows, so every state is sometimes above 0.8
+    states = rng.dirichlet(np.full(4, 0.2), size=TIME.size)
+    row_posterior = posterior(
+        **{name: states[:, k] for k, name in enumerate(STATE_COLUMNS)}
+    )
+    table = intervals_of("kay", [[TIME[a], TIME[a + 40]] for a in range(0, 900, 60)])
+    first, n_rows = _grid_rows(TIME, table)
+    shares = state_row_shares(row_posterior, first, n_rows)
+    np.testing.assert_allclose(shares.sum(axis=1), 1.0)
+    assert (shares[["ss_frac_rows_local", "ss_frac_rows_no_spike"]] > 0).any().all()
+    np.testing.assert_array_equal(
+        shares["ss_frac_rows_nonlocal"].to_numpy(),
+        ss(table, row_posterior)["ss_frac_rows_nonlocal"].to_numpy(),
+    )
+
+
+def test_state_row_shares_are_missing_with_no_row_or_a_nan_probability():
+    local = np.full(TIME.size, 0.9)
+    local[105] = np.nan
+    shares = state_row_shares(
+        posterior(Local_prob=local), np.array([100, 300, 400]), np.array([10, 10, 0])
+    )
+    assert shares.iloc[0].isna().all()
+    assert shares.iloc[1].notna().all()
+    assert shares.iloc[2].isna().all()
 
 
 def test_ss_features_refuse_a_bin_outside_the_distance_matrix():
