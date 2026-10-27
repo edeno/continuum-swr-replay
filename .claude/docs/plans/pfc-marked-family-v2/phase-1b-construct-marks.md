@@ -40,7 +40,7 @@ Why: correlated marks split and shrink each other under the joint fit (current-a
 
 - **Rare-level eligibility.** In `build_marked_family_ladder`, before standardizing, for every mark named in `spec.required_varying_nuisance_marks` (the binary modifiers) and every target that is binary (at most two distinct finite values), require at least `MIN_LEVEL_COUNT = 10` finite events at each level in each class; otherwise raise `ModelIneligibleError` naming the model, class, mark and the level count. Add `MIN_LEVEL_COUNT` next to `MIN_MARKED_EVENTS_PER_CLASS` in `marked_glm.py` and record it in the fit contract.
 
-- **`scripts/qa/measure_pfc_mark_context.py` and the family sidecar's `event_mark_geometry_by_class`** need no code change; the geometry diagnostic will show the new correlations. Add one QA assertion to phase 1c's audit instead (see that phase).
+- **`scripts/pfc/measure_pfc_mark_context.py` and the family sidecar's `event_mark_geometry_by_class`** need no code change; the geometry diagnostic will show the new correlations. Add one QA assertion to phase 1c's audit instead (see that phase).
 
 - **Docs.** Regenerate the model table in `docs/design/pfc_marked_model_family.md` ("Recommended models") from the new specs; add the distance mark to "Derived content marks"; replace the sentence on raw products with the centered-product rule and the reference-level consequence (the main effect is now the response at the modifier's class mean); state the rare-level rule next to the ten-event rule.
 
@@ -61,7 +61,7 @@ Why: correlated marks split and shrink each other under the joint fit (current-a
 | `test_binary_target_needs_ten_events_at_each_level` | same rule applied to a binary target (`rewarded_context`). |
 | `test_specs_carry_their_interaction_constituents` | every interaction model's `interactions` map names constituents that are in its adjustments; every core model's targets are in `MARK_DESCRIPTIONS`. |
 | `test_recommended_specs_share_compiled_widths_within_each_tier` (edited) | the new inventory: six compact / three wide / three interactions with the stated widths. |
-| `test_measure_pfc_mark_context_reports_the_distance_mark` | `scripts/qa/measure_pfc_mark_context.py` gains `content_distance_cm` alongside `arm_fraction` in its correlation table on the synthetic frame. |
+| `test_measure_pfc_mark_context_reports_the_distance_mark` | `scripts/pfc/measure_pfc_mark_context.py` gains `content_distance_cm` alongside `arm_fraction` in its correlation table on the synthetic frame. |
 
 ## Fixtures
 
