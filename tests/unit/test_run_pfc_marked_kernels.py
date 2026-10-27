@@ -91,6 +91,13 @@ def _make_context(*, n_units: int = 2) -> SimpleNamespace:
             "swr_interval_source": "kay",
             "swr_events_sha256": "swr",
         },
+        baseline=np.ones((4, 1)),
+        baseline_names=("rewarded_outcome",),
+        baseline_report={
+            "baseline_reference_well": 0,
+            "baseline_dropped_constant": [],
+            "n_bins_without_well": 0,
+        },
     )
 
 

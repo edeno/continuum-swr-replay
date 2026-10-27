@@ -994,6 +994,7 @@ def build_marked_family_ladder(
     *,
     classes: tuple[str, ...] = MARKED_EVENT_CLASSES,
     min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
+    baseline: NDArray | None = None,
 ) -> MarkedFamilyLadder:
     """Build one joint family design and every target-specific reduced design.
 
@@ -1018,6 +1019,10 @@ def build_marked_family_ladder(
         Event classes, in design-block order; each must be in ``events``.
     min_marked_events : int
         Fewest finite events a class may contribute to a marked kernel.
+    baseline : NDArray, shape (n_fit_bins, n_baseline), optional
+        Unpenalized per-stop baseline columns placed after the intercept of
+        the full and every reduced design
+        (:func:`~continuum_swr_replay.analysis.pfc.marked_glm.build_baseline_columns`).
 
     Returns
     -------
@@ -1074,6 +1079,7 @@ def build_marked_family_ladder(
         spline_basis,
         lags,
         (*base_blocks, *nuisance_blocks, *scientific_blocks),
+        baseline=baseline,
     )
     reduced = {
         (event_class, mark): _without_block(full, _block_name(event_class, mark))
@@ -1160,10 +1166,13 @@ def family_ridge_penalty(
     Returns
     -------
     NDArray, shape (n_columns,)
-        ``0`` for the intercept, ``1 / penalty_sigma**2`` for base columns and
+        ``0`` for the intercept and the ``design.n_baseline`` baseline columns,
+        ``1 / penalty_sigma**2`` for base columns and
         ``1 / mark_penalty_sigma**2`` for marked columns.
     """
-    penalty = make_ridge_penalty(design.matrix.shape[1], penalty_sigma)
+    penalty = make_ridge_penalty(
+        design.matrix.shape[1], penalty_sigma, n_unpenalized=1 + design.n_baseline
+    )
     if mark_penalty_sigma is None:
         return penalty
     if mark_penalty_sigma <= 0 or not np.isfinite(mark_penalty_sigma):

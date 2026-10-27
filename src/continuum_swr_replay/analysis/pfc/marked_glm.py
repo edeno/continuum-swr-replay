@@ -49,6 +49,14 @@ CONTENT_MARK_COLUMNS = {
 }
 EVENT_DURATION_MARK = "log_event_duration_s"
 
+#: The well whose indicator the per-stop baseline omits; the intercept carries
+#: it. A session without it falls back to its lowest kept well.
+BASELINE_REFERENCE_WELL = 0
+
+#: The per-stop baseline a marked design can carry: unpenalized well and
+#: reward-outcome columns, or none (the single-intercept designs).
+BASELINE_TERMS = ("well_and_reward_outcome", "none")
+
 # A within-class content slope estimated from a handful of events is a
 # descriptive curve through almost no data, and its label-randomization
 # reference has too few distinct permutations to be readable.  Classes below
@@ -143,33 +151,40 @@ class EventKernelBlock:
 class KernelDesign:
     """A fit-bin design and the exact columns occupied by each basis block.
 
-    Column 0 is the unpenalized intercept and is owned by no block. Every
-    remaining column belongs to exactly one block: the blocks tile columns
-    ``1 .. n_features`` contiguously in ``blocks`` order.
+    Column 0 is the unpenalized intercept and columns ``1 .. n_baseline`` are
+    the unpenalized per-stop baseline columns (:func:`build_baseline_columns`);
+    none of them is owned by a block. Every remaining column belongs to exactly
+    one block: the blocks tile columns ``1 + n_baseline .. n_features``
+    contiguously in ``blocks`` order.
 
     Attributes
     ----------
     matrix : NDArray, shape (n_fit_bins, n_features)
-        Intercept column followed by the blocks' basis columns.
+        Intercept column, baseline columns, then the blocks' basis columns.
     block_slices : dict[str, slice]
         Column span of each block, keyed and ordered by block name.
     blocks : tuple[EventKernelBlock, ...]
         The blocks, in column order.
+    n_baseline : int
+        Number of unpenalized baseline columns after the intercept.
     """
 
     matrix: NDArray
     block_slices: dict[str, slice]
     blocks: tuple[EventKernelBlock, ...]
+    n_baseline: int = 0
 
     def __post_init__(self) -> None:
-        """Refuse a design whose block spans do not tile its non-intercept columns."""
+        """Refuse a design whose block spans do not tile its non-free columns."""
         names = [block.name for block in self.blocks]
         if list(self.block_slices) != names:
             raise ValueError(
                 "block_slices must name the blocks in column order; got "
                 f"{list(self.block_slices)} for blocks {names}"
             )
-        next_column = 1
+        if self.n_baseline < 0:
+            raise ValueError("n_baseline cannot be negative")
+        next_column = 1 + self.n_baseline
         for name in names:
             span = self.block_slices[name]
             if span.step not in (None, 1):
@@ -183,7 +198,8 @@ class KernelDesign:
         if next_column != self.matrix.shape[1]:
             raise ValueError(
                 f"basis blocks end at column {next_column} but the design has "
-                f"{self.matrix.shape[1]} columns (column 0 is the intercept)"
+                f"{self.matrix.shape[1]} columns (column 0 is the intercept, "
+                f"columns 1..{self.n_baseline} the baseline)"
             )
 
 
@@ -305,6 +321,149 @@ class MarkedSessionContext:
     lags: NDArray
     cohort_info: dict[str, object]
     input_provenance: dict[str, object]
+    baseline: NDArray
+    baseline_names: tuple[str, ...]
+    baseline_report: dict[str, Any]
+
+
+def build_baseline_columns(
+    fit_mask: pd.Series,
+    cohort_stops: pd.DataFrame,
+    *,
+    reference_well: int = BASELINE_REFERENCE_WELL,
+    context_columns: tuple[str, ...] = (),
+) -> tuple[NDArray, tuple[str, ...], dict[str, Any]]:
+    """Per-stop, unpenalized baseline columns on the fitted bins.
+
+    Every fitted bin is mapped to the cohort stop that contains it. The columns
+    are an indicator per kept well other than the reference, then
+    ``rewarded_outcome`` (1 when the stop's outcome is known and rewarded) and
+    ``outcome_unknown`` (1 when ``is_rewarded_outcome`` is NaN), then, per
+    ``context_columns`` entry, the stop's value z-scored over the fitted bins
+    where it is defined (0 elsewhere) and a ``<column>_unknown`` indicator.
+    Each column is constant within a stop. A column that is constant over all
+    fitted bins is dropped (it would duplicate the intercept or be all zero)
+    and named in the report.
+
+    Parameters
+    ----------
+    fit_mask : pd.Series of bool, shape (n_time,)
+        Fitted-bin mask indexed by session time in seconds.
+    cohort_stops : pd.DataFrame, shape (n_stops, ...)
+        The session's cohort stops: ``stop_start``, ``stop_end`` (seconds, on
+        the fit mask's clock, closed), ``occupancy_well_id`` (0--5 or NaN),
+        ``is_rewarded_outcome`` (0/1/NaN) and every ``context_columns`` entry.
+    reference_well : int
+        Well whose indicator is omitted; when it has no fitted bin, the lowest
+        kept well is the reference instead.
+    context_columns : tuple of str
+        Stop-level context values to carry as baseline columns too.
+
+    Returns
+    -------
+    baseline : NDArray, shape (n_fit_bins, n_baseline)
+        The kept columns, in ``names`` order.
+    names : tuple of str
+        Column names, in design order.
+    report : dict
+        ``baseline_reference_well``, ``baseline_dropped_constant`` (names of
+        dropped columns), ``n_bins_without_well`` (fitted bins in a stop with
+        no ``occupancy_well_id``) and ``baseline_context_scales`` (per context
+        column, the mean and population SD over its defined fitted bins).
+
+    Raises
+    ------
+    KeyError
+        If ``cohort_stops`` lacks a required column.
+    ValueError
+        If a fitted bin lies outside every cohort stop.
+    """
+    required = {"stop_start", "stop_end", "occupancy_well_id", "is_rewarded_outcome"}
+    missing = sorted((required | set(context_columns)) - set(cohort_stops))
+    if missing:
+        raise KeyError(f"cohort stops are missing column(s) {missing}")
+    time = fit_mask.index.to_numpy(dtype=float)
+    rows = fit_mask.to_numpy(dtype=bool)
+    fitted_time = time[rows]
+    order = np.argsort(cohort_stops["stop_start"].to_numpy(dtype=float), kind="stable")
+
+    def stop_values(column: str) -> NDArray:
+        return pd.to_numeric(cohort_stops[column], errors="coerce").to_numpy(
+            dtype=float
+        )[order]
+
+    starts = stop_values("stop_start")
+    ends = stop_values("stop_end")
+    stop_of_bin = np.searchsorted(starts, fitted_time, side="right") - 1
+    clipped = np.clip(stop_of_bin, 0, None)
+    if len(fitted_time) and not len(starts):
+        raise ValueError(
+            f"{len(fitted_time)} fitted bins lie outside every cohort stop"
+        )
+    inside = (stop_of_bin >= 0) & (fitted_time <= ends[clipped])
+    if not inside.all():
+        raise ValueError(
+            f"{int((~inside).sum())} fitted bins lie outside every cohort stop"
+        )
+    well_of_bin = stop_values("occupancy_well_id")[clipped]
+    reward_of_bin = stop_values("is_rewarded_outcome")[clipped]
+    kept = sorted({int(well) for well in well_of_bin[np.isfinite(well_of_bin)]})
+    reference = (
+        reference_well
+        if reference_well in kept
+        else (kept[0] if kept else reference_well)
+    )
+    columns: list[NDArray] = []
+    names: list[str] = []
+    for well in kept:
+        if well == reference:
+            continue
+        columns.append((well_of_bin == well).astype(float))
+        names.append(f"well_{well}")
+    columns.append(np.where(np.isfinite(reward_of_bin), reward_of_bin, 0.0))
+    names.append("rewarded_outcome")
+    columns.append((~np.isfinite(reward_of_bin)).astype(float))
+    names.append("outcome_unknown")
+    context_scales: dict[str, dict[str, float]] = {}
+    for column in context_columns:
+        value_of_bin = stop_values(column)[clipped]
+        defined = np.isfinite(value_of_bin)
+        mean = float(value_of_bin[defined].mean()) if defined.any() else 0.0
+        std = float(value_of_bin[defined].std(ddof=0)) if defined.any() else 0.0
+        z = np.zeros(len(value_of_bin), dtype=float)
+        if std > 0:
+            z[defined] = (value_of_bin[defined] - mean) / std
+        columns.append(z)
+        names.append(column)
+        columns.append((~defined).astype(float))
+        names.append(f"{column}_unknown")
+        context_scales[column] = {"mean": mean, "std": std}
+    baseline = (
+        np.column_stack(columns)
+        if len(fitted_time)
+        else np.empty((0, len(columns)), dtype=float)
+    )
+    # A column all-zero or all-one on the fitted rows duplicates the intercept
+    # or carries nothing; it would only make the design rank-deficient.
+    constant = np.all(baseline == baseline[:1], axis=0)
+    keep = ~constant
+    report = {
+        "baseline_reference_well": int(reference),
+        "baseline_dropped_constant": [
+            name
+            for name, is_constant in zip(names, constant, strict=True)
+            if is_constant
+        ],
+        "n_bins_without_well": int((~np.isfinite(well_of_bin)).sum()),
+        "baseline_context_scales": context_scales,
+    }
+    return (
+        baseline[:, keep],
+        tuple(
+            name for name, kept_column in zip(names, keep, strict=True) if kept_column
+        ),
+        report,
+    )
 
 
 def prepare_marked_session_context(
@@ -315,6 +474,7 @@ def prepare_marked_session_context(
     sampling_frequency: float = 500.0,
     cohort_stops: pd.DataFrame,
     event_arm_table_path: str | Path | None = None,
+    baseline_terms: str = "well_and_reward_outcome",
 ) -> MarkedSessionContext:
     """Load and align one at-well session without running the legacy ladder.
 
@@ -343,11 +503,18 @@ def prepare_marked_session_context(
     event_arm_table_path : str or Path, optional
         Event-arm table holding the content marks. Defaults to the canonical
         one, ``table_path("event_arm_table")``, resolved at the call.
+    baseline_terms : {"well_and_reward_outcome", "none"}
+        Per-stop baseline columns to build (:func:`build_baseline_columns`);
+        ``"none"`` stores an empty ``(n_fit_bins, 0)`` baseline.
 
     Returns
     -------
     MarkedSessionContext
     """
+    if baseline_terms not in BASELINE_TERMS:
+        raise ValueError(
+            f"baseline_terms must be one of {BASELINE_TERMS}; got {baseline_terms!r}"
+        )
     # These imports open Spyglass/DataJoint resources at import time, so keep
     # them off the pure marked-design import path used by unit tests.
     from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
@@ -419,6 +586,15 @@ def prepare_marked_session_context(
         counts = np.empty((int(fit_mask.sum()), 0), dtype=float)
         logger.warning("No %s neurons found for this session", brain_area)
 
+    if baseline_terms == "none":
+        baseline = np.empty((int(fit_mask.sum()), 0), dtype=float)
+        baseline_names: tuple[str, ...] = ()
+        baseline_report: dict[str, Any] = {}
+    else:
+        baseline, baseline_names, baseline_report = build_baseline_columns(
+            fit_mask, cohort_stops
+        )
+
     return MarkedSessionContext(
         fit_mask=fit_mask,
         counts=counts,
@@ -437,6 +613,9 @@ def prepare_marked_session_context(
             "event_arm_table_path": str(arm_path),
             "event_arm_table_sha256": event_arm_sha256,
         },
+        baseline=baseline,
+        baseline_names=baseline_names,
+        baseline_report=baseline_report,
     )
 
 
@@ -917,8 +1096,10 @@ def build_kernel_design(
     spline_basis: NDArray,
     lags: NDArray,
     blocks: tuple[EventKernelBlock, ...],
+    *,
+    baseline: NDArray | None = None,
 ) -> KernelDesign:
-    """Build an intercept plus an ordered collection of event-basis blocks.
+    """Build an intercept, baseline columns and ordered event-basis blocks.
 
     Parameters
     ----------
@@ -932,11 +1113,15 @@ def build_kernel_design(
         Lag indices in samples, ascending by one sample.
     blocks : tuple[EventKernelBlock, ...]
         Blocks in column order; their names must be unique.
+    baseline : NDArray, shape (n_fit_bins, n_baseline), optional
+        Unpenalized per-stop baseline columns (:func:`build_baseline_columns`),
+        placed right after the intercept. ``None`` adds none.
 
     Returns
     -------
     KernelDesign
-        Design of shape ``(fit_mask.sum(), 1 + len(blocks) * n_basis)``.
+        Design of shape ``(fit_mask.sum(), 1 + n_baseline + len(blocks) *
+        n_basis)``.
     """
     if not isinstance(fit_mask, pd.Series):
         raise TypeError("fit_mask must be a pandas Series carrying the time index")
@@ -948,9 +1133,21 @@ def build_kernel_design(
     if len(names) != len(set(names)):
         raise ValueError("event-kernel block names must be unique")
 
-    columns = [np.ones((int(rows.sum()), 1), dtype=float)]
+    n_rows = int(rows.sum())
+    baseline_columns = (
+        np.empty((n_rows, 0), dtype=float)
+        if baseline is None
+        else np.asarray(baseline, dtype=float)
+    )
+    if baseline_columns.ndim != 2 or baseline_columns.shape[0] != n_rows:
+        raise ValueError(
+            f"baseline has shape {baseline_columns.shape}; expected "
+            f"({n_rows}, n_baseline), one row per fitted bin"
+        )
+    n_baseline = int(baseline_columns.shape[1])
+    columns = [np.ones((n_rows, 1), dtype=float), baseline_columns]
     block_slices: dict[str, slice] = {}
-    next_column = 1
+    next_column = 1 + n_baseline
     n_basis = np.asarray(spline_basis).shape[1]
     for block in blocks:
         if block.event_class not in events:
@@ -974,6 +1171,7 @@ def build_kernel_design(
         matrix=np.concatenate(columns, axis=1),
         block_slices=block_slices,
         blocks=blocks,
+        n_baseline=n_baseline,
     )
 
 
@@ -986,7 +1184,7 @@ def _without_block(design: KernelDesign, block_name: str) -> KernelDesign:
     keep[dropped] = False
     blocks = tuple(block for block in design.blocks if block.name != block_name)
     block_slices: dict[str, slice] = {}
-    next_column = 1
+    next_column = 1 + design.n_baseline
     for block in blocks:
         width = (
             design.block_slices[block.name].stop - design.block_slices[block.name].start
@@ -997,6 +1195,7 @@ def _without_block(design: KernelDesign, block_name: str) -> KernelDesign:
         matrix=np.ascontiguousarray(design.matrix[:, keep]),
         block_slices=block_slices,
         blocks=blocks,
+        n_baseline=design.n_baseline,
     )
 
 
@@ -1010,6 +1209,7 @@ def build_marked_model_ladder(
     nuisance_marks: tuple[str, ...] = (),
     classes: tuple[str, ...] = MARKED_EVENT_CLASSES,
     min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
+    baseline: NDArray | None = None,
 ) -> MarkedModelLadder:
     """Build one joint full model and a reduced model for each event class.
 
@@ -1039,6 +1239,9 @@ def build_marked_model_ladder(
         Event classes, in design-block order; must be unique.
     min_marked_events : int
         Fewest finite events a class may contribute to a marked kernel.
+    baseline : NDArray, shape (n_fit_bins, n_baseline), optional
+        Unpenalized per-stop baseline columns placed after the intercept of
+        every design (:func:`build_baseline_columns`).
 
     Returns
     -------
@@ -1092,7 +1295,9 @@ def build_marked_model_ladder(
         for event_class in classes
     )
     full_blocks = (*base_blocks, *nuisance_blocks, *scientific_blocks)
-    full = build_kernel_design(standardized, fit_mask, spline_basis, lags, full_blocks)
+    full = build_kernel_design(
+        standardized, fit_mask, spline_basis, lags, full_blocks, baseline=baseline
+    )
 
     reduced: dict[str, KernelDesign] = {}
     for event_class in classes:
@@ -1120,13 +1325,17 @@ def _score_designs(
     penalty_sigma: float,
     *,
     design_batch_size: int,
+    n_unpenalized: int = 1,
 ) -> BatchedHeldoutResults:
-    """Score equal-width designs under the marked model's common prior."""
+    """Score equal-width designs under the marked model's common prior.
+
+    The leading ``n_unpenalized`` columns (intercept and baseline) are free.
+    """
     width = np.asarray(designs).shape[-1]
     return score_poisson_designs_heldout(
         designs,
         response,
-        make_ridge_penalty(width, penalty_sigma),
+        make_ridge_penalty(width, penalty_sigma, n_unpenalized=n_unpenalized),
         design_batch_size=design_batch_size,
     )
 
@@ -1342,18 +1551,22 @@ def fit_marked_kernel_ladder(
     response = prepare_heldout_response(fit_counts, fold_array)
     scoring_started = time.perf_counter()
     classes = ladder.classes
+    # The intercept and every baseline column are free in each design.
+    n_unpenalized = 1 + ladder.full.n_baseline
     reduced_batch = np.stack([ladder.reduced[name].matrix for name in classes])
     reduced_score = _score_designs(
         reduced_batch,
         response,
         penalty_sigma,
         design_batch_size=design_batch_size,
+        n_unpenalized=n_unpenalized,
     )
     full_score = _score_designs(
         ladder.full.matrix[None, :, :],
         response,
         penalty_sigma,
         design_batch_size=design_batch_size,
+        n_unpenalized=n_unpenalized,
     )
     observed_scoring_seconds = time.perf_counter() - scoring_started
 
@@ -1417,7 +1630,9 @@ def fit_marked_kernel_ladder(
     fitted = fit_poisson_glms(
         ladder.full.matrix,
         fit_counts,
-        penalty=make_ridge_penalty(ladder.full.matrix.shape[1], penalty_sigma),
+        penalty=make_ridge_penalty(
+            ladder.full.matrix.shape[1], penalty_sigma, n_unpenalized=n_unpenalized
+        ),
         compute_covariance=False,
     )
     diagnostics["timing_seconds"]["full_data_fit"] = (
@@ -1489,6 +1704,7 @@ def fit_marked_kernel_ladder(
                 response,
                 penalty_sigma,
                 design_batch_size=design_batch_size,
+                n_unpenalized=n_unpenalized,
             )
             per_class_reference[start:stop] = (
                 reduced_score.total[class_index][None, :] - shuffled_score.total

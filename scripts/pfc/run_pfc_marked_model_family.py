@@ -102,7 +102,7 @@ from continuum_swr_replay.runs.batch import setup_logger
 OUTPUT_SUBDIR = "pfc_marked_model_family"
 ESTIMATOR = "joint_multimark_ridge_poisson_temporal_glm"
 INFERENCE = "descriptive_blocked_heldout_leave_one_mark_block_out"
-BUNDLE_CONTRACT_VERSION = 1
+BUNDLE_CONTRACT_VERSION = 2
 # ``prepare_marked_session_context`` fits over lags -125..125 samples with an
 # 11-function clamped cubic B-spline basis per kernel. Both are pinned into the
 # contract here because the contract is built before the session is prepared;
@@ -170,6 +170,7 @@ def build_fit_contract(
     min_marked_events: int,
     brain_area: str,
     input_hashes: Mapping[str, object],
+    baseline_terms: str = "well_and_reward_outcome",
 ) -> dict[str, object]:
     """Return every model, data, fold and execution fact that defines a bundle.
 
@@ -196,6 +197,8 @@ def build_fit_contract(
     input_hashes : Mapping of str to object
         SHA-256 digests of every input the fit reads, and the SWR source's
         name (``swr_interval_source``).
+    baseline_terms : {"well_and_reward_outcome", "none"}
+        The per-stop baseline columns every design carries.
 
     Returns
     -------
@@ -209,6 +212,7 @@ def build_fit_contract(
         "bundle_contract_version": BUNDLE_CONTRACT_VERSION,
         "model_name": spec.name,
         "model_tier": spec.tier,
+        "baseline_terms": baseline_terms,
         "model_question": spec.question,
         "scientific_marks": list(spec.scientific_marks),
         "nuisance_marks": list(spec.nuisance_marks),
@@ -455,6 +459,7 @@ def run_analysis(
     min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
     event_arm_table_path: Path | None = None,
     event_table_path: Path | None = None,
+    baseline_terms: str = "well_and_reward_outcome",
     gpu_record: Mapping[str, object] | None = None,
     failure_sink: list[tuple[str, str]] | None = None,
 ) -> bool:
@@ -500,6 +505,9 @@ def run_analysis(
     event_table_path : Path, optional
         Event table supplying the per-event marks; the canonical
         ``table_path("event_table")`` when None.
+    baseline_terms : {"well_and_reward_outcome", "none"}, optional
+        Per-stop baseline columns every design carries; ``"none"`` reproduces
+        the single-intercept designs.
     gpu_record : Mapping of str to object, optional
         The accelerator record from ``configure_jax_gpu``.
     failure_sink : list of tuple of str, optional
@@ -577,6 +585,7 @@ def run_analysis(
                 min_marked_events=min_marked_events,
                 brain_area=brain_area,
                 input_hashes=input_hashes,
+                baseline_terms=baseline_terms,
             )
             for name, spec in specs.items()
         }
@@ -606,6 +615,7 @@ def run_analysis(
             sampling_frequency=SAMPLING_FREQUENCY,
             cohort_stops=cohort_stops,
             event_arm_table_path=event_arm_table_path,
+            baseline_terms=baseline_terms,
         )
         marked_events, mark_hashes = load_session_recommended_event_marks(
             nwb_file_name,
@@ -649,6 +659,8 @@ def run_analysis(
                 for event_class in MARKED_EVENT_CLASSES
             },
             "session_preparation_seconds": preparation_seconds,
+            "baseline_column_names": list(context.baseline_names),
+            **context.baseline_report,
             "jax_backend": gpu_record["jax_backend"],
             "gpu_index": gpu_record["gpu_index"],
             "gpu_uuid": gpu_record["gpu_uuid"],
@@ -698,6 +710,7 @@ def run_analysis(
                     context.lags,
                     spec,
                     min_marked_events=min_marked_events,
+                    baseline=context.baseline,
                 )
                 design_seconds = time.perf_counter() - design_started
                 fit_started = time.perf_counter()
@@ -871,6 +884,14 @@ def get_command_line_arguments() -> Namespace:
     parser.add_argument(
         "--min-marked-events", type=int, default=MIN_MARKED_EVENTS_PER_CLASS
     )
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help=(
+            "Fit with one intercept per session and no per-stop well and "
+            "reward-outcome baseline columns (the contract-1 designs)."
+        ),
+    )
     args = parser.parse_args()
     if args.include_interactions:
         args.models = list(dict.fromkeys([*args.models, *INTERACTION_MODEL_NAMES]))
@@ -976,6 +997,7 @@ def main() -> None:
             min_marked_events=args.min_marked_events,
             event_arm_table_path=args.event_arm_table,
             event_table_path=args.event_table,
+            baseline_terms="none" if args.no_baseline else "well_and_reward_outcome",
             gpu_record=gpu_record,
             failure_sink=sink,
         )

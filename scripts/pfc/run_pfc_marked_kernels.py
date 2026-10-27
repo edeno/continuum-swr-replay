@@ -104,7 +104,7 @@ INFERENCE = "descriptive_blocked_heldout_association_with_label_shuffle_referenc
 MARK_SCALING = "within_session_within_replay_class_population_sd_ddof0"
 SHUFFLE_POLICY = "permute_scientific_mark_among_events_within_session_and_class"
 LABEL_SHUFFLE_TAIL_METHOD = EMPIRICAL_PVALUE_METHOD
-BUNDLE_CONTRACT_VERSION = 1
+BUNDLE_CONTRACT_VERSION = 2
 FIT_HALF_WINDOW_S = 0.25
 
 MARK_DESCRIPTIONS = {
@@ -184,6 +184,7 @@ def build_fit_contract(
     design_batch_size: int,
     brain_area: str,
     input_hashes: Mapping[str, object],
+    baseline_terms: str = "well_and_reward_outcome",
 ) -> dict[str, object]:
     """Return every fact that defines one marked-kernel fit.
 
@@ -216,6 +217,8 @@ def build_fit_contract(
         ``stop_table_sha256``, ``event_arm_table_sha256`` and
         ``swr_events_sha256``, and the SWR source's name
         (``swr_interval_source``).
+    baseline_terms : {"well_and_reward_outcome", "none"}
+        The per-stop baseline columns every design carries.
 
     Returns
     -------
@@ -229,6 +232,7 @@ def build_fit_contract(
         "bundle_contract_version": BUNDLE_CONTRACT_VERSION,
         "scientific_mark": scientific_mark,
         "nuisance_marks": list(nuisance_marks),
+        "baseline_terms": baseline_terms,
         "mark_scaling": MARK_SCALING,
         "shuffle_policy": SHUFFLE_POLICY,
         "label_shuffle_tail_method": LABEL_SHUFFLE_TAIL_METHOD,
@@ -409,6 +413,7 @@ def run_analysis(
     event_arm_table_path: Path,
     gpu_record: dict[str, object],
     failure_sink: list[tuple[str, str]] | None = None,
+    baseline_terms: str = "well_and_reward_outcome",
 ) -> bool:
     """Fit, audit, and save one session's complete marked-kernel bundle.
 
@@ -450,6 +455,9 @@ def run_analysis(
         Appended with ``(exception type name, first 120 characters of the
         message)`` when the session fails, so the batch can report why every
         failed session failed.
+    baseline_terms : {"well_and_reward_outcome", "none"}
+        Per-stop baseline columns every design carries; ``"none"`` reproduces
+        the single-intercept designs.
 
     Returns
     -------
@@ -492,6 +500,7 @@ def run_analysis(
             shuffle_seed=shuffle_seed,
             design_batch_size=design_batch_size,
             brain_area=brain_area,
+            baseline_terms=baseline_terms,
             input_hashes={
                 "stop_table_sha256": input_records["stop_table"]["sha256"],
                 "event_arm_table_sha256": input_provenance["event_arm_table_sha256"],
@@ -525,6 +534,7 @@ def run_analysis(
             sampling_frequency=SAMPLING_FREQUENCY,
             cohort_stops=cohort_stops,
             event_arm_table_path=event_arm_table_path,
+            baseline_terms=baseline_terms,
         )
         preparation_seconds = time.perf_counter() - preparation_started
         if cohort_report["stop_table_sha256"] != input_records["stop_table"]["sha256"]:
@@ -567,6 +577,7 @@ def run_analysis(
             context.lags,
             scientific_mark=scientific_mark,
             nuisance_marks=nuisance_marks,
+            baseline=context.baseline,
         )
         design_seconds = time.perf_counter() - design_started
         folds = assign_blocked_folds(
@@ -686,6 +697,8 @@ def run_analysis(
                         "fit_and_shuffle": fit_seconds,
                     },
                     "marked_diagnostics": fitted.diagnostics,
+                    "baseline_column_names": list(context.baseline_names),
+                    **context.baseline_report,
                     "cohort_report": cohort_report,
                     "cohort_info": context.cohort_info,
                     "nwb_file_name": nwb_file_name,
@@ -773,6 +786,14 @@ def get_command_line_arguments() -> Namespace:
     parser.add_argument(
         "--design-batch-size", type=int, default=DEFAULT_NULL_DESIGN_BATCH_SIZE
     )
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help=(
+            "Fit with one intercept per session and no per-stop well and "
+            "reward-outcome baseline columns (the contract-1 designs)."
+        ),
+    )
     args = parser.parse_args()
     if args.penalty_sigma <= 0 or not np.isfinite(args.penalty_sigma):
         parser.error("--penalty-sigma must be finite and positive")
@@ -851,6 +872,7 @@ def main() -> None:
             event_arm_table_path=args.event_arm_table,
             gpu_record=gpu_record,
             failure_sink=failure_sink,
+            baseline_terms="none" if args.no_baseline else "well_and_reward_outcome",
         )
         if not succeeded:
             kind, message = (

@@ -90,6 +90,13 @@ def _context(n_units: int = 2) -> SimpleNamespace:
             "swr_interval_source": "kay",
             "swr_events_sha256": "swr",
         },
+        baseline=np.column_stack([np.ones(6), np.r_[np.ones(3), np.zeros(3)]]),
+        baseline_names=("well_2", "rewarded_outcome"),
+        baseline_report={
+            "baseline_reference_well": 0,
+            "baseline_dropped_constant": ["outcome_unknown"],
+            "n_bins_without_well": 0,
+        },
     )
 
 
@@ -540,3 +547,33 @@ def test_interaction_models_are_appended_without_duplicates(monkeypatch):
 def test_a_prepared_window_off_the_pinned_contract_is_refused(spline_basis, lags):
     with pytest.raises(RuntimeError, match="pinned contract"):
         runner._check_prepared_window(spline_basis, lags)
+
+
+def test_runner_contract_records_baseline_names_and_version_two(
+    tmp_path, monkeypatch
+):
+    context = _context()
+    _install_mocks(monkeypatch, context)
+
+    assert _run(tmp_path)
+
+    artifact = _artifact(tmp_path)
+    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    assert record["bundle_contract_version"] == 2
+    assert record["baseline_terms"] == "well_and_reward_outcome"
+    assert record["baseline_column_names"] == ["well_2", "rewarded_outcome"]
+    assert record["baseline_reference_well"] == 0
+    assert record["baseline_dropped_constant"] == ["outcome_unknown"]
+    assert runner._bundle_is_current(
+        artifact, SPEC, overwrite=False, fit_contract=_contract()
+    )
+    # A contract-1 sidecar never matches, so the old corpus is refit, not skipped.
+    runner.fit_provenance_path(artifact).write_text(
+        json.dumps({**record, "bundle_contract_version": 1})
+    )
+    assert not runner._bundle_is_current(
+        artifact, SPEC, overwrite=False, fit_contract=_contract()
+    )
+    # Without the baseline the contract differs, so neither bundle stands in
+    # for the other.
+    assert _contract(baseline_terms="none") != _contract()
