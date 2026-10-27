@@ -529,7 +529,14 @@ def ml_comparator_values(ml_tree: Path, make: Callable[..., Value]) -> list[Valu
             "non-converged fits as a percent of model fits in the maximum-likelihood "
             f"tree ({nonconverged} of {fits}, {len(sidecars)} sessions)",
             "%",
-        )
+        ),
+        make(
+            "ml_sessions",
+            len(sidecars),
+            "count",
+            "count",
+            "sessions in the maximum-likelihood tree",
+        ),
     ]
 
 
