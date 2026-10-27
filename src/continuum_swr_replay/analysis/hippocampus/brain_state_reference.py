@@ -15,6 +15,8 @@ Bins in excluded time (``in_excluded_time``) are left out of both.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 import pandas as pd
 
@@ -31,7 +33,9 @@ EVENT_COLUMNS = ("non_local_event", "SWR_event", "MUA_event")
 """The frame's event labels; 0 is no event."""
 
 
-def brain_state_reference(dot: pd.DataFrame) -> dict[str, float]:
+def brain_state_reference(
+    dot: pd.DataFrame, signals: Mapping[str, str] = SIGNALS
+) -> dict[str, float]:
     """One epoch's signal levels during running and during quiet rest.
 
     Parameters
@@ -40,7 +44,10 @@ def brain_state_reference(dot: pd.DataFrame) -> dict[str, float]:
         A decode frame read through the SWR source
         (``analysed_time.with_swr_source``), with ``head_speed``,
         ``in_excluded_time``, :data:`EVENT_COLUMNS` and the columns of
-        :data:`SIGNALS`.
+        ``signals``.
+    signals : Mapping[str, str]
+        Each signal's word and its column in ``dot``; :data:`SIGNALS` by
+        default.
 
     Returns
     -------
@@ -61,7 +68,7 @@ def brain_state_reference(dot: pd.DataFrame) -> dict[str, float]:
     reference: dict[str, float] = {
         f"n_{name}_bins": int(mask.sum()) for name, mask in masks.items()
     }
-    for word, column in SIGNALS.items():
+    for word, column in signals.items():
         values = dot[column].to_numpy(dtype=np.float64)
         for name, mask in masks.items():
             chosen = values[mask]
