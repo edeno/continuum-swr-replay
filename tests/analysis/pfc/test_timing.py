@@ -99,3 +99,16 @@ def test_population_timing_with_no_units_is_nan():
     )
 
     assert np.isnan(result.peak_lag) and result.n_units == 0
+
+
+def test_rise_onset_measures_from_the_window_start():
+    # A curve sitting at 0.6 from the window start that rises to 1.2 at +50 ms:
+    # from zero the run reaches the edge; from the start level it begins near
+    # the half-way point of the rise.
+    rise = 0.6 + _bump(0.050, 0.020, 0.6)
+    from_zero = peak_and_onset(rise, LAG_TIME)
+    from_start = peak_and_onset(rise, LAG_TIME, baseline="window_start")
+
+    assert from_zero.onset_at_edge[0]
+    assert from_start.onset_lag[0] == pytest.approx(0.050 - 1.1774 * 0.020, abs=0.004)
+    assert from_start.peak_lag[0] == from_zero.peak_lag[0]

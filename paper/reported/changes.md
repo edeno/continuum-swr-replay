@@ -2014,3 +2014,26 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part3.horserace_recency_non_swr_animals` | … | 4 |
 | `paper/reported/overview.md` | `part3.horserace_condition_number_swr` | … | 3.36 |
 | `paper/reported/overview.md` | `part3.horserace_condition_number_non_swr` | … | 2.98 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_replay_enhanced` | ? | 92 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_swr_replay_enhanced` | ? | 82 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_swr_replay_enhanced` | ? | 100 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_non_swr_replay_enhanced` | ? | 84 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_non_swr_replay_enhanced` | ? | 68 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_non_swr_replay_enhanced` | ? | 92 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_enhanced` | ? | 104 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced` | ? | −22 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_replay_enhanced` | ? | −32 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_swr_replay_enhanced` | ? | −8 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced` | ? | −44 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced` | ? | −56 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced` | ? | −30 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced` | ? | −12 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_enhanced` | ? | −24 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_swr_enhanced` | ? | 2 |
+| `paper/reported/overview.md` | `part4.timing_calibration_onset_bias_ms_boxcar_enhanced` | ? | 4 |
+| `paper/reported/overview.md` | `part4.timing_calibration_onset_bias_ms_alpha_enhanced` | ? | 8 |
+| `paper/reported/overview.md` | `part4.timing_paired_units` | ? | 1,219 |
+| `paper/reported/overview.md` | `part4.timing_peak_lag_difference_median_ms` | ? | −14 |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_swr_replay_suppressed` | ? | 42 % |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed` | ? | 42 % |
+| `paper/reported/overview.md` | `part4.timing_matched_control_peak_before_onset_fraction` | ? | 50 % |

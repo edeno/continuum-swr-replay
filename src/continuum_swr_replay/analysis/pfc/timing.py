@@ -10,13 +10,13 @@ The shipped curves are ridge-penalised B-spline kernels on the report window
   while the curve keeps the peak's sign and at least ``fraction`` of its size;
   the onset is the earliest lag reached. A run that reaches the first lag of
   the window is flagged (``onset_at_edge``): its true onset is at or before
-  the window edge.
+  the window edge. With ``baseline="window_start"`` the threshold is half way
+  from the curve's value at the first lag to the peak instead of half way from
+  zero (a rise onset), for curves that sit away from zero across the window.
 
-A smooth kernel spreads a response that starts at a given lag into earlier
-lags, so an onset read this way is earlier than the response's true start by
-an amount that depends on the basis and the prior.
-``scripts/pfc/calibrate_pfc_kernel_timing.py`` measures that amount on
-simulated responses; read onsets beside it.
+A smooth kernel moves a response's apparent start by an amount that depends
+on the basis and the prior; ``scripts/pfc/calibrate_pfc_kernel_timing.py``
+measures it on simulated responses of known onset. Read onsets beside it.
 
 The population curve is the mean over units of each curve multiplied by the
 sign of its own peak (so a suppression counts as a response of the same
@@ -58,7 +58,11 @@ class PeakOnset(NamedTuple):
 
 
 def peak_and_onset(
-    curves: NDArray, lag_time: NDArray, *, fraction: float = 0.5
+    curves: NDArray,
+    lag_time: NDArray,
+    *,
+    fraction: float = 0.5,
+    baseline: str = "zero",
 ) -> PeakOnset:
     """Peak and half-maximum onset of each curve.
 
@@ -71,6 +75,12 @@ def peak_and_onset(
         Lag of each row, in seconds, ascending.
     fraction : float
         Share of the peak's size the curve must keep to belong to the run.
+    baseline : {"zero", "window_start"}
+        Where the size is measured from: zero (the half-maximum onset), or
+        the curve's value at the first lag (the rise onset). With
+        ``"window_start"`` a lag belongs to the run when the curve, signed by
+        the peak, is at least ``fraction`` of the way from its first-lag value
+        to the peak.
 
     Returns
     -------
@@ -78,6 +88,8 @@ def peak_and_onset(
     """
     if not 0.0 < fraction <= 1.0:
         raise ValueError(f"fraction must be in (0, 1], got {fraction}")
+    if baseline not in ("zero", "window_start"):
+        raise ValueError(f"baseline must be 'zero' or 'window_start', got {baseline!r}")
     lag_time = np.asarray(lag_time, dtype=float)
     values = np.asarray(curves, dtype=float)
     if values.ndim == 1:
@@ -93,9 +105,14 @@ def peak_and_onset(
     peak = filled[np.arange(n_units), at]
     usable = np.isfinite(by_unit).all(axis=1) & (peak != 0)
 
-    above = (np.sign(filled) == np.sign(peak)[:, None]) & (
-        np.abs(filled) >= fraction * np.abs(peak)[:, None]
-    )
+    if baseline == "zero":
+        above = (np.sign(filled) == np.sign(peak)[:, None]) & (
+            np.abs(filled) >= fraction * np.abs(peak)[:, None]
+        )
+    else:
+        aligned = filled * np.sign(peak)[:, None]
+        start = aligned[:, :1]
+        above = aligned >= start + fraction * (np.abs(peak)[:, None] - start)
     lag_index = np.arange(n_lags)
     breaks = ~above & (lag_index[None, :] < at[:, None])
     last_break = np.where(breaks, lag_index[None, :], -1).max(axis=1)
@@ -164,6 +181,7 @@ def population_timing(
     n_boot: int = 1_000,
     seed: int = 0,
     fraction: float = 0.5,
+    baseline: str = "zero",
 ) -> PopulationTiming:
     """Timing of the sign-aligned population curve, resampling sessions.
 
@@ -184,8 +202,8 @@ def population_timing(
         Session resamples.
     seed : int
         Seed of the resampling.
-    fraction : float
-        Onset threshold, as in :func:`peak_and_onset`.
+    fraction, baseline
+        Onset rule, as in :func:`peak_and_onset`.
 
     Returns
     -------
@@ -205,14 +223,14 @@ def population_timing(
     np.add.at(sums, group_index, aligned.T)
     sizes = np.bincount(group_index, minlength=n_groups).astype(float)
     curve = sums.sum(axis=0) / sizes.sum()
-    observed = peak_and_onset(curve, lag_time, fraction=fraction)
+    observed = peak_and_onset(curve, lag_time, fraction=fraction, baseline=baseline)
 
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, n_groups, size=(n_boot, n_groups))
     weights = np.zeros((n_boot, n_groups))
     np.add.at(weights, (np.arange(n_boot)[:, None], draws), 1.0)
     boot_curves = (weights @ sums) / (weights @ sizes)[:, None]
-    boot = peak_and_onset(boot_curves.T, lag_time, fraction=fraction)
+    boot = peak_and_onset(boot_curves.T, lag_time, fraction=fraction, baseline=baseline)
 
     def interval(values: NDArray) -> tuple[float, float]:
         low, high = np.nanpercentile(values, [2.5, 97.5])

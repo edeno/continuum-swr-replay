@@ -90,6 +90,11 @@ def test_timing_values_keys_kinds_and_directions(population_and_curves):
             high = values[f"timing_population_onset_ms_ci_high_{stem}"].value
             assert low <= values[f"timing_population_onset_ms_{stem}"].value <= high
             assert values[f"timing_population_onset_animals_{stem}"].value == 2
+            # The bumps start near zero, so the rise onset is the half-max onset.
+            assert values[f"timing_population_rise_onset_ms_{stem}"].value == (
+                pytest.approx(values[f"timing_population_onset_ms_{stem}"].value, abs=4)
+            )
+            assert values[f"timing_peak_at_edge_fraction_{stem}"].value == 0.0
     assert values["timing_peak_lag_difference_median_ms"].value == pytest.approx(
         20, abs=2
     )

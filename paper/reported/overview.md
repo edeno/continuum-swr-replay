@@ -262,5 +262,25 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 - The share of peaks that are decreases is about the same for events (<!--v:part4.effect_suppressed_fraction_non_swr_replay-->63 %<!--/v-->) and for the
   control windows (<!--v:part4.effect_suppressed_fraction_matched_control-->61 %<!--/v-->), so the peak measure does not show whether replay mostly
   suppresses or excites.
+- **When?** Over the units called for each class whose peak is an increase, the mean curve peaks
+  <!--v:part4.timing_population_peak_ms_swr_replay_enhanced-->92<!--/v--> ms after onset for SWR-coupled replay
+  (<!--v:part4.timing_population_peak_ms_ci_low_swr_replay_enhanced-->82<!--/v-->–<!--v:part4.timing_population_peak_ms_ci_high_swr_replay_enhanced-->100<!--/v-->, session resamples),
+  <!--v:part4.timing_population_peak_ms_non_swr_replay_enhanced-->84<!--/v--> ms for non-SWR replay
+  (<!--v:part4.timing_population_peak_ms_ci_low_non_swr_replay_enhanced-->68<!--/v-->–<!--v:part4.timing_population_peak_ms_ci_high_non_swr_replay_enhanced-->92<!--/v-->) and
+  <!--v:part4.timing_population_peak_ms_swr_enhanced-->104<!--/v--> ms for all SWRs. It is half way up from its pre-event level
+  <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced-->−22<!--/v--> ms from onset for SWR-coupled replay
+  (<!--v:part4.timing_population_rise_onset_ms_ci_low_swr_replay_enhanced-->−32<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_swr_replay_enhanced-->−8<!--/v-->),
+  <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced-->−44<!--/v--> ms for non-SWR replay
+  (<!--v:part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced-->−56<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced-->−30<!--/v-->) and
+  <!--v:part4.timing_population_rise_onset_ms_swr_enhanced-->−12<!--/v--> ms for all SWRs
+  (<!--v:part4.timing_population_rise_onset_ms_ci_low_swr_enhanced-->−24<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_swr_enhanced-->2<!--/v-->).
+  In simulation the estimator moves the onset of a response that starts exactly at onset by
+  <!--v:part4.timing_calibration_onset_bias_ms_boxcar_enhanced-->4<!--/v--> to <!--v:part4.timing_calibration_onset_bias_ms_alpha_enhanced-->8<!--/v--> ms (later, for an increase).
+  In the <!--v:part4.timing_paired_units-->1,219<!--/v--> units called for both replay classes with peaks of one sign, the non-SWR peak
+  minus the SWR-coupled peak has median <!--v:part4.timing_peak_lag_difference_median_ms-->−14<!--/v--> ms. Units whose peak is a decrease
+  sit at <!--v:part4.timing_population_pre_event_level_fraction_swr_replay_suppressed-->42 %<!--/v--> (SWR-coupled) and
+  <!--v:part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed-->42 %<!--/v--> (non-SWR) of their peak already at −200 ms, so their
+  timing is not read here. Single-unit timing is noisy: <!--v:part4.timing_matched_control_peak_before_onset_fraction-->50 %<!--/v--> of the
+  matched-control curves peak before onset.
 - *Reading:* a sizeable minority of mPFC units respond to non-SWR replay beyond matched rest. These are unit-level,
   uncorrected fractions; the population-level SWR against non-SWR test is still to do, and only mPFC is fitted.

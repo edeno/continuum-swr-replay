@@ -43,6 +43,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
 )
+from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_timing,
@@ -1192,6 +1193,28 @@ def timing_values(
                 f"share of {who} whose half-maximum run reaches the window edge "
                 "(-200 ms), so their onset is at or before it",
             )
+            add(
+                f"timing_peak_at_edge_fraction_{stem}",
+                float((np.abs(peak_ms) >= REPORT_HALF_WINDOW_S * ms - 1e-6).mean()),
+                "fraction",
+                "pct",
+                f"share of {who} whose peak lies at the edge of the +/-200 ms window",
+            )
+            rise_ms = (
+                peak_and_onset(
+                    curves[curve_key][:, chosen], lag_time, baseline="window_start"
+                ).onset_lag
+                * ms
+            )
+            add(
+                f"timing_rise_onset_median_ms_{stem}",
+                np.nanmedian(rise_ms),
+                "quantity",
+                "int",
+                f"median rise onset of {who}: the onset rule measured from the curve's "
+                "value at -200 ms instead of from zero",
+                "ms",
+            )
             population_curve = population_timing(
                 curves[curve_key][:, chosen],
                 timing.peak[chosen],
@@ -1199,6 +1222,55 @@ def timing_values(
                 lag_time,
                 n_boot=TIMING_BOOTSTRAP_DRAWS,
                 seed=TIMING_BOOTSTRAP_SEED,
+            )
+            population_rise = population_timing(
+                curves[curve_key][:, chosen],
+                timing.peak[chosen],
+                sessions[chosen],
+                lag_time,
+                n_boot=TIMING_BOOTSTRAP_DRAWS,
+                seed=TIMING_BOOTSTRAP_SEED,
+                baseline="window_start",
+            )
+            add(
+                f"timing_population_pre_event_level_fraction_{stem}",
+                float(
+                    np.clip(
+                        population_curve.curve[0] / np.max(population_curve.curve),
+                        0.0,
+                        1.0,
+                    )
+                ),
+                "fraction",
+                "pct",
+                f"value at -200 ms of the sign-aligned mean curve of {who}, as a share "
+                "of its peak: how far the curve sits from zero before the event",
+            )
+            add(
+                f"timing_population_rise_onset_ms_{stem}",
+                population_rise.onset_lag * ms,
+                "quantity",
+                "int",
+                f"rise onset of the sign-aligned mean curve of {who}: half way from its "
+                "value at -200 ms to its peak",
+                "ms",
+            )
+            add(
+                f"timing_population_rise_onset_ms_ci_low_{stem}",
+                population_rise.onset_lag_interval[0] * ms,
+                "quantity",
+                "int",
+                f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} session "
+                f"resamples (seed {TIMING_BOOTSTRAP_SEED})",
+                "ms",
+            )
+            add(
+                f"timing_population_rise_onset_ms_ci_high_{stem}",
+                population_rise.onset_lag_interval[1] * ms,
+                "quantity",
+                "int",
+                "97.5th percentile of that over the same resamples",
+                "ms",
             )
             for what, point, (ci_low, ci_high) in (
                 ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
