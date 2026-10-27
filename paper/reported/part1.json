@@ -3,7 +3,7 @@
  "part": 1,
  "title": "the model",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "2b879e2d17c8",
+ "commit": "6e13b49e103e",
  "inputs": [
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
