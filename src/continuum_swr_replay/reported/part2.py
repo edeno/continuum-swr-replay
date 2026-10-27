@@ -725,6 +725,20 @@ _PROPERTIES = (
 )
 
 
+_PROPERTY_NAMES = {
+    "duration": "event duration",
+    "extent": "spatial extent of the decoded content",
+    "speed": "replay speed (median over the event)",
+    "peak": "posterior peak (mean over the event)",
+    "hpd": "highest-density-region coverage",
+    "pause": "pause fraction",
+    "max_step": "largest step of the decoded position",
+    "reversals": "number of direction reversals",
+    "multimodal": "multimodal fraction of the posterior",
+}
+"""How each property's values describe it."""
+
+
 def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Claims 15–18 and 16b: per-event properties, non-SWR against SWR.
 
@@ -742,7 +756,7 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
             pd.Series.lt if direction == "lower" else pd.Series.gt
         )
         in_direction = compare(by_animal[False], by_animal[True]).sum()
-        name = column.replace("_", " ")
+        name = _PROPERTY_NAMES[word]
         values += [
             make(
                 f"{word}_median_non_swr",

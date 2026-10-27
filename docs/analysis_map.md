@@ -107,15 +107,10 @@ after a change to fitting code only, start at step 6.
 | Replayed position along the track, by SWR status | `figures/generate_figure03.py` | Figure 3d | — |
 | Event duration of non-local, SWR and MUA events | `figures/generate_supp_decoder_validation.py` | supplement d | — (18, non-SWR against SWR, has no panel) |
 
-**No tracked script:**
-- 16 (extent);
-- 16b (stationarity);
-- 17 (certainty);
-- the duration-controlled contrasts behind 15 and 18.
-
-The per-event trajectory columns they need (`pause_fraction` and others) are built in
-`src/continuum_swr_replay/analysis/replay/trajectory.py`. The event features run (2d) also has extent, HPD and
-distance per event, by duration stratum, but nothing cites it for these claims yet.
+Claims 15–18 and 16b (speed, extent, stillness, certainty, duration) are plain medians by SWR status, with the
+animals in the claimed direction, from the event table's per-event columns (built in
+`src/continuum_swr_replay/analysis/replay/trajectory.py`): `reported/summarize_part.py --part 2`. They are not
+duration-controlled; no tracked analysis does that.
 
 ### 2d. Against the other detectors
 
