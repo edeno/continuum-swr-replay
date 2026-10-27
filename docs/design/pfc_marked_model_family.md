@@ -167,9 +167,12 @@ Ripple power is not matched between classes: the models measure how the
 response scales with it in each class (`ripple_power`) and overall
 (`ripple_power_pooled`: each event's mark is standardized within its class,
 then every class's events feed one marked block, the sum of the per-class
-blocks; each class keeps its own base kernel and duration block). A session
-with fewer than ten SWRs without replay makes the two ripple-power models
-ineligible there.
+blocks; each class keeps its own base kernel and duration block). A class a
+session cannot carry for a model -- fewer than ten finite events of a mark
+(for example fewer than ten SWRs without replay), a constant target, or a
+two-level mark with fewer than ten events at a level -- is dropped from that
+model in that session and named in the sidecar (`dropped_event_classes`); the
+model is ineligible only when no class is left.
 
 `trips_to_patch_switch` (`marked_model_family.stop_patch_switch_marks`) is a
 forward mark of the stop. The session's completed trials are rebuilt from the
@@ -199,18 +202,47 @@ With `--slope-permutations R` (30 by default for the follow-up set) each
 slope kernel gets a shuffled-mark reference: R full-data refits (no held-out
 scoring, the observed fit's prior) in which only that target block is rebuilt
 from the target shuffled within its class, every other block -- the other
-classes' included -- keeping its observed values. An event-level mark is
-permuted among the events where it is defined. A stop-level mark
-(`rewarded_context`, `trips_to_patch_switch`, `next_trip_switches_patch`) is
-permuted among stops: each stop's value moves to another stop and all its
-events take it, so the reference keeps the within-stop dependence (a stop
-whose events disagree on the value -- the latest known outcome can change
-inside a stop -- is split into one unit per value). A pooled block is
-permuted within each class. The summary aggregates the observed and every
-shuffled population curve the same way (unit -> session -> animal) and calls
-the observed peak inside or outside the 95 % band over draws, overall and per
-animal. The band is a reference for the population curve, not a per-unit
-test.
+classes' included -- keeping its observed values. The reference is drawn only
+after the observed fit passes the runner's convergence gate.
+
+The shuffle is residualized (`slope_permutation_method =
+residualized_within_class`): within the class the target is regressed, with an
+intercept, on the model's other marks (adjustments and other targets), and only
+the residuals are permuted; each draw is fitted plus permuted residual,
+re-standardized within the class as the observed mark is. Permuting the raw
+target would decorrelate it from those marks and make the reference too
+narrow by about `sqrt(1 - R^2)` (simulated at r = 0.75: estimator SD 0.0100,
+residualized reference 0.0103, raw 0.0071). The target's R² on the other marks
+is recorded per class. An event-level mark's residuals are permuted among the
+events where it is defined. A stop-level mark (`rewarded_context`,
+`trips_to_patch_switch`, `next_trip_switches_patch`) is regressed and permuted
+at the stop level (a stop's other marks averaged over its events): each
+stop's value moves to another stop and all its events take it, so the
+reference keeps the within-stop dependence (a stop whose events disagree on
+the value -- the latest known outcome can change inside a stop -- is split
+into one unit per value). A pooled block is shuffled within each class. Each
+model's draws use their own seed (session, model name and optional base
+seed), so different models' references are independent.
+
+The draws of a block are fit together in device batches
+(`batched_glm.fit_poisson_column_variants`: the design stays on the device and
+only the replaced columns cross per batch), each warm-started from the
+observed fit's coefficients. The penalised objective is strictly concave, so
+the warm start moves the iterations, not the answer: against one draw at a
+time, cold, the curves agree to 1.5e-8.
+
+The summary aggregates the observed and every shuffled population curve the
+same way (unit -> session -> animal, as every population quantity in the
+summary is). The call to quote is the max statistic: the observed largest
+`|curve|` over the ±200 ms window against the 95th percentile of each draw's
+largest `|curve|`, with the plus-one p `(1 + #draws >= observed) / (R + 1)`.
+The per-lag 95 % band at the observed peak lag (overall and per animal) is
+descriptive, since the peak lag is selected as the most extreme. In
+simulation the stop-shuffled reference of `rewarded_context` was well
+calibrated with no stationary offset between stops (z RMS about 0.8 over 24
+fits) and somewhat narrow when the baseline absorbed a ×1.5 offset (about 1.2
+over 16 fits, one |z| of 3.0). The reference describes the population curve;
+it is not a per-unit test.
 
 ## Missing values and denominators
 

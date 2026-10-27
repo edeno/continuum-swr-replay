@@ -369,8 +369,11 @@ them importable.
   with `--tier {joint,marginal,all}` for their generated single-target marginal
   tier, `--event-set with_swr_without_replay` to add the SWRs without replay to
   the ripple-power models, and `--slope-permutations` (default 30 for the
-  follow-up set, 0 otherwise) with `--slope-permutation-seed` for the
-  shuffled-mark reference of every slope kernel. The follow-up set requires an
+  follow-up set, 0 otherwise) with `--slope-permutation-seed` (a base; each
+  model's seed also depends on its name) for the residualized shuffled-mark
+  reference of every slope kernel, drawn after the observed fit passes its
+  convergence gate. A class a session cannot carry for a model is dropped from
+  that model and named in the sidecar. The follow-up set requires an
   explicit `--output-dir` (use `Processed-Data/pfc_response_followups/marked_family`).
   Recommended-set output goes to `pfc_marked_model_family/` under the
   processed-data root; the bundles there are the 71-session corpus of
@@ -379,10 +382,11 @@ them importable.
   rerun under contract 2 removes them as stale, so do not point a run there.
 - `summarize_pfc_marked_family.py` aggregates those bundles unit → session →
   animal (fraction of units with a positive held-out gain, population mean
-  slope kernels with pre- and post-onset means, the shuffled-mark 95 % band
-  and an inside/outside call when the bundles carry nulls, each joint target
-  beside its marginal fit, one figure per model); no p-values. It refuses a
-  directory that mixes bundle contracts or event sets. `--bundle-dir`,
+  slope kernels with pre- and post-onset means, all animal-balanced; when the
+  bundles carry nulls, the max-statistic call against the shuffled-mark
+  reference with its plus-one p, and the per-lag 95 % band, each joint target
+  beside its marginal fit, one figure per model); no per-unit p-values. It
+  refuses a directory that mixes bundle contracts, event sets or model sets. `--bundle-dir`,
   `--out <markdown>`, `--figure-dir`, `--blowup` (default 1000),
   `--summary-parquet` (default `<bundle-dir>/summary.parquet`, one row per
   model, tier, class, target and statistic).
