@@ -31,12 +31,14 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     LOG_SPATIAL_EXTENT,
     LOG_STOP_TIME,
     MARK_DESCRIPTIONS,
+    NEXT_TRIP_SWITCHES_PATCH,
     PREVIOUS_ARM_FRACTION,
     RECOMMENDED_MODEL_SPECS,
     RETROSPECTIVE_BIAS,
     REWARDED_CONTEXT,
     RIPPLE_POWER,
     SWITCH_CONTEXT,
+    TRIPS_TO_PATCH_SWITCH,
     UNCERTAINTY_X_REWARD,
     UNCERTAINTY_X_RIPPLE,
     UNCERTAINTY_X_SWITCH,
@@ -47,6 +49,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     build_marked_family_ladder,
     build_recommended_event_mark_table,
     fit_marked_family_ladder,
+    stop_patch_switch_marks,
 )
 
 SAMPLING_FREQUENCY = 500.0
@@ -801,3 +804,81 @@ def test_family_ridge_penalty_gives_marked_blocks_their_own_prior():
         np.testing.assert_allclose(split[design.block_slices[block.name]], expected)
     with pytest.raises(ValueError, match="mark_penalty_sigma"):
         family_ridge_penalty(design, 3.0, 0.0)
+
+
+def _stop_sequence(arms) -> pd.DataFrame:
+    """One stop per completed trial; trial ``i`` ends at ``arms[i]``."""
+    arms = np.asarray(arms, dtype=float)
+    return pd.DataFrame(
+        {
+            "stop_idx": np.arange(len(arms)) + 100,
+            "completed_trial_id": pd.array(np.arange(len(arms)), dtype="Int64"),
+            "completed_trial_arm": arms,
+            "next_arm": np.r_[arms[1:], np.nan],
+        }
+    )
+
+
+def test_trips_to_patch_switch_counts_forward():
+    # wells 0, 1, 0, 2, 3, 4 sit in patches 1, 1, 1, 2, 2, 3
+    marks = stop_patch_switch_marks(_stop_sequence([0, 1, 0, 2, 3, 4]))
+
+    np.testing.assert_array_equal(
+        marks[TRIPS_TO_PATCH_SWITCH].to_numpy(), [2, 1, 0, 1, 0, np.nan]
+    )
+    np.testing.assert_array_equal(
+        marks[NEXT_TRIP_SWITCHES_PATCH].to_numpy(), [0, 0, 1, 0, 1, np.nan]
+    )
+    assert marks.index.tolist() == list(range(100, 106))
+
+    # Six trips stay in patch 1 before the switch: capped at three.
+    capped = stop_patch_switch_marks(_stop_sequence([0, 1, 0, 1, 0, 1, 0, 2, 4]))
+    np.testing.assert_array_equal(
+        capped[TRIPS_TO_PATCH_SWITCH].to_numpy(), [3, 3, 3, 3, 2, 1, 0, 0, np.nan]
+    )
+
+
+def test_trips_to_patch_switch_reads_every_stop_of_a_trial_and_checks_them():
+    stops = _stop_sequence([0, 1, 2])
+    # A second stop after trial 0 (e.g. off the well) shares its next trip.
+    extra = stops.iloc[[0]].assign(stop_idx=999)
+    # A stop before the first completed trial has no known origin.
+    first = pd.DataFrame(
+        {
+            "stop_idx": [99],
+            "completed_trial_id": pd.array([pd.NA], dtype="Int64"),
+            "completed_trial_arm": [np.nan],
+            "next_arm": [0.0],
+        }
+    )
+    marks = stop_patch_switch_marks(pd.concat([first, stops, extra]))
+
+    assert (
+        marks.loc[999, TRIPS_TO_PATCH_SWITCH] == marks.loc[100, TRIPS_TO_PATCH_SWITCH]
+    )
+    assert marks.loc[100, TRIPS_TO_PATCH_SWITCH] == 1.0
+    assert np.isnan(marks.loc[99, TRIPS_TO_PATCH_SWITCH])
+
+    inconsistent = stops.copy()
+    inconsistent.loc[0, "next_arm"] = 4.0  # disagrees with trial 1's arm, 1
+    with pytest.raises(ValueError, match="disagree on the arm of trial 1"):
+        stop_patch_switch_marks(inconsistent)
+
+
+def test_stop_marks_join_each_event_through_its_stop():
+    arm, event = _tables()
+    event["stop_idx"] = [100, 102, 102]
+    stop_marks = stop_patch_switch_marks(_stop_sequence([0, 1, 0, 2, 3, 4]))
+
+    marks = build_recommended_event_mark_table(arm, event, stop_marks).set_index(
+        "event_id"
+    )
+
+    assert marks[TRIPS_TO_PATCH_SWITCH].tolist() == [2.0, 0.0, 0.0]
+    assert marks[NEXT_TRIP_SWITCHES_PATCH].tolist() == [0.0, 1.0, 1.0]
+    assert marks["stop_idx"].tolist() == [100, 102, 102]
+    event.loc[0, "stop_idx"] = 7
+    with pytest.raises(ValueError, match="stop_idx the stop marks lack"):
+        build_recommended_event_mark_table(arm, event, stop_marks)
+    # Without stop marks the forward marks are simply absent.
+    assert TRIPS_TO_PATCH_SWITCH not in build_recommended_event_mark_table(arm, event)

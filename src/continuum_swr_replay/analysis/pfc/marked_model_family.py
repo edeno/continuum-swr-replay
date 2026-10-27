@@ -46,6 +46,7 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     build_kernel_design,
     standardize_event_marks,
 )
+from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
@@ -78,6 +79,16 @@ CURRENT_X_REWARD = "current_arm_fraction_x_rewarded"
 UNCERTAINTY_X_REWARD = "content_uncertainty_x_rewarded"
 CURRENT_X_RIPPLE = "current_arm_fraction_x_ripple_power"
 UNCERTAINTY_X_RIPPLE = "content_uncertainty_x_ripple_power"
+TRIPS_TO_PATCH_SWITCH = "trips_to_patch_switch"
+NEXT_TRIP_SWITCHES_PATCH = "next_trip_switches_patch"
+
+#: ``trips_to_patch_switch`` counts at most this many trips; a value of 3
+#: means "three or more trips stay in the patch first".
+TRIPS_TO_PATCH_SWITCH_CAP = 3
+
+#: Marks that are properties of the stop, shared by every event in it. Their
+#: shuffled-mark reference permutes whole stops' values among stops.
+STOP_LEVEL_MARKS = (REWARDED_CONTEXT, TRIPS_TO_PATCH_SWITCH, NEXT_TRIP_SWITCHES_PATCH)
 
 # The shipped single-mark profile used four designs of width 67 (268 batched
 # feature columns, about 34 GB on the largest profiled session). Rounding that
@@ -127,6 +138,15 @@ MARK_DESCRIPTIONS: Mapping[str, str] = MappingProxyType(
         UNCERTAINTY_X_REWARD: "content-weighted uncertainty times rewarded context",
         CURRENT_X_RIPPLE: "current-arm replay fraction times ripple power",
         UNCERTAINTY_X_RIPPLE: "content-weighted uncertainty times ripple power",
+        TRIPS_TO_PATCH_SWITCH: (
+            "completed trips from this stop until the first later trip that "
+            "leaves the patch (0 when the next trip leaves), capped at 3; "
+            "undefined after the session's last patch switch"
+        ),
+        NEXT_TRIP_SWITCHES_PATCH: (
+            "whether the trip that starts at this stop leaves the patch "
+            "(trips_to_patch_switch == 0)"
+        ),
     }
 )
 
@@ -606,9 +626,160 @@ def _leaf_weighted_mark(
     return numerator / denominator.where(denominator > 1e-12)
 
 
+def _patch_of_arm(arms: NDArray) -> NDArray:
+    """Patch of each leaf arm (well); NaN where the arm is unknown."""
+    return np.array(
+        [
+            float(TRACK_SEGMENT_TO_PATCH[int(arm)]) if np.isfinite(arm) else np.nan
+            for arm in np.asarray(arms, dtype=float)
+        ]
+    )
+
+
+def stop_patch_switch_marks(stops: pd.DataFrame) -> pd.DataFrame:
+    """Forward patch-switch context of every stop of one session.
+
+    Trips are the session's completed trials. Trial ``k`` ends at the arm that
+    stops with ``completed_trial_id == k`` record as ``completed_trial_arm``,
+    and stops with ``completed_trial_id == k - 1`` record the same arm as their
+    ``next_arm``; the two are checked against each other. The trip that starts
+    at a stop whose last completed trial is ``k`` is trial ``k + 1``, from
+    trial ``k``'s arm to trial ``k + 1``'s; it switches patch when the two
+    arms' patches differ. ``trips_to_patch_switch`` is the number of trips,
+    from that one on, that stay in the patch before the first one that leaves
+    it: 0 when the next trip leaves. It is capped at
+    :data:`TRIPS_TO_PATCH_SWITCH_CAP` and undefined (NaN) for a stop with no
+    completed trial, when a trip on the way has an unknown arm, and after the
+    session's last switch.
+
+    Parameters
+    ----------
+    stops : pd.DataFrame, shape (n_stops, ...)
+        One session's stop-table rows, every stop (not only a cohort):
+        ``stop_idx``, ``completed_trial_id`` (nullable integer),
+        ``completed_trial_arm`` and ``next_arm`` (0--5 or NaN).
+
+    Returns
+    -------
+    pd.DataFrame, shape (n_stops, 2)
+        Indexed by ``stop_idx``: ``trips_to_patch_switch`` (0, 1, 2, 3 or NaN)
+        and ``next_trip_switches_patch`` (1.0, 0.0 or NaN).
+
+    Raises
+    ------
+    KeyError
+        If a required column is missing.
+    ValueError
+        If ``stop_idx`` repeats, or if two stops disagree on a trial's arm.
+    """
+    required = {"stop_idx", "completed_trial_id", "completed_trial_arm", "next_arm"}
+    missing = sorted(required - set(stops))
+    if missing:
+        raise KeyError(f"stops are missing column(s) {missing}")
+    if stops["stop_idx"].duplicated().any():
+        raise ValueError("stop_idx must be unique within a session")
+    trial = pd.to_numeric(stops["completed_trial_id"], errors="coerce").to_numpy(
+        dtype=float
+    )
+    arm_of_trial: dict[int, float] = {}
+    for trial_ids, arms in (
+        (trial, _numeric(stops, "completed_trial_arm")),
+        (trial + 1, _numeric(stops, "next_arm")),
+    ):
+        for trial_id, arm in zip(trial_ids, arms, strict=True):
+            if not (np.isfinite(trial_id) and np.isfinite(arm)):
+                continue
+            known = arm_of_trial.setdefault(int(trial_id), float(arm))
+            if known != arm:
+                raise ValueError(
+                    f"stops disagree on the arm of trial {int(trial_id)}: "
+                    f"{known} and {arm}"
+                )
+    n_trials = max(arm_of_trial, default=-1) + 1
+    patch = _patch_of_arm(
+        np.array([arm_of_trial.get(index, np.nan) for index in range(n_trials)])
+    )
+    # switches[k]: whether trial k leaves the patch trial k - 1 ended in.
+    switches = np.full(n_trials, np.nan)
+    known = np.isfinite(patch[1:]) & np.isfinite(patch[:-1])
+    switches[1:][known] = (patch[1:] != patch[:-1])[known].astype(float)
+    # trips_from[k]: trips from trial k on that stay before the first that
+    # leaves, filled backward; NaN after the last switch or past an unknown.
+    trips_from = np.full(n_trials + 1, np.nan)
+    for index in range(n_trials - 1, -1, -1):
+        if switches[index] == 1.0:
+            trips_from[index] = 0.0
+        elif switches[index] == 0.0:
+            trips_from[index] = trips_from[index + 1] + 1.0
+    trips_from = np.minimum(trips_from, TRIPS_TO_PATCH_SWITCH_CAP)
+    next_trial = trial + 1
+    has_next = np.isfinite(next_trial) & (next_trial < n_trials)
+    trips = np.full(len(stops), np.nan)
+    trips[has_next] = trips_from[next_trial[has_next].astype(int)]
+    out = pd.DataFrame(
+        {
+            TRIPS_TO_PATCH_SWITCH: trips,
+            NEXT_TRIP_SWITCHES_PATCH: np.where(
+                np.isfinite(trips), (trips == 0.0).astype(float), np.nan
+            ),
+        },
+        index=pd.Index(stops["stop_idx"].to_numpy(), name="stop_idx"),
+    )
+    return out
+
+
+def load_session_stop_patch_switch_marks(
+    nwb_file_name: str,
+    epoch_name: str,
+    *,
+    stop_table_path: str | Path | None = None,
+) -> tuple[pd.DataFrame, str]:
+    """Read one session's stops and derive their forward patch-switch context.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        Session NWB file, e.g. ``"chimi20200212_.nwb"``.
+    epoch_name : str
+        Epoch within that file, e.g. ``"02_r1"``.
+    stop_table_path : str or Path, optional
+        Stop table to read. Defaults to ``table_path("stop_table")``,
+        resolved at the call.
+
+    Returns
+    -------
+    marks : pd.DataFrame
+        :func:`stop_patch_switch_marks` over every stop of the session.
+    stop_table_sha256 : str
+        Digest of the table read.
+
+    Raises
+    ------
+    ValueError
+        If the session has no stops.
+    """
+    path = (
+        table_path("stop_table") if stop_table_path is None else Path(stop_table_path)
+    )
+    table = read_table(path)
+    animal, session_date = parse_nwb_filename(nwb_file_name)
+    session = table.loc[
+        table.animal.eq(animal)
+        & table.session_date.eq(session_date)
+        & table.epoch.eq(epoch_name)
+    ]
+    if session.empty:
+        raise ValueError(f"no stops for ({animal}, {session_date}, {epoch_name})")
+    return (
+        stop_patch_switch_marks(session),
+        sha256_file(resolved_table_path(path)),
+    )
+
+
 def build_recommended_event_mark_table(
     event_arm_table: pd.DataFrame,
     event_table: pd.DataFrame,
+    stop_marks: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Collapse canonical arm/event tables to one row of recommended marks/event.
 
@@ -636,13 +807,19 @@ def build_recommended_event_mark_table(
         One session's canonical nine-row-per-event arm table.
     event_table : pd.DataFrame, shape (n_events, ...)
         The same session's canonical one-row-per-event table.
+    stop_marks : pd.DataFrame, optional
+        :func:`stop_patch_switch_marks` for the session, indexed by
+        ``stop_idx``; joined to each event through the event table's
+        ``stop_idx``. ``None`` leaves the forward patch-switch marks out.
 
     Returns
     -------
     pd.DataFrame, shape (n_events, ...)
         One row per event, keyed by ``event_id`` in the arm table's
-        first-appearance order, carrying the event metadata columns and every
-        mark named in :data:`MARK_DESCRIPTIONS`. Undefined marks are ``nan``.
+        first-appearance order, carrying the event metadata columns (and
+        ``stop_idx`` when the event table has it) and every mark named in
+        :data:`MARK_DESCRIPTIONS` that the inputs define. Undefined marks are
+        ``nan``.
 
     Raises
     ------
@@ -770,6 +947,8 @@ def build_recommended_event_mark_table(
         ).reindex(arm_ids)
 
     scalar_columns = sorted(event_required - {"event_id"})
+    if "stop_idx" in event_table:
+        scalar_columns.append("stop_idx")
     event_scalars = event_table.set_index("event_id").loc[arm_ids, scalar_columns]
     marks = marks.join(event_scalars, validate="one_to_one")
     duration = _numeric(marks, "event_duration_s")
@@ -795,6 +974,18 @@ def build_recommended_event_mark_table(
     marks[UNCERTAINTY_X_REWARD] = marks[CONTENT_UNCERTAINTY] * marks[REWARDED_CONTEXT]
     marks[CURRENT_X_RIPPLE] = marks[CURRENT_ARM_FRACTION] * marks[RIPPLE_POWER]
     marks[UNCERTAINTY_X_RIPPLE] = marks[CONTENT_UNCERTAINTY] * marks[RIPPLE_POWER]
+    if stop_marks is not None:
+        if "stop_idx" not in marks:
+            raise KeyError("event_table needs stop_idx to join stop-level marks")
+        stop_idx = pd.to_numeric(marks["stop_idx"], errors="coerce")
+        unknown = ~stop_idx.isin(stop_marks.index)
+        if unknown.any():
+            raise ValueError(
+                f"{int(unknown.sum())} event(s) sit in a stop_idx the stop marks "
+                f"lack, first {marks.index[unknown.to_numpy()][0]!r}"
+            )
+        for column in (TRIPS_TO_PATCH_SWITCH, NEXT_TRIP_SWITCHES_PATCH):
+            marks[column] = stop_marks[column].reindex(stop_idx).to_numpy(dtype=float)
     return marks.reset_index()
 
 
@@ -854,6 +1045,9 @@ def attach_recommended_event_marks(
         )
     selected = available.loc[requested_index].reset_index(drop=True)
     mark_columns = [column for column in MARK_DESCRIPTIONS if column in selected]
+    # The stop each event sits in, for the stop-level mark permutation.
+    if "stop_idx" in selected:
+        mark_columns.append("stop_idx")
     metadata = selected[
         ["event_id", "event_start_s", "event_end_s", "is_swr", *mark_columns]
     ]
@@ -910,6 +1104,7 @@ def load_session_recommended_event_marks(
     *,
     event_arm_table_path: str | Path | None = None,
     event_table_path: str | Path | None = None,
+    stop_table_path: str | Path | None = None,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
     """Read, derive and attach all recommended marks for one session.
 
@@ -927,13 +1122,17 @@ def load_session_recommended_event_marks(
     event_table_path : str or Path, optional
         Canonical event table to read. Defaults to
         ``table_path("event_table")``, resolved at the call.
+    stop_table_path : str or Path, optional
+        Canonical stop table the forward patch-switch marks are derived from
+        (:func:`stop_patch_switch_marks`). Defaults to
+        ``table_path("stop_table")``, resolved at the call.
 
     Returns
     -------
     marked : dict[str, pd.DataFrame]
         ``events`` with every recommended mark attached.
     provenance : dict[str, str]
-        SHA-256 digests of the two tables the marks were derived from.
+        SHA-256 digests of the three tables the marks were derived from.
 
     Raises
     ------
@@ -975,12 +1174,16 @@ def load_session_recommended_event_marks(
         raise ValueError(
             f"missing event-family rows for ({animal}, {session_date}, {epoch_name})"
         )
-    marks = build_recommended_event_mark_table(session_arm, session_event)
+    stop_marks, stop_sha256 = load_session_stop_patch_switch_marks(
+        nwb_file_name, epoch_name, stop_table_path=stop_table_path
+    )
+    marks = build_recommended_event_mark_table(session_arm, session_event, stop_marks)
     return (
         attach_recommended_event_marks(events, marks),
         {
             "event_arm_table_sha256": sha256_file(resolved_table_path(arm_path)),
             "event_table_sha256": sha256_file(resolved_table_path(event_path)),
+            "stop_table_sha256": stop_sha256,
         },
     )
 
