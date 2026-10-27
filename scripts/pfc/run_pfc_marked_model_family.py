@@ -30,6 +30,16 @@ Run core plus content-interaction sensitivities on GPU 0::
 Run one process per GPU with disjoint session files. Six compact core models
 share one feature width; the three content horse-races and three interactions
 share the wider tier, so only two scorer shapes compile within a session.
+
+Fit the follow-up models (content, strength, stop context, ripple power) and
+their marginal tier on the extended event set, with a 30-draw shuffled-mark
+reference for every slope kernel; the follow-up set needs an explicit output
+directory::
+
+    python scripts/pfc/run_pfc_marked_model_family.py --gpu 1 \
+        --sessions worker1.sessions --model-set followup --tier all \
+        --event-set with_swr_without_replay \
+        --output-dir Processed-Data/pfc_response_followups/marked_family
 """
 
 from __future__ import annotations
@@ -60,17 +70,23 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (
     canonical_event_input_hashes,
 )
 from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+from continuum_swr_replay.analysis.pfc.event_sets import EVENT_SETS, SWR_NO_NON_LOCAL
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
 from continuum_swr_replay.analysis.pfc.marked_glm import (
+    EXTENDED_MARKED_EVENT_CLASSES,
     MARKED_EVENT_CLASSES,
     MIN_MARKED_EVENTS_PER_CLASS,
+    build_baseline_columns,
     prepare_marked_session_context,
 )
 from continuum_swr_replay.analysis.pfc.marked_model_family import (
+    ALL_MODEL_SPECS,
     CORE_MODEL_NAMES,
     DEFAULT_MARK_PENALTY_SIGMA,
+    FOLLOWUP_MODEL_NAMES,
     INTERACTION_MODEL_NAMES,
+    MARGINAL_MODEL_NAMES,
     MARK_DESCRIPTIONS,
     PROFILED_BATCH_FEATURE_BUDGET,
     RECOMMENDED_MODEL_SPECS,
@@ -79,6 +95,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     build_marked_family_ladder,
     fit_marked_family_ladder,
     load_session_recommended_event_marks,
+    load_session_stop_patch_switch_marks,
 )
 from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
@@ -109,6 +126,53 @@ BUNDLE_CONTRACT_VERSION = 2
 # ``_check_prepared_window`` refuses the fit if the prepared context disagrees.
 FIT_HALF_WINDOW_S = 0.25
 N_BASIS_PER_KERNEL = 11
+#: Shuffled-mark draws per slope kernel when the follow-up set is run.
+DEFAULT_FOLLOWUP_SLOPE_PERMUTATIONS = 30
+MODEL_SETS = ("recommended", "followup")
+TIERS = ("joint", "marginal", "all")
+
+
+def available_marked_classes(event_set: str) -> tuple[str, ...]:
+    """The marked classes a session cut with ``event_set`` provides."""
+    if event_set not in EVENT_SETS:
+        raise ValueError(f"event_set must be one of {EVENT_SETS}; got {event_set!r}")
+    return (
+        EXTENDED_MARKED_EVENT_CLASSES
+        if event_set == "with_swr_without_replay"
+        else MARKED_EVENT_CLASSES
+    )
+
+
+def resolve_model_names(model_set: str, tier: str) -> tuple[str, ...]:
+    """The models a model set and tier select, in fitting order.
+
+    Parameters
+    ----------
+    model_set : {"recommended", "followup"}
+        ``recommended`` is the v1 core family; ``followup`` the content,
+        strength, stop-context and ripple-power models.
+    tier : {"joint", "marginal", "all"}
+        ``marginal`` is the generated single-target tier of the follow-up
+        models; ``all`` is the joint models then the marginal ones.
+
+    Returns
+    -------
+    tuple of str
+
+    Raises
+    ------
+    ValueError
+        For a marginal tier of the recommended set, which has none.
+    """
+    if model_set not in MODEL_SETS or tier not in TIERS:
+        raise ValueError(f"unknown model set {model_set!r} or tier {tier!r}")
+    if model_set == "recommended":
+        if tier != "joint":
+            raise ValueError("the recommended model set has only the joint tier")
+        return CORE_MODEL_NAMES
+    joint = FOLLOWUP_MODEL_NAMES if tier in ("joint", "all") else ()
+    marginal = MARGINAL_MODEL_NAMES if tier in ("marginal", "all") else ()
+    return (*joint, *marginal)
 
 
 def family_artifact_path(
@@ -133,7 +197,9 @@ def family_artifact_path(
     return output_dir / f"{epoch_identifier}_{model_name}_marked_family.pkl"
 
 
-def family_companion_paths(artifact: Path, spec: MarkedFamilySpec) -> tuple[Path, ...]:
+def family_companion_paths(
+    artifact: Path, spec: MarkedFamilySpec, *, slope_permutations: int = 0
+) -> tuple[Path, ...]:
     """Return every array a complete eligible bundle must carry.
 
     Parameters
@@ -141,21 +207,31 @@ def family_companion_paths(artifact: Path, spec: MarkedFamilySpec) -> tuple[Path
     artifact : Path
         The bundle's primary ``.pkl`` statistics table.
     spec : MarkedFamilySpec
-        The fitted model family; one slope curve per event class and
-        *scientific* mark, so nuisance marks get no companion file.
+        The fitted model family, restricted to the session's classes; one
+        slope curve per target class and *scientific* mark, so nuisance marks
+        get no companion file.
+    slope_permutations : int
+        Shuffled-mark draws per slope kernel; when positive each slope curve
+        has a ``.slope_null.npy`` companion.
 
     Returns
     -------
     tuple of Path
-        The lag axis, and each class's typical and per-target slope curves.
+        The lag axis, each class's typical curve, and each target's slope
+        curve (and null).
     """
     curves: list[Path] = [artifact.with_suffix(".lag_time.npy")]
-    for event_class in MARKED_EVENT_CLASSES:
-        curves.append(artifact.with_suffix(f".{event_class}.typical.npy"))
-        curves.extend(
-            artifact.with_suffix(f".{event_class}.{mark}.slope.npy")
-            for mark in spec.scientific_marks
-        )
+    curves.extend(
+        artifact.with_suffix(f".{event_class}.typical.npy")
+        for event_class in spec.event_classes
+    )
+    for target_class in spec.target_classes:
+        for mark in spec.scientific_marks:
+            curves.append(artifact.with_suffix(f".{target_class}.{mark}.slope.npy"))
+            if slope_permutations > 0:
+                curves.append(
+                    artifact.with_suffix(f".{target_class}.{mark}.slope_null.npy")
+                )
     return tuple(curves)
 
 
@@ -171,6 +247,9 @@ def build_fit_contract(
     brain_area: str,
     input_hashes: Mapping[str, object],
     baseline_terms: str = "well_and_reward_outcome",
+    event_set: str = "canonical",
+    slope_permutations: int = 0,
+    slope_permutation_seed: int = 0,
 ) -> dict[str, object]:
     """Return every model, data, fold and execution fact that defines a bundle.
 
@@ -199,6 +278,12 @@ def build_fit_contract(
         name (``swr_interval_source``).
     baseline_terms : {"well_and_reward_outcome", "none"}
         The per-stop baseline columns every design carries.
+    event_set : {"canonical", "with_swr_without_replay"}
+        The event set the session is cut with.
+    slope_permutations : int
+        Shuffled-mark draws per slope kernel (0: none).
+    slope_permutation_seed : int
+        Seed of those draws.
 
     Returns
     -------
@@ -212,7 +297,20 @@ def build_fit_contract(
         "bundle_contract_version": BUNDLE_CONTRACT_VERSION,
         "model_name": spec.name,
         "model_tier": spec.tier,
+        "tier": "marginal" if spec.tier == "marginal" else "joint",
+        "event_set": event_set,
+        "event_classes": list(spec.event_classes),
+        "target_classes": list(spec.target_classes),
+        "pooled": bool(spec.pooled),
         "baseline_terms": baseline_terms,
+        "baseline_context_marks": list(spec.baseline_context_marks),
+        "slope_permutations": int(slope_permutations),
+        "slope_permutation_seed": int(slope_permutation_seed),
+        "slope_null_policy": (
+            "full-data refits with one target block rebuilt from the target "
+            "shuffled within its class: among events where defined, or for a "
+            "stop-level mark among stops with each stop's events together"
+        ),
         "model_question": spec.question,
         "scientific_marks": list(spec.scientific_marks),
         "nuisance_marks": list(spec.nuisance_marks),
@@ -291,8 +389,12 @@ def _bundle_is_current(
         return not artifact.exists()
     if status != "complete":
         return False
+    slope_permutations = int(fit_contract.get("slope_permutations", 0))
     return is_nonempty_file(artifact) and all(
-        is_nonempty_file(path) for path in family_companion_paths(artifact, spec)
+        is_nonempty_file(path)
+        for path in family_companion_paths(
+            artifact, spec, slope_permutations=slope_permutations
+        )
     )
 
 
@@ -315,7 +417,7 @@ def _remove_stale_bundle(artifact: Path, spec: MarkedFamilySpec) -> None:
     """
     fit_provenance_path(artifact).unlink(missing_ok=True)
     artifact.unlink(missing_ok=True)
-    for path in family_companion_paths(artifact, spec):
+    for path in family_companion_paths(artifact, spec, slope_permutations=1):
         path.unlink(missing_ok=True)
 
 
@@ -460,6 +562,9 @@ def run_analysis(
     event_arm_table_path: Path | None = None,
     event_table_path: Path | None = None,
     baseline_terms: str = "well_and_reward_outcome",
+    event_set: str = "canonical",
+    slope_permutations: int = 0,
+    slope_permutation_seed: int | None = None,
     gpu_record: Mapping[str, object] | None = None,
     failure_sink: list[tuple[str, str]] | None = None,
 ) -> bool:
@@ -477,7 +582,8 @@ def run_analysis(
     epoch_name : str
         Session epoch (interval list) name.
     model_names : tuple of str
-        Families to fit, as keys of ``RECOMMENDED_MODEL_SPECS``.
+        Families to fit, as keys of ``ALL_MODEL_SPECS`` (the recommended,
+        follow-up and marginal specs).
     brain_area : str, optional
         Recorded area whose units are fit (``"mPFC"`` or ``"OFC"``).
     output_dir : Path, optional
@@ -508,6 +614,13 @@ def run_analysis(
     baseline_terms : {"well_and_reward_outcome", "none"}, optional
         Per-stop baseline columns every design carries; ``"none"`` reproduces
         the single-intercept designs.
+    event_set : {"canonical", "with_swr_without_replay"}, optional
+        The event set the session is cut with; the extended set adds the SWRs
+        without replay to the specs that name them.
+    slope_permutations : int, optional
+        Shuffled-mark draws per slope kernel (0: no reference).
+    slope_permutation_seed : int or None, optional
+        Seed of the draws; derived from the session when None.
     gpu_record : Mapping of str to object, optional
         The accelerator record from ``configure_jax_gpu``.
     failure_sink : list of tuple of str, optional
@@ -527,7 +640,7 @@ def run_analysis(
         event_arm_table_path = table_path("event_arm_table")
     if event_table_path is None:
         event_table_path = table_path("event_table")
-    unknown = sorted(set(model_names) - set(RECOMMENDED_MODEL_SPECS))
+    unknown = sorted(set(model_names) - set(ALL_MODEL_SPECS))
     if unknown or not model_names:
         raise ValueError(f"unknown or empty model selection: {unknown}")
     if len(model_names) != len(set(model_names)):
@@ -537,6 +650,14 @@ def run_analysis(
         if fold_seed is None
         else fold_seed
     )
+    slope_permutation_seed = (
+        session_seed("marked_family_slope_null", nwb_file_name, epoch_name)
+        if slope_permutation_seed is None
+        else slope_permutation_seed
+    )
+    if slope_permutations < 0:
+        raise ValueError("slope_permutations must be non-negative")
+    available_classes = available_marked_classes(event_set)
     if gpu_record is None:
         gpu_record = {
             "jax_backend": "unknown",
@@ -569,7 +690,10 @@ def run_analysis(
             "swr_interval_source": canonical_hashes["swr_interval_source"],
             "swr_events_sha256": canonical_hashes["swr_events_sha256"],
         }
-        specs = {name: RECOMMENDED_MODEL_SPECS[name] for name in model_names}
+        specs = {
+            name: ALL_MODEL_SPECS[name].for_classes(available_classes)
+            for name in model_names
+        }
         artifacts = {
             name: family_artifact_path(output_dir, epoch_identifier, name)
             for name in model_names
@@ -586,6 +710,9 @@ def run_analysis(
                 brain_area=brain_area,
                 input_hashes=input_hashes,
                 baseline_terms=baseline_terms,
+                event_set=event_set,
+                slope_permutations=slope_permutations,
+                slope_permutation_seed=slope_permutation_seed,
             )
             for name, spec in specs.items()
         }
@@ -616,6 +743,7 @@ def run_analysis(
             cohort_stops=cohort_stops,
             event_arm_table_path=event_arm_table_path,
             baseline_terms=baseline_terms,
+            event_set=event_set,
         )
         marked_events, mark_hashes = load_session_recommended_event_marks(
             nwb_file_name,
@@ -624,7 +752,21 @@ def run_analysis(
             event_arm_table_path=event_arm_table_path,
             event_table_path=event_table_path,
         )
+        if SWR_NO_NON_LOCAL in available_classes:
+            # SWRs without replay carry only duration and ripple power, which
+            # the context computed; they have no content or stop marks.
+            marked_events[SWR_NO_NON_LOCAL] = context.events[SWR_NO_NON_LOCAL]
+        stop_marks, stop_marks_sha256 = load_session_stop_patch_switch_marks(
+            nwb_file_name, epoch_name
+        )
+        # Stop-level context marks enter the baseline of the specs that name
+        # them; each cohort stop takes its own value.
+        context_stops = cohort_stops.join(
+            stop_marks, on="stop_idx", validate="many_to_one"
+        )
         preparation_seconds = time.perf_counter() - preparation_started
+        if stop_marks_sha256 != input_hashes["stop_table_sha256"]:
+            raise RuntimeError("stop table changed between hashing and loading")
         if cohort_report["stop_table_sha256"] != input_hashes["stop_table_sha256"]:
             raise RuntimeError("stop table changed between hashing and loading")
         for key, value in mark_hashes.items():
@@ -656,7 +798,7 @@ def run_analysis(
             "n_fit_bins": int(context.counts.shape[0]),
             "n_events_by_class": {
                 event_class: int(len(marked_events[event_class]))
-                for event_class in MARKED_EVENT_CLASSES
+                for event_class in available_classes
             },
             "session_preparation_seconds": preparation_seconds,
             "baseline_column_names": list(context.baseline_names),
@@ -702,7 +844,19 @@ def run_analysis(
             # session that failed on an earlier family.
             _remove_stale_bundle(artifact, spec)
             design_started = time.perf_counter()
+            baseline = context.baseline
+            baseline_record = {
+                "baseline_column_names": list(context.baseline_names),
+                **context.baseline_report,
+            }
             try:
+                if spec.baseline_context_marks and baseline_terms != "none":
+                    baseline, names, report_ = build_baseline_columns(
+                        context.fit_mask,
+                        context_stops,
+                        context_columns=spec.baseline_context_marks,
+                    )
+                    baseline_record = {"baseline_column_names": list(names), **report_}
                 ladder = build_marked_family_ladder(
                     marked_events,
                     context.fit_mask,
@@ -710,7 +864,7 @@ def run_analysis(
                     context.lags,
                     spec,
                     min_marked_events=min_marked_events,
-                    baseline=context.baseline,
+                    baseline=baseline,
                 )
                 design_seconds = time.perf_counter() - design_started
                 fit_started = time.perf_counter()
@@ -722,6 +876,9 @@ def run_analysis(
                     mark_penalty_sigma=mark_penalty_sigma,
                     design_batch_size=design_batch_size,
                     prepared_response=prepared_response,
+                    slope_permutations=slope_permutations,
+                    slope_permutation_seed=slope_permutation_seed,
+                    report_lags=report,
                 )
                 fit_seconds = time.perf_counter() - fit_started
             except ModelIneligibleError as error:
@@ -765,16 +922,24 @@ def run_analysis(
             )
             statistics.to_pickle(artifact)
             np.save(artifact.with_suffix(".lag_time.npy"), context.lag_time[report])
-            for event_class in MARKED_EVENT_CLASSES:
+            for event_class in spec.event_classes:
                 np.save(
                     artifact.with_suffix(f".{event_class}.typical.npy"),
                     fitted.typical_curves[event_class][report],
                 )
+            for target_class in spec.target_classes:
                 for mark in spec.scientific_marks:
                     np.save(
-                        artifact.with_suffix(f".{event_class}.{mark}.slope.npy"),
-                        fitted.mark_curves[event_class][mark][report],
+                        artifact.with_suffix(f".{target_class}.{mark}.slope.npy"),
+                        fitted.mark_curves[target_class][mark][report],
                     )
+                    if slope_permutations > 0:
+                        np.save(
+                            artifact.with_suffix(
+                                f".{target_class}.{mark}.slope_null.npy"
+                            ),
+                            fitted.slope_null[target_class][mark].astype(np.float32),
+                        )
             contract_extra = {
                 key: value
                 for key, value in contracts[name].items()
@@ -802,6 +967,7 @@ def run_analysis(
                         },
                         "marked_family_diagnostics": fitted.diagnostics,
                         **common_extra,
+                        **baseline_record,
                     }
                 ),
             )
@@ -830,7 +996,9 @@ def get_command_line_arguments() -> Namespace:
     -------
     Namespace
         Validated CLI arguments; ``--include-interactions`` has already been
-        folded into ``models`` without introducing duplicates.
+        folded into ``models`` without introducing duplicates, ``models``
+        defaults to the model set's tier, and ``slope_permutations`` to the
+        model set's default.
     """
     parser = ArgumentParser(
         description=__doc__, formatter_class=RawDescriptionHelpFormatter
@@ -845,7 +1013,14 @@ def get_command_line_arguments() -> Namespace:
     parser.add_argument("--allow-cpu", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument(
-        "--output-dir", type=Path, default=processed_data_dir() / OUTPUT_SUBDIR
+        "--output-dir",
+        type=Path,
+        help=(
+            "Bundle directory. Default for the recommended set: "
+            f"<processed data>/{OUTPUT_SUBDIR}. Required for the follow-up set, "
+            "so a follow-up run can never land in (and refit the stale bundles "
+            "of) another corpus's directory."
+        ),
     )
     parser.add_argument("--log-directory", type=Path, default=Path("logs"))
     parser.add_argument(
@@ -853,11 +1028,54 @@ def get_command_line_arguments() -> Namespace:
     )
     parser.add_argument("--event-table", type=Path, default=table_path("event_table"))
     parser.add_argument(
+        "--model-set",
+        choices=MODEL_SETS,
+        default="recommended",
+        help=(
+            "recommended: the v1 families; followup: replay content, event "
+            "strength, stop context and ripple power (default: recommended)."
+        ),
+    )
+    parser.add_argument(
+        "--tier",
+        choices=TIERS,
+        default="joint",
+        help=(
+            "joint models, the generated single-target marginal tier, or both "
+            "(follow-up set only; default: joint)."
+        ),
+    )
+    parser.add_argument(
         "--models",
         nargs="+",
-        choices=tuple(RECOMMENDED_MODEL_SPECS),
-        default=list(CORE_MODEL_NAMES),
-        help="Models to fit (default: the nine core families).",
+        choices=tuple(ALL_MODEL_SPECS),
+        help=(
+            "Models to fit (default: the model set's tier; for the recommended "
+            "set the nine core families)."
+        ),
+    )
+    parser.add_argument(
+        "--event-set",
+        choices=EVENT_SETS,
+        default="canonical",
+        help=(
+            "with_swr_without_replay adds the SWRs without replay as a third "
+            "class of the ripple-power models (default: canonical)."
+        ),
+    )
+    parser.add_argument(
+        "--slope-permutations",
+        type=int,
+        help=(
+            "Shuffled-mark refits per slope kernel (default: "
+            f"{DEFAULT_FOLLOWUP_SLOPE_PERMUTATIONS} for the follow-up set, 0 for "
+            "the recommended set)."
+        ),
+    )
+    parser.add_argument(
+        "--slope-permutation-seed",
+        type=int,
+        help="Seed of the shuffled-mark draws (default: derived per session).",
     )
     parser.add_argument(
         "--include-interactions",
@@ -893,8 +1111,36 @@ def get_command_line_arguments() -> Namespace:
         ),
     )
     args = parser.parse_args()
+    try:
+        selected = resolve_model_names(args.model_set, args.tier)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.models is None:
+        args.models = list(selected)
+    allowed = (
+        set(RECOMMENDED_MODEL_SPECS)
+        if args.model_set == "recommended"
+        else set(resolve_model_names("followup", "all"))
+    )
+    if not set(args.models) <= allowed:
+        parser.error(
+            f"--models {sorted(set(args.models) - allowed)} are not in the "
+            f"{args.model_set} set"
+        )
     if args.include_interactions:
+        if args.model_set != "recommended":
+            parser.error("--include-interactions belongs to the recommended set")
         args.models = list(dict.fromkeys([*args.models, *INTERACTION_MODEL_NAMES]))
+    if args.output_dir is None:
+        if args.model_set == "followup":
+            parser.error("--model-set followup needs an explicit --output-dir")
+        args.output_dir = processed_data_dir() / OUTPUT_SUBDIR
+    if args.slope_permutations is None:
+        args.slope_permutations = (
+            DEFAULT_FOLLOWUP_SLOPE_PERMUTATIONS if args.model_set == "followup" else 0
+        )
+    if args.slope_permutations < 0:
+        parser.error("--slope-permutations cannot be negative")
     if args.penalty_sigma <= 0 or not np.isfinite(args.penalty_sigma):
         parser.error("--penalty-sigma must be finite and positive")
     if args.mark_penalty_sigma is not None and (
@@ -998,6 +1244,9 @@ def main() -> None:
             event_arm_table_path=args.event_arm_table,
             event_table_path=args.event_table,
             baseline_terms="none" if args.no_baseline else "well_and_reward_outcome",
+            event_set=args.event_set,
+            slope_permutations=args.slope_permutations,
+            slope_permutation_seed=args.slope_permutation_seed,
             gpu_record=gpu_record,
             failure_sink=sink,
         )

@@ -63,6 +63,9 @@ def _contract(spec=SPEC, **overrides):
         "min_marked_events": 10,
         "brain_area": "mPFC",
         "input_hashes": INPUT_HASHES,
+        "slope_permutation_seed": runner.session_seed(
+            "marked_family_slope_null", "rat20200101_.nwb", "01_r1"
+        ),
     }
     kwargs.update(overrides)
     return runner.build_fit_contract(spec, **kwargs)
@@ -101,25 +104,41 @@ def _context(n_units: int = 2) -> SimpleNamespace:
 
 
 def _result(
-    context: SimpleNamespace, spec=SPEC, *, n_not_converged: int = 0
+    context: SimpleNamespace,
+    spec=SPEC,
+    *,
+    n_not_converged: int = 0,
+    slope_permutations: int = 0,
 ) -> MarkedFamilyResults:
     """Mock fitted results whose curves span the full 251-lag fit window."""
     n_units = context.counts.shape[1]
     n_lags = context.lag_time.size
     grid = np.arange(n_lags * n_units, dtype=float).reshape(n_lags, n_units)
+    n_report = int(
+        (np.abs(context.lag_time) <= runner.REPORT_HALF_WINDOW_S + 1e-12).sum()
+    )
     return MarkedFamilyResults(
         statistics=pd.DataFrame({"family_full_heldout_deviance": [1.0] * n_units}),
         typical_curves={
             event_class: grid + offset
-            for offset, event_class in enumerate(runner.MARKED_EVENT_CLASSES)
+            for offset, event_class in enumerate(spec.event_classes)
         },
         mark_curves={
-            event_class: {
+            target_class: {
                 mark: -grid - offset
                 for offset, mark in enumerate(spec.scientific_marks)
             }
-            for event_class in runner.MARKED_EVENT_CLASSES
+            for target_class in spec.target_classes
         },
+        slope_null={
+            target_class: {
+                mark: np.zeros((slope_permutations, n_report, n_units), np.float32)
+                for mark in spec.scientific_marks
+            }
+            for target_class in spec.target_classes
+        }
+        if slope_permutations
+        else {},
         diagnostics={
             "n_units_full_fit_not_converged": n_not_converged,
             "n_units_nan_heldout_delta_by_comparison": {},
@@ -159,8 +178,27 @@ def _install_mocks(monkeypatch, context: SimpleNamespace, *, build=None, fit=Non
         runner,
         "load_session_stop_cohort",
         lambda *a, **k: (
-            pd.DataFrame({"start_time": [0.0], "end_time": [1.0]}),
+            pd.DataFrame(
+                {
+                    "stop_idx": [4],
+                    "stop_start": [0.0],
+                    "stop_end": [1.0],
+                    "occupancy_well_id": [0.0],
+                    "is_rewarded_outcome": [1.0],
+                }
+            ),
             {"stop_table_sha256": "stop"},
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_patch_switch_marks",
+        lambda *a, **k: (
+            pd.DataFrame(
+                {"trips_to_patch_switch": [1.0], "next_trip_switches_patch": [0.0]},
+                index=pd.Index([4], name="stop_idx"),
+            ),
+            "stop",
         ),
     )
     monkeypatch.setattr(
@@ -191,7 +229,13 @@ def _install_mocks(monkeypatch, context: SimpleNamespace, *, build=None, fit=Non
         "fit_marked_family_ladder",
         fit
         if fit is not None
-        else (lambda ladder, *a, **k: _result(context, ladder.spec)),
+        else (
+            lambda ladder, *a, **k: _result(
+                context,
+                ladder.spec,
+                slope_permutations=k.get("slope_permutations", 0),
+            )
+        ),
     )
 
 
@@ -549,9 +593,7 @@ def test_a_prepared_window_off_the_pinned_contract_is_refused(spline_basis, lags
         runner._check_prepared_window(spline_basis, lags)
 
 
-def test_runner_contract_records_baseline_names_and_version_two(
-    tmp_path, monkeypatch
-):
+def test_runner_contract_records_baseline_names_and_version_two(tmp_path, monkeypatch):
     context = _context()
     _install_mocks(monkeypatch, context)
 
@@ -577,3 +619,108 @@ def test_runner_contract_records_baseline_names_and_version_two(
     # Without the baseline the contract differs, so neither bundle stands in
     # for the other.
     assert _contract(baseline_terms="none") != _contract()
+
+
+def _parse(monkeypatch, *argv):
+    monkeypatch.setattr(sys, "argv", ["run_pfc_marked_model_family.py", *argv])
+    return runner.get_command_line_arguments()
+
+
+def test_runner_tier_flag_selects_the_generated_models(monkeypatch, tmp_path):
+    out = ["--output-dir", str(tmp_path)]
+    followup = _parse(monkeypatch, "--model-set", "followup", *out)
+    assert followup.models == list(runner.FOLLOWUP_MODEL_NAMES)
+    assert followup.slope_permutations == runner.DEFAULT_FOLLOWUP_SLOPE_PERMUTATIONS
+    marginal = _parse(
+        monkeypatch, "--model-set", "followup", "--tier", "marginal", *out
+    )
+    assert marginal.models == list(runner.MARGINAL_MODEL_NAMES)
+    every = _parse(monkeypatch, "--model-set", "followup", "--tier", "all", *out)
+    assert every.models == [*runner.FOLLOWUP_MODEL_NAMES, *runner.MARGINAL_MODEL_NAMES]
+    assert all(name.startswith("marginal_") for name in runner.MARGINAL_MODEL_NAMES)
+    assert runner.family_artifact_path(
+        tmp_path, EPOCH_IDENTIFIER, runner.MARGINAL_MODEL_NAMES[0]
+    ).name == (f"{EPOCH_IDENTIFIER}_{runner.MARGINAL_MODEL_NAMES[0]}_marked_family.pkl")
+    # The recommended default is unchanged, without a reference.
+    recommended = _parse(monkeypatch)
+    assert recommended.models == list(runner.CORE_MODEL_NAMES)
+    assert recommended.slope_permutations == 0
+    assert recommended.output_dir.name == runner.OUTPUT_SUBDIR
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("--model-set", "followup"),  # no explicit output directory
+        ("--tier", "marginal"),  # the recommended set has no marginal tier
+        ("--model-set", "followup", "--output-dir", "x", "--models", OTHER_MODEL),
+    ],
+)
+def test_runner_refuses_unsafe_or_mixed_selections(monkeypatch, argv):
+    with pytest.raises(SystemExit):
+        _parse(monkeypatch, *argv)
+
+
+def test_runner_writes_null_companions_and_requires_them(tmp_path, monkeypatch):
+    context = _context()
+    _install_mocks(monkeypatch, context)
+    model = "stop_context"
+    spec = runner.ALL_MODEL_SPECS[model]
+
+    assert _run(tmp_path, model_names=(model,), slope_permutations=2)
+
+    artifact = _artifact(tmp_path, model)
+    nulls = sorted(tmp_path.glob("*.slope_null.npy"))
+    assert len(nulls) == len(spec.target_classes) * len(spec.scientific_marks) == 4
+    for path in nulls:
+        null = np.load(path)
+        assert null.dtype == np.float32
+        assert null.shape == (2, 201, context.counts.shape[1])
+    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    assert record["slope_permutations"] == 2 and record["tier"] == "joint"
+    # The context mark is a baseline column of this model only.
+    assert (
+        record["baseline_column_names"][-2:]
+        == [
+            "trips_to_patch_switch",
+            "trips_to_patch_switch_unknown",
+        ]
+        or "trips_to_patch_switch" in record["baseline_dropped_constant"]
+    )
+    contract = _contract(spec, slope_permutations=2)
+    assert runner._bundle_is_current(
+        artifact, spec, overwrite=False, fit_contract=contract
+    )
+    nulls[0].unlink()
+    assert not runner._bundle_is_current(
+        artifact, spec, overwrite=False, fit_contract=contract
+    )
+
+
+def test_extended_event_set_adds_swrs_without_replay_to_ripple_power(
+    tmp_path, monkeypatch
+):
+    context = _context()
+    context.events[runner.SWR_NO_NON_LOCAL] = pd.DataFrame({"start_time": [0.004]})
+    seen = {}
+
+    def build(events, *args, **kwargs):
+        seen[args[3].name] = (tuple(events), args[3].event_classes)
+        return SimpleNamespace(spec=args[3])
+
+    _install_mocks(monkeypatch, context, build=build)
+
+    assert _run(
+        tmp_path,
+        model_names=("ripple_power", "ripple_power_pooled", "event_strength"),
+        event_set="with_swr_without_replay",
+    )
+
+    assert runner.SWR_NO_NON_LOCAL in seen["ripple_power"][0]
+    assert seen["ripple_power"][1] == runner.EXTENDED_MARKED_EVENT_CLASSES
+    assert seen["event_strength"][1] == runner.MARKED_EVENT_CLASSES
+    pooled = _artifact(tmp_path, "ripple_power_pooled")
+    assert pooled.with_suffix(".pooled.ripple_power_z.slope.npy").is_file()
+    record = json.loads(runner.fit_provenance_path(pooled).read_text())
+    assert record["event_set"] == "with_swr_without_replay"
+    assert record["target_classes"] == ["pooled"]
