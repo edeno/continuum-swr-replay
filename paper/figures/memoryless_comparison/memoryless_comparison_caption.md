@@ -75,25 +75,25 @@ more ground than the path does.
 travels and how long it lasts; both detectors are scored the same way against
 the same known answer. The comparison that isolates detection uses a shared
 target: the replays the published definition can accept at all, a path over
-about 42 cm and a duration over 100 ms, <!--v:part1.sweep_domain_fraction|pctnum-->25<!--/v-->% of the cells, with both detectors
+about 42 cm and a duration over 100 ms, <!--v:part1.sweep_domain_fraction@pctnum-->25<!--/v-->% of the cells, with both detectors
 held to that definition's duration and dispersion criteria. There the
-sliding-window detector reports <!--v:part1.sweep_domain_sliding_before_test_fraction|pctnum-->68<!--/v-->% before its significance test and the
-state-space detector <!--v:part1.sweep_domain_state_space_published_fraction|pctnum-->68<!--/v-->%. The significance test, which only the sliding-window
-detector is put through, brings it to <!--v:part1.sweep_domain_sliding_fraction|pctnum-->63<!--/v-->%; the state-space detector's own
-acceptance criteria, in place of the published ones, bring it to <!--v:part1.sweep_domain_state_space_fraction|pctnum-->99<!--/v-->%. Over the
-whole grid, each under its own criteria, the two read <!--v:part1.sweep_sliding_fraction|pctnum-->18<!--/v-->% and <!--v:part1.sweep_state_space_fraction|pctnum-->91<!--/v-->%; that gap
+sliding-window detector reports <!--v:part1.sweep_domain_sliding_before_test_fraction@pctnum-->68<!--/v-->% before its significance test and the
+state-space detector <!--v:part1.sweep_domain_state_space_published_fraction@pctnum-->68<!--/v-->%. The significance test, which only the sliding-window
+detector is put through, brings it to <!--v:part1.sweep_domain_sliding_fraction@pctnum-->63<!--/v-->%; the state-space detector's own
+acceptance criteria, in place of the published ones, bring it to <!--v:part1.sweep_domain_state_space_fraction@pctnum-->99<!--/v-->%. Over the
+whole grid, each under its own criteria, the two read <!--v:part1.sweep_sliding_fraction@pctnum-->18<!--/v-->% and <!--v:part1.sweep_state_space_fraction@pctnum-->91<!--/v-->%; that gap
 combines differences in detection with differences in what each counts as a
-replay. Over the whole grid the sliding-window detector reports <!--v:part1.sweep_sliding_before_test_fraction|pctnum-->21<!--/v-->% before its
-significance test, and <!--v:part1.sweep_sliding_spread_only_fraction|pctnum-->20<!--/v-->% with the spread half alone, the only half the
+replay. Over the whole grid the sliding-window detector reports <!--v:part1.sweep_sliding_before_test_fraction@pctnum-->21<!--/v-->% before its
+significance test, and <!--v:part1.sweep_sliding_spread_only_fraction@pctnum-->20<!--/v-->% with the spread half alone, the only half the
 detection script's own filter could fail; the paper's analyses read both
 halves, from a corrected script. Of the replays it reported before the test,
-<!--v:part1.sweep_spread_half_pass_fraction|pctnum-->97<!--/v-->% pass the spread half and <!--v:part1.sweep_jump_half_pass_fraction|pctnum-->87<!--/v-->% the jump half; a short replay covers its path
-in few windows, so its own jumps are large, and the jump half passes <!--v:part1.sweep_jump_half_pass_shortest_fraction|pctnum-->31<!--/v-->% of 40
-ms replays against <!--v:part1.sweep_jump_half_pass_longest_fraction|pctnum-->98<!--/v-->% of 500 ms ones. The test keeps the reference's
+<!--v:part1.sweep_spread_half_pass_fraction@pctnum-->97<!--/v-->% pass the spread half and <!--v:part1.sweep_jump_half_pass_fraction@pctnum-->87<!--/v-->% the jump half; a short replay covers its path
+in few windows, so its own jumps are large, and the jump half passes <!--v:part1.sweep_jump_half_pass_shortest_fraction@pctnum-->31<!--/v-->% of 40
+ms replays against <!--v:part1.sweep_jump_half_pass_longest_fraction@pctnum-->98<!--/v-->% of 500 ms ones. The test keeps the reference's
 conventions where they carry over, counting only draws strictly below the
 observed value and passing each half at p ≤ 0.05, and translates its zero-jump
-rule to binned centers. <!--v:part1.sweep_state_space_only_fraction|pctnum-->73<!--/v-->% were reported by the state-space detector and not
-by the sliding-window detector, counting the <!--v:part1.sweep_failed_test_fraction|pctnum-->4<!--/v-->% it reported and then failed on
+rule to binned centers. <!--v:part1.sweep_state_space_only_fraction@pctnum-->73<!--/v-->% were reported by the state-space detector and not
+by the sliding-window detector, counting the <!--v:part1.sweep_failed_test_fraction@pctnum-->4<!--/v-->% it reported and then failed on
 the significance test; <!--v:part1.sweep_sliding_only_replays-->0<!--/v--> of the <!--v:part1.sweep_replays-->4,536<!--/v--> went the other way (<!--v:part1.sweep_sliding_only_before_test_replays-->5<!--/v--> before the significance
 test).
 
@@ -124,7 +124,7 @@ ms windows that decode the animal's place rather than a replayed one. That
 absorption of local coding reaches about 80 cm from the animal and is what
 drives the largest over-reporting, as in panel (b); beyond it the window floor
 of panels (i, j) still leaves the reported duration too long. Over the whole
-sweep, <!--v:part1.sweep_sliding_not_the_replay_fraction|pctnum-->23<!--/v-->% of the sliding-window detector's accepted events are not the replay
+sweep, <!--v:part1.sweep_sliding_not_the_replay_fraction@pctnum-->23<!--/v-->% of the sliding-window detector's accepted events are not the replay
 that was put in.
 
 **(l-o) Activity that is not one clean replay**, written into the same
@@ -134,14 +134,14 @@ state alone. **(l)** Share of bursts with an event reported on them. A
 place-less burst, every cell firing at one rate unrelated to its field, carries
 no spatial content, so any event on it is false; a jumping burst represents a
 random place every 15 ms, so calling it non-local is right and calling it a
-sequence is not. Our detector's non-local events cover <!--v:part1.controls_placeless_nonlocal_fraction|pctnum-->90<!--/v-->% of place-less
-bursts, which spend <!--v:part1.controls_placeless_fragmented_share_min|pctnum-->59<!--/v-->% to <!--v:part1.controls_placeless_fragmented_share_max|pctnum-->80<!--/v-->% of their time in the fragmented state; the
-continuous state alone covers <!--v:part1.controls_placeless_continuous_fraction|pctnum-->1<!--/v-->%, and the sliding window <!--v:part1.controls_placeless_sliding_fraction|pctnum-->8<!--/v-->% (<!--v:part1.controls_placeless_sliding_before_test_fraction|pctnum-->15<!--/v-->% before its
+sequence is not. Our detector's non-local events cover <!--v:part1.controls_placeless_nonlocal_fraction@pctnum-->90<!--/v-->% of place-less
+bursts, which spend <!--v:part1.controls_placeless_fragmented_share_min@pctnum-->59<!--/v-->% to <!--v:part1.controls_placeless_fragmented_share_max@pctnum-->80<!--/v-->% of their time in the fragmented state; the
+continuous state alone covers <!--v:part1.controls_placeless_continuous_fraction@pctnum-->1<!--/v-->%, and the sliding window <!--v:part1.controls_placeless_sliding_fraction@pctnum-->8<!--/v-->% (<!--v:part1.controls_placeless_sliding_before_test_fraction@pctnum-->15<!--/v-->% before its
 significance test). These pool the three peak rates, 20, 60 and 160 Hz; at 20
 Hz a place-less burst fires about as fast as the local coding it replaces, and
-our non-local events still cover <!--v:part1.controls_placeless_nonlocal_lowest_rate_fraction|pctnum-->75<!--/v-->% of them. On jumping bursts our non-local
-events cover <!--v:part1.controls_jumping_nonlocal_fraction|pctnum-->97<!--/v-->%, which is right; the continuous state alone covers <!--v:part1.controls_jumping_continuous_fraction|pctnum-->50<!--/v-->% and the
-sliding window <!--v:part1.controls_jumping_sliding_fraction|pctnum-->7<!--/v-->% (<!--v:part1.controls_jumping_sliding_before_test_fraction|pctnum-->13<!--/v-->% before its test), each calling a sequence that is not
+our non-local events still cover <!--v:part1.controls_placeless_nonlocal_lowest_rate_fraction@pctnum-->75<!--/v-->% of them. On jumping bursts our non-local
+events cover <!--v:part1.controls_jumping_nonlocal_fraction@pctnum-->97<!--/v-->%, which is right; the continuous state alone covers <!--v:part1.controls_jumping_continuous_fraction@pctnum-->50<!--/v-->% and the
+sliding window <!--v:part1.controls_jumping_sliding_fraction@pctnum-->7<!--/v-->% (<!--v:part1.controls_jumping_sliding_before_test_fraction@pctnum-->13<!--/v-->% before its test), each calling a sequence that is not
 there. Over <!--v:part1.controls_no_replay_minutes-->1.7<!--/v--> minutes of immobility with no replay, from <!--v:part1.controls_no_replay_recordings-->8<!--/v--> simulated
 recordings that pause in the same places at the track's end, no output reported
 any event: fewer than <!--v:part1.controls_no_replay_rate_bound-->1.8<!--/v--> per minute, at 95% confidence, and only there.
@@ -151,21 +151,21 @@ far end held 45 cm from where the animal rests whatever the jump; bars give how
 each detector carved the event (vermilion outline the sliding window under the
 published definition, blue our non-local events), and the numbers above them
 the share of parts recovered. Our detector reports one event over both parts in
-<!--v:part1.controls_jump_ours_spanning_min|pctnum-->73<!--/v-->% to <!--v:part1.controls_jump_ours_spanning_max|pctnum-->85<!--/v-->% of trials at every jump; the sliding window does so in up to <!--v:part1.controls_jump_sliding_spanning_max|pctnum-->79<!--/v-->% of
+<!--v:part1.controls_jump_ours_spanning_min@pctnum-->73<!--/v-->% to <!--v:part1.controls_jump_ours_spanning_max@pctnum-->85<!--/v-->% of trials at every jump; the sliding window does so in up to <!--v:part1.controls_jump_sliding_spanning_max@pctnum-->79<!--/v-->% of
 trials for jumps up to 40 cm and never across 80 cm. **(n, o)** Two 150 ms, 60
 cm replays with a silent gap, the second continuing from the first's end (n) or
 starting 140 cm away from it (o), both reaching no nearer the animal than 20
 cm. Continuing, at a 10 ms gap both detectors report one event over both parts
-(<!--v:part1.controls_continuing_sliding_spanning_shortest_fraction|pctnum-->71<!--/v-->% of trials for the sliding window, <!--v:part1.controls_continuing_ours_spanning_shortest_fraction|pctnum-->88<!--/v-->% for ours); at 200 ms neither does,
-and they report one event per part in <!--v:part1.controls_continuing_sliding_one_per_part_longest_fraction|pctnum-->54<!--/v-->% and <!--v:part1.controls_continuing_ours_one_per_part_longest_fraction|pctnum-->79<!--/v-->%. Far apart, the sliding
-window never reports one event over both, and misses a part in <!--v:part1.controls_elsewhere_sliding_missing_min|pctnum-->38<!--/v-->% to <!--v:part1.controls_elsewhere_sliding_missing_max|pctnum-->58<!--/v-->% of
-trials; our detector reports one event per part in <!--v:part1.controls_elsewhere_ours_one_per_part_shortest_fraction|pctnum-->17<!--/v-->% of trials at a 10 ms gap
-and <!--v:part1.controls_elsewhere_ours_one_per_part_longest_fraction|pctnum-->83<!--/v-->% at 200 ms. Each part is also decoded alone, with exactly the spikes it
+(<!--v:part1.controls_continuing_sliding_spanning_shortest_fraction@pctnum-->71<!--/v-->% of trials for the sliding window, <!--v:part1.controls_continuing_ours_spanning_shortest_fraction@pctnum-->88<!--/v-->% for ours); at 200 ms neither does,
+and they report one event per part in <!--v:part1.controls_continuing_sliding_one_per_part_longest_fraction@pctnum-->54<!--/v-->% and <!--v:part1.controls_continuing_ours_one_per_part_longest_fraction@pctnum-->79<!--/v-->%. Far apart, the sliding
+window never reports one event over both, and misses a part in <!--v:part1.controls_elsewhere_sliding_missing_min@pctnum-->38<!--/v-->% to <!--v:part1.controls_elsewhere_sliding_missing_max@pctnum-->58<!--/v-->% of
+trials; our detector reports one event per part in <!--v:part1.controls_elsewhere_ours_one_per_part_shortest_fraction@pctnum-->17<!--/v-->% of trials at a 10 ms gap
+and <!--v:part1.controls_elsewhere_ours_one_per_part_longest_fraction@pctnum-->83<!--/v-->% at 200 ms. Each part is also decoded alone, with exactly the spikes it
 had in its event and the recording's own spikes around it; a part counts as
 recovered only where the event's positions over that part sit on its path.
 Across jumps and chains, pooled recovery is higher inside the event than alone:
-the sliding window recovers <!--v:part1.controls_sliding_recovery_in_event_fraction|pctnum-->72<!--/v-->% of parts inside the event against <!--v:part1.controls_sliding_recovery_alone_fraction|pctnum-->61<!--/v-->% alone,
-and ours <!--v:part1.controls_ours_recovery_in_event_fraction|pctnum-->89<!--/v-->% against <!--v:part1.controls_ours_recovery_alone_fraction|pctnum-->86<!--/v-->%. Paired by trial, the gain is not uniform: the sliding
+the sliding window recovers <!--v:part1.controls_sliding_recovery_in_event_fraction@pctnum-->72<!--/v-->% of parts inside the event against <!--v:part1.controls_sliding_recovery_alone_fraction@pctnum-->61<!--/v-->% alone,
+and ours <!--v:part1.controls_ours_recovery_in_event_fraction@pctnum-->89<!--/v-->% against <!--v:part1.controls_ours_recovery_alone_fraction@pctnum-->86<!--/v-->%. Paired by trial, the gain is not uniform: the sliding
 window recovers fewer parts inside the event than alone in <!--v:part1.controls_sliding_fewer_in_event_trials-->15<!--/v--> of <!--v:part1.controls_multipart_trials-->432<!--/v--> trials and
 more in <!--v:part1.controls_sliding_more_in_event_trials-->95<!--/v-->, ours fewer in <!--v:part1.controls_ours_fewer_in_event_trials-->2<!--/v--> and more in <!--v:part1.controls_ours_more_in_event_trials-->22<!--/v-->.
 
@@ -181,17 +181,17 @@ position and against 100 permutations of the evaluation fields, spikes and
 silence both counting, and has support when it beats both (p ≤ 0.05). **(p)**
 Share of events with support, among those along whose content the evaluation
 cells are expected to fire at least 5 spikes; numbers give how many. True
-replays that only our detector reported have support in <!--v:part1.heldout_ours_only_support_min|pctnum-->93<!--/v-->% to <!--v:part1.heldout_ours_only_support_max|pctnum-->97<!--/v-->% of cases in
-folds A and B and <!--v:part1.heldout_ours_only_support_fold_c|pctnum-->87<!--/v-->% in fold C; shared ones in <!--v:part1.heldout_shared_support|pctnum-->100<!--/v-->%. No informative place-less
+replays that only our detector reported have support in <!--v:part1.heldout_ours_only_support_min@pctnum-->93<!--/v-->% to <!--v:part1.heldout_ours_only_support_max@pctnum-->97<!--/v-->% of cases in
+folds A and B and <!--v:part1.heldout_ours_only_support_fold_c@pctnum-->87<!--/v-->% in fold C; shared ones in <!--v:part1.heldout_shared_support@pctnum-->100<!--/v-->%. No informative place-less
 burst event has support (<!--v:part1.heldout_placeless_informative_events-->19<!--/v--> of them), and at a floor of 2 expected spikes <!--v:part1.heldout_placeless_loose_supported_events-->4<!--/v--> of
-<!--v:part1.heldout_placeless_loose_events-->75<!--/v--> do; jumping bursts, which do represent places, have support in <!--v:part1.heldout_jumping_support_min|pctnum-->57<!--/v-->% to <!--v:part1.heldout_jumping_support_max|pctnum-->63<!--/v-->%.
+<!--v:part1.heldout_placeless_loose_events-->75<!--/v--> do; jumping bursts, which do represent places, have support in <!--v:part1.heldout_jumping_support_min@pctnum-->57<!--/v-->% to <!--v:part1.heldout_jumping_support_max@pctnum-->63<!--/v-->%.
 Neither detector reported an event from discovery cells on the no-replay
 stretches, so no event of pure local coding reached the test. The two content
-estimates agree on <!--v:part1.heldout_estimator_agreement_min|pctnum-->99<!--/v-->% of the events informative under both, or more. The
+estimates agree on <!--v:part1.heldout_estimator_agreement_min@pctnum-->99<!--/v-->% of the events informative under both, or more. The
 sliding window reported no event our detector missed, so there is no
 comparator-only class to test. **(q)** Share of each kind of replay the
-evaluation cells can judge at all: <!--v:part1.heldout_ours_only_informative_min|pctnum-->6<!--/v-->% to <!--v:part1.heldout_ours_only_informative_max|pctnum-->7<!--/v-->% of those only our detector
-reported, <!--v:part1.heldout_shared_informative_min|pctnum-->16<!--/v-->% to <!--v:part1.heldout_shared_informative_max|pctnum-->23<!--/v-->% of shared ones, in folds A and B. The rest are too short
+evaluation cells can judge at all: <!--v:part1.heldout_ours_only_informative_min@pctnum-->6<!--/v-->% to <!--v:part1.heldout_ours_only_informative_max@pctnum-->7<!--/v-->% of those only our detector
+reported, <!--v:part1.heldout_shared_informative_min@pctnum-->16<!--/v-->% to <!--v:part1.heldout_shared_informative_max@pctnum-->23<!--/v-->% of shared ones, in folds A and B. The rest are too short
 or too sparse for a dozen evaluation cells, so an event without support is
 mostly one that cannot be judged, not one shown false. Held-out support tests
 spatial information, not sequence, and is read with these error rates, not

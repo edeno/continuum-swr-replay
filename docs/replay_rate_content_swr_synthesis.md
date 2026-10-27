@@ -202,7 +202,7 @@ retain a **different** share of each population's event bins — **<!--v:part3.r
 detected SWR, **<!--v:part3.rate_arrival_event_share_non_local_swr-->0.94<!--/v-->** w/ SWR, **<!--v:part3.rate_arrival_event_share_non_local-->0.91<!--/v-->** non-local, **<!--v:part3.rate_arrival_event_share_non_local_no_swr-->0.88<!--/v-->** no SWR (on all
 stops: <!--v:part3.rate_allstops_arrival_event_share_swr-->0.91<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local_swr-->0.91<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local-->0.86<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local_no_swr-->0.81<!--/v-->) — so a
 between-population contrast on that ladder is partly a contrast between windows;
-and they are heavily flagged (<!--v:part3.rate_arrival_separated_fraction_low|pctnum-->58<!--/v-->–<!--v:part3.rate_arrival_separated_fraction_high-->63 %<!--/v--> of `M5a_time_arrival` fits carry a
+and they are heavily flagged (<!--v:part3.rate_arrival_separated_fraction_low@pctnum-->58<!--/v-->–<!--v:part3.rate_arrival_separated_fraction_high-->63 %<!--/v--> of `M5a_time_arrival` fits carry a
 separated non-nuisance term), so read them pooled, on the fitted curve, never
 per session.
 
@@ -305,7 +305,7 @@ on `C2_base` (animal bootstrap [<!--v:part3.est_breadth_dm_low-->+1.5<!--/v-->, 
 <!--v:part3.dm_breadth_positive_fraction-->100 %<!--/v--> of sessions**, and positive on every rung of the pooled table. Large φ
 means the event's timebins sit closer to independent draws from its own arm
 distribution and its mass is spread over more arms, so an SWR event's φ is
-≈ e^<!--v:part3.dm_breadth|sig2-->1.7<!--/v--> ≈ **<!--v:part3.dm_breadth_ratio-->5.6<!--/v-->×** a non-SWR event's. **Caveat — φ is assumed length-invariant.**
+≈ e^<!--v:part3.dm_breadth@sig2-->1.7<!--/v--> ≈ **<!--v:part3.dm_breadth_ratio-->5.6<!--/v-->×** a non-SWR event's. **Caveat — φ is assumed length-invariant.**
 The likelihood uses event length only as the multinomial index, and length is
 post-treatment with respect to `is_swr`: SWR events run **<!--v:part3.event_bins_ratio-->2.0<!--/v-->×** longer (median
 <!--v:part3.event_bins_median_swr-->47<!--/v--> vs <!--v:part3.event_bins_median_non_swr-->24<!--/v--> bins). The length-adjusted twin (`_dm_len`) puts the contrast at

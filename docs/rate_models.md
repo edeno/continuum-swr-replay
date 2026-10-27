@@ -412,11 +412,11 @@ time at a well. The caveat survives only for the `_allstops` sensitivity
 bundle.
 
 **Retention is not balanced across populations.** The window keeps a different
-fraction of each population's *events* — on the well-anchored cohort <!--v:part3.rate_arrival_event_share_swr|pct-->95 %<!--/v-->
-(detected SWR), <!--v:part3.rate_arrival_event_share_non_local_swr|pct-->94 %<!--/v--> (non-local with SWR), <!--v:part3.rate_arrival_event_share_non_local|pct-->91 %<!--/v--> (non-local, all) and
-**<!--v:part3.rate_arrival_event_share_non_local_no_swr|pct-->88 %<!--/v-->** (non-local without SWR) — so an arrival-ladder contrast between
+fraction of each population's *events* — on the well-anchored cohort <!--v:part3.rate_arrival_event_share_swr@pct-->95 %<!--/v-->
+(detected SWR), <!--v:part3.rate_arrival_event_share_non_local_swr@pct-->94 %<!--/v--> (non-local with SWR), <!--v:part3.rate_arrival_event_share_non_local@pct-->91 %<!--/v--> (non-local, all) and
+**<!--v:part3.rate_arrival_event_share_non_local_no_swr@pct-->88 %<!--/v-->** (non-local without SWR) — so an arrival-ladder contrast between
 populations is partly a contrast between windows. The imbalance is smaller than
-it was on all stops (<!--v:part3.rate_allstops_arrival_event_share_swr|pctnum-->91<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local_swr|pctnum-->91<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local|pctnum-->86<!--/v--> / **<!--v:part3.rate_allstops_arrival_event_share_non_local_no_swr|pct-->81 %<!--/v-->**), because the bouts the
+it was on all stops (<!--v:part3.rate_allstops_arrival_event_share_swr@pctnum-->91<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local_swr@pctnum-->91<!--/v--> / <!--v:part3.rate_allstops_arrival_event_share_non_local@pctnum-->86<!--/v--> / **<!--v:part3.rate_allstops_arrival_event_share_non_local_no_swr@pct-->81 %<!--/v-->**), because the bouts the
 window discards most are the in-transit ones the cohort no longer holds (their
 retention is 0.17–0.35). Both the cohort audit and the runner log report it per
 population (`result.attrs["arrival_clock_cohort"]`;

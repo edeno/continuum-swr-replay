@@ -9,10 +9,10 @@ fails the LaTeX build rather than redefining anything.
 **Inline markers.** In a markdown doc a value is written between two markers::
 
     <!--v:part2.kay_no_nonlocal_fraction-->17 %<!--/v-->
-    <!--v:part2.kay_no_nonlocal_fraction|pctnum-->17<!--/v--> %
+    <!--v:part2.kay_no_nonlocal_fraction@pctnum-->17<!--/v--> %
 
 The text between them is replaced by the value printed in the marker's style
-(after ``|``) or the value's own. The prose around the markers stays
+(after ``@``; not ``|``, which would split a markdown table cell) or the value's own. The prose around the markers stays
 hand-written. A marker naming a key no summary holds is an error, so a renamed
 value cannot leave a stale number behind. Markers inside code (backticks or a
 fenced block) are examples and are left alone.
@@ -29,11 +29,11 @@ from continuum_swr_replay.reported.formatting import formatted
 from continuum_swr_replay.reported.values import Summary, Value, values_by_key
 
 MARKER = re.compile(
-    r"<!--v:(?P<key>part\d\.[a-z_]+)(?:\|(?P<style>[a-z0-9]+))?-->"
+    r"<!--v:(?P<key>part\d\.[a-z_]+)(?:@(?P<style>[a-z0-9]+))?-->"
     r"(?P<text>.*?)<!--/v-->",
     re.DOTALL,
 )
-_CODE = re.compile(r"```.*?```|`[^`\n]*`", re.DOTALL)
+_CODE = re.compile(r"```.*?```|~~~.*?~~~|`[^`\n]*`", re.DOTALL)
 """Fenced code blocks and inline code spans: a marker shown in code is an
 example, not a value."""
 _PART_WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four"}
@@ -95,6 +95,8 @@ def fill_markers(
     ------
     KeyError
         A marker names a key no summary holds.
+    ValueError
+        A marker is not closed before the next one opens.
     """
     changes: list[Change] = []
 
@@ -105,7 +107,11 @@ def fill_markers(
         new = formatted(values[key], match["style"])
         if new != match["text"]:
             changes.append(Change(doc, key, match["text"], new))
-        style = f"|{match['style']}" if match["style"] else ""
+        if "<!--v:" in match["text"]:
+            raise ValueError(
+                f"{doc}: marker {key} is not closed before the next marker"
+            )
+        style = f"@{match['style']}" if match["style"] else ""
         return f"<!--v:{key}{style}-->{new}<!--/v-->"
 
     return _outside_code(text, lambda part: MARKER.sub(replace, part)), changes

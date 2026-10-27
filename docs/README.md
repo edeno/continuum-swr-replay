@@ -428,7 +428,7 @@ Three tiers:
    over <!--v:part4.nonconverged_neurons-->48<!--/v--> neurons), against <!--v:part4.ml_nonconverged_percent-->15<!--/v-->% in the maximum-likelihood tree (fit on the tables before the R11 re-decode); the prior binds on
    <!--v:part4.prior_binds_percent_min-->1.3<!--/v-->–<!--v:part4.prior_binds_percent_max-->2.7<!--/v-->% of well-posed units per curve. The null's geometry, by the rules of
    `scripts/pfc/measure_pfc_null_geometry.py`: the engagement null's draws land on the
-   shipped control they are entered beside on a median <!--v:part4.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:part4.class_called_flat_fraction_min|pctnum-->5<!--/v-->–<!--v:part4.class_called_flat_fraction_max-->9 %<!--/v--> of
+   shipped control they are entered beside on a median <!--v:part4.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:part4.class_called_flat_fraction_min@pctnum-->5<!--/v-->–<!--v:part4.class_called_flat_fraction_max-->9 %<!--/v--> of
    the units called at raw p < .05 for an event class have no positive held-out improvement of their own,
    and <!--v:part4.unmatchable_percent_class_min-->0.27<!--/v-->–<!--v:part4.unmatchable_percent_class_max-->0.60<!--/v-->% of a class's events have no legal within-bout control and enter neither
    side of its test. Figure 4 is regenerated from these bundles; claim 20's numbers are read from

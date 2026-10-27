@@ -152,7 +152,13 @@ def _value_factory(
     ) -> Value:
         return Value(
             key=key,
-            value=int(value) if kind == "count" else float(value),
+            value=(
+                int(value)
+                if kind == "count" and float(value).is_integer()
+                else value
+                if kind == "count"
+                else float(value)
+            ),
             kind=kind,
             style=style,
             unit=unit,

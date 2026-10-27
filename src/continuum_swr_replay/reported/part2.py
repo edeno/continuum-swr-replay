@@ -111,9 +111,9 @@ def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...
         claims_: tuple[str, ...] | None = None,
         used_in_: tuple[str, ...] | None = None,
     ) -> Value:
-        if kind == "count":
+        if kind == "count" and float(value).is_integer():
             value = int(value)
-        else:
+        elif kind != "count":
             value = float(value)
         return Value(
             key=key,

@@ -15,8 +15,10 @@ r"""How a reported value is printed: the project's only rounding rules.
 - ``pval``: a p- or q-value, two significant figures; below 0.001 in scientific
   notation (``0.034``, ``1.1e-11``; LaTeX ``\ensuremath{1.1\times10^{-11}}``).
 
-Rounding is half away from zero, so a printed number does not depend on
-binary floating point's ties. Rounding is a communication choice, not a
+Rounding is half away from zero, in decimal (a value's shortest repr), so a
+printed number does not depend on binary floating point's ties. A negative
+number prints a true minus (U+2212; ``\ensuremath{-}`` in LaTeX), and a value
+that rounds to zero prints without a sign. Rounding is a communication choice, not a
 statement of uncertainty: where variability matters to a claim, it is a value
 of its own (an interval's bounds, a count of animals).
 """
@@ -29,8 +31,18 @@ from decimal import ROUND_HALF_UP, Decimal
 from continuum_swr_replay.reported.values import Value
 
 
-def _round(x: float, places: int) -> Decimal:
-    return Decimal(repr(float(x))).quantize(Decimal(1).scaleb(-places), ROUND_HALF_UP)
+def _round(x: float | Decimal, places: int) -> Decimal:
+    exact = x if isinstance(x, Decimal) else Decimal(repr(float(x)))
+    return exact.quantize(Decimal(1).scaleb(-places), ROUND_HALF_UP)
+
+
+def _signed(text: str, latex: bool) -> str:
+    """``text`` with a true minus sign, and no sign on a value that rounds to zero."""
+    if not text.startswith("-"):
+        return text
+    if Decimal(text) == 0:
+        return text[1:]
+    return ("\\ensuremath{-}" if latex else "\u2212") + text[1:]
 
 
 def _sig2(x: float) -> str:
@@ -66,21 +78,21 @@ def formatted(value: Value, style: str | None = None, *, latex: bool = False) ->
         text = f"{int(x):,}"
         return text.replace(",", "{,}") if latex else text
     if style in ("pct", "pctnum"):
-        number = format(_round(100 * float(x), 0), "f")
+        number = format(_round(Decimal(repr(float(x))) * 100, 0), "f")
         return number if (latex or style == "pctnum") else f"{number} %"
     if style == "int":
-        return format(_round(x, 0), "f")
+        return _signed(format(_round(x, 0), "f"), latex)
     if style == "dec2":
-        return format(_round(x, 2), "f")
+        return _signed(format(_round(x, 2), "f"), latex)
     if style == "sig2":
-        return _sig2(x)
+        return _signed(_sig2(x), latex)
     if style == "sig2s":
         text = _sig2(x)
         if text.startswith("-"):
             return ("\\ensuremath{-}" if latex else "\u2212") + text[1:]
         return "+" + text
     if style == "pval":
-        if float(x) >= 0.001 or x == 0:
+        if x == 0 or Decimal(_sig2(x)) >= Decimal("0.001"):
             return _sig2(x)
         exponent = math.floor(math.log10(float(x)))
         mantissa = Decimal(repr(float(x))).scaleb(-exponent)
