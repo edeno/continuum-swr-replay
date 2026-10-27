@@ -10,7 +10,7 @@ Why: the quantity the summary quotes is the population mean one-SD slope kernel,
 - [src/continuum_swr_replay/analysis/pfc/marked_glm.py:1137-1272](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L1137) — `permuted_mark_blocks`, `_mark_block_geometry`, `within_available_mark_permutations`: the batched block rebuild used by the single-mark label shuffle; typed for `MarkedModelLadder` but only reads `events[class]`, `fit_mask`, `spline_basis`, `lags` and a z column.
 - [src/continuum_swr_replay/analysis/pfc/batched_glm.py:1227](../../../../src/continuum_swr_replay/analysis/pfc/batched_glm.py#L1227) — `fit_poisson_glms(design, counts, penalty, compute_covariance)`: one design, all units.
 - [scripts/pfc/summarize_pfc_marked_family.py:181-245](../../../../scripts/pfc/summarize_pfc_marked_family.py#L181) — `population_curve_summary`.
-- `docs/audits/2026-09-18-pfc-marked-family-smoke.md` — the σ_mark scan; the reference must use the same prior as the observed fit.
+- `.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md` — the σ_mark scan; the reference must use the same prior as the observed fit.
 
 **Contracts referenced:**
 

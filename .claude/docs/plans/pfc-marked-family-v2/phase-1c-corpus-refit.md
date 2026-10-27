@@ -6,8 +6,8 @@ Why: phases 1a and 1b change every estimate. This phase reruns the three-session
 
 **Inputs to read first:**
 
-- `docs/audits/2026-09-18-pfc-marked-family-smoke.md` — the smoke protocol, the sessions used (j16 20210710 02_r1, senor 20201101 08_r4, wilbur 20210331 10_r5), and the isolation-refit check.
-- `docs/audits/2026-09-19-pfc-marked-family-corpus.md` and `-summary.md` — the contract-1 numbers to compare against.
+- `.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md` — the smoke protocol, the sessions used (j16 20210710 02_r1, senor 20201101 08_r4, wilbur 20210331 10_r5), and the isolation-refit check.
+- `.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md` and `-summary.md` — the contract-1 numbers to compare against.
 - [scripts/pfc/run_pfc_marked_model_family.py:800-960](../../../../scripts/pfc/run_pfc_marked_model_family.py#L800) — CLI and `main`; the runner is resumable and its skip check will refit everything under contract 2.
 - [scripts/pfc/summarize_pfc_marked_family.py:59-120](../../../../scripts/pfc/summarize_pfc_marked_family.py#L59) — `load_bundles`; it must refuse a mixed-contract directory.
 - `logs/pfc_marked_family_20260918/sessions_gpu{4,7,9}.txt` — the per-worker session lists of the first batch; reuse the ranked list.

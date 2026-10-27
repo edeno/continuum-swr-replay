@@ -34,7 +34,10 @@ current-arm content.
 
 The fit uses the same 500 Hz axis, ±250 ms spline support, ±200 ms reporting
 window, at-well stop cohort, ridge-Poisson estimator, and support-separated
-blocked folds as the canonical PFC analysis.
+blocked folds as the canonical PFC analysis. The session is assembled by the
+canonical PFC assembly (`analysis/pfc/session.py`), so the fit mask (with the
+analysed-time rule: no fitted bin's ±250 ms basis window reaches excluded
+time) and the replay-class onsets are exactly the ones Figure 4 is fit on.
 
 ## Nested held-out comparisons
 
@@ -67,10 +70,11 @@ and session time. In the current canonical table, content/log-duration
 correlation has median `-0.129` across 436 session × class groups (138 have
 `|r| > 0.2`), and content/session-time correlation exceeds `|r| = 0.2` in 71
 groups. Occupied-arm identity explains a median 6.8% of content-mark variance.
-These are computed by `scripts/qa/measure_pfc_mark_context.py` over the
+These are computed by `scripts/pfc/measure_pfc_mark_context.py` over the
 well-anchored events (event `occupancy_state` of `at_well` or `mixed`, the
-population the kernels fit) of all 218 canonical sessions, not only the 71 mPFC
-sessions; "session time" is the event midpoint.
+population the kernels fit) of all canonical sessions, not only the mPFC
+sessions; "session time" is the event midpoint. The numbers above were measured
+2026-09-18 on the 218-session tables of that date.
 The reference therefore describes where the observed held-out gain falls
 relative to freely reassigned labels; it does not test a context-independent
 content effect.

@@ -39,7 +39,7 @@ Everything below is on branch `feature/pfc-marked-event-kernels` at commit `55c5
 - No per-arm kernels (arm-identity tuning); phase 5 answers "which place" from the population side instead.
 - No change to the canonical Figure 4 model, its bundles, or claim 20.
 - No OFC run in this plan; the runners accept `--brain-area OFC` and that is a separate decision.
-- No time-resolved (within-event) content marks and no pre-onset "mPFC predicts content" analysis; both are listed as later questions in `docs/audits/2026-09-19-pfc-marked-family-corpus.md` and are out of scope here.
+- No time-resolved (within-event) content marks and no pre-onset "mPFC predicts content" analysis; both are listed as later questions in `.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md` and are out of scope here.
 
 ### Dependency policy
 
@@ -68,7 +68,7 @@ No new dependencies. `statsmodels` (already present) is used for the per-unit pe
 
 ## Rollout Strategy
 
-Replace in place; no deprecation window (CLAUDE.md default). Before phase 1c's refit, `Processed-Data/pfc_marked_model_family/` is renamed to `Processed-Data/pfc_marked_model_family_v1_single_intercept/` and the audits that quote it (`docs/audits/2026-09-19-pfc-marked-family-corpus.md`, `-summary.md`) get one line saying so. Contract-1 bundles are never read by the contract-2 summary. Phases 4 and 5 write their own artifact directories and touch nothing in the family tree.
+Replace in place; no deprecation window (CLAUDE.md default). Before phase 1c's refit, `Processed-Data/pfc_marked_model_family/` is renamed to `Processed-Data/pfc_marked_model_family_v1_single_intercept/` and the audits that quote it (`.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md`, `-summary.md`) get one line saying so. Contract-1 bundles are never read by the contract-2 summary. Phases 4 and 5 write their own artifact directories and touch nothing in the family tree.
 
 ## Open Questions
 

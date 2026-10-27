@@ -328,6 +328,48 @@ them importable.
   host. A batch runs as one process per card — `--n_workers 1 --gpu N --sessions
   <partition file>` — because one card handed to several workers is refused, and the
   same card handed twice to one process is ignored.
+- `run_pfc_marked_kernels.py` fits the content-marked extension of those unit GLMs
+  (`docs/design/pfc_marked_event_kernels.md`) on the same session assembly (fit mask,
+  analysed-time rule, canonical event sets): per replay class an ordinary kernel, a
+  log-duration nuisance kernel and a content kernel, all jointly, scored out of fold
+  against a mark-label shuffle. It takes `--scientific-mark`
+  (`current_arm_fraction`, the default, or `current_arm_fraction_posterior`),
+  `--nuisance-marks` (log event duration by default; pass the flag with no values to
+  drop it), `--n-shuffles` with `--shuffle-seed` (default 100, giving 1/101 tail
+  resolution — 0 skips the reference, and any other value must be at least the 20-draw
+  floor), `--design-batch-size` for how many permuted designs are scored at once, and
+  `--event-arm-table` for the table the mark is read from. It shares
+  `--penalty-sigma`, `--n-folds`, `--fold-seed`, `--brain-area`, the session
+  selectors (`--animal` / `--date` / `--epoch` / `--sessions` / `--max-sessions`, over
+  the epoch register's analysed epochs), `--gpu` / `--allow-cpu`, `--output-dir`
+  (default `pfc_marked_kernels/` under the processed-data root) and `--overwrite`
+  with the canonical runner. It has no `--stop-cohort`: it always fits the
+  well-anchored cohort. **No bundle has been produced yet.**
+- `run_pfc_marked_model_family.py` fits the recommended descriptive extension
+  without decoding mPFC activity or computing p-values. Its nine default core
+  families jointly characterize spatial role, content-weighted uncertainty and
+  value, reward memory/recency, trajectory geometry, within-stop timing,
+  switch/reward context, and graded ripple/MUA/theta coupling. Pass
+  `--include-interactions` for the three current-arm/uncertainty interactions
+  with exploration, reward, and ripple power, or select explicit `--models`.
+  Every target is compared out of fold with the otherwise identical joint model
+  lacking only that target's temporal block. Session loading and folds are
+  shared across models; the six compact core models share the 155-column tier,
+  while the three content horse-races and three interactions share the 221-column
+  tier for JAX compilation reuse. Wide-design microbatches are bounded by
+  the measured single-mark memory workload. It supports the same session/GPU,
+  penalty, fold, output, overwrite, and event-arm-table options as the
+  single-mark runner plus `--event-table`, `--mark-penalty-sigma` and
+  `--min-marked-events` (default 10 per class). Output goes to
+  `pfc_marked_model_family/` under the processed-data root; the bundles there are
+  the 71-session corpus of 2026-09-19
+  (`.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md`), fit before the
+  analysed-time rule.
+- `summarize_pfc_marked_family.py` aggregates those bundles unit → session →
+  animal (fraction of units with a positive held-out gain, population mean
+  slope kernels with pre- and post-onset means, one figure per model); no
+  p-values. `--bundle-dir`, `--out <markdown>`, `--figure-dir`, `--blowup`
+  (default 1000).
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
@@ -354,6 +396,12 @@ them importable.
   are entered beside; how many units called at raw p < .05 have no positive held-out
   improvement of their own; and how many events of each class had no legal within-bout
   control and so entered neither side of its test.
+- `measure_pfc_mark_context.py` — measures what the marked kernels' content mark
+  (`current_arm_fraction`) is entangled with, session by session and per replay
+  class, over the well-anchored events of the canonical `event_arm_table`: its
+  correlation with log event duration and with session time, and the share of its
+  variance the occupied arm explains. Reported for the reader of the label-shuffle
+  reference, not acted on. `--event-arm-table`, `--out <markdown>`.
 - `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
   retired run-time event construction yielded against the canonical event table it now
   reads: the two event counts, how many events change SWR class once the lists are

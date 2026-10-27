@@ -169,7 +169,7 @@ rank (221/221). This cost is why interactions are opt-in.
 ## What the first smoke showed
 
 The three-session GPU smoke
-([audits/2026-09-18-pfc-marked-family-smoke.md](../audits/2026-09-18-pfc-marked-family-smoke.md))
+([2026-09-18-pfc-marked-family-smoke.md](../../.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md))
 ran end to end, but it also showed that a family bundle's `typical` curve is
 **not** the Figure 4 kernel: with the base kernels alone the family reproduces
 the canonical curves exactly, and adding the mark blocks under the σ = 3 prior
@@ -202,4 +202,9 @@ model under `Processed-Data/pfc_marked_model_family/`:
 The provenance file is written last and is the bundle commit marker. A stale,
 partial, or mismatched bundle is removed before refitting. **The 71-session
 corpus was fit 2026-09-19** at git `4d69b83` (816 bundles, 36 ineligible
-markers): [audits/2026-09-19-pfc-marked-family-corpus.md](../audits/2026-09-19-pfc-marked-family-corpus.md).
+markers): [2026-09-19-pfc-marked-family-corpus.md](../../.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md).
+That corpus predates the analysed-time rule: its sessions were assembled
+without excluded time and without the artifact-dropped events, on the
+218-session tables of that date. The runner now assembles each session with
+the canonical PFC assembly (`analysis/pfc/session.py`), so a refit's fit mask
+and event onsets are the Figure 4 ones.

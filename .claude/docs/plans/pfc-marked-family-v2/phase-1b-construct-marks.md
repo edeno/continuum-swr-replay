@@ -12,7 +12,7 @@ Why: correlated marks split and shrink each other under the joint fit (current-a
 - [src/continuum_swr_replay/analysis/pfc/marked_model_family.py:609-799](../../../../src/continuum_swr_replay/analysis/pfc/marked_model_family.py#L609) — `build_recommended_event_mark_table`; the raw products at `:792-797`.
 - [src/continuum_swr_replay/analysis/pfc/marked_model_family.py:980-1080](../../../../src/continuum_swr_replay/analysis/pfc/marked_model_family.py#L980) — `build_marked_family_ladder`, where standardization happens and where the products must now be formed.
 - [src/continuum_swr_replay/analysis/pfc/marked_glm.py:785-915](../../../../src/continuum_swr_replay/analysis/pfc/marked_glm.py#L785) — `standardize_event_marks` (`allow_missing`, `allow_constant`, `min_marked_events`).
-- `docs/audits/2026-09-19-pfc-marked-family-corpus.md` — the correlation and blow-up numbers this phase is answering.
+- `.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md` — the correlation and blow-up numbers this phase is answering.
 
 **Contracts referenced:**
 
