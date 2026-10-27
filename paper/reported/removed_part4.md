@@ -1,0 +1,17 @@
+# Part 4: what was removed when its numbers moved to the summary
+
+Each row is an analysis or number taken out of a doc when Part 4's typed numbers became values in
+`paper/reported/part4.json` (2026-10-26). Restored items are listed at the bottom.
+
+| Doc | Claim / section | What was removed | Why |
+|---|---|---|---|
+| `paper/claims_table.md` | 20, REVISED 2026-09-14 | "on this population that definition relabels nothing (identical event and SWR-coupled counts in 71/71 sessions, median SWR fraction 0.447 either way)" | The comparison of the old run-time event definition with the canonical one was made against bundles that have since been overwritten. No current output compares the two definitions. The median SWR-coupled share is kept, as a current value (`swr_coupled_share_session_median`). |
+| `paper/claims_table.md` | 20, REFIT 2026-09-15 | "nothing the old and new trees share moved outside the estimator gate in any session"; engagement "19.1% of 10,898 neurons FDR-significant pooled (chimi 41.7%, j16 19.5%, peanut 21.8%, senor 23.3%, wilbur 16.0%)"; "4.0% for the control's own modulation"; "14.8% of the shipped model fits (22,902 of 154,350, over 4,640 neurons)"; "Numbers pending the fit-validity phase; the engagement claim stands and the equivalence one does not" | These were the maximum-likelihood refit's results, and the row already called them superseded by the ridge refit. They are not reported values now. They could be recomputed from `Processed-Data/_pre_ridge_backup_20260915/` (legacy loader), but nothing quotes them. Only the non-convergence percent is kept, as a pending comparator (`ml_nonconverged_percent`). The sentence now points to the 2026-09-15 review. |
+| `docs/README.md` | PFC unit bundles ("Where results live") | The first ridge batch's run details: "launched 2026-09-16, finished 2026-09-17, five workers on the idle A100s (cards 3, 4, 6, 7 and 9), 13 h 52 m to 16 h 59 m of wall clock each" | They describe a batch that is no longer the current one. The current 75 bundles are the refit at `110c9ae` on 2026-10-11/12 (`logs/pfc_refresh2_20261011/`). |
+| `docs/README.md` | PFC unit bundles | "sits beside them under `_sigma2` / `_sigma4p5`" (the σ = 2 / 4.5 sensitivity pair) | The pair is no longer in `Processed-Data/` and was not refit on the R11 re-decode. The sentence now says so. |
+
+## Restored
+
+| Doc | Claim / section | What | Now |
+|---|---|---|---|
+| `paper/claims_table.md` | 20, Numbers | "BH across the pooled units would give 12.1 %, quoted for reference only" | Restored as the computed value `engagement_bh_fraction`: BH applied once over the pooled plus-one empirical engagement p-values of every tested unit in Figure 4's population. Removed at first because no tracked script BH-corrects the held-out p-values (it was retired as inference); the review pointed out that the bundles hold those p-values. |

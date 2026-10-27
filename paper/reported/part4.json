@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "2eb4cfadf2c6",
+ "commit": "e5c0e9f9ccb7-dirty",
  "inputs": [
   {
    "path": "Processed-Data/*_mPFC_modulation.pkl",
@@ -196,6 +196,21 @@
    "style": "pctnum",
    "unit": "",
    "description": "lowest such share over the four event classes (non_local_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_bh_fraction": {
+   "value": 0.1024646673560841,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid",
    "claims": [
     "20"
    ],
@@ -459,6 +474,21 @@
    "style": "sig2",
    "unit": "%",
    "description": "non-converged fits as a percent of model fits in the maximum-likelihood tree (22902 of 154350, 71 sessions)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
+   "pending": "read from the superseded maximum-likelihood tree (Processed-Data/_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; it is a comparison of estimators, not refit on the current tables"
+  },
+  "ml_sessions": {
+   "value": 71,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sessions in the maximum-likelihood tree",
    "claims": [
     "20"
    ],
