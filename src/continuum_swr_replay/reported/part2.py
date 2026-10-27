@@ -39,6 +39,7 @@ from continuum_swr_replay.paths import (
     ROOT_DIR,
     event_features_root,
     inventory_comparison_root,
+    processed_data_dir,
     replay_content_dir,
     table_path,
 )
@@ -83,6 +84,8 @@ class Part2Inputs:
     reality_dir: Path
     heldout_by_swr: Path
     content_occupancy: Path
+    brain_state_reference: Path
+    event_gamma: Path
 
 
 def default_inputs() -> Part2Inputs:
@@ -94,6 +97,10 @@ def default_inputs() -> Part2Inputs:
         / ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
         content_occupancy=ROOT_DIR
         / "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+        brain_state_reference=processed_data_dir()
+        / "brain_state_reference"
+        / "reference.parquet",
+        event_gamma=processed_data_dir() / "event_gamma",
     )
 
 
@@ -652,6 +659,115 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
     return values
 
 
+# --- 2b: theta, ripple and MUA during events --------------------------------------
+
+_SIGNAL_EVENT_COLUMNS = {
+    "theta": "theta_z",
+    "ripple": "ripple_power_z",
+    "mua": "mua_rate_z",
+    "slow_gamma": "slow_gamma_z",
+    "fast_gamma": "fast_gamma_z",
+}
+_SIGNAL_LABELS = {
+    "theta": "theta power",
+    "ripple": "ripple power",
+    "mua": "MUA rate",
+    "slow_gamma": "slow-gamma power (25-55 Hz)",
+    "fast_gamma": "fast-gamma power (65-100 Hz)",
+}
+
+
+def brain_state_values(
+    events: pd.DataFrame, reference: pd.DataFrame, source: str
+) -> list[Value]:
+    """Claims 5 and 24: theta, ripple power, MUA and slow and fast gamma during
+    events, against running and quiet rest.
+
+    Each event's value is its mean over its bins of the epoch's z-scored signal
+    (the event table's ``theta_z``, ``ripple_power_z``, ``mua_rate_z``, and the
+    gamma pass's ``slow_gamma_z``, ``fast_gamma_z``, joined on ``event_id``); the
+    references are each epoch's median during running (>10 cm/s) and quiet rest
+    (<4 cm/s, in no event), on the same scale (``brain_state_reference``). An
+    event is theta-like when its theta reaches its epoch's running median.
+    """
+    keys = ["animal", "session_date", "epoch"]
+    joined = events.merge(reference, on=keys, how="left", validate="m:1")
+    if joined["theta_running_median"].isna().any():
+        raise ValueError("an event's epoch has no running reference")
+    values: list[Value] = []
+    for word, column in _SIGNAL_EVENT_COLUMNS.items():
+        make = _value_factory(
+            source,
+            ("5", "24") if word == "ripple" else ("5",),
+            ("paper", "figure: 3b") if word == "ripple" else ("supplement",),
+        )
+        label = _SIGNAL_LABELS[word]
+        values += [
+            make(
+                f"{word}_running_reference",
+                reference[f"{word}_running_median"].median(),
+                "quantity",
+                "dec2",
+                f"median over epochs of the epoch's median z-scored {label} while running",
+                "z",
+            ),
+            make(
+                f"{word}_rest_reference",
+                reference[f"{word}_rest_median"].median(),
+                "quantity",
+                "dec2",
+                f"median over epochs of the epoch's median z-scored {label} in quiet rest",
+                "z",
+            ),
+        ]
+        for group, is_swr in (("non_swr", False), ("swr", True)):
+            rows = joined[joined["is_swr"] == is_swr].dropna(subset=[column])
+            name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
+            per_animal = rows.groupby("animal").agg(
+                event=(column, "median"),
+                running=(f"{word}_running_median", "median"),
+                rest=(f"{word}_rest_median", "median"),
+            )
+            values += [
+                make(
+                    f"{word}_median_{group}",
+                    rows[column].median(),
+                    "quantity",
+                    "dec2",
+                    f"median z-scored {label} of immobile {name} non-local events (event mean)",
+                    "z",
+                ),
+                make(
+                    f"{word}_animals_below_running_{group}",
+                    (per_animal["event"] < per_animal["running"]).sum(),
+                    "count",
+                    "count",
+                    f"animals whose median {name} event {label} is below their median running "
+                    "level",
+                ),
+                make(
+                    f"{word}_animals_above_rest_{group}",
+                    (per_animal["event"] > per_animal["rest"]).sum(),
+                    "count",
+                    "count",
+                    f"animals whose median {name} event {label} is above their median "
+                    "quiet-rest level",
+                ),
+            ]
+            if word == "theta":
+                values.append(
+                    make(
+                        f"theta_like_fraction_{group}",
+                        (rows[column] >= rows["theta_running_median"]).mean(),
+                        "fraction",
+                        "pct",
+                        f"share of immobile {name} non-local events whose theta power "
+                        "reaches their epoch's median running level",
+                    )
+                )
+    return values
+
+
 # --- 2b: spike support ------------------------------------------------------
 
 _REALITY_GROUPS = {
@@ -1087,6 +1203,42 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
     summary.add(*boundary_offset_values(events, source))
     summary.add(*property_values(events, source))
     summary.inputs.append(file_record(inputs.event_table, ROOT_DIR))
+    reference = pd.read_parquet(inputs.brain_state_reference)
+    gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
+    if len(reference) != REALITY_EPOCHS or len(gamma_reference) != REALITY_EPOCHS:
+        raise ValueError("the brain-state or gamma reference does not hold every epoch")
+    gamma_columns = [c for c in gamma_reference.columns if "gamma" in c]
+    reference = reference.merge(
+        gamma_reference[["animal", "session_date", "epoch", *gamma_columns]],
+        on=["animal", "session_date", "epoch"],
+        how="inner",
+        validate="1:1",
+    )
+    gamma_events = pd.concat(
+        pd.read_parquet(path, columns=["event_id", "slow_gamma_z", "fast_gamma_z"])
+        for path in sorted(inputs.event_gamma.glob("*_events.parquet"))
+    )
+    events_with_gamma = events.merge(
+        gamma_events, on="event_id", how="left", validate="1:1"
+    )
+    if events_with_gamma[["slow_gamma_z", "fast_gamma_z"]].isna().all(axis=1).any():
+        raise ValueError("an event has no gamma value")
+    summary.add(
+        *brain_state_values(
+            events_with_gamma,
+            reference,
+            f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) and "
+            f"{rel(inputs.brain_state_reference)} (scripts/detection/"
+            "measure_brain_state_reference.py) and the gamma pass "
+            f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)",
+        )
+    )
+    summary.inputs.append(file_record(inputs.brain_state_reference, ROOT_DIR))
+    summary.inputs.append(
+        files_record(
+            "*_events.parquet", inputs.event_gamma.glob("*_events.parquet"), ROOT_DIR
+        )
+    )
 
     run = inputs.event_features_run
     others = other_detector_events(run)

@@ -101,7 +101,9 @@ def epoch_gamma(
     ].assign(**columns)
     return table.reset_index(drop=True), {
         "epoch_id": identifier,
-        **{key: events[key].iloc[0] for key in KEYS},
+        "animal": str(events["animal"].iloc[0]),
+        "session_date": int(events["session_date"].iloc[0]),
+        "epoch": str(events["epoch"].iloc[0]),
         "n_kept_tetrodes": int(keep.sum()),
         "sampling_frequency": sampling_frequency,
         **reference,
