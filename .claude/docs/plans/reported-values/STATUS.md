@@ -60,6 +60,9 @@ Done 2026-10-26 20:40: branch `worktree-agent-a52c665f3acd09fe4` commit `8dc0382
 generalises across animals (smallest q 0.12 on slopes over animals); across-day content trends track each
 animal's HPC spike-rate drift and the per-epoch fitted transitions. Next checks: re-decode with a common
 transition matrix; match epochs on spike count; within-day reward vs reward delivered so far.
+Follow-up (commit `e14301d5`): Kay SWRs and SWR-coupled events are elevated early (mostly the first-exposure
+epoch: novelty and p(R)=1.0 confounded); SWR-coupled keeps 1.32x without it; non-SWR shows no early peak.
+Next: split the first-exposure epoch into its p(R) 1.0 and 0.5 halves.
 
 The mPFC agent finished Phases A (timing) and 0 (port) on `pfc-response-followups`; six questions for the lead
 before Phase B (in its `overview.md` Open Questions).
