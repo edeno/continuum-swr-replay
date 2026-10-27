@@ -11,9 +11,9 @@ r"""How a reported value is printed: the project's only rounding rules.
 - ``dec2``: a quantity to two decimal places (``0.60``).
 - ``sig2s``: ``sig2`` with its sign always written (``+0.73``, ``−0.071``), for
   coefficients whose sign is the claim. The minus is U+2212 in markdown and
-  ``-`` in LaTeX.
+  ``\ensuremath{-}`` in LaTeX.
 - ``pval``: a p- or q-value, two significant figures; below 0.001 in scientific
-  notation (``0.034``, ``1.1e-11``; LaTeX ``1.1\times10^{-11}``).
+  notation (``0.034``, ``1.1e-11``; LaTeX ``\ensuremath{1.1\times10^{-11}}``).
 
 Rounding is half away from zero, so a printed number does not depend on
 binary floating point's ties. Rounding is a communication choice, not a
@@ -77,7 +77,7 @@ def formatted(value: Value, style: str | None = None, *, latex: bool = False) ->
     if style == "sig2s":
         text = _sig2(x)
         if text.startswith("-"):
-            return text if latex else "\u2212" + text[1:]
+            return ("\\ensuremath{-}" if latex else "\u2212") + text[1:]
         return "+" + text
     if style == "pval":
         if float(x) >= 0.001 or x == 0:
@@ -89,6 +89,6 @@ def formatted(value: Value, style: str | None = None, *, latex: bool = False) ->
             # rounding up gained a digit (9.96e-5 -> 10.0e-5): it is 1.0e-4
             mantissa, exponent = (mantissa / 10).quantize(Decimal("0.1")), exponent + 1
         if latex:
-            return f"{mantissa}\\times10^{{{exponent}}}"
+            return f"\\ensuremath{{{mantissa}\\times10^{{{exponent}}}}}"
         return f"{mantissa}e{exponent}"
     raise ValueError(f"{value.key}: unknown style {style!r}")
