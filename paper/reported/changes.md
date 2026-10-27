@@ -15,3 +15,11 @@ marker, and the computed value now there. Newest last.
 | `paper/claims_table.md` | `part2.multimodal_median_non_swr` | … | 0.03 |
 | `paper/claims_table.md` | `part2.multimodal_median_swr` | … | 0.11 |
 | `paper/claims_table.md` | `part2.multimodal_animals_in_direction` | 3 | 4 |
+| `docs/analysis_map.md` | `part1.state_evidence_epochs_ok` | 241 | 242 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.sweep_replays` | 4536 | 4,536 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.sweep_replays` | 4536 | 4,536 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.sweep_sliding_only_replays` | 0.00% | 0 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.sweep_replays` | … | 4,536 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.sweep_sliding_only_before_test_replays` | 0.11% | 5 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.controls_jumping_sliding_before_test_fraction` | 12 | 13 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.heldout_jumping_support_max` | 62 | 63 |

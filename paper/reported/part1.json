@@ -1,0 +1,1848 @@
+{
+ "schema_version": 1,
+ "part": 1,
+ "title": "the model",
+ "produced_by": "scripts/reported/summarize_part.py",
+ "commit": "2b879e2d17c8",
+ "inputs": [
+  {
+   "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
+   "sha256": "b986673dc32336208125b037194ebf4a27e03fadcaa99f695b9e6a675461c2ce"
+  },
+  {
+   "path": "Processed-Data/_refresh_20261016/state_evidence/manifest.json",
+   "sha256": "85044d43dee28ec366285a8d283b558d89bd56d3a6568543ee2afa0df9347490"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet",
+   "sha256": "28a816cb1c312b9b274e64aedb641b324d2e4a5751144ec924d86fa8d59d60f7"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/manifest.json",
+   "sha256": "5538d333d003c1959e73503938ae63cf48c937bd0673e742a79f43dae27c39bd"
+  },
+  {
+   "path": "docs/design/replay_detection_comparison/detection_sweep_summary.csv",
+   "sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362"
+  },
+  {
+   "path": "docs/design/replay_detection_comparison/detection_controls_summary.csv",
+   "sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d"
+  },
+  {
+   "path": "docs/design/replay_detection_comparison/detection_heldout_summary.csv",
+   "sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4"
+  }
+ ],
+ "values": {
+  "controls_continuing_ours_one_per_part_longest_fraction": {
+   "value": 0.7916666666666666,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same for our detector",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_continuing_ours_spanning_shortest_fraction": {
+   "value": 0.875,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same for our detector",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_continuing_sliding_one_per_part_longest_fraction": {
+   "value": 0.5416666666666666,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "continuing chains at the longest gap: share of trials the sliding window reports as one event per part",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_continuing_sliding_spanning_shortest_fraction": {
+   "value": 0.7083333333333334,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_elsewhere_ours_one_per_part_longest_fraction": {
+   "value": 0.8333333333333334,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same at the longest gap",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_elsewhere_ours_one_per_part_shortest_fraction": {
+   "value": 0.1666666666666666,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_elsewhere_sliding_missing_max": {
+   "value": 0.5833333333333334,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "highest such share",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_elsewhere_sliding_missing_min": {
+   "value": 0.375,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jump_ours_spanning_max": {
+   "value": 0.8541666666666667,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "highest such share",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jump_ours_spanning_min": {
+   "value": 0.7291666666666666,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts)",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jump_sliding_spanning_max": {
+   "value": 0.7916666666666667,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jumping_continuous_fraction": {
+   "value": 0.5,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of jumping bursts our continuous state alone covers",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jumping_nonlocal_fraction": {
+   "value": 0.9722222222222222,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of jumping bursts our detector's non-local events cover",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jumping_sliding_before_test_fraction": {
+   "value": 0.125,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same before its significance test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_jumping_sliding_fraction": {
+   "value": 0.0694444444444444,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of jumping bursts the sliding window reports under the published definition",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_multipart_trials": {
+   "value": 432,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "two-part trials over every jump and chain condition",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_no_replay_minutes": {
+   "value": 1.6750777777777772,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "min",
+   "description": "minutes of simulated immobility with no replay; no output reported any event there",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_no_replay_rate_bound": {
+   "value": 1.7909616137227464,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "events per minute",
+   "description": "95 % upper bound on the false event rate with none observed (the rule of three over those minutes)",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_no_replay_recordings": {
+   "value": 8,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "simulated recordings the no-replay stretches come from",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_ours_fewer_in_event_trials": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "trials in which our detector recovers fewer parts inside the event than alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_ours_more_in_event_trials": {
+   "value": 22,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "trials in which it recovers more inside the event than alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_ours_recovery_alone_fraction": {
+   "value": 0.8634259259259259,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same with each part decoded alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_ours_recovery_in_event_fraction": {
+   "value": 0.8912037037037037,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of parts our detector recovers inside the event, the same mean",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_continuous_fraction": {
+   "value": 0.0138888888888888,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of place-less bursts our continuous state alone covers",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_fragmented_share_max": {
+   "value": 0.795127717157205,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "highest share of a place-less burst's time in the fragmented state, over burst durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_fragmented_share_min": {
+   "value": 0.5916386330500245,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest share of a place-less burst's time in the fragmented state, over burst durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_nonlocal_fraction": {
+   "value": 0.9027777777777778,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of place-less bursts our detector's non-local events cover, pooled over the three peak rates",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_nonlocal_lowest_rate_fraction": {
+   "value": 0.75,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_sliding_before_test_fraction": {
+   "value": 0.1527777777777778,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same before its significance test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_placeless_sliding_fraction": {
+   "value": 0.0833333333333333,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of place-less bursts the sliding window reports under the published definition",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_sliding_fewer_in_event_trials": {
+   "value": 15,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "trials in which the sliding window recovers fewer parts inside the event than alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_sliding_more_in_event_trials": {
+   "value": 95,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "trials in which it recovers more inside the event than alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_sliding_recovery_alone_fraction": {
+   "value": 0.6053240740740741,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same with each part decoded alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "controls_sliding_recovery_in_event_fraction": {
+   "value": 0.7199074074074073,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "pending": null
+  },
+  "heldout_continuous_immobile_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_immobile_ci_high": {
+   "value": 7.943073796271374,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_immobile_ci_low": {
+   "value": 4.247954418351876,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_immobile_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with Non-Local Continuous bouts, immobile scored",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_immobile_epochs_positive": {
+   "value": 239,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median held-out evidence of Non-Local Continuous bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_immobile_estimate": {
+   "value": 6.095514107311625,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_running_animals_positive": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_running_ci_high": {
+   "value": -0.5043086296534636,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_running_ci_low": {
+   "value": -1.8722314176728352,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_running_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with Non-Local Continuous bouts, running scored",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_running_epochs_positive": {
+   "value": 23,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_continuous_running_estimate": {
+   "value": -1.1882700236631494,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_estimator_agreement_min": {
+   "value": 0.9895348837209302,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest share over folds of the events informative under both content estimates on which they agree",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_fragmented_immobile_mismatched_animals_positive": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_fragmented_immobile_mismatched_ci_high": {
+   "value": 0.7932949224004892,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_fragmented_immobile_mismatched_ci_low": {
+   "value": -0.5563469738444028,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_fragmented_immobile_mismatched_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with Non-Local Fragmented bouts, immobile scored",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_fragmented_immobile_mismatched_epochs_positive": {
+   "value": 117,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_fragmented_immobile_mismatched_estimate": {
+   "value": 0.1184739742780432,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_jumping_support_max": {
+   "value": 0.625,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the higher of the two",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_jumping_support_min": {
+   "value": 0.5714285714285714,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "jumping bursts: lower of folds A and B's share with held-out support",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_local_immobile_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean held-out evidence of Local bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_local_immobile_ci_high": {
+   "value": 4.403325037649237,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_local_immobile_ci_low": {
+   "value": 1.177210455146977,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_local_immobile_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with Local bouts, immobile scored",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_local_immobile_epochs_positive": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median held-out evidence of Local bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_local_immobile_estimate": {
+   "value": 2.790267746398107,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_no_spike_immobile_animals_positive": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean held-out evidence of No-Spike bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_no_spike_immobile_ci_high": {
+   "value": 9.696696599215915,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "upper bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_no_spike_immobile_ci_low": {
+   "value": 5.700477350013855,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "lower bound of its 95 % t-interval over animals",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_no_spike_immobile_epochs": {
+   "value": 241,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with No-Spike bouts, immobile scored",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_no_spike_immobile_epochs_positive": {
+   "value": 241,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs whose median held-out evidence of No-Spike bouts, immobile is above zero",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_no_spike_immobile_estimate": {
+   "value": 7.698586974614885,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "nats per window",
+   "description": "held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "heldout_ours_only_informative_max": {
+   "value": 0.0734126984126984,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the higher of the two",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_ours_only_informative_min": {
+   "value": 0.0557809330628803,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_ours_only_support_fold_c": {
+   "value": 0.8650793650793651,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the same share in fold C",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_ours_only_support_max": {
+   "value": 0.968181818181818,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the higher of the two",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_ours_only_support_min": {
+   "value": 0.9256756756756754,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_placeless_informative_events": {
+   "value": 19,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "informative place-less burst events over the three folds (none has held-out support)",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_placeless_loose_events": {
+   "value": 75,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "place-less burst events informative at that floor",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_placeless_loose_supported_events": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "place-less burst events with held-out support at a floor of 2 expected spikes",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_shared_informative_max": {
+   "value": 0.22996057818659646,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "the higher of the two",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_shared_informative_min": {
+   "value": 0.1625730994152046,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "shared replays: lower of folds A and B's share the evaluation cells can judge at all",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "heldout_shared_support": {
+   "value": 1.0,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "replays both detectors reported: share with held-out support, the same in every fold",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "pending": null
+  },
+  "pilot_calls_decided_by_outside_window": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, calls whose dispersion clears the threshold only with kept windows outside every piece",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "pending": null
+  },
+  "pilot_replay_calls": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "pending": null
+  },
+  "state_evidence_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in the held-out tetrode run",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "state_evidence_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs the held-out tetrode run lists",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "state_evidence_epochs_ok": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, epochs that passed every check of the run (status ok)",
+   "claims": [
+    "7",
+    "9"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "pending": null
+  },
+  "sweep_domain_fraction": {
+   "value": 0.25396825396825395,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms)",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_domain_sliding_before_test_fraction": {
+   "value": 0.6770833333333334,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "on the shared target, share the sliding-window detector reports before its significance test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_domain_sliding_fraction": {
+   "value": 0.6276041666666666,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "on the shared target, share the sliding-window detector reports after its significance test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_domain_state_space_fraction": {
+   "value": 0.9869791666666666,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "on the shared target, share the state-space detector reports under its own acceptance criteria",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_domain_state_space_published_fraction": {
+   "value": 0.6762152777777778,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "on the shared target, share the state-space detector reports held to the published duration and dispersion criteria",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_failed_test_fraction": {
+   "value": 0.0375643744319903,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share the sliding-window detector reported and then failed on its significance test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_jump_half_pass_fraction": {
+   "value": 0.8740818467995802,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "of the replays the sliding window reported before its test, share passing the test's jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_jump_half_pass_longest_fraction": {
+   "value": 0.984251968503937,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the longest (500 ms) replays passing the jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_jump_half_pass_shortest_fraction": {
+   "value": 0.3125,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the shortest (40 ms) replays passing the jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_replays": {
+   "value": 4536,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "replays swept (grid cells)",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_shortest_end_late_ms": {
+   "value": 65.29666376593468,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median amount the sliding window ends the shortest replays late",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_shortest_reported_duration_ms": {
+   "value": 131.9999999999979,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median duration the sliding window reports for the shortest replays",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_shortest_start_early_ms": {
+   "value": 27.783154739370985,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median amount the sliding window starts the shortest replays early",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_before_test_fraction": {
+   "value": 0.2100970017636684,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "over the whole grid, share the sliding-window detector reports before its significance test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_end_late_max_ms": {
+   "value": 65.29666376593468,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest median amount the sliding window ends late, over true durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_end_late_min_ms": {
+   "value": 21.233180588211557,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "smallest median amount the sliding window ends late, over true durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_end_late_upper_quartile_max_ms": {
+   "value": 231.4627562891438,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest upper quartile of the sliding window's end error, over true durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_fraction": {
+   "value": 0.1816578483245149,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "over the whole grid, share the sliding-window detector reports under its own criteria, significance test included",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_not_the_replay_fraction": {
+   "value": 0.2302100161550888,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the sliding-window detector's accepted events that are not the replay put in",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_only_before_test_replays": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "the same, counting the sliding window's reports before its test",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_only_replays": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "swept replays the sliding-window detector reported and the state-space detector did not",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_spread_only_fraction": {
+   "value": 0.2028218694885361,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_start_early_max_ms": {
+   "value": 27.783154739370985,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest median amount the sliding window starts early, over true durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_sliding_start_early_min_ms": {
+   "value": 18.04877062630439,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "smallest median amount the sliding window starts early, over true durations",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_spread_half_pass_fraction": {
+   "value": 0.9653725078698846,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "of the replays the sliding window reported before its test, share passing the test's spread half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_state_space_edge_error_max_ms": {
+   "value": 5.2984727396205855,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_state_space_fraction": {
+   "value": 0.9093915343915344,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "over the whole grid, share the state-space detector reports under its own criteria",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  },
+  "sweep_state_space_only_fraction": {
+   "value": 0.7277336860670194,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the swept replays reported by the state-space detector and not by the sliding-window detector",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "pending": null
+  }
+ }
+}
