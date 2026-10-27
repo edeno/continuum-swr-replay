@@ -3,7 +3,7 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "2f4504188203",
+ "commit": "0c18c5ec9a07",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/event_table.parquet",
@@ -384,7 +384,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median event duration s is lower than their SWR median",
+   "description": "animals whose non-SWR median event duration is lower than their SWR median",
    "claims": [
     "18"
    ],
@@ -399,7 +399,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median event duration s of immobile non-SWR non-local events",
+   "description": "median event duration of immobile non-SWR non-local events",
    "claims": [
     "18"
    ],
@@ -414,7 +414,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median event duration s of immobile SWR-overlapping non-local events",
+   "description": "median event duration of immobile SWR-overlapping non-local events",
    "claims": [
     "18"
    ],
@@ -498,7 +498,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median spatial extent cm is lower than their SWR median",
+   "description": "animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median",
    "claims": [
     "16"
    ],
@@ -514,7 +514,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
-   "description": "median spatial extent cm of immobile non-SWR non-local events",
+   "description": "median spatial extent of the decoded content of immobile non-SWR non-local events",
    "claims": [
     "16"
    ],
@@ -530,7 +530,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
-   "description": "median spatial extent cm of immobile SWR-overlapping non-local events",
+   "description": "median spatial extent of the decoded content of immobile SWR-overlapping non-local events",
    "claims": [
     "16"
    ],
@@ -706,7 +706,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median hpd coverage cm is lower than their SWR median",
+   "description": "animals whose non-SWR median highest-density-region coverage is lower than their SWR median",
    "claims": [
     "17"
    ],
@@ -721,7 +721,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
-   "description": "median hpd coverage cm of immobile non-SWR non-local events",
+   "description": "median highest-density-region coverage of immobile non-SWR non-local events",
    "claims": [
     "17"
    ],
@@ -736,7 +736,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
-   "description": "median hpd coverage cm of immobile SWR-overlapping non-local events",
+   "description": "median highest-density-region coverage of immobile SWR-overlapping non-local events",
    "claims": [
     "17"
    ],
@@ -1181,7 +1181,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median step distance max cm is lower than their SWR median",
+   "description": "animals whose non-SWR median largest step of the decoded position is lower than their SWR median",
    "claims": [
     "16b"
    ],
@@ -1197,7 +1197,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
-   "description": "median step distance max cm of immobile non-SWR non-local events",
+   "description": "median largest step of the decoded position of immobile non-SWR non-local events",
    "claims": [
     "16b"
    ],
@@ -1213,7 +1213,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm",
-   "description": "median step distance max cm of immobile SWR-overlapping non-local events",
+   "description": "median largest step of the decoded position of immobile SWR-overlapping non-local events",
    "claims": [
     "16b"
    ],
@@ -1421,7 +1421,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median multimodal fraction is lower than their SWR median",
+   "description": "animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median",
    "claims": [
     "17"
    ],
@@ -1436,7 +1436,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "median multimodal fraction of immobile non-SWR non-local events",
+   "description": "median multimodal fraction of the posterior of immobile non-SWR non-local events",
    "claims": [
     "17"
    ],
@@ -1451,7 +1451,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "median multimodal fraction of immobile SWR-overlapping non-local events",
+   "description": "median multimodal fraction of the posterior of immobile SWR-overlapping non-local events",
    "claims": [
     "17"
    ],
@@ -1993,7 +1993,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median posterior peak mean is higher than their SWR median",
+   "description": "animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median",
    "claims": [
     "17"
    ],
@@ -2008,7 +2008,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "median posterior peak mean of immobile non-SWR non-local events",
+   "description": "median posterior peak (mean over the event) of immobile non-SWR non-local events",
    "claims": [
     "17"
    ],
@@ -2023,7 +2023,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "median posterior peak mean of immobile SWR-overlapping non-local events",
+   "description": "median posterior peak (mean over the event) of immobile SWR-overlapping non-local events",
    "claims": [
     "17"
    ],
@@ -2038,7 +2038,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median n reversals is lower than their SWR median",
+   "description": "animals whose non-SWR median number of direction reversals is lower than their SWR median",
    "claims": [
     "16b"
    ],
@@ -2054,7 +2054,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "",
-   "description": "median n reversals of immobile non-SWR non-local events",
+   "description": "median number of direction reversals of immobile non-SWR non-local events",
    "claims": [
     "16b"
    ],
@@ -2070,7 +2070,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "",
-   "description": "median n reversals of immobile SWR-overlapping non-local events",
+   "description": "median number of direction reversals of immobile SWR-overlapping non-local events",
    "claims": [
     "16b"
    ],
@@ -2086,7 +2086,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals whose non-SWR median replay speed median cm s is lower than their SWR median",
+   "description": "animals whose non-SWR median replay speed (median over the event) is lower than their SWR median",
    "claims": [
     "15"
    ],
@@ -2102,7 +2102,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm/s",
-   "description": "median replay speed median cm s of immobile non-SWR non-local events",
+   "description": "median replay speed (median over the event) of immobile non-SWR non-local events",
    "claims": [
     "15"
    ],
@@ -2118,7 +2118,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "cm/s",
-   "description": "median replay speed median cm s of immobile SWR-overlapping non-local events",
+   "description": "median replay speed (median over the event) of immobile SWR-overlapping non-local events",
    "claims": [
     "15"
    ],

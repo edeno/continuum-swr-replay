@@ -115,7 +115,7 @@
 \newcommand{\PartOneSweepStateSpaceFraction}{91}  % part1.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
 \newcommand{\PartOneSweepStateSpaceOnlyFraction}{73}  % part1.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
-% --- Part 2 (commit 2f4504188203)
+% --- Part 2 (commit 0c18c5ec9a07)
 \newcommand{\PartTwoAnimals}{5}  % part2.animals: animals in the event table
 \newcommand{\PartTwoAnimalsNonSwrMajority}{4}  % part2.animals_non_swr_majority: animals in which more than half the events are non-SWR
 \newcommand{\PartTwoAnimalsNonSwrMoreAtWell}{5}  % part2.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content
@@ -137,16 +137,16 @@
 \newcommand{\PartTwoCareyOverlapNoSpikeShareMedian}{0}  % part2.carey_overlap_no_spike_share_median: median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoCareyOverlapNonlocalShareMedian}{87}  % part2.carey_overlap_nonlocal_share_median: median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoCareyOverlapUncertainShareMedian}{9}  % part2.carey_overlap_uncertain_share_median: median over carey events overlapping a non-local event of the share of their rows with no state above 0.8
-\newcommand{\PartTwoDurationAnimalsInDirection}{5}  % part2.duration_animals_in_direction: animals whose non-SWR median event duration s is lower than their SWR median
-\newcommand{\PartTwoDurationMedianNonSwr}{48}  % part2.duration_median_non_swr: median event duration s of immobile non-SWR non-local events
-\newcommand{\PartTwoDurationMedianSwr}{94}  % part2.duration_median_swr: median event duration s of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoDurationAnimalsInDirection}{5}  % part2.duration_animals_in_direction: animals whose non-SWR median event duration is lower than their SWR median
+\newcommand{\PartTwoDurationMedianNonSwr}{48}  % part2.duration_median_non_swr: median event duration of immobile non-SWR non-local events
+\newcommand{\PartTwoDurationMedianSwr}{94}  % part2.duration_median_swr: median event duration of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoEndOffsetMedianMs}{\ensuremath{-}4}  % part2.end_offset_median_ms: median of event end minus matched SWR end
 \newcommand{\PartTwoEpochs}{242}  % part2.epochs: epochs in the event table
 \newcommand{\PartTwoEvidenceAnimals}{5}  % part2.evidence_animals: animals in the spike-evidence run
 \newcommand{\PartTwoEvidenceEpochs}{242}  % part2.evidence_epochs: epochs in the spike-evidence run
-\newcommand{\PartTwoExtentAnimalsInDirection}{5}  % part2.extent_animals_in_direction: animals whose non-SWR median spatial extent cm is lower than their SWR median
-\newcommand{\PartTwoExtentMedianNonSwr}{8.0}  % part2.extent_median_non_swr: median spatial extent cm of immobile non-SWR non-local events
-\newcommand{\PartTwoExtentMedianSwr}{50}  % part2.extent_median_swr: median spatial extent cm of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoExtentAnimalsInDirection}{5}  % part2.extent_animals_in_direction: animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median
+\newcommand{\PartTwoExtentMedianNonSwr}{8.0}  % part2.extent_median_non_swr: median spatial extent of the decoded content of immobile non-SWR non-local events
+\newcommand{\PartTwoExtentMedianSwr}{50}  % part2.extent_median_swr: median spatial extent of the decoded content of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoHeldoutNonSwrAnimals}{5}  % part2.heldout_non_swr_animals: animals in that test [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
 \newcommand{\PartTwoHeldoutNonSwrAnimalsPositive}{5}  % part2.heldout_non_swr_animals_positive: animals with a positive mean [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
 \newcommand{\PartTwoHeldoutNonSwrPerSpike}{0.20}  % part2.heldout_non_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
@@ -157,9 +157,9 @@
 \newcommand{\PartTwoHeldoutSwrPerSpike}{0.60}  % part2.heldout_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
 \newcommand{\PartTwoHeldoutSwrPerSpikeCiHigh}{0.74}  % part2.heldout_swr_per_spike_ci_high: upper bound of its 95 % t-interval over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
 \newcommand{\PartTwoHeldoutSwrPerSpikeCiLow}{0.45}  % part2.heldout_swr_per_spike_ci_low: lower bound of its 95 % t-interval over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHpdAnimalsInDirection}{4}  % part2.hpd_animals_in_direction: animals whose non-SWR median hpd coverage cm is lower than their SWR median
-\newcommand{\PartTwoHpdMedianNonSwr}{44}  % part2.hpd_median_non_swr: median hpd coverage cm of immobile non-SWR non-local events
-\newcommand{\PartTwoHpdMedianSwr}{80}  % part2.hpd_median_swr: median hpd coverage cm of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoHpdAnimalsInDirection}{4}  % part2.hpd_animals_in_direction: animals whose non-SWR median highest-density-region coverage is lower than their SWR median
+\newcommand{\PartTwoHpdMedianNonSwr}{44}  % part2.hpd_median_non_swr: median highest-density-region coverage of immobile non-SWR non-local events
+\newcommand{\PartTwoHpdMedianSwr}{80}  % part2.hpd_median_swr: median highest-density-region coverage of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoKarlssonEvents}{60{,}472}  % part2.karlsson_events: karlsson events compared with the non-local detector
 \newcommand{\PartTwoKarlssonNoNonlocalFraction}{38}  % part2.karlsson_no_nonlocal_fraction: share of karlsson events that overlap no non-local event
 \newcommand{\PartTwoKarlssonNoNonlocalMixedFraction}{18}  % part2.karlsson_no_nonlocal_mixed_fraction: of karlsson events overlapping no non-local event, the share with neither state in more than half their rows
@@ -186,9 +186,9 @@
 \newcommand{\PartTwoKayOverlapNoSpikeShareMedian}{0}  % part2.kay_overlap_no_spike_share_median: median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoKayOverlapNonlocalShareMedian}{88}  % part2.kay_overlap_nonlocal_share_median: median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoKayOverlapUncertainShareMedian}{9}  % part2.kay_overlap_uncertain_share_median: median over kay events overlapping a non-local event of the share of their rows with no state above 0.8
-\newcommand{\PartTwoMaxStepAnimalsInDirection}{5}  % part2.max_step_animals_in_direction: animals whose non-SWR median step distance max cm is lower than their SWR median
-\newcommand{\PartTwoMaxStepMedianNonSwr}{2.0}  % part2.max_step_median_non_swr: median step distance max cm of immobile non-SWR non-local events
-\newcommand{\PartTwoMaxStepMedianSwr}{14}  % part2.max_step_median_swr: median step distance max cm of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoMaxStepAnimalsInDirection}{5}  % part2.max_step_animals_in_direction: animals whose non-SWR median largest step of the decoded position is lower than their SWR median
+\newcommand{\PartTwoMaxStepMedianNonSwr}{2.0}  % part2.max_step_median_non_swr: median largest step of the decoded position of immobile non-SWR non-local events
+\newcommand{\PartTwoMaxStepMedianSwr}{14}  % part2.max_step_median_swr: median largest step of the decoded position of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoMuaEvents}{40{,}732}  % part2.mua_events: mua events compared with the non-local detector
 \newcommand{\PartTwoMuaNoNonlocalFraction}{15}  % part2.mua_no_nonlocal_fraction: share of mua events that overlap no non-local event
 \newcommand{\PartTwoMuaNoNonlocalMixedFraction}{22}  % part2.mua_no_nonlocal_mixed_fraction: of mua events overlapping no non-local event, the share with neither state in more than half their rows
@@ -201,9 +201,9 @@
 \newcommand{\PartTwoMuaOverlapNoSpikeShareMedian}{0}  % part2.mua_overlap_no_spike_share_median: median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoMuaOverlapNonlocalShareMedian}{81}  % part2.mua_overlap_nonlocal_share_median: median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoMuaOverlapUncertainShareMedian}{13}  % part2.mua_overlap_uncertain_share_median: median over mua events overlapping a non-local event of the share of their rows with no state above 0.8
-\newcommand{\PartTwoMultimodalAnimalsInDirection}{4}  % part2.multimodal_animals_in_direction: animals whose non-SWR median multimodal fraction is lower than their SWR median
-\newcommand{\PartTwoMultimodalMedianNonSwr}{0.03}  % part2.multimodal_median_non_swr: median multimodal fraction of immobile non-SWR non-local events
-\newcommand{\PartTwoMultimodalMedianSwr}{0.11}  % part2.multimodal_median_swr: median multimodal fraction of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoMultimodalAnimalsInDirection}{4}  % part2.multimodal_animals_in_direction: animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median
+\newcommand{\PartTwoMultimodalMedianNonSwr}{0.03}  % part2.multimodal_median_non_swr: median multimodal fraction of the posterior of immobile non-SWR non-local events
+\newcommand{\PartTwoMultimodalMedianSwr}{0.11}  % part2.multimodal_median_swr: median multimodal fraction of the posterior of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoNonSwrCloseAnimalsAboveBaseline}{5}  % part2.non_swr_close_animals_above_baseline: animals whose median nonSWR-close event scores above their median quiet window, per spike
 \newcommand{\PartTwoNonSwrCloseDllPerSpikeMedian}{0.51}  % part2.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
 \newcommand{\PartTwoNonSwrCloseEpochsAboveBaseline}{242}  % part2.non_swr_close_epochs_above_baseline: epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike
@@ -236,15 +236,15 @@
 \newcommand{\PartTwoPauseAnimalsInDirection}{5}  % part2.pause_animals_in_direction: animals whose non-SWR median pause fraction is higher than their SWR median
 \newcommand{\PartTwoPauseMedianNonSwr}{1.00}  % part2.pause_median_non_swr: median pause fraction of immobile non-SWR non-local events
 \newcommand{\PartTwoPauseMedianSwr}{0.93}  % part2.pause_median_swr: median pause fraction of immobile SWR-overlapping non-local events
-\newcommand{\PartTwoPeakAnimalsInDirection}{4}  % part2.peak_animals_in_direction: animals whose non-SWR median posterior peak mean is higher than their SWR median
-\newcommand{\PartTwoPeakMedianNonSwr}{0.90}  % part2.peak_median_non_swr: median posterior peak mean of immobile non-SWR non-local events
-\newcommand{\PartTwoPeakMedianSwr}{0.82}  % part2.peak_median_swr: median posterior peak mean of immobile SWR-overlapping non-local events
-\newcommand{\PartTwoReversalsAnimalsInDirection}{5}  % part2.reversals_animals_in_direction: animals whose non-SWR median n reversals is lower than their SWR median
-\newcommand{\PartTwoReversalsMedianNonSwr}{0}  % part2.reversals_median_non_swr: median n reversals of immobile non-SWR non-local events
-\newcommand{\PartTwoReversalsMedianSwr}{3}  % part2.reversals_median_swr: median n reversals of immobile SWR-overlapping non-local events
-\newcommand{\PartTwoSpeedAnimalsInDirection}{5}  % part2.speed_animals_in_direction: animals whose non-SWR median replay speed median cm s is lower than their SWR median
-\newcommand{\PartTwoSpeedMedianNonSwr}{320}  % part2.speed_median_non_swr: median replay speed median cm s of immobile non-SWR non-local events
-\newcommand{\PartTwoSpeedMedianSwr}{490}  % part2.speed_median_swr: median replay speed median cm s of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoPeakAnimalsInDirection}{4}  % part2.peak_animals_in_direction: animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median
+\newcommand{\PartTwoPeakMedianNonSwr}{0.90}  % part2.peak_median_non_swr: median posterior peak (mean over the event) of immobile non-SWR non-local events
+\newcommand{\PartTwoPeakMedianSwr}{0.82}  % part2.peak_median_swr: median posterior peak (mean over the event) of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoReversalsAnimalsInDirection}{5}  % part2.reversals_animals_in_direction: animals whose non-SWR median number of direction reversals is lower than their SWR median
+\newcommand{\PartTwoReversalsMedianNonSwr}{0}  % part2.reversals_median_non_swr: median number of direction reversals of immobile non-SWR non-local events
+\newcommand{\PartTwoReversalsMedianSwr}{3}  % part2.reversals_median_swr: median number of direction reversals of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoSpeedAnimalsInDirection}{5}  % part2.speed_animals_in_direction: animals whose non-SWR median replay speed (median over the event) is lower than their SWR median
+\newcommand{\PartTwoSpeedMedianNonSwr}{320}  % part2.speed_median_non_swr: median replay speed (median over the event) of immobile non-SWR non-local events
+\newcommand{\PartTwoSpeedMedianSwr}{490}  % part2.speed_median_swr: median replay speed (median over the event) of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoStartOffsetMedianMs}{4}  % part2.start_offset_median_ms: median of event start minus matched SWR start
 \newcommand{\PartTwoSwrContentAtWellFraction}{26}  % part2.swr_content_at_well_fraction: share of SWR non-local time bins whose content is at well, weighted by time bins over sessions
 \newcommand{\PartTwoSwrContentNearOffFraction}{0}  % part2.swr_content_near_off_fraction: share of SWR non-local time bins whose content is near off, weighted by time bins over sessions
