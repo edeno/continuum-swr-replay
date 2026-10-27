@@ -1,0 +1,829 @@
+"""Part 4's reported values: how mPFC units respond to SWR and non-SWR non-local events.
+
+Every value is read from an output an analysis already wrote; nothing is
+refitted here. The inputs (:class:`Part4Inputs`):
+
+- the at-well mPFC unit bundles (``Processed-Data/{epoch}_mPFC_modulation.pkl``
+  and their ``*.provenance.json`` sidecars, from
+  ``scripts/pfc/run_pfc_analysis_bandit.py``), read through Figure 4's loader
+  (:func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`,
+  firing-rate gate 1 Hz) for every per-unit value;
+- the PFC cohort record the runner writes (``pfc_cohort_mPFC.json``);
+- the canonical event and stop tables, only to check that the bundles were fit
+  on the current ones;
+- the superseded maximum-likelihood tree (``_pre_ridge_backup_20260915``), for
+  the one comparison the prior is justified by (marked pending: it was fit on
+  earlier tables).
+
+The derived values follow the rules of the scripts that first reported them:
+Figure 4 (``scripts/figures/generate_figure04.py``) for the unit fractions,
+``scripts/pfc/compare_pfc_cohorts.py`` for the cohort, fit-count and
+prior-binding values, and ``scripts/pfc/measure_pfc_null_geometry.py`` for the
+null's geometry. Unit fractions are descriptive and pooled over sessions and
+animals; they are not population inference.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from continuum_swr_replay.analysis.pfc.load_population import (
+    HELDOUT_P_COLUMNS,
+    MATCHED_NULL_OBSERVED_COLUMNS,
+    load_population_data,
+    significant_fraction,
+)
+from continuum_swr_replay.paths import (
+    ROOT_DIR,
+    processed_data_dir,
+    replay_content_dir,
+    table_path,
+)
+from continuum_swr_replay.reported.values import (
+    Summary,
+    Value,
+    file_record,
+    files_record,
+)
+
+STEM = "_mPFC_modulation"
+"""The canonical (at-well, sigma 3) bundle name; other cohorts and priors carry
+a suffix after it."""
+
+ALPHA = 0.05
+"""Figure 4's raw empirical-p threshold."""
+
+MIN_FIRING_RATE_HZ = 1.0
+"""Figure 4's firing-rate gate."""
+
+ML_TREE = "_pre_ridge_backup_20260915"
+ML_PENDING = (
+    "read from the superseded maximum-likelihood tree (Processed-Data/"
+    "_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; "
+    "it is a comparison of estimators, not refit on the current tables"
+)
+
+#: The unit tests Figure 4 reports, by the word their keys use.
+CLASSES = {
+    "swr": "SWR",
+    "nonlocal": "non_local",
+    "non_swr_replay": "non_local_no_SWR",
+    "swr_replay": "non_local_SWR",
+    "engagement": "engagement",
+}
+CLASS_LABELS = {
+    "SWR": "SWR",
+    "non_local": "all non-local events",
+    "non_local_no_SWR": "non-SWR replay",
+    "non_local_SWR": "SWR-coupled replay",
+    "engagement": (
+        "the engagement test (matched_control + non_local_no_SWR vs. matched_control)"
+    ),
+}
+
+#: Animals by the word their keys use (a key holds no digits).
+ANIMAL_WORDS = {
+    "chimi": "chimi",
+    "j16": "jsixteen",
+    "peanut": "peanut",
+    "senor": "senor",
+    "wilbur": "wilbur",
+}
+
+#: The curves whose prior binding the audit counts (compare_pfc_cohorts.CURVE_NAMES).
+CURVES = ("SWR", "no_SWR", "non_local_SWR", "non_local_no_SWR", "matched_control")
+
+#: Figure 4d's best-model bars.
+BEST_MODELS = {
+    "constant": "constant",
+    "swr": "SWR",
+    "nonlocal": "non_local",
+    "joint": "SWR + non_local_no_SWR",
+}
+
+
+@dataclass(frozen=True)
+class Part4Inputs:
+    """The files Part 4 reads."""
+
+    bundle_dir: Path
+    pfc_cohort: Path
+    event_table: Path
+    stop_table: Path
+    ml_tree: Path
+
+
+def default_inputs() -> Part4Inputs:
+    data = processed_data_dir()
+    return Part4Inputs(
+        bundle_dir=data,
+        pfc_cohort=data / "pfc_cohort_mPFC.json",
+        event_table=table_path("event_table", replay_content_dir()),
+        stop_table=table_path("stop_table", replay_content_dir()),
+        ml_tree=data / ML_TREE,
+    )
+
+
+def _value_factory(
+    source: str,
+    claims: tuple[str, ...],
+    used_in: tuple[str, ...],
+    pending: str | None = None,
+):
+    """A :class:`Value` builder with the shared source, claims, use and pending
+    note filled in."""
+
+    def make(
+        key: str,
+        value: float | int,
+        kind: str,
+        style: str,
+        description: str,
+        unit: str = "",
+        *,
+        used_in_: tuple[str, ...] | None = None,
+    ) -> Value:
+        return Value(
+            key=key,
+            value=int(value) if kind == "count" else float(value),
+            kind=kind,
+            style=style,
+            unit=unit,
+            description=description,
+            claims=claims,
+            used_in=used_in_ or used_in,
+            source=source,
+            pending=pending,
+        )
+
+    return make
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def read_sidecars(bundle_dir: Path) -> list[dict[str, Any]]:
+    """Every canonical bundle's provenance sidecar, in session order.
+
+    Raises
+    ------
+    ValueError
+        A bundle has no sidecar or a sidecar no bundle.
+    """
+    bundles = {
+        p.name.removesuffix(f"{STEM}.pkl") for p in bundle_dir.glob(f"*{STEM}.pkl")
+    }
+    paths = sorted(bundle_dir.glob(f"*{STEM}.provenance.json"))
+    described = {p.name.removesuffix(f"{STEM}.provenance.json") for p in paths}
+    if not bundles or bundles != described:
+        raise ValueError(
+            f"bundles and sidecars in {bundle_dir} differ: "
+            f"{sorted(bundles ^ described)}"
+        )
+    return [json.loads(p.read_text()) for p in paths]
+
+
+def staleness(
+    sidecars: list[dict[str, Any]], event_table: Path, stop_table: Path
+) -> str | None:
+    """Why the bundles are stale against the current tables, or None.
+
+    A bundle records the SHA-256 of the canonical event table and the stop
+    table it was fit on; a bundle fit on other tables describes other events.
+    """
+    current = {
+        "canonical_event_table_sha256": _sha256(event_table),
+        "stop_table_sha256": _sha256(stop_table),
+    }
+    stale = {
+        name: sum(s.get(name) != sha for s in sidecars) for name, sha in current.items()
+    }
+    if not any(stale.values()):
+        return None
+    return (
+        "the mPFC bundles were fit on other tables than the current ones "
+        f"({', '.join(f'{n} differs in {k} bundles' for n, k in stale.items() if k)}); "
+        "refit before citing"
+    )
+
+
+def _uniform(sidecars: list[dict[str, Any]], name: str) -> Any:
+    """The one value every sidecar records for ``name``."""
+    values = {json.dumps(s.get(name), sort_keys=True) for s in sidecars}
+    if len(values) != 1:
+        raise ValueError(f"the bundles disagree on {name}: {sorted(values)}")
+    return sidecars[0].get(name)
+
+
+# --- the cohort -----------------------------------------------------------------
+
+
+def cohort_values(
+    sidecars: list[dict[str, Any]],
+    population: pd.DataFrame,
+    cohort: dict[str, Any],
+    make: Callable[..., Value],
+) -> list[Value]:
+    """Which sessions, units, bins and events the unit GLM was fit on.
+
+    Bins and events are summed over sessions, before and after the at-well
+    stop restriction, as ``compare_pfc_cohorts.session_cohort_table`` totals
+    them.
+    """
+    if len(sidecars) != cohort["n_pfc_cohort"]:
+        raise ValueError(
+            f"{len(sidecars)} bundles, but the PFC cohort holds "
+            f"{cohort['n_pfc_cohort']} epochs"
+        )
+    if _uniform(sidecars, "stop_cohort") != "at_well":
+        raise ValueError("the canonical bundles are not the at-well cohort")
+    counts = pd.DataFrame([s["cohort_counts"] for s in sidecars])
+    totals = counts[
+        [
+            "n_bins_fit",
+            "n_bins_immobile",
+            "n_nonlocal_after",
+            "n_nonlocal_before",
+            "n_ripple_after",
+            "n_ripple_before",
+        ]
+    ].sum()
+    swr_share = counts["n_nonlocal_swr"] / counts["n_nonlocal_after"]
+    return [
+        make(
+            "sessions",
+            len(sidecars),
+            "count",
+            "count",
+            "epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with "
+            "curated cortical spike sorting)",
+        ),
+        make(
+            "analysed_epochs",
+            cohort["n_analysed"],
+            "count",
+            "count",
+            "analysed epochs the PFC cohort is drawn from",
+        ),
+        make(
+            "animals",
+            population["animal"].nunique(),
+            "count",
+            "count",
+            "animals in the mPFC population",
+        ),
+        make(
+            "units",
+            len(population),
+            "count",
+            "count",
+            "mPFC units in Figure 4's population: a usable fit, an immobility firing "
+            f"rate of at least {MIN_FIRING_RATE_HZ:g} Hz on the fitted bins, and "
+            "finite modulation curves",
+            used_in_=("paper", "figure: 4c", "figure: 4d"),
+        ),
+        make(
+            "bins_fit",
+            totals["n_bins_fit"],
+            "count",
+            "count",
+            "immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, "
+            "summed over sessions",
+        ),
+        make(
+            "bins_immobile",
+            totals["n_bins_immobile"],
+            "count",
+            "count",
+            "immobile 2 ms bins before the stop restriction, summed over sessions",
+        ),
+        make(
+            "bins_fit_fraction",
+            totals["n_bins_fit"] / totals["n_bins_immobile"],
+            "fraction",
+            "pct",
+            "share of the immobile bins the stop restriction keeps, pooled",
+        ),
+        make(
+            "nonlocal_events_kept",
+            totals["n_nonlocal_after"],
+            "count",
+            "count",
+            "non-local events whose onset is in a kept stop, summed over sessions",
+        ),
+        make(
+            "nonlocal_events_before",
+            totals["n_nonlocal_before"],
+            "count",
+            "count",
+            "the session's non-local events before the stop restriction, summed",
+        ),
+        make(
+            "nonlocal_events_kept_fraction",
+            totals["n_nonlocal_after"] / totals["n_nonlocal_before"],
+            "fraction",
+            "pct",
+            "share of the non-local events the stop restriction keeps, pooled",
+        ),
+        make(
+            "swrs_kept_fraction",
+            totals["n_ripple_after"] / totals["n_ripple_before"],
+            "fraction",
+            "pct",
+            "share of the SWRs the stop restriction keeps, pooled",
+        ),
+        make(
+            "swr_coupled_share_session_median",
+            swr_share.median(),
+            "fraction",
+            "dec2",
+            "median over sessions of the share of kept non-local events that are "
+            "SWR-coupled (the canonical event table's is_swr)",
+        ),
+    ]
+
+
+# --- the estimator and its fits ------------------------------------------------
+
+
+def estimator_values(
+    sidecars: list[dict[str, Any]], make: Callable[..., Value]
+) -> list[Value]:
+    """The prior, folds and null the bundles state, and what the fits did.
+
+    Raises
+    ------
+    ValueError
+        The bundles disagree on a setting, or were not fit with the ridge
+        estimator and the held-out inference.
+    """
+    if (_uniform(sidecars, "estimator"), _uniform(sidecars, "inference")) != (
+        "ridge_poisson_glm",
+        "blocked_heldout_deviance",
+    ):
+        raise ValueError("the bundles are not the ridge, held-out bundles")
+    if _uniform(sidecars, "empirical_pvalue_method") != "plus_one":
+        raise ValueError("the bundles' p-values are not plus-one corrected")
+    prior = _uniform(sidecars, "implied_prior_sd")
+    draws = _uniform(sidecars, "n_control_draws")
+    fits = pd.DataFrame(
+        [
+            {
+                name: s[name]
+                for name in (
+                    "n_model_fits",
+                    "n_nonconverged_model_fits",
+                    "n_neurons_with_nonconverged_model",
+                )
+            }
+            for s in sidecars
+        ]
+    ).sum()
+    return [
+        make(
+            "penalty_sigma",
+            _uniform(sidecars, "penalty_sigma_log_rate"),
+            "quantity",
+            "int",
+            "prior standard deviation of an event-basis coefficient",
+            "log rate",
+        ),
+        make(
+            "prior_sd_per_lag",
+            prior["per_lag"],
+            "quantity",
+            "dec2",
+            "the prior's implied standard deviation of a curve at one lag",
+            "log rate",
+        ),
+        make(
+            "prior_multiplier_per_lag_low",
+            prior["per_lag_multiplier_low"],
+            "quantity",
+            "sig2",
+            "lower end of the rate multiplier that per-lag sd allows at 95 %",
+            "rate multiplier",
+        ),
+        make(
+            "prior_multiplier_per_lag_high",
+            prior["per_lag_multiplier_high"],
+            "quantity",
+            "sig2",
+            "upper end of that multiplier",
+            "rate multiplier",
+        ),
+        make(
+            "prior_sd_sustained",
+            prior["sustained"],
+            "quantity",
+            "dec2",
+            "the prior's implied standard deviation of a curve sustained over the "
+            "reported window",
+            "log rate",
+        ),
+        make(
+            "prior_multiplier_sustained_low",
+            prior["sustained_multiplier_low"],
+            "quantity",
+            "sig2",
+            "lower end of the rate multiplier that sustained sd allows at 95 %",
+            "rate multiplier",
+        ),
+        make(
+            "prior_multiplier_sustained_high",
+            prior["sustained_multiplier_high"],
+            "quantity",
+            "sig2",
+            "upper end of that multiplier",
+            "rate multiplier",
+        ),
+        make(
+            "folds",
+            _uniform(sidecars, "n_folds"),
+            "count",
+            "count",
+            "blocked folds of whole immobility runs the held-out deviance is scored on",
+        ),
+        make(
+            "null_draws",
+            draws,
+            "count",
+            "count",
+            "matched-control draws in each unit's null",
+        ),
+        make(
+            "min_pvalue_denominator",
+            draws + 1,
+            "count",
+            "count",
+            "R + 1: the smallest plus-one empirical p-value is one over it",
+        ),
+        make(
+            "min_pvalue",
+            1 / (draws + 1),
+            "fraction",
+            "sig2",
+            "the smallest plus-one empirical p-value, 1/(R + 1)",
+        ),
+        make(
+            "model_fits",
+            fits["n_model_fits"],
+            "count",
+            "count",
+            "neuron x model fits in the bundles",
+        ),
+        make(
+            "nonconverged_model_fits",
+            fits["n_nonconverged_model_fits"],
+            "count",
+            "count",
+            "of those, fits that ran to maxiter without converging",
+        ),
+        make(
+            "nonconverged_neurons",
+            fits["n_neurons_with_nonconverged_model"],
+            "count",
+            "count",
+            "neurons carrying at least one non-converged fit",
+        ),
+        make(
+            "nonconverged_percent",
+            100 * fits["n_nonconverged_model_fits"] / fits["n_model_fits"],
+            "quantity",
+            "sig2",
+            "non-converged fits as a percent of model fits",
+            "%",
+        ),
+    ]
+
+
+def ml_comparator_values(ml_tree: Path, make: Callable[..., Value]) -> list[Value]:
+    """Non-convergence in the maximum-likelihood tree the prior replaced."""
+    sidecars = read_sidecars(ml_tree)
+    if _uniform(sidecars, "estimator") != "poisson_glm":
+        raise ValueError(f"{ml_tree} is not the maximum-likelihood tree")
+    fits = sum(s["n_model_fits"] for s in sidecars)
+    nonconverged = sum(s["n_nonconverged_model_fits"] for s in sidecars)
+    return [
+        make(
+            "ml_nonconverged_percent",
+            100 * nonconverged / fits,
+            "quantity",
+            "sig2",
+            "non-converged fits as a percent of model fits in the maximum-likelihood "
+            f"tree ({nonconverged} of {fits}, {len(sidecars)} sessions)",
+            "%",
+        )
+    ]
+
+
+def prior_binding_values(
+    population: pd.DataFrame, make: Callable[..., Value]
+) -> list[Value]:
+    """How often the prior moves a curve's peak, per curve.
+
+    The rule of ``compare_pfc_cohorts.shrinkage_table``: among the well-posed
+    units of a curve (unpenalised fit converged and no separated column), the
+    share whose penalised peak differs from the unpenalised one by more than
+    that peak's standard error (the bundle's ``prior_binds``). The values are
+    the lowest and highest share over the five curves.
+    """
+    shares = {}
+    for curve in CURVES:
+        converged = population[f"{curve}: mle_converged"].fillna(False).astype(bool)
+        separated = population[f"{curve}: mle_separated"].fillna(False).astype(bool)
+        well_posed = converged & ~separated
+        binds = population[f"{curve}: prior_binds"].fillna(False).astype(bool)
+        shares[curve] = 100 * (binds & well_posed).sum() / well_posed.sum()
+    shares = pd.Series(shares)
+    return [
+        make(
+            "prior_binds_percent_min",
+            shares.min(),
+            "quantity",
+            "sig2",
+            f"lowest per-curve percent of well-posed units the prior binds on "
+            f"({shares.idxmin()})",
+            "%",
+        ),
+        make(
+            "prior_binds_percent_max",
+            shares.max(),
+            "quantity",
+            "sig2",
+            f"highest per-curve percent of well-posed units the prior binds on "
+            f"({shares.idxmax()})",
+            "%",
+        ),
+    ]
+
+
+# --- the unit fractions (Figure 4d) -----------------------------------------------
+
+
+def called_fraction_values(
+    population: pd.DataFrame, make: Callable[..., Value]
+) -> list[Value]:
+    """Figure 4d: the share of units at raw empirical p < 0.05, per test.
+
+    The denominator is the units tested for that class
+    (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`).
+    Engagement is also given per animal.
+    """
+    fractions = significant_fraction(population, alpha=ALPHA)
+    values = []
+    for word, name in CLASSES.items():
+        n_called, n_tested = fractions[name]
+        label = CLASS_LABELS[name]
+        values += [
+            make(
+                f"{word}_called_fraction",
+                n_called / n_tested,
+                "fraction",
+                "pct",
+                f"share of tested units at raw empirical p < {ALPHA:g} for {label}, "
+                "pooled (descriptive)",
+            ),
+            make(
+                f"{word}_units_called",
+                n_called,
+                "count",
+                "count",
+                f"units at raw empirical p < {ALPHA:g} for {label}",
+            ),
+            make(
+                f"{word}_units_tested",
+                n_tested,
+                "count",
+                "count",
+                f"units with a finite p-value for {label}",
+            ),
+        ]
+    for animal, frame in population.groupby("animal"):
+        n_called, n_tested = significant_fraction(frame, alpha=ALPHA)["engagement"]
+        values.append(
+            make(
+                f"engagement_called_fraction_{ANIMAL_WORDS[animal]}",
+                n_called / n_tested,
+                "fraction",
+                "pct",
+                f"share of {animal}'s tested units at raw empirical p < {ALPHA:g} for "
+                "the engagement test",
+            )
+        )
+    counts = population["min_heldout_model"].value_counts()
+    for word, model in BEST_MODELS.items():
+        values.append(
+            make(
+                f"best_model_{word}_fraction",
+                counts.get(model, 0) / len(population),
+                "fraction",
+                "pct",
+                f"share of units whose best model by held-out deviance is {model}",
+                used_in_=("figure: 4d",),
+            )
+        )
+    return values
+
+
+# --- the null's geometry -----------------------------------------------------------
+
+
+def null_geometry_values(
+    population: pd.DataFrame,
+    sidecars: list[dict[str, Any]],
+    make: Callable[..., Value],
+) -> list[Value]:
+    """Three caveats on the empirical p-values, by the rules of
+    ``scripts/pfc/measure_pfc_null_geometry.py``.
+
+    - Units called at raw p < 0.05 whose own observed held-out improvement (on
+      the matchable subset) is not positive.
+    - How much of the engagement null's windows land on the shipped control:
+      each session's median over draws, then the median and range over
+      sessions.
+    - Events with no legal within-bout control, which enter neither side:
+      per class, summed over sessions.
+    """
+    shares = {}
+    for name, column in HELDOUT_P_COLUMNS.items():
+        called = population[column] < ALPHA
+        observed = population[MATCHED_NULL_OBSERVED_COLUMNS[name]]
+        shares[name] = ((called & (observed <= 0)).sum(), called.sum())
+    n_flat, n_called = shares.pop("engagement")
+    class_shares = pd.Series({name: a / b for name, (a, b) in shares.items()})
+
+    overlap = pd.Series([s["engagement_null_overlap"]["median"] for s in sidecars])
+
+    windows = pd.DataFrame(
+        [
+            {
+                "session": s["artifact"].removesuffix(f"{STEM}.pkl"),
+                "event_class": event_class,
+                "total": w["n_events_total"],
+                "excluded": w["n_events_excluded_unmatchable"],
+            }
+            for s in sidecars
+            for event_class, w in s["null_windows"].items()
+        ]
+    )
+    by_class = windows.groupby("event_class")[["total", "excluded"]].sum()
+    excluded = 100 * by_class["excluded"] / by_class["total"]
+    worst = windows.loc[(windows["excluded"] / windows["total"]).idxmax()]
+    worst_label = f"{worst['session']} / {worst['event_class']}"
+    return [
+        make(
+            "engagement_called_flat_fraction",
+            n_flat / n_called,
+            "fraction",
+            "pct",
+            "of the units called by the engagement test, the share whose own "
+            "observed held-out improvement is not positive",
+        ),
+        make(
+            "engagement_called_flat",
+            n_flat,
+            "count",
+            "count",
+            "units called by the engagement test with no positive observed improvement",
+        ),
+        make(
+            "class_called_flat_fraction_min",
+            class_shares.min(),
+            "fraction",
+            "pctnum",
+            f"lowest such share over the four event classes ({class_shares.idxmin()})",
+        ),
+        make(
+            "class_called_flat_fraction_max",
+            class_shares.max(),
+            "fraction",
+            "pct",
+            f"highest such share over the four event classes ({class_shares.idxmax()})",
+        ),
+        make(
+            "engagement_null_overlap_median",
+            overlap.median(),
+            "fraction",
+            "pct",
+            "median over sessions of each session's median share of an engagement "
+            "null draw's windows that land on the shipped matched control",
+        ),
+        make(
+            "engagement_null_overlap_session_min",
+            overlap.min(),
+            "fraction",
+            "pctnum",
+            "lowest session median of that share",
+        ),
+        make(
+            "engagement_null_overlap_session_max",
+            overlap.max(),
+            "fraction",
+            "pct",
+            "highest session median of that share",
+        ),
+        make(
+            "unmatchable_percent_class_min",
+            excluded.min(),
+            "quantity",
+            "sig2",
+            "lowest percent, over event classes, of a class's events with no legal "
+            f"within-bout control, summed over sessions ({excluded.idxmin()})",
+            "%",
+        ),
+        make(
+            "unmatchable_percent_class_max",
+            excluded.max(),
+            "quantity",
+            "sig2",
+            f"highest such percent ({excluded.idxmax()})",
+            "%",
+        ),
+        make(
+            "unmatchable_worst_excluded",
+            worst["excluded"],
+            "count",
+            "count",
+            f"events with no legal control in the worst session and class ({worst_label})",
+        ),
+        make(
+            "unmatchable_worst_total",
+            worst["total"],
+            "count",
+            "count",
+            f"events of that class in that session ({worst_label})",
+        ),
+    ]
+
+
+# --- the summary -------------------------------------------------------------------
+
+
+def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
+    """Part 4's summary from ``inputs``."""
+    summary = Summary(part=4, produced_by=produced_by, commit=commit)
+    sidecars = read_sidecars(inputs.bundle_dir)
+    pending = staleness(sidecars, inputs.event_table, inputs.stop_table)
+    population, _, _ = load_population_data(
+        inputs.bundle_dir, min_firing_rate=MIN_FIRING_RATE_HZ
+    )
+    cohort = json.loads(inputs.pfc_cohort.read_text())
+    source = (
+        f"{rel(inputs.bundle_dir)}/*{STEM}.pkl and their provenance sidecars "
+        f"(scripts/pfc/run_pfc_analysis_bandit.py), {len(sidecars)} bundles, "
+        "read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)"
+    )
+    claims = ("20",)
+    make = _value_factory(source, claims, ("paper",), pending)
+    figure = _value_factory(source, claims, ("paper", "figure: 4d"), pending)
+    summary.add(*cohort_values(sidecars, population, cohort, make))
+    summary.add(*estimator_values(sidecars, make))
+    summary.add(*prior_binding_values(population, make))
+    summary.add(*called_fraction_values(population, figure))
+    summary.add(*null_geometry_values(population, sidecars, make))
+    summary.add(
+        *ml_comparator_values(
+            inputs.ml_tree,
+            _value_factory(
+                f"{rel(inputs.ml_tree)}/*{STEM}.provenance.json",
+                claims,
+                ("paper",),
+                ML_PENDING,
+            ),
+        )
+    )
+
+    data = inputs.bundle_dir
+    summary.inputs += [
+        files_record(f"*{STEM}.pkl", data.glob(f"*{STEM}.pkl"), ROOT_DIR),
+        files_record(f"*{STEM}.*.npy", data.glob(f"*{STEM}.*.npy"), ROOT_DIR),
+        files_record(
+            f"*{STEM}.provenance.json", data.glob(f"*{STEM}.provenance.json"), ROOT_DIR
+        ),
+        file_record(inputs.pfc_cohort, ROOT_DIR),
+        file_record(inputs.event_table, ROOT_DIR),
+        file_record(inputs.stop_table, ROOT_DIR),
+        files_record(
+            f"*{STEM}.provenance.json",
+            inputs.ml_tree.glob(f"*{STEM}.provenance.json"),
+            ROOT_DIR,
+            note="superseded maximum-likelihood tree, for one comparison",
+        ),
+    ]
+    return summary
+
+
+def rel(path: Path) -> str:
+    """``path`` relative to the repository when it is under it."""
+    return (
+        str(path.relative_to(ROOT_DIR)) if path.is_relative_to(ROOT_DIR) else str(path)
+    )
