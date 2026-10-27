@@ -1079,3 +1079,11 @@ marker, and the computed value now there. Newest last.
 | Doc | Key | Was | Now |
 |---|---|---|---|
 | `paper/claims_table.md` | `part2.end_offset_median_ms` | -4 | −4 |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/README.md` | `part4.ml_sessions` | … | 71 |
+| `paper/claims_table.md` | `part4.ml_sessions` | … | 71 |
+| `paper/claims_table.md` | `part4.engagement_bh_fraction` | 12.1 % | 10 % |
