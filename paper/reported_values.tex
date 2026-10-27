@@ -308,3 +308,70 @@
 \newcommand{\PartTwoZugaroOverlapNoSpikeShareMedian}{0}  % part2.zugaro_overlap_no_spike_share_median: median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoZugaroOverlapNonlocalShareMedian}{100}  % part2.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoZugaroOverlapUncertainShareMedian}{0}  % part2.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
+
+% --- Part 4 (commit 2893ef49ec70)
+\newcommand{\PartFourAnalysedEpochs}{242}  % part4.analysed_epochs: analysed epochs the PFC cohort is drawn from
+\newcommand{\PartFourAnimals}{5}  % part4.animals: animals in the mPFC population
+\newcommand{\PartFourBestModelConstantFraction}{48}  % part4.best_model_constant_fraction: share of units whose best model by held-out deviance is constant
+\newcommand{\PartFourBestModelJointFraction}{5}  % part4.best_model_joint_fraction: share of units whose best model by held-out deviance is SWR + non_local_no_SWR
+\newcommand{\PartFourBestModelNonlocalFraction}{33}  % part4.best_model_nonlocal_fraction: share of units whose best model by held-out deviance is non_local
+\newcommand{\PartFourBestModelSwrFraction}{14}  % part4.best_model_swr_fraction: share of units whose best model by held-out deviance is SWR
+\newcommand{\PartFourBinsFit}{20{,}618{,}388}  % part4.bins_fit: immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, summed over sessions
+\newcommand{\PartFourBinsFitFraction}{92}  % part4.bins_fit_fraction: share of the immobile bins the stop restriction keeps, pooled
+\newcommand{\PartFourBinsImmobile}{22{,}360{,}999}  % part4.bins_immobile: immobile 2 ms bins before the stop restriction, summed over sessions
+\newcommand{\PartFourClassCalledFlatFractionMax}{9}  % part4.class_called_flat_fraction_max: highest such share over the four event classes (non_local_no_SWR)
+\newcommand{\PartFourClassCalledFlatFractionMin}{5}  % part4.class_called_flat_fraction_min: lowest such share over the four event classes (non_local_SWR)
+\newcommand{\PartFourEngagementCalledFlat}{253}  % part4.engagement_called_flat: units called by the engagement test with no positive observed improvement
+\newcommand{\PartFourEngagementCalledFlatFraction}{9}  % part4.engagement_called_flat_fraction: of the units called by the engagement test, the share whose own observed held-out improvement is not positive
+\newcommand{\PartFourEngagementCalledFraction}{23}  % part4.engagement_called_fraction: share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive)
+\newcommand{\PartFourEngagementCalledFractionChimi}{44}  % part4.engagement_called_fraction_chimi: share of chimi's tested units at raw empirical p < 0.05 for the engagement test
+\newcommand{\PartFourEngagementCalledFractionJsixteen}{20}  % part4.engagement_called_fraction_jsixteen: share of j16's tested units at raw empirical p < 0.05 for the engagement test
+\newcommand{\PartFourEngagementCalledFractionPeanut}{29}  % part4.engagement_called_fraction_peanut: share of peanut's tested units at raw empirical p < 0.05 for the engagement test
+\newcommand{\PartFourEngagementCalledFractionSenor}{27}  % part4.engagement_called_fraction_senor: share of senor's tested units at raw empirical p < 0.05 for the engagement test
+\newcommand{\PartFourEngagementCalledFractionWilbur}{21}  % part4.engagement_called_fraction_wilbur: share of wilbur's tested units at raw empirical p < 0.05 for the engagement test
+\newcommand{\PartFourEngagementNullOverlapMedian}{11}  % part4.engagement_null_overlap_median: median over sessions of each session's median share of an engagement null draw's windows that land on the shipped matched control
+\newcommand{\PartFourEngagementNullOverlapSessionMax}{36}  % part4.engagement_null_overlap_session_max: highest session median of that share
+\newcommand{\PartFourEngagementNullOverlapSessionMin}{5}  % part4.engagement_null_overlap_session_min: lowest session median of that share
+\newcommand{\PartFourEngagementUnitsCalled}{2{,}718}  % part4.engagement_units_called: units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control)
+\newcommand{\PartFourEngagementUnitsTested}{11{,}604}  % part4.engagement_units_tested: units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control)
+\newcommand{\PartFourFolds}{5}  % part4.folds: blocked folds of whole immobility runs the held-out deviance is scored on
+\newcommand{\PartFourMinPvalue}{0.0010}  % part4.min_pvalue: the smallest plus-one empirical p-value, 1/(R + 1)
+\newcommand{\PartFourMinPvalueDenominator}{1{,}001}  % part4.min_pvalue_denominator: R + 1: the smallest plus-one empirical p-value is one over it
+\newcommand{\PartFourMlNonconvergedPercent}{15}  % part4.ml_nonconverged_percent: non-converged fits as a percent of model fits in the maximum-likelihood tree (22902 of 154350, 71 sessions) [PENDING: read from the superseded maximum-likelihood tree (Processed-Data/_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; it is a comparison of estimators, not refit on the current tables]
+\newcommand{\PartFourModelFits}{166{,}968}  % part4.model_fits: neuron x model fits in the bundles
+\newcommand{\PartFourNonSwrReplayCalledFraction}{23}  % part4.non_swr_replay_called_fraction: share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive)
+\newcommand{\PartFourNonSwrReplayUnitsCalled}{2{,}646}  % part4.non_swr_replay_units_called: units at raw empirical p < 0.05 for non-SWR replay
+\newcommand{\PartFourNonSwrReplayUnitsTested}{11{,}604}  % part4.non_swr_replay_units_tested: units with a finite p-value for non-SWR replay
+\newcommand{\PartFourNonconvergedModelFits}{432}  % part4.nonconverged_model_fits: of those, fits that ran to maxiter without converging
+\newcommand{\PartFourNonconvergedNeurons}{48}  % part4.nonconverged_neurons: neurons carrying at least one non-converged fit
+\newcommand{\PartFourNonconvergedPercent}{0.26}  % part4.nonconverged_percent: non-converged fits as a percent of model fits
+\newcommand{\PartFourNonlocalCalledFraction}{40}  % part4.nonlocal_called_fraction: share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive)
+\newcommand{\PartFourNonlocalEventsBefore}{17{,}726}  % part4.nonlocal_events_before: the session's non-local events before the stop restriction, summed
+\newcommand{\PartFourNonlocalEventsKept}{16{,}419}  % part4.nonlocal_events_kept: non-local events whose onset is in a kept stop, summed over sessions
+\newcommand{\PartFourNonlocalEventsKeptFraction}{93}  % part4.nonlocal_events_kept_fraction: share of the non-local events the stop restriction keeps, pooled
+\newcommand{\PartFourNonlocalUnitsCalled}{4{,}661}  % part4.nonlocal_units_called: units at raw empirical p < 0.05 for all non-local events
+\newcommand{\PartFourNonlocalUnitsTested}{11{,}604}  % part4.nonlocal_units_tested: units with a finite p-value for all non-local events
+\newcommand{\PartFourNullDraws}{1{,}000}  % part4.null_draws: matched-control draws in each unit's null
+\newcommand{\PartFourPenaltySigma}{3}  % part4.penalty_sigma: prior standard deviation of an event-basis coefficient
+\newcommand{\PartFourPriorBindsPercentMax}{2.7}  % part4.prior_binds_percent_max: highest per-curve percent of well-posed units the prior binds on (non_local_no_SWR)
+\newcommand{\PartFourPriorBindsPercentMin}{1.3}  % part4.prior_binds_percent_min: lowest per-curve percent of well-posed units the prior binds on (matched_control)
+\newcommand{\PartFourPriorMultiplierPerLagHigh}{57}  % part4.prior_multiplier_per_lag_high: upper end of that multiplier
+\newcommand{\PartFourPriorMultiplierPerLagLow}{0.017}  % part4.prior_multiplier_per_lag_low: lower end of the rate multiplier that per-lag sd allows at 95 %
+\newcommand{\PartFourPriorMultiplierSustainedHigh}{5.9}  % part4.prior_multiplier_sustained_high: upper end of that multiplier
+\newcommand{\PartFourPriorMultiplierSustainedLow}{0.17}  % part4.prior_multiplier_sustained_low: lower end of the rate multiplier that sustained sd allows at 95 %
+\newcommand{\PartFourPriorSdPerLag}{2.07}  % part4.prior_sd_per_lag: the prior's implied standard deviation of a curve at one lag
+\newcommand{\PartFourPriorSdSustained}{0.90}  % part4.prior_sd_sustained: the prior's implied standard deviation of a curve sustained over the reported window
+\newcommand{\PartFourSessions}{75}  % part4.sessions: epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting)
+\newcommand{\PartFourSwrCalledFraction}{31}  % part4.swr_called_fraction: share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive)
+\newcommand{\PartFourSwrCoupledShareSessionMedian}{0.51}  % part4.swr_coupled_share_session_median: median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr)
+\newcommand{\PartFourSwrReplayCalledFraction}{33}  % part4.swr_replay_called_fraction: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)
+\newcommand{\PartFourSwrReplayUnitsCalled}{3{,}850}  % part4.swr_replay_units_called: units at raw empirical p < 0.05 for SWR-coupled replay
+\newcommand{\PartFourSwrReplayUnitsTested}{11{,}604}  % part4.swr_replay_units_tested: units with a finite p-value for SWR-coupled replay
+\newcommand{\PartFourSwrUnitsCalled}{3{,}574}  % part4.swr_units_called: units at raw empirical p < 0.05 for SWR
+\newcommand{\PartFourSwrUnitsTested}{11{,}604}  % part4.swr_units_tested: units with a finite p-value for SWR
+\newcommand{\PartFourSwrsKeptFraction}{93}  % part4.swrs_kept_fraction: share of the SWRs the stop restriction keeps, pooled
+\newcommand{\PartFourUnits}{11{,}604}  % part4.units: mPFC units in Figure 4's population: a usable fit, an immobility firing rate of at least 1 Hz on the fitted bins, and finite modulation curves
+\newcommand{\PartFourUnmatchablePercentClassMax}{0.60}  % part4.unmatchable_percent_class_max: highest such percent (non_local_no_SWR)
+\newcommand{\PartFourUnmatchablePercentClassMin}{0.27}  % part4.unmatchable_percent_class_min: lowest percent, over event classes, of a class's events with no legal within-bout control, summed over sessions (non_local_SWR)
+\newcommand{\PartFourUnmatchableWorstExcluded}{8}  % part4.unmatchable_worst_excluded: events with no legal control in the worst session and class (j1620210709_10_r5 / non_local_SWR)
+\newcommand{\PartFourUnmatchableWorstTotal}{102}  % part4.unmatchable_worst_total: events of that class in that session (j1620210709_10_r5 / non_local_SWR)

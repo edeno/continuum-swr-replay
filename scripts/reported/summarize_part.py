@@ -18,13 +18,14 @@ import argparse
 from collections.abc import Sequence
 
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported import part1, part2
+from continuum_swr_replay.reported import part1, part2, part4
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
 BUILDERS = {
     1: lambda by, commit: part1.summarize(part1.default_inputs(), by, commit),
     2: lambda by, commit: part2.summarize(part2.default_inputs(), by, commit),
+    4: lambda by, commit: part4.summarize(part4.default_inputs(), by, commit),
 }
 """The parts with a summary so far."""
 

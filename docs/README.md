@@ -370,7 +370,7 @@ Three tiers:
    is the unrestricted sensitivity bundle (unit bundles and Stage 6 only — Stage 5B has
    one rule at the event grain). **Only Stage 6 has shipped an `_allstops` bundle**;
    the unit-GLM one has never been run — produce it with
-   `run_pfc_analysis_bandit.py --stop-cohort all_stops` (a full 71-session refit), which
+   `run_pfc_analysis_bandit.py --stop-cohort all_stops` (a full <!--v:part4.sessions-->75<!--/v-->-session refit), which
    is the only way to compare the unit fits across populations on artifacts rather than
    on the unit test that pins the unrestricted path. A bundle fit at a prior other than
    the canonical one is written under a `_sigma<value>` name beside it and draws no
@@ -395,11 +395,10 @@ Three tiers:
    `control_null_event_policy` (`fixed_jointly_matchable_subset`) and
    `engagement_null_overlap` (how much of the engagement null's draws land on the shipped
    control). The
-   canonical bundles carry **σ = 3** (implied per-lag sd **2.066**, a rate multiplier
-   of ×0.017–×57 at 95 %; sustained sd **0.905**, ×0.17–×5.9), **K = 5** folds and
-   **R = 1,000** null draws — quoted from the sidecars, which is where a reader should
-   check them. The finite-sample Monte Carlo p-value is **`(r + 1)/(R + 1)`**,
-   so with 1,000 usable draws its minimum is **1/1,001 ≈ 0.001**; zero is impossible.
+   canonical bundles carry **σ = <!--v:part4.penalty_sigma-->3<!--/v-->** (implied per-lag sd **<!--v:part4.prior_sd_per_lag-->2.07<!--/v-->**, a rate multiplier
+   of ×<!--v:part4.prior_multiplier_per_lag_low-->0.017<!--/v-->–×<!--v:part4.prior_multiplier_per_lag_high-->57<!--/v--> at 95 %; sustained sd **<!--v:part4.prior_sd_sustained-->0.90<!--/v-->**, ×<!--v:part4.prior_multiplier_sustained_low-->0.17<!--/v-->–×<!--v:part4.prior_multiplier_sustained_high-->5.9<!--/v-->), **K = <!--v:part4.folds-->5<!--/v-->** folds and
+   **R = <!--v:part4.null_draws-->1,000<!--/v-->** null draws — read from the sidecars into `paper/reported/part4.json`. The finite-sample Monte Carlo p-value is **`(r + 1)/(R + 1)`**,
+   so with <!--v:part4.null_draws-->1,000<!--/v--> usable draws its minimum is **1/<!--v:part4.min_pvalue_denominator-->1,001<!--/v--> ≈ <!--v:part4.min_pvalue-->0.0010<!--/v-->**; zero is impossible.
    Draws that fail to place every matched window are excluded, and **every
    requested draw must be usable** for a unit's p-value to be reported — an
    `R = 1,000` label always means a denominator of 1,000, and the per-unit
@@ -417,23 +416,25 @@ Three tiers:
    never settled is non-estimable for the unit that owns it — every statistic reading
    it is NaN — so those counts are the only record of how much was dropped.
 
-   **The current 71 at-well unit bundles are the ridge/held-out batch**, fit at git
-   `db01df0` — launched 2026-09-16, finished 2026-09-17, five workers on the idle A100s
-   (cards 3, 4, 6, 7 and 9), 13 h 52 m to 16 h 59 m of wall clock each. They replaced the
+   **The current <!--v:part4.sessions-->75<!--/v--> at-well unit bundles are the ridge/held-out estimator refit on the
+   R11 re-decode**, at git `110c9ae` on 2026-10-11/12 (logs in `logs/pfc_refresh2_20261011/`).
+   The estimator's first batch, at `db01df0` (2026-09-16/17), replaced the
    maximum-likelihood tree, which is kept whole at
-   `Processed-Data/_pre_ridge_backup_20260915/`. The before/after is audited in
+   `Processed-Data/_pre_ridge_backup_20260915/`. That before/after is audited in
    [2026-09-18-pfc-ridge-heldout.md](../.claude/docs/reviews/2026-09-18-pfc-ridge-heldout.md):
-   non-converged fits fall from 14.8% of shipped model fits to **0.28%** (432 of 155,952,
-   over 48 neurons); the prior binds on 1.2–2.8% of well-posed units per curve; and the
-   two inferences call comparable fractions of a comparable population, which are **not**
-   comparable test by test. That audit also carries the null's geometry
-   (`scripts/pfc/measure_pfc_null_geometry.py`): the engagement null's draws land on the
-   shipped control they are entered beside on a median 11.0% of their windows, 7–10% of
-   the units called at raw p < .05 have no positive held-out improvement of their own,
-   and 0.3–1.4% of a class's events have no legal within-bout control and enter neither
-   side of its test. Figure 4 is regenerated from these bundles; claim 20 is requoted from
-   this audit. A one-session sensitivity pair at σ = 2 and σ = 4.5
-   (`j1620210710_02_r1`) sits beside them under `_sigma2` / `_sigma4p5`.
+   the two inferences call comparable fractions of a comparable population, which are **not**
+   comparable test by test. In the current bundles (`paper/reported/part4.json`),
+   non-converged fits are **<!--v:part4.nonconverged_percent-->0.26<!--/v-->%** of model fits (<!--v:part4.nonconverged_model_fits-->432<!--/v--> of <!--v:part4.model_fits-->166,968<!--/v-->,
+   over <!--v:part4.nonconverged_neurons-->48<!--/v--> neurons), against <!--v:part4.ml_nonconverged_percent-->15<!--/v-->% in the maximum-likelihood tree (fit on the tables before the R11 re-decode); the prior binds on
+   <!--v:part4.prior_binds_percent_min-->1.3<!--/v-->–<!--v:part4.prior_binds_percent_max-->2.7<!--/v-->% of well-posed units per curve. The null's geometry, by the rules of
+   `scripts/pfc/measure_pfc_null_geometry.py`: the engagement null's draws land on the
+   shipped control they are entered beside on a median <!--v:part4.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:part4.class_called_flat_fraction_min|pctnum-->5<!--/v-->–<!--v:part4.class_called_flat_fraction_max-->9 %<!--/v--> of
+   the units called at raw p < .05 for an event class have no positive held-out improvement of their own,
+   and <!--v:part4.unmatchable_percent_class_min-->0.27<!--/v-->–<!--v:part4.unmatchable_percent_class_max-->0.60<!--/v-->% of a class's events have no legal within-bout control and enter neither
+   side of its test. Figure 4 is regenerated from these bundles; claim 20's numbers are read from
+   `paper/reported/part4.json`. A one-session sensitivity pair at σ = 2 and σ = 4.5
+   (`j1620210710_02_r1`) was fit beside the first batch under `_sigma2` / `_sigma4p5`; it was
+   not refit on the R11 re-decode and is no longer in `Processed-Data/`.
    **The replay-split curves were swapped in every bundle written before 2026-09-15** —
    `non_local_SWR_modulation` held the non-SWR kernel and vice versa — so any per-class
    modulation magnitude quoted from the split model before that date, including from the
