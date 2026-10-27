@@ -865,3 +865,36 @@ class TestControlDrawNull:
             ks = stats.kstest(pvalues, "uniform").statistic
             assert ks < 0.30, f"{class_name}: p-values not uniform, KS = {ks:.3f}"
             assert 0.2 < pvalues.mean() < 0.8, class_name
+
+
+def test_control_null_covers_the_extended_class(null_session):
+    """The fifth class gets its own count-matched draws."""
+    from continuum_swr_replay.analysis.pfc.event_sets import (
+        EXTENDED_EVENT_CLASSES,
+        SWR_NO_NON_LOCAL,
+    )
+
+    event_times = dict(null_session["event_times"])
+    event_times[SWR_NO_NON_LOCAL] = event_times["SWR"].iloc[::3].reset_index(drop=True)
+    folds = assign_blocked_folds(null_session["fit_mask"], n_folds=5, seed=2)
+
+    null = control_draw_null(
+        event_times,
+        null_session["fit_mask"],
+        null_session["counts"],
+        folds,
+        rng_seeds=[11, 12],
+        spline_basis=null_session["spline_basis"],
+        lags=null_session["lags"],
+        penalty_sigma=2.0,
+        classes=EXTENDED_EVENT_CLASSES,
+    )
+
+    n_new = len(event_times[SWR_NO_NON_LOCAL])
+    assert null.n_events[SWR_NO_NON_LOCAL] == n_new
+    assert 0 < null.n_tested[SWR_NO_NON_LOCAL] <= n_new
+    assert np.all(null.n_placed[SWR_NO_NON_LOCAL] <= null.n_tested[SWR_NO_NON_LOCAL])
+    assert null.improvement[SWR_NO_NON_LOCAL].shape == (
+        2,
+        null_session["counts"].shape[1],
+    )

@@ -281,6 +281,7 @@ def load_population_data(
     expected_n_control_draws: int = DEFAULT_CONTROL_DRAWS,
     expected_n_folds: int = 5,
     expected_penalty_sigma: float = DEFAULT_PENALTY_SIGMA,
+    extra_curves: tuple[str, ...] = (),
 ) -> tuple[pd.DataFrame, dict[str, np.ndarray], np.ndarray]:
     """Load and filter PFC population data.
 
@@ -314,6 +315,12 @@ def load_population_data(
         all three, preventing partial reruns from pooling generations with
         different p-value grids, folds, or estimators. Ignored for legacy
         reads.
+    extra_curves : tuple of str
+        Further curves to read, by the name in their file
+        (``<bundle>.<name>_modulation.npy``), e.g. the extended event set's
+        ``"SWR_no_non_local"`` and ``"non_local_SWR_3class"``. Returned under
+        that name, lower-cased; like the matched-control curve they may carry
+        NaN and do not decide which units are kept.
 
     Returns
     -------
@@ -355,6 +362,7 @@ def load_population_data(
     loaded_artifacts: list[Path] = []
     swr_list, no_swr_list, nl_swr_list, nl_no_swr_list = [], [], [], []
     matched_control_list = []
+    extra_lists: dict[str, list[np.ndarray]] = {name: [] for name in extra_curves}
 
     n_lag_times = len(lag_time)
 
@@ -435,6 +443,17 @@ def load_population_data(
                 "with modulation traces."
             )
 
+        extras = {
+            name: np.load(f"{base}.{name}_modulation.npy") for name in extra_curves
+        }
+        bad = {name: a.shape for name, a in extras.items() if a.shape != sess_swr.shape}
+        if bad:
+            raise ValueError(
+                f"Per-session shape mismatch in {p.name}: extra curves {bad} do "
+                f"not match the canonical curves' {sess_swr.shape}"
+            )
+        for name, array in extras.items():
+            extra_lists[name].append(array)
         dfs.append(df_session)
         loaded_artifacts.append(p)
         swr_list.append(sess_swr)
@@ -529,6 +548,10 @@ def load_population_data(
         df[q_col] = q
 
     modulations = {
+        **{
+            name.lower(): np.hstack(arrays)[:, good]
+            for name, arrays in extra_lists.items()
+        },
         "swr": swr_all,
         "no_swr": no_swr_all,
         "non_local_swr": nl_swr_all,

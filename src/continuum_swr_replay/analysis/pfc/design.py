@@ -13,6 +13,8 @@ from numpy.typing import NDArray
 from patsy import dmatrix
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
+from continuum_swr_replay.analysis.pfc.event_sets import SWR_NO_NON_LOCAL
+from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
 
@@ -423,5 +425,22 @@ def _make_design_matrices(
             matched_control_and_non_local_no_swr_design_matrix
         ),
     }
+
+    # The extended event set: SWRs without replay alone, and beside the replay
+    # split. Present only when the caller drew that class, so a canonical run
+    # builds exactly the ladder above.
+    if SWR_NO_NON_LOCAL in conv_spline_basis:
+        design_matrices[SWR_NO_NON_LOCAL] = np.concatenate(
+            [constant_design_matrix, conv_spline_basis[SWR_NO_NON_LOCAL]], axis=1
+        )
+        design_matrices[THREE_CLASS_MODEL] = np.concatenate(
+            [
+                constant_design_matrix,
+                conv_spline_basis["non_local_no_SWR"],
+                conv_spline_basis["non_local_SWR"],
+                conv_spline_basis[SWR_NO_NON_LOCAL],
+            ],
+            axis=1,
+        )
 
     return design_matrices, spline_basis, lag_time

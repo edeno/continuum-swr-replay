@@ -246,13 +246,30 @@ CURVE_SOURCES = {
 }
 
 
-def curve_coefficients(curve: str, n_basis: int) -> tuple[str, slice]:
-    """The model a :data:`CURVE_SOURCES` curve is read from, and its parameter slice.
+#: The extended event set's joint model: the two replay classes and the SWRs
+#: that overlap no non-local event, each with its own kernel, in this block
+#: order.
+THREE_CLASS_MODEL = "non_local_no_SWR + non_local_SWR + SWR_no_non_local"
 
-    Parameter 0 is the intercept; basis block ``b`` is the ``n_basis``
-    parameters after it, starting at ``1 + b * n_basis``.
+#: The extended event set's extra curves, both read off :data:`THREE_CLASS_MODEL`
+#: so the two can be compared within one fit: SWRs without replay (block 2) and
+#: SWR-coupled replay in the same model (block 1).
+EXTENDED_CURVE_SOURCES = {
+    "SWR_no_non_local": (THREE_CLASS_MODEL, 2),
+    "non_local_SWR_3class": (THREE_CLASS_MODEL, 1),
+}
+
+
+def curve_coefficients(
+    curve: str, n_basis: int, sources: dict[str, tuple[str, int]] | None = None
+) -> tuple[str, slice]:
+    """The model a curve is read from, and its parameter slice.
+
+    ``sources`` defaults to :data:`CURVE_SOURCES`. Parameter 0 is the
+    intercept; basis block ``b`` is the ``n_basis`` parameters after it,
+    starting at ``1 + b * n_basis``.
     """
-    model, block = CURVE_SOURCES[curve]
+    model, block = (CURVE_SOURCES if sources is None else sources)[curve]
     start = 1 + block * n_basis
     return model, slice(start, start + n_basis)
 
@@ -288,4 +305,13 @@ NESTED_MODEL_PAIRS: tuple[tuple[str, str], ...] = (
     # baseline itself modulate firing?
     ("matched_control + non_local_no_SWR", "matched_control"),
     ("matched_control", "constant"),
+)
+
+#: The extended event set's nested pairs, beside :data:`NESTED_MODEL_PAIRS`:
+#: does mPFC respond to SWRs without replay at all, do they add to the replay
+#: split, and does the replay split add to them.
+EXTENDED_NESTED_MODEL_PAIRS: tuple[tuple[str, str], ...] = (
+    ("SWR_no_non_local", "constant"),
+    (THREE_CLASS_MODEL, "non_local_SWR + non_local_no_SWR"),
+    (THREE_CLASS_MODEL, "SWR_no_non_local"),
 )

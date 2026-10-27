@@ -26,9 +26,12 @@ from continuum_swr_replay.analysis.pfc.design import (
 )
 from continuum_swr_replay.analysis.pfc.event_sets import (
     DEFAULT_BASIS_HALF_WINDOW_S,
+    EVENT_SETS,
+    SWR_NO_NON_LOCAL,
     build_session_event_sets,
     build_session_fit_mask,
     count_events_covering_fit_bins,
+    swr_without_non_local,
 )
 from continuum_swr_replay.analysis.pfc.fit import (
     _check_fitter,
@@ -821,6 +824,7 @@ def run_session(
     fit_diagnostics_out: dict[str, Any] | None = None,
     penalty_sigma: float | None = None,
     scoring_out: dict[str, Any] | None = None,
+    event_set: str = "canonical",
 ) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray, dict[str, Any]]:
     """Run PFC GLM analysis for all neurons in a single session.
 
@@ -889,6 +893,13 @@ def run_session(
         reassembled it from the same functions would pay a second load of the
         session and could drift from what was actually fit. Left empty for a
         session with no units in ``brain_area``.
+    event_set : {"canonical", "with_swr_without_replay"}
+        ``"with_swr_without_replay"`` adds the class ``SWR_no_non_local`` (the
+        SWRs that overlap no non-local event) and its two models,
+        ``SWR_no_non_local`` and
+        :data:`~continuum_swr_replay.analysis.pfc.modulation.THREE_CLASS_MODEL`.
+        The returned curves are the canonical five either way; the runner reads
+        the extra curves off the fit material in ``scoring_out``.
 
     Returns
     -------
@@ -1006,6 +1017,7 @@ def run_session(
         stop_cohort=stop_cohort,
         non_local_threshold=non_local_threshold,
         logger=logger,
+        event_set=event_set,
     )
     n_matched_control = int(len(control_draw.times))
     cohort_info = {
@@ -1293,6 +1305,7 @@ def _session_events(
     stop_cohort: str,
     non_local_threshold: float,
     logger: logging.Logger,
+    event_set: str = "canonical",
 ) -> tuple[
     dict[str, pd.DataFrame],
     dict[str, Any],
@@ -1304,12 +1317,16 @@ def _session_events(
     """The session's event sets, artifact-dropped events and matched control.
 
     The matched non-event control is drawn against the event sets and the
-    events the analysed-time rule dropped.
+    events the analysed-time rule dropped. With ``event_set`` set to
+    ``"with_swr_without_replay"`` the SWRs that overlap no non-local event
+    (:func:`swr_without_non_local`) are added as ``"SWR_no_non_local"``; they
+    are a subset of ``"SWR"``, so the control is drawn exactly as without them.
 
     Returns
     -------
     event_times : dict of pd.DataFrame
-        From :func:`build_session_event_sets`, with ``"matched_control"`` added.
+        From :func:`build_session_event_sets`, with ``"matched_control"`` (and,
+        for the extended set, ``"SWR_no_non_local"``) added.
     event_counts : dict
         Its counts, plus the artifact-dropped event counts.
     event_provenance : dict
@@ -1382,6 +1399,21 @@ def _session_events(
         np.asarray(fit_mask, dtype=bool),
         basis_half_window_s=DEFAULT_BASIS_HALF_WINDOW_S,
     )
+    if event_set == "with_swr_without_replay":
+        event_times[SWR_NO_NON_LOCAL], swr_counts = swr_without_non_local(
+            event_times["SWR"], canonical_events, artifact_dropped
+        )
+        event_counts.update(swr_counts)
+        logger.info(
+            "SWRs without replay: %d of %d kept SWRs (%d with replay, %d unknown: "
+            "overlapping a dropped window)",
+            swr_counts["n_swr_no_non_local"],
+            len(event_times["SWR"]),
+            swr_counts["n_swr_with_non_local"],
+            swr_counts["n_swr_no_non_local_unknown"],
+        )
+    elif event_set != "canonical":
+        raise ValueError(f"unknown event_set {event_set!r}; one of {EVENT_SETS}")
     # The matched non-event control is drawn after the cohort restriction and
     # from the fit mask, so its windows sample exactly the bins the models are
     # fit on and avoid every event, the ones the restriction or the

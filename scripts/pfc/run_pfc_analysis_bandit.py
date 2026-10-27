@@ -90,7 +90,12 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (  # noqa: E402
 from continuum_swr_replay.analysis.pfc.cohort import (  # noqa: E402
     load_session_stop_cohort,
 )
-from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES  # noqa: E402
+from continuum_swr_replay.analysis.pfc.event_sets import (  # noqa: E402
+    EVENT_CLASSES,
+    EVENT_SETS,
+    EXTENDED_EVENT_CLASSES,
+    SWR_NO_NON_LOCAL,
+)
 from continuum_swr_replay.analysis.pfc.fit import model_penalties  # noqa: E402
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu  # noqa: E402
 from continuum_swr_replay.analysis.pfc.heldout import (  # noqa: E402
@@ -115,8 +120,11 @@ from continuum_swr_replay.analysis.pfc.matched_control import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     CURVE_SOURCES,
+    EXTENDED_CURVE_SOURCES,
+    EXTENDED_NESTED_MODEL_PAIRS,
     NESTED_MODEL_PAIRS,
     REPORT_HALF_WINDOW_S,
+    THREE_CLASS_MODEL,
     curve_coefficients,
     is_separated,
     peak_log_modulation,
@@ -248,6 +256,8 @@ def results_exist(
     control_draw_seed: int | None = None,
     swr_interval_source: str | None = None,
     swr_events_sha256: str | None = None,
+    event_set: str = "canonical",
+    null_classes: Sequence[str] | None = None,
 ) -> bool:
     """Check if this session's bundle already exists *for this population*.
 
@@ -304,6 +314,11 @@ def results_exist(
     before the held-out inference existed is read -- and such a bundle also
     fails the estimator comparison above, so it is refit.
 
+    An extended-event-set bundle (``event_set``) must carry its two extra
+    curves and record the same event set and the same null classes
+    (``null_classes``; None is every class); a sidecar written before the
+    event set existed reads as ``"canonical"``.
+
     The sidecar must also name the current matched-control placement method.
     The former disjoint-duration-window policy can leave every null draw
     thinner than the real class on dense bouts, so those bundles do not carry
@@ -323,6 +338,11 @@ def results_exist(
         save_base.with_suffix(".non_local_no_SWR_modulation.npy"),
         save_base.with_suffix(".matched_control_modulation.npy"),
     ]
+    if event_set != "canonical":
+        required_files += [
+            save_base.with_suffix(f".{name}_modulation.npy")
+            for name in EXTENDED_CURVE_SOURCES
+        ]
     if not all(f.exists() for f in required_files):
         return False
     sidecar = fit_provenance_path(artifact)
@@ -333,7 +353,10 @@ def results_exist(
         None if n_control_draws is None else required_usable_null_draws(n_control_draws)
     )
     return (
-        record.get("stop_cohort") == stop_cohort
+        record.get("event_set", "canonical") == event_set
+        and record.get("null_classes")
+        == (None if null_classes is None else sorted(null_classes))
+        and record.get("stop_cohort") == stop_cohort
         and record.get("stop_table_sha256") == stop_table_sha256
         and record.get("is_swr_definition") == IS_SWR_DEFINITION
         and record.get("canonical_event_table_sha256") == event_table_sha256
@@ -397,6 +420,7 @@ def score_session(
     n_control_draws: int,
     control_draw_seed: int,
     logger: logging.Logger,
+    null_classes: Sequence[str] | None = None,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     """Score every model out of fold, and read the improvements against a null.
 
@@ -440,6 +464,9 @@ def score_session(
     control_draw_seed : int
         Seed the ``R`` draw seeds are derived from, recorded in the sidecar.
     logger : logging.Logger
+    null_classes : sequence of str, optional
+        Event classes to draw the null for; every class of the session's event
+        set when None. The engagement null is drawn either way.
 
     Returns
     -------
@@ -454,6 +481,27 @@ def score_session(
     fit_mask = context["fit_mask"]
     designs: dict[str, NDArray] = context["designs"]
     fit_rows = np.asarray(fit_mask, dtype=bool)
+    # The extended event set carries SWRs without replay, their models, their
+    # nested pairs, a three-class best-model set and two more curves.
+    extended = SWR_NO_NON_LOCAL in context["event_times"]
+    nested_pairs = NESTED_MODEL_PAIRS + (
+        EXTENDED_NESTED_MODEL_PAIRS if extended else ()
+    )
+    best_model_candidates = dict(BEST_MODEL_CANDIDATES)
+    if extended:
+        best_model_candidates["min_heldout_model_three_class"] = (
+            "constant",
+            "non_local",
+            "non_local_SWR + non_local_no_SWR",
+            THREE_CLASS_MODEL,
+        )
+    curve_sources = {**CURVE_SOURCES, **(EXTENDED_CURVE_SOURCES if extended else {})}
+    event_classes = EXTENDED_EVENT_CLASSES if extended else EVENT_CLASSES
+    tested_classes = [
+        name
+        for name in event_classes
+        if null_classes is None or name in set(null_classes)
+    ]
     counts = np.asarray(context["counts"], dtype=float)
     fit_counts = counts[fit_rows]
     n_units = counts.shape[1]
@@ -523,13 +571,13 @@ def score_session(
             designs[name][fit_rows], fit_counts
         )
 
-    for full, reduced in NESTED_MODEL_PAIRS:
+    for full, reduced in nested_pairs:
         stem = pair_name(full, reduced)
         statistics[f"{stem}: heldout_delta_dev"] = deviance[reduced] - deviance[full]
         difference = per_fold[reduced] - per_fold[full]
         statistics[f"{stem}: heldout_delta_dev_folds"] = list(difference.T)
 
-    for column, candidates in BEST_MODEL_CANDIDATES.items():
+    for column, candidates in best_model_candidates.items():
         usable = [name for name in candidates if name not in non_estimable]
         if usable:
             stacked = np.column_stack([deviance[name] for name in usable])
@@ -550,7 +598,13 @@ def score_session(
 
     statistics.update(
         maximum_likelihood_comparison(
-            designs, fit_rows, fit_counts, context, modulation_curves, logger
+            designs,
+            fit_rows,
+            fit_counts,
+            context,
+            modulation_curves,
+            logger,
+            curve_sources=curve_sources,
         )
     )
 
@@ -572,6 +626,7 @@ def score_session(
             spline_basis=context["spline_basis"],
             lags=context["lags"],
             penalty_sigma=penalty_sigma,
+            classes=tested_classes,
             baseline_control=context["event_times"]["matched_control"],
             model_deviance=deviance,
             response=scoring_response,
@@ -582,7 +637,7 @@ def score_session(
         # less than one built from 300 whatever either contains, so one shared
         # null would hold classes of different size to the same reference.
         usable_draws: dict[str, NDArray] = {}
-        for event_class in EVENT_CLASSES:
+        for event_class in tested_classes:
             stem = pair_name(event_class, "constant")
             statistics[f"{stem}: matched_null_observed_delta_dev"] = (
                 null.observed_improvement[event_class]
@@ -654,6 +709,7 @@ def maximum_likelihood_comparison(
     context: dict[str, object],
     modulation_curves: dict[str, NDArray],
     logger: logging.Logger,
+    curve_sources: dict[str, tuple[str, int]] = CURVE_SOURCES,
 ) -> dict[str, NDArray]:
     """What the same curve looks like without the prior, and whether it binds.
 
@@ -680,6 +736,10 @@ def maximum_likelihood_comparison(
         The shipped penalised curves, ``(n_report_lags, n_units)`` each, keyed
         as :data:`CURVE_SOURCES` is.
     logger : logging.Logger
+    curve_sources : dict
+        The curves to compare and where each is read from;
+        :data:`CURVE_SOURCES` plus, for the extended event set,
+        :data:`EXTENDED_CURVE_SOURCES`.
 
     Returns
     -------
@@ -691,7 +751,7 @@ def maximum_likelihood_comparison(
     spline_basis = context["spline_basis"]
     lag_time = context["lag_time"]
     n_basis = spline_basis.shape[1]
-    wanted = sorted({model for model, _ in CURVE_SOURCES.values()})
+    wanted = sorted({model for model, _ in curve_sources.values()})
     logger.info("Fitting %d models unpenalised, to read the prior against", len(wanted))
     unpenalised = {
         model: fit_poisson_glms(designs[model][fit_rows], fit_counts, penalty=None)
@@ -699,8 +759,8 @@ def maximum_likelihood_comparison(
     }
 
     columns: dict[str, NDArray] = {}
-    for curve in CURVE_SOURCES:
-        model, block = curve_coefficients(curve, n_basis)
+    for curve in curve_sources:
+        model, block = curve_coefficients(curve, n_basis, curve_sources)
         result = unpenalised[model]
         raw_params = np.asarray(result.params)
         model_separated = is_separated(raw_params[:, 1:])
@@ -722,6 +782,56 @@ def maximum_likelihood_comparison(
             penalised_peak, mle.value, mle_se
         )
     return columns
+
+
+def extended_curves(
+    context: dict[str, object], penalty_sigma: float
+) -> dict[str, NDArray]:
+    """The extended event set's two curves, off :data:`THREE_CLASS_MODEL`.
+
+    The model is refit here on the session's fit bins under the shipped prior;
+    it is the same design, counts, penalty and fitter as the session's own
+    prefit of that model, so the fit is the same one. A unit whose fit did not
+    converge, or a session whose design is rank-deficient (no SWR without
+    replay), gets a NaN curve.
+
+    Parameters
+    ----------
+    context : dict
+        The session's fit material from ``run_session`` (``scoring_out``).
+    penalty_sigma : float
+        The shipped prior.
+
+    Returns
+    -------
+    dict[str, NDArray]
+        :data:`EXTENDED_CURVE_SOURCES` key -> ``(n_report_lags, n_units)``.
+    """
+    fit_rows = np.asarray(context["fit_mask"], dtype=bool)
+    design = np.asarray(context["designs"][THREE_CLASS_MODEL])[fit_rows]
+    counts = np.asarray(context["counts"], dtype=float)[fit_rows]
+    basis = np.asarray(context["spline_basis"])
+    lag_time = np.asarray(context["lag_time"])
+    report = np.abs(lag_time) <= REPORT_HALF_WINDOW_S + 1e-12
+    n_basis = basis.shape[1]
+    curves: dict[str, NDArray] = {}
+    if np.linalg.matrix_rank(design) < design.shape[1]:
+        nan = np.full((int(report.sum()), counts.shape[1]), np.nan)
+        return {name: nan.copy() for name in EXTENDED_CURVE_SOURCES}
+    fit = fit_poisson_glms(
+        design,
+        counts,
+        penalty=model_penalties({THREE_CLASS_MODEL: design}, penalty_sigma)[
+            THREE_CLASS_MODEL
+        ],
+        compute_covariance=False,
+    )
+    params = np.asarray(fit.params).copy()
+    params[~np.asarray(fit.converged, dtype=bool)] = np.nan
+    for name in EXTENDED_CURVE_SOURCES:
+        _, block = curve_coefficients(name, n_basis, EXTENDED_CURVE_SOURCES)
+        curves[name] = basis[report] @ params[:, block].T
+    return curves
 
 
 def curve_peaks(curves: NDArray) -> NDArray:
@@ -816,6 +926,8 @@ def run_analysis(
     n_control_draws: int = DEFAULT_CONTROL_DRAWS,
     fold_seed: int | None = None,
     control_draw_seed: int | None = None,
+    event_set: str = "canonical",
+    null_classes: Sequence[str] | None = None,
     *,
     cli: list[str],
 ) -> None:
@@ -877,6 +989,13 @@ def run_analysis(
         Seeds of the fold split and of the null draws. Derived from the session
         key when omitted, so a session refit on its own reproduces the batch's
         split and null exactly.
+    event_set : {"canonical", "with_swr_without_replay"}
+        ``"with_swr_without_replay"`` adds the SWRs that overlap no non-local
+        event as their own class, with its models, its null, and two more
+        curves (``<artifact>.SWR_no_non_local_modulation.npy`` and
+        ``<artifact>.non_local_SWR_3class_modulation.npy``).
+    null_classes : sequence of str, optional
+        Draw the null for these classes only (every class when None).
     cli : list of str
         The command line recorded in the sidecar: ``main``'s program and the
         arguments it parsed.
@@ -967,6 +1086,8 @@ def run_analysis(
         control_draw_seed=control_draw_seed,
         swr_interval_source=event_inputs["swr_interval_source"],
         swr_events_sha256=event_inputs["swr_events_sha256"],
+        event_set=event_set,
+        null_classes=null_classes,
     ):
         logger.info(f"Results already exist for {epoch_identifier}. Skipping...")
         return
@@ -982,6 +1103,7 @@ def run_analysis(
     logger.info(f"sampling_frequency: {sampling_frequency}")
     logger.info(f"immobility_threshold: {DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC}")
     logger.info(f"stop_cohort: {stop_cohort}")
+    logger.info(f"event_set: {event_set} (null classes: {null_classes or 'all'})")
     logger.info(f"fitter: {fitter}")
     logger.info(f"penalty_sigma_log_rate: {penalty_sigma}")
     logger.info(f"n_folds: {n_folds} (fold_seed {fold_seed})")
@@ -1044,6 +1166,7 @@ def run_analysis(
             fit_diagnostics_out=diagnostics,
             penalty_sigma=penalty_sigma,
             scoring_out=scoring_context,
+            event_set=event_set,
         )
 
         logger.info(f"Analyzed {len(neuron_stats)} neurons")
@@ -1055,6 +1178,9 @@ def run_analysis(
         n_basis_per_class: int | None = None
         implied_prior: dict[str, float] = {}
         scoring_diagnostics: dict[str, object] = {}
+        extra_curves: dict[str, NDArray] = {}
+        if len(neuron_stats) and event_set != "canonical":
+            extra_curves = extended_curves(scoring_context, penalty_sigma)
         if len(neuron_stats):
             context = scoring_context
             n_basis_per_class = int(context["spline_basis"].shape[1])
@@ -1075,6 +1201,7 @@ def run_analysis(
                     "non_local_SWR": non_local_SWR_modulation,
                     "non_local_no_SWR": non_local_no_SWR_modulation,
                     "matched_control": matched_control_modulation,
+                    **extra_curves,
                 },
                 penalty_sigma=penalty_sigma,
                 n_folds=n_folds,
@@ -1082,6 +1209,7 @@ def run_analysis(
                 n_control_draws=n_control_draws,
                 control_draw_seed=control_draw_seed,
                 logger=logger,
+                null_classes=null_classes,
             )
             if len(heldout_stats) != len(neuron_stats):
                 raise ValueError(
@@ -1122,6 +1250,12 @@ def run_analysis(
             save_file.with_suffix(".matched_control_modulation.npy"),
             matched_control_modulation,
         )
+        if event_set != "canonical":
+            for name in EXTENDED_CURVE_SOURCES:
+                np.save(
+                    save_file.with_suffix(f".{name}_modulation.npy"),
+                    extra_curves.get(name, np.empty((0, 0))),
+                )
 
         if diagnostics:
             # Per-neuron, per-model parameters and fit criteria. Not part of
@@ -1156,6 +1290,22 @@ def run_analysis(
                     else {}
                 ),
                 "stop_cohort": stop_cohort,
+                "event_set": event_set,
+                "null_classes": (
+                    None if null_classes is None else sorted(null_classes)
+                ),
+                **(
+                    {
+                        key: cohort_info.get(key)
+                        for key in (
+                            "n_swr_with_non_local",
+                            "n_swr_no_non_local",
+                            "n_swr_no_non_local_unknown",
+                        )
+                    }
+                    if event_set != "canonical"
+                    else {}
+                ),
                 # The estimator and the inference, in full: the prior the
                 # coefficients were fit under, the blocked split the models
                 # were scored out of, and the null the improvements are read
@@ -1462,7 +1612,46 @@ def get_command_line_arguments(argv: Sequence[str] | None = None) -> Namespace:
         ),
     )
 
+    parser.add_argument(
+        "--event-set",
+        type=str,
+        default="canonical",
+        choices=list(EVENT_SETS),
+        help=(
+            "Event classes to fit (default: canonical). "
+            "'with_swr_without_replay' adds the SWRs that overlap no non-local "
+            "event as a fifth class, with its own models, null and curves; it "
+            "must write to its own --output-dir, never beside the canonical "
+            "bundles."
+        ),
+    )
+    parser.add_argument(
+        "--null-classes",
+        type=str,
+        nargs="+",
+        default=None,
+        help=(
+            "Draw the matched-control null for these event classes only "
+            "(default: every class of the event set). Recorded in the sidecar."
+        ),
+    )
+
     args = parser.parse_args(argv)
+    if args.event_set != "canonical" and (
+        args.output_dir.resolve() == processed_data_dir().resolve()
+    ):
+        parser.error(
+            f"--event-set {args.event_set} writes bundles with the canonical "
+            "names; give it its own --output-dir so they can never sit beside "
+            "the canonical Figure 4 bundles."
+        )
+    if args.null_classes is not None:
+        allowed = (
+            EXTENDED_EVENT_CLASSES if args.event_set != "canonical" else EVENT_CLASSES
+        )
+        unknown = sorted(set(args.null_classes) - set(allowed))
+        if unknown:
+            parser.error(f"--null-classes {unknown} not in {list(allowed)}")
     if args.penalty_sigma <= 0:
         parser.error(
             f"--penalty-sigma {args.penalty_sigma} is not positive; it is a "
@@ -1755,6 +1944,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 n_control_draws=args.n_control_draws,
                 fold_seed=args.fold_seed,
                 control_draw_seed=args.control_draw_seed,
+                event_set=args.event_set,
+                null_classes=args.null_classes,
                 cli=cli,
             )
     else:
@@ -1787,6 +1978,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                     n_control_draws=args.n_control_draws,
                     fold_seed=args.fold_seed,
                     control_draw_seed=args.control_draw_seed,
+                    event_set=args.event_set,
+                    null_classes=args.null_classes,
                     cli=cli,
                 )
                 for epoch in epoch_info.itertuples()

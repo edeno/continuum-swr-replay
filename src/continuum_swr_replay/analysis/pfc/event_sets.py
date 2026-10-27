@@ -3,6 +3,12 @@
 The immobility bins a session's GLMs are fit on, and the four event sets
 (SWR, replay, and the two replay/SWR classes) its design matrices are
 keyed on, restricted to the shared stop cohort.
+
+An extended event set adds a fifth class, ``SWR_no_non_local``: the kept,
+cohort-restricted SWRs that overlap no canonical non-local event of the
+session (whether or not that event is in the cohort) and no window the
+analysed-time rule dropped (:func:`swr_without_non_local`). It is a subset of
+``SWR``, so every window a matched control must avoid is unchanged by it.
 """
 
 import logging
@@ -19,6 +25,8 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
 )
 from continuum_swr_replay.intervals import (
     interval_mask,
+    merge_intervals,
+    overlaps_open,
     pad_intervals,
 )
 
@@ -416,3 +424,72 @@ def build_session_event_sets(
 #: not overlap a window of any of them -- including ``SWR``, whose windows are
 #: not all covered by the non-local classes.
 EVENT_CLASSES = ("non_local_no_SWR", "non_local_SWR", "non_local", "SWR")
+
+#: The extended set's fifth class: SWRs that carry no non-local event.
+SWR_NO_NON_LOCAL = "SWR_no_non_local"
+
+#: The event classes of the extended event set, in design order.
+EXTENDED_EVENT_CLASSES = (*EVENT_CLASSES, SWR_NO_NON_LOCAL)
+
+#: The event sets a run can be cut with: the canonical four classes, or those
+#: plus ``SWR_no_non_local``.
+EVENT_SETS = ("canonical", "with_swr_without_replay")
+
+
+def swr_without_non_local(
+    swr_intervals: pd.DataFrame,
+    non_local_events: pd.DataFrame,
+    unknown_windows: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    """The SWRs that overlap no non-local event.
+
+    Overlap is the open test (:func:`~continuum_swr_replay.intervals.overlaps_open`),
+    which agrees with the strict positive-duration overlap that defines the
+    canonical ``is_swr`` for intervals of positive duration. An SWR that
+    overlaps no non-local event but does overlap a window the analysed-time
+    rule dropped has an unknown class -- the dropped window may have held a
+    non-local event -- and is left out, and counted.
+
+    Parameters
+    ----------
+    swr_intervals : pandas.DataFrame
+        The kept, cohort-restricted SWRs: ``start_time``, ``end_time``,
+        seconds.
+    non_local_events : pandas.DataFrame
+        Every canonical non-local event of the session, in the cohort or not:
+        ``start_time``, ``end_time``.
+    unknown_windows : pandas.DataFrame
+        The windows the analysed-time rule dropped (``start_time``,
+        ``end_time``), from
+        :func:`~continuum_swr_replay.analysis.pfc.matched_control.artifact_dropped_events`.
+
+    Returns
+    -------
+    swr_no_non_local : pandas.DataFrame
+        The SWRs of ``swr_intervals`` that overlap neither, in their order,
+        with a fresh index.
+    counts : dict
+        ``n_swr_with_non_local``, ``n_swr_no_non_local`` and
+        ``n_swr_no_non_local_unknown``; they sum to ``len(swr_intervals)``.
+    """
+
+    def windows(frame: pd.DataFrame) -> NDArray:
+        return merge_intervals(
+            frame["start_time"].to_numpy(dtype=float),
+            frame["end_time"].to_numpy(dtype=float),
+        )
+
+    starts = swr_intervals["start_time"].to_numpy(dtype=float)
+    ends = swr_intervals["end_time"].to_numpy(dtype=float)
+    replay = windows(non_local_events)
+    dropped = windows(unknown_windows)
+    overlaps_replay = overlaps_open(starts, ends, replay[:, 0], replay[:, 1])
+    unknown = ~overlaps_replay & overlaps_open(
+        starts, ends, dropped[:, 0], dropped[:, 1]
+    )
+    keep = ~overlaps_replay & ~unknown
+    return swr_intervals.loc[keep].reset_index(drop=True), {
+        "n_swr_with_non_local": int(overlaps_replay.sum()),
+        "n_swr_no_non_local": int(keep.sum()),
+        "n_swr_no_non_local_unknown": int(unknown.sum()),
+    }

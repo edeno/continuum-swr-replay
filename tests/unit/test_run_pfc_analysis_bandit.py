@@ -1532,3 +1532,60 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
     assert cohort["left_out"] == {
         "chimi20200224_.nwb 02_r1": runner.NO_SORTED_UNITS_REASON
     }
+
+
+def test_the_extended_event_set_needs_its_own_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv("CSR_PROCESSED_DATA_DIR", str(tmp_path))
+    with pytest.raises(SystemExit):
+        runner.get_command_line_arguments(
+            ["--event-set", "with_swr_without_replay", "--output-dir", str(tmp_path)]
+        )
+    args = runner.get_command_line_arguments(
+        [
+            "--event-set",
+            "with_swr_without_replay",
+            "--output-dir",
+            str(tmp_path / "extended"),
+            "--null-classes",
+            "SWR_no_non_local",
+        ]
+    )
+    assert args.null_classes == ["SWR_no_non_local"]
+    with pytest.raises(SystemExit):
+        runner.get_command_line_arguments(["--null-classes", "SWR_no_non_local"])
+
+
+def test_results_exist_keeps_the_event_sets_apart(tmp_path):
+    epoch_identifier = "wilbur20210329_02_r1_mPFC"
+    _write_bundle_files(tmp_path, epoch_identifier, "at_well", "at_well")
+    common = (
+        tmp_path,
+        epoch_identifier,
+        False,
+        "at_well",
+        "abc123",
+        EVENT_TABLE_SHA,
+        DOT_SHA,
+    )
+
+    # A canonical bundle (no event_set key) never satisfies an extended request.
+    assert _results_exist(*common)
+    assert not _results_exist(*common, event_set="with_swr_without_replay")
+
+    _write_bundle_files(
+        tmp_path,
+        epoch_identifier,
+        "at_well",
+        "at_well",
+        event_set="with_swr_without_replay",
+    )
+    # The extended request also needs the two extra curves on disk.
+    assert not _results_exist(*common, event_set="with_swr_without_replay")
+    base = runner.modulation_path(tmp_path, epoch_identifier, "at_well").with_suffix("")
+    for name in runner.EXTENDED_CURVE_SOURCES:
+        base.with_suffix(f".{name}_modulation.npy").touch()
+    assert _results_exist(*common, event_set="with_swr_without_replay")
+    assert not _results_exist(*common)
+    assert not _results_exist(
+        *common, event_set="with_swr_without_replay", null_classes=["SWR_no_non_local"]
+    )
