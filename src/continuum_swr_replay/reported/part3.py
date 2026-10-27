@@ -256,6 +256,10 @@ class Part3Inputs:
 
     per_bin: Path
     per_bin_all_stops: Path
+    per_bin_in_transit: Path
+    rate_contrast: Path
+    per_bin_audit: Path
+    per_stop_audit: Path
     per_stop: Path
     content_contrast_dir: Path
     estimator_summary: Path
@@ -274,6 +278,10 @@ def default_inputs() -> Part3Inputs:
     return Part3Inputs(
         per_bin=model_dir("per_bin_rate") / "all_models.pkl",
         per_bin_all_stops=model_dir("per_bin_rate") / "all_models_allstops.pkl",
+        per_bin_in_transit=model_dir("per_bin_rate") / "all_models_intransit.pkl",
+        rate_contrast=model_dir("per_bin_rate") / "swr_contrast_rate.pkl",
+        per_bin_audit=model_dir("per_bin_rate") / "per_bin_rate_cohort_audit.csv",
+        per_stop_audit=model_dir("per_stop_rate") / "all_models_cohort_audit.csv",
         per_stop=model_dir("per_stop_rate") / "all_models.pkl",
         content_contrast_dir=rc / "models_swr_contrast",
         estimator_summary=estimators / "content_estimator_comparison_summary.csv",
@@ -442,6 +450,30 @@ def _time_course(
     return grid, np.median(curves, axis=0)
 
 
+def _clock_shape(fits: pd.DataFrame, outcome: str) -> tuple[float, float, float]:
+    """Where the stop-clock and arrival-clock time courses peak, and the KS
+    distance between their shapes (``compare_fits.arrival_clock_shape_table``)."""
+    grid, stop_curve = _time_course(
+        fits, STOP_TIME_RUNG, outcome, "tc", SPLINE_KNOTS, TMAX
+    )
+    arr_grid, arr_curve = _time_course(
+        fits,
+        ARRIVAL_TIME_RUNG,
+        outcome,
+        ARRIVAL_CLOCK_COLUMN,
+        ARRIVAL_SPLINE_KNOTS,
+        TMAX_ARRIVAL,
+    )
+    ks = np.nanmax(
+        np.abs(_shape_cdf(grid, stop_curve) - _shape_cdf(arr_grid, arr_curve))
+    )
+    return (
+        float(grid[int(np.argmax(stop_curve))]),
+        float(arr_grid[int(np.argmax(arr_curve))]),
+        float(ks),
+    )
+
+
 def _shape_cdf(grid: np.ndarray, curve: np.ndarray) -> np.ndarray:
     increments = np.diff(grid) * 0.5 * (curve[1:] + curve[:-1])
     cdf = np.concatenate([[0.0], np.cumsum(increments)])
@@ -516,6 +548,13 @@ def per_bin_values(
                 "count",
                 "count",
                 f"{label}: sessions with a fit of {FULL_RATE_RUNG}",
+            ),
+            make(
+                f"rate_time_sessions_{word}",
+                _rung(fits, STOP_TIME_RUNG, outcome)["coef_Intercept"].notna().sum(),
+                "count",
+                "count",
+                f"{label}: sessions with a fit of {STOP_TIME_RUNG}",
             ),
             make(
                 f"rate_kernel_lag_one_{word}",
@@ -656,17 +695,6 @@ def per_bin_values(
         ]
         cohort = fits.attrs["arrival_clock_cohort"][outcome]
         cohort_all = all_stops.attrs["arrival_clock_cohort"][outcome]
-        grid, stop_curve = _time_course(
-            fits, STOP_TIME_RUNG, outcome, "tc", SPLINE_KNOTS, TMAX
-        )
-        arr_grid, arr_curve = _time_course(
-            fits,
-            ARRIVAL_TIME_RUNG,
-            outcome,
-            ARRIVAL_CLOCK_COLUMN,
-            ARRIVAL_SPLINE_KNOTS,
-            TMAX_ARRIVAL,
-        )
         arrival_rung = _rung(fits, ARRIVAL_TIME_RUNG, outcome)
         values += [
             make(
@@ -685,34 +713,6 @@ def per_bin_values(
                 f"{label}: the same share on the all-stops fit",
             ),
             make(
-                f"rate_time_peak_s_{word}",
-                grid[int(np.argmax(stop_curve))],
-                "quantity",
-                "dec2",
-                f"{label}: peak of the median fitted {STOP_TIME_RUNG} time course, read on [1, 3] s",
-                "s",
-            ),
-            make(
-                f"rate_arrival_peak_s_{word}",
-                arr_grid[int(np.argmax(arr_curve))],
-                "quantity",
-                "dec2",
-                f"{label}: peak of the median fitted {ARRIVAL_TIME_RUNG} time course, read on [1, 6] s",
-                "s",
-            ),
-            make(
-                f"rate_clock_ks_{word}",
-                np.nanmax(
-                    np.abs(
-                        _shape_cdf(grid, stop_curve) - _shape_cdf(arr_grid, arr_curve)
-                    )
-                ),
-                "quantity",
-                "dec2",
-                f"{label}: KS distance between the two clocks' median time courses, each "
-                "normalized over its own supported interval and read on relative position",
-            ),
-            make(
                 f"rate_arrival_separated_fraction_{word}",
                 (arrival_rung["separated"] == True).mean(),  # noqa: E712
                 "fraction",
@@ -720,6 +720,38 @@ def per_bin_values(
                 f"{label}: share of {ARRIVAL_TIME_RUNG} fits flagged separated",
             ),
         ]
+        for prefix, frame in (("rate", fits), ("rate_allstops", all_stops)):
+            stop_peak, arrival_peak, ks = _clock_shape(frame, outcome)
+            cohort_label = "" if prefix == "rate" else ", all-stops fit"
+            values += [
+                make(
+                    f"{prefix}_time_peak_s_{word}",
+                    stop_peak,
+                    "quantity",
+                    "dec2",
+                    f"{label}: peak of the median fitted {STOP_TIME_RUNG} time course, "
+                    f"read on [1, 3] s{cohort_label}",
+                    "s",
+                ),
+                make(
+                    f"{prefix}_arrival_peak_s_{word}",
+                    arrival_peak,
+                    "quantity",
+                    "dec2",
+                    f"{label}: peak of the median fitted {ARRIVAL_TIME_RUNG} time course, "
+                    f"read on [1, 6] s{cohort_label}",
+                    "s",
+                ),
+                make(
+                    f"{prefix}_clock_ks_{word}",
+                    ks,
+                    "quantity",
+                    "dec2",
+                    f"{label}: KS distance between the two clocks' median time courses, each "
+                    "normalized over its own supported interval and read on relative "
+                    f"position{cohort_label}",
+                ),
+            ]
     paired = _paired_immediate(fits)
     paired_all = _paired_immediate(all_stops)
     no_swr_all = _rung(all_stops, FULL_RATE_RUNG, "non_local_no_swr")
@@ -886,8 +918,12 @@ _RANGED = (
     "rate_time_peak_s",
     "rate_arrival_peak_s",
     "rate_clock_ks",
+    "rate_allstops_time_peak_s",
+    "rate_allstops_arrival_peak_s",
+    "rate_allstops_clock_ks",
     "rate_arrival_separated_fraction",
     "rate_burst_peak",
+    "rate_burst_peak_lag_ms",
 )
 
 
@@ -914,6 +950,98 @@ def _population_ranges(values: list[Value], make: Callable[..., Value]) -> list[
 
 
 # --- 3a: rate, per stop (Family A) -------------------------------------------
+
+
+def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Value]:
+    """How heavily the per-bin ``is_swr``-contrast rate ladder is separated: the
+    share of its ``contrast`` fits flagged separated, per cohort, and the share of
+    fits carrying ``is_swr:reward_history_rcos_1`` that flag that term."""
+    make = _value_factory(
+        source, ("19c",), ("docs: replay_rate_content_swr_synthesis",)
+    )
+    contrast = fits[fits["population"] == "contrast"]
+    term = "is_swr:reward_history_rcos_1"
+    carries = fits[fits[f"coef_{term}"].notna()]
+    flagged = carries["separated_terms"].map(
+        lambda v: isinstance(v, str) and term in v.split("|")
+    )
+    values = [
+        make(
+            f"rate_contrast_separated_fraction_{cohort}",
+            (contrast.loc[contrast["cohort"] == cohort, "separated"] == True).mean(),  # noqa: E712
+            "fraction",
+            "pct",
+            f"share of the is_swr-contrast rate ladder's {cohort} contrast fits flagged "
+            "separated",
+        )
+        for cohort in ("primary", "post_outcome")
+    ]
+    values.append(
+        make(
+            "rate_contrast_term_separated_fraction",
+            flagged.mean(),
+            "fraction",
+            "pct",
+            f"share of the fits carrying {term} that flag it separated",
+        )
+    )
+    return values
+
+
+def cohort_audit_values(inputs: Part3Inputs) -> list[Value]:
+    """What the rate families' common-cohort freeze cost, as their runners'
+    cohort audits record it (population non-local; every population shares it)."""
+    values = []
+    for prefix, path, rows in (
+        ("rate_audit", inputs.per_bin_audit, {"modeled": "M0_const"}),
+        ("per_stop_audit", inputs.per_stop_audit, {"modeled": "R0", "full": "R1"}),
+    ):
+        audit = pd.read_csv(path)
+        audit = audit[audit["population"] == "non_local"].set_index("model")
+        make = _value_factory(f"{rel(path)} (cohort audit)", ("19c",), ("supplement",))
+        first = audit.loc[rows["modeled"]]
+        values += [
+            make(
+                f"{prefix}_stops_in",
+                first["n_in"],
+                "count",
+                "count",
+                f"{path.name}: stops entering the cohort",
+            ),
+            make(
+                f"{prefix}_stops_own_drop",
+                first["n_drop_own_predictor_missing"],
+                "count",
+                "count",
+                f"{path.name}: stops dropped for a missing own predictor",
+            ),
+            make(
+                f"{prefix}_stops_common_drop",
+                first["n_drop_common_cohort_other"],
+                "count",
+                "count",
+                f"{path.name}: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock)",
+            ),
+        ]
+        for word, model in rows.items():
+            row = audit.loc[model]
+            values += [
+                make(
+                    f"{prefix}_stops_{word}",
+                    row["n_modeled"],
+                    "count",
+                    "count",
+                    f"{path.name}: stops modelled on {model}",
+                ),
+                make(
+                    f"{prefix}_stops_{word}_session_excluded",
+                    row["n_excluded_session"],
+                    "count",
+                    "count",
+                    f"{path.name}: stops in sessions {model} gates out",
+                ),
+            ]
+    return values
 
 
 def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
@@ -1150,6 +1278,14 @@ def breadth_derived_values(
             "bins",
         ),
         make(
+            "event_bins_median",
+            events["n_nonlocal_bins"].median(),
+            "quantity",
+            "int",
+            "median non-local bins per event, all events (event table)",
+            "bins",
+        ),
+        make(
             "event_bins_ratio",
             bins[True] / bins[False],
             "quantity",
@@ -1239,6 +1375,25 @@ def estimator_values(
                         "AIC",
                     )
                 )
+    boot = bootstrap[
+        (bootstrap["model"] == "C2_base")
+        & (bootstrap["term"] == "log_phi_is_swr")
+        & (bootstrap["estimator"] == ESTIMATORS["dm"])
+    ]
+    _require(len(boot) == 1, f"C2_base log_phi_is_swr: {len(boot)} bootstrap rows")
+    for end, column in (("low", "p2_5"), ("high", "p97_5")):
+        values.append(
+            make(
+                f"est_breadth_dm_{end}",
+                boot[column].iloc[0],
+                "quantity",
+                "sig2s",
+                f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: animal bootstrap "
+                f"{'2.5th' if end == 'low' else '97.5th'} percentile",
+                "log concentration",
+                claims_=("19a",),
+            )
+        )
     return values
 
 
@@ -1665,8 +1820,49 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     def record(*paths: Path) -> None:
         summary.inputs.extend(file_record(p, ROOT_DIR) for p in paths)
 
-    for artifact in (inputs.per_bin, inputs.per_bin_all_stops, inputs.per_stop):
+    rate_fits = (
+        inputs.per_bin,
+        inputs.per_bin_all_stops,
+        inputs.per_bin_in_transit,
+        inputs.rate_contrast,
+        inputs.per_stop,
+    )
+    for artifact in rate_fits:
         _check_fresh(artifact)
+    summary.add(
+        *rate_contrast_separation_values(
+            pd.read_pickle(inputs.rate_contrast),
+            f"{rel(inputs.rate_contrast)} (rate.swr_contrast.at_well)",
+        )
+    )
+    in_transit = pd.read_pickle(inputs.per_bin_in_transit)
+    make_transit = _value_factory(
+        f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.in_transit)",
+        ("19c",),
+        ("supplement",),
+    )
+    summary.add(
+        make_transit(
+            "rate_intransit_sessions",
+            in_transit.groupby(SC).ngroups,
+            "count",
+            "count",
+            "sessions with any per-bin fit on the in-transit stops (the sample gates "
+            "leave the rest out)",
+        ),
+        *(
+            make_transit(
+                f"rate_intransit_sessions_{word}",
+                in_transit[in_transit["outcome"] == outcome].groupby(SC).ngroups,
+                "count",
+                "count",
+                f"{label}: sessions with a per-bin fit on the in-transit stops",
+            )
+            for word, (outcome, label) in RATE_POPULATIONS.items()
+        ),
+    )
+    summary.add(*cohort_audit_values(inputs))
+    record(inputs.per_bin_audit, inputs.per_stop_audit)
     per_bin = pd.read_pickle(inputs.per_bin)
     per_bin_all = pd.read_pickle(inputs.per_bin_all_stops)
     summary.add(
@@ -1682,7 +1878,7 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
             f"{rel(inputs.per_stop)} (rate.per_stop.at_well)",
         )
     )
-    record(inputs.per_bin, inputs.per_bin_all_stops, inputs.per_stop)
+    record(*rate_fits)
 
     audited, sources = {}, {}
     for suffix in sorted({spec[0] for spec in CONTENT_SPECS.values()}):
