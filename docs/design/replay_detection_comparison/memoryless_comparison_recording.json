@@ -1,0 +1,29 @@
+{
+ "produced_by": "scripts/figures/generate_memoryless_comparison.py",
+ "produced_at": "2026-10-27T01:03:16+00:00",
+ "git_commit": "7fb1dcfa84ad",
+ "n_neurons": 25,
+ "numbers": {
+  "outbound_duration_ratio": 5.779951100244497,
+  "outbound_local_fraction": 0.8055555555555556,
+  "outbound_p_spread": 0.009900990099009901,
+  "outbound_p_jump": 0.07920792079207921,
+  "outbound_draws_from_passing": 3,
+  "inbound_p_spread": 0.009900990099009901,
+  "inbound_p_jump": 0.019801980198019802,
+  "short_replay_duration_ratio": 1.6000000000000356,
+  "short_replay_local_fraction": 0.0,
+  "short_replay_p_spread": 0.009900990099009901,
+  "short_replay_p_jump": 0.0297029702970297,
+  "short_path_dispersion_cm": 6.255837822237522,
+  "remote_stationary_dispersion_cm": 0.0,
+  "state_space_bound_error_ms": 42.00000000000159,
+  "stray_window_distance_cm": 148.7499541695486,
+  "stray_window_local_fraction": 0.9896907216494846,
+  "stray_window_duration_ms": 396.0000000000008,
+  "stray_window_dispersion_cm": 14.375550376708484,
+  "stray_window_pieces_dispersion_cm": 0.5337834065514341,
+  "stray_window_p_spread": 0.40594059405940597,
+  "stray_window_p_jump": 0.31683168316831684
+ }
+}

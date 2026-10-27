@@ -2,7 +2,7 @@
 % Every value is read from a summary file, paper/reported/part{n}.json;
 % each macro's comment names its key and what it is.
 
-% --- Part 1 (commit 6e13b49e103e)
+% --- Part 1 (commit 7fb1dcfa84ad)
 \newcommand{\PartOneControlsContinuingOursOnePerPartLongestFraction}{79}  % part1.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\PartOneControlsContinuingOursSpanningShortestFraction}{88}  % part1.controls_continuing_ours_spanning_shortest_fraction: the same for our detector
 \newcommand{\PartOneControlsContinuingSlidingOnePerPartLongestFraction}{54}  % part1.controls_continuing_sliding_one_per_part_longest_fraction: continuing chains at the longest gap: share of trials the sliding window reports as one event per part
@@ -83,6 +83,27 @@
 \newcommand{\PartOneHeldoutSharedSupport}{100}  % part1.heldout_shared_support: replays both detectors reported: share with held-out support, the same in every fold
 \newcommand{\PartOnePilotCallsDecidedByOutsideWindow}{2}  % part1.pilot_calls_decided_by_outside_window: of those, calls whose dispersion clears the threshold only with kept windows outside every piece
 \newcommand{\PartOnePilotReplayCalls}{4}  % part1.pilot_replay_calls: sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1
+\newcommand{\PartOneRecordingInboundPJump}{0.020}  % part1.recording_inbound_p_jump: significance test of the inbound replay: jump half
+\newcommand{\PartOneRecordingInboundPSpread}{0.0099}  % part1.recording_inbound_p_spread: significance test of the inbound replay: spread half
+\newcommand{\PartOneRecordingOutboundDrawsFromPassing}{3}  % part1.recording_outbound_draws_from_passing: how many more shuffle draws below the observed value than a pass allows
+\newcommand{\PartOneRecordingOutboundDurationRatio}{5.8}  % part1.recording_outbound_duration_ratio: the sliding window's reported duration of the continuous outbound replay over its true duration
+\newcommand{\PartOneRecordingOutboundLocalFraction}{81}  % part1.recording_outbound_local_fraction: share of that reported event's kept windows decoding the animal's own place (within 15 cm)
+\newcommand{\PartOneRecordingOutboundPJump}{0.079}  % part1.recording_outbound_p_jump: significance test of the outbound replay: jump half
+\newcommand{\PartOneRecordingOutboundPSpread}{0.0099}  % part1.recording_outbound_p_spread: significance test of the outbound replay: spread half
+\newcommand{\PartOneRecordingRemoteStationaryDispersionCm}{0}  % part1.recording_remote_stationary_dispersion_cm: largest dispersion of a candidate over the remote stationary event
+\newcommand{\PartOneRecordingShortPathDispersionCm}{6}  % part1.recording_short_path_dispersion_cm: largest dispersion of a sliding-window candidate over the 30 cm replay
+\newcommand{\PartOneRecordingShortReplayDurationRatio}{1.6}  % part1.recording_short_replay_duration_ratio: the sliding window's reported duration of the 80 ms replay over its true duration
+\newcommand{\PartOneRecordingShortReplayLocalFraction}{0}  % part1.recording_short_replay_local_fraction: share of that reported event's kept windows decoding the animal's own place
+\newcommand{\PartOneRecordingShortReplayPJump}{0.030}  % part1.recording_short_replay_p_jump: significance test of the 80 ms replay: jump half
+\newcommand{\PartOneRecordingShortReplayPSpread}{0.0099}  % part1.recording_short_replay_p_spread: significance test of the 80 ms replay: spread half
+\newcommand{\PartOneRecordingStateSpaceBoundErrorMs}{42}  % part1.recording_state_space_bound_error_ms: largest error in either bound of the state-space detector's reports of the four zoomed events
+\newcommand{\PartOneRecordingStrayWindowDispersionCm}{14}  % part1.recording_stray_window_dispersion_cm: its dispersion with the window outside every piece
+\newcommand{\PartOneRecordingStrayWindowDistanceCm}{149}  % part1.recording_stray_window_distance_cm: distance from the animal of the far cell whose two spikes fill the stray window
+\newcommand{\PartOneRecordingStrayWindowDurationMs}{396}  % part1.recording_stray_window_duration_ms: the stray-window event's reported duration
+\newcommand{\PartOneRecordingStrayWindowLocalFraction}{99}  % part1.recording_stray_window_local_fraction: share of the stray-window event's kept windows decoding within 15 cm of the animal
+\newcommand{\PartOneRecordingStrayWindowPJump}{0.32}  % part1.recording_stray_window_p_jump: significance test of the stray-window event: jump half
+\newcommand{\PartOneRecordingStrayWindowPSpread}{0.41}  % part1.recording_stray_window_p_spread: significance test of the stray-window event: spread half
+\newcommand{\PartOneRecordingStrayWindowPiecesDispersionCm}{0.53}  % part1.recording_stray_window_pieces_dispersion_cm: its dispersion without that window
 \newcommand{\PartOneStateEvidenceAnimals}{5}  % part1.state_evidence_animals: animals in the held-out tetrode run
 \newcommand{\PartOneStateEvidenceEpochs}{242}  % part1.state_evidence_epochs: epochs the held-out tetrode run lists
 \newcommand{\PartOneStateEvidenceEpochsOk}{242}  % part1.state_evidence_epochs_ok: of those, epochs that passed every check of the run (status ok)

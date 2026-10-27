@@ -1087,3 +1087,8 @@ marker, and the computed value now there. Newest last.
 | `docs/README.md` | `part4.ml_sessions` | … | 71 |
 | `paper/claims_table.md` | `part4.ml_sessions` | … | 71 |
 | `paper/claims_table.md` | `part4.engagement_bh_fraction` | 12.1 % | 10 % |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_short_replay_p_spread` | 0.010 | 0.0099 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_outbound_p_spread` | 0.010 | 0.0099 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_inbound_p_spread` | 0.010 | 0.0099 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_stray_window_dispersion_cm` | 14.4 | 14 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_stray_window_pieces_dispersion_cm` | 0.5 | 0.53 |

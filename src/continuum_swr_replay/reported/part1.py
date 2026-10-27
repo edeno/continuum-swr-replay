@@ -10,21 +10,19 @@ refitted or re-decoded here. The inputs (:class:`Part1Inputs`):
 - the three simulation sweeps of the two replay detectors
   (``docs/design/replay_detection_comparison/detection_{sweep,controls,heldout}_summary.csv``,
   from ``scripts/detection/sweep_memoryless_{detection,controls,heldout}.py``),
-  which the memoryless-comparison figure's caption reads;
+  for the memoryless-comparison caption's panels (g-q);
+- the one labeled recording of that caption's panels (a-f)
+  (``docs/design/replay_detection_comparison/memoryless_comparison_recording.json``,
+  written by ``scripts/figures/generate_memoryless_comparison.py``);
 - the sliding-window detector's first real-data pilot epoch (a
   ``replay_detection_comparison/memoryless`` run, from
   ``scripts/detection/run_memoryless_detection.py``), for the caption's
   stray-window note.
 
-The caption's sweep values repeat the computations of
-``scripts/figures/generate_memoryless_comparison.py``'s ``write_caption``, so
-the caption's numbers and these agree; where the caption states a fact rather
-than a number (one value standing for several folds, no event of a kind), the
-builder refuses inputs that contradict it.
-
-The upper panels' numbers of that caption (a-f) come from a simulation the
-figure script decodes in memory and writes nowhere but the caption, so they
-are not values here.
+The caption is prose with markers; these values are its only numbers. Where
+it states a fact rather than a number (one value standing for several folds,
+no event of a kind), the builder refuses inputs that contradict it; the figure
+script checks the recording's verdicts the same way.
 """
 
 from __future__ import annotations
@@ -61,6 +59,7 @@ class Part1Inputs:
     sweep_summary: Path
     controls_summary: Path
     heldout_summary: Path
+    recording_numbers: Path
     pilot_events: Path
     pilot_manifest: Path
 
@@ -72,6 +71,7 @@ def default_inputs() -> Part1Inputs:
         sweep_summary=ROOT_DIR / SWEEP_DIR / "detection_sweep_summary.csv",
         controls_summary=ROOT_DIR / SWEEP_DIR / "detection_controls_summary.csv",
         heldout_summary=ROOT_DIR / SWEEP_DIR / "detection_heldout_summary.csv",
+        recording_numbers=ROOT_DIR / SWEEP_DIR / "memoryless_comparison_recording.json",
         pilot_events=pilot / f"{MEMORYLESS_PILOT_EPOCH}_memoryless_events.parquet",
         pilot_manifest=pilot / "manifest.json",
     )
@@ -300,6 +300,148 @@ def pilot_stray_window_values(
             "count",
             "of those, calls whose dispersion clears the threshold only with kept "
             "windows outside every piece",
+        ),
+    ]
+
+
+# --- the memoryless comparison: one labeled recording (a-f) -------------------
+
+
+def recording_values(numbers: dict, source: str) -> list[Value]:
+    """Panels (a-f): what each detector made of the labeled events of one
+    simulated recording, as the figure script computed them."""
+    make = _value_factory(source, ("12",), MEMORYLESS_FIGURE)
+    if not numbers["outbound_draws_from_passing"] > 1:
+        raise ValueError(
+            "the caption says the outbound continuous replay fails the test by "
+            "several draws; the recording's numbers disagree"
+        )
+
+    def p(key: str, description: str) -> Value:
+        return make(f"recording_{key}", numbers[key], "quantity", "pval", description)
+
+    return [
+        make(
+            "recording_outbound_duration_ratio",
+            numbers["outbound_duration_ratio"],
+            "quantity",
+            "sig2",
+            "the sliding window's reported duration of the continuous outbound "
+            "replay over its true duration",
+        ),
+        make(
+            "recording_outbound_local_fraction",
+            numbers["outbound_local_fraction"],
+            "fraction",
+            "pctnum",
+            "share of that reported event's kept windows decoding the animal's own "
+            "place (within 15 cm)",
+        ),
+        p("outbound_p_spread", "significance test of the outbound replay: spread half"),
+        p("outbound_p_jump", "significance test of the outbound replay: jump half"),
+        make(
+            "recording_outbound_draws_from_passing",
+            numbers["outbound_draws_from_passing"],
+            "count",
+            "count",
+            "how many more shuffle draws below the observed value than a pass allows",
+        ),
+        p("inbound_p_spread", "significance test of the inbound replay: spread half"),
+        p("inbound_p_jump", "significance test of the inbound replay: jump half"),
+        make(
+            "recording_short_replay_duration_ratio",
+            numbers["short_replay_duration_ratio"],
+            "quantity",
+            "sig2",
+            "the sliding window's reported duration of the 80 ms replay over its "
+            "true duration",
+        ),
+        make(
+            "recording_short_replay_local_fraction",
+            numbers["short_replay_local_fraction"],
+            "fraction",
+            "pctnum",
+            "share of that reported event's kept windows decoding the animal's own "
+            "place",
+        ),
+        p(
+            "short_replay_p_spread",
+            "significance test of the 80 ms replay: spread half",
+        ),
+        p("short_replay_p_jump", "significance test of the 80 ms replay: jump half"),
+        make(
+            "recording_short_path_dispersion_cm",
+            numbers["short_path_dispersion_cm"],
+            "quantity",
+            "int",
+            "largest dispersion of a sliding-window candidate over the 30 cm replay",
+            "cm",
+        ),
+        make(
+            "recording_remote_stationary_dispersion_cm",
+            numbers["remote_stationary_dispersion_cm"],
+            "quantity",
+            "int",
+            "largest dispersion of a candidate over the remote stationary event",
+            "cm",
+        ),
+        make(
+            "recording_state_space_bound_error_ms",
+            numbers["state_space_bound_error_ms"],
+            "quantity",
+            "int",
+            "largest error in either bound of the state-space detector's reports of "
+            "the four zoomed events",
+            "ms",
+        ),
+        make(
+            "recording_stray_window_distance_cm",
+            numbers["stray_window_distance_cm"],
+            "quantity",
+            "int",
+            "distance from the animal of the far cell whose two spikes fill the "
+            "stray window",
+            "cm",
+        ),
+        make(
+            "recording_stray_window_local_fraction",
+            numbers["stray_window_local_fraction"],
+            "fraction",
+            "pctnum",
+            "share of the stray-window event's kept windows decoding within 15 cm "
+            "of the animal",
+        ),
+        make(
+            "recording_stray_window_duration_ms",
+            numbers["stray_window_duration_ms"],
+            "quantity",
+            "int",
+            "the stray-window event's reported duration",
+            "ms",
+        ),
+        make(
+            "recording_stray_window_dispersion_cm",
+            numbers["stray_window_dispersion_cm"],
+            "quantity",
+            "sig2",
+            "its dispersion with the window outside every piece",
+            "cm",
+        ),
+        make(
+            "recording_stray_window_pieces_dispersion_cm",
+            numbers["stray_window_pieces_dispersion_cm"],
+            "quantity",
+            "sig2",
+            "its dispersion without that window",
+            "cm",
+        ),
+        p(
+            "stray_window_p_spread",
+            "significance test of the stray-window event: spread half",
+        ),
+        p(
+            "stray_window_p_jump",
+            "significance test of the stray-window event: jump half",
         ),
     ]
 
@@ -1073,6 +1215,16 @@ def summarize(inputs: Part1Inputs, produced_by: str, commit: str) -> Summary:
         _record(inputs.pilot_events),
         _record(inputs.pilot_manifest),
     ]
+
+    recording = json.loads(inputs.recording_numbers.read_text())
+    summary.add(
+        *recording_values(
+            recording["numbers"],
+            f"{rel(inputs.recording_numbers)} ({recording['produced_by']}, commit "
+            f"{recording['git_commit']})",
+        )
+    )
+    summary.inputs.append(_record(inputs.recording_numbers))
 
     for path, build, script in (
         (inputs.sweep_summary, sweep_values, "sweep_memoryless_detection.py"),
