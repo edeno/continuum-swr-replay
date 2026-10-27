@@ -34,6 +34,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.load_population import (
@@ -42,6 +43,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
 )
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     processed_data_dir,
@@ -804,6 +806,251 @@ def null_geometry_values(
 # --- the summary -------------------------------------------------------------------
 
 
+def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
+    """Do the same mPFC units respond to SWR-coupled and non-SWR replay, how much,
+    and do they respond alike?
+
+    - **Overlap:** units called (raw empirical p < 0.05) for SWR-coupled replay
+      (``non_local_SWR``), for non-SWR replay (``non_local_no_SWR``), for both or
+      neither, among units tested for both; the count of both expected if the two
+      calls were independent; their odds ratio, pooled and per animal.
+    - **Effect size:** each unit's ``peak_log_modulation`` (the ridge fit's
+      largest log-rate change over the reported window) for each class, as a
+      median of its absolute value; the matched quiet-rest control's is the
+      noise floor. ``exp`` of a log modulation is a rate multiplier.
+    - **Alike:** across units, the rank correlation of the two classes' peak
+      modulations, and among units called for both the share with the same sign;
+      the share of units whose held-out deviance improves when the non-local
+      response is split by SWR status (``non_local_SWR + non_local_no_SWR vs.
+      non_local``), and whose best model by held-out deviance is that split.
+    """
+    swr_p = population[HELDOUT_P_COLUMNS["non_local_SWR"]]
+    non_p = population[HELDOUT_P_COLUMNS["non_local_no_SWR"]]
+    tested = swr_p.notna() & non_p.notna()
+    frame = population[tested]
+    swr_called = (swr_p[tested] < ALPHA).to_numpy()
+    non_called = (non_p[tested] < ALPHA).to_numpy()
+    both, swr_only = (
+        int((swr_called & non_called).sum()),
+        int((swr_called & ~non_called).sum()),
+    )
+    non_only, neither = (
+        int((~swr_called & non_called).sum()),
+        int((~swr_called & ~non_called).sum()),
+    )
+    n = int(tested.sum())
+
+    def odds_ratio(a: int, b: int, c: int, d: int) -> float:
+        return (a * d) / (b * c)
+
+    animals = (
+        frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]).to_numpy()
+    )
+    per_animal = []
+    for animal in np.unique(animals):
+        sc, nc = swr_called[animals == animal], non_called[animals == animal]
+        per_animal.append(
+            odds_ratio(
+                int((sc & nc).sum()),
+                int((sc & ~nc).sum()),
+                int((~sc & nc).sum()),
+                int((~sc & ~nc).sum()),
+            )
+        )
+    swr_peak = frame["non_local_SWR: peak_log_modulation"]
+    non_peak = frame["non_local_no_SWR: peak_log_modulation"]
+    either = swr_called | non_called
+    split = population[
+        "non_local_SWR + non_local_no_SWR vs. non_local: heldout_delta_dev"
+    ]
+    best = population["min_heldout_model_replay_split"]
+    values = [
+        make(
+            "overlap_units_tested",
+            n,
+            "count",
+            "count",
+            "units with a finite p-value for both SWR-coupled and non-SWR replay",
+        ),
+        make(
+            "overlap_units_both",
+            both,
+            "count",
+            "count",
+            "of those, units called (raw p < 0.05) for both",
+        ),
+        make(
+            "overlap_units_swr_replay_only",
+            swr_only,
+            "count",
+            "count",
+            "units called for SWR-coupled replay and not for non-SWR replay",
+        ),
+        make(
+            "overlap_units_non_swr_replay_only",
+            non_only,
+            "count",
+            "count",
+            "units called for non-SWR replay and not for SWR-coupled replay",
+        ),
+        make(
+            "overlap_units_neither",
+            neither,
+            "count",
+            "count",
+            "units called for neither",
+        ),
+        make(
+            "overlap_units_both_expected",
+            swr_called.mean() * non_called.mean() * n,
+            "quantity",
+            "int",
+            "units called for both expected if the two calls were independent "
+            "(product of the two called shares times the units tested)",
+            "units",
+        ),
+        make(
+            "overlap_odds_ratio",
+            odds_ratio(both, swr_only, non_only, neither),
+            "quantity",
+            "sig2",
+            "odds ratio of being called for non-SWR replay given called for SWR-coupled "
+            "replay, pooled over units (1 = independent)",
+        ),
+        make(
+            "overlap_odds_ratio_animal_min",
+            min(per_animal),
+            "quantity",
+            "sig2",
+            "lowest per-animal odds ratio",
+        ),
+        make(
+            "overlap_odds_ratio_animal_max",
+            max(per_animal),
+            "quantity",
+            "sig2",
+            "highest per-animal odds ratio",
+        ),
+        make(
+            "overlap_animals_odds_ratio_above_one",
+            sum(r > 1 for r in per_animal),
+            "count",
+            "count",
+            "animals whose odds ratio is above 1",
+        ),
+        make(
+            "overlap_rank_correlation",
+            stats.spearmanr(swr_peak, non_peak).statistic,
+            "quantity",
+            "dec2",
+            "Spearman correlation over units tested for both of the peak log modulation "
+            "for SWR-coupled replay and for non-SWR replay",
+        ),
+        make(
+            "overlap_rank_correlation_called",
+            stats.spearmanr(swr_peak[either], non_peak[either]).statistic,
+            "quantity",
+            "dec2",
+            "the same over units called for either",
+        ),
+        make(
+            "overlap_same_sign_fraction_both",
+            float(
+                (
+                    np.sign(swr_peak[swr_called & non_called])
+                    == np.sign(non_peak[swr_called & non_called])
+                ).mean()
+            ),
+            "fraction",
+            "pct",
+            "of the units called for both, the share whose two peak modulations have the "
+            "same sign (both up or both down)",
+        ),
+        make(
+            "split_improves_fraction",
+            float((split.dropna() > 0).mean()),
+            "fraction",
+            "pct",
+            "share of units whose held-out deviance improves when the non-local response "
+            "is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local)",
+        ),
+        make(
+            "split_best_model_fraction",
+            float(
+                (best == "non_local_SWR + non_local_no_SWR").sum() / best.notna().sum()
+            ),
+            "fraction",
+            "pct",
+            "share of units whose best model by held-out deviance (among constant, "
+            "non_local, and the split) is the split by SWR status",
+        ),
+        make(
+            "split_swr_larger_fraction_called",
+            float((swr_peak[either].abs() > non_peak[either].abs()).mean()),
+            "fraction",
+            "pct",
+            "of units called for either, the share whose absolute peak modulation is "
+            "larger for SWR-coupled replay than for non-SWR replay",
+        ),
+    ]
+    for word, column in (
+        ("swr_replay", "non_local_SWR"),
+        ("non_swr_replay", "non_local_no_SWR"),
+        ("swr", "SWR"),
+        ("matched_control", "matched_control"),
+    ):
+        peak = population[f"{column}: peak_log_modulation"].dropna()
+        label = {
+            "swr_replay": "SWR-coupled replay",
+            "non_swr_replay": "non-SWR replay",
+            "swr": "SWRs",
+            "matched_control": "matched quiet-rest control windows (the noise floor)",
+        }[word]
+        values += [
+            make(
+                f"effect_abs_peak_median_{word}",
+                peak.abs().median(),
+                "quantity",
+                "dec2",
+                f"median over units of the absolute peak log-rate modulation for {label}",
+                "log rate",
+            ),
+            make(
+                f"effect_rate_multiplier_median_{word}",
+                float(np.exp(peak.abs().median())),
+                "quantity",
+                "sig2",
+                f"exp of that median: the median unit's largest rate change for {label}, as "
+                "a multiplier (up or down)",
+                "x",
+            ),
+            make(
+                f"effect_suppressed_fraction_{word}",
+                float((peak < 0).mean()),
+                "fraction",
+                "pct",
+                f"share of units whose peak modulation for {label} is a decrease",
+            ),
+        ]
+    for word, column, called in (
+        ("swr_replay", "non_local_SWR", swr_called),
+        ("non_swr_replay", "non_local_no_SWR", non_called),
+    ):
+        peak = frame[f"{column}: peak_log_modulation"][called]
+        values.append(
+            make(
+                f"effect_abs_peak_median_called_{word}",
+                peak.abs().median(),
+                "quantity",
+                "dec2",
+                f"median absolute peak log-rate modulation of the units called for "
+                f"{'SWR-coupled' if word == 'swr_replay' else 'non-SWR'} replay",
+                "log rate",
+            )
+        )
+    return values
+
+
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     """Part 4's summary from ``inputs``."""
     summary = Summary(part=4, produced_by=produced_by, commit=commit)
@@ -826,6 +1073,7 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     summary.add(*prior_binding_values(population, make))
     summary.add(*called_fraction_values(population, figure))
     summary.add(*null_geometry_values(population, sidecars, make))
+    summary.add(*overlap_and_effect_values(population, make))
     summary.add(
         *ml_comparator_values(
             inputs.ml_tree,
