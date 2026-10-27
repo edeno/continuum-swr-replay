@@ -51,6 +51,7 @@ import sys
 import time
 from argparse import ArgumentParser, Namespace, RawDescriptionHelpFormatter
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -84,6 +85,7 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     ALL_MODEL_SPECS,
     CORE_MODEL_NAMES,
     DEFAULT_MARK_PENALTY_SIGMA,
+    DEFAULT_SLOPE_PERMUTATION_METHOD,
     FOLLOWUP_MODEL_NAMES,
     INTERACTION_MODEL_NAMES,
     MARGINAL_MODEL_NAMES,
@@ -93,9 +95,12 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     MarkedFamilySpec,
     ModelIneligibleError,
     build_marked_family_ladder,
+    class_eligibility,
     fit_marked_family_ladder,
+    fit_marked_family_slope_null,
     load_session_recommended_event_marks,
     load_session_stop_patch_switch_marks,
+    model_set_of,
 )
 from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
@@ -140,6 +145,21 @@ def available_marked_classes(event_set: str) -> tuple[str, ...]:
         EXTENDED_MARKED_EVENT_CLASSES
         if event_set == "with_swr_without_replay"
         else MARKED_EVENT_CLASSES
+    )
+
+
+def model_slope_seed(
+    model_name: str, nwb_file_name: str, epoch_name: str, seed: int | None = None
+) -> int:
+    """The shuffled-mark seed of one model in one session.
+
+    Derived from the model name too, so the references of different models
+    of a session are independent draws. ``seed`` (``--slope-permutation-seed``)
+    replaces the session-derived base.
+    """
+    base = "session" if seed is None else str(int(seed))
+    return session_seed(
+        f"marked_family_slope_null:{model_name}:{base}", nwb_file_name, epoch_name
     )
 
 
@@ -250,6 +270,7 @@ def build_fit_contract(
     event_set: str = "canonical",
     slope_permutations: int = 0,
     slope_permutation_seed: int = 0,
+    slope_permutation_method: str = DEFAULT_SLOPE_PERMUTATION_METHOD,
 ) -> dict[str, object]:
     """Return every model, data, fold and execution fact that defines a bundle.
 
@@ -283,7 +304,10 @@ def build_fit_contract(
     slope_permutations : int
         Shuffled-mark draws per slope kernel (0: none).
     slope_permutation_seed : int
-        Seed of those draws.
+        Seed of those draws (:func:`model_slope_seed`).
+    slope_permutation_method : str
+        How the draws shuffle a target
+        (``marked_model_family.SLOPE_PERMUTATION_METHODS``).
 
     Returns
     -------
@@ -296,6 +320,7 @@ def build_fit_contract(
         "inference": INFERENCE,
         "bundle_contract_version": BUNDLE_CONTRACT_VERSION,
         "model_name": spec.name,
+        "model_set": model_set_of(spec.name),
         "model_tier": spec.tier,
         "tier": "marginal" if spec.tier == "marginal" else "joint",
         "event_set": event_set,
@@ -306,10 +331,13 @@ def build_fit_contract(
         "baseline_context_marks": list(spec.baseline_context_marks),
         "slope_permutations": int(slope_permutations),
         "slope_permutation_seed": int(slope_permutation_seed),
+        "slope_permutation_method": slope_permutation_method,
         "slope_null_policy": (
-            "full-data refits with one target block rebuilt from the target "
-            "shuffled within its class: among events where defined, or for a "
-            "stop-level mark among stops with each stop's events together"
+            "full-data refits, warm-started from the observed fit, with one "
+            "target block rebuilt from the target shuffled within its class: its "
+            "residual on the model's other marks permuted among events where "
+            "defined, or for a stop-level mark among stops with each stop's "
+            "events together"
         ),
         "model_question": spec.question,
         "scientific_marks": list(spec.scientific_marks),
@@ -390,6 +418,11 @@ def _bundle_is_current(
     if status != "complete":
         return False
     slope_permutations = int(fit_contract.get("slope_permutations", 0))
+    fitted_classes = record.get("fitted_event_classes")
+    if fitted_classes:
+        # Classes a session could not carry were dropped from the fit and
+        # have no companions.
+        spec = spec.for_classes(tuple(fitted_classes))
     return is_nonempty_file(artifact) and all(
         is_nonempty_file(path)
         for path in family_companion_paths(
@@ -620,7 +653,9 @@ def run_analysis(
     slope_permutations : int, optional
         Shuffled-mark draws per slope kernel (0: no reference).
     slope_permutation_seed : int or None, optional
-        Seed of the draws; derived from the session when None.
+        Base seed of the draws; derived from the session when None. Each
+        model's seed is derived from it and the model name
+        (:func:`model_slope_seed`).
     gpu_record : Mapping of str to object, optional
         The accelerator record from ``configure_jax_gpu``.
     failure_sink : list of tuple of str, optional
@@ -650,11 +685,10 @@ def run_analysis(
         if fold_seed is None
         else fold_seed
     )
-    slope_permutation_seed = (
-        session_seed("marked_family_slope_null", nwb_file_name, epoch_name)
-        if slope_permutation_seed is None
-        else slope_permutation_seed
-    )
+    slope_seeds = {
+        name: model_slope_seed(name, nwb_file_name, epoch_name, slope_permutation_seed)
+        for name in model_names
+    }
     if slope_permutations < 0:
         raise ValueError("slope_permutations must be non-negative")
     available_classes = available_marked_classes(event_set)
@@ -712,7 +746,7 @@ def run_analysis(
                 baseline_terms=baseline_terms,
                 event_set=event_set,
                 slope_permutations=slope_permutations,
-                slope_permutation_seed=slope_permutation_seed,
+                slope_permutation_seed=slope_seeds[name],
             )
             for name, spec in specs.items()
         }
@@ -842,14 +876,28 @@ def run_analysis(
             # Removed here, not before the session loaded: a family that is
             # never reached keeps whatever it had rather than losing it to a
             # session that failed on an earlier family.
-            _remove_stale_bundle(artifact, spec)
+            _remove_stale_bundle(artifact, specs[name])
             design_started = time.perf_counter()
             baseline = context.baseline
             baseline_record = {
                 "baseline_column_names": list(context.baseline_names),
                 **context.baseline_report,
             }
+            dropped_classes: dict[str, str] = {}
             try:
+                reasons = class_eligibility(
+                    marked_events, spec, min_marked_events=min_marked_events
+                )
+                dropped_classes = {c: r for c, r in reasons.items() if r is not None}
+                kept_classes = tuple(c for c, r in reasons.items() if r is None)
+                if not kept_classes:
+                    raise ModelIneligibleError(
+                        f"model {name!r}: no class can carry it: "
+                        + "; ".join(f"{c}: {r}" for c, r in dropped_classes.items())
+                    )
+                if dropped_classes:
+                    logger.warning("Model %s drops class(es) %s", name, dropped_classes)
+                spec = spec.for_classes(kept_classes)
                 if spec.baseline_context_marks and baseline_terms != "none":
                     baseline, names, report_ = build_baseline_columns(
                         context.fit_mask,
@@ -876,9 +924,6 @@ def run_analysis(
                     mark_penalty_sigma=mark_penalty_sigma,
                     design_batch_size=design_batch_size,
                     prepared_response=prepared_response,
-                    slope_permutations=slope_permutations,
-                    slope_permutation_seed=slope_permutation_seed,
-                    report_lags=report,
                 )
                 fit_seconds = time.perf_counter() - fit_started
             except ModelIneligibleError as error:
@@ -888,14 +933,18 @@ def run_analysis(
                     input_records,
                     contracts[name],
                     status="ineligible",
-                    extra={**common_extra, "ineligibility_reason": str(error)},
+                    extra={
+                        **common_extra,
+                        "ineligibility_reason": str(error),
+                        "dropped_event_classes": dropped_classes,
+                    },
                 )
                 continue
             except MemoryError:
                 raise
             except Exception as error:
                 logger.exception("Model %s failed for %s", name, epoch_identifier)
-                _remove_stale_bundle(artifact, spec)
+                _remove_stale_bundle(artifact, specs[name])
                 failures.append((type(error).__name__, f"{name}: {str(error)[:160]}"))
                 continue
             n_units = int(context.counts.shape[1])
@@ -909,6 +958,38 @@ def run_analysis(
                     )
                 )
                 continue
+            # The reference is drawn only for a fit that passed its gate.
+            null_seconds = 0.0
+            if slope_permutations > 0:
+                null_started = time.perf_counter()
+                try:
+                    slope_null, null_diagnostics = fit_marked_family_slope_null(
+                        ladder,
+                        context.counts,
+                        fitted,
+                        penalty_sigma=penalty_sigma,
+                        mark_penalty_sigma=mark_penalty_sigma,
+                        n_draws=slope_permutations,
+                        seed=slope_seeds[name],
+                        report_lags=report,
+                    )
+                except MemoryError:
+                    raise
+                except Exception as error:
+                    logger.exception(
+                        "Slope reference of %s failed for %s", name, epoch_identifier
+                    )
+                    _remove_stale_bundle(artifact, specs[name])
+                    failures.append(
+                        (type(error).__name__, f"{name}: {str(error)[:160]}")
+                    )
+                    continue
+                fitted = replace(
+                    fitted,
+                    slope_null=slope_null,
+                    diagnostics={**fitted.diagnostics, **null_diagnostics},
+                )
+                null_seconds = time.perf_counter() - null_started
 
             statistics = fitted.statistics.copy()
             statistics.insert(0, "neuron_index", np.arange(len(statistics)))
@@ -964,7 +1045,10 @@ def run_analysis(
                             "session_preparation_shared": preparation_seconds,
                             "design_construction": design_seconds,
                             "fit": fit_seconds,
+                            "slope_reference": null_seconds,
                         },
+                        "fitted_event_classes": list(spec.event_classes),
+                        "dropped_event_classes": dropped_classes,
                         "marked_family_diagnostics": fitted.diagnostics,
                         **common_extra,
                         **baseline_record,

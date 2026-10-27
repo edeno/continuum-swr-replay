@@ -63,8 +63,8 @@ def _contract(spec=SPEC, **overrides):
         "min_marked_events": 10,
         "brain_area": "mPFC",
         "input_hashes": INPUT_HASHES,
-        "slope_permutation_seed": runner.session_seed(
-            "marked_family_slope_null", "rat20200101_.nwb", "01_r1"
+        "slope_permutation_seed": runner.model_slope_seed(
+            spec.name, "rat20200101_.nwb", "01_r1"
         ),
     }
     kwargs.update(overrides)
@@ -217,6 +217,30 @@ def _install_mocks(monkeypatch, context: SimpleNamespace, *, build=None, fit=Non
     )
     monkeypatch.setattr(
         runner, "prepare_heldout_response", lambda *a, **k: SimpleNamespace()
+    )
+    # Every class of the mocked events can carry every model.
+    monkeypatch.setattr(
+        runner,
+        "class_eligibility",
+        lambda events, spec, **k: dict.fromkeys(spec.event_classes),
+    )
+    # The mocked reference returns one zero null per target curve.
+    monkeypatch.setattr(
+        runner,
+        "fit_marked_family_slope_null",
+        lambda ladder, counts, fitted, *, n_draws, report_lags, **k: (
+            {
+                target_class: {
+                    mark: np.zeros(
+                        (n_draws, int(report_lags.sum()), counts.shape[1]),
+                        np.float32,
+                    )
+                    for mark in ladder.spec.scientific_marks
+                }
+                for target_class in ladder.spec.target_classes
+            },
+            {"slope_permutations": n_draws},
+        ),
     )
     # The ladder carries its spec, so a mocked fit can tell the families apart.
     monkeypatch.setattr(
@@ -540,9 +564,14 @@ def test_convergence_gate_records_the_counts_and_writes_nothing(tmp_path, monkey
         context,
         fit=lambda ladder, *a, **k: _result(context, ladder.spec, n_not_converged=2),
     )
+
+    def no_reference(*args, **kwargs):
+        raise AssertionError("a fit that failed its gate gets no reference")
+
+    monkeypatch.setattr(runner, "fit_marked_family_slope_null", no_reference)
     sink: list[tuple[str, str]] = []
 
-    assert _run(tmp_path, failure_sink=sink) is False
+    assert _run(tmp_path, failure_sink=sink, slope_permutations=3) is False
 
     artifact = _artifact(tmp_path)
     assert not artifact.exists()
@@ -664,6 +693,36 @@ def test_runner_refuses_unsafe_or_mixed_selections(monkeypatch, argv):
 def test_runner_writes_null_companions_and_requires_them(tmp_path, monkeypatch):
     context = _context()
     _install_mocks(monkeypatch, context)
+    # Two cohort stops over the six fitted bins, with different context
+    # values, so the context column is not constant on the fitted bins.
+    two_stops = pd.DataFrame(
+        {
+            "stop_idx": [4, 5],
+            "stop_start": [0.0, 0.006],
+            "stop_end": [0.005, 1.0],
+            "occupancy_well_id": [0.0, 0.0],
+            "is_rewarded_outcome": [1.0, 1.0],
+        }
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_cohort",
+        lambda *a, **k: (two_stops, {"stop_table_sha256": "stop"}),
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_patch_switch_marks",
+        lambda *a, **k: (
+            pd.DataFrame(
+                {
+                    "trips_to_patch_switch": [1.0, 2.0],
+                    "next_trip_switches_patch": [0.0, 0.0],
+                },
+                index=pd.Index([4, 5], name="stop_idx"),
+            ),
+            "stop",
+        ),
+    )
     model = "stop_context"
     spec = runner.ALL_MODEL_SPECS[model]
 
@@ -678,15 +737,15 @@ def test_runner_writes_null_companions_and_requires_them(tmp_path, monkeypatch):
         assert null.shape == (2, 201, context.counts.shape[1])
     record = json.loads(runner.fit_provenance_path(artifact).read_text())
     assert record["slope_permutations"] == 2 and record["tier"] == "joint"
-    # The context mark is a baseline column of this model only.
-    assert (
-        record["baseline_column_names"][-2:]
-        == [
-            "trips_to_patch_switch",
-            "trips_to_patch_switch_unknown",
-        ]
-        or "trips_to_patch_switch" in record["baseline_dropped_constant"]
-    )
+    # The context mark is a baseline column of this model; well and outcome
+    # are constant here and dropped, and no stop has an unknown context.
+    assert record["baseline_column_names"] == ["trips_to_patch_switch"]
+    assert record["baseline_dropped_constant"] == [
+        "rewarded_outcome",
+        "outcome_unknown",
+        "trips_to_patch_switch_unknown",
+    ]
+    assert record["slope_permutation_method"] == "residualized_within_class"
     contract = _contract(spec, slope_permutations=2)
     assert runner._bundle_is_current(
         artifact, spec, overwrite=False, fit_contract=contract
@@ -724,3 +783,46 @@ def test_extended_event_set_adds_swrs_without_replay_to_ripple_power(
     record = json.loads(runner.fit_provenance_path(pooled).read_text())
     assert record["event_set"] == "with_swr_without_replay"
     assert record["target_classes"] == ["pooled"]
+
+
+def test_a_class_too_short_for_a_model_is_dropped_and_recorded(tmp_path, monkeypatch):
+    context = _context()
+    context.events[runner.SWR_NO_NON_LOCAL] = pd.DataFrame({"start_time": [0.004]})
+    _install_mocks(monkeypatch, context)
+    reason = "event mark 'ripple_power_z' has only 1 finite events"
+    monkeypatch.setattr(
+        runner,
+        "class_eligibility",
+        lambda events, spec, **k: {
+            c: (reason if c == runner.SWR_NO_NON_LOCAL else None)
+            for c in spec.event_classes
+        },
+    )
+    model = "ripple_power"
+    spec = runner.ALL_MODEL_SPECS[model].for_classes(
+        runner.EXTENDED_MARKED_EVENT_CLASSES
+    )
+
+    assert _run(tmp_path, model_names=(model,), event_set="with_swr_without_replay")
+
+    artifact = _artifact(tmp_path, model)
+    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    assert record["bundle_status"] == "complete"
+    assert record["fitted_event_classes"] == list(runner.MARKED_EVENT_CLASSES)
+    assert record["dropped_event_classes"] == {runner.SWR_NO_NON_LOCAL: reason}
+    assert not list(tmp_path.glob(f"*.{runner.SWR_NO_NON_LOCAL}.*"))
+    contract = _contract(spec, event_set="with_swr_without_replay")
+    assert runner._bundle_is_current(
+        artifact, spec, overwrite=False, fit_contract=contract
+    )
+
+
+def test_slope_seeds_differ_between_models_and_follow_the_base_seed():
+    seeds = {
+        name: runner.model_slope_seed(name, "rat20200101_.nwb", "01_r1")
+        for name in runner.FOLLOWUP_MODEL_NAMES
+    }
+    assert len(set(seeds.values())) == len(seeds)
+    assert runner.model_slope_seed(
+        "ripple_power", "rat20200101_.nwb", "01_r1", 7
+    ) != runner.model_slope_seed("ripple_power", "rat20200101_.nwb", "01_r1", 8)
