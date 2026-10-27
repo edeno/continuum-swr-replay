@@ -1664,3 +1664,96 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.split_swr_larger_fraction_called` | … | 65 % |
 | `paper/reported/overview.md` | `part4.effect_suppressed_fraction_non_swr_replay` | … | 63 % |
 | `paper/reported/overview.md` | `part4.effect_suppressed_fraction_matched_control` | … | 61 % |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/claims_table.md` | `part2.rest_hours` | … | 40 |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_kay` | … | 42,962 |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_kay_fraction` | … | 57 % |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_kay_per_hour` | … | 1100 |
+| `paper/claims_table.md` | `part2.nonlocal_time_outside_kay_s` | … | 3485 |
+| `paper/claims_table.md` | `part2.nonlocal_time_outside_kay_fraction` | … | 53 % |
+| `paper/claims_table.md` | `part2.kay_time_s` | … | 4127 |
+| `paper/claims_table.md` | `part2.ripple_median_non_swr` | … | 0.50 |
+| `paper/claims_table.md` | `part2.ripple_rest_reference` | … | −0.60 |
+| `paper/claims_table.md` | `part2.ripple_animals_above_rest_non_swr` | … | 5 |
+| `paper/claims_table.md` | `part2.ripple_median_swr` | … | 2.35 |
+| `paper/claims_table.md` | `part2.mua_median_non_swr` | … | 0.79 |
+| `paper/claims_table.md` | `part2.mua_median_swr` | … | 2.37 |
+| `paper/claims_table.md` | `part2.mua_rest_reference` | … | −0.84 |
+| `paper/claims_table.md` | `part2.theta_median_non_swr` | … | −0.62 |
+| `paper/claims_table.md` | `part2.theta_median_swr` | … | −0.70 |
+| `paper/claims_table.md` | `part2.theta_rest_reference` | … | −0.60 |
+| `paper/claims_table.md` | `part2.theta_running_reference` | … | 0.42 |
+| `paper/claims_table.md` | `part2.theta_animals_below_running_non_swr` | … | 5 |
+| `paper/claims_table.md` | `part2.theta_like_fraction_non_swr` | … | 13 % |
+| `paper/claims_table.md` | `part2.theta_like_fraction_swr` | … | 11 % |
+| `paper/claims_table.md` | `part2.slow_gamma_median_non_swr` | … | −0.10 |
+| `paper/claims_table.md` | `part2.slow_gamma_rest_reference` | … | −0.28 |
+| `paper/claims_table.md` | `part2.slow_gamma_animals_above_rest_non_swr` | … | 5 |
+| `paper/claims_table.md` | `part2.slow_gamma_median_swr` | … | 0.36 |
+| `paper/claims_table.md` | `part2.fast_gamma_median_non_swr` | … | −0.21 |
+| `paper/claims_table.md` | `part2.fast_gamma_median_swr` | … | 0.11 |
+| `paper/claims_table.md` | `part2.fast_gamma_rest_reference` | … | −0.43 |
+| `paper/claims_table.md` | `part2.non_swr_remote_spikes_median` | 33 | 34 |
+| `paper/claims_table.md` | `part2.non_swr_close_spikes_median` | 36 | 42 |
+| `paper/claims_table.md` | `part2.non_swr_close_tetrodes_median` | 10 | 12 |
+| `paper/claims_table.md` | `part2.swr_remote_spikes_median` | 109 | 116 |
+| `paper/claims_table.md` | `part2.swr_remote_tetrodes_median` | 14 | 15 |
+| `paper/claims_table.md` | `part2.baseline_spikes_median` | 10 | 11 |
+| `paper/claims_table.md` | `part2.baseline_tetrodes_median` | 5 | 6 |
+| `paper/claims_table.md` | `part2.non_swr_close_dll_per_spike_median` | 0.51 | 0.47 |
+| `paper/claims_table.md` | `part2.non_swr_remote_dll_per_spike_median` | 0.71 | 0.69 |
+| `paper/claims_table.md` | `part2.swr_remote_dll_per_spike_median` | 1.14 | 1.17 |
+| `paper/claims_table.md` | `part2.non_swr_remote_gpi_distance_median_cm` | 96 | 97 |
+| `paper/claims_table.md` | `part2.non_swr_close_gpi_distance_median_cm` | 109 | 105 |
+| `paper/claims_table.md` | `part2.baseline_gpi_distance_median_cm` | 105 | 100 |
+| `paper/claims_table.md` | `part2.non_swr_remote_gpi_distance_median_cm` | 96 | 97 |
+| `paper/claims_table.md` | `part2.baseline_gpi_distance_median_cm` | 105 | 100 |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_trigger` | … | 19,221 |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_trigger_fraction` | … | 25 % |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_trigger_per_hour` | … | 480 |
+| `paper/claims_table.md` | `part2.nonlocal_time_outside_trigger_fraction` | … | 28 % |
+| `paper/claims_table.md` | `part2.nonlocal_time_outside_trigger_s` | … | 1821 |
+| `paper/claims_table.md` | `part2.nonlocal_time_outside_swr_fraction` | … | 31 % |
+| `paper/claims_table.md` | `part2.nonlocal_events_outside_widloski_fraction` | … | 94 % |
+| `paper/claims_table.md` | `part2.non_swr_close_dll_per_spike_median` | 0.51 | 0.47 |
+| `paper/reported/overview.md` | `part2.rest_hours` | … | 40 |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_kay` | … | 42,962 |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_kay_fraction` | … | 57 % |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_kay_per_hour` | … | 1100 |
+| `paper/reported/overview.md` | `part2.nonlocal_time_outside_kay_s` | … | 3485 |
+| `paper/reported/overview.md` | `part2.nonlocal_time_outside_kay_fraction` | … | 53 % |
+| `paper/reported/overview.md` | `part2.kay_time_s` | … | 4127 |
+| `paper/reported/overview.md` | `part2.nonlocal_time_s` | … | 6562 |
+| `paper/reported/overview.md` | `part2.nonlocal_time_outside_swr_fraction` | … | 31 % |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_trigger` | … | 19,221 |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_trigger_fraction` | … | 25 % |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_trigger_per_hour` | … | 480 |
+| `paper/reported/overview.md` | `part2.nonlocal_time_outside_trigger_fraction` | … | 28 % |
+| `paper/reported/overview.md` | `part2.nonlocal_events_outside_widloski_fraction` | … | 94 % |
+| `paper/reported/overview.md` | `part2.nonlocal_time_outside_widloski_fraction` | … | 93 % |
+| `paper/reported/overview.md` | `part2.theta_median_non_swr` | … | −0.62 |
+| `paper/reported/overview.md` | `part2.theta_rest_reference` | … | −0.60 |
+| `paper/reported/overview.md` | `part2.theta_running_reference` | … | 0.42 |
+| `paper/reported/overview.md` | `part2.theta_animals_below_running_non_swr` | … | 5 |
+| `paper/reported/overview.md` | `part2.theta_like_fraction_non_swr` | … | 13 % |
+| `paper/reported/overview.md` | `part2.theta_like_fraction_swr` | … | 11 % |
+| `paper/reported/overview.md` | `part2.ripple_median_non_swr` | … | 0.50 |
+| `paper/reported/overview.md` | `part2.ripple_rest_reference` | … | −0.60 |
+| `paper/reported/overview.md` | `part2.ripple_animals_above_rest_non_swr` | … | 5 |
+| `paper/reported/overview.md` | `part2.ripple_median_swr` | … | 2.35 |
+| `paper/reported/overview.md` | `part2.slow_gamma_median_non_swr` | … | −0.10 |
+| `paper/reported/overview.md` | `part2.slow_gamma_median_swr` | … | 0.36 |
+| `paper/reported/overview.md` | `part2.slow_gamma_rest_reference` | … | −0.28 |
+| `paper/reported/overview.md` | `part2.fast_gamma_median_non_swr` | … | −0.21 |
+| `paper/reported/overview.md` | `part2.fast_gamma_median_swr` | … | 0.11 |
+| `paper/reported/overview.md` | `part2.fast_gamma_rest_reference` | … | −0.43 |
+| `paper/reported/overview.md` | `part2.non_swr_close_dll_per_spike_median` | 0.51 | 0.47 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_dll_per_spike_median` | 0.71 | 0.69 |
+| `paper/reported/overview.md` | `part2.swr_remote_dll_per_spike_median` | 1.14 | 1.17 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_spikes_median` | 33 | 34 |
+| `paper/reported/overview.md` | `part2.swr_remote_spikes_median` | 109 | 116 |
+| `paper/reported/overview.md` | `part2.swr_remote_tetrodes_median` | 14 | 15 |

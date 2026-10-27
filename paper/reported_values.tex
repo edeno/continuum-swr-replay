@@ -136,16 +136,16 @@
 \newcommand{\PartOneSweepStateSpaceFraction}{91}  % part1.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
 \newcommand{\PartOneSweepStateSpaceOnlyFraction}{73}  % part1.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
-% --- Part 2 (commit 0c18c5ec9a07)
+% --- Part 2 (commit 53710f69476b)
 \newcommand{\PartTwoAnimals}{5}  % part2.animals: animals in the event table
 \newcommand{\PartTwoAnimalsNonSwrMajority}{4}  % part2.animals_non_swr_majority: animals in which more than half the events are non-SWR
 \newcommand{\PartTwoAnimalsNonSwrMoreAtWell}{5}  % part2.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content
 \newcommand{\PartTwoAnimalsNonSwrPlurality}{5}  % part2.animals_non_swr_plurality: animals in which non-SWR is the largest of the three overlap classes
 \newcommand{\PartTwoBaselineDllPerSpikeMedian}{0.00}  % part2.baseline_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows
-\newcommand{\PartTwoBaselineGpiDistanceMedianCm}{105}  % part2.baseline_gpi_distance_median_cm: median track distance from the MAP of matched quiet windows to the ground-process intensity peak
-\newcommand{\PartTwoBaselineScored}{5{,}748}  % part2.baseline_scored: matched quiet windows scored (at most 30 per epoch)
-\newcommand{\PartTwoBaselineSpikesMedian}{10}  % part2.baseline_spikes_median: median spike count of matched quiet windows
-\newcommand{\PartTwoBaselineTetrodesMedian}{5}  % part2.baseline_tetrodes_median: median number of tetrodes with a spike in matched quiet windows
+\newcommand{\PartTwoBaselineGpiDistanceMedianCm}{100}  % part2.baseline_gpi_distance_median_cm: median track distance from the MAP of matched quiet windows to the ground-process intensity peak
+\newcommand{\PartTwoBaselineScored}{24{,}890}  % part2.baseline_scored: matched quiet windows scored
+\newcommand{\PartTwoBaselineSpikesMedian}{11}  % part2.baseline_spikes_median: median spike count of matched quiet windows
+\newcommand{\PartTwoBaselineTetrodesMedian}{6}  % part2.baseline_tetrodes_median: median number of tetrodes with a spike in matched quiet windows
 \newcommand{\PartTwoCareyEvents}{24{,}084}  % part2.carey_events: carey events compared with the non-local detector
 \newcommand{\PartTwoCareyNoNonlocalFraction}{20}  % part2.carey_no_nonlocal_fraction: share of carey events that overlap no non-local event
 \newcommand{\PartTwoCareyNoNonlocalMixedFraction}{18}  % part2.carey_no_nonlocal_mixed_fraction: of carey events overlapping no non-local event, the share with neither state in more than half their rows
@@ -168,6 +168,14 @@
 \newcommand{\PartTwoExtentAnimalsInDirection}{5}  % part2.extent_animals_in_direction: animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median
 \newcommand{\PartTwoExtentMedianNonSwr}{8.0}  % part2.extent_median_non_swr: median spatial extent of the decoded content of immobile non-SWR non-local events
 \newcommand{\PartTwoExtentMedianSwr}{50}  % part2.extent_median_swr: median spatial extent of the decoded content of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoFastGammaAnimalsAboveRestNonSwr}{5}  % part2.fast_gamma_animals_above_rest_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level
+\newcommand{\PartTwoFastGammaAnimalsAboveRestSwr}{5}  % part2.fast_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level
+\newcommand{\PartTwoFastGammaAnimalsBelowRunningNonSwr}{5}  % part2.fast_gamma_animals_below_running_non_swr: animals whose median non-SWR event fast-gamma power (65-100 Hz) is below their median running level
+\newcommand{\PartTwoFastGammaAnimalsBelowRunningSwr}{0}  % part2.fast_gamma_animals_below_running_swr: animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below their median running level
+\newcommand{\PartTwoFastGammaMedianNonSwr}{\ensuremath{-}0.21}  % part2.fast_gamma_median_non_swr: median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean)
+\newcommand{\PartTwoFastGammaMedianSwr}{0.11}  % part2.fast_gamma_median_swr: median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean)
+\newcommand{\PartTwoFastGammaRestReference}{\ensuremath{-}0.43}  % part2.fast_gamma_rest_reference: median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest
+\newcommand{\PartTwoFastGammaRunningReference}{\ensuremath{-}0.14}  % part2.fast_gamma_running_reference: median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running
 \newcommand{\PartTwoHeldoutNonSwrAnimals}{5}  % part2.heldout_non_swr_animals: animals in that test [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
 \newcommand{\PartTwoHeldoutNonSwrAnimalsPositive}{5}  % part2.heldout_non_swr_animals_positive: animals with a positive mean [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
 \newcommand{\PartTwoHeldoutNonSwrPerSpike}{0.20}  % part2.heldout_non_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
@@ -207,10 +215,17 @@
 \newcommand{\PartTwoKayOverlapNoSpikeShareMedian}{0}  % part2.kay_overlap_no_spike_share_median: median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoKayOverlapNonlocalShareMedian}{88}  % part2.kay_overlap_nonlocal_share_median: median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoKayOverlapUncertainShareMedian}{9}  % part2.kay_overlap_uncertain_share_median: median over kay events overlapping a non-local event of the share of their rows with no state above 0.8
+\newcommand{\PartTwoKayTimeS}{4127}  % part2.kay_time_s: seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines
 \newcommand{\PartTwoMaxStepAnimalsInDirection}{5}  % part2.max_step_animals_in_direction: animals whose non-SWR median largest step of the decoded position is lower than their SWR median
 \newcommand{\PartTwoMaxStepMedianNonSwr}{2.0}  % part2.max_step_median_non_swr: median largest step of the decoded position of immobile non-SWR non-local events
 \newcommand{\PartTwoMaxStepMedianSwr}{14}  % part2.max_step_median_swr: median largest step of the decoded position of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoMuaAnimalsAboveRestNonSwr}{5}  % part2.mua_animals_above_rest_non_swr: animals whose median non-SWR event MUA rate is above their median quiet-rest level
+\newcommand{\PartTwoMuaAnimalsAboveRestSwr}{5}  % part2.mua_animals_above_rest_swr: animals whose median SWR-overlapping event MUA rate is above their median quiet-rest level
+\newcommand{\PartTwoMuaAnimalsBelowRunningNonSwr}{1}  % part2.mua_animals_below_running_non_swr: animals whose median non-SWR event MUA rate is below their median running level
+\newcommand{\PartTwoMuaAnimalsBelowRunningSwr}{0}  % part2.mua_animals_below_running_swr: animals whose median SWR-overlapping event MUA rate is below their median running level
 \newcommand{\PartTwoMuaEvents}{40{,}732}  % part2.mua_events: mua events compared with the non-local detector
+\newcommand{\PartTwoMuaMedianNonSwr}{0.79}  % part2.mua_median_non_swr: median z-scored MUA rate of immobile non-SWR non-local events (event mean)
+\newcommand{\PartTwoMuaMedianSwr}{2.37}  % part2.mua_median_swr: median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean)
 \newcommand{\PartTwoMuaNoNonlocalFraction}{15}  % part2.mua_no_nonlocal_fraction: share of mua events that overlap no non-local event
 \newcommand{\PartTwoMuaNoNonlocalMixedFraction}{22}  % part2.mua_no_nonlocal_mixed_fraction: of mua events overlapping no non-local event, the share with neither state in more than half their rows
 \newcommand{\PartTwoMuaNoNonlocalMostlyLocalFraction}{78}  % part2.mua_no_nonlocal_mostly_local_fraction: of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows
@@ -222,17 +237,19 @@
 \newcommand{\PartTwoMuaOverlapNoSpikeShareMedian}{0}  % part2.mua_overlap_no_spike_share_median: median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoMuaOverlapNonlocalShareMedian}{81}  % part2.mua_overlap_nonlocal_share_median: median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoMuaOverlapUncertainShareMedian}{13}  % part2.mua_overlap_uncertain_share_median: median over mua events overlapping a non-local event of the share of their rows with no state above 0.8
+\newcommand{\PartTwoMuaRestReference}{\ensuremath{-}0.84}  % part2.mua_rest_reference: median over epochs of the epoch's median z-scored MUA rate in quiet rest
+\newcommand{\PartTwoMuaRunningReference}{0.56}  % part2.mua_running_reference: median over epochs of the epoch's median z-scored MUA rate while running
 \newcommand{\PartTwoMultimodalAnimalsInDirection}{4}  % part2.multimodal_animals_in_direction: animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median
 \newcommand{\PartTwoMultimodalMedianNonSwr}{0.03}  % part2.multimodal_median_non_swr: median multimodal fraction of the posterior of immobile non-SWR non-local events
 \newcommand{\PartTwoMultimodalMedianSwr}{0.11}  % part2.multimodal_median_swr: median multimodal fraction of the posterior of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoNonSwrCloseAnimalsAboveBaseline}{5}  % part2.non_swr_close_animals_above_baseline: animals whose median nonSWR-close event scores above their median quiet window, per spike
-\newcommand{\PartTwoNonSwrCloseDllPerSpikeMedian}{0.51}  % part2.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
+\newcommand{\PartTwoNonSwrCloseDllPerSpikeMedian}{0.47}  % part2.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
 \newcommand{\PartTwoNonSwrCloseEpochsAboveBaseline}{242}  % part2.non_swr_close_epochs_above_baseline: epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike
 \newcommand{\PartTwoNonSwrCloseEpochsScored}{242}  % part2.non_swr_close_epochs_scored: epochs with a scored nonSWR-close event
-\newcommand{\PartTwoNonSwrCloseGpiDistanceMedianCm}{109}  % part2.non_swr_close_gpi_distance_median_cm: median track distance from the MAP of nonSWR-close events to the ground-process intensity peak
-\newcommand{\PartTwoNonSwrCloseScored}{5{,}435}  % part2.non_swr_close_scored: nonSWR-close events scored (at most 30 per epoch)
-\newcommand{\PartTwoNonSwrCloseSpikesMedian}{36}  % part2.non_swr_close_spikes_median: median spike count of nonSWR-close events
-\newcommand{\PartTwoNonSwrCloseTetrodesMedian}{10}  % part2.non_swr_close_tetrodes_median: median number of tetrodes with a spike in nonSWR-close events
+\newcommand{\PartTwoNonSwrCloseGpiDistanceMedianCm}{105}  % part2.non_swr_close_gpi_distance_median_cm: median track distance from the MAP of nonSWR-close events to the ground-process intensity peak
+\newcommand{\PartTwoNonSwrCloseScored}{10{,}488}  % part2.non_swr_close_scored: nonSWR-close events scored
+\newcommand{\PartTwoNonSwrCloseSpikesMedian}{42}  % part2.non_swr_close_spikes_median: median spike count of nonSWR-close events
+\newcommand{\PartTwoNonSwrCloseTetrodesMedian}{12}  % part2.non_swr_close_tetrodes_median: median number of tetrodes with a spike in nonSWR-close events
 \newcommand{\PartTwoNonSwrContentAtWellFraction}{58}  % part2.non_swr_content_at_well_fraction: share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions
 \newcommand{\PartTwoNonSwrContentNearOffFraction}{1}  % part2.non_swr_content_near_off_fraction: share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions
 \newcommand{\PartTwoNonSwrContentOwnWellFraction}{13}  % part2.non_swr_content_own_well_fraction: share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions
@@ -242,17 +259,35 @@
 \newcommand{\PartTwoNonSwrFractionAnimalMax}{65}  % part2.non_swr_fraction_animal_max: highest per-animal share of non-SWR events
 \newcommand{\PartTwoNonSwrFractionAnimalMin}{47}  % part2.non_swr_fraction_animal_min: lowest per-animal share of non-SWR events
 \newcommand{\PartTwoNonSwrRemoteAnimalsAboveBaseline}{5}  % part2.non_swr_remote_animals_above_baseline: animals whose median nonSWR-remote event scores above their median quiet window, per spike
-\newcommand{\PartTwoNonSwrRemoteDllPerSpikeMedian}{0.71}  % part2.non_swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events
+\newcommand{\PartTwoNonSwrRemoteDllPerSpikeMedian}{0.69}  % part2.non_swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events
 \newcommand{\PartTwoNonSwrRemoteEpochsAboveBaseline}{242}  % part2.non_swr_remote_epochs_above_baseline: epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike
 \newcommand{\PartTwoNonSwrRemoteEpochsScored}{242}  % part2.non_swr_remote_epochs_scored: epochs with a scored nonSWR-remote event
-\newcommand{\PartTwoNonSwrRemoteGpiDistanceMedianCm}{96}  % part2.non_swr_remote_gpi_distance_median_cm: median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak
-\newcommand{\PartTwoNonSwrRemoteScored}{7{,}239}  % part2.non_swr_remote_scored: nonSWR-remote events scored (at most 30 per epoch)
-\newcommand{\PartTwoNonSwrRemoteSpikesMedian}{33}  % part2.non_swr_remote_spikes_median: median spike count of nonSWR-remote events
+\newcommand{\PartTwoNonSwrRemoteGpiDistanceMedianCm}{97}  % part2.non_swr_remote_gpi_distance_median_cm: median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak
+\newcommand{\PartTwoNonSwrRemoteScored}{24{,}076}  % part2.non_swr_remote_scored: nonSWR-remote events scored
+\newcommand{\PartTwoNonSwrRemoteSpikesMedian}{34}  % part2.non_swr_remote_spikes_median: median spike count of nonSWR-remote events
 \newcommand{\PartTwoNonSwrRemoteTetrodesMedian}{10}  % part2.non_swr_remote_tetrodes_median: median number of tetrodes with a spike in nonSWR-remote events
 \newcommand{\PartTwoNonlocalEvents}{75{,}675}  % part2.nonlocal_events: immobile non-local events in the canonical event table (whole event below 4 cm/s)
 \newcommand{\PartTwoNonlocalEventsNonSwr}{42{,}974}  % part2.nonlocal_events_non_swr: of those, events overlapping no SWR (overlap_class non_swr)
+\newcommand{\PartTwoNonlocalEventsOutsideKay}{42{,}962}  % part2.nonlocal_events_outside_kay: non-local events no Kay SWR overlaps (detector comparison memberships)
+\newcommand{\PartTwoNonlocalEventsOutsideKayFraction}{57}  % part2.nonlocal_events_outside_kay_fraction: share of the non-local events with a known membership that no Kay SWR overlaps
+\newcommand{\PartTwoNonlocalEventsOutsideKayPerHour}{1100}  % part2.nonlocal_events_outside_kay_per_hour: non-local events no Kay SWR overlaps, per hour of analysed immobility
+\newcommand{\PartTwoNonlocalEventsOutsideTrigger}{19{,}221}  % part2.nonlocal_events_outside_trigger: non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger)
+\newcommand{\PartTwoNonlocalEventsOutsideTriggerFraction}{25}  % part2.nonlocal_events_outside_trigger_fraction: share of the non-local events with a known membership that no SWR definition and no MUA event overlaps
+\newcommand{\PartTwoNonlocalEventsOutsideTriggerPerHour}{480}  % part2.nonlocal_events_outside_trigger_per_hour: non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility
+\newcommand{\PartTwoNonlocalEventsOutsideWidloski}{71{,}498}  % part2.nonlocal_events_outside_widloski: non-local events no Widloski event overlaps (detector comparison memberships) [PENDING: Widloski detector: pending the Phase 2 pilot checks]
+\newcommand{\PartTwoNonlocalEventsOutsideWidloskiFraction}{94}  % part2.nonlocal_events_outside_widloski_fraction: share of the non-local events with a known membership that no Widloski event overlaps [PENDING: Widloski detector: pending the Phase 2 pilot checks]
+\newcommand{\PartTwoNonlocalEventsOutsideWidloskiPerHour}{1800}  % part2.nonlocal_events_outside_widloski_per_hour: non-local events no Widloski event overlaps, per hour of analysed immobility [PENDING: Widloski detector: pending the Phase 2 pilot checks]
 \newcommand{\PartTwoNonlocalEventsSwrContained}{16{,}037}  % part2.nonlocal_events_swr_contained: events lying inside an SWR (overlap_class swr_contained)
 \newcommand{\PartTwoNonlocalEventsSwrPartial}{16{,}664}  % part2.nonlocal_events_swr_partial: events partly overlapping an SWR (overlap_class swr_partial)
+\newcommand{\PartTwoNonlocalTimeOutsideKayFraction}{53}  % part2.nonlocal_time_outside_kay_fraction: share of non-local event time that Kay's SWRs do not cover
+\newcommand{\PartTwoNonlocalTimeOutsideKayS}{3485}  % part2.nonlocal_time_outside_kay_s: seconds of non-local event time that Kay's SWRs do not cover
+\newcommand{\PartTwoNonlocalTimeOutsideSwrFraction}{31}  % part2.nonlocal_time_outside_swr_fraction: share of non-local event time that the five SWR definitions together do not cover
+\newcommand{\PartTwoNonlocalTimeOutsideSwrS}{2004}  % part2.nonlocal_time_outside_swr_s: seconds of non-local event time that the five SWR definitions together do not cover
+\newcommand{\PartTwoNonlocalTimeOutsideTriggerFraction}{28}  % part2.nonlocal_time_outside_trigger_fraction: share of non-local event time that the five SWR definitions and MUA together do not cover
+\newcommand{\PartTwoNonlocalTimeOutsideTriggerS}{1821}  % part2.nonlocal_time_outside_trigger_s: seconds of non-local event time that the five SWR definitions and MUA together do not cover
+\newcommand{\PartTwoNonlocalTimeOutsideWidloskiFraction}{93}  % part2.nonlocal_time_outside_widloski_fraction: share of non-local event time that the Widloski detector's events do not cover [PENDING: Widloski detector: pending the Phase 2 pilot checks]
+\newcommand{\PartTwoNonlocalTimeOutsideWidloskiS}{6098}  % part2.nonlocal_time_outside_widloski_s: seconds of non-local event time that the Widloski detector's events do not cover [PENDING: Widloski detector: pending the Phase 2 pilot checks]
+\newcommand{\PartTwoNonlocalTimeS}{6562}  % part2.nonlocal_time_s: seconds of non-local event time (compared events), summed over epochs
 \newcommand{\PartTwoOccupancyEpochs}{242}  % part2.occupancy_epochs: epochs in the content-occupancy table
 \newcommand{\PartTwoPauseAnimalsInDirection}{5}  % part2.pause_animals_in_direction: animals whose non-SWR median pause fraction is higher than their SWR median
 \newcommand{\PartTwoPauseMedianNonSwr}{1.00}  % part2.pause_median_non_swr: median pause fraction of immobile non-SWR non-local events
@@ -260,9 +295,26 @@
 \newcommand{\PartTwoPeakAnimalsInDirection}{4}  % part2.peak_animals_in_direction: animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median
 \newcommand{\PartTwoPeakMedianNonSwr}{0.90}  % part2.peak_median_non_swr: median posterior peak (mean over the event) of immobile non-SWR non-local events
 \newcommand{\PartTwoPeakMedianSwr}{0.82}  % part2.peak_median_swr: median posterior peak (mean over the event) of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoRestHours}{40}  % part2.rest_hours: hours of analysed immobility the non-local detector observed (exposure), summed over epochs
 \newcommand{\PartTwoReversalsAnimalsInDirection}{5}  % part2.reversals_animals_in_direction: animals whose non-SWR median number of direction reversals is lower than their SWR median
 \newcommand{\PartTwoReversalsMedianNonSwr}{0}  % part2.reversals_median_non_swr: median number of direction reversals of immobile non-SWR non-local events
 \newcommand{\PartTwoReversalsMedianSwr}{3}  % part2.reversals_median_swr: median number of direction reversals of immobile SWR-overlapping non-local events
+\newcommand{\PartTwoRippleAnimalsAboveRestNonSwr}{5}  % part2.ripple_animals_above_rest_non_swr: animals whose median non-SWR event ripple power is above their median quiet-rest level
+\newcommand{\PartTwoRippleAnimalsAboveRestSwr}{5}  % part2.ripple_animals_above_rest_swr: animals whose median SWR-overlapping event ripple power is above their median quiet-rest level
+\newcommand{\PartTwoRippleAnimalsBelowRunningNonSwr}{1}  % part2.ripple_animals_below_running_non_swr: animals whose median non-SWR event ripple power is below their median running level
+\newcommand{\PartTwoRippleAnimalsBelowRunningSwr}{0}  % part2.ripple_animals_below_running_swr: animals whose median SWR-overlapping event ripple power is below their median running level
+\newcommand{\PartTwoRippleMedianNonSwr}{0.50}  % part2.ripple_median_non_swr: median z-scored ripple power of immobile non-SWR non-local events (event mean)
+\newcommand{\PartTwoRippleMedianSwr}{2.35}  % part2.ripple_median_swr: median z-scored ripple power of immobile SWR-overlapping non-local events (event mean)
+\newcommand{\PartTwoRippleRestReference}{\ensuremath{-}0.60}  % part2.ripple_rest_reference: median over epochs of the epoch's median z-scored ripple power in quiet rest
+\newcommand{\PartTwoRippleRunningReference}{0.33}  % part2.ripple_running_reference: median over epochs of the epoch's median z-scored ripple power while running
+\newcommand{\PartTwoSlowGammaAnimalsAboveRestNonSwr}{5}  % part2.slow_gamma_animals_above_rest_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) is above their median quiet-rest level
+\newcommand{\PartTwoSlowGammaAnimalsAboveRestSwr}{5}  % part2.slow_gamma_animals_above_rest_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above their median quiet-rest level
+\newcommand{\PartTwoSlowGammaAnimalsBelowRunningNonSwr}{0}  % part2.slow_gamma_animals_below_running_non_swr: animals whose median non-SWR event slow-gamma power (25-55 Hz) is below their median running level
+\newcommand{\PartTwoSlowGammaAnimalsBelowRunningSwr}{0}  % part2.slow_gamma_animals_below_running_swr: animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below their median running level
+\newcommand{\PartTwoSlowGammaMedianNonSwr}{\ensuremath{-}0.10}  % part2.slow_gamma_median_non_swr: median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean)
+\newcommand{\PartTwoSlowGammaMedianSwr}{0.36}  % part2.slow_gamma_median_swr: median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean)
+\newcommand{\PartTwoSlowGammaRestReference}{\ensuremath{-}0.28}  % part2.slow_gamma_rest_reference: median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest
+\newcommand{\PartTwoSlowGammaRunningReference}{\ensuremath{-}0.30}  % part2.slow_gamma_running_reference: median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running
 \newcommand{\PartTwoSpeedAnimalsInDirection}{5}  % part2.speed_animals_in_direction: animals whose non-SWR median replay speed (median over the event) is lower than their SWR median
 \newcommand{\PartTwoSpeedMedianNonSwr}{320}  % part2.speed_median_non_swr: median replay speed (median over the event) of immobile non-SWR non-local events
 \newcommand{\PartTwoSpeedMedianSwr}{490}  % part2.speed_median_swr: median replay speed (median over the event) of immobile SWR-overlapping non-local events
@@ -274,13 +326,23 @@
 \newcommand{\PartTwoSwrContentRemoteWellFraction}{21}  % part2.swr_content_remote_well_fraction: share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions
 \newcommand{\PartTwoSwrOverlappingEvents}{32{,}701}  % part2.swr_overlapping_events: immobile non-local events overlapping an SWR
 \newcommand{\PartTwoSwrRemoteAnimalsAboveBaseline}{5}  % part2.swr_remote_animals_above_baseline: animals whose median SWR-remote event scores above their median quiet window, per spike
-\newcommand{\PartTwoSwrRemoteDllPerSpikeMedian}{1.14}  % part2.swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events
+\newcommand{\PartTwoSwrRemoteDllPerSpikeMedian}{1.17}  % part2.swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events
 \newcommand{\PartTwoSwrRemoteEpochsAboveBaseline}{242}  % part2.swr_remote_epochs_above_baseline: epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike
 \newcommand{\PartTwoSwrRemoteEpochsScored}{242}  % part2.swr_remote_epochs_scored: epochs with a scored SWR-remote event
-\newcommand{\PartTwoSwrRemoteGpiDistanceMedianCm}{82}  % part2.swr_remote_gpi_distance_median_cm: median track distance from the MAP of SWR-remote events to the ground-process intensity peak
-\newcommand{\PartTwoSwrRemoteScored}{7{,}251}  % part2.swr_remote_scored: SWR-remote events scored (at most 30 per epoch)
-\newcommand{\PartTwoSwrRemoteSpikesMedian}{109}  % part2.swr_remote_spikes_median: median spike count of SWR-remote events
-\newcommand{\PartTwoSwrRemoteTetrodesMedian}{14}  % part2.swr_remote_tetrodes_median: median number of tetrodes with a spike in SWR-remote events
+\newcommand{\PartTwoSwrRemoteGpiDistanceMedianCm}{81}  % part2.swr_remote_gpi_distance_median_cm: median track distance from the MAP of SWR-remote events to the ground-process intensity peak
+\newcommand{\PartTwoSwrRemoteScored}{20{,}862}  % part2.swr_remote_scored: SWR-remote events scored
+\newcommand{\PartTwoSwrRemoteSpikesMedian}{116}  % part2.swr_remote_spikes_median: median spike count of SWR-remote events
+\newcommand{\PartTwoSwrRemoteTetrodesMedian}{15}  % part2.swr_remote_tetrodes_median: median number of tetrodes with a spike in SWR-remote events
+\newcommand{\PartTwoThetaAnimalsAboveRestNonSwr}{2}  % part2.theta_animals_above_rest_non_swr: animals whose median non-SWR event theta power is above their median quiet-rest level
+\newcommand{\PartTwoThetaAnimalsAboveRestSwr}{2}  % part2.theta_animals_above_rest_swr: animals whose median SWR-overlapping event theta power is above their median quiet-rest level
+\newcommand{\PartTwoThetaAnimalsBelowRunningNonSwr}{5}  % part2.theta_animals_below_running_non_swr: animals whose median non-SWR event theta power is below their median running level
+\newcommand{\PartTwoThetaAnimalsBelowRunningSwr}{5}  % part2.theta_animals_below_running_swr: animals whose median SWR-overlapping event theta power is below their median running level
+\newcommand{\PartTwoThetaLikeFractionNonSwr}{13}  % part2.theta_like_fraction_non_swr: share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level
+\newcommand{\PartTwoThetaLikeFractionSwr}{11}  % part2.theta_like_fraction_swr: share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level
+\newcommand{\PartTwoThetaMedianNonSwr}{\ensuremath{-}0.62}  % part2.theta_median_non_swr: median z-scored theta power of immobile non-SWR non-local events (event mean)
+\newcommand{\PartTwoThetaMedianSwr}{\ensuremath{-}0.70}  % part2.theta_median_swr: median z-scored theta power of immobile SWR-overlapping non-local events (event mean)
+\newcommand{\PartTwoThetaRestReference}{\ensuremath{-}0.60}  % part2.theta_rest_reference: median over epochs of the epoch's median z-scored theta power in quiet rest
+\newcommand{\PartTwoThetaRunningReference}{0.42}  % part2.theta_running_reference: median over epochs of the epoch's median z-scored theta power while running
 \newcommand{\PartTwoWidloskiCriteriaEvents}{4{,}388}  % part2.widloski_criteria_events: memoryless_criteria events compared with the non-local detector [PENDING: Widloski detector: pending the Phase 2 pilot checks]
 \newcommand{\PartTwoWidloskiCriteriaNoNonlocalFraction}{4}  % part2.widloski_criteria_no_nonlocal_fraction: share of memoryless_criteria events that overlap no non-local event [PENDING: Widloski detector: pending the Phase 2 pilot checks]
 \newcommand{\PartTwoWidloskiCriteriaNoNonlocalMixedFraction}{48}  % part2.widloski_criteria_no_nonlocal_mixed_fraction: of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows [PENDING: Widloski detector: pending the Phase 2 pilot checks]

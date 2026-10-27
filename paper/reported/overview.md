@@ -5,9 +5,7 @@ Every number on this page is filled by `scripts/reported/emit_reported_values.py
 [values_index.md](values_index.md). The interpretations are the assistant's reading of those values
 (2026-10-26), for the lead to check; "pending" marks values that may not be quoted as findings yet.
 
-**Two cautions that apply throughout.**
-- Part 2's spike-evidence values (claims 6, 7, 7c) still come from the run capped at 30 events per group per
-  epoch; an uncapped rerun of every event is in progress and will replace them.
+**A caution that applies throughout.**
 - Unless a line says otherwise, a property contrast is a plain median, not controlled for event duration, and
   non-SWR events are about half as long as SWR events.
 
@@ -67,16 +65,39 @@ simulated replays:
   and even the overlapping ones are partly local. The Widloski detector, which requires a moving sequence, almost
   never fires without a non-local event.
 
+**What does an analysis that starts from SWRs leave out?** Over <!--v:part2.rest_hours-->40<!--/v--> h of analysed rest:
+- starting from Kay SWRs: <!--v:part2.nonlocal_events_outside_kay-->42,962<!--/v--> non-local events (<!--v:part2.nonlocal_events_outside_kay_fraction-->57 %<!--/v-->; about
+  <!--v:part2.nonlocal_events_outside_kay_per_hour-->1100<!--/v--> per hour of rest) and <!--v:part2.nonlocal_time_outside_kay_s-->3485<!--/v--> s of non-local time
+  (<!--v:part2.nonlocal_time_outside_kay_fraction-->53 %<!--/v-->). For scale, Kay's SWRs span <!--v:part2.kay_time_s-->4127<!--/v--> s and all non-local events
+  <!--v:part2.nonlocal_time_s-->6562<!--/v--> s;
+- starting from any of the five SWR definitions: <!--v:part2.nonlocal_time_outside_swr_fraction-->31 %<!--/v--> of non-local time;
+- starting from any SWR definition or MUA: <!--v:part2.nonlocal_events_outside_trigger-->19,221<!--/v--> events (<!--v:part2.nonlocal_events_outside_trigger_fraction-->25 %<!--/v-->;
+  about <!--v:part2.nonlocal_events_outside_trigger_per_hour-->480<!--/v--> per hour) and <!--v:part2.nonlocal_time_outside_trigger_fraction-->28 %<!--/v--> of the time;
+- starting from Widloski events (pending): <!--v:part2.nonlocal_events_outside_widloski_fraction-->94 %<!--/v--> of events and
+  <!--v:part2.nonlocal_time_outside_widloski_fraction-->93 %<!--/v--> of the time.
+
+**Are these immobility theta events?** No, in general. Non-SWR events sit at quiet-rest theta
+(<!--v:part2.theta_median_non_swr-->−0.62<!--/v--> z against <!--v:part2.theta_rest_reference-->−0.60<!--/v--> z at rest and <!--v:part2.theta_running_reference-->0.42<!--/v--> z while running;
+below running in <!--v:part2.theta_animals_below_running_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals); <!--v:part2.theta_like_fraction_non_swr-->13 %<!--/v--> reach their epoch's
+running theta (SWR events <!--v:part2.theta_like_fraction_swr-->11 %<!--/v-->).
+- Ripple power: non-SWR events <!--v:part2.ripple_median_non_swr-->0.50<!--/v--> z, above quiet rest (<!--v:part2.ripple_rest_reference-->−0.60<!--/v--> z) in
+  <!--v:part2.ripple_animals_above_rest_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; SWR events <!--v:part2.ripple_median_swr-->2.35<!--/v--> z.
+- Slow gamma (25–55 Hz): non-SWR <!--v:part2.slow_gamma_median_non_swr-->−0.10<!--/v--> z, SWR <!--v:part2.slow_gamma_median_swr-->0.36<!--/v--> z, quiet rest
+  <!--v:part2.slow_gamma_rest_reference-->−0.28<!--/v--> z. Fast gamma (65–100 Hz): <!--v:part2.fast_gamma_median_non_swr-->−0.21<!--/v-->, <!--v:part2.fast_gamma_median_swr-->0.11<!--/v-->
+  and <!--v:part2.fast_gamma_rest_reference-->−0.43<!--/v--> z. Spiking and the ripple leak broadband power into both bands, so part of
+  these rises may be leakage rather than oscillation.
+- *Not yet:* how often quiet rest itself reaches running theta, the reference for the theta-like share.
+
 **Do event boundaries agree?** For <!--v:part2.swr_overlapping_events-->32,701<!--/v--> overlapping events, the median start offset is
 <!--v:part2.start_offset_median_ms-->4<!--/v--> ms and the median end offset <!--v:part2.end_offset_median_ms-->−4<!--/v--> ms (event minus SWR):
 close on average.
 
-**Are the events backed by spikes?** (capped run; see the caution above)
-- Per spike, the decoded location beats the animal's by <!--v:part2.non_swr_close_dll_per_spike_median-->0.51<!--/v--> nats (non-SWR,
-  close), <!--v:part2.non_swr_remote_dll_per_spike_median-->0.71<!--/v--> (non-SWR, remote) and <!--v:part2.swr_remote_dll_per_spike_median-->1.14<!--/v-->
+**Are the events backed by spikes?** (every event of every epoch)
+- Per spike, the decoded location beats the animal's by <!--v:part2.non_swr_close_dll_per_spike_median-->0.47<!--/v--> nats (non-SWR,
+  close), <!--v:part2.non_swr_remote_dll_per_spike_median-->0.69<!--/v--> (non-SWR, remote) and <!--v:part2.swr_remote_dll_per_spike_median-->1.17<!--/v-->
   (SWR, remote); matched quiet windows score <!--v:part2.baseline_dll_per_spike_median-->0.00<!--/v-->.
-- Non-SWR events have fewer spikes (<!--v:part2.non_swr_remote_spikes_median-->33<!--/v--> against <!--v:part2.swr_remote_spikes_median-->109<!--/v-->)
-  on fewer tetrodes (<!--v:part2.non_swr_remote_tetrodes_median-->10<!--/v--> against <!--v:part2.swr_remote_tetrodes_median-->14<!--/v-->).
+- Non-SWR events have fewer spikes (<!--v:part2.non_swr_remote_spikes_median-->34<!--/v--> against <!--v:part2.swr_remote_spikes_median-->116<!--/v-->)
+  on fewer tetrodes (<!--v:part2.non_swr_remote_tetrodes_median-->10<!--/v--> against <!--v:part2.swr_remote_tetrodes_median-->15<!--/v-->).
 - The held-out version (pending: untracked script) gives <!--v:part2.heldout_non_swr_per_spike-->0.20<!--/v--> nats per held-out spike
   without SWR and <!--v:part2.heldout_swr_per_spike-->0.60<!--/v--> with.
 - *Reading:* non-SWR events are real but carry less evidence per spike and involve fewer cells. Close events stay

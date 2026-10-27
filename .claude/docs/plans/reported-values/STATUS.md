@@ -8,10 +8,12 @@ the lead's OK). Design: `docs/design/2026-10-26-reported-values-design.md`. Ever
 
 | What | Where | State | When it finishes |
 |---|---|---|---|
-| Uncapped spike evidence (claims 6, 7, 7c): every event of every epoch, no 30-event cap | tmux `reality_all`; `logs/reality_all_20261026/progress.txt`; outputs `paper/figures/reality_all/per_epoch/` | 104/242 epochs at 19:40, none failed | about midnight |
+| Uncapped spike evidence (claims 6, 7, 7c): every event of every epoch, no 30-event cap | tmux `reality_all`; `logs/reality_all_20261026/progress.txt`; outputs `paper/figures/reality_all/per_epoch/` | done 21:50: 242/242 ok | done |
 | Slow and fast gamma during events (claim 5) | tmux `event_gamma`; `logs/event_gamma_20261026/run.log`; outputs `Processed-Data/event_gamma/` | done 19:44: 242/242 ok | done |
 
-## To do when both runs are done
+## Done 2026-10-26 ~22:00 (steps 1-3): Part 2 regenerated from the uncapped run and the gamma pass; claims 2, 5, 6, 21, 24 and the overview carry the new values
+
+## Was: to do when both runs are done
 
 1. `uv run python scripts/reported/summarize_part.py --part 2` (it refuses until the uncapped run has all
    242 epochs and the gamma reference exists).

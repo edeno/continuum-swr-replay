@@ -3,11 +3,33 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "0c18c5ec9a07",
+ "commit": "53710f69476b",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/event_table.parquet",
    "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
+  },
+  {
+   "path": "Processed-Data/brain_state_reference/reference.parquet",
+   "sha256": "f7120f54f539fc6afe114f9c25b60487822c6f25b3347ee083566dc7bb2e4f54"
+  },
+  {
+   "path": "Processed-Data/event_gamma/*_events.parquet",
+   "n_files": 242,
+   "sha256": "782529b6714cb876176f8e2d10c26a9a123fc5f168ed2cdbbdd9b33153a25b56"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_features.parquet",
+   "n_files": 242,
+   "sha256": "7045d747c109d3af1485cc0455f981c717e3c6e365b41bb5a14242e19cab5561"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/counts_by_animal.csv",
+   "sha256": "88d2e4bc011cc2ad5831084e646dac50e82b110f3a795999ac1837d22dc1f612"
+  },
+  {
+   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/cells_by_animal.csv",
+   "sha256": "343e537122112e3578b58ade3ca0f3df121dccfe6749ec06085a8b4649d0b0d3"
   },
   {
    "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_state_shares.parquet",
@@ -24,8 +46,9 @@
    "sha256": "19a36645f549d0fba071e773ba57f874df53e339b643d99dfd311d14f3094d6d"
   },
   {
-   "path": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet",
-   "sha256": "639a1326c972de9ac2bd4dc34b22b36e817fa6873bdab80604b17cc840f78049"
+   "path": "paper/figures/reality_all/per_epoch/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
+   "n_files": 242,
+   "sha256": "dc5c47d2c37fab035c68754a38c0ddccfbb075b35c92df73d0f1d5e75c7b23e5"
   },
   {
    "path": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
@@ -106,7 +129,7 @@
    "pending": null
   },
   "baseline_dll_per_spike_median": {
-   "value": 0.0018171760020777583,
+   "value": -0.004568513948470354,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -119,11 +142,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "baseline_gpi_distance_median_cm": {
-   "value": 105.39721862517277,
+   "value": 100.43956984531246,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -134,15 +157,15 @@
    "used_in": [
     "supplement"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "baseline_scored": {
-   "value": 5748,
+   "value": 24890,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "matched quiet windows scored (at most 30 per epoch)",
+   "description": "matched quiet windows scored",
    "claims": [
     "6",
     "7",
@@ -152,11 +175,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "baseline_spikes_median": {
-   "value": 10.0,
+   "value": 11.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -168,11 +191,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "baseline_tetrodes_median": {
-   "value": 5.0,
+   "value": 6.0,
    "kind": "quantity",
    "style": "int",
    "unit": "tetrodes",
@@ -184,7 +207,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "carey_events": {
@@ -472,7 +495,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "evidence_epochs": {
@@ -490,7 +513,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "extent_animals_in_direction": {
@@ -539,6 +562,126 @@
     "figure: 3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "fast_gamma_animals_above_rest_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_animals_above_rest_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_animals_below_running_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_animals_below_running_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_median_non_swr": {
+   "value": -0.21276955763535474,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_median_swr": {
+   "value": 0.10946984653262316,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_rest_reference": {
+   "value": -0.4298946911128849,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_running_reference": {
+   "value": -0.1391173532811394,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "heldout_non_swr_animals": {
@@ -1176,6 +1319,23 @@
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
   },
+  "kay_time_s": {
+   "value": 4127.039939403534,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "s",
+   "description": "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
   "max_step_animals_in_direction": {
    "value": 5,
    "kind": "count",
@@ -1224,6 +1384,66 @@
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
+  "mua_animals_above_rest_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event MUA rate is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "mua_animals_above_rest_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event MUA rate is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "mua_animals_below_running_non_swr": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event MUA rate is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "mua_animals_below_running_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event MUA rate is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
   "mua_events": {
    "value": 40732,
    "kind": "count",
@@ -1238,6 +1458,36 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "mua_median_non_swr": {
+   "value": 0.785190072225664,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored MUA rate of immobile non-SWR non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "mua_median_swr": {
+   "value": 2.3729087282731434,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_no_nonlocal_fraction": {
@@ -1416,6 +1666,36 @@
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
   },
+  "mua_rest_reference": {
+   "value": -0.8378970788426388,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored MUA rate in quiet rest",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "mua_running_reference": {
+   "value": 0.5592926646450833,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored MUA rate while running",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
   "multimodal_animals_in_direction": {
    "value": 4,
    "kind": "count",
@@ -1474,11 +1754,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_dll_per_spike_median": {
-   "value": 0.5125951170921326,
+   "value": 0.466031014919281,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1490,7 +1770,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_epochs_above_baseline": {
@@ -1506,7 +1786,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_epochs_scored": {
@@ -1522,11 +1802,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_gpi_distance_median_cm": {
-   "value": 108.91992203378703,
+   "value": 105.42238685318416,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -1537,15 +1817,15 @@
    "used_in": [
     "supplement"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_scored": {
-   "value": 5435,
+   "value": 10488,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "nonSWR-close events scored (at most 30 per epoch)",
+   "description": "nonSWR-close events scored",
    "claims": [
     "6",
     "7",
@@ -1555,11 +1835,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_spikes_median": {
-   "value": 36.0,
+   "value": 42.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -1571,11 +1851,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_close_tetrodes_median": {
-   "value": 10.0,
+   "value": 12.0,
    "kind": "quantity",
    "style": "int",
    "unit": "tetrodes",
@@ -1587,7 +1867,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_content_at_well_fraction": {
@@ -1739,11 +2019,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_dll_per_spike_median": {
-   "value": 0.7147106528282166,
+   "value": 0.6851800680160522,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1755,7 +2035,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_epochs_above_baseline": {
@@ -1771,7 +2051,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_epochs_scored": {
@@ -1787,11 +2067,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_gpi_distance_median_cm": {
-   "value": 95.67404393310467,
+   "value": 96.72020822347216,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -1802,15 +2082,15 @@
    "used_in": [
     "supplement"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_scored": {
-   "value": 7239,
+   "value": 24076,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "nonSWR-remote events scored (at most 30 per epoch)",
+   "description": "nonSWR-remote events scored",
    "claims": [
     "6",
     "7",
@@ -1820,11 +2100,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_spikes_median": {
-   "value": 33.0,
+   "value": 34.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -1836,7 +2116,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "non_swr_remote_tetrodes_median": {
@@ -1852,7 +2132,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "nonlocal_events": {
@@ -1889,6 +2169,159 @@
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
+  "nonlocal_events_outside_kay": {
+   "value": 42962,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local events no Kay SWR overlaps (detector comparison memberships)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_events_outside_kay_fraction": {
+   "value": 0.5677247139043793,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events with a known membership that no Kay SWR overlaps",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_events_outside_kay_per_hour": {
+   "value": 1068.1709758814895,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "per h",
+   "description": "non-local events no Kay SWR overlaps, per hour of analysed immobility",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_events_outside_trigger": {
+   "value": 19221,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_events_outside_trigger_fraction": {
+   "value": 0.25402762175378313,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events with a known membership that no SWR definition and no MUA event overlaps",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_events_outside_trigger_per_hour": {
+   "value": 477.89475181365185,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "per h",
+   "description": "non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_events_outside_widloski": {
+   "value": 71498,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local events no Widloski event overlaps (detector comparison memberships)",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "nonlocal_events_outside_widloski_fraction": {
+   "value": 0.9449407908648763,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events with a known membership that no Widloski event overlaps",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "nonlocal_events_outside_widloski_per_hour": {
+   "value": 1777.6660405375621,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "per h",
+   "description": "non-local events no Widloski event overlaps, per hour of analysed immobility",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
   "nonlocal_events_swr_contained": {
    "value": 16037,
    "kind": "count",
@@ -1921,6 +2354,159 @@
     "figure: 2b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "nonlocal_time_outside_kay_fraction": {
+   "value": 0.5310887375662227,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of non-local event time that Kay's SWRs do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_time_outside_kay_s": {
+   "value": 3485.0221643447876,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "s",
+   "description": "seconds of non-local event time that Kay's SWRs do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_time_outside_swr_fraction": {
+   "value": 0.30534821936486617,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of non-local event time that the five SWR definitions together do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_time_outside_swr_s": {
+   "value": 2003.705288887024,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "s",
+   "description": "seconds of non-local event time that the five SWR definitions together do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_time_outside_trigger_fraction": {
+   "value": 0.2774725375582378,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of non-local event time that the five SWR definitions and MUA together do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_time_outside_trigger_s": {
+   "value": 1820.784126996994,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "s",
+   "description": "seconds of non-local event time that the five SWR definitions and MUA together do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
+  "nonlocal_time_outside_widloski_fraction": {
+   "value": 0.929279282335591,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of non-local event time that the Widloski detector's events do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "nonlocal_time_outside_widloski_s": {
+   "value": 6097.961916208267,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "s",
+   "description": "seconds of non-local event time that the Widloski detector's events do not cover",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+  },
+  "nonlocal_time_s": {
+   "value": 6562.033644914627,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "s",
+   "description": "seconds of non-local event time (compared events), summed over epochs",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "occupancy_epochs": {
@@ -2033,6 +2619,23 @@
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
+  "rest_hours": {
+   "value": 40.220152925,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "h",
+   "description": "hours of analysed immobility the non-local detector observed (exposure), summed over epochs",
+   "claims": [
+    "2",
+    "21"
+   ],
+   "used_in": [
+    "paper",
+    "figure: main, left out"
+   ],
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "pending": null
+  },
   "reversals_animals_in_direction": {
    "value": 5,
    "kind": "count",
@@ -2079,6 +2682,262 @@
     "figure: 3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "ripple_animals_above_rest_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event ripple power is above their median quiet-rest level",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_animals_above_rest_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event ripple power is above their median quiet-rest level",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_animals_below_running_non_swr": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event ripple power is below their median running level",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_animals_below_running_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event ripple power is below their median running level",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_median_non_swr": {
+   "value": 0.49852993214482355,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored ripple power of immobile non-SWR non-local events (event mean)",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_median_swr": {
+   "value": 2.3475254305254167,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored ripple power of immobile SWR-overlapping non-local events (event mean)",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_rest_reference": {
+   "value": -0.6031271004218872,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored ripple power in quiet rest",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "ripple_running_reference": {
+   "value": 0.33218722024625746,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored ripple power while running",
+   "claims": [
+    "5",
+    "24"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3b"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_animals_above_rest_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_animals_above_rest_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_animals_below_running_non_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_animals_below_running_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_median_non_swr": {
+   "value": -0.10483297970275972,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_median_swr": {
+   "value": 0.35792542553983864,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_rest_reference": {
+   "value": -0.28267979831698997,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "slow_gamma_running_reference": {
+   "value": -0.29710325399289655,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "speed_animals_in_direction": {
@@ -2259,11 +3118,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_dll_per_spike_median": {
-   "value": 1.1356621980667114,
+   "value": 1.1743625402450562,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -2275,7 +3134,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_epochs_above_baseline": {
@@ -2291,7 +3150,7 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_epochs_scored": {
@@ -2307,11 +3166,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_gpi_distance_median_cm": {
-   "value": 82.16192077901111,
+   "value": 81.46319856201036,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -2322,15 +3181,15 @@
    "used_in": [
     "supplement"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_scored": {
-   "value": 7251,
+   "value": 20862,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "SWR-remote events scored (at most 30 per epoch)",
+   "description": "SWR-remote events scored",
    "claims": [
     "6",
     "7",
@@ -2340,11 +3199,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_spikes_median": {
-   "value": 109.0,
+   "value": 116.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -2356,11 +3215,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
   },
   "swr_remote_tetrodes_median": {
-   "value": 14.0,
+   "value": 15.0,
    "kind": "quantity",
    "style": "int",
    "unit": "tetrodes",
@@ -2372,7 +3231,157 @@
     "paper",
     "figure: spike support"
    ],
-   "source": "paper/figures/reality_r11/event_spike_evidence_metrics.parquet (242-epoch run)",
+   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "pending": null
+  },
+  "theta_animals_above_rest_non_swr": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event theta power is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_animals_above_rest_swr": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event theta power is above their median quiet-rest level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_animals_below_running_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median non-SWR event theta power is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_animals_below_running_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median SWR-overlapping event theta power is below their median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_like_fraction_non_swr": {
+   "value": 0.130078652208312,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_like_fraction_swr": {
+   "value": 0.10562368123298982,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_median_non_swr": {
+   "value": -0.620012383977862,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored theta power of immobile non-SWR non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_median_swr": {
+   "value": -0.7042093709260455,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median z-scored theta power of immobile SWR-overlapping non-local events (event mean)",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_rest_reference": {
+   "value": -0.5993965751136097,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored theta power in quiet rest",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_running_reference": {
+   "value": 0.4179785893809393,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "z",
+   "description": "median over epochs of the epoch's median z-scored theta power while running",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "widloski_criteria_events": {

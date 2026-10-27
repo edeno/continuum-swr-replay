@@ -95,7 +95,7 @@ after a change to fitting code only, start at step 6.
 
 | What it tests | Script | Output, figure | Claims |
 |---|---|---|---|
-| Each event's spikes favor its decoded location over the animal's, against matched quiet windows. Not held out: the same spikes choose the location and score it. Ran on all 242 epochs, at most 30 events per group per epoch | `detection/analyze_event_spike_evidence.py --output-dir paper/figures/reality_r11` | `paper/figures/reality_r11/` (the default `paper/figures/reality/` holds the June prototype, 5 epochs) | 6, 7, 7b, 7c, 9 |
+| Each event's spikes favor its decoded location over the animal's, against matched quiet windows. Not held out: the same spikes choose the location and score it. Ran on every event of all 242 epochs (2026-10-26; the earlier `paper/figures/reality_r11/` run capped each group at 30 events per epoch) | `detection/analyze_event_spike_evidence.py --n-sample 1000000`, one epoch per call (`logs/reality_all_20261026/run_one.sh`) | `paper/figures/reality_all/per_epoch/` (the default `paper/figures/reality/` holds the June prototype, 5 epochs) | 6, 7, 7b, 7c, 9 |
 | The held-out test above (Part 1), split by SWR: both kinds are supported, the non-SWR events less per spike | `.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py` (untracked; report `.claude/research/refresh_followup/f1_evidence_report.md`) | `.claude/research/refresh_followup/f1_outputs/` | 7 |
 
 ### 2c. Their properties
