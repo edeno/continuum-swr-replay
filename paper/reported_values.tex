@@ -330,7 +330,7 @@
 \newcommand{\PartTwoZugaroOverlapNonlocalShareMedian}{100}  % part2.zugaro_overlap_nonlocal_share_median: median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoZugaroOverlapUncertainShareMedian}{0}  % part2.zugaro_overlap_uncertain_share_median: median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8
 
-% --- Part 3 (commit 81e163874790)
+% --- Part 3 (commit dca377e0eecb)
 \newcommand{\PartThreeArmrewardAll}{\ensuremath{-}0.082}  % part3.armreward_all: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\PartThreeArmrewardAllAnimalsPositive}{2}  % part3.armreward_all_animals_positive: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\PartThreeArmrewardAllQ}{0.29}  % part3.armreward_all_q: C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
@@ -590,6 +590,11 @@
 \newcommand{\PartThreeLeafValueAnimalsPositive}{3}  % part3.leaf_value_animals_positive: leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: animals positive
 \newcommand{\PartThreeLeafValueSe}{1.0}  % part3.leaf_value_se: leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: median event-clustered session SE
 \newcommand{\PartThreeLeafValueSessions}{242}  % part3.leaf_value_sessions: leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: sessions kept
+\newcommand{\PartThreeOnsetMedianSNonLocal}{2.4}  % part3.onset_median_s_non_local: median time of a non-local onset after its stop's speed-threshold crossing
+\newcommand{\PartThreeOnsetsRewardHistoryIncompleteFractionNonLocal}{0.015}  % part3.onsets_reward_history_incomplete_fraction_non_local: share of non-local onsets in those stops
+\newcommand{\PartThreeOnsetsWithinTmaxFractionMua}{79}  % part3.onsets_within_tmax_fraction_mua: share of MUA onsets within the first 4 s of their stop (event_onset_table)
+\newcommand{\PartThreeOnsetsWithinTmaxFractionNonLocal}{79}  % part3.onsets_within_tmax_fraction_non_local: share of non_local onsets within the first 4 s of their stop (event_onset_table)
+\newcommand{\PartThreeOnsetsWithinTmaxFractionSwr}{80}  % part3.onsets_within_tmax_fraction_swr: share of SWR onsets within the first 4 s of their stop (event_onset_table)
 \newcommand{\PartThreePatchCurrent}{+1.1}  % part3.patch_current: CP0_base is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\PartThreePatchCurrentAnimalsPositive}{5}  % part3.patch_current_animals_positive: CP0_base is_current_patch (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\PartThreePatchCurrentQ}{\ensuremath{4.4\times10^{-38}}}  % part3.patch_current_q: CP0_base is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
@@ -609,6 +614,7 @@
 \newcommand{\PartThreePerStopChildBetterFractionNonLocalNoSwr}{46}  % part3.per_stop_child_better_fraction_non_local_no_swr: non-local without SWR: share of sessions in which R1 has the lower AIC
 \newcommand{\PartThreePerStopChildBetterFractionNonLocalSwr}{66}  % part3.per_stop_child_better_fraction_non_local_swr: non-local with SWR: share of sessions in which R1 has the lower AIC
 \newcommand{\PartThreePerStopChildBetterFractionSwr}{69}  % part3.per_stop_child_better_fraction_swr: detected SWR: share of sessions in which R1 has the lower AIC
+\newcommand{\PartThreePerStopCvFiniteFractionFull}{52}  % part3.per_stop_cv_finite_fraction_full: share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean
 \newcommand{\PartThreePerStopDeltaAicAnimalNonLocal}{\ensuremath{-}4.3}  % part3.per_stop_delta_aic_animal_non_local: non-local (all): median over animals of the per-animal median AIC(R1) - AIC(R0)
 \newcommand{\PartThreePerStopDeltaAicAnimalNonLocalNoSwr}{+0.88}  % part3.per_stop_delta_aic_animal_non_local_no_swr: non-local without SWR: median over animals of the per-animal median AIC(R1) - AIC(R0)
 \newcommand{\PartThreePerStopDeltaAicAnimalNonLocalSwr}{\ensuremath{-}2.6}  % part3.per_stop_delta_aic_animal_non_local_swr: non-local with SWR: median over animals of the per-animal median AIC(R1) - AIC(R0)
@@ -643,22 +649,38 @@
 \newcommand{\PartThreePowerRpeAnimalsPositive}{5}  % part3.power_rpe_animals_positive: rpe_postoutcome: animals with a positive median [PENDING: the SWR-power model has no provenance sidecar, so it cannot be checked against the current tables; give its runner one before citing]
 \newcommand{\PartThreePowerRpeP}{\ensuremath{5.9\times10^{-22}}}  % part3.power_rpe_p: rpe_postoutcome: signed-rank p [PENDING: the SWR-power model has no provenance sidecar, so it cannot be checked against the current tables; give its runner one before citing]
 \newcommand{\PartThreePowerSessions}{242}  % part3.power_sessions: sessions in the SWR-power model [PENDING: the SWR-power model has no provenance sidecar, so it cannot be checked against the current tables; give its runner one before citing]
+\newcommand{\PartThreeRateAllstopsArrivalBinsBefore}{8{,}230{,}251}  % part3.rate_allstops_arrival_bins_before: all-stops fit: bins before that removal
+\newcommand{\PartThreeRateAllstopsArrivalBinsDropped}{92{,}849}  % part3.rate_allstops_arrival_bins_dropped: all-stops fit: bins the arrival clock removed from the common cohort
+\newcommand{\PartThreeRateAllstopsArrivalBinsDroppedFraction}{1}  % part3.rate_allstops_arrival_bins_dropped_fraction: all-stops fit: share of bins the arrival clock removed
 \newcommand{\PartThreeRateAllstopsArrivalEventShareNonLocal}{0.86}  % part3.rate_allstops_arrival_event_share_non_local: non-local (all): the same share on the all-stops fit
 \newcommand{\PartThreeRateAllstopsArrivalEventShareNonLocalNoSwr}{0.81}  % part3.rate_allstops_arrival_event_share_non_local_no_swr: non-local without SWR: the same share on the all-stops fit
 \newcommand{\PartThreeRateAllstopsArrivalEventShareNonLocalSwr}{0.91}  % part3.rate_allstops_arrival_event_share_non_local_swr: non-local with SWR: the same share on the all-stops fit
 \newcommand{\PartThreeRateAllstopsArrivalEventShareSwr}{0.91}  % part3.rate_allstops_arrival_event_share_swr: detected SWR: the same share on the all-stops fit
-\newcommand{\PartThreeRateAllstopsArrivalPeakSHigh}{5.73}  % part3.rate_allstops_arrival_peak_s_high: highest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsArrivalPeakSLow}{2.91}  % part3.rate_allstops_arrival_peak_s_low: lowest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsArrivalPeakSNonLocal}{2.91}  % part3.rate_allstops_arrival_peak_s_non_local: non-local (all): peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsArrivalPeakSNonLocalNoSwr}{5.73}  % part3.rate_allstops_arrival_peak_s_non_local_no_swr: non-local without SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsArrivalPeakSNonLocalSwr}{3.09}  % part3.rate_allstops_arrival_peak_s_non_local_swr: non-local with SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsArrivalPeakSSwr}{2.98}  % part3.rate_allstops_arrival_peak_s_swr: detected SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsClockKsHigh}{0.09}  % part3.rate_allstops_clock_ks_high: highest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
-\newcommand{\PartThreeRateAllstopsClockKsLow}{0.08}  % part3.rate_allstops_clock_ks_low: lowest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakEdgeCount}{0}  % part3.rate_allstops_arrival_peak_edge_count: populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit sits on the interval's edge
+\newcommand{\PartThreeRateAllstopsArrivalPeakEdgeNonLocal}{0}  % part3.rate_allstops_arrival_peak_edge_non_local: non-local (all): 1 if that argmax sits on the edge of [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakEdgeNonLocalNoSwr}{0}  % part3.rate_allstops_arrival_peak_edge_non_local_no_swr: non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakEdgeNonLocalSwr}{0}  % part3.rate_allstops_arrival_peak_edge_non_local_swr: non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakEdgeSwr}{0}  % part3.rate_allstops_arrival_peak_edge_swr: detected SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSHigh}{5.73}  % part3.rate_allstops_arrival_peak_s_high: highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSLow}{2.91}  % part3.rate_allstops_arrival_peak_s_low: lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSNonLocal}{2.91}  % part3.rate_allstops_arrival_peak_s_non_local: non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSNonLocalNoSwr}{5.73}  % part3.rate_allstops_arrival_peak_s_non_local_no_swr: non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSNonLocalSwr}{3.09}  % part3.rate_allstops_arrival_peak_s_non_local_swr: non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSSwr}{2.98}  % part3.rate_allstops_arrival_peak_s_swr: detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSessionsNonLocal}{116}  % part3.rate_allstops_arrival_peak_sessions_non_local: non-local (all): unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSessionsNonLocalNoSwr}{112}  % part3.rate_allstops_arrival_peak_sessions_non_local_no_swr: non-local without SWR: unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSessionsNonLocalSwr}{80}  % part3.rate_allstops_arrival_peak_sessions_non_local_swr: non-local with SWR: unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalPeakSessionsSwr}{94}  % part3.rate_allstops_arrival_peak_sessions_swr: detected SWR: unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsArrivalStopsDropped}{1{,}509}  % part3.rate_allstops_arrival_stops_dropped: all-stops fit: stops the arrival clock removed
+\newcommand{\PartThreeRateAllstopsArrivalWindowBins}{7{,}374{,}525}  % part3.rate_allstops_arrival_window_bins: all-stops fit: frozen-cohort bins inside the arrival window
+\newcommand{\PartThreeRateAllstopsArrivalWindowFraction}{91}  % part3.rate_allstops_arrival_window_fraction: all-stops fit: share of frozen-cohort bins inside the arrival window
+\newcommand{\PartThreeRateAllstopsClockKsHigh}{0.09}  % part3.rate_allstops_clock_ks_high: highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
+\newcommand{\PartThreeRateAllstopsClockKsLow}{0.08}  % part3.rate_allstops_clock_ks_low: lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
 \newcommand{\PartThreeRateAllstopsClockKsNonLocal}{0.08}  % part3.rate_allstops_clock_ks_non_local: non-local (all): KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
 \newcommand{\PartThreeRateAllstopsClockKsNonLocalNoSwr}{0.08}  % part3.rate_allstops_clock_ks_non_local_no_swr: non-local without SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
 \newcommand{\PartThreeRateAllstopsClockKsNonLocalSwr}{0.09}  % part3.rate_allstops_clock_ks_non_local_swr: non-local with SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
 \newcommand{\PartThreeRateAllstopsClockKsSwr}{0.08}  % part3.rate_allstops_clock_ks_swr: detected SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit
+\newcommand{\PartThreeRateAllstopsFrozenBins}{8{,}137{,}402}  % part3.rate_allstops_frozen_bins: all-stops fit: bins in the frozen common cohort
 \newcommand{\PartThreeRateAllstopsImmediateAnimalNonLocal}{1.9}  % part3.rate_allstops_immediate_animal_non_local: all-stops fit, non-local (all): rr_immediate (animal-balanced)
 \newcommand{\PartThreeRateAllstopsImmediateAnimalNonLocalNoSwr}{0.84}  % part3.rate_allstops_immediate_animal_non_local_no_swr: all-stops fit, non-local without SWR: rr_immediate (animal-balanced)
 \newcommand{\PartThreeRateAllstopsImmediateAnimalNonLocalSwr}{8.6}  % part3.rate_allstops_immediate_animal_non_local_swr: all-stops fit, non-local with SWR: rr_immediate (animal-balanced)
@@ -671,55 +693,145 @@
 \newcommand{\PartThreeRateAllstopsImmediateSessionNoSwr}{0.83}  % part3.rate_allstops_immediate_session_no_swr: all-stops fit, non-local without SWR: exp of the across-session median immediate coefficient
 \newcommand{\PartThreeRateAllstopsImmediateSessionPNoSwr}{0.74}  % part3.rate_allstops_immediate_session_p_no_swr: its signed-rank p
 \newcommand{\PartThreeRateAllstopsKernelLagOneNoSwr}{0.95}  % part3.rate_allstops_kernel_lag_one_no_swr: all-stops fit, non-local without SWR: median reconstructed kernel at lag 1
+\newcommand{\PartThreeRateAllstopsMarginalRewardChildBetterFractionNonLocalNoSwr}{44}  % part3.rate_allstops_marginal_reward_child_better_fraction_non_local_no_swr: all-stops fit, non-local without SWR: share of sessions in which M1_rew has the lower AIC
+\newcommand{\PartThreeRateAllstopsMarginalRewardDeltaAicNonLocalNoSwr}{+0.65}  % part3.rate_allstops_marginal_reward_delta_aic_non_local_no_swr: all-stops fit, non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const)
 \newcommand{\PartThreeRateAllstopsPairedP}{\ensuremath{4.6\times10^{-26}}}  % part3.rate_allstops_paired_p: the same, all-stops fit: signed-rank p
 \newcommand{\PartThreeRateAllstopsPairedPositiveFraction}{83}  % part3.rate_allstops_paired_positive_fraction: the same, all-stops fit: share positive
 \newcommand{\PartThreeRateAllstopsPairedSessions}{241}  % part3.rate_allstops_paired_sessions: the same, all-stops fit: paired sessions
-\newcommand{\PartThreeRateAllstopsTimePeakSHigh}{3.00}  % part3.rate_allstops_time_peak_s_high: highest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsTimePeakSLow}{2.57}  % part3.rate_allstops_time_peak_s_low: lowest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsTimePeakSNonLocal}{2.98}  % part3.rate_allstops_time_peak_s_non_local: non-local (all): peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsTimePeakSNonLocalNoSwr}{3.00}  % part3.rate_allstops_time_peak_s_non_local_no_swr: non-local without SWR: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsTimePeakSNonLocalSwr}{2.57}  % part3.rate_allstops_time_peak_s_non_local_swr: non-local with SWR: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
-\newcommand{\PartThreeRateAllstopsTimePeakSSwr}{2.80}  % part3.rate_allstops_time_peak_s_swr: detected SWR: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakEdgeCount}{1}  % part3.rate_allstops_time_peak_edge_count: populations whose argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit sits on the interval's edge
+\newcommand{\PartThreeRateAllstopsTimePeakEdgeNonLocal}{0}  % part3.rate_allstops_time_peak_edge_non_local: non-local (all): 1 if that argmax sits on the edge of [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakEdgeNonLocalNoSwr}{1}  % part3.rate_allstops_time_peak_edge_non_local_no_swr: non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakEdgeNonLocalSwr}{0}  % part3.rate_allstops_time_peak_edge_non_local_swr: non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakEdgeSwr}{0}  % part3.rate_allstops_time_peak_edge_swr: detected SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSHigh}{2.98}  % part3.rate_allstops_time_peak_s_high: highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSLow}{2.57}  % part3.rate_allstops_time_peak_s_low: lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSNonLocal}{2.98}  % part3.rate_allstops_time_peak_s_non_local: non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSNonLocalNoSwr}{3.00}  % part3.rate_allstops_time_peak_s_non_local_no_swr: non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit; it sits on the interval's edge, so it bounds the peak rather than locating it
+\newcommand{\PartThreeRateAllstopsTimePeakSNonLocalSwr}{2.57}  % part3.rate_allstops_time_peak_s_non_local_swr: non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSSwr}{2.80}  % part3.rate_allstops_time_peak_s_swr: detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSessionsNonLocal}{241}  % part3.rate_allstops_time_peak_sessions_non_local: non-local (all): unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSessionsNonLocalNoSwr}{242}  % part3.rate_allstops_time_peak_sessions_non_local_no_swr: non-local without SWR: unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSessionsNonLocalSwr}{204}  % part3.rate_allstops_time_peak_sessions_non_local_swr: non-local with SWR: unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateAllstopsTimePeakSessionsSwr}{236}  % part3.rate_allstops_time_peak_sessions_swr: detected SWR: unflagged session curves behind that median, all-stops fit
+\newcommand{\PartThreeRateArrivalConstSessionsNonLocal}{242}  % part3.rate_arrival_const_sessions_non_local: non-local (all): M0a_const_arrival fits with a finite AIC
+\newcommand{\PartThreeRateArrivalConstSessionsNonLocalNoSwr}{242}  % part3.rate_arrival_const_sessions_non_local_no_swr: non-local without SWR: M0a_const_arrival fits with a finite AIC
+\newcommand{\PartThreeRateArrivalConstSessionsNonLocalSwr}{242}  % part3.rate_arrival_const_sessions_non_local_swr: non-local with SWR: M0a_const_arrival fits with a finite AIC
+\newcommand{\PartThreeRateArrivalConstSessionsSwr}{242}  % part3.rate_arrival_const_sessions_swr: detected SWR: M0a_const_arrival fits with a finite AIC
 \newcommand{\PartThreeRateArrivalEventShareNonLocal}{0.91}  % part3.rate_arrival_event_share_non_local: non-local (all): share of its event bins the arrival window [0, 8] s keeps
 \newcommand{\PartThreeRateArrivalEventShareNonLocalNoSwr}{0.88}  % part3.rate_arrival_event_share_non_local_no_swr: non-local without SWR: share of its event bins the arrival window [0, 8] s keeps
 \newcommand{\PartThreeRateArrivalEventShareNonLocalSwr}{0.94}  % part3.rate_arrival_event_share_non_local_swr: non-local with SWR: share of its event bins the arrival window [0, 8] s keeps
 \newcommand{\PartThreeRateArrivalEventShareSwr}{0.95}  % part3.rate_arrival_event_share_swr: detected SWR: share of its event bins the arrival window [0, 8] s keeps
-\newcommand{\PartThreeRateArrivalPeakSHigh}{4.00}  % part3.rate_arrival_peak_s_high: highest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s
-\newcommand{\PartThreeRateArrivalPeakSLow}{2.94}  % part3.rate_arrival_peak_s_low: lowest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s
-\newcommand{\PartThreeRateArrivalPeakSNonLocal}{3.21}  % part3.rate_arrival_peak_s_non_local: non-local (all): peak of the median fitted M5a_time_arrival time course, read on [1, 6] s
-\newcommand{\PartThreeRateArrivalPeakSNonLocalNoSwr}{4.00}  % part3.rate_arrival_peak_s_non_local_no_swr: non-local without SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s
-\newcommand{\PartThreeRateArrivalPeakSNonLocalSwr}{2.94}  % part3.rate_arrival_peak_s_non_local_swr: non-local with SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s
-\newcommand{\PartThreeRateArrivalPeakSSwr}{3.08}  % part3.rate_arrival_peak_s_swr: detected SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s
-\newcommand{\PartThreeRateArrivalSeparatedFractionHigh}{63}  % part3.rate_arrival_separated_fraction_high: highest over the four populations: share of M5a_time_arrival fits flagged separated
-\newcommand{\PartThreeRateArrivalSeparatedFractionLow}{58}  % part3.rate_arrival_separated_fraction_low: lowest over the four populations: share of M5a_time_arrival fits flagged separated
+\newcommand{\PartThreeRateArrivalFullCvNanFractionNonLocal}{95}  % part3.rate_arrival_full_cv_nan_fraction_non_local: non-local (all): share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite
+\newcommand{\PartThreeRateArrivalFullCvNanFractionNonLocalSwr}{100}  % part3.rate_arrival_full_cv_nan_fraction_non_local_swr: non-local with SWR: share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite
+\newcommand{\PartThreeRateArrivalFullSessionsNonLocal}{234}  % part3.rate_arrival_full_sessions_non_local: non-local (all): M7ra_time_arrival_histcos_rew fits with a finite AIC
+\newcommand{\PartThreeRateArrivalFullSessionsNonLocalNoSwr}{233}  % part3.rate_arrival_full_sessions_non_local_no_swr: non-local without SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC
+\newcommand{\PartThreeRateArrivalFullSessionsNonLocalSwr}{219}  % part3.rate_arrival_full_sessions_non_local_swr: non-local with SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC
+\newcommand{\PartThreeRateArrivalFullSessionsSwr}{231}  % part3.rate_arrival_full_sessions_swr: detected SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC
+\newcommand{\PartThreeRateArrivalPeakEdgeCount}{0}  % part3.rate_arrival_peak_edge_count: populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s sits on the interval's edge
+\newcommand{\PartThreeRateArrivalPeakEdgeNonLocal}{0}  % part3.rate_arrival_peak_edge_non_local: non-local (all): 1 if that argmax sits on the edge of [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakEdgeNonLocalNoSwr}{0}  % part3.rate_arrival_peak_edge_non_local_no_swr: non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakEdgeNonLocalSwr}{0}  % part3.rate_arrival_peak_edge_non_local_swr: non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakEdgeSwr}{0}  % part3.rate_arrival_peak_edge_swr: detected SWR: 1 if that argmax sits on the edge of [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSHigh}{4.00}  % part3.rate_arrival_peak_s_high: highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSLow}{2.94}  % part3.rate_arrival_peak_s_low: lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSNonLocal}{3.21}  % part3.rate_arrival_peak_s_non_local: non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSNonLocalNoSwr}{4.00}  % part3.rate_arrival_peak_s_non_local_no_swr: non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSNonLocalSwr}{2.94}  % part3.rate_arrival_peak_s_non_local_swr: non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSSwr}{3.08}  % part3.rate_arrival_peak_s_swr: detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s
+\newcommand{\PartThreeRateArrivalPeakSessionsNonLocal}{99}  % part3.rate_arrival_peak_sessions_non_local: non-local (all): unflagged session curves behind that median
+\newcommand{\PartThreeRateArrivalPeakSessionsNonLocalNoSwr}{96}  % part3.rate_arrival_peak_sessions_non_local_no_swr: non-local without SWR: unflagged session curves behind that median
+\newcommand{\PartThreeRateArrivalPeakSessionsNonLocalSwr}{83}  % part3.rate_arrival_peak_sessions_non_local_swr: non-local with SWR: unflagged session curves behind that median
+\newcommand{\PartThreeRateArrivalPeakSessionsSwr}{86}  % part3.rate_arrival_peak_sessions_swr: detected SWR: unflagged session curves behind that median
+\newcommand{\PartThreeRateArrivalSeparatedFractionHigh}{63}  % part3.rate_arrival_separated_fraction_high: highest over the populations: share of M5a_time_arrival fits flagged separated
+\newcommand{\PartThreeRateArrivalSeparatedFractionLow}{58}  % part3.rate_arrival_separated_fraction_low: lowest over the populations: share of M5a_time_arrival fits flagged separated
 \newcommand{\PartThreeRateArrivalSeparatedFractionNonLocal}{58}  % part3.rate_arrival_separated_fraction_non_local: non-local (all): share of M5a_time_arrival fits flagged separated
 \newcommand{\PartThreeRateArrivalSeparatedFractionNonLocalNoSwr}{59}  % part3.rate_arrival_separated_fraction_non_local_no_swr: non-local without SWR: share of M5a_time_arrival fits flagged separated
 \newcommand{\PartThreeRateArrivalSeparatedFractionNonLocalSwr}{63}  % part3.rate_arrival_separated_fraction_non_local_swr: non-local with SWR: share of M5a_time_arrival fits flagged separated
 \newcommand{\PartThreeRateArrivalSeparatedFractionSwr}{63}  % part3.rate_arrival_separated_fraction_swr: detected SWR: share of M5a_time_arrival fits flagged separated
+\newcommand{\PartThreeRateArrivalTimeCvNanFractionNonLocal}{92}  % part3.rate_arrival_time_cv_nan_fraction_non_local: non-local (all): share of M5a_time_arrival fits whose held-out score is not finite
+\newcommand{\PartThreeRateArrivalTimeCvNanFractionNonLocalSwr}{100}  % part3.rate_arrival_time_cv_nan_fraction_non_local_swr: non-local with SWR: share of M5a_time_arrival fits whose held-out score is not finite
+\newcommand{\PartThreeRateArrivalTimeSessionsNonLocal}{237}  % part3.rate_arrival_time_sessions_non_local: non-local (all): M5a_time_arrival fits with a finite AIC
+\newcommand{\PartThreeRateArrivalTimeSessionsNonLocalNoSwr}{236}  % part3.rate_arrival_time_sessions_non_local_no_swr: non-local without SWR: M5a_time_arrival fits with a finite AIC
+\newcommand{\PartThreeRateArrivalTimeSessionsNonLocalSwr}{222}  % part3.rate_arrival_time_sessions_non_local_swr: non-local with SWR: M5a_time_arrival fits with a finite AIC
+\newcommand{\PartThreeRateArrivalTimeSessionsSwr}{233}  % part3.rate_arrival_time_sessions_swr: detected SWR: M5a_time_arrival fits with a finite AIC
 \newcommand{\PartThreeRateAuditStopsCommonDrop}{575}  % part3.rate_audit_stops_common_drop: per_bin_rate_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock)
 \newcommand{\PartThreeRateAuditStopsIn}{93{,}560}  % part3.rate_audit_stops_in: per_bin_rate_cohort_audit.csv: stops entering the cohort
 \newcommand{\PartThreeRateAuditStopsModeled}{92{,}942}  % part3.rate_audit_stops_modeled: per_bin_rate_cohort_audit.csv: stops modelled on M0_const
 \newcommand{\PartThreeRateAuditStopsModeledSessionExcluded}{38}  % part3.rate_audit_stops_modeled_session_excluded: per_bin_rate_cohort_audit.csv: stops in sessions M0_const gates out
 \newcommand{\PartThreeRateAuditStopsOwnDrop}{5}  % part3.rate_audit_stops_own_drop: per_bin_rate_cohort_audit.csv: stops dropped for a missing own predictor
+\newcommand{\PartThreeRateBaselineLowerQuartileNonLocal}{0.32}  % part3.rate_baseline_lower_quartile_non_local: non-local (all): 25th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBaselineLowerQuartileNonLocalNoSwr}{0.15}  % part3.rate_baseline_lower_quartile_non_local_no_swr: non-local without SWR: 25th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBaselineLowerQuartileNonLocalSwr}{0.18}  % part3.rate_baseline_lower_quartile_non_local_swr: non-local with SWR: 25th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBaselineLowerQuartileSwr}{0.23}  % part3.rate_baseline_lower_quartile_swr: detected SWR: 25th percentile over sessions of the M0_const rate
 \newcommand{\PartThreeRateBaselineNonLocal}{0.43}  % part3.rate_baseline_non_local: non-local (all): median over sessions of exp(intercept) of M0_const, events per second of immobility
 \newcommand{\PartThreeRateBaselineNonLocalNoSwr}{0.22}  % part3.rate_baseline_non_local_no_swr: non-local without SWR: median over sessions of exp(intercept) of M0_const, events per second of immobility
 \newcommand{\PartThreeRateBaselineNonLocalSwr}{0.21}  % part3.rate_baseline_non_local_swr: non-local with SWR: median over sessions of exp(intercept) of M0_const, events per second of immobility
+\newcommand{\PartThreeRateBaselineRatioNoSwrToSwr}{0.77}  % part3.rate_baseline_ratio_no_swr_to_swr: median within-session M0_const rate ratio, non_local_no_swr over swr
+\newcommand{\PartThreeRateBaselineRatioNoSwrToSwrP}{\ensuremath{8.3\times10^{-11}}}  % part3.rate_baseline_ratio_no_swr_to_swr_p: its paired signed-rank p
+\newcommand{\PartThreeRateBaselineRatioSwrCoupledToNoSwr}{0.98}  % part3.rate_baseline_ratio_swr_coupled_to_no_swr: median within-session M0_const rate ratio, non_local_swr over non_local_no_swr
+\newcommand{\PartThreeRateBaselineRatioSwrCoupledToNoSwrP}{0.30}  % part3.rate_baseline_ratio_swr_coupled_to_no_swr_p: its paired signed-rank p
+\newcommand{\PartThreeRateBaselineRatioSwrCoupledToNonLocal}{0.49}  % part3.rate_baseline_ratio_swr_coupled_to_non_local: median within-session M0_const rate ratio, non_local_swr over non_local
+\newcommand{\PartThreeRateBaselineRatioSwrCoupledToNonLocalP}{\ensuremath{1.9\times10^{-41}}}  % part3.rate_baseline_ratio_swr_coupled_to_non_local_p: its paired signed-rank p
+\newcommand{\PartThreeRateBaselineRatioSwrCoupledToSwr}{0.80}  % part3.rate_baseline_ratio_swr_coupled_to_swr: median within-session M0_const rate ratio, non_local_swr over swr
+\newcommand{\PartThreeRateBaselineRatioSwrCoupledToSwrP}{\ensuremath{3.0\times10^{-41}}}  % part3.rate_baseline_ratio_swr_coupled_to_swr_p: its paired signed-rank p
+\newcommand{\PartThreeRateBaselineRatioSwrToNonLocal}{0.63}  % part3.rate_baseline_ratio_swr_to_non_local: median within-session M0_const rate ratio, swr over non_local
+\newcommand{\PartThreeRateBaselineRatioSwrToNonLocalP}{\ensuremath{6.3\times10^{-39}}}  % part3.rate_baseline_ratio_swr_to_non_local_p: its paired signed-rank p
 \newcommand{\PartThreeRateBaselineSwr}{0.27}  % part3.rate_baseline_swr: detected SWR: median over sessions of exp(intercept) of M0_const, events per second of immobility
+\newcommand{\PartThreeRateBaselineUpperQuartileNonLocal}{0.56}  % part3.rate_baseline_upper_quartile_non_local: non-local (all): 75th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBaselineUpperQuartileNonLocalNoSwr}{0.30}  % part3.rate_baseline_upper_quartile_non_local_no_swr: non-local without SWR: 75th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBaselineUpperQuartileNonLocalSwr}{0.26}  % part3.rate_baseline_upper_quartile_non_local_swr: non-local with SWR: 75th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBaselineUpperQuartileSwr}{0.31}  % part3.rate_baseline_upper_quartile_swr: detected SWR: 75th percentile over sessions of the M0_const rate
+\newcommand{\PartThreeRateBinCountNonLocal}{0.0065}  % part3.rate_bin_count_non_local: non-local (all): median M0_const rate times the 15 ms bin, the mean per-bin count
+\newcommand{\PartThreeRateBinCountNonLocalNoSwr}{0.0032}  % part3.rate_bin_count_non_local_no_swr: non-local without SWR: median M0_const rate times the 15 ms bin, the mean per-bin count
+\newcommand{\PartThreeRateBinCountNonLocalSwr}{0.0032}  % part3.rate_bin_count_non_local_swr: non-local with SWR: median M0_const rate times the 15 ms bin, the mean per-bin count
+\newcommand{\PartThreeRateBinCountSwr}{0.0040}  % part3.rate_bin_count_swr: detected SWR: median M0_const rate times the 15 ms bin, the mean per-bin count
 \newcommand{\PartThreeRateBins}{7{,}535{,}050}  % part3.rate_bins: 15 ms bins in the frozen common cohort
-\newcommand{\PartThreeRateBurstPeakHigh}{2.67}  % part3.rate_burst_peak_high: highest over the four populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew
-\newcommand{\PartThreeRateBurstPeakLagMsHigh}{120}  % part3.rate_burst_peak_lag_ms_high: highest over the four populations: lag of that peak (15 ms lags)
-\newcommand{\PartThreeRateBurstPeakLagMsLow}{105}  % part3.rate_burst_peak_lag_ms_low: lowest over the four populations: lag of that peak (15 ms lags)
-\newcommand{\PartThreeRateBurstPeakLagMsNonLocal}{120}  % part3.rate_burst_peak_lag_ms_non_local: non-local (all): lag of that peak (15 ms lags)
-\newcommand{\PartThreeRateBurstPeakLagMsNonLocalNoSwr}{105}  % part3.rate_burst_peak_lag_ms_non_local_no_swr: non-local without SWR: lag of that peak (15 ms lags)
-\newcommand{\PartThreeRateBurstPeakLagMsNonLocalSwr}{120}  % part3.rate_burst_peak_lag_ms_non_local_swr: non-local with SWR: lag of that peak (15 ms lags)
-\newcommand{\PartThreeRateBurstPeakLagMsSwr}{105}  % part3.rate_burst_peak_lag_ms_swr: detected SWR: lag of that peak (15 ms lags)
-\newcommand{\PartThreeRateBurstPeakLow}{1.56}  % part3.rate_burst_peak_low: lowest over the four populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew
-\newcommand{\PartThreeRateBurstPeakNonLocal}{1.95}  % part3.rate_burst_peak_non_local: non-local (all): peak of the median reconstructed self-history kernel of M7r_time_histcos_rew
-\newcommand{\PartThreeRateBurstPeakNonLocalNoSwr}{1.56}  % part3.rate_burst_peak_non_local_no_swr: non-local without SWR: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew
-\newcommand{\PartThreeRateBurstPeakNonLocalSwr}{1.98}  % part3.rate_burst_peak_non_local_swr: non-local with SWR: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew
-\newcommand{\PartThreeRateBurstPeakSwr}{2.67}  % part3.rate_burst_peak_swr: detected SWR: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew
-\newcommand{\PartThreeRateClockKsHigh}{0.09}  % part3.rate_clock_ks_high: highest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
-\newcommand{\PartThreeRateClockKsLow}{0.08}  % part3.rate_clock_ks_low: lowest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
+\newcommand{\PartThreeRateBumpOneAnimalsNonLocal}{5}  % part3.rate_bump_one_animals_non_local: non-local (all): animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpOneAnimalsNonLocalNoSwr}{5}  % part3.rate_bump_one_animals_non_local_no_swr: non-local without SWR: animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpOneAnimalsNonLocalSwr}{5}  % part3.rate_bump_one_animals_non_local_swr: non-local with SWR: animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpOneAnimalsSwr}{5}  % part3.rate_bump_one_animals_swr: detected SWR: animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpOnePositiveFractionNonLocal}{18}  % part3.rate_bump_one_positive_fraction_non_local: non-local (all): share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpOnePositiveFractionNonLocalNoSwr}{35}  % part3.rate_bump_one_positive_fraction_non_local_no_swr: non-local without SWR: share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpOnePositiveFractionNonLocalSwr}{13}  % part3.rate_bump_one_positive_fraction_non_local_swr: non-local with SWR: share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpOnePositiveFractionSwr}{14}  % part3.rate_bump_one_positive_fraction_swr: detected SWR: share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpOneSessionNonLocal}{0.050}  % part3.rate_bump_one_session_non_local: non-local (all): exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpOneSessionNonLocalNoSwr}{0.17}  % part3.rate_bump_one_session_non_local_no_swr: non-local without SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpOneSessionNonLocalSwr}{0.0065}  % part3.rate_bump_one_session_non_local_swr: non-local with SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpOneSessionSwr}{0.021}  % part3.rate_bump_one_session_swr: detected SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpTwoAnimalsNonLocal}{5}  % part3.rate_bump_two_animals_non_local: non-local (all): animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpTwoAnimalsNonLocalNoSwr}{5}  % part3.rate_bump_two_animals_non_local_no_swr: non-local without SWR: animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpTwoAnimalsNonLocalSwr}{5}  % part3.rate_bump_two_animals_non_local_swr: non-local with SWR: animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpTwoAnimalsSwr}{5}  % part3.rate_bump_two_animals_swr: detected SWR: animals whose median has the across-session median's sign
+\newcommand{\PartThreeRateBumpTwoPositiveFractionNonLocal}{80}  % part3.rate_bump_two_positive_fraction_non_local: non-local (all): share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpTwoPositiveFractionNonLocalNoSwr}{61}  % part3.rate_bump_two_positive_fraction_non_local_no_swr: non-local without SWR: share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpTwoPositiveFractionNonLocalSwr}{83}  % part3.rate_bump_two_positive_fraction_non_local_swr: non-local with SWR: share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpTwoPositiveFractionSwr}{80}  % part3.rate_bump_two_positive_fraction_swr: detected SWR: share of sessions with that coefficient positive
+\newcommand{\PartThreeRateBumpTwoSessionNonLocal}{5.2}  % part3.rate_bump_two_session_non_local: non-local (all): exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpTwoSessionNonLocalNoSwr}{2.4}  % part3.rate_bump_two_session_non_local_no_swr: non-local without SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpTwoSessionNonLocalSwr}{15}  % part3.rate_bump_two_session_non_local_swr: non-local with SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBumpTwoSessionSwr}{7.7}  % part3.rate_bump_two_session_swr: detected SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew
+\newcommand{\PartThreeRateBurstPeakGatedLagMsNonLocal}{135}  % part3.rate_burst_peak_gated_lag_ms_non_local: non-local (all): lag of that gated peak
+\newcommand{\PartThreeRateBurstPeakGatedLagMsNonLocalNoSwr}{105}  % part3.rate_burst_peak_gated_lag_ms_non_local_no_swr: non-local without SWR: lag of that gated peak
+\newcommand{\PartThreeRateBurstPeakGatedLagMsNonLocalSwr}{135}  % part3.rate_burst_peak_gated_lag_ms_non_local_swr: non-local with SWR: lag of that gated peak
+\newcommand{\PartThreeRateBurstPeakGatedLagMsSwr}{105}  % part3.rate_burst_peak_gated_lag_ms_swr: detected SWR: lag of that gated peak
+\newcommand{\PartThreeRateBurstPeakGatedNonLocal}{1.92}  % part3.rate_burst_peak_gated_non_local: non-local (all): peak of the median self-history kernel over the fits that flag no hist_rcos term
+\newcommand{\PartThreeRateBurstPeakGatedNonLocalNoSwr}{1.86}  % part3.rate_burst_peak_gated_non_local_no_swr: non-local without SWR: peak of the median self-history kernel over the fits that flag no hist_rcos term
+\newcommand{\PartThreeRateBurstPeakGatedNonLocalSwr}{2.18}  % part3.rate_burst_peak_gated_non_local_swr: non-local with SWR: peak of the median self-history kernel over the fits that flag no hist_rcos term
+\newcommand{\PartThreeRateBurstPeakGatedSwr}{2.81}  % part3.rate_burst_peak_gated_swr: detected SWR: peak of the median self-history kernel over the fits that flag no hist_rcos term
+\newcommand{\PartThreeRateBurstPeakHigh}{2.67}  % part3.rate_burst_peak_high: highest over the populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLagMsHigh}{120}  % part3.rate_burst_peak_lag_ms_high: highest over the populations: lag of that peak (15 ms lags) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLagMsLow}{105}  % part3.rate_burst_peak_lag_ms_low: lowest over the populations: lag of that peak (15 ms lags) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLagMsNonLocal}{120}  % part3.rate_burst_peak_lag_ms_non_local: non-local (all): lag of that peak (15 ms lags) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLagMsNonLocalNoSwr}{105}  % part3.rate_burst_peak_lag_ms_non_local_no_swr: non-local without SWR: lag of that peak (15 ms lags) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLagMsNonLocalSwr}{120}  % part3.rate_burst_peak_lag_ms_non_local_swr: non-local with SWR: lag of that peak (15 ms lags) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLagMsSwr}{105}  % part3.rate_burst_peak_lag_ms_swr: detected SWR: lag of that peak (15 ms lags) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakLow}{1.56}  % part3.rate_burst_peak_low: lowest over the populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakNonLocal}{1.95}  % part3.rate_burst_peak_non_local: non-local (all): peak of the median reconstructed self-history kernel of M7r_time_histcos_rew [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakNonLocalNoSwr}{1.56}  % part3.rate_burst_peak_non_local_no_swr: non-local without SWR: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakNonLocalSwr}{1.98}  % part3.rate_burst_peak_non_local_swr: non-local with SWR: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateBurstPeakSwr}{2.67}  % part3.rate_burst_peak_swr: detected SWR: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateClockKsHigh}{0.09}  % part3.rate_clock_ks_high: highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
+\newcommand{\PartThreeRateClockKsLow}{0.08}  % part3.rate_clock_ks_low: lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
 \newcommand{\PartThreeRateClockKsNonLocal}{0.08}  % part3.rate_clock_ks_non_local: non-local (all): KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
 \newcommand{\PartThreeRateClockKsNonLocalNoSwr}{0.08}  % part3.rate_clock_ks_non_local_no_swr: non-local without SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
 \newcommand{\PartThreeRateClockKsNonLocalSwr}{0.09}  % part3.rate_clock_ks_non_local_swr: non-local with SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position
@@ -728,13 +840,33 @@
 \newcommand{\PartThreeRateConditionalRewardDeltaAicNonLocalNoSwr}{+2.4}  % part3.rate_conditional_reward_delta_aic_non_local_no_swr: non-local without SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better
 \newcommand{\PartThreeRateConditionalRewardDeltaAicNonLocalSwr}{+1.6}  % part3.rate_conditional_reward_delta_aic_non_local_swr: non-local with SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better
 \newcommand{\PartThreeRateConditionalRewardDeltaAicSwr}{+0.94}  % part3.rate_conditional_reward_delta_aic_swr: detected SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better
+\newcommand{\PartThreeRateContrastAuditedRows}{32}  % part3.rate_contrast_audited_rows: rows the audited is_swr-contrast rate aggregate publishes
+\newcommand{\PartThreeRateContrastExpandedFitsHigh}{240}  % part3.rate_contrast_expanded_fits_high: most fits over the contrast rungs carrying an is_swr reward expansion (S2-S10)
+\newcommand{\PartThreeRateContrastExpandedFitsLow}{235}  % part3.rate_contrast_expanded_fits_low: fewest fits over the contrast rungs carrying an is_swr reward expansion (S2-S10)
+\newcommand{\PartThreeRateContrastExpandedFlaggedHigh}{196}  % part3.rate_contrast_expanded_flagged_high: most fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10)
+\newcommand{\PartThreeRateContrastExpandedFlaggedLow}{173}  % part3.rate_contrast_expanded_flagged_low: fewest fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10)
+\newcommand{\PartThreeRateContrastExpandedSeparatedHigh}{206}  % part3.rate_contrast_expanded_separated_high: most fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10)
+\newcommand{\PartThreeRateContrastExpandedSeparatedLow}{193}  % part3.rate_contrast_expanded_separated_low: fewest fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10)
+\newcommand{\PartThreeRateContrastMostDropped}{23}  % part3.rate_contrast_most_dropped: most sessions a key contrast term loses to the gate (S3_periswitch is_swr:periswitch_index_trials)
+\newcommand{\PartThreeRateContrastMostDroppedOf}{236}  % part3.rate_contrast_most_dropped_of: sessions fit for that term (S3_periswitch)
+\newcommand{\PartThreeRateContrastPlainFits}{242}  % part3.rate_contrast_plain_fits: S1_rew contrast fits
+\newcommand{\PartThreeRateContrastPlainFlagged}{0}  % part3.rate_contrast_plain_flagged: S1_rew contrast fits flagging reward_history_rcos_1 separated
 \newcommand{\PartThreeRateContrastSeparatedFractionPostOutcome}{67}  % part3.rate_contrast_separated_fraction_post_outcome: share of the is_swr-contrast rate ladder's post_outcome contrast fits flagged separated
 \newcommand{\PartThreeRateContrastSeparatedFractionPrimary}{71}  % part3.rate_contrast_separated_fraction_primary: share of the is_swr-contrast rate ladder's primary contrast fits flagged separated
 \newcommand{\PartThreeRateContrastTermSeparatedFraction}{75}  % part3.rate_contrast_term_separated_fraction: share of the fits carrying is_swr:reward_history_rcos_1 that flag it separated
+\newcommand{\PartThreeRateContrastTermsLosingSessions}{2}  % part3.rate_contrast_terms_losing_sessions: key is_swr contrast terms that lose any session to the per-term gate
 \newcommand{\PartThreeRateFullSessionsNonLocal}{242}  % part3.rate_full_sessions_non_local: non-local (all): sessions with a fit of M7r_time_histcos_rew
 \newcommand{\PartThreeRateFullSessionsNonLocalNoSwr}{240}  % part3.rate_full_sessions_non_local_no_swr: non-local without SWR: sessions with a fit of M7r_time_histcos_rew
 \newcommand{\PartThreeRateFullSessionsNonLocalSwr}{242}  % part3.rate_full_sessions_non_local_swr: non-local with SWR: sessions with a fit of M7r_time_histcos_rew
 \newcommand{\PartThreeRateFullSessionsSwr}{242}  % part3.rate_full_sessions_swr: detected SWR: sessions with a fit of M7r_time_histcos_rew
+\newcommand{\PartThreeRateHistSeparatedFractionNonLocal}{28}  % part3.rate_hist_separated_fraction_non_local: non-local (all): share of those fits flagging a hist_rcos term separated
+\newcommand{\PartThreeRateHistSeparatedFractionNonLocalNoSwr}{40}  % part3.rate_hist_separated_fraction_non_local_no_swr: non-local without SWR: share of those fits flagging a hist_rcos term separated
+\newcommand{\PartThreeRateHistSeparatedFractionNonLocalSwr}{42}  % part3.rate_hist_separated_fraction_non_local_swr: non-local with SWR: share of those fits flagging a hist_rcos term separated
+\newcommand{\PartThreeRateHistSeparatedFractionSwr}{40}  % part3.rate_hist_separated_fraction_swr: detected SWR: share of those fits flagging a hist_rcos term separated
+\newcommand{\PartThreeRateHistSessionsNonLocal}{242}  % part3.rate_hist_sessions_non_local: non-local (all): sessions whose M7r_time_histcos_rew fit carries the self-history block
+\newcommand{\PartThreeRateHistSessionsNonLocalNoSwr}{240}  % part3.rate_hist_sessions_non_local_no_swr: non-local without SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block
+\newcommand{\PartThreeRateHistSessionsNonLocalSwr}{242}  % part3.rate_hist_sessions_non_local_swr: non-local with SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block
+\newcommand{\PartThreeRateHistSessionsSwr}{242}  % part3.rate_hist_sessions_swr: detected SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block
 \newcommand{\PartThreeRateImmediateAnimalNonLocal}{2.9}  % part3.rate_immediate_animal_non_local: non-local (all): exp of the animal-balanced median immediate coefficient (rr_immediate)
 \newcommand{\PartThreeRateImmediateAnimalNonLocalNoSwr}{1.2}  % part3.rate_immediate_animal_non_local_no_swr: non-local without SWR: exp of the animal-balanced median immediate coefficient (rr_immediate)
 \newcommand{\PartThreeRateImmediateAnimalNonLocalSwr}{8.8}  % part3.rate_immediate_animal_non_local_swr: non-local with SWR: exp of the animal-balanced median immediate coefficient (rr_immediate)
@@ -760,11 +892,33 @@
 \newcommand{\PartThreeRateImmediateSessionPositiveFractionNonLocalSwr}{87}  % part3.rate_immediate_session_positive_fraction_non_local_swr: non-local with SWR: share of sessions whose immediate coefficient is positive
 \newcommand{\PartThreeRateImmediateSessionPositiveFractionSwr}{83}  % part3.rate_immediate_session_positive_fraction_swr: detected SWR: share of sessions whose immediate coefficient is positive
 \newcommand{\PartThreeRateImmediateSessionSwr}{6.4}  % part3.rate_immediate_session_swr: detected SWR: exp of the across-session median of the immediate basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew (the full 0 to 1 contrast on bump 0)
+\newcommand{\PartThreeRateIntransitArrivalEventShareHigh}{0.37}  % part3.rate_intransit_arrival_event_share_high: highest over populations of the in-transit fit's arrival-window event share
+\newcommand{\PartThreeRateIntransitArrivalEventShareLow}{0.18}  % part3.rate_intransit_arrival_event_share_low: lowest over populations of the in-transit fit's arrival-window event share
+\newcommand{\PartThreeRateIntransitArrivalEventShareNonLocal}{0.33}  % part3.rate_intransit_arrival_event_share_non_local: non-local (all): share of its event bins the arrival window keeps on the in-transit fit
+\newcommand{\PartThreeRateIntransitArrivalEventShareNonLocalNoSwr}{0.37}  % part3.rate_intransit_arrival_event_share_non_local_no_swr: non-local without SWR: share of its event bins the arrival window keeps on the in-transit fit
+\newcommand{\PartThreeRateIntransitArrivalEventShareNonLocalSwr}{0.18}  % part3.rate_intransit_arrival_event_share_non_local_swr: non-local with SWR: share of its event bins the arrival window keeps on the in-transit fit
+\newcommand{\PartThreeRateIntransitArrivalEventShareSwr}{0.30}  % part3.rate_intransit_arrival_event_share_swr: detected SWR: share of its event bins the arrival window keeps on the in-transit fit
 \newcommand{\PartThreeRateIntransitSessions}{52}  % part3.rate_intransit_sessions: sessions with any per-bin fit on the in-transit stops (the sample gates leave the rest out)
 \newcommand{\PartThreeRateIntransitSessionsNonLocal}{51}  % part3.rate_intransit_sessions_non_local: non-local (all): sessions with a per-bin fit on the in-transit stops
 \newcommand{\PartThreeRateIntransitSessionsNonLocalNoSwr}{39}  % part3.rate_intransit_sessions_non_local_no_swr: non-local without SWR: sessions with a per-bin fit on the in-transit stops
 \newcommand{\PartThreeRateIntransitSessionsNonLocalSwr}{10}  % part3.rate_intransit_sessions_non_local_swr: non-local with SWR: sessions with a per-bin fit on the in-transit stops
 \newcommand{\PartThreeRateIntransitSessionsSwr}{17}  % part3.rate_intransit_sessions_swr: detected SWR: sessions with a per-bin fit on the in-transit stops
+\newcommand{\PartThreeRateKernelLagEightNonLocal}{0.98}  % part3.rate_kernel_lag_eight_non_local: non-local (all): median reconstructed reward kernel at lag 8
+\newcommand{\PartThreeRateKernelLagEightNonLocalNoSwr}{0.98}  % part3.rate_kernel_lag_eight_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 8
+\newcommand{\PartThreeRateKernelLagEightNonLocalSwr}{0.98}  % part3.rate_kernel_lag_eight_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 8
+\newcommand{\PartThreeRateKernelLagEightSwr}{0.97}  % part3.rate_kernel_lag_eight_swr: detected SWR: median reconstructed reward kernel at lag 8
+\newcommand{\PartThreeRateKernelLagFiveNonLocal}{0.91}  % part3.rate_kernel_lag_five_non_local: non-local (all): median reconstructed reward kernel at lag 5
+\newcommand{\PartThreeRateKernelLagFiveNonLocalNoSwr}{0.94}  % part3.rate_kernel_lag_five_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 5
+\newcommand{\PartThreeRateKernelLagFiveNonLocalSwr}{0.89}  % part3.rate_kernel_lag_five_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 5
+\newcommand{\PartThreeRateKernelLagFiveSwr}{0.90}  % part3.rate_kernel_lag_five_swr: detected SWR: median reconstructed reward kernel at lag 5
+\newcommand{\PartThreeRateKernelLagFourNonLocal}{0.91}  % part3.rate_kernel_lag_four_non_local: non-local (all): median reconstructed reward kernel at lag 4
+\newcommand{\PartThreeRateKernelLagFourNonLocalNoSwr}{0.93}  % part3.rate_kernel_lag_four_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 4
+\newcommand{\PartThreeRateKernelLagFourNonLocalSwr}{0.89}  % part3.rate_kernel_lag_four_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 4
+\newcommand{\PartThreeRateKernelLagFourSwr}{0.90}  % part3.rate_kernel_lag_four_swr: detected SWR: median reconstructed reward kernel at lag 4
+\newcommand{\PartThreeRateKernelLagNineNonLocal}{1.01}  % part3.rate_kernel_lag_nine_non_local: non-local (all): median reconstructed reward kernel at lag 9
+\newcommand{\PartThreeRateKernelLagNineNonLocalNoSwr}{1.00}  % part3.rate_kernel_lag_nine_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 9
+\newcommand{\PartThreeRateKernelLagNineNonLocalSwr}{1.02}  % part3.rate_kernel_lag_nine_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 9
+\newcommand{\PartThreeRateKernelLagNineSwr}{1.00}  % part3.rate_kernel_lag_nine_swr: detected SWR: median reconstructed reward kernel at lag 9
 \newcommand{\PartThreeRateKernelLagOneAnimalNonLocal}{1.22}  % part3.rate_kernel_lag_one_animal_non_local: non-local (all): the same lag-1 kernel, median over animals of each animal's median (animal-balanced)
 \newcommand{\PartThreeRateKernelLagOneAnimalNonLocalNoSwr}{1.01}  % part3.rate_kernel_lag_one_animal_non_local_no_swr: non-local without SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced)
 \newcommand{\PartThreeRateKernelLagOneAnimalNonLocalSwr}{1.49}  % part3.rate_kernel_lag_one_animal_non_local_swr: non-local with SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced)
@@ -777,36 +931,75 @@
 \newcommand{\PartThreeRateKernelLagOneNonLocalNoSwr}{1.01}  % part3.rate_kernel_lag_one_non_local_no_swr: non-local without SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over sessions (session-pooled)
 \newcommand{\PartThreeRateKernelLagOneNonLocalSwr}{1.51}  % part3.rate_kernel_lag_one_non_local_swr: non-local with SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over sessions (session-pooled)
 \newcommand{\PartThreeRateKernelLagOneSwr}{1.38}  % part3.rate_kernel_lag_one_swr: detected SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over sessions (session-pooled)
+\newcommand{\PartThreeRateKernelLagSevenNonLocal}{0.95}  % part3.rate_kernel_lag_seven_non_local: non-local (all): median reconstructed reward kernel at lag 7
+\newcommand{\PartThreeRateKernelLagSevenNonLocalNoSwr}{0.97}  % part3.rate_kernel_lag_seven_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 7
+\newcommand{\PartThreeRateKernelLagSevenNonLocalSwr}{0.93}  % part3.rate_kernel_lag_seven_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 7
+\newcommand{\PartThreeRateKernelLagSevenSwr}{0.94}  % part3.rate_kernel_lag_seven_swr: detected SWR: median reconstructed reward kernel at lag 7
+\newcommand{\PartThreeRateKernelLagSixNonLocal}{0.93}  % part3.rate_kernel_lag_six_non_local: non-local (all): median reconstructed reward kernel at lag 6
+\newcommand{\PartThreeRateKernelLagSixNonLocalNoSwr}{0.96}  % part3.rate_kernel_lag_six_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 6
+\newcommand{\PartThreeRateKernelLagSixNonLocalSwr}{0.91}  % part3.rate_kernel_lag_six_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 6
+\newcommand{\PartThreeRateKernelLagSixSwr}{0.92}  % part3.rate_kernel_lag_six_swr: detected SWR: median reconstructed reward kernel at lag 6
 \newcommand{\PartThreeRateKernelLagTenNonLocal}{1.04}  % part3.rate_kernel_lag_ten_non_local: non-local (all): median reconstructed kernel at lag 10
 \newcommand{\PartThreeRateKernelLagTenNonLocalNoSwr}{1.01}  % part3.rate_kernel_lag_ten_non_local_no_swr: non-local without SWR: median reconstructed kernel at lag 10
 \newcommand{\PartThreeRateKernelLagTenNonLocalSwr}{1.07}  % part3.rate_kernel_lag_ten_non_local_swr: non-local with SWR: median reconstructed kernel at lag 10
 \newcommand{\PartThreeRateKernelLagTenSwr}{1.04}  % part3.rate_kernel_lag_ten_swr: detected SWR: median reconstructed kernel at lag 10
+\newcommand{\PartThreeRateKernelLagThreeNonLocal}{0.93}  % part3.rate_kernel_lag_three_non_local: non-local (all): median reconstructed reward kernel at lag 3
+\newcommand{\PartThreeRateKernelLagThreeNonLocalNoSwr}{0.94}  % part3.rate_kernel_lag_three_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 3
+\newcommand{\PartThreeRateKernelLagThreeNonLocalSwr}{0.94}  % part3.rate_kernel_lag_three_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 3
+\newcommand{\PartThreeRateKernelLagThreeSwr}{0.93}  % part3.rate_kernel_lag_three_swr: detected SWR: median reconstructed reward kernel at lag 3
+\newcommand{\PartThreeRateKernelLagTwoNonLocal}{0.99}  % part3.rate_kernel_lag_two_non_local: non-local (all): median reconstructed reward kernel at lag 2
+\newcommand{\PartThreeRateKernelLagTwoNonLocalNoSwr}{0.95}  % part3.rate_kernel_lag_two_non_local_no_swr: non-local without SWR: median reconstructed reward kernel at lag 2
+\newcommand{\PartThreeRateKernelLagTwoNonLocalSwr}{1.07}  % part3.rate_kernel_lag_two_non_local_swr: non-local with SWR: median reconstructed reward kernel at lag 2
+\newcommand{\PartThreeRateKernelLagTwoSwr}{1.04}  % part3.rate_kernel_lag_two_swr: detected SWR: median reconstructed reward kernel at lag 2
 \newcommand{\PartThreeRateKernelLateMaxNonLocal}{1.04}  % part3.rate_kernel_late_max_non_local: non-local (all): highest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMaxNonLocalNoSwr}{1.01}  % part3.rate_kernel_late_max_non_local_no_swr: non-local without SWR: highest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMaxNonLocalSwr}{1.07}  % part3.rate_kernel_late_max_non_local_swr: non-local with SWR: highest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMaxSwr}{1.04}  % part3.rate_kernel_late_max_swr: detected SWR: highest median reconstructed kernel over lags 3-10
-\newcommand{\PartThreeRateKernelLateMinHigh}{0.93}  % part3.rate_kernel_late_min_high: highest over the four populations: lowest median reconstructed kernel over lags 3-10
-\newcommand{\PartThreeRateKernelLateMinLow}{0.89}  % part3.rate_kernel_late_min_low: lowest over the four populations: lowest median reconstructed kernel over lags 3-10
+\newcommand{\PartThreeRateKernelLateMinHigh}{0.93}  % part3.rate_kernel_late_min_high: highest over the populations: lowest median reconstructed kernel over lags 3-10
+\newcommand{\PartThreeRateKernelLateMinLow}{0.89}  % part3.rate_kernel_late_min_low: lowest over the populations: lowest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMinNonLocal}{0.91}  % part3.rate_kernel_late_min_non_local: non-local (all): lowest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMinNonLocalNoSwr}{0.93}  % part3.rate_kernel_late_min_non_local_no_swr: non-local without SWR: lowest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMinNonLocalSwr}{0.89}  % part3.rate_kernel_late_min_non_local_swr: non-local with SWR: lowest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateKernelLateMinSwr}{0.90}  % part3.rate_kernel_late_min_swr: detected SWR: lowest median reconstructed kernel over lags 3-10
 \newcommand{\PartThreeRateLadderAicConst}{2227}  % part3.rate_ladder_aic_const: non-local (all): median AIC of M0_const
 \newcommand{\PartThreeRateLadderAicFull}{2128}  % part3.rate_ladder_aic_full: non-local (all): median AIC of M7r_time_histcos_rew
+\newcommand{\PartThreeRateLadderAicHistcos}{2207}  % part3.rate_ladder_aic_histcos: non-local (all): median AIC of M3r_histcos
+\newcommand{\PartThreeRateLadderAicRew}{2221}  % part3.rate_ladder_aic_rew: non-local (all): median AIC of M1_rew
 \newcommand{\PartThreeRateLadderAicRewardByTime}{2133}  % part3.rate_ladder_aic_reward_by_time: non-local (all): median AIC of M9r_rew_x_time
 \newcommand{\PartThreeRateLadderAicTime}{2138}  % part3.rate_ladder_aic_time: non-local (all): median AIC of M5_time
+\newcommand{\PartThreeRateLadderAicTimeHistcos}{2128}  % part3.rate_ladder_aic_time_histcos: non-local (all): median AIC of M6r_time_histcos
 \newcommand{\PartThreeRateLadderCvBitsConst}{0.00}  % part3.rate_ladder_cv_bits_const: non-local (all): median held-out bits per event of M0_const, over sessions with a finite score
 \newcommand{\PartThreeRateLadderCvBitsFull}{0.22}  % part3.rate_ladder_cv_bits_full: non-local (all): median held-out bits per event of M7r_time_histcos_rew, over sessions with a finite score
+\newcommand{\PartThreeRateLadderCvBitsHistcos}{0.05}  % part3.rate_ladder_cv_bits_histcos: non-local (all): median held-out bits per event of M3r_histcos, over sessions with a finite score
+\newcommand{\PartThreeRateLadderCvBitsRew}{0.02}  % part3.rate_ladder_cv_bits_rew: non-local (all): median held-out bits per event of M1_rew, over sessions with a finite score
 \newcommand{\PartThreeRateLadderCvBitsRewardByTime}{0.18}  % part3.rate_ladder_cv_bits_reward_by_time: non-local (all): median held-out bits per event of M9r_rew_x_time, over sessions with a finite score
 \newcommand{\PartThreeRateLadderCvBitsTime}{0.24}  % part3.rate_ladder_cv_bits_time: non-local (all): median held-out bits per event of M5_time, over sessions with a finite score
+\newcommand{\PartThreeRateLadderCvBitsTimeHistcos}{0.22}  % part3.rate_ladder_cv_bits_time_histcos: non-local (all): median held-out bits per event of M6r_time_histcos, over sessions with a finite score
 \newcommand{\PartThreeRateLadderCvSessionsConst}{242}  % part3.rate_ladder_cv_sessions_const: non-local (all): sessions with a finite held-out score for M0_const
 \newcommand{\PartThreeRateLadderCvSessionsFull}{61}  % part3.rate_ladder_cv_sessions_full: non-local (all): sessions with a finite held-out score for M7r_time_histcos_rew
+\newcommand{\PartThreeRateLadderCvSessionsHistcos}{67}  % part3.rate_ladder_cv_sessions_histcos: non-local (all): sessions with a finite held-out score for M3r_histcos
+\newcommand{\PartThreeRateLadderCvSessionsRew}{238}  % part3.rate_ladder_cv_sessions_rew: non-local (all): sessions with a finite held-out score for M1_rew
 \newcommand{\PartThreeRateLadderCvSessionsRewardByTime}{40}  % part3.rate_ladder_cv_sessions_reward_by_time: non-local (all): sessions with a finite held-out score for M9r_rew_x_time
 \newcommand{\PartThreeRateLadderCvSessionsTime}{226}  % part3.rate_ladder_cv_sessions_time: non-local (all): sessions with a finite held-out score for M5_time
+\newcommand{\PartThreeRateLadderCvSessionsTimeHistcos}{62}  % part3.rate_ladder_cv_sessions_time_histcos: non-local (all): sessions with a finite held-out score for M6r_time_histcos
 \newcommand{\PartThreeRateLadderKsBandConst}{0.45}  % part3.rate_ladder_ks_band_const: non-local (all): share of M0_const fits inside the KS band
 \newcommand{\PartThreeRateLadderKsBandFull}{0.96}  % part3.rate_ladder_ks_band_full: non-local (all): share of M7r_time_histcos_rew fits inside the KS band
+\newcommand{\PartThreeRateLadderKsBandHistcos}{0.37}  % part3.rate_ladder_ks_band_histcos: non-local (all): share of M3r_histcos fits inside the KS band
+\newcommand{\PartThreeRateLadderKsBandRew}{0.37}  % part3.rate_ladder_ks_band_rew: non-local (all): share of M1_rew fits inside the KS band
 \newcommand{\PartThreeRateLadderKsBandRewardByTime}{0.95}  % part3.rate_ladder_ks_band_reward_by_time: non-local (all): share of M9r_rew_x_time fits inside the KS band
 \newcommand{\PartThreeRateLadderKsBandTime}{0.93}  % part3.rate_ladder_ks_band_time: non-local (all): share of M5_time fits inside the KS band
+\newcommand{\PartThreeRateLadderKsBandTimeHistcos}{0.96}  % part3.rate_ladder_ks_band_time_histcos: non-local (all): share of M6r_time_histcos fits inside the KS band
+\newcommand{\PartThreeRateLadderSessionsConst}{242}  % part3.rate_ladder_sessions_const: non-local (all): sessions with a finite-AIC fit of M0_const
+\newcommand{\PartThreeRateLadderSessionsFull}{242}  % part3.rate_ladder_sessions_full: non-local (all): sessions with a finite-AIC fit of M7r_time_histcos_rew
+\newcommand{\PartThreeRateLadderSessionsHistcos}{242}  % part3.rate_ladder_sessions_histcos: non-local (all): sessions with a finite-AIC fit of M3r_histcos
+\newcommand{\PartThreeRateLadderSessionsRew}{242}  % part3.rate_ladder_sessions_rew: non-local (all): sessions with a finite-AIC fit of M1_rew
+\newcommand{\PartThreeRateLadderSessionsRewardByTime}{242}  % part3.rate_ladder_sessions_reward_by_time: non-local (all): sessions with a finite-AIC fit of M9r_rew_x_time
+\newcommand{\PartThreeRateLadderSessionsTime}{242}  % part3.rate_ladder_sessions_time: non-local (all): sessions with a finite-AIC fit of M5_time
+\newcommand{\PartThreeRateLadderSessionsTimeHistcos}{242}  % part3.rate_ladder_sessions_time_histcos: non-local (all): sessions with a finite-AIC fit of M6r_time_histcos
+\newcommand{\PartThreeRateMarginalRewardChildBetterFractionNonLocal}{84}  % part3.rate_marginal_reward_child_better_fraction_non_local: non-local (all): share of sessions in which M1_rew has the lower AIC than M0_const
+\newcommand{\PartThreeRateMarginalRewardChildBetterFractionNonLocalNoSwr}{49}  % part3.rate_marginal_reward_child_better_fraction_non_local_no_swr: non-local without SWR: share of sessions in which M1_rew has the lower AIC than M0_const
+\newcommand{\PartThreeRateMarginalRewardChildBetterFractionNonLocalSwr}{83}  % part3.rate_marginal_reward_child_better_fraction_non_local_swr: non-local with SWR: share of sessions in which M1_rew has the lower AIC than M0_const
+\newcommand{\PartThreeRateMarginalRewardChildBetterFractionSwr}{79}  % part3.rate_marginal_reward_child_better_fraction_swr: detected SWR: share of sessions in which M1_rew has the lower AIC than M0_const
 \newcommand{\PartThreeRateMarginalRewardDeltaAicNonLocal}{\ensuremath{-}7.8}  % part3.rate_marginal_reward_delta_aic_non_local: non-local (all): median per-session AIC(M1_rew) - AIC(M0_const); negative = child better
 \newcommand{\PartThreeRateMarginalRewardDeltaAicNonLocalNoSwr}{+0.089}  % part3.rate_marginal_reward_delta_aic_non_local_no_swr: non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better
 \newcommand{\PartThreeRateMarginalRewardDeltaAicNonLocalSwr}{\ensuremath{-}5.4}  % part3.rate_marginal_reward_delta_aic_non_local_swr: non-local with SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better
@@ -815,18 +1008,35 @@
 \newcommand{\PartThreeRatePairedP}{\ensuremath{1.1\times10^{-19}}}  % part3.rate_paired_p: signed-rank p of the paired difference
 \newcommand{\PartThreeRatePairedPositiveFraction}{77}  % part3.rate_paired_positive_fraction: share of paired sessions whose immediate coefficient coef_reward_history_rcos_0 is larger for SWR-coupled than for non-SWR non-local events
 \newcommand{\PartThreeRatePairedSessions}{240}  % part3.rate_paired_sessions: sessions with both non-local streams fit, paired
-\newcommand{\PartThreeRateRefractoryMsNonLocal}{60}  % part3.rate_refractory_ms_non_local: non-local (all): longest lag at which the median self-history kernel is below 1
-\newcommand{\PartThreeRateRefractoryMsNonLocalNoSwr}{60}  % part3.rate_refractory_ms_non_local_no_swr: non-local without SWR: longest lag at which the median self-history kernel is below 1
-\newcommand{\PartThreeRateRefractoryMsNonLocalSwr}{60}  % part3.rate_refractory_ms_non_local_swr: non-local with SWR: longest lag at which the median self-history kernel is below 1
-\newcommand{\PartThreeRateRefractoryMsSwr}{60}  % part3.rate_refractory_ms_swr: detected SWR: longest lag at which the median self-history kernel is below 1
+\newcommand{\PartThreeRateRawBurstPeakNonLocal}{2.83}  % part3.rate_raw_burst_peak_non_local: non-local (all): peak of the median self-history kernel of M3r_histcos (uncontrolled) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRawBurstPeakNonLocalNoSwr}{2.15}  % part3.rate_raw_burst_peak_non_local_no_swr: non-local without SWR: peak of the median self-history kernel of M3r_histcos (uncontrolled) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRawBurstPeakNonLocalSwr}{3.49}  % part3.rate_raw_burst_peak_non_local_swr: non-local with SWR: peak of the median self-history kernel of M3r_histcos (uncontrolled) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRawBurstPeakSwr}{4.18}  % part3.rate_raw_burst_peak_swr: detected SWR: peak of the median self-history kernel of M3r_histcos (uncontrolled) [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRawImmediateSessionNonLocal}{30}  % part3.rate_raw_immediate_session_non_local: non-local (all): exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)
+\newcommand{\PartThreeRateRawImmediateSessionNonLocalNoSwr}{12}  % part3.rate_raw_immediate_session_non_local_no_swr: non-local without SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)
+\newcommand{\PartThreeRateRawImmediateSessionNonLocalSwr}{130}  % part3.rate_raw_immediate_session_non_local_swr: non-local with SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)
+\newcommand{\PartThreeRateRawImmediateSessionSwr}{58}  % part3.rate_raw_immediate_session_swr: detected SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)
+\newcommand{\PartThreeRateRefractoryMsNonLocal}{60}  % part3.rate_refractory_ms_non_local: non-local (all): end of the first run of lags, from lag 1, at which the median self-history kernel is below 1 [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRefractoryMsNonLocalNoSwr}{60}  % part3.rate_refractory_ms_non_local_no_swr: non-local without SWR: end of the first run of lags, from lag 1, at which the median self-history kernel is below 1 [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRefractoryMsNonLocalSwr}{60}  % part3.rate_refractory_ms_non_local_swr: non-local with SWR: end of the first run of lags, from lag 1, at which the median self-history kernel is below 1 [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
+\newcommand{\PartThreeRateRefractoryMsSwr}{60}  % part3.rate_refractory_ms_swr: detected SWR: end of the first run of lags, from lag 1, at which the median self-history kernel is below 1 [PENDING: read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)]
 \newcommand{\PartThreeRateSessions}{242}  % part3.rate_sessions: sessions in the per-bin rate fit
 \newcommand{\PartThreeRateStops}{92{,}942}  % part3.rate_stops: stops in the frozen common cohort (M0_const, every population)
-\newcommand{\PartThreeRateTimePeakSHigh}{3.00}  % part3.rate_time_peak_s_high: highest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s
-\newcommand{\PartThreeRateTimePeakSLow}{2.48}  % part3.rate_time_peak_s_low: lowest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s
-\newcommand{\PartThreeRateTimePeakSNonLocal}{2.96}  % part3.rate_time_peak_s_non_local: non-local (all): peak of the median fitted M5_time time course, read on [1, 3] s
-\newcommand{\PartThreeRateTimePeakSNonLocalNoSwr}{3.00}  % part3.rate_time_peak_s_non_local_no_swr: non-local without SWR: peak of the median fitted M5_time time course, read on [1, 3] s
-\newcommand{\PartThreeRateTimePeakSNonLocalSwr}{2.48}  % part3.rate_time_peak_s_non_local_swr: non-local with SWR: peak of the median fitted M5_time time course, read on [1, 3] s
-\newcommand{\PartThreeRateTimePeakSSwr}{2.62}  % part3.rate_time_peak_s_swr: detected SWR: peak of the median fitted M5_time time course, read on [1, 3] s
+\newcommand{\PartThreeRateTimePeakEdgeCount}{1}  % part3.rate_time_peak_edge_count: populations whose argmax of the median fitted M5_time time course, read on [1, 3] s sits on the interval's edge
+\newcommand{\PartThreeRateTimePeakEdgeNonLocal}{0}  % part3.rate_time_peak_edge_non_local: non-local (all): 1 if that argmax sits on the edge of [1, 3] s
+\newcommand{\PartThreeRateTimePeakEdgeNonLocalNoSwr}{1}  % part3.rate_time_peak_edge_non_local_no_swr: non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s
+\newcommand{\PartThreeRateTimePeakEdgeNonLocalSwr}{0}  % part3.rate_time_peak_edge_non_local_swr: non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s
+\newcommand{\PartThreeRateTimePeakEdgeSwr}{0}  % part3.rate_time_peak_edge_swr: detected SWR: 1 if that argmax sits on the edge of [1, 3] s
+\newcommand{\PartThreeRateTimePeakSHigh}{2.96}  % part3.rate_time_peak_s_high: highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s
+\newcommand{\PartThreeRateTimePeakSLow}{2.48}  % part3.rate_time_peak_s_low: lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s
+\newcommand{\PartThreeRateTimePeakSNonLocal}{2.96}  % part3.rate_time_peak_s_non_local: non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s
+\newcommand{\PartThreeRateTimePeakSNonLocalNoSwr}{3.00}  % part3.rate_time_peak_s_non_local_no_swr: non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s; it sits on the interval's edge, so it bounds the peak rather than locating it
+\newcommand{\PartThreeRateTimePeakSNonLocalSwr}{2.48}  % part3.rate_time_peak_s_non_local_swr: non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s
+\newcommand{\PartThreeRateTimePeakSSwr}{2.62}  % part3.rate_time_peak_s_swr: detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s
+\newcommand{\PartThreeRateTimePeakSessionsNonLocal}{236}  % part3.rate_time_peak_sessions_non_local: non-local (all): unflagged session curves behind that median
+\newcommand{\PartThreeRateTimePeakSessionsNonLocalNoSwr}{233}  % part3.rate_time_peak_sessions_non_local_no_swr: non-local without SWR: unflagged session curves behind that median
+\newcommand{\PartThreeRateTimePeakSessionsNonLocalSwr}{192}  % part3.rate_time_peak_sessions_non_local_swr: non-local with SWR: unflagged session curves behind that median
+\newcommand{\PartThreeRateTimePeakSessionsSwr}{233}  % part3.rate_time_peak_sessions_swr: detected SWR: unflagged session curves behind that median
 \newcommand{\PartThreeRateTimeSessionsNonLocal}{242}  % part3.rate_time_sessions_non_local: non-local (all): sessions with a fit of M5_time
 \newcommand{\PartThreeRateTimeSessionsNonLocalNoSwr}{242}  % part3.rate_time_sessions_non_local_no_swr: non-local without SWR: sessions with a fit of M5_time
 \newcommand{\PartThreeRateTimeSessionsNonLocalSwr}{242}  % part3.rate_time_sessions_non_local_swr: non-local with SWR: sessions with a fit of M5_time
@@ -865,14 +1075,27 @@
 \newcommand{\PartThreeStayFitsSwr}{1{,}936}  % part3.stay_fits_swr: stratum swr: session-by-role logistic fits attempted
 \newcommand{\PartThreeStayMinQGee}{0.52}  % part3.stay_min_q_gee: smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all)
 \newcommand{\PartThreeStayMinQSignrank}{0.44}  % part3.stay_min_q_signrank: smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role last_rewarded, stratum non_swr)
-\newcommand{\PartThreeStopDurationMeanRatio}{3.5}  % part3.stop_duration_mean_ratio: ratio of those means
-\newcommand{\PartThreeStopDurationMeanRewarded}{1.8}  % part3.stop_duration_mean_rewarded: mean immobility duration of rewarded-outcome stops
-\newcommand{\PartThreeStopDurationMeanUnrewarded}{0.52}  % part3.stop_duration_mean_unrewarded: mean immobility duration of unrewarded-outcome stops
+\newcommand{\PartThreeStopDurationMeanRatio}{3.6}  % part3.stop_duration_mean_ratio: ratio of those means
+\newcommand{\PartThreeStopDurationMeanRewarded}{2.2}  % part3.stop_duration_mean_rewarded: well-anchored stops with a rewarded outcome: mean immobility duration
+\newcommand{\PartThreeStopDurationMeanUnrewarded}{0.60}  % part3.stop_duration_mean_unrewarded: well-anchored stops with an omitted outcome: mean immobility duration
+\newcommand{\PartThreeStopDurationMedianRatio}{3.6}  % part3.stop_duration_median_ratio: ratio of those medians
+\newcommand{\PartThreeStopDurationMedianRewarded}{1.0}  % part3.stop_duration_median_rewarded: well-anchored stops with a rewarded outcome: median immobility duration
+\newcommand{\PartThreeStopDurationMedianUnrewarded}{0.28}  % part3.stop_duration_median_unrewarded: well-anchored stops with an omitted outcome: median immobility duration
+\newcommand{\PartThreeStopSurvivalFourS}{14}  % part3.stop_survival_four_s: share of well-anchored stops still immobile at 4 s
+\newcommand{\PartThreeStopSurvivalTwoS}{25}  % part3.stop_survival_two_s: share of well-anchored stops still immobile at 2 s
 \newcommand{\PartThreeStopsAtWellWithStay}{75{,}785}  % part3.stops_at_well_with_stay: at_well stops carrying an is_stay (Stage 6's population)
+\newcommand{\PartThreeStopsCrossingOutcome}{16{,}353}  % part3.stops_crossing_outcome: stops with stop_start < outcome_known_time_s <= stop_end (all stops)
+\newcommand{\PartThreeStopsCrossingOutcomeFraction}{14}  % part3.stops_crossing_outcome_fraction: their share of all stops
 \newcommand{\PartThreeStopsDropped}{26{,}760}  % part3.stops_dropped: stops the well-anchored cohort leaves out
 \newcommand{\PartThreeStopsDroppedWithStay}{0}  % part3.stops_dropped_with_stay: of those, stops carrying an is_stay
+\newcommand{\PartThreeStopsInTransit}{25{,}768}  % part3.stops_in_transit: in-transit stops in the canonical stop table
 \newcommand{\PartThreeStopsMixed}{16{,}061}  % part3.stops_mixed: mixed stops (every one without an is_stay)
 \newcommand{\PartThreeStopsMixedWithStay}{0}  % part3.stops_mixed_with_stay: mixed stops carrying an is_stay
+\newcommand{\PartThreeStopsOutcomeShifted}{16{,}066}  % part3.stops_outcome_shifted: crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary)
+\newcommand{\PartThreeStopsOutcomeShiftedFraction}{13}  % part3.stops_outcome_shifted_fraction: their share of all stops
+\newcommand{\PartThreeStopsRewardHistoryIncompleteFraction}{0.013}  % part3.stops_reward_history_incomplete_fraction: share of stops flagged reward_history_incomplete (fewer than two known outcomes)
+\newcommand{\PartThreeStopsSpanningArrival}{185}  % part3.stops_spanning_arrival: stops containing a later well arrival
+\newcommand{\PartThreeStopsSpanningArrivalCrossing}{0}  % part3.stops_spanning_arrival_crossing: of those, stops that also cross their outcome boundary
 \newcommand{\PartThreeStopsTotal}{120{,}320}  % part3.stops_total: stops in the canonical stop table
 \newcommand{\PartThreeStopsWellAnchored}{93{,}560}  % part3.stops_well_anchored: stops with occupancy_state at_well or mixed (the shared cohort)
 \newcommand{\PartThreeSwitchrateCurrentAll}{+0.18}  % part3.switchrate_current_all: C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient
@@ -953,6 +1176,9 @@
 \newcommand{\PartThreeSwrPrevgoalQ}{0.16}  % part3.swr_prevgoal_q: CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
 \newcommand{\PartThreeSwrPrevgoalSeparated}{4}  % part3.swr_prevgoal_separated: CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session fits flagged separated
 \newcommand{\PartThreeSwrPrevgoalSessions}{198}  % part3.swr_prevgoal_sessions: CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps
+\newcommand{\PartThreeTrunkShareMeanNonSwr}{17}  % part3.trunk_share_mean_non_swr: mean share of a non-SWR event's posterior mass on trunk arms [PENDING: read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it]
+\newcommand{\PartThreeTrunkShareMeanSwr}{36}  % part3.trunk_share_mean_swr: mean share of an SWR event's posterior mass on trunk arms [PENDING: read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it]
+\newcommand{\PartThreeTrunkShareRatio}{2.2}  % part3.trunk_share_ratio: ratio of those means [PENDING: read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it]
 \newcommand{\PartThreeUpdateCurrentAll}{+0.24}  % part3.update_current_all: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient
 \newcommand{\PartThreeUpdateCurrentAllAnimalsPositive}{5}  % part3.update_current_all_animals_positive: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median
 \newcommand{\PartThreeUpdateCurrentAllQ}{\ensuremath{2.0\times10^{-18}}}  % part3.update_current_all_q: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
