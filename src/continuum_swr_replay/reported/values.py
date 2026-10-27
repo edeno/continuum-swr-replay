@@ -20,7 +20,7 @@ PARTS = {1: "the model", 2: "the events", 3: "behavior", 4: "other brain areas"}
 KINDS = ("count", "fraction", "quantity")
 """A count is exact; a fraction is a share in [0, 1]; a quantity has a unit."""
 
-STYLES = ("count", "pct", "pctnum", "sig2", "int", "dec2")
+STYLES = ("count", "pct", "pctnum", "sig2", "sig2s", "int", "dec2", "pval")
 """How a value is printed (:mod:`continuum_swr_replay.reported.formatting`)."""
 
 _KEY = re.compile(r"[a-z]+(_[a-z]+)*")
