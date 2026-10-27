@@ -1,0 +1,1041 @@
+{
+ "schema_version": 1,
+ "part": 4,
+ "title": "other brain areas",
+ "produced_by": "scripts/reported/summarize_part.py",
+ "commit": "2893ef49ec70",
+ "inputs": [
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/*_mPFC_modulation.pkl",
+   "n_files": 75,
+   "sha256": "81d31bd377ebacc41e93653ab34cd0ae7c746d59a2179a81389d09cc2988dab1"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/*_mPFC_modulation.*.npy",
+   "n_files": 375,
+   "sha256": "0fde031f85a5276463a857ed290b6aed04766b0baf673b8afa235cd9738ae1e2"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/*_mPFC_modulation.provenance.json",
+   "n_files": 75,
+   "sha256": "a218d37a67b60805253460ceb854eab144ee5a18c9cc6533789df81986c8144c"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/pfc_cohort_mPFC.json",
+   "sha256": "2c177e90b77b56c8ba8ca4bab0faedcc1df8e9795c310089df228dde3ab5b621"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/replay_content/event_table.parquet",
+   "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/replay_content/stop_table.parquet",
+   "sha256": "879e8d05775754f58c56afee5e08a4ef49c113c2937876eaf68b78038c6d6e80"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
+   "n_files": 71,
+   "sha256": "58042fdf081b88313bb8f0dd606407ac8c61af80e2d9e840679d2481ed119f3c",
+   "note": "superseded maximum-likelihood tree, for one comparison"
+  }
+ ],
+ "values": {
+  "analysed_epochs": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "analysed epochs the PFC cohort is drawn from",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in the mPFC population",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "best_model_constant_fraction": {
+   "value": 0.4824198552223371,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance is constant",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "best_model_joint_fraction": {
+   "value": 0.05153395380903137,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance is SWR + non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "best_model_nonlocal_fraction": {
+   "value": 0.3287659427783523,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance is non_local",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "best_model_swr_fraction": {
+   "value": 0.1372802481902792,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance is SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "bins_fit": {
+   "value": 20618388,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, summed over sessions",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "bins_fit_fraction": {
+   "value": 0.9220691794673396,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the immobile bins the stop restriction keeps, pooled",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "bins_immobile": {
+   "value": 22360999,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "immobile 2 ms bins before the stop restriction, summed over sessions",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "class_called_flat_fraction_max": {
+   "value": 0.0944822373393802,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest such share over the four event classes (non_local_no_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "class_called_flat_fraction_min": {
+   "value": 0.05376623376623377,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest such share over the four event classes (non_local_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_flat": {
+   "value": 253,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called by the engagement test with no positive observed improvement",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_flat_fraction": {
+   "value": 0.0930831493745401,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of the units called by the engagement test, the share whose own observed held-out improvement is not positive",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_fraction": {
+   "value": 0.23422957600827302,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_fraction_chimi": {
+   "value": 0.44047619047619047,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of chimi's tested units at raw empirical p < 0.05 for the engagement test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_fraction_jsixteen": {
+   "value": 0.19550561797752808,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of j16's tested units at raw empirical p < 0.05 for the engagement test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_fraction_peanut": {
+   "value": 0.29441624365482233,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of peanut's tested units at raw empirical p < 0.05 for the engagement test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_fraction_senor": {
+   "value": 0.2674362674362674,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of senor's tested units at raw empirical p < 0.05 for the engagement test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_called_fraction_wilbur": {
+   "value": 0.20765027322404372,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of wilbur's tested units at raw empirical p < 0.05 for the engagement test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_null_overlap_median": {
+   "value": 0.11290322580645161,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "median over sessions of each session's median share of an engagement null draw's windows that land on the shipped matched control",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_null_overlap_session_max": {
+   "value": 0.358974358974359,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "highest session median of that share",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_null_overlap_session_min": {
+   "value": 0.046511627906976744,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "lowest session median of that share",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_units_called": {
+   "value": 2718,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "engagement_units_tested": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "folds": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "blocked folds of whole immobility runs the held-out deviance is scored on",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "min_pvalue": {
+   "value": 0.000999000999000999,
+   "kind": "fraction",
+   "style": "sig2",
+   "unit": "",
+   "description": "the smallest plus-one empirical p-value, 1/(R + 1)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "min_pvalue_denominator": {
+   "value": 1001,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "R + 1: the smallest plus-one empirical p-value is one over it",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "ml_nonconverged_percent": {
+   "value": 14.837706511175899,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "%",
+   "description": "non-converged fits as a percent of model fits in the maximum-likelihood tree (22902 of 154350, 71 sessions)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
+   "pending": "read from the superseded maximum-likelihood tree (Processed-Data/_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; it is a comparison of estimators, not refit on the current tables"
+  },
+  "model_fits": {
+   "value": 166968,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "neuron x model fits in the bundles",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "non_swr_replay_called_fraction": {
+   "value": 0.2280248190279214,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "non_swr_replay_units_called": {
+   "value": 2646,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units at raw empirical p < 0.05 for non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "non_swr_replay_units_tested": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units with a finite p-value for non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonconverged_model_fits": {
+   "value": 432,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, fits that ran to maxiter without converging",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonconverged_neurons": {
+   "value": 48,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "neurons carrying at least one non-converged fit",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonconverged_percent": {
+   "value": 0.258732212160414,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "%",
+   "description": "non-converged fits as a percent of model fits",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonlocal_called_fraction": {
+   "value": 0.4016718372974836,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonlocal_events_before": {
+   "value": 17726,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "the session's non-local events before the stop restriction, summed",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonlocal_events_kept": {
+   "value": 16419,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local events whose onset is in a kept stop, summed over sessions",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonlocal_events_kept_fraction": {
+   "value": 0.9262665011847004,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the non-local events the stop restriction keeps, pooled",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonlocal_units_called": {
+   "value": 4661,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units at raw empirical p < 0.05 for all non-local events",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "nonlocal_units_tested": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units with a finite p-value for all non-local events",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "null_draws": {
+   "value": 1000,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "matched-control draws in each unit's null",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "penalty_sigma": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "log rate",
+   "description": "prior standard deviation of an event-basis coefficient",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_binds_percent_max": {
+   "value": 2.6818906001062133,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "%",
+   "description": "highest per-curve percent of well-posed units the prior binds on (non_local_no_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_binds_percent_min": {
+   "value": 1.2633963579332579,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "%",
+   "description": "lowest per-curve percent of well-posed units the prior binds on (matched_control)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_multiplier_per_lag_high": {
+   "value": 57.35373930344971,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate multiplier",
+   "description": "upper end of that multiplier",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_multiplier_per_lag_low": {
+   "value": 0.017435654800276503,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate multiplier",
+   "description": "lower end of the rate multiplier that per-lag sd allows at 95 %",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_multiplier_sustained_high": {
+   "value": 5.8878252743712265,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate multiplier",
+   "description": "upper end of that multiplier",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_multiplier_sustained_low": {
+   "value": 0.1698419965607407,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate multiplier",
+   "description": "lower end of the rate multiplier that sustained sd allows at 95 %",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_sd_per_lag": {
+   "value": 2.065937776992323,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the prior's implied standard deviation of a curve at one lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "prior_sd_sustained": {
+   "value": 0.9045340337332909,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the prior's implied standard deviation of a curve sustained over the reported window",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "sessions": {
+   "value": 75,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_called_fraction": {
+   "value": 0.30799724233023096,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_coupled_share_session_median": {
+   "value": 0.5144230769230769,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_replay_called_fraction": {
+   "value": 0.3317821440882454,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_replay_units_called": {
+   "value": 3850,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units at raw empirical p < 0.05 for SWR-coupled replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_replay_units_tested": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units with a finite p-value for SWR-coupled replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_units_called": {
+   "value": 3574,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units at raw empirical p < 0.05 for SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_units_tested": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units with a finite p-value for SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swrs_kept_fraction": {
+   "value": 0.9273946518751552,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the SWRs the stop restriction keeps, pooled",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "units": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "mPFC units in Figure 4's population: a usable fit, an immobility firing rate of at least 1 Hz on the fitted bins, and finite modulation curves",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 4c",
+    "figure: 4d"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "unmatchable_percent_class_max": {
+   "value": 0.5970891901977858,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "%",
+   "description": "highest such percent (non_local_no_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "unmatchable_percent_class_min": {
+   "value": 0.2744630071599045,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "%",
+   "description": "lowest percent, over event classes, of a class's events with no legal within-bout control, summed over sessions (non_local_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "unmatchable_worst_excluded": {
+   "value": 8,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "events with no legal control in the worst session and class (j1620210709_10_r5 / non_local_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "unmatchable_worst_total": {
+   "value": 102,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "events of that class in that session (j1620210709_10_r5 / non_local_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  }
+ }
+}
