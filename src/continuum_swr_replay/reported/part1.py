@@ -1056,8 +1056,8 @@ def summarize(inputs: Part1Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     summary.inputs += [
-        file_record(bouts_path, ROOT_DIR),
-        file_record(manifest_path, ROOT_DIR),
+        _record(bouts_path),
+        _record(manifest_path),
     ]
 
     pilot_settings = json.loads(inputs.pilot_manifest.read_text())["settings"]
@@ -1070,8 +1070,8 @@ def summarize(inputs: Part1Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     summary.inputs += [
-        file_record(inputs.pilot_events, ROOT_DIR),
-        file_record(inputs.pilot_manifest, ROOT_DIR),
+        _record(inputs.pilot_events),
+        _record(inputs.pilot_manifest),
     ]
 
     for path, build, script in (
@@ -1082,8 +1082,18 @@ def summarize(inputs: Part1Inputs, produced_by: str, commit: str) -> Summary:
         summary.add(
             *build(pd.read_csv(path), f"{rel(path)} (scripts/detection/{script})")
         )
-        summary.inputs.append(file_record(path, ROOT_DIR))
+        summary.inputs.append(_record(path))
     return summary
+
+
+def _record(path: Path) -> dict:
+    """An input's :func:`file_record`, its path shown relative to the repository.
+
+    ``file_record`` resolves symbolic links first, so in a worktree whose
+    ``Processed-Data`` links to another checkout's it would show an absolute
+    path; this shows the path as the repository reads it.
+    """
+    return {**file_record(path, ROOT_DIR), "path": rel(path)}
 
 
 def rel(path: Path) -> str:
