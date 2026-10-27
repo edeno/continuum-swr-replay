@@ -198,3 +198,93 @@ def test_planted_kernel_is_recovered_with_a_context_offset_present():
         assert abs(reward[pre_onset].mean()) < 0.05
         confounded = without_baseline.mark_curves[event_class][REWARDED_CONTEXT]
         assert confounded[pre_onset].mean() > 0.1
+
+
+def _window_mean_and_band(result, event_class: str, mark: str):
+    """Population window-mean of the slope kernel and its 95 % null band.
+
+    The population curve is the mean over units; its mean over the whole
+    window is compared with the same statistic of each shuffled refit.
+    """
+    observed = float(np.nanmean(result.mark_curves[event_class][mark]))
+    null = result.slope_null[event_class][mark]  # (n_draws, n_lags, n_units)
+    draws = np.nanmean(null, axis=(1, 2))
+    return observed, np.percentile(draws, [2.5, 97.5])
+
+
+def _window_z(result, event_class: str, mark: str) -> float:
+    """Observed window mean in SDs of the shuffled refits' window means."""
+    observed = float(np.nanmean(result.mark_curves[event_class][mark]))
+    draws = np.nanmean(result.slope_null[event_class][mark], axis=(1, 2))
+    return (observed - draws.mean()) / draws.std(ddof=1)
+
+
+@pytest.mark.slow
+def test_planted_context_kernel_is_separated_from_its_baseline():
+    simulation = simulate(20261028, rewarded_rate_factor=1.5)
+    spec = MarkedFamilySpec(
+        "context_reference",
+        (REWARDED_CONTEXT,),
+        (EVENT_DURATION_MARK, CURRENT_ARM_FRACTION),
+        "is a stationary reward offset read as an event-locked reward effect?",
+    )
+    options = {
+        "slope_permutations": 20,
+        "slope_permutation_seed": 3,
+        "slope_permutation_targets": (REWARDED_CONTEXT,),
+    }
+
+    with_baseline = fit(simulation, spec, baseline=True, **options)
+    without_baseline = fit(simulation, spec, baseline=False, **options)
+
+    for event_class in MARKED_EVENT_CLASSES:
+        # With the baseline the reward kernel sits with its stop-shuffled
+        # reference. The bound is 3.5 reference SDs, not the 95 % band: on
+        # simulated sessions with this stationary offset the observed window
+        # mean scattered somewhat more widely than the shuffled refits (z RMS
+        # about 1.2 over 16 class x seed fits, one |z| = 3.0), against about
+        # 0.8 with no offset, so the band can be crossed by chance here.
+        assert abs(_window_z(with_baseline, event_class, REWARDED_CONTEXT)) < 3.5
+        # Without it the stationary offset is read as a reward kernel outside
+        # the reference.
+        observed, (_, high) = _window_mean_and_band(
+            without_baseline, event_class, REWARDED_CONTEXT
+        )
+        assert observed > high
+
+
+@pytest.mark.slow
+def test_planted_strength_kernel_is_recovered():
+    simulation = simulate(20261029, planted_mark="ripple_power_z")
+    spec = MarkedFamilySpec(
+        "strength_reference",
+        ("ripple_power_z", CURRENT_ARM_FRACTION),
+        (EVENT_DURATION_MARK,),
+        "is a planted ripple-power gain recovered and outside its reference?",
+    )
+
+    result = fit(
+        simulation,
+        spec,
+        baseline=True,
+        slope_permutations=20,
+        slope_permutation_seed=5,
+        slope_permutation_targets=("ripple_power_z", CURRENT_ARM_FRACTION),
+    )
+
+    peak = simulation.peak_lag_index
+    curve = np.nanmean(result.mark_curves[DRIVEN_CLASS]["ripple_power_z"], axis=1)
+    # Sign and peak lag of the planted kernel (within 10 ms).
+    assert curve[peak] == pytest.approx(PLANTED_PEAK, abs=0.35)
+    assert abs(int(np.argmax(curve)) - peak) <= 5
+    null = np.nanmean(result.slope_null[DRIVEN_CLASS]["ripple_power_z"], axis=2)
+    assert abs(null[:, peak].mean()) < 0.15
+    assert curve[peak] > np.percentile(null[:, peak], 97.5)
+    # The unplanted target, and the planted mark on the other class, stay
+    # inside their references.
+    for event_class, mark in (
+        (DRIVEN_CLASS, CURRENT_ARM_FRACTION),
+        ("non_local_SWR", "ripple_power_z"),
+    ):
+        observed, (low, high) = _window_mean_and_band(result, event_class, mark)
+        assert low <= observed <= high
