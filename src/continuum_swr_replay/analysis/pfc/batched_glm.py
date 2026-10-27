@@ -1316,6 +1316,77 @@ class BatchedDesignFits:
     rank: NDArray
 
 
+def _fit_in_batches(
+    design_batch: Callable[[NDArray], jax.Array],
+    n_designs: int,
+    n_features: int,
+    counts: NDArray,
+    penalties: NDArray | None,
+    initial_params: NDArray | None,
+    *,
+    design_batch_size: int,
+    maxiter: int,
+    tol: float,
+    rcond: float,
+) -> BatchedDesignFits:
+    """Run :func:`_full_fit_batch` over fixed-size batches of design indices.
+
+    ``design_batch(index)`` returns the device array of the designs at
+    ``index``, shape ``(design_batch_size, n_time, n_features)``; a short last
+    batch repeats its first design and the copies are dropped on the way out,
+    so every call has one compiled shape.
+    """
+    counts_array = np.asarray(counts, dtype=float)
+    if counts_array.ndim == 1:
+        counts_array = counts_array[:, None]
+    if design_batch_size < 1:
+        raise ValueError("design_batch_size must be positive")
+    n_units = counts_array.shape[1]
+    penalty_array = (
+        np.zeros((n_designs, n_features))
+        if penalties is None
+        else np.broadcast_to(
+            np.asarray(penalties, dtype=float), (n_designs, n_features)
+        )
+    )
+    if np.any(penalty_array < 0) or not np.all(np.isfinite(penalty_array)):
+        raise ValueError("penalties must be finite and non-negative")
+    initial = (
+        np.full((n_designs, n_units, n_features), np.nan)
+        if initial_params is None
+        else np.broadcast_to(
+            np.asarray(initial_params, dtype=float), (n_designs, n_units, n_features)
+        )
+    )
+    counts_device = jax.device_put(counts_array)
+    chunk_rows = _heldout_chunk_rows(design_batch_size, n_units, n_features)
+    parts: list[tuple] = []
+    for start in range(0, n_designs, design_batch_size):
+        stop = min(start + design_batch_size, n_designs)
+        n_actual = stop - start
+        index = np.r_[
+            np.arange(start, stop), np.full(design_batch_size - n_actual, start)
+        ].astype(int)
+        beta, usable, n_iter, rank = _full_fit_batch(
+            design_batch(index),
+            counts_device,
+            jax.device_put(np.ascontiguousarray(penalty_array[index])),
+            jax.device_put(np.ascontiguousarray(initial[index])),
+            maxiter=maxiter,
+            tol=tol,
+            rcond=rcond,
+            chunk_rows=chunk_rows,
+        )
+        host = jax.device_get((beta, usable, n_iter, rank))
+        parts.append(tuple(np.asarray(part)[:n_actual] for part in host))
+    return BatchedDesignFits(
+        params=np.concatenate([part[0] for part in parts]),
+        converged=np.concatenate([part[1] for part in parts]),
+        n_iter=np.concatenate([part[2] for part in parts]),
+        rank=np.concatenate([part[3] for part in parts]),
+    )
+
+
 @_in_float64
 def fit_poisson_designs(
     designs: NDArray,
@@ -1367,60 +1438,84 @@ def fit_poisson_designs(
             f"{design_array.shape}"
         )
     n_designs, n_time, n_features = design_array.shape
-    counts_array = np.asarray(counts, dtype=float)
-    if counts_array.ndim == 1:
-        counts_array = counts_array[:, None]
-    if counts_array.shape[0] != n_time:
-        raise ValueError(
-            f"designs have {n_time} rows but counts {counts_array.shape[0]}"
-        )
-    if design_batch_size < 1:
-        raise ValueError("design_batch_size must be positive")
-    n_units = counts_array.shape[1]
-    penalty_array = (
-        np.zeros((n_designs, n_features))
-        if penalties is None
-        else np.broadcast_to(
-            np.asarray(penalties, dtype=float), (n_designs, n_features)
-        )
+    if np.asarray(counts).shape[0] != n_time:
+        raise ValueError(f"designs have {n_time} rows but counts do not")
+    return _fit_in_batches(
+        lambda index: jax.device_put(design_array[index]),
+        n_designs,
+        n_features,
+        counts,
+        penalties,
+        initial_params,
+        design_batch_size=design_batch_size,
+        maxiter=maxiter,
+        tol=tol,
+        rcond=rcond,
     )
-    if np.any(penalty_array < 0) or not np.all(np.isfinite(penalty_array)):
-        raise ValueError("penalties must be finite and non-negative")
-    initial = (
-        np.full((n_designs, n_units, n_features), np.nan)
-        if initial_params is None
-        else np.broadcast_to(
-            np.asarray(initial_params, dtype=float), (n_designs, n_units, n_features)
-        )
-    )
-    counts_device = jax.device_put(counts_array)
-    chunk_rows = _heldout_chunk_rows(design_batch_size, n_units, n_features)
-    parts: list[tuple] = []
-    for start in range(0, n_designs, design_batch_size):
-        stop = min(start + design_batch_size, n_designs)
-        n_actual = stop - start
-        # Fixed-size batches keep one compiled shape; padding rows repeat the
-        # first design and are dropped on the way out.
-        index = np.r_[
-            np.arange(start, stop), np.full(design_batch_size - n_actual, start)
-        ]
-        beta, usable, n_iter, rank = _full_fit_batch(
-            jax.device_put(design_array[index]),
-            counts_device,
-            jax.device_put(np.ascontiguousarray(penalty_array[index])),
-            jax.device_put(np.ascontiguousarray(initial[index])),
-            maxiter=maxiter,
-            tol=tol,
-            rcond=rcond,
-            chunk_rows=chunk_rows,
-        )
-        host = jax.device_get((beta, usable, n_iter, rank))
-        parts.append(tuple(np.asarray(part)[:n_actual] for part in host))
-    return BatchedDesignFits(
-        params=np.concatenate([part[0] for part in parts]),
-        converged=np.concatenate([part[1] for part in parts]),
-        n_iter=np.concatenate([part[2] for part in parts]),
-        rank=np.concatenate([part[3] for part in parts]),
+
+
+@_in_float64
+def fit_poisson_column_variants(
+    base_design: NDArray,
+    columns: slice,
+    variants: Callable[[NDArray], NDArray],
+    n_designs: int,
+    counts: NDArray,
+    penalties: NDArray | None = None,
+    *,
+    initial_params: NDArray | None = None,
+    design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
+    maxiter: int = DEFAULT_MAXITER,
+    tol: float = DEFAULT_TOL,
+    rcond: float = DEFAULT_RCOND,
+) -> BatchedDesignFits:
+    """:func:`fit_poisson_designs` for designs that differ in one column span.
+
+    Design ``d`` is ``base_design`` with ``columns`` replaced by
+    ``variants([d])[0]``. The base design is put on the device once and each
+    batch is assembled there, so the host never holds more than one batch of
+    the replaced columns -- a permutation reference over a tall design would
+    otherwise copy the whole design once per draw.
+
+    Parameters
+    ----------
+    base_design : NDArray, shape (n_time, n_features)
+    columns : slice
+        The contiguous span every design replaces.
+    variants : callable
+        ``variants(index)`` returns the replaced columns of the designs at the
+        integer array ``index``, shape ``(len(index), n_time, span_width)``.
+    n_designs : int
+        Number of designs.
+    counts, penalties, initial_params, design_batch_size, maxiter, tol, rcond
+        As :func:`fit_poisson_designs`.
+
+    Returns
+    -------
+    BatchedDesignFits
+    """
+    require_configured_device()
+    base = np.asarray(base_design, dtype=float)
+    if base.ndim != 2 or np.asarray(counts).shape[0] != base.shape[0]:
+        raise ValueError("base_design must be (n_time, n_features) with counts' rows")
+    base_device = jax.device_put(base)
+
+    def design_batch(index: NDArray) -> jax.Array:
+        replaced = jax.device_put(np.asarray(variants(index), dtype=float))
+        batch = jnp.broadcast_to(base_device, (len(index), *base.shape))
+        return batch.at[:, :, columns].set(replaced)
+
+    return _fit_in_batches(
+        design_batch,
+        n_designs,
+        base.shape[1],
+        counts,
+        penalties,
+        initial_params,
+        design_batch_size=design_batch_size,
+        maxiter=maxiter,
+        tol=tol,
+        rcond=rcond,
     )
 
 

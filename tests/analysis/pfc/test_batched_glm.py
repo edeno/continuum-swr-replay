@@ -981,3 +981,27 @@ def test_batched_design_fits_match_one_design_at_a_time(warm):
         )
         assert batched.rank[index] == fit.rank
     assert np.isnan(batched.params[:, 3]).all()
+
+
+def test_column_variants_equal_the_assembled_designs():
+    from continuum_swr_replay.analysis.pfc.batched_glm import (
+        fit_poisson_column_variants,
+        fit_poisson_designs,
+    )
+
+    designs, counts, penalty = _design_batch()
+    span = slice(5, 8)
+
+    variants = fit_poisson_column_variants(
+        designs[0],
+        span,
+        lambda index: designs[index][:, :, span],
+        len(designs),
+        counts,
+        penalty,
+        design_batch_size=2,
+    )
+    assembled = fit_poisson_designs(designs, counts, penalty, design_batch_size=2)
+
+    np.testing.assert_array_equal(variants.params, assembled.params)
+    np.testing.assert_array_equal(variants.converged, assembled.converged)

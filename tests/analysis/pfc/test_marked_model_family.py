@@ -565,8 +565,9 @@ def _eligibility_inputs(
     n_events: int = 12,
 ) -> tuple[pd.Series, np.ndarray, np.ndarray, dict[str, pd.DataFrame]]:
     """Two classes of well-separated events carrying every mark a spec needs."""
+    n_time = max(600, 40 * n_events + 40)
     fit_mask = pd.Series(
-        np.ones(600, dtype=bool), index=np.arange(600) / SAMPLING_FREQUENCY
+        np.ones(n_time, dtype=bool), index=np.arange(n_time) / SAMPLING_FREQUENCY
     )
     time = fit_mask.index.to_numpy()
     lags = np.arange(-4, 5)
@@ -1122,10 +1123,10 @@ def test_stop_level_permutation_moves_whole_stops():
 
 
 def _null_fit(slope_permutations: int, seed: int, monkeypatch=None):
-    fit_mask, basis, lags, events = _eligibility_inputs(n_events=12)
+    fit_mask, basis, lags, events = _eligibility_inputs(n_events=24)
     for index, event_class in enumerate(MARKED_EVENT_CLASSES):
-        events[event_class]["stop_idx"] = np.repeat(np.arange(6), 2) + 10 * index
-        events[event_class][REWARDED_CONTEXT] = np.resize([1.0, 1.0, 0.0, 0.0], 12)
+        events[event_class]["stop_idx"] = np.repeat(np.arange(12), 2) + 100 * index
+        events[event_class][REWARDED_CONTEXT] = np.resize([1.0, 1.0, 0.0, 0.0], 24)
     spec = MarkedFamilySpec(
         "null_probe",
         (CURRENT_ARM_FRACTION, REWARDED_CONTEXT),
@@ -1163,28 +1164,29 @@ def test_slope_null_is_seeded_and_only_permutes_the_named_target(monkeypatch):
             assert not np.array_equal(null, other_seed.slope_null[event_class][mark])
     assert first.diagnostics["slope_permutations"] == 3
 
-    # Every refit design differs from the observed one in exactly one block.
-    designs = []
-    original = family.fit_poisson_glms
+    # Every refit replaces exactly one target block, block by block, and
+    # starts from the observed fit's coefficients.
+    calls = []
+    original = family.fit_poisson_column_variants
 
-    def capture(design, *args, **kwargs):
-        designs.append(np.array(design))
-        return original(design, *args, **kwargs)
+    def capture(base, columns, variants, n_designs, *args, **kwargs):
+        calls.append((columns, n_designs, kwargs["initial_params"]))
+        np.testing.assert_array_equal(base, ladder.full.matrix)
+        return original(base, columns, variants, n_designs, *args, **kwargs)
 
-    monkeypatch.setattr(family, "fit_poisson_glms", capture)
-    _null_fit(2, seed=11)
-    null_designs = designs[1:]  # the first fit is the observed one
+    monkeypatch.setattr(family, "fit_poisson_column_variants", capture)
+    _, refit = _null_fit(2, seed=11)
     order = [
         (event_class, mark)
         for event_class in MARKED_EVENT_CLASSES
         for mark in (CURRENT_ARM_FRACTION, REWARDED_CONTEXT)
     ]
-    assert len(null_designs) == 2 * len(order)
-    for index, design in enumerate(null_designs):
-        event_class, mark = order[index // 2]
-        changed = np.flatnonzero(np.any(design != ladder.full.matrix, axis=0))
-        span = ladder.full.block_slices[f"{event_class}:{mark}"]
-        assert changed.size and set(changed) <= set(range(span.start, span.stop))
+    assert [call[0] for call in calls] == [
+        ladder.full.block_slices[f"{event_class}:{mark}"] for event_class, mark in order
+    ]
+    assert all(call[1] == 2 for call in calls)
+    for call in calls:
+        np.testing.assert_array_equal(call[2], refit.full_params)
 
 
 def test_pooled_slope_null_permutes_within_each_class():
@@ -1199,10 +1201,122 @@ def test_pooled_slope_null_permutes_within_each_class():
     )
     frame = ladder.events["pooled"]
 
-    weights = _slope_null_weights(np.random.default_rng(0), frame, RIPPLE_POWER, 5)
+    weights, _ = _slope_null_weights(
+        np.random.default_rng(0), ladder, "pooled", RIPPLE_POWER, 5, "raw_within_class"
+    )
 
     observed = frame[f"{RIPPLE_POWER}_z"].to_numpy()
     for event_class in frame.event_class.unique():
         rows = (frame.event_class == event_class).to_numpy()
         for draw in weights:
             np.testing.assert_allclose(np.sort(draw[rows]), np.sort(observed[rows]))
+    # The residualized draws keep each class standardized.
+    residualized, r_squared = _slope_null_weights(
+        np.random.default_rng(0),
+        ladder,
+        "pooled",
+        RIPPLE_POWER,
+        5,
+        "residualized_within_class",
+    )
+    assert set(r_squared) == set(ladder.classes)
+    for event_class in frame.event_class.unique():
+        rows = (frame.event_class == event_class).to_numpy()
+        np.testing.assert_allclose(residualized[:, rows].mean(axis=1), 0.0, atol=1e-12)
+        np.testing.assert_allclose(residualized[:, rows].std(axis=1), 1.0)
+
+
+def _one_at_a_time(base, columns, variants, n_designs, counts, penalty, **kwargs):
+    """The reference fitter: each draw's design built and fit alone, cold."""
+    from continuum_swr_replay.analysis.pfc.batched_glm import (
+        BatchedDesignFits,
+        fit_poisson_glms,
+    )
+
+    fits = []
+    for draw in range(n_designs):
+        design = base.copy()
+        design[:, columns] = variants(np.array([draw]))[0]
+        fits.append(
+            fit_poisson_glms(design, counts, penalty=penalty, compute_covariance=False)
+        )
+    params = np.stack([fit.params for fit in fits])
+    converged = np.stack([fit.converged for fit in fits])
+    params[~converged] = np.nan
+    return BatchedDesignFits(
+        params=params,
+        converged=converged,
+        n_iter=np.stack([fit.n_iter for fit in fits]),
+        rank=np.array([fit.rank for fit in fits]),
+    )
+
+
+def test_batched_warm_started_null_equals_one_draw_at_a_time(monkeypatch):
+    import continuum_swr_replay.analysis.pfc.marked_model_family as family
+
+    _, batched = _null_fit(5, seed=21)
+    monkeypatch.setattr(family, "fit_poisson_column_variants", _one_at_a_time)
+    _, serial = _null_fit(5, seed=21)
+
+    for event_class in MARKED_EVENT_CLASSES:
+        for mark in (CURRENT_ARM_FRACTION, REWARDED_CONTEXT):
+            np.testing.assert_allclose(
+                batched.slope_null[event_class][mark],
+                serial.slope_null[event_class][mark],
+                atol=1e-5,
+                rtol=0.0,
+            )
+
+
+def test_stop_level_permutation_refuses_an_event_without_a_stop():
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        stop_level_permutation_weights,
+    )
+
+    with pytest.raises(ValueError, match="have no stop_idx"):
+        stop_level_permutation_weights(
+            np.random.default_rng(0),
+            np.array([1.0, 0.0, 1.0]),
+            np.ones(3, dtype=bool),
+            np.array([1.0, np.nan, 2.0]),
+            2,
+        )
+
+
+def test_class_eligibility_names_the_short_class_and_the_rare_level():
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+    )
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        FOLLOWUP_MODEL_SPECS,
+        class_eligibility,
+    )
+
+    fit_mask, basis, lags, events = _three_class_inputs()
+    events["SWR_no_non_local"] = events["SWR_no_non_local"].iloc[:4]
+    spec = FOLLOWUP_MODEL_SPECS["ripple_power"]
+
+    reasons = class_eligibility(events, spec)
+
+    assert reasons["non_local_no_SWR"] is None and reasons["non_local_SWR"] is None
+    assert "only 4 finite events" in reasons["SWR_no_non_local"]
+    kept = tuple(c for c, reason in reasons.items() if reason is None)
+    ladder = build_marked_family_ladder(
+        events, fit_mask, basis, lags, spec.for_classes(kept)
+    )
+    assert ladder.classes == EXTENDED_MARKED_EVENT_CLASSES[:2]
+
+    # A binary target with 9 events at one level is refused for that class.
+    fit_mask, basis, lags, events = _eligibility_inputs(n_events=24)
+    for frame in events.values():
+        frame[REWARDED_CONTEXT] = np.r_[np.ones(9), np.zeros(15)]
+    binary = MarkedFamilySpec(
+        "binary_levels", (REWARDED_CONTEXT,), (EVENT_DURATION_MARK,), "rare level"
+    )
+    reasons = class_eligibility(events, binary)
+    assert all(
+        "binary mark 'rewarded_context' has levels {0: 15, 1: 9}" in reason
+        for reason in reasons.values()
+    )
+    with pytest.raises(ModelIneligibleError, match="at least 10 events at each level"):
+        build_marked_family_ladder(events, fit_mask, basis, lags, binary)

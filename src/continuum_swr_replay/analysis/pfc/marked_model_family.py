@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     DEFAULT_NULL_DESIGN_BATCH_SIZE,
     BatchedHeldoutResults,
     PreparedHeldoutResponse,
+    fit_poisson_column_variants,
     fit_poisson_glms,
     make_ridge_penalty,
     prepare_heldout_response,
@@ -39,6 +40,7 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     EVENT_DURATION_MARK,
     EXTENDED_MARKED_EVENT_CLASSES,
     MARKED_EVENT_CLASSES,
+    MIN_LEVEL_COUNT,
     MIN_MARKED_EVENTS_PER_CLASS,
     RIPPLE_POWER_MARK,
     EventKernelBlock,
@@ -50,7 +52,6 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     mark_block_geometry,
     mark_blocks_from_weights,
     standardize_event_marks,
-    within_available_mark_permutations,
 )
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
@@ -610,6 +611,25 @@ def marginal_specs(
 MARGINAL_MODEL_SPECS = marginal_specs()
 MARGINAL_MODEL_NAMES = tuple(MARGINAL_MODEL_SPECS)
 
+
+def model_set_of(model_name: str) -> str:
+    """``"recommended"`` for a v1 model, ``"followup"`` for the follow-up set.
+
+    The follow-up set holds :data:`FOLLOWUP_MODEL_SPECS` and their marginal
+    tier.
+
+    Raises
+    ------
+    KeyError
+        For a name in neither set.
+    """
+    if model_name in RECOMMENDED_MODEL_SPECS:
+        return "recommended"
+    if model_name in FOLLOWUP_MODEL_SPECS or model_name in MARGINAL_MODEL_SPECS:
+        return "followup"
+    raise KeyError(f"unknown model {model_name!r}")
+
+
 #: Every spec a runner can fit, by name.
 ALL_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
     {**RECOMMENDED_MODEL_SPECS, **FOLLOWUP_MODEL_SPECS, **MARGINAL_MODEL_SPECS}
@@ -688,7 +708,10 @@ class MarkedFamilyResults:
     slope_null : dict[str, dict[str, NDArray]]
         ``slope_null[c][mark]``, shape ``(n_draws, n_report_lags, n_units)``,
         float32: the same slope kernel refit with the target's values
-        shuffled (:func:`fit_marked_family_ladder`). Empty without draws.
+        shuffled (:func:`fit_marked_family_slope_null`). Empty without draws.
+    full_params : NDArray, shape (n_units, n_features), optional
+        The observed full-data fit's coefficients (NaN for a unit that did not
+        converge); they start the shuffled refits.
     """
 
     statistics: pd.DataFrame
@@ -696,6 +719,7 @@ class MarkedFamilyResults:
     mark_curves: dict[str, dict[str, NDArray]]
     diagnostics: dict[str, Any]
     slope_null: dict[str, dict[str, NDArray]] = field(default_factory=dict)
+    full_params: NDArray | None = None
 
 
 class ModelIneligibleError(ValueError):
@@ -1415,6 +1439,96 @@ def load_session_recommended_event_marks(
     )
 
 
+def _standardize_for_spec(
+    frame: pd.DataFrame, spec: MarkedFamilySpec, min_marked_events: int
+) -> tuple[pd.DataFrame, dict[str, MarkScale]]:
+    """Standardize one class's marks as the family's designs need them."""
+    return standardize_event_marks(
+        frame,
+        spec.all_marks,
+        allow_missing=spec.all_marks,
+        allow_constant=tuple(
+            mark
+            for mark in spec.nuisance_marks
+            if mark not in spec.required_varying_nuisance_marks
+        ),
+        min_marked_events=min_marked_events,
+    )
+
+
+def _require_binary_levels(frame: pd.DataFrame, marks: tuple[str, ...]) -> None:
+    """Refuse a two-level mark with fewer than :data:`MIN_LEVEL_COUNT` at a level.
+
+    A mark with exactly two distinct finite values in the class is binary; a
+    slope through a level a handful of events carry is not readable, so each
+    level needs :data:`MIN_LEVEL_COUNT` events. A one-level mark is left to
+    the constant-mark rule of
+    :func:`~continuum_swr_replay.analysis.pfc.marked_glm.standardize_event_marks`.
+
+    Raises
+    ------
+    ValueError
+        Naming the mark and its level counts.
+    """
+    for mark in marks:
+        if mark not in frame:
+            continue
+        values = pd.to_numeric(frame[mark], errors="coerce").to_numpy(dtype=float)
+        levels, counts = np.unique(values[np.isfinite(values)], return_counts=True)
+        if len(levels) == 2 and counts.min() < MIN_LEVEL_COUNT:
+            described = ", ".join(
+                f"{level:g}: {count}"
+                for level, count in zip(levels, counts, strict=True)
+            )
+            raise ValueError(
+                f"binary mark {mark!r} has levels {{{described}}}; at least "
+                f"{MIN_LEVEL_COUNT} events at each level are required"
+            )
+
+
+def class_eligibility(
+    events: dict[str, pd.DataFrame],
+    spec: MarkedFamilySpec,
+    *,
+    min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
+) -> dict[str, str | None]:
+    """Which of a spec's classes can carry its marks, and why not.
+
+    A class can when every mark standardizes (enough finite events, varying
+    where the spec needs it) and every binary mark has
+    :data:`MIN_LEVEL_COUNT` events at each level -- the checks
+    :func:`build_marked_family_ladder` makes. A runner drops the classes that
+    cannot (:meth:`MarkedFamilySpec.for_classes`) instead of refusing the
+    whole model.
+
+    Parameters
+    ----------
+    events : dict[str, pd.DataFrame]
+        Per event class, the events carrying every raw mark column; a class
+        absent from ``events`` is ineligible.
+    spec : MarkedFamilySpec
+    min_marked_events : int
+
+    Returns
+    -------
+    dict
+        ``class -> None`` when eligible, else the reason.
+    """
+    reasons: dict[str, str | None] = {}
+    for event_class in spec.event_classes:
+        if event_class not in events:
+            reasons[event_class] = "no events of this class in the session's event set"
+            continue
+        try:
+            _require_binary_levels(events[event_class], spec.all_marks)
+            _standardize_for_spec(events[event_class], spec, min_marked_events)
+        except (ValueError, KeyError) as error:
+            reasons[event_class] = str(error)
+        else:
+            reasons[event_class] = None
+    return reasons
+
+
 def build_marked_family_ladder(
     events: dict[str, pd.DataFrame],
     fit_mask: pd.Series,
@@ -1465,9 +1579,10 @@ def build_marked_family_ladder(
         If an event class is missing from ``events``.
     ModelIneligibleError
         If a class cannot support the spec: a mark is non-finite, has fewer
-        than ``min_marked_events`` finite events, or is constant when the spec
-        does not permit it. The message names the model, the class and the
-        mark.
+        than ``min_marked_events`` finite events, is constant when the spec
+        does not permit it, or is binary with fewer than
+        :data:`MIN_LEVEL_COUNT` events at a level. The message names the
+        model, the class and the mark.
     """
     if classes is None:
         classes = spec.event_classes
@@ -1477,16 +1592,9 @@ def build_marked_family_ladder(
         if event_class not in events:
             raise KeyError(f"event class {event_class!r} is missing")
         try:
-            standardized[event_class], scales[event_class] = standardize_event_marks(
-                events[event_class],
-                spec.all_marks,
-                allow_missing=spec.all_marks,
-                allow_constant=tuple(
-                    mark
-                    for mark in spec.nuisance_marks
-                    if mark not in spec.required_varying_nuisance_marks
-                ),
-                min_marked_events=min_marked_events,
+            _require_binary_levels(events[event_class], spec.all_marks)
+            standardized[event_class], scales[event_class] = _standardize_for_spec(
+                events[event_class], spec, min_marked_events
             )
         except ValueError as error:
             raise ModelIneligibleError(
@@ -1704,6 +1812,49 @@ def _event_mark_geometry(ladder: MarkedFamilyLadder) -> dict[str, dict[str, obje
     return output
 
 
+#: How a slope reference shuffles a target. ``residualized_within_class``
+#: regresses the target on the model's other marks of its class and permutes
+#: only the residual, so a draw keeps the target's correlation with them;
+#: ``raw_within_class`` permutes the target itself (the residual on an
+#: intercept alone), which decorrelates it from every other mark and makes the
+#: reference too narrow when the marks are correlated.
+SLOPE_PERMUTATION_METHODS = ("residualized_within_class", "raw_within_class")
+DEFAULT_SLOPE_PERMUTATION_METHOD = "residualized_within_class"
+
+#: Shuffled refits fit together per device call. The held-out scorer's
+#: profiled budget is for ``n_folds = 5`` fold fits per design; a full-data
+#: refit is one fit, so five times as many columns fit the same workload.
+FULL_FIT_BATCH_FEATURE_BUDGET = 5 * PROFILED_BATCH_FEATURE_BUDGET
+DEFAULT_SLOPE_NULL_BATCH_SIZE = 10
+
+
+def _permutation_units(stop_idx: NDArray, values: NDArray) -> tuple[NDArray, NDArray]:
+    """Group events into stop-level permutation units.
+
+    A unit is a stop, split by value where the stop's events disagree.
+
+    Returns
+    -------
+    unit_of_event : NDArray of int, shape (n_events,)
+    first_event_of_unit : NDArray of int, shape (n_units,)
+
+    Raises
+    ------
+    ValueError
+        If an event has no stop.
+    """
+    stops = pd.to_numeric(pd.Series(stop_idx), errors="coerce").to_numpy(dtype=float)
+    if np.isnan(stops).any():
+        raise ValueError(
+            f"{int(np.isnan(stops).sum())} event(s) with a defined stop-level mark "
+            "have no stop_idx; a stop-level permutation needs every event's stop"
+        )
+    units = pd.DataFrame({"stop": stops, "value": np.asarray(values, dtype=float)})
+    unit_of_event = units.groupby(["stop", "value"], sort=False).ngroup().to_numpy()
+    first = pd.Series(np.arange(len(units))).groupby(unit_of_event).first().to_numpy()
+    return unit_of_event, first
+
+
 def stop_level_permutation_weights(
     rng: np.random.Generator,
     values: NDArray,
@@ -1729,7 +1880,7 @@ def stop_level_permutation_weights(
     available : NDArray of bool, shape (n_events,)
         Whether each event's mark is defined.
     stop_idx : NDArray, shape (n_events,)
-        The stop each event sits in.
+        The stop each event sits in; must be finite where ``available``.
     n_draws : int
         Draws to return.
 
@@ -1737,6 +1888,11 @@ def stop_level_permutation_weights(
     -------
     NDArray, shape (n_draws, n_events)
         Each draw's per-event values.
+
+    Raises
+    ------
+    ValueError
+        If an available event has no stop.
     """
     values = np.asarray(values, dtype=float)
     available = np.asarray(available, dtype=bool)
@@ -1744,13 +1900,10 @@ def stop_level_permutation_weights(
     marked = np.flatnonzero(available)
     if marked.size == 0:
         return out
-    units = pd.DataFrame(
-        {"stop": np.asarray(stop_idx)[marked], "value": values[marked]}
+    unit_of_event, first = _permutation_units(
+        np.asarray(stop_idx)[marked], values[marked]
     )
-    unit_of_event = units.groupby(["stop", "value"], sort=False).ngroup().to_numpy()
-    unit_values = (
-        pd.Series(values[marked]).groupby(unit_of_event, sort=True).first().to_numpy()
-    )
+    unit_values = values[marked][first]
     for draw in range(n_draws):
         out[draw, marked] = unit_values[rng.permutation(len(unit_values))][
             unit_of_event
@@ -1758,45 +1911,280 @@ def stop_level_permutation_weights(
     return out
 
 
-def _slope_null_weights(
+def residualized_permutation_weights(
     rng: np.random.Generator,
     frame: pd.DataFrame,
     mark: str,
+    other_marks: tuple[str, ...],
     n_draws: int,
-) -> NDArray:
-    """One target block's shuffled weights, permuted within each class.
+    *,
+    stop_level: bool,
+) -> tuple[NDArray, float]:
+    """Shuffled target weights that keep the target's relation to other marks.
 
-    Event-level marks are permuted among the class's events where defined;
-    stop-level marks (:data:`STOP_LEVEL_MARKS`) among stops
-    (:func:`stop_level_permutation_weights`). A pooled frame is permuted
-    within each of its classes, so no value crosses a class.
+    On the events where the target is defined, its standardized value is
+    regressed (least squares, with an intercept) on the other marks'
+    standardized values as the design carries them (zero where a mark is
+    undefined). Each draw is the fitted value plus a permutation of the
+    residuals, re-standardized over those events as the observed mark is.
+    Event-level marks permute residuals among events; a stop-level mark is
+    regressed and permuted at the stop level (a stop's other marks averaged
+    over its events, :func:`_permutation_units`), so every event of a stop
+    keeps one value. With no other marks this is the plain permutation of the
+    target.
+
+    Parameters
+    ----------
+    rng : np.random.Generator
+    frame : pd.DataFrame, shape (n_events, ...)
+        One class's standardized events: ``<m>_z`` and ``<m>_available`` for
+        the target and every other mark, and ``stop_idx`` for a stop-level
+        target.
+    mark : str
+        The target.
+    other_marks : tuple of str
+        The model's other marks in this class.
+    n_draws : int
+    stop_level : bool
+        Permute whole stops.
+
+    Returns
+    -------
+    weights : NDArray, shape (n_draws, n_events)
+        Zero where the target is undefined, as in the design.
+    r_squared : float
+        Share of the target's variance (over its defined events, or stops) the
+        other marks explain; ``nan`` with fewer than two units.
     """
     values = frame[f"{mark}_z"].to_numpy(dtype=float)
     available = frame[f"{mark}_available"].to_numpy(dtype=bool)
-    groups = (
-        frame["event_class"].to_numpy()
-        if "event_class" in frame
-        else np.zeros(len(frame), dtype=int)
-    )
-    if mark in STOP_LEVEL_MARKS and "stop_idx" not in frame:
-        raise KeyError(f"stop-level mark {mark!r} needs each event's stop_idx")
     weights = np.repeat(values[None, :], n_draws, axis=0)
-    for group in pd.unique(groups):
-        rows = np.flatnonzero(groups == group)
-        if mark in STOP_LEVEL_MARKS:
-            weights[:, rows] = stop_level_permutation_weights(
-                rng,
-                values[rows],
-                available[rows],
-                frame["stop_idx"].to_numpy()[rows],
-                n_draws,
-            )
-        else:
-            permutations = within_available_mark_permutations(
-                rng, available[rows], n_draws
-            )
-            weights[:, rows] = values[rows][permutations]
-    return weights
+    marked = np.flatnonzero(available)
+    if marked.size < 2:
+        return weights, float("nan")
+    predictors = np.column_stack(
+        [
+            np.ones(marked.size),
+            *(
+                frame[f"{other}_z"].to_numpy(dtype=float)[marked]
+                for other in other_marks
+            ),
+        ]
+    )
+    if stop_level:
+        if "stop_idx" not in frame:
+            raise KeyError(f"stop-level mark {mark!r} needs each event's stop_idx")
+        unit_of_event, first = _permutation_units(
+            frame["stop_idx"].to_numpy()[marked], values[marked]
+        )
+        n_units = len(first)
+        response = values[marked][first]
+        # A stop's other marks are averaged over its events.
+        counts = np.bincount(unit_of_event, minlength=n_units).astype(float)
+        unit_predictors = np.stack(
+            [
+                np.bincount(unit_of_event, weights=column, minlength=n_units) / counts
+                for column in predictors.T
+            ],
+            axis=1,
+        )
+    else:
+        unit_of_event = np.arange(marked.size)
+        response = values[marked]
+        unit_predictors = predictors
+    coefficients, *_ = np.linalg.lstsq(unit_predictors, response, rcond=None)
+    fitted = unit_predictors @ coefficients
+    residual = response - fitted
+    total = np.sum((response - response.mean()) ** 2)
+    r_squared = float(1.0 - np.sum(residual**2) / total) if total > 0 else float("nan")
+    for draw in range(n_draws):
+        unit_values = fitted + residual[rng.permutation(len(residual))]
+        event_values = unit_values[unit_of_event]
+        spread = event_values.std(ddof=0)
+        weights[draw, marked] = (
+            (event_values - event_values.mean()) / spread if spread > 0 else 0.0
+        )
+    return weights, r_squared
+
+
+def _slope_null_weights(
+    rng: np.random.Generator,
+    ladder: MarkedFamilyLadder,
+    target_class: str,
+    mark: str,
+    n_draws: int,
+    method: str,
+) -> tuple[NDArray, dict[str, float]]:
+    """One target block's shuffled weights, shuffled within each class.
+
+    A pooled block's frame stacks the classes' events in class order, so its
+    weights are each class's own draws, stacked the same way; no value crosses
+    a class.
+
+    Returns
+    -------
+    weights : NDArray, shape (n_draws, n_block_events)
+    r_squared : dict
+        Per class, the target's R² on the other marks (``nan`` for the raw
+        method, which uses none).
+    """
+    if method not in SLOPE_PERMUTATION_METHODS:
+        raise ValueError(f"method must be one of {SLOPE_PERMUTATION_METHODS}")
+    classes = ladder.classes if target_class == POOLED_CLASS else (target_class,)
+    others = (
+        tuple(other for other in ladder.spec.all_marks if other != mark)
+        if method == "residualized_within_class"
+        else ()
+    )
+    parts = []
+    r_squared: dict[str, float] = {}
+    for event_class in classes:
+        draws, r2 = residualized_permutation_weights(
+            rng,
+            ladder.events[event_class],
+            mark,
+            others,
+            n_draws,
+            stop_level=mark in STOP_LEVEL_MARKS,
+        )
+        parts.append(draws)
+        r_squared[event_class] = r2 if others else float("nan")
+    weights = np.concatenate(parts, axis=1)
+    if weights.shape[1] != len(ladder.events[target_class]):
+        raise ValueError(f"weights do not match the {target_class!r} block's events")
+    return weights, r_squared
+
+
+def slope_null_batch_size(requested: int, n_features: int) -> int:
+    """Refits per device call, bounded by :data:`FULL_FIT_BATCH_FEATURE_BUDGET`."""
+    return bounded_design_batch_size(
+        requested, n_features, feature_budget=FULL_FIT_BATCH_FEATURE_BUDGET
+    )
+
+
+def fit_marked_family_slope_null(
+    ladder: MarkedFamilyLadder,
+    counts: NDArray,
+    observed: MarkedFamilyResults,
+    *,
+    penalty_sigma: float,
+    mark_penalty_sigma: float | None = DEFAULT_MARK_PENALTY_SIGMA,
+    n_draws: int,
+    seed: int,
+    targets: tuple[str, ...] | None = None,
+    report_lags: NDArray | None = None,
+    method: str = DEFAULT_SLOPE_PERMUTATION_METHOD,
+    batch_size: int = DEFAULT_SLOPE_NULL_BATCH_SIZE,
+) -> tuple[dict[str, dict[str, NDArray]], dict[str, Any]]:
+    """Shuffled-mark reference for every target block's slope kernel.
+
+    Each draw refits the full-data design (no held-out scoring, the observed
+    fit's prior) with only one target block rebuilt from the target shuffled
+    within its class (``method``; see :data:`SLOPE_PERMUTATION_METHODS`);
+    every other block, the other classes' included, keeps its observed
+    values. The draws of a block are fit together in device batches, each
+    warm-started from the observed fit's coefficients
+    (:func:`~continuum_swr_replay.analysis.pfc.batched_glm.fit_poisson_column_variants`),
+    which moves the iterations, not the optimum.
+
+    Parameters
+    ----------
+    ladder : MarkedFamilyLadder
+    counts : NDArray, shape (n_fit_bins, n_units)
+    observed : MarkedFamilyResults
+        The observed fit of this ladder (its ``full_params`` start the draws).
+    penalty_sigma, mark_penalty_sigma : float
+        The observed fit's priors.
+    n_draws : int
+        Refits per target block.
+    seed : int
+        Target block ``k`` (in comparison order) draws from child ``k`` of
+        ``np.random.SeedSequence(seed)``.
+    targets : tuple of str, optional
+        Target marks to draw for; ``None`` draws for every one.
+    report_lags : NDArray of bool, shape (n_lags,), optional
+        Lags the null curves are kept on; ``None`` keeps every lag.
+    method : str
+        One of :data:`SLOPE_PERMUTATION_METHODS`.
+    batch_size : int
+        Requested refits per device call, before
+        :func:`slope_null_batch_size`.
+
+    Returns
+    -------
+    null : dict
+        ``null[c][mark]``, shape ``(n_draws, n_report_lags, n_units)``,
+        float32; NaN for a unit whose refit did not converge.
+    diagnostics : dict
+        ``slope_permutations``, ``slope_permutation_seed``,
+        ``slope_permutation_method``, ``slope_null_target_r_squared`` (per
+        block, per class), ``slope_null_converged_draws_by_unit``,
+        ``slope_null_batch_size`` and ``slope_null_seconds``.
+    """
+    started = time.perf_counter()
+    report = (
+        np.ones(len(ladder.lags), dtype=bool)
+        if report_lags is None
+        else np.asarray(report_lags, dtype=bool)
+    )
+    if report.shape != (len(ladder.lags),):
+        raise ValueError("report_lags must have one entry per lag")
+    if n_draws < 0:
+        raise ValueError("n_draws must be non-negative")
+    unknown = set(targets or ()) - set(ladder.spec.scientific_marks)
+    if unknown:
+        raise ValueError(f"slope_permutation_targets {sorted(unknown)} are not targets")
+    if method not in SLOPE_PERMUTATION_METHODS:
+        raise ValueError(f"method must be one of {SLOPE_PERMUTATION_METHODS}")
+    fit_counts = np.asarray(counts, dtype=float)
+    if fit_counts.ndim == 1:
+        fit_counts = fit_counts[:, None]
+    penalty = family_ridge_penalty(ladder.full, penalty_sigma, mark_penalty_sigma)
+    width = ladder.full.matrix.shape[1]
+    batch = slope_null_batch_size(batch_size, width)
+    comparison_order = tuple(ladder.reduced)
+    children = np.random.SeedSequence(seed).spawn(len(comparison_order))
+    null: dict[str, dict[str, NDArray]] = {}
+    converged_draws: dict[str, list[int]] = {}
+    r_squared: dict[str, dict[str, float]] = {}
+    for index, (target_class, mark) in enumerate(comparison_order):
+        if n_draws == 0 or (targets is not None and mark not in targets):
+            continue
+        rng = np.random.default_rng(children[index])
+        span = ladder.full.block_slices[_block_name(target_class, mark)]
+        geometry = mark_block_geometry(
+            ladder.events[target_class], ladder.fit_mask, ladder.lags, target_class
+        )
+        weights, r_squared[f"{target_class}:{mark}"] = _slope_null_weights(
+            rng, ladder, target_class, mark, n_draws, method
+        )
+        fits = fit_poisson_column_variants(
+            ladder.full.matrix,
+            span,
+            lambda draws, w=weights, g=geometry: mark_blocks_from_weights(
+                w[draws], g, ladder.spline_basis
+            ),
+            n_draws,
+            fit_counts,
+            penalty,
+            initial_params=observed.full_params,
+            design_batch_size=batch,
+        )
+        parameters = fits.params[:, :, span]  # (n_draws, n_units, n_basis)
+        curves = np.einsum("lb,dub->dlu", ladder.spline_basis[report], parameters)
+        null.setdefault(target_class, {})[mark] = curves.astype(np.float32)
+        converged_draws[f"{target_class}:{mark}"] = (
+            np.isfinite(curves).all(axis=1).sum(axis=0).tolist()
+        )
+    return null, {
+        "slope_permutations": int(n_draws),
+        "slope_permutation_seed": int(seed),
+        "slope_permutation_method": method,
+        "slope_null_target_r_squared": r_squared,
+        "slope_null_converged_draws_by_unit": converged_draws,
+        "slope_null_batch_size": int(batch),
+        "slope_null_seconds": time.perf_counter() - started,
+    }
 
 
 def fit_marked_family_ladder(
@@ -1812,6 +2200,7 @@ def fit_marked_family_ladder(
     slope_permutation_seed: int = 0,
     slope_permutation_targets: tuple[str, ...] | None = None,
     report_lags: NDArray | None = None,
+    slope_permutation_method: str = DEFAULT_SLOPE_PERMUTATION_METHOD,
 ) -> MarkedFamilyResults:
     """Fit one model family without p-values or response filtering.
 
@@ -1820,12 +2209,9 @@ def fit_marked_family_ladder(
     that class's block for that mark is removed from the common design.
 
     With ``slope_permutations`` R > 0 every target block also gets a
-    shuffled-mark reference for its slope kernel: R refits of the full-data
-    design (no held-out scoring) in which only that block is rebuilt from the
-    target's values shuffled within its class -- among the events where it is
-    defined, or, for a stop-level mark, among stops with each stop's events
-    moving together. Every other block, the other classes' included, keeps
-    its observed values, and the prior is the observed fit's.
+    shuffled-mark reference for its slope kernel
+    (:func:`fit_marked_family_slope_null`, run after the observed fit; a
+    caller that gates on the observed fit calls that function itself).
 
     Parameters
     ----------
@@ -1856,6 +2242,8 @@ def fit_marked_family_ladder(
         Target marks to draw a reference for; ``None`` draws for every one.
     report_lags : NDArray of bool, shape (n_lags,), optional
         Lags the null curves are kept on; ``None`` keeps every lag.
+    slope_permutation_method : str
+        One of :data:`SLOPE_PERMUTATION_METHODS`.
 
     Returns
     -------
@@ -1979,17 +2367,6 @@ def fit_marked_family_ladder(
             parameters[~usable] = np.nan
             mark_curves[target_class][mark] = ladder.spline_basis @ parameters.T
 
-    slope_null, null_diagnostics = _slope_null(
-        ladder,
-        fit_counts,
-        full_penalty,
-        comparison_order,
-        n_draws=slope_permutations,
-        seed=slope_permutation_seed,
-        targets=slope_permutation_targets,
-        report_lags=report_lags,
-    )
-
     diagnostics: dict[str, Any] = {
         "model_name": ladder.spec.name,
         "penalty_sigma_log_rate": float(penalty_sigma),
@@ -2036,85 +2413,31 @@ def fit_marked_family_ladder(
         "timing_seconds": {
             "observed_heldout_scoring": heldout_seconds,
             "full_data_fit": full_fit_seconds,
-            "slope_null_fits": null_diagnostics.pop("seconds"),
         },
-        **null_diagnostics,
     }
-    return MarkedFamilyResults(
+    results = MarkedFamilyResults(
         statistics=pd.DataFrame(statistics),
         typical_curves=typical_curves,
         mark_curves=mark_curves,
         diagnostics=diagnostics,
+        full_params=np.asarray(fitted.params, dtype=float),
+    )
+    if slope_permutations == 0:
+        return results
+    slope_null, null_diagnostics = fit_marked_family_slope_null(
+        ladder,
+        fit_counts,
+        results,
+        penalty_sigma=penalty_sigma,
+        mark_penalty_sigma=mark_penalty_sigma,
+        n_draws=slope_permutations,
+        seed=slope_permutation_seed,
+        targets=slope_permutation_targets,
+        report_lags=report_lags,
+        method=slope_permutation_method,
+    )
+    return replace(
+        results,
         slope_null=slope_null,
+        diagnostics={**diagnostics, **null_diagnostics},
     )
-
-
-def _slope_null(
-    ladder: MarkedFamilyLadder,
-    counts: NDArray,
-    penalty: NDArray,
-    comparison_order: tuple[tuple[str, str], ...],
-    *,
-    n_draws: int,
-    seed: int,
-    targets: tuple[str, ...] | None,
-    report_lags: NDArray | None,
-) -> tuple[dict[str, dict[str, NDArray]], dict[str, Any]]:
-    """Refit the full design with one target block shuffled at a time.
-
-    Returns the null slope curves, ``null[c][mark]`` of shape
-    ``(n_draws, n_report_lags, n_units)`` (float32; NaN for a unit whose
-    refit did not converge), and their diagnostics: per block, the converged
-    draws per unit, and the total seconds.
-    """
-    started = time.perf_counter()
-    report = (
-        np.ones(len(ladder.lags), dtype=bool)
-        if report_lags is None
-        else np.asarray(report_lags, dtype=bool)
-    )
-    if report.shape != (len(ladder.lags),):
-        raise ValueError("report_lags must have one entry per lag")
-    unknown = set(targets or ()) - set(ladder.spec.scientific_marks)
-    if unknown:
-        raise ValueError(f"slope_permutation_targets {sorted(unknown)} are not targets")
-    null: dict[str, dict[str, NDArray]] = {}
-    converged_draws: dict[str, list[int]] = {}
-    if n_draws == 0:
-        return null, {"seconds": 0.0}
-    children = np.random.SeedSequence(seed).spawn(len(comparison_order))
-    design = ladder.full.matrix.copy()
-    for index, (target_class, mark) in enumerate(comparison_order):
-        if targets is not None and mark not in targets:
-            continue
-        rng = np.random.default_rng(children[index])
-        frame = ladder.events[target_class]
-        span = ladder.full.block_slices[_block_name(target_class, mark)]
-        geometry = mark_block_geometry(
-            frame, ladder.fit_mask, ladder.lags, target_class
-        )
-        weights = _slope_null_weights(rng, frame, mark, n_draws)
-        curves = np.full(
-            (n_draws, int(report.sum()), counts.shape[1]), np.nan, dtype=np.float32
-        )
-        for draw in range(n_draws):
-            design[:, span] = mark_blocks_from_weights(
-                weights[draw], geometry, ladder.spline_basis
-            )[0]
-            fitted = fit_poisson_glms(
-                design, counts, penalty=penalty, compute_covariance=False
-            )
-            parameters = np.asarray(fitted.params[:, span], dtype=float).copy()
-            parameters[~np.asarray(fitted.converged, dtype=bool)] = np.nan
-            curves[draw] = (ladder.spline_basis @ parameters.T)[report]
-        design[:, span] = ladder.full.matrix[:, span]
-        null.setdefault(target_class, {})[mark] = curves
-        converged_draws[f"{target_class}:{mark}"] = (
-            np.isfinite(curves).all(axis=1).sum(axis=0).tolist()
-        )
-    return null, {
-        "slope_permutations": int(n_draws),
-        "slope_permutation_seed": int(seed),
-        "slope_null_converged_draws_by_unit": converged_draws,
-        "seconds": time.perf_counter() - started,
-    }

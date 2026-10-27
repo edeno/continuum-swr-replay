@@ -243,7 +243,11 @@ def test_planted_context_kernel_is_separated_from_its_baseline():
         # simulated sessions with this stationary offset the observed window
         # mean scattered somewhat more widely than the shuffled refits (z RMS
         # about 1.2 over 16 class x seed fits, one |z| = 3.0), against about
-        # 0.8 with no offset, so the band can be crossed by chance here.
+        # 0.8 with no offset, so the band can be crossed by chance here. The
+        # residualized reference does not change that (here the SWR class
+        # sits at z -2.3, outside its band): the reward mark is unrelated to
+        # the other marks by construction, so its extra spread does not come
+        # from correlated marks.
         assert abs(_window_z(with_baseline, event_class, REWARDED_CONTEXT)) < 3.5
         # Without it the stationary offset is read as a reward kernel outside
         # the reference.
@@ -288,3 +292,119 @@ def test_planted_strength_kernel_is_recovered():
     ):
         observed, (low, high) = _window_mean_and_band(result, event_class, mark)
         assert low <= observed <= high
+
+
+def _correlated_marks_replicate(seed: int, n_draws: int):
+    """One session where the target is correlated with an adjustment (r 0.75).
+
+    The adjustment (``mua_rate_z``) carries a planted per-SD kernel and the
+    target (``ripple_power_z``) none. Returns the target's observed
+    population window mean and its two references' draws of the same
+    statistic.
+    """
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        MUA_RATE,
+        RIPPLE_POWER,
+        fit_marked_family_slope_null,
+    )
+
+    event_class = DRIVEN_CLASS
+    rng = np.random.default_rng(seed)
+    n_stops, stop_bins, gap_bins, n_units = 30, 600, 100, 20
+    n_time = n_stops * (stop_bins + gap_bins)
+    time = np.arange(n_time) / SAMPLING_FREQUENCY
+    fitted = np.zeros(n_time, dtype=bool)
+    onsets = []
+    for stop in range(n_stops):
+        first = stop * (stop_bins + gap_bins)
+        fitted[first : first + stop_bins] = True
+        onsets.extend(first + 60 + np.arange(0, stop_bins - 120, 60))
+    onsets = np.asarray(onsets)
+    fit_mask = pd.Series(fitted, index=time)
+    lags = np.arange(-30, 31)
+    basis, lag_time, _ = event_basis_functions(lags, SAMPLING_FREQUENCY)
+    other = rng.normal(size=len(onsets))
+    target = 0.75 * other + np.sqrt(1 - 0.75**2) * rng.normal(size=len(onsets))
+    events = {
+        event_class: pd.DataFrame(
+            {
+                "event_id": np.arange(len(onsets)),
+                "start_time": time[onsets],
+                RIPPLE_POWER: target,
+                MUA_RATE: other,
+            }
+        )
+    }
+    kernel = (
+        basis
+        @ np.linalg.lstsq(
+            basis, np.exp(-0.5 * ((lag_time - 0.02) / 0.03) ** 2), rcond=None
+        )[0]
+    )
+    kernel *= 0.5 / kernel.max()
+    log_rate = np.full(n_time, np.log(25.0 / SAMPLING_FREQUENCY))
+    other_z = (other - other.mean()) / other.std()
+    for onset, mark_z in zip(onsets, other_z, strict=True):
+        np.add.at(
+            log_rate, np.clip(onset + lags, 0, n_time - 1), (mark_z + 0.3) * kernel
+        )
+    counts = rng.poisson(np.exp(log_rate)[:, None], size=(n_time, n_units))[fitted]
+    folds = assign_blocked_folds(fit_mask, n_folds=5, seed=1, support_radius_bins=30)
+    spec = MarkedFamilySpec(
+        "correlated_marks",
+        (RIPPLE_POWER,),
+        (MUA_RATE,),
+        "is the reference as wide as the estimator?",
+        event_classes=(event_class,),
+    )
+    ladder = build_marked_family_ladder(events, fit_mask, basis, lags, spec)
+    observed = fit_marked_family_ladder(
+        ladder, counts.astype(float), folds, penalty_sigma=3.0
+    )
+    statistic = float(np.nanmean(observed.mark_curves[event_class][RIPPLE_POWER]))
+    references = {}
+    for method in ("residualized_within_class", "raw_within_class"):
+        null, diagnostics = fit_marked_family_slope_null(
+            ladder,
+            counts.astype(float),
+            observed,
+            penalty_sigma=3.0,
+            n_draws=n_draws,
+            seed=seed,
+            method=method,
+        )
+        references[method] = np.nanmean(null[event_class][RIPPLE_POWER], axis=(1, 2))
+        if method == "residualized_within_class":
+            r_squared = diagnostics["slope_null_target_r_squared"][
+                f"{event_class}:{RIPPLE_POWER}"
+            ][event_class]
+    return statistic, references, r_squared
+
+
+@pytest.mark.slow
+def test_residualized_reference_is_as_wide_as_the_estimator_under_correlated_marks():
+    """The reference's spread matches the estimator's; the raw one's does not.
+
+    Over 40 simulated sessions the across-session SD of the target's observed
+    window mean is the estimator's sampling SD under no target effect. A raw
+    permutation decorrelates the target from the correlated adjustment, so its
+    draws are narrower by about sqrt(1 - R^2) (0.66 at r = 0.75); the
+    residualized permutation keeps the correlation (measured at these seeds:
+    estimator SD 0.0100, residualized reference 0.0103, raw 0.0071).
+    """
+    replicates = [_correlated_marks_replicate(seed, n_draws=40) for seed in range(40)]
+    estimator_sd = np.std([observed for observed, _, _ in replicates], ddof=1)
+    residualized_sd = np.mean(
+        [
+            references["residualized_within_class"].std(ddof=1)
+            for _, references, _ in replicates
+        ]
+    )
+    raw_sd = np.mean(
+        [references["raw_within_class"].std(ddof=1) for _, references, _ in replicates]
+    )
+    r_squared = np.mean([r2 for _, _, r2 in replicates])
+
+    assert r_squared == pytest.approx(0.5625, abs=0.1)
+    assert residualized_sd / estimator_sd == pytest.approx(1.0, abs=0.2)
+    assert raw_sd / estimator_sd < 0.85

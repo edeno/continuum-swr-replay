@@ -70,6 +70,10 @@ BASELINE_TERMS = ("well_and_reward_outcome", "none")
 # this many marked events are refused rather than silently reported.
 MIN_MARKED_EVENTS_PER_CLASS = 10
 
+#: A binary mark (two distinct finite values in a class) needs this many
+#: events at each level for its slope to be read.
+MIN_LEVEL_COUNT = 10
+
 
 def _block_name(event_class: str, mark: str | None = None) -> str:
     """Canonical design-block name for one class's ordinary or marked kernel.
