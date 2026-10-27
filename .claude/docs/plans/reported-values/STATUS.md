@@ -50,6 +50,13 @@ mask plus onset- and offset-locked history on simulated data (own worktree; repo
 `.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`). Hold the cross-history values out of
 Part 3 until then; then decide on refitting the real self- and cross-history models.
 
+## Trends across sessions (2026-10-26, exploratory)
+
+An agent (own worktree, read-only on real data) is checking whether event properties, behavioral correlates,
+the decoder's transition matrix and mPFC response shares change across days and within days, with confound
+checks. Output: `scripts/exploratory/_learning_trends.py` and `.claude/docs/reviews/2026-10-26-learning-trends.md`
+on its branch. Memory: project-learning-evolution-followup.
+
 ## Next project: mPFC response (approved 2026-10-26)
 
 Items 2 (SWRs without replay), 3 (content), 4 (timing), 5 (event strength), 8 (behavioral context).
