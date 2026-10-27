@@ -44,6 +44,11 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-27 | 3a | `trips_to_patch_switch` takes the cap when ≥3 staying trips are known and no switch follows | `3bd90f08` | — | — |
 | 2026-10-27 | 3a | cost warning: `--tier all --slope-permutations 30` ≈ 1,140 full-data refits per session; must be measured on the GPU smoke before a corpus launch | — | — | open |
 
+| 2026-10-27 | 3a | review fixes by the implementer: animal weighting in the summary, residualized (Freedman–Lane-type) shuffled-mark reference, max-statistic call with plus-one p, per-class eligibility (MIN_LEVEL_COUNT 10), reference only after the convergence gate, batched warm-started refits, per-model seeds; ridge-leakage study (bias small, carried by the reference; false-outside rate 4.2 % with the plus-one rule) | `a8928340`..`d8b0c02e` | — | 210 passed, 3 skipped |
+| 2026-10-27 | 2 (B) | **batch finished**: 75/75 sessions, every worker EXIT 0, 9.6–10.9 h per card, no Traceback; `compare_pfc_event_set_bundles.py` over all 75: every canonical column and curve identical to the canonical bundles | started `ccb5b8d0` | `Processed-Data/pfc_response_followups/swr_without_replay/` | — |
+| 2026-10-27 | 4 (D) | Phase B values into Part 4 + **SWRs without replay?** overview bullet | (this commit) | `part4.json` (478 values) | `swr_no_replay_called_fraction_all` / `_min_events` against `swr_replay_called_fraction`; `swr_no_replay_overlap_odds_ratio_all`; `swr_no_replay_rank_correlation_all`; per animal `swr_no_replay_called_fraction_all_<animal>` |
+| 2026-10-27 | 3b (C) | GPU smoke started on cards freed by Phase B: j1620210710 12_r6 (GPU 4, 08:30), senor20201101 06_r3 (GPU 2, 08:40), wilbur20210331 16_r8 (GPU 5, 08:40); `--model-set followup --tier all --event-set with_swr_without_replay --slope-permutations 30` | `d8b0c02e` | tmux `pfc_c_smoke`; logs `logs/pfc_response_followups/marked_family_smoke/`; output `Processed-Data/pfc_response_followups/marked_family_smoke/` | j16 `replay_content`: observed fit ≈ 9 min, reference 1,351 s for 180 refits (batch 8) |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
@@ -51,7 +56,8 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | timing calibration | — (foreground, CPU) | none | — | `Processed-Data/pfc_response_followups/` | 2026-10-26 | 2026-10-26 | 2 min 15 s CPU |
 | timing calibration with decreases | — (background, CPU) | none | — | `Processed-Data/pfc_response_followups/timing_calibration.json` | 2026-10-26 | 2026-10-26 | about 40 min CPU (shared with tests) |
 | Phase B smoke | `pfc_b_smoke` (closed) | 1–4 | `logs/pfc_response_followups/swr_without_replay_smoke/` | `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | 2026-10-26 21:11 | 2026-10-26 22:53 | 48–102 min per session |
-| Phase B batch | `pfc_b_swr_without_replay` | 1–9 | `logs/pfc_response_followups/swr_without_replay/` | `Processed-Data/pfc_response_followups/swr_without_replay/` | 2026-10-26 22:55 | | ETA ~10:00 2026-10-27 |
+| Phase B batch | `pfc_b_swr_without_replay` | 1–9 | `logs/pfc_response_followups/swr_without_replay/` | `Processed-Data/pfc_response_followups/swr_without_replay/` | 2026-10-26 22:55 | 2026-10-27 09:48 | 9.6–10.9 h per card |
+| Phase C smoke | `pfc_c_smoke` | 4, 2, 5 | `logs/pfc_response_followups/marked_family_smoke/` | `Processed-Data/pfc_response_followups/marked_family_smoke/` | 2026-10-27 08:30 | | |
 
 ## Findings (phase 1)
 

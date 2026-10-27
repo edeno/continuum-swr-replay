@@ -3,8 +3,18 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "f173d89bcb26",
+ "commit": "d8b0c02ed66d",
  "inputs": [
+  {
+   "path": "Processed-Data/pfc_response_followups/swr_without_replay/swr_without_replay/*_mPFC_modulation.pkl",
+   "n_files": 75,
+   "sha256": "3d18543ad6aadae4fd5f7bf7559866807829d9b1564704dee684ffcff2772a8d"
+  },
+  {
+   "path": "Processed-Data/pfc_response_followups/swr_without_replay/swr_without_replay/*_mPFC_modulation.*.npy",
+   "n_files": 525,
+   "sha256": "719a9f1f21dd55cb292a32c9f03cfc6abb02377999a79131a58bc7410f729ea7"
+  },
   {
    "path": "Processed-Data/*_mPFC_modulation.pkl",
    "n_files": 75,
@@ -1347,6 +1357,1236 @@
     "paper"
    ],
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_adds_to_split_fraction_all": {
+   "value": 0.15710099965529128,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when SWRs without replay are added to the replay split (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_adds_to_split_fraction_min_events": {
+   "value": 0.1314123553809212,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when SWRs without replay are added to the replay split (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_best_model_fraction_all": {
+   "value": 0.03412616339193381,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_best_model_fraction_min_events": {
+   "value": 0.03525431128574547,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_all": {
+   "value": 0.08011507279225874,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_all_chimi": {
+   "value": 0.30714285714285716,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for chimi's tested units (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_all_jsixteen": {
+   "value": 0.11610486891385768,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for j16's tested units (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_all_peanut": {
+   "value": 0.08021390374331551,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for peanut's tested units (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_all_senor": {
+   "value": 0.04436689930209372,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for senor's tested units (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_all_wilbur": {
+   "value": 0.0692167577413479,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for wilbur's tested units (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_min_events": {
+   "value": 0.08578912901113293,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_min_events_chimi": {
+   "value": 0.30714285714285716,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for chimi's tested units (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_min_events_jsixteen": {
+   "value": 0.11610486891385768,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for j16's tested units (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_min_events_peanut": {
+   "value": 0.07692307692307693,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for peanut's tested units (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_min_events_senor": {
+   "value": 0.04158004158004158,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for senor's tested units (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_called_fraction_min_events_wilbur": {
+   "value": 0.0692167577413479,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same for wilbur's tested units (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_called_swr_no_replay_all": {
+   "value": 1.1827043096688925,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the same over the units called for SWRs without replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_called_swr_no_replay_min_events": {
+   "value": 1.1238298193717338,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_called_swr_replay_all": {
+   "value": 0.6704303306753397,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the same over the units called for SWRs without replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_called_swr_replay_min_events": {
+   "value": 0.6363854516682146,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_swr_no_replay_all": {
+   "value": 0.9647604666746488,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_swr_no_replay_min_events": {
+   "value": 0.8460910062890794,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_swr_replay_all": {
+   "value": 0.6896477939984536,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_abs_peak_median_swr_replay_min_events": {
+   "value": 0.6972502504659719,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_rate_multiplier_median_swr_no_replay_all": {
+   "value": 2.624159007653056,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for SWRs without replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_rate_multiplier_median_swr_no_replay_min_events": {
+   "value": 2.330519039000619,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for SWRs without replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_rate_multiplier_median_swr_replay_all": {
+   "value": 1.9930134583116577,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for SWR-coupled replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_effect_rate_multiplier_median_swr_replay_min_events": {
+   "value": 2.0082229980436552,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for SWR-coupled replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_events": {
+   "value": 2290,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed over sessions",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_events_fraction": {
+   "value": 0.2044277807534369,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of the kept, cohort Kay SWRs that overlap no non-local event",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_events_session_median": {
+   "value": 29.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "events",
+   "description": "median per session of those SWRs",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_events_unknown": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "kept SWRs left out of the class because they overlap a window the analysed-time rule dropped",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_both_all": {
+   "value": 372,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for both (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_both_min_events": {
+   "value": 314,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for both (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_expected_all": {
+   "value": 305.15831226571356,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "units",
+   "description": "units called for both expected if the two calls were independent (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_expected_min_events": {
+   "value": 253.4210870988867,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "units",
+   "description": "units called for both expected if the two calls were independent (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_neither_all": {
+   "value": 7115,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for neither (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_neither_min_events": {
+   "value": 5736,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for neither (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_odds_ratio_all": {
+   "value": 1.4078324970918157,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_odds_ratio_min_events": {
+   "value": 1.4454160246533128,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_swr_no_replay_only_all": {
+   "value": 547,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for SWRs without replay only (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_swr_no_replay_only_min_events": {
+   "value": 472,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for SWRs without replay only (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_swr_replay_only_all": {
+   "value": 3437,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for SWR-coupled replay only (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_swr_replay_only_min_events": {
+   "value": 2640,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called for SWR-coupled replay only (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_tested_all": {
+   "value": 11471,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units tested for both SWRs without replay and SWR-coupled replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_overlap_tested_min_events": {
+   "value": 9162,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units tested for both SWRs without replay and SWR-coupled replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_rank_correlation_all": {
+   "value": 0.09014431826556221,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_rank_correlation_min_events": {
+   "value": 0.11706987009270872,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_same_sign_fraction_all": {
+   "value": 0.6478494623655914,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of the units called for both, the share whose two peaks have the same sign (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_same_sign_fraction_min_events": {
+   "value": 0.6624203821656051,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of the units called for both, the share whose two peaks have the same sign (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_sessions": {
+   "value": 75,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sessions in the extended-event-set tree",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_sessions_min_events": {
+   "value": 60,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sessions with at least 10 such SWRs",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_peak_ms_enhanced_all": {
+   "value": 88.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_peak_ms_enhanced_min_events": {
+   "value": 74.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_peak_ms_suppressed_all": {
+   "value": 88.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_peak_ms_suppressed_min_events": {
+   "value": 92.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_high_enhanced_all": {
+   "value": 74.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_high_enhanced_min_events": {
+   "value": 56.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_high_suppressed_all": {
+   "value": 78.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_high_suppressed_min_events": {
+   "value": 110.04999999999995,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_low_enhanced_all": {
+   "value": -68.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_low_enhanced_min_events": {
+   "value": -176.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_low_suppressed_all": {
+   "value": -200.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_ci_low_suppressed_min_events": {
+   "value": -200.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_enhanced_all": {
+   "value": 28.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_enhanced_min_events": {
+   "value": 22.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_suppressed_all": {
+   "value": 20.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_onset_ms_suppressed_min_events": {
+   "value": 26.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_size_enhanced_all": {
+   "value": 0.11682766453833954,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_size_enhanced_min_events": {
+   "value": 0.06477423478642622,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_size_suppressed_all": {
+   "value": 0.13359966949333218,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_rise_size_suppressed_min_events": {
+   "value": 0.13148155907646103,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_units_enhanced_all": {
+   "value": 301,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWRs without replay whose peak is an increase (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_units_enhanced_min_events": {
+   "value": 261,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_units_suppressed_all": {
+   "value": 618,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWRs without replay whose peak is a decrease (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_timing_units_suppressed_min_events": {
+   "value": 525,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_units_all": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units in every session (Figure 4's population)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_units_called_all": {
+   "value": 919,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWRs without replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_units_called_min_events": {
+   "value": 786,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWRs without replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_units_min_events": {
+   "value": 9162,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units in sessions with at least 10 SWRs without replay (Figure 4's population)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_units_tested_all": {
+   "value": 11471,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units with a finite p-value for SWRs without replay (every session)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
+   "pending": null
+  },
+  "swr_no_replay_units_tested_min_events": {
+   "value": 9162,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (1 Hz gate)",
    "pending": null
   },
   "swr_replay_called_fraction": {

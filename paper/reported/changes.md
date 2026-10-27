@@ -2230,3 +2230,29 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_non_swr_replay_enhanced` | ? | 4 % |
 | `paper/reported/overview.md` | `part4.timing_calibration_wide_bias_ms_onset_rise_boxcar_suppressed` | ? | 12 |
 | `paper/reported/overview.md` | `part4.timing_calibration_wide_stop_offset_size` | ? | 0.20 |
+
+## 2026-10-27
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.swr_no_replay_events` | ? | 2,290 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_events_fraction` | ? | 20 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_events_session_median` | ? | 29 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_sessions` | ? | 75 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_sessions_min_events` | ? | 60 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all` | ? | 8 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_units_called_all` | ? | 919 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_units_tested_all` | ? | 11,471 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_min_events` | ? | 9 % |
+| `paper/reported/overview.md` | `part4.swr_replay_called_fraction` | ? | 33 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_chimi` | ? | 31 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_jsixteen` | ? | 12 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_peanut` | ? | 8 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_senor` | ? | 4 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_wilbur` | ? | 7 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_overlap_odds_ratio_all` | ? | 1.4 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_overlap_both_all` | ? | 372 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_overlap_expected_all` | ? | 305 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_rank_correlation_all` | ? | 0.09 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_adds_to_split_fraction_all` | ? | 16 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_effect_abs_peak_median_swr_no_replay_all` | ? | 0.96 |

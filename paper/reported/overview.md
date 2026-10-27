@@ -312,5 +312,18 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   wider window is not needed for this: in the same simulation a ±1 s window moves a decrease's rise onset by
   <!--v:part4.timing_calibration_wide_bias_ms_onset_rise_boxcar_suppressed-->12<!--/v--> ms and shows the same stationary offset
   (size from zero <!--v:part4.timing_calibration_wide_stop_offset_size-->0.20<!--/v-->).
+- **SWRs without replay?** <!--v:part4.swr_no_replay_events-->2,290<!--/v--> Kay SWRs in the fitted stops overlap no non-local event
+  (<!--v:part4.swr_no_replay_events_fraction-->20 %<!--/v--> of them; median <!--v:part4.swr_no_replay_events_session_median-->29<!--/v--> per session), refit as their own class beside the
+  two replay classes with their own matched null (all <!--v:part4.swr_no_replay_sessions-->75<!--/v--> sessions; the canonical classes' results reproduce
+  exactly). Every value is given over all sessions and over the <!--v:part4.swr_no_replay_sessions_min_events-->60<!--/v--> sessions with at least 10 such SWRs
+  (which subset to read is open). At raw p < 0.05 they modulate <!--v:part4.swr_no_replay_called_fraction_all-->8 %<!--/v--> of tested units
+  (<!--v:part4.swr_no_replay_units_called_all-->919<!--/v--> of <!--v:part4.swr_no_replay_units_tested_all-->11,471<!--/v-->; <!--v:part4.swr_no_replay_called_fraction_min_events-->9 %<!--/v--> in the ≥10-event sessions), against
+  <!--v:part4.swr_replay_called_fraction-->33 %<!--/v--> for SWR-coupled replay; by animal chimi <!--v:part4.swr_no_replay_called_fraction_all_chimi-->31 %<!--/v-->, j16 <!--v:part4.swr_no_replay_called_fraction_all_jsixteen-->12 %<!--/v-->, peanut <!--v:part4.swr_no_replay_called_fraction_all_peanut-->8 %<!--/v-->, senor <!--v:part4.swr_no_replay_called_fraction_all_senor-->4 %<!--/v-->, wilbur <!--v:part4.swr_no_replay_called_fraction_all_wilbur-->7 %<!--/v-->. The units they do modulate overlap the
+  SWR-coupled ones only a little (odds ratio <!--v:part4.swr_no_replay_overlap_odds_ratio_all-->1.4<!--/v-->; <!--v:part4.swr_no_replay_overlap_both_all-->372<!--/v--> units called for both against
+  <!--v:part4.swr_no_replay_overlap_expected_all-->305<!--/v--> expected by chance), and the two peak modulations barely correlate across units
+  (Spearman <!--v:part4.swr_no_replay_rank_correlation_all-->0.09<!--/v-->). Adding them to the replay split improves held-out prediction for
+  <!--v:part4.swr_no_replay_adds_to_split_fraction_all-->16 %<!--/v--> of units. Caveats: these SWRs are few, so their test has less power than SWR-coupled
+  replay's and their curves are noisier (the median peak, <!--v:part4.swr_no_replay_effect_abs_peak_median_swr_no_replay_all-->0.96<!--/v--> log units, is inflated by
+  that noise); no match on event count or ripple power has been made.
 - *Reading:* a sizeable minority of mPFC units respond to non-SWR replay beyond matched rest. These are unit-level,
   uncorrected fractions; the population-level SWR against non-SWR test is still to do, and only mPFC is fitted.
