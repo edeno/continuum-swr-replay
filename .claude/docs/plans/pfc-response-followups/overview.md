@@ -61,7 +61,7 @@ New bundle trees only (see [shared-contracts.md#bundle-trees](shared-contracts.m
 
 ## Open Questions
 
-Questions for the lead. Each has the default the plan proceeds with.
+Questions for the lead. Each has the default the plan proceeds with. **Answered 2026-10-26 (~20:47):** 1 — report both rules, recommend one per sign; 66471fd3 stays out; 3 — definition confirmed, no power matching, ripple power as a graded mark on every class including SWRs without replay, null-only fallback allowed above ~16 h; 5, 6, 7 — defaults accepted; 8 — superseded by the ripple-power answer.
 
 1. **Commit `66471fd3` ("Make the PFC population fully descriptive")** on the marked branch drops Figure 4's 1 Hz firing-rate gate and the "has a held-out fit" screen. It changes the canonical Figure 4 population, which this plan must not touch. Default: not ported.
 2. **Onset definition (phase 1).** Default: the half-maximum onset, the earliest lag of the contiguous run around the peak where the curve keeps the peak's sign and at least half its size. Reported with the smoothing calibration. Alternatives: a fixed threshold in log-rate units, or the lag where the sign-aligned population curve leaves the matched-control band.

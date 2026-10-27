@@ -1530,9 +1530,33 @@ def _calibration_values(calibration: dict[str, Any], add: Callable[..., None]) -
     and under a planted decrease, looks like to each rule.
     """
     for scenario in calibration["scenarios"]:
-        if scenario["window"] != "canonical" or scenario["true_onset_ms"] != 0.0:
+        if scenario["true_onset_ms"] != 0.0:
             continue
         rules = scenario["rules"]
+        if scenario["window"] == "wide":
+            # Only what says whether a wider window would change the reading.
+            if scenario["scenario"] == "response":
+                stem = f"{scenario['shape']}_{CALIBRATION_GAIN_WORDS[scenario['gain']]}"
+                add(
+                    f"timing_calibration_wide_bias_ms_onset_rise_{stem}",
+                    rules["onset_rise"]["population_bias"],
+                    "quantity",
+                    "int",
+                    "rise onset minus the truth's, as the canonical-window key, for a "
+                    "kernel fit on +/-1.05 s and read on +/-1.0 s",
+                    "ms",
+                )
+            elif scenario["scenario"] == "stop_offset":
+                add(
+                    "timing_calibration_wide_stop_offset_size",
+                    rules["size_zero"]["population"],
+                    "quantity",
+                    "dec2",
+                    "size from zero of the stop-offset scenario's sign-aligned mean "
+                    "curve for a kernel fit on +/-1.05 s and read on +/-1.0 s",
+                    "log rate",
+                )
+            continue
         if scenario["scenario"] == "response":
             stem = f"{scenario['shape']}_{CALIBRATION_GAIN_WORDS[scenario['gain']]}"
             response = (

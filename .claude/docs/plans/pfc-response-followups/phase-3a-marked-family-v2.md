@@ -29,6 +29,7 @@ Why: questions 3, 5 and 8 are graded properties of events (what is replayed, how
   | `stop_context` | `rewarded_context`, `trips_to_patch_switch` | `log_event_duration_s`, `current_arm_fraction`, `posterior_entropy_mean` | `trips_to_patch_switch` |
 
   Both replay classes are marked (`MARKED_EVENT_CLASSES`). Reward outcome is already a baseline column under v2 1a.
+- **Ripple power on every class, the new one included** (lead, 2026-10-26: do not match SWRs without replay on power; measure how the response scales with ripple power in each class and overall). The family's marked classes become `non_local_SWR`, `non_local_no_SWR` and, when the session is cut with the extended event set, `SWR_no_non_local`. For the first two, `ripple_power_z` is the event table's (event-mean `SWR_zscore` of the decode frame). For `SWR_no_non_local` it is computed the same way: the mean of the cached decode frame's `SWR_zscore` (`load_session_swr_intervals` reads that frame; `analysis/events/swr_source.py:ripple_power_inputs` documents the covariate) over the SWR's own bins, with a test that this rule reproduces the event table's `ripple_power_z` for the non-local events of one session. A model `ripple_power` (target `ripple_power_z`, adjustment `log_event_duration_s`) is fit on all three classes; `event_strength` keeps its three targets on the replay classes. Pooled ("overall") slope: one marked block for the three classes together in a second fit, `ripple_power_pooled`.
 - **Marginal tier** (v2 phase 2) generated from `FOLLOWUP_MODEL_SPECS`: each target alone with `log_event_duration_s` and `posterior_entropy_mean` as adjustments (`log_event_duration_s` alone with entropy), content targets also with `leaf_content_fraction`; `next_trip_switches_patch` gets a marginal spec too.
 - **Shuffled-mark reference** (v2 phase 3) for the three joint models and every marginal spec, default R = 30, permuting each target within class among events where it is defined; for stop-level marks (`rewarded_context`, `trips_to_patch_switch`) permute **whole stops' values among stops** (all events of a stop move together), so the reference keeps the within-stop dependence. Write `.slope_null.npy` companions.
 - **Runner** `run_pfc_marked_model_family.py`: `--model-set {recommended,followup}` (default `recommended`), `--tier`, `--slope-permutations`, output default unchanged; the follow-up runs pass `--output-dir Processed-Data/pfc_response_followups/marked_family`. Contract 2.
@@ -39,7 +40,7 @@ Why: questions 3, 5 and 8 are graded properties of events (what is replayed, how
 
 - No GPU run (phase 3b).
 - v2 phase 1b's re-specification of the v1 models, its interaction work, and v2 phases 4–5.
-- No marks on `SWR_no_non_local` (overview Open Questions 8).
+- No content or context marks on `SWR_no_non_local` (it has no replay content); it carries ripple power only.
 
 ## Validation slice
 
