@@ -32,7 +32,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
+from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
@@ -625,6 +627,24 @@ def called_fraction_values(
                 "the engagement test",
             )
         )
+    pvalues = population[HELDOUT_P_COLUMNS["engagement"]].to_numpy(dtype=float)
+    pvalues = pvalues[np.isfinite(pvalues)]
+    if len(pvalues) != fractions["engagement"][1]:
+        raise ValueError("the engagement p-values are not the units it was tested on")
+    values.append(
+        make(
+            "engagement_bh_fraction",
+            (false_discovery_control(pvalues, method="bh") < ALPHA).mean(),
+            "fraction",
+            "pct",
+            "share of the tested units with a Benjamini-Hochberg q below "
+            f"{ALPHA:g} for the engagement test, BH applied once over the pooled "
+            "plus-one empirical p-values of every tested unit "
+            "(scipy.stats.false_discovery_control). For reference only: the units "
+            "are not independent, and the p-values sit on a 1/(R + 1) grid",
+            used_in_=("paper",),
+        )
+    )
     counts = population["min_heldout_model"].value_counts()
     for word, model in BEST_MODELS.items():
         values.append(
@@ -683,7 +703,10 @@ def null_geometry_values(
     )
     by_class = windows.groupby("event_class")[["total", "excluded"]].sum()
     excluded = 100 * by_class["excluded"] / by_class["total"]
-    worst = windows.loc[(windows["excluded"] / windows["total"]).idxmax()]
+    with_events = windows[windows["total"] > 0]
+    if with_events.empty:
+        raise ValueError("no session holds an event of any class")
+    worst = with_events.loc[(with_events["excluded"] / with_events["total"]).idxmax()]
     worst_label = f"{worst['session']} / {worst['event_class']}"
     return [
         make(
