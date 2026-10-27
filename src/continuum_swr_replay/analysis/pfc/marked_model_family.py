@@ -866,9 +866,10 @@ def stop_patch_switch_marks(stops: pd.DataFrame) -> pd.DataFrame:
     arms' patches differ. ``trips_to_patch_switch`` is the number of trips,
     from that one on, that stay in the patch before the first one that leaves
     it: 0 when the next trip leaves. It is capped at
-    :data:`TRIPS_TO_PATCH_SWITCH_CAP` and undefined (NaN) for a stop with no
-    completed trial, when a trip on the way has an unknown arm, and after the
-    session's last switch.
+    :data:`TRIPS_TO_PATCH_SWITCH_CAP`, which it also takes when no switch
+    follows but at least that many staying trips do; otherwise it is undefined
+    (NaN) for a stop with no completed trial, when a trip on the way has an
+    unknown arm, and after the session's last switch.
 
     Parameters
     ----------
@@ -923,13 +924,21 @@ def stop_patch_switch_marks(stops: pd.DataFrame) -> pd.DataFrame:
     switches[1:][known] = (patch[1:] != patch[:-1])[known].astype(float)
     # trips_from[k]: trips from trial k on that stay before the first that
     # leaves, filled backward; NaN after the last switch or past an unknown.
+    # With no switch ahead, the capped value is still known once at least
+    # TRIPS_TO_PATCH_SWITCH_CAP staying trips are: it is the cap.
     trips_from = np.full(n_trials + 1, np.nan)
+    known_stays = np.zeros(n_trials + 1)
     for index in range(n_trials - 1, -1, -1):
         if switches[index] == 1.0:
             trips_from[index] = 0.0
         elif switches[index] == 0.0:
             trips_from[index] = trips_from[index + 1] + 1.0
-    trips_from = np.minimum(trips_from, TRIPS_TO_PATCH_SWITCH_CAP)
+            known_stays[index] = known_stays[index + 1] + 1.0
+    trips_from = np.where(
+        np.isnan(trips_from) & (known_stays >= TRIPS_TO_PATCH_SWITCH_CAP),
+        TRIPS_TO_PATCH_SWITCH_CAP,
+        np.minimum(trips_from, TRIPS_TO_PATCH_SWITCH_CAP),
+    )
     next_trial = trial + 1
     has_next = np.isfinite(next_trial) & (next_trial < n_trials)
     trips = np.full(len(stops), np.nan)

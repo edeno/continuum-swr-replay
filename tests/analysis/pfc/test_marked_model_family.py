@@ -837,6 +837,13 @@ def test_trips_to_patch_switch_counts_forward():
         capped[TRIPS_TO_PATCH_SWITCH].to_numpy(), [3, 3, 3, 3, 2, 1, 0, 0, np.nan]
     )
 
+    # No switch after the last one, but three staying trips are known: the
+    # capped value is known too; with fewer it is not.
+    tail = stop_patch_switch_marks(_stop_sequence([2, 0, 1, 0, 1, 0]))
+    np.testing.assert_array_equal(
+        tail[TRIPS_TO_PATCH_SWITCH].to_numpy(), [0, 3, 3, np.nan, np.nan, np.nan]
+    )
+
 
 def test_trips_to_patch_switch_reads_every_stop_of_a_trial_and_checks_them():
     stops = _stop_sequence([0, 1, 2])
