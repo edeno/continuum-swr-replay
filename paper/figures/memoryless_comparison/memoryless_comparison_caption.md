@@ -34,31 +34,31 @@ sliding-window detector rejected.
 **(b-f)** Five events, with the posterior in grey; bars below the axis are the
 events each detector reports, and a sequence that fails the significance test
 is drawn as rejected. The sliding-window detector finds the continuous replay
-and gives it 5.8 times its true length, because 81% of the event it reports is
+and gives it <!--v:part1.recording_outbound_duration_ratio-->5.8<!--/v--> times its true length, because <!--v:part1.recording_outbound_local_fraction@pctnum-->81<!--/v-->% of the event it reports is
 the animal's own place, absorbed by the merge rule. It also accepts the 80 ms
-replay, at 1.6 times its length with 0% local coding in it: the window alone
+replay, at <!--v:part1.recording_short_replay_duration_ratio-->1.6<!--/v--> times its length with <!--v:part1.recording_short_replay_local_fraction@pctnum-->0<!--/v-->% local coding in it: the window alone
 puts a floor under any duration it can report. It passes the significance test
-(p = 0.010 on spread and 0.030 on jump). It assembles a candidate from the 30
+(p = <!--v:part1.recording_short_replay_p_spread-->0.010<!--/v--> on spread and <!--v:part1.recording_short_replay_p_jump-->0.030<!--/v--> on jump). It assembles a candidate from the 30
 cm replay and another from the remote stationary event and declines both for
-too little dispersion (6 and 0 cm against the 12 cm it requires). The
-state-space detector reports all four, with every bound within 42 ms of the
-truth. The outbound continuous replay fails it (p = 0.010 on spread and 0.079
-on jump), 3 draws from passing, and the inbound continuous replay passes it (p
-= 0.010 on spread and 0.020 on jump). Most of each reported continuous replay
+too little dispersion (<!--v:part1.recording_short_path_dispersion_cm-->6<!--/v--> and <!--v:part1.recording_remote_stationary_dispersion_cm-->0<!--/v--> cm against the 12 cm it requires). The
+state-space detector reports all four, with every bound within <!--v:part1.recording_state_space_bound_error_ms-->42<!--/v--> ms of the
+truth. The outbound continuous replay fails it (p = <!--v:part1.recording_outbound_p_spread-->0.010<!--/v--> on spread and <!--v:part1.recording_outbound_p_jump-->0.079<!--/v-->
+on jump), <!--v:part1.recording_outbound_draws_from_passing-->3<!--/v--> draws from passing, and the inbound continuous replay passes it (p
+= <!--v:part1.recording_inbound_p_spread-->0.010<!--/v--> on spread and <!--v:part1.recording_inbound_p_jump-->0.020<!--/v--> on jump). Most of each reported continuous replay
 is the animal's own place either way: the test asks whether a sequence is
 spatially coherent, not whether it is somewhere other than the animal. **(f)**
 A still event at the animal's own place, with spikes placed by hand so that one
-80 ms window holds only two spikes of a cell 149 cm away (star). The still
+80 ms window holds only two spikes of a cell <!--v:part1.recording_stray_window_distance_cm-->149<!--/v--> cm away (star). The still
 parts, 120 ms either side, come from the two cells whose fields lie nearest the
-animal, and 99% of the reported event's kept windows decode within 15 cm of it;
-the event is reported 396 ms long. The windows either side of the far one are
+animal, and <!--v:part1.recording_stray_window_local_fraction@pctnum-->99<!--/v-->% of the reported event's kept windows decode within 15 cm of it;
+the event is reported <!--v:part1.recording_stray_window_duration_ms-->396<!--/v--> ms long. The windows either side of the far one are
 too broad to keep, but the one after it centres near it, so it passes the jump
 rule; as a run of one window it is dropped before the merge, and the still
 parts either side merge across it. Its dispersion still counts toward the
-merged event's, as in the reference: 14.4 cm with it and 0.5 cm without,
+merged event's, as in the reference: <!--v:part1.recording_stray_window_dispersion_cm-->14.4<!--/v--> cm with it and <!--v:part1.recording_stray_window_pieces_dispersion_cm-->0.5<!--/v--> cm without,
 against the 12 cm required, so a still event is called replay on the strength
-of one window. Put through the significance test it fails it (p = 0.41 on
-spread and 0.32 on jump). The state-space detector reports no non-local event
+of one window. Put through the significance test it fails it (p = <!--v:part1.recording_stray_window_p_spread-->0.41<!--/v--> on
+spread and <!--v:part1.recording_stray_window_p_jump-->0.32<!--/v--> on jump). The state-space detector reports no non-local event
 over it. On the first recorded pilot epoch this pattern decided <!--v:part1.pilot_calls_decided_by_outside_window-->2<!--/v--> of its <!--v:part1.pilot_replay_calls-->4<!--/v-->
 replay calls, both of which passed the test; the event table now carries the
 dispersion without such windows beside the published one.
@@ -208,5 +208,9 @@ tested on activity that holds none. The significance test is the reference's
 place-cell identity shuffle, which needs sorted cells; recorded data, decoded
 clusterless, are tested with an encoding-pair shuffle instead.
 
-Produced by `scripts/figures/generate_memoryless_comparison.py` from
-`docs/design/replay_detection_comparison/detection_sweep_summary.csv`.
+Drawn by `scripts/figures/generate_memoryless_comparison.py`, which does not
+write this caption. Its numbers are Part 1's reported values
+(`paper/reported/part1.json`), read from the sweep summaries and
+`docs/design/replay_detection_comparison/memoryless_comparison_recording.json`
+(which the figure script writes) and filled in by
+`scripts/reported/emit_reported_values.py`.

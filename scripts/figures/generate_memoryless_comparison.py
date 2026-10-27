@@ -13,9 +13,14 @@ detector reported. Those panels read the aggregates the sweep saves, so the
 figure and the numbers quoted from the sweep cannot disagree; re-run the sweep
 to change them.
 
-Every outcome the titles and caption state is read from the data. Where the
-prose commits to a verdict -- an event missed, declined, or found -- the script
-checks it and stops rather than write a caption the panels contradict.
+The caption, `paper/figures/memoryless_comparison/memoryless_comparison_caption.md`,
+is prose this script does not write. Its numbers are reported values
+(`continuum_swr_replay.reported.part1`): the sweep's from the sweeps' CSVs, the
+labeled recording's (a-f) from the JSON this script writes
+(:data:`RECORDING_NUMBERS_PATH`), filled into the caption by
+`scripts/reported/emit_reported_values.py`. Where the prose commits to a verdict
+-- an event missed, declined, found, passing or failing the significance test --
+the script checks it and stops rather than draw a figure the caption contradicts.
 
 In both halves the two detectors read one encoding model, fitted once.
 The upper panels' simulation and its decode are
@@ -27,9 +32,10 @@ Usage:
 """
 
 import argparse
+import json
 import string
-import textwrap
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -70,6 +76,7 @@ from continuum_swr_replay.figure_utilities import (
     set_figure_defaults,
 )
 from continuum_swr_replay.runs.device import default_jax_platforms
+from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_sweep_summary.csv"
@@ -84,6 +91,12 @@ CONTROLS_SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_controls_summary.csv"
 )
 """Aggregates of the controls sweep: no replay, bursts, jumps, chains."""
+
+RECORDING_NUMBERS_PATH = Path(
+    "docs/design/replay_detection_comparison/memoryless_comparison_recording.json"
+)
+"""The numbers the caption states about the one labeled recording (a-f),
+which this script computes; Part 1's reported values read them."""
 
 HELDOUT_SUMMARY_PATH = Path(
     "docs/design/replay_detection_comparison/detection_heldout_summary.csv"
@@ -398,43 +411,40 @@ def stray_window_dispersions(decoded: dict) -> tuple[float, float, int]:
     )
 
 
-def stray_window_shuffle_sentence(decoded: dict) -> str:
-    """What the significance test made of the stray-window event, from the data."""
-    _, _, sequence = stray_window_dispersions(decoded)
-    result = decoded["shuffles"][sequence]
-    halves = (
-        "passes both halves"
-        if result.passes
-        else "fails it"
-        if not (
-            result.p_spread <= SIGNIFICANCE_LEVEL or result.p_jump <= SIGNIFICANCE_LEVEL
+CAPTION_SETTINGS = {
+    "n_shuffles": 100,
+    "spread_threshold_cm": 10.0,
+    "stride_ms": 4.0,
+    "speed_threshold_cm_per_s": 4.0,
+    "dispersion_threshold_cm": 12.0,
+    "stray_window_still_ms": 120.0,
+    "stray_window_n_local": 2,
+}
+"""Settings the caption's prose states. They are method, not results, so the
+caption types them; :func:`check_caption_settings` stops if the code moves."""
+
+
+def check_caption_settings(config: MemorylessSequenceConfig) -> None:
+    """Stop when a setting the caption states is no longer the code's."""
+    actual = {
+        "n_shuffles": DEFAULT_N_SHUFFLES,
+        "spread_threshold_cm": config.spread_threshold_cm,
+        "stride_ms": 1000 * config.stride_s,
+        "speed_threshold_cm_per_s": config.speed_threshold_cm_per_s,
+        "dispersion_threshold_cm": config.dispersion_threshold_cm,
+        "stray_window_still_ms": 1000 * STRAY_WINDOW_STILL_S,
+        "stray_window_n_local": STRAY_WINDOW_N_LOCAL,
+    }
+    moved = {
+        k: (v, actual[k])
+        for k, v in CAPTION_SETTINGS.items()
+        if not np.isclose(v, actual[k])
+    }
+    if moved:
+        raise RuntimeError(
+            f"The caption states settings the code no longer uses (caption, code): "
+            f"{moved}. Rewrite the caption and CAPTION_SETTINGS."
         )
-        else "passes the spread half and fails the jump half"
-        if result.p_spread <= SIGNIFICANCE_LEVEL
-        else "passes the jump half and fails the spread half"
-    )
-    return (
-        f"Put through the significance test it {halves} (p = "
-        f"{result.p_spread:.2f} on spread and {result.p_jump:.2f} on jump)"
-    )
-
-
-def stray_window_state_space_sentence(decoded: dict) -> str:
-    """What the state-space detector reported over the stray-window event."""
-    start_s, end_s = decoded["event_times"][STRAY_WINDOW_EVENT]
-    overlapping = [
-        (max(a, start_s), min(b, end_s))
-        for a, b in decoded["state_space_intervals"]
-        if a < end_s and start_s < b
-    ]
-    if not overlapping:
-        return "The state-space detector reports no non-local event over it."
-    total_ms = 1000 * sum(b - a for a, b in overlapping)
-    return (
-        f"The state-space detector reports {len(overlapping)} short non-local "
-        f"event{'s' if len(overlapping) > 1 else ''} over it, {total_ms:.0f} ms "
-        f"of its {1000 * (end_s - start_s):.0f} ms in all."
-    )
 
 
 def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> None:
@@ -506,6 +516,32 @@ def check_caption_claims(decoded: dict, config: MemorylessSequenceConfig) -> Non
                 "The caption says most of each reported continuous replay is the "
                 f"animal's own place; {EVENT_LABELS[event]!r} is not. Rewrite it."
             )
+    if not shuffle_of(decoded, SHORT_REPLAY_EVENT).passes:
+        raise RuntimeError(
+            "The caption says the 80 ms replay passes the significance test; it "
+            "fails it. Rewrite the caption."
+        )
+    if (
+        shuffle_of(decoded, CONTINUOUS_OUTBOUND_EVENT).passes
+        or not shuffle_of(decoded, CONTINUOUS_INBOUND_EVENT).passes
+    ):
+        raise RuntimeError(
+            "The caption says the outbound continuous replay fails the significance "
+            "test and the inbound one passes it; the data disagree. Rewrite the "
+            "caption."
+        )
+    stray = decoded["shuffles"][sequence]
+    if stray.p_spread <= SIGNIFICANCE_LEVEL or stray.p_jump <= SIGNIFICANCE_LEVEL:
+        raise RuntimeError(
+            "The caption says the stray-window event fails both halves of the "
+            "significance test; it passes one. Rewrite the caption."
+        )
+    start_s, end_s = decoded["event_times"][STRAY_WINDOW_EVENT]
+    if any(a < end_s and start_s < b for a, b in decoded["state_space_intervals"]):
+        raise RuntimeError(
+            "The caption says the state-space detector reports no non-local event "
+            "over the stray-window event; it reports one. Rewrite the caption."
+        )
 
 
 def local_fraction(decoded: dict, sequence: int, tolerance_cm: float = 15.0) -> float:
@@ -1374,23 +1410,6 @@ def make_figure(
     return fig, decoded
 
 
-def rewrap(text: str, width: int = 79) -> str:
-    """Re-fill each paragraph, so interpolated numbers cannot leave ragged lines.
-
-    The caption is prose with blank lines between paragraphs and nothing else,
-    so filling paragraph by paragraph is safe.
-    """
-    return "\n\n".join(
-        textwrap.fill(
-            " ".join(paragraph.split()),
-            width=width,
-            break_on_hyphens=False,  # keeps "state-space" on one line
-            break_long_words=False,
-        )
-        for paragraph in text.strip().split("\n\n")
-    )
-
-
 def check_summary_claims(summary: pd.DataFrame) -> None:
     """The caption's claims about the sweep, checked against the summary.
 
@@ -1467,59 +1486,6 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
             "The caption says the window floor still leaves events too long "
             "beyond 80 cm; the summary's duration ratios disagree."
         )
-
-
-def pct(value: float, digits: int = 0) -> str:
-    """A percentage for the caption, refusing to print one that is not a number."""
-    if not np.isfinite(value):
-        raise RuntimeError(
-            "A caption percentage is not finite; the sweep summary is incomplete."
-        )
-    return f"{100 * value:.{digits}f}%"
-
-
-def pct_range(values) -> str:
-    """A range of percentages for the caption, one value when both ends agree."""
-    low, high = pct(min(values)), pct(max(values))
-    return low if low == high else f"{low} to {high}"
-
-
-def continuous_shuffle_sentence(decoded: dict) -> str:
-    """What the significance test did with the two continuous replays."""
-    parts = []
-    for event, name in (
-        (CONTINUOUS_OUTBOUND_EVENT, "outbound"),
-        (CONTINUOUS_INBOUND_EVENT, "inbound"),
-    ):
-        result = shuffle_of(decoded, event)
-        p = f"p = {result.p_spread:.3f} on spread and {result.p_jump:.3f} on jump"
-        if result.passes:
-            parts.append(f"the {name} continuous replay passes it ({p})")
-        else:
-            margin = draws_from_passing(result)
-            parts.append(
-                f"the {name} continuous replay fails it ({p}), "
-                f"{margin} draw{'s' if margin != 1 else ''} from passing"
-            )
-    return parts[0][0].upper() + parts[0][1:] + ", and " + parts[1] + "."
-
-
-def short_replay_shuffle_sentence(decoded: dict) -> str:
-    """What the significance test did with the 80 ms replay, from the data."""
-    result = shuffle_of(decoded, SHORT_REPLAY_EVENT)
-    p = f"p = {result.p_spread:.3f} on spread and {result.p_jump:.3f} on jump"
-    if result.passes:
-        return f"It passes the significance test ({p})."
-    margin = draws_from_passing(result)
-    closeness = (
-        "one draw from passing, so another seed could pass it"
-        if margin == 1
-        else f"{margin} draws from passing"
-    )
-    return (
-        f"The significance test rejects it ({p}, against 0.05), {closeness}, "
-        "and the published method would not report it."
-    )
 
 
 def check_controls_claims(controls: pd.DataFrame) -> None:
@@ -1676,439 +1642,74 @@ def check_heldout_claims(heldout: pd.DataFrame) -> None:
                 )
 
 
-def write_caption(
-    decoded: dict,
-    summary: pd.DataFrame,
-    controls: pd.DataFrame,
-    heldout: pd.DataFrame,
-    config: MemorylessSequenceConfig,
-    path: Path,
-) -> None:
-    """Save the caption beside the figure, with its numbers read from the data.
+def recording_numbers(decoded: dict) -> dict[str, float | int]:
+    """The numbers the caption states about the one labeled recording (a-f).
 
-    The figure itself carries almost no words, which is what a paper figure
-    should look like. Everything a reader needs is here instead, written from
-    the same arrays and the same summary the figure plots, so the two cannot
-    drift apart.
+    The caption no longer interpolates them: they go to
+    :data:`RECORDING_NUMBERS_PATH`, ``continuum_swr_replay.reported.part1``
+    reads them into Part 1's summary, and the emitter writes them into the
+    caption's markers. Durations in ms, distances in cm, shares in [0, 1].
     """
-    overall = summary[summary["summary"] == "overall"].set_index("measure").value
-    domain = (
-        summary[summary["summary"] == "overall_in_domain"].set_index("measure").value
+    outbound = shuffle_of(decoded, CONTINUOUS_OUTBOUND_EVENT)
+    inbound = shuffle_of(decoded, CONTINUOUS_INBOUND_EVENT)
+    short = shuffle_of(decoded, SHORT_REPLAY_EVENT)
+    stray_full, stray_pieces, stray_sequence = stray_window_dispersions(decoded)
+    stray = decoded["shuffles"][stray_sequence]
+    zoomed = (
+        CONTINUOUS_OUTBOUND_EVENT,
+        SHORT_REPLAY_EVENT,
+        SHORT_PATH_EVENT,
+        REMOTE_STATIONARY_EVENT,
     )
-    ratio = summary[
-        (summary["summary"] == "median_duration_ratio_by_duration")
-        & (summary.measure == "sliding_duration_ratio")
-    ].sort_values("duration_s")
-    shortest = ratio.iloc[0]
-    durations_ms, sliding_onset = timing_series(summary, "sliding", "start", "median")
-    _, sliding_offset = timing_series(summary, "sliding", "end", "median")
-    _, sliding_offset_q75 = timing_series(summary, "sliding", "end", "q75")
-    state_space_edges = np.concatenate(
-        [
-            timing_series(summary, "state_space", edge, "median")[1]
-            for edge in ("start", "end")
-        ]
-    )
-    passes = summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
-    jump_pass = (
-        passes[passes.measure == "sliding_jump_pass"]
-        .set_index("duration_s")
-        .value.sort_index()
-    )
-    check_summary_claims(summary)
-    check_controls_claims(controls)
-    check_heldout_claims(heldout)
-
-    def support(fold, classes, truth, estimator="state_space"):
-        return heldout_rate(heldout, fold, estimator, classes, truth)[0]
-
-    ours_support = [support(f, ("ours_only",), "continuous_replay") for f in "AB"]
-    shared_support = [support(f, ("shared",), "continuous_replay") for f in "ABC"]
-    jumping_support = [support(f, ("ours_only", "shared"), "non_local") for f in "AB"]
-    informative = {
-        name: [
-            heldout_rate(
-                heldout,
-                f,
-                "state_space",
-                classes,
-                "continuous_replay",
-                "informative_share",
-            )[0]
-            for f in "AB"
-        ]
-        for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
+    return {
+        "outbound_duration_ratio": duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT),
+        "outbound_local_fraction": local_fraction_of_event(
+            decoded, CONTINUOUS_OUTBOUND_EVENT
+        ),
+        "outbound_p_spread": float(outbound.p_spread),
+        "outbound_p_jump": float(outbound.p_jump),
+        "outbound_draws_from_passing": draws_from_passing(outbound),
+        "inbound_p_spread": float(inbound.p_spread),
+        "inbound_p_jump": float(inbound.p_jump),
+        "short_replay_duration_ratio": duration_ratio(decoded, SHORT_REPLAY_EVENT),
+        "short_replay_local_fraction": local_fraction_of_event(
+            decoded, SHORT_REPLAY_EVENT
+        ),
+        "short_replay_p_spread": float(short.p_spread),
+        "short_replay_p_jump": float(short.p_jump),
+        "short_path_dispersion_cm": best_dispersion_cm(decoded, SHORT_PATH_EVENT),
+        "remote_stationary_dispersion_cm": best_dispersion_cm(
+            decoded, REMOTE_STATIONARY_EVENT
+        ),
+        "state_space_bound_error_ms": bound_error_ms(decoded, zoomed),
+        "stray_window_distance_cm": abs(
+            decoded["stray_window_remote_cm"] - decoded["stray_window_local_cm"]
+        ),
+        "stray_window_local_fraction": local_fraction_of_event(
+            decoded, STRAY_WINDOW_EVENT
+        ),
+        "stray_window_duration_ms": 1000
+        * float(decoded["candidates"].duration_s[stray_sequence]),
+        "stray_window_dispersion_cm": stray_full,
+        "stray_window_pieces_dispersion_cm": stray_pieces,
+        "stray_window_p_spread": float(stray.p_spread),
+        "stray_window_p_jump": float(stray.p_jump),
     }
-    agreement = heldout[
-        (heldout["summary"] == "agreement") & (heldout.measure == "estimator_agreement")
-    ].value
-    placeless = [
-        heldout_rate(heldout, f, "state_space", ("ours_only", "shared"), "no_content")
-        for f in FOLD_HATCH
-    ]
-    placeless_loose = [
-        heldout_rate(
-            heldout,
-            f,
-            "state_space",
-            ("ours_only", "shared"),
-            "no_content",
-            suffix="_floor2",
-        )
-        for f in FOLD_HATCH
-    ]
-    loose_supported = sum(round(rate * n) for rate, n in placeless_loose if n)
 
-    def called(condition, detector):
-        return controls_value(
-            controls, "bursts", "called_rate", condition, None, detector
-        )
 
-    def burst_share(share):
-        rows = controls[
-            (controls["summary"] == "bursts")
-            & (controls.measure == share)
-            & (controls.condition == "placeless_burst")
-        ]
-        return float(rows.value.min()), float(rows.value.max())
-
-    def carving(conditions, label, detector):
-        """Share of trials carved this way at each level, pooled over conditions."""
-        return np.array(
-            [
-                np.mean(
-                    [
-                        controls_value(
-                            controls,
-                            "parts",
-                            f"segmentation_{label}",
-                            c,
-                            level,
-                            detector,
-                        )
-                        for c in conditions
-                    ]
-                )
-                for level in controls_levels(controls, conditions[0])
-            ]
-        )
-
-    def recovery(condition, detector):
-        return np.array(
-            [
-                controls_value(
-                    controls, "parts", "part_recovery", condition, level, detector
-                )
-                for level in controls_levels(controls, condition)
-            ]
-        )
-
-    minutes = no_replay_minutes(controls)
-    n_recordings = int(
-        controls[
-            (controls["summary"] == "provenance") & (controls.measure == "n_recordings")
-        ].value.iloc[0]
-    )
-
-    def mean_recovery(detector, measure):
-        return np.mean(
-            [
-                controls_value(controls, "parts", measure, c, level, detector)
-                for c in MULTIPART_CONDITIONS
-                for level in controls_levels(controls, c)
-            ]
-        )
-
-    sliding_fewer, sliding_more, sliding_trials = paired_part_changes(
-        controls, "sliding_published"
-    )
-    ours_fewer, ours_more, _ = paired_part_changes(controls, "state_space_canonical")
-    fragmented_low, fragmented_high = burst_share("fragmented_share")
-    jumps = ("jump_120ms", "jump_200ms")
-    spanning_jumps = carving(jumps, "spanning", "state_space_canonical")
-    sliding_spanning = carving(jumps, "spanning", "sliding_published")
-    elsewhere_missing = carving(
-        ("chain_elsewhere",), "parts_missing", "sliding_published"
-    )
-    elsewhere_split = carving(
-        ("chain_elsewhere",), "one_per_part", "state_space_canonical"
-    )
-    continuing = {
-        (label, detector): carving(("chain_continuing",), label, detector)
-        for label in ("spanning", "one_per_part")
-        for detector in ("sliding_published", "state_space_canonical")
-    }
-    gaps_ms = 1000 * np.array(controls_levels(controls, "chain_continuing"))
-
+def write_recording_numbers(numbers: dict, n_neurons: int, path: Path) -> None:
+    """Save :func:`recording_numbers` with the provenance the sweeps' CSVs carry."""
     path.write_text(
-        rewrap(
-            f"""# {path.stem}
-
-**Two replay detectors on replays whose shape is known.** The sliding-window
-detector decodes each 80 ms window on its own, with no model of how one window
-follows the next, and keeps or drops windows on the spread of their posterior
-and on the jump to the next window. The state-space detector infers the whole
-event at once and carries the animal's own place as a competing hypothesis.
-Throughout, both detectors read one encoding model, fitted once; the
-sliding-window detector decodes it as the reference does, with 1e-3 Hz added to
-every place field, and is held to the published definition as adapted here,
-its significance test included: each accepted sequence is decoded again
-{DEFAULT_N_SHUFFLES} times with the place fields swapped between cells, and
-must beat those draws on both its mean posterior spread and its mean jump. The
-adaptations: a window's spread is a root-mean-square distance along the track
-about a place bin, cut at {config.spread_threshold_cm:.0f} cm, where the
-paper's open-field statistic is a two-dimensional image moment that a 10 cm
-cutoff does not carry over to exactly; centers are place bins, so the pairs of windows whose
-jump the original sets aside as zero are read from the spikes instead;
-windows step {1000 * config.stride_s:.0f} ms rather than 5 ms; and the
-immobility cutoff is {config.speed_threshold_cm_per_s:.0f} rather than
-5 cm/s. The figure compares the events two complete pipelines report, each with
-its own acceptance criteria, so a difference between them cannot be put down
-to how either finds candidates alone.
-
-**(a-f) One recording with labeled events.** The simulation carries a
-continuous outbound replay, a fragmented replay, a continuous inbound replay
-and a silent stretch; a remote stationary event, a 30 cm replay, an 80 ms
-replay and a still event with one window decoded far away were written into
-the spike trains here and are marked with a star.
-
-**(a)** The whole recording. Green is where the animal is; dots are the decoded
-place of each window, kept or rejected; yellow marks a labeled event; bars below
-the axis are the events each detector reports and the candidates the
-sliding-window detector rejected.
-
-**(b-f)** Five events, with the posterior in grey; bars below the axis are
-the events each detector reports, and a sequence that fails the significance
-test is drawn as rejected. The sliding-window detector finds the continuous
-replay and gives it
-{duration_ratio(decoded, CONTINUOUS_OUTBOUND_EVENT):.1f} times its true length,
-because {100 * local_fraction_of_event(decoded, CONTINUOUS_OUTBOUND_EVENT):.0f}%
-of the event it reports is the animal's own place, absorbed by the merge rule.
-It also accepts the 80 ms replay, at
-{duration_ratio(decoded, SHORT_REPLAY_EVENT):.1f} times its length with
-{100 * local_fraction_of_event(decoded, SHORT_REPLAY_EVENT):.0f}% local coding
-in it: the window alone puts a floor under any duration it can report.
-{short_replay_shuffle_sentence(decoded)} It
-assembles a candidate from the 30 cm replay and another from the remote
-stationary event and declines both for too little dispersion
-({best_dispersion_cm(decoded, SHORT_PATH_EVENT):.0f} and
-{best_dispersion_cm(decoded, REMOTE_STATIONARY_EVENT):.0f} cm against the
-{config.dispersion_threshold_cm:.0f} cm it requires). The state-space detector
-reports all four, with every bound within
-{bound_error_ms(decoded, (CONTINUOUS_OUTBOUND_EVENT, SHORT_REPLAY_EVENT, SHORT_PATH_EVENT, REMOTE_STATIONARY_EVENT)):.0f} ms
-of the truth. {continuous_shuffle_sentence(decoded)} Most of each reported
-continuous replay is the animal's own place either way: the test asks whether
-a sequence is spatially coherent, not whether it is somewhere other than the
-animal. **(f)** A still event at the animal's own place, with spikes placed by
-hand so that one 80 ms window holds only two spikes of a cell
-{abs(decoded["stray_window_remote_cm"] - decoded["stray_window_local_cm"]):.0f} cm
-away (star). The still parts, {1000 * STRAY_WINDOW_STILL_S:.0f} ms either side,
-come from the {("one", "two", "three")[STRAY_WINDOW_N_LOCAL - 1]} cells whose fields lie nearest the animal, and
-{100 * local_fraction_of_event(decoded, STRAY_WINDOW_EVENT):.0f}% of the
-reported event's kept windows decode within 15 cm of it; the event is reported
-{1000 * decoded["candidates"].duration_s[stray_window_dispersions(decoded)[2]]:.0f} ms
-long. The windows either side of the far one are too broad to keep, but the one
-after it centres near it, so it passes the jump rule; as a run of one window it
-is dropped before the merge, and the still parts either side merge across it.
-Its dispersion still counts toward the merged event's, as in the reference:
-{stray_window_dispersions(decoded)[0]:.1f} cm with it and
-{stray_window_dispersions(decoded)[1]:.1f} cm without, against the
-{config.dispersion_threshold_cm:.0f} cm required, so a still event is called
-replay on the strength of one window. {stray_window_shuffle_sentence(decoded)}.
-{stray_window_state_space_sentence(decoded)}
-On the first recorded pilot epoch this pattern decided 2 of its 4 replay calls,
-both of which passed the test; the event table now carries the dispersion
-without such windows beside the published one.
-
-**(g-k) {int(overall["n_cells"])} replays of chosen shape.** Made-up
-replays were written into the spike trains of a simulated linear-track
-recording, one at a time, each with a path length, duration, firing rate and
-distance from the animal's own place that we chose. Because the right answer is known, what each
-detector reports can be scored against it. A detector counts as reporting a
-replay only when what it returns is that replay: on its path throughout, and
-not covering far more ground than the path does.
-
-**(g, h)** Percent of those {int(overall["n_cells"])} replays reported, by the
-path the replay travels and how long it lasts; both detectors are scored the
-same way against the same known answer. The comparison that isolates detection
-uses a shared target: the replays the published definition can accept at all,
-a path over about 42 cm and a duration over 100 ms,
-{pct(domain["n_cells"] / overall["n_cells"])} of the cells, with both detectors
-held to that definition's duration and dispersion criteria. There the
-sliding-window detector reports {pct(domain["sliding_matches_before_shuffle"])}
-before its significance test and the state-space detector
-{pct(domain["state_space_replay_matches"])}. The significance test, which only
-the sliding-window detector is put through, brings it to
-{pct(domain["sliding_matches"])}; the state-space detector's own acceptance
-criteria, in place of the published ones, bring it to
-{pct(domain["state_space_matches"])}. Over the whole grid, each under its own
-criteria, the two read {pct(overall["sliding_matches"])} and
-{pct(overall["state_space_matches"])}; that gap combines differences in
-detection with differences in what each counts as a replay. Over the whole
-grid the sliding-window detector reports
-{pct(overall["sliding_matches_before_shuffle"])} before its significance test,
-and {pct(overall["sliding_matches_spread_only"])} with the spread half alone,
-the only half the detection script's own filter could fail; the paper's
-analyses read both halves, from a corrected script. Of the replays it reported
-before the test,
-{pct(overall["sliding_shuffle_spread_pass_rate"])} pass the spread half and
-{pct(overall["sliding_shuffle_jump_pass_rate"])} the jump half; a short replay
-covers its path in few windows, so its own jumps are large, and the jump half
-passes {pct(jump_pass.iloc[0])} of {1000 * jump_pass.index[0]:.0f} ms replays
-against {pct(jump_pass.iloc[-1])} of {1000 * jump_pass.index[-1]:.0f} ms ones.
-The test keeps the reference's conventions where they carry over, counting only
-draws strictly below the observed value and passing each half at p ≤ 0.05, and
-translates its zero-jump rule to binned centers.
-{pct(overall["found_by_state_space_only"])} were reported by the
-state-space detector and not by the sliding-window detector, counting the
-{pct(overall["missed_failed_shuffle"])} it reported and then failed on the
-significance test; {pct(overall["found_by_sliding_window_only"], 2)} went the
-other way ({pct(overall["found_by_sliding_window_only_before_shuffle"], 2)}
-before the significance test).
-
-The two detectors reach their limits on different quantities. The state-space
-detector is limited by duration, which is spike count, which is the data. The
-sliding-window detector is limited by path length, through its own dispersion
-criterion: a replay must spread more than 12 cm about its own centre, and a
-30 cm path cannot, however well it is decoded.
-Held to that same criterion our state-space detector also reports nothing below
-45 cm, so this is the published replay definition acting, not the window-by-window
-inference.
-
-**(i, j)** Where each detector puts a replay's start (i) and end (j): reported
-minus true, in ms, median line and interquartile band by true duration, over
-the replays both detectors reported, the sliding window's before its
-significance test, which never moves a sequence's bounds. The sliding window's
-bounds are its first and last window midpoints, and its 80 ms windows reach
-40 ms beyond each. The state-space detector's median start and end sit within
-{np.abs(state_space_edges).max():.0f} ms of the truth at every duration. The
-sliding window starts a median {-sliding_onset.max():.0f} to
-{-sliding_onset.min():.0f} ms early and ends {sliding_offset.min():.0f} to
-{sliding_offset.max():.0f} ms late, and its late ends carry a long tail, the
-upper quartile reaching {sliding_offset_q75.max():.0f} ms; panel (k) shows
-how much of a reported event is the animal's own place. A {durations_ms[0]:.0f} ms
-replay's reported start is a median {-sliding_onset[0]:.0f} ms early and its end a
-median {sliding_offset[0]:.0f} ms late, and its median reported duration is about
-{1000 * shortest.duration_s * shortest.value:.0f} ms, the floor panel (c) shows for
-one event.
-
-**(k)** Reported duration over actual duration against how far the replay sits
-from the animal's own place. Numbers give the share of the reported event's
-80 ms windows that decode the animal's place rather than a replayed one. That
-absorption of local coding reaches about 80 cm from the animal and is what
-drives the largest over-reporting, as in panel (b); beyond it the window
-floor of panels (i, j) still leaves the reported duration too long. Over the whole sweep,
-{pct(overall["sliding_accepted_but_not_the_injection"])} of the
-sliding-window detector's accepted events are not the replay that was put in.
-
-**(l-o) Activity that is not one clean replay**, written into the same recording
-and scored by the same rule; our detector is read both ways, its non-local
-events (continuous and fragmented states together) and the continuous state
-alone. **(l)** Share of bursts with an event reported on them. A place-less
-burst, every cell firing at one rate unrelated to its field, carries no
-spatial content, so any event on it is false; a jumping burst represents a
-random place every 15 ms, so calling it non-local is right and calling it a
-sequence is not. Our detector's non-local events cover
-{pct(called("placeless_burst", "state_space_canonical"))} of place-less
-bursts, which spend {pct(fragmented_low)} to {pct(fragmented_high)} of their
-time in the fragmented state; the continuous state alone covers
-{pct(called("placeless_burst", "state_space_continuous"))}, and the sliding
-window {pct(called("placeless_burst", "sliding_published"))}
-({pct(called("placeless_burst", "sliding_accepted"))} before its significance
-test). These pool the three peak rates, 20, 60 and 160 Hz; at 20 Hz a
-place-less burst fires about as fast as the local coding it replaces, and our
-non-local events still cover
-{pct(controls_value(controls, "bursts", "called_rate_at_20hz", "placeless_burst", None, "state_space_canonical"))}
-of them. On jumping bursts our non-local events cover
-{pct(called("jumping_burst", "state_space_canonical"))}, which is right; the
-continuous state alone covers {pct(called("jumping_burst", "state_space_continuous"))}
-and the sliding window {pct(called("jumping_burst", "sliding_published"))}
-({pct(called("jumping_burst", "sliding_accepted"))} before its test), each
-calling a sequence that is not there. Over {minutes:.1f} minutes of immobility
-with no replay, from {n_recordings} simulated recordings that pause in the same
-places at the track's end, no output reported any event: fewer than
-{3 / minutes:.1f} per minute, at 95% confidence, and only there.
-**(m)** Two 60 cm parts, the second starting the given distance behind where
-the first ended, with no gap in time, pooled over 120 and 200 ms parts, their
-far end held 45 cm from where the animal rests whatever the jump; bars
-give how each detector carved the event (vermilion outline the sliding window
-under the published definition, blue our non-local events), and the numbers
-above them the share of parts recovered. Our detector reports one event over
-both parts in {pct(spanning_jumps.min())} to {pct(spanning_jumps.max())} of
-trials at every jump; the sliding window does so in up to
-{pct(sliding_spanning.max())} of trials for jumps up to 40 cm and never across
-80 cm. **(n, o)** Two 150 ms, 60 cm replays with a silent gap, the second
-continuing from the first's end (n) or starting 140 cm away from it (o), both
-reaching no nearer the animal than 20 cm.
-Continuing, at a {gaps_ms[0]:.0f} ms gap both detectors report one event over
-both parts ({pct(continuing["spanning", "sliding_published"][0])} of trials
-for the sliding window, {pct(continuing["spanning", "state_space_canonical"][0])}
-for ours); at {gaps_ms[-1]:.0f} ms neither does, and they report one event per
-part in {pct(continuing["one_per_part", "sliding_published"][-1])} and
-{pct(continuing["one_per_part", "state_space_canonical"][-1])}. Far apart, the
-sliding window never reports one event over both, and misses a part in
-{pct(elsewhere_missing.min())} to {pct(elsewhere_missing.max())} of trials; our
-detector reports one event per part in {pct(elsewhere_split[0])} of trials at a
-{gaps_ms[0]:.0f} ms gap and {pct(elsewhere_split[-1])} at {gaps_ms[-1]:.0f} ms.
-Each part is also decoded alone, with exactly the spikes it had in its event
-and the recording's own spikes around it; a part counts as recovered only where
-the event's positions over that part sit on its path. Across jumps and chains,
-pooled recovery is higher inside the event than alone: the sliding window
-recovers {pct(mean_recovery("sliding_published", "part_recovery"))} of parts
-inside the event against
-{pct(mean_recovery("sliding_published", "part_recovery_alone"))} alone, and ours
-{pct(mean_recovery("state_space_canonical", "part_recovery"))} against
-{pct(mean_recovery("state_space_canonical", "part_recovery_alone"))}. Paired by
-trial, the gain is not uniform: the sliding window recovers fewer parts inside
-the event than alone in {sliding_fewer} of {sliding_trials} trials and more in
-{sliding_more}, ours fewer in {ours_fewer} and more in {ours_more}.
-
-**(p, q) Held-out evidence.** The simulated cells are split into discovery and
-evaluation cells three ways: two interleaved folds with their roles swapped (A,
-B), each half tiling the track, and one whose evaluation cells cover only its
-lower half (C, hatched). Both detectors are fitted and run on the discovery
-cells alone, over every injected replay, controls trial and no-replay stretch.
-Events are counted once each, as our detector bounds them. An event's content,
-estimated from the discovery cells by our decoder (bars) or by the sliding
-window (dots), is scored on the evaluation cells against the animal's own
-position and against 100 permutations of the evaluation fields, spikes and
-silence both counting, and has support when it beats both (p ≤ 0.05). **(p)**
-Share of events with support, among those along whose content the evaluation
-cells are expected to fire at least 5 spikes; numbers give how many. True
-replays that only our detector reported have support in
-{pct_range(ours_support)} of cases in folds A and B
-and {pct(support("C", ("ours_only",), "continuous_replay"))} in fold C; shared
-ones in {pct_range(shared_support)}. No
-informative place-less burst event has support
-({sum(n for _, n in placeless)} of them), and at a floor of 2 expected spikes
-{loose_supported} of {sum(n for _, n in placeless_loose)} do; jumping bursts,
-which do represent places, have support in {pct_range(jumping_support)}. Neither
-detector reported an event from discovery cells on the no-replay stretches, so
-no event of pure local coding reached the test. The two content estimates agree
-on {pct(agreement.min())} of the events informative under both, or more. The sliding window
-reported no event our detector missed, so there is no comparator-only class to
-test. **(q)** Share of each kind of replay the evaluation cells can judge at
-all: {pct_range(informative["ours"])} of those only our detector reported,
-{pct_range(informative["shared"])} of shared ones, in folds A and B. The rest are too short or too
-sparse for a dozen evaluation cells, so an event without support is mostly one
-that cannot be judged, not one shown false. Held-out support tests spatial
-information, not sequence, and is read with these error rates, not alone.
-
-**Caveats.** Sorted spikes, a linear track, no artifacts. In (g-k) the animal
-rests at one end of the track and pauses nowhere else, so distance from its
-place is fixed by where the replay is put and cannot be varied independently.
-Replays run at constant speed with Poisson firing from the same place fields
-the encoding model was fitted on, so there is no model mismatch and the picture
-is optimistic. Every cell of (g-k) holds a replay, so those panels measure how
-often each detector reports a replay that is there; (l) is where they are tested
-on activity that holds none. The significance
-test is the reference's place-cell identity shuffle, which needs sorted cells;
-recorded data, decoded clusterless, are tested with an encoding-pair shuffle
-instead.
-
-Produced by `scripts/figures/generate_memoryless_comparison.py` from
-`docs/design/replay_detection_comparison/detection_sweep_summary.csv`.
-"""
+        json.dumps(
+            {
+                "produced_by": produced_by(__file__),
+                "produced_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                "git_commit": described_commit(),
+                "n_neurons": n_neurons,
+                "numbers": numbers,
+            },
+            indent=1,
+            allow_nan=False,
         )
         + "\n"
     )
@@ -2131,6 +1732,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--output-dir", type=Path, default=Path("paper/figures/memoryless_comparison")
     )
+    parser.add_argument(
+        "--recording-numbers", type=Path, default=RECORDING_NUMBERS_PATH
+    )
     args = parser.parse_args(argv)
 
     config = MemorylessSequenceConfig(sampling_frequency=500.0)
@@ -2143,18 +1747,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     heldout = read_summary(
         args.heldout_summary, "scripts/detection/sweep_memoryless_heldout.py"
     )
+    check_caption_settings(config)
+    check_summary_claims(summary)
+    check_controls_claims(controls)
+    check_heldout_claims(heldout)
     fig, decoded = make_figure(args.n_neurons, config, summary, controls, heldout)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     save_figure(fig, "memoryless_comparison", base_dir=args.output_dir)
     plt.close(fig)
-    write_caption(
-        decoded,
-        summary,
-        controls,
-        heldout,
-        config,
-        args.output_dir / "memoryless_comparison_caption.md",
+    write_recording_numbers(
+        recording_numbers(decoded), args.n_neurons, args.recording_numbers
     )
 
     candidates = decoded["candidates"]
@@ -2170,7 +1773,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"disp {candidates.dispersion_cm[sequence]:5.1f} cm  "
             f"local {100 * local_fraction(decoded, sequence):.0f}%"
         )
-    print(f"saved to {args.output_dir}")
+    print(f"saved to {args.output_dir}; caption numbers to {args.recording_numbers}")
 
 
 if __name__ == "__main__":
