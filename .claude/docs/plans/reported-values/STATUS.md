@@ -9,7 +9,7 @@ the lead's OK). Design: `docs/design/2026-10-26-reported-values-design.md`. Ever
 | What | Where | State | When it finishes |
 |---|---|---|---|
 | Uncapped spike evidence (claims 6, 7, 7c): every event of every epoch, no 30-event cap | tmux `reality_all`; `logs/reality_all_20261026/progress.txt`; outputs `paper/figures/reality_all/per_epoch/` | 104/242 epochs at 19:40, none failed | about midnight |
-| Slow and fast gamma during events (claim 5) | tmux `event_gamma`; `logs/event_gamma_20261026/run.log`; outputs `Processed-Data/event_gamma/` | 160/242 at 19:40, none failed | about 20:15 |
+| Slow and fast gamma during events (claim 5) | tmux `event_gamma`; `logs/event_gamma_20261026/run.log`; outputs `Processed-Data/event_gamma/` | done 19:44: 242/242 ok | done |
 
 ## To do when both runs are done
 
@@ -23,6 +23,8 @@ the lead's OK). Design: `docs/design/2026-10-26-reported-values-design.md`. Ever
    - theta / ripple / MUA / slow and fast gamma during events against running and quiet rest:
      `{theta,ripple,mua,slow_gamma,fast_gamma}_{median_*,running_reference,rest_reference,animals_*}`,
      `theta_like_fraction_*`.
+   - Gamma caveat to state with the values: spiking and the ripple leak broadband power into both gamma
+     bands (fast more than slow); the SWR rise, and part of the non-SWR rise, may be leakage, not oscillation.
    - Open: compare `theta_like_fraction_non_swr` (13 % in the preview) with how often quiet rest reaches
      running theta, so 13 % has a reference.
 4. Emit; run the unit suite; update `removed_part2.md` if wording drops anything.
