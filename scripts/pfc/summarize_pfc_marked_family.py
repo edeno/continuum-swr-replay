@@ -15,7 +15,19 @@ Per model, replay class and target mark the summary reports
   scale;
 - the population mean one-SD slope kernel (mean over session means, SEM over
   sessions), its peak value and lag, and how many sessions and animals share
-  the sign of that peak.
+  the sign of that peak;
+- when the bundles carry shuffled-mark nulls (``*.slope_null.npy``), the 95 %
+  band of the same population curve over the shuffled refits, and whether
+  the observed peak (and window mean) lies outside it, overall and per
+  animal;
+- beside each joint-model target, the same target's marginal-tier result.
+
+Bundles of one directory must share one fit contract version and one event
+set; a directory that mixes them is refused. Besides the markdown report the
+summary writes ``summary.parquet`` (one row per model, tier, class, target and
+statistic) into the bundle directory, or to ``--summary-parquet``. Units
+aggregate unit -> session -> animal there: the population curve is the mean
+over animals of each animal's mean over its sessions' unit-mean curves.
 
 Units whose delta is non-finite, or whose |delta| exceeds ``--blowup`` (a
 held-out prediction that exploded on one fold), are excluded from that
@@ -26,6 +38,13 @@ Usage
 ``uv run python scripts/pfc/summarize_pfc_marked_family.py \
     --out .claude/docs/reviews/<date>-pfc-marked-family-summary.md \
     --figure-dir paper/figures/pfc_marked_family``
+
+The follow-up corpus::
+
+    uv run python scripts/pfc/summarize_pfc_marked_family.py \
+        --bundle-dir Processed-Data/pfc_response_followups/marked_family \
+        --out .claude/docs/reviews/<date>-pfc-marked-followups-summary.md \
+        --figure-dir paper/figures/pfc_marked_family/followups
 """
 
 from __future__ import annotations
@@ -42,7 +61,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.pfc.marked_glm import MARKED_EVENT_CLASSES
+from continuum_swr_replay.analysis.pfc.marked_glm import (
+    EXTENDED_MARKED_EVENT_CLASSES,
+    MARKED_EVENT_CLASSES,
+)
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -51,12 +73,25 @@ DEFAULT_BLOWUP = 1000.0
 CLASS_LABEL = {
     "non_local_no_SWR": "non-SWR replay",
     "non_local_SWR": "SWR-coupled replay",
+    "SWR_no_non_local": "SWRs without replay",
+    "pooled": "all classes (shared slope)",
 }
+#: Order of the target classes in tables and figure columns.
+CLASS_ORDER = (*EXTENDED_MARKED_EVENT_CLASSES, "pooled")
+#: Lags of the pre-onset, post-onset and whole-window means, seconds.
+PRE_ONSET_MAX_S = -0.1
+POST_ONSET_WINDOW_S = (0.0, 0.15)
 #: Okabe-Ito, one colour per animal, in the corpus's animal order.
 ANIMAL_COLOURS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00"]
 
 
-def load_bundles(bundle_dir: Path) -> tuple[pd.DataFrame, dict, np.ndarray]:
+class MixedContractError(ValueError):
+    """A bundle directory holds bundles of more than one contract or event set."""
+
+
+def load_bundles(
+    bundle_dir: Path,
+) -> tuple[pd.DataFrame, dict, dict, np.ndarray]:
     """Read every complete bundle into a unit-level table and per-session curves.
 
     Parameters
@@ -68,23 +103,41 @@ def load_bundles(bundle_dir: Path) -> tuple[pd.DataFrame, dict, np.ndarray]:
     -------
     units : pandas.DataFrame
         One row per unit x model x class x target: ``animal``, ``session``,
-        ``model``, ``event_class``, ``target``, ``delta`` (raw held-out
-        delta), ``curve_finite``.
+        ``model``, ``tier`` (``joint`` or ``marginal``), ``event_class``,
+        ``target``, ``delta`` (raw held-out delta), ``curve_finite``.
     curves : dict
         ``(model, event_class, target) -> {session: mean slope curve over
         units with finite curves, shape (n_lags,)}``.
+    nulls : dict
+        ``(model, event_class, target) -> {session: per-draw mean null curve
+        over the same units, shape (n_draws, n_lags)}`` for bundles with a
+        ``.slope_null.npy`` companion.
     lag_time : NDArray, shape (n_lags,)
         The reported lag axis in seconds.
+
+    Raises
+    ------
+    MixedContractError
+        If the complete bundles record more than one
+        ``bundle_contract_version`` or ``event_set``.
+    FileNotFoundError
+        If there is no complete bundle.
     """
     rows: list[dict] = []
     curves: dict = defaultdict(dict)
+    nulls: dict = defaultdict(dict)
     lag_time = None
+    contracts: set = set()
+    event_sets: set = set()
     for sidecar in sorted(bundle_dir.glob("*_marked_family.provenance.json")):
         record = json.load(open(sidecar))
         extra = record.get("extra", record)
         if extra.get("bundle_status") != "complete":
             continue
+        contracts.add(extra.get("bundle_contract_version"))
+        event_sets.add(extra.get("event_set", "canonical"))
         model = extra["model_name"]
+        tier = extra.get("tier", "joint")
         animal, _ = parse_nwb_filename(extra["nwb_file_name"])
         session = f"{extra['nwb_file_name'].replace('_.nwb', '')}_{extra['epoch_name']}"
         base = sidecar.with_name(sidecar.name.replace(".provenance.json", ""))
@@ -92,23 +145,30 @@ def load_bundles(bundle_dir: Path) -> tuple[pd.DataFrame, dict, np.ndarray]:
         if lag_time is None:
             lag_time = np.load(base.with_suffix(".lag_time.npy"))
         targets = extra["marked_family_diagnostics"]["scientific_marks"]
-        for event_class in MARKED_EVENT_CLASSES:
+        target_classes = extra.get("target_classes", list(MARKED_EVENT_CLASSES))
+        for event_class in target_classes:
             for target in targets:
                 delta = stats[
                     f"{event_class}:{target}: heldout_delta_deviance"
                 ].to_numpy(dtype=float)
                 slope = np.load(base.with_suffix(f".{event_class}.{target}.slope.npy"))
                 finite_curve = np.isfinite(slope).all(axis=0)
+                key = (model, event_class, target)
                 if finite_curve.any():
-                    curves[(model, event_class, target)][session] = slope[
-                        :, finite_curve
-                    ].mean(axis=1)
+                    curves[key][session] = slope[:, finite_curve].mean(axis=1)
+                    null_path = base.with_suffix(
+                        f".{event_class}.{target}.slope_null.npy"
+                    )
+                    if null_path.is_file():
+                        null = np.load(null_path)[:, :, finite_curve]
+                        nulls[key][session] = np.nanmean(null, axis=2)
                 for unit_index in range(len(stats)):
                     rows.append(
                         {
                             "animal": animal,
                             "session": session,
                             "model": model,
+                            "tier": tier,
                             "event_class": event_class,
                             "target": target,
                             "delta": delta[unit_index],
@@ -117,7 +177,12 @@ def load_bundles(bundle_dir: Path) -> tuple[pd.DataFrame, dict, np.ndarray]:
                     )
     if lag_time is None:
         raise FileNotFoundError(f"no complete bundle under {bundle_dir}")
-    return pd.DataFrame(rows), curves, lag_time
+    if len(contracts) > 1 or len(event_sets) > 1:
+        raise MixedContractError(
+            f"{bundle_dir} mixes bundle contracts {sorted(map(str, contracts))} "
+            f"or event sets {sorted(event_sets)}; summarize one corpus at a time"
+        )
+    return pd.DataFrame(rows), curves, nulls, lag_time
 
 
 def usable_delta(delta: pd.Series, blowup: float) -> pd.Series:
@@ -244,27 +309,221 @@ def population_curve_summary(
     return pd.DataFrame(out)
 
 
+def animal_balanced_curve(
+    by_session: dict[str, np.ndarray], animal_of: dict[str, str]
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Unit-mean session curves -> per-animal means -> mean over animals.
+
+    Parameters
+    ----------
+    by_session : dict
+        ``session -> array``; the last axis is lag (a curve, or draws x lags).
+    animal_of : dict
+        ``session -> animal``.
+
+    Returns
+    -------
+    population : NDArray
+        Mean over animals of each animal's mean over its sessions.
+    per_animal : dict
+        ``animal -> that animal's mean over its sessions``.
+    """
+    grouped: dict[str, list[np.ndarray]] = defaultdict(list)
+    for session, curve in by_session.items():
+        grouped[animal_of[session]].append(np.asarray(curve, dtype=float))
+    per_animal = {
+        animal: np.mean(np.stack(group), axis=0)
+        for animal, group in sorted(grouped.items())
+    }
+    return np.mean(np.stack(list(per_animal.values())), axis=0), per_animal
+
+
+def null_band_summary(
+    curves: dict,
+    nulls: dict,
+    lag_time: np.ndarray,
+    animal_of: dict[str, str],
+) -> pd.DataFrame:
+    """Observed population slope kernels against their shuffled-mark bands.
+
+    For each (model, class, target), the observed population curve and each
+    shuffled draw's population curve are aggregated the same way, unit ->
+    session -> animal, over the sessions that carry a null (draw ``r`` of
+    every session forms population draw ``r``). The band is the per-lag
+    2.5th and 97.5th percentile over draws.
+
+    Parameters
+    ----------
+    curves, nulls : dict
+        From :func:`load_bundles`.
+    lag_time : NDArray, shape (n_lags,)
+        Lag axis in seconds.
+    animal_of : dict
+        ``session -> animal``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per key with a null: ``animal_balanced_peak_value`` and
+        ``animal_balanced_peak_lag_ms`` of the observed curve,
+        ``band_low_at_peak``/``band_high_at_peak``, ``peak_outside_band``,
+        ``animal_balanced_window_mean`` (over every lag) and its band
+        (``window_band_low``/``window_band_high``), ``window_outside_band``,
+        ``n_draws``, ``n_null_sessions``, and ``animals_peak_outside_band``
+        (animals whose own curve's value at the population peak lag lies
+        outside that animal's band) of ``n_null_animals``.
+    """
+    out = []
+    for key, by_session in nulls.items():
+        sessions = sorted(set(by_session) & set(curves.get(key, {})))
+        if not sessions:
+            continue
+        n_draws = min(by_session[s].shape[0] for s in sessions)
+        observed, observed_animals = animal_balanced_curve(
+            {s: curves[key][s] for s in sessions}, animal_of
+        )
+        null, null_animals = animal_balanced_curve(
+            {s: by_session[s][:n_draws] for s in sessions}, animal_of
+        )
+        low, high = np.nanpercentile(null, [2.5, 97.5], axis=0)
+        peak = int(np.argmax(np.abs(observed)))
+        window = observed.mean()
+        window_low, window_high = np.nanpercentile(null.mean(axis=1), [2.5, 97.5])
+        animals_outside = 0
+        for animal, curve in observed_animals.items():
+            animal_low, animal_high = np.nanpercentile(
+                null_animals[animal][:, peak], [2.5, 97.5]
+            )
+            animals_outside += int(not animal_low <= curve[peak] <= animal_high)
+        model, event_class, target = key
+        out.append(
+            {
+                "model": model,
+                "event_class": event_class,
+                "target": target,
+                "animal_balanced_peak_value": float(observed[peak]),
+                "animal_balanced_peak_lag_ms": float(lag_time[peak] * 1000),
+                "band_low_at_peak": float(low[peak]),
+                "band_high_at_peak": float(high[peak]),
+                "peak_outside_band": bool(
+                    not low[peak] <= observed[peak] <= high[peak]
+                ),
+                "animal_balanced_window_mean": float(window),
+                "window_band_low": float(window_low),
+                "window_band_high": float(window_high),
+                "window_outside_band": bool(not window_low <= window <= window_high),
+                "n_draws": int(n_draws),
+                "n_null_sessions": len(sessions),
+                "animals_peak_outside_band": animals_outside,
+                "n_null_animals": len(observed_animals),
+            }
+        )
+    return pd.DataFrame(out)
+
+
+def summary_table(
+    fractions: pd.DataFrame,
+    peaks: pd.DataFrame,
+    bands: pd.DataFrame,
+    tiers: pd.DataFrame,
+) -> pd.DataFrame:
+    """Long table: one row per model, tier, class, target and statistic.
+
+    Parameters
+    ----------
+    fractions, peaks, bands : pandas.DataFrame
+        From :func:`animal_balanced_fraction_positive`,
+        :func:`population_curve_summary` and :func:`null_band_summary`
+        (``bands`` may be empty).
+    tiers : pandas.DataFrame
+        ``model`` and ``tier`` of every model.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``model``, ``tier``, ``event_class``, ``target``,
+        ``statistic`` and ``value`` (float; booleans as 0/1).
+    """
+    keys = ["model", "event_class", "target"]
+    wide = fractions.merge(peaks, on=keys, how="outer")
+    if len(bands):
+        wide = wide.merge(bands, on=keys, how="left")
+    wide = wide.merge(tiers.drop_duplicates("model"), on="model", how="left")
+    long = wide.melt(
+        id_vars=["model", "tier", "event_class", "target"],
+        var_name="statistic",
+        value_name="value",
+    )
+    long["value"] = pd.to_numeric(long["value"], errors="coerce").astype(float)
+    return long.sort_values(
+        ["model", "event_class", "target", "statistic"]
+    ).reset_index(drop=True)
+
+
+def joint_versus_marginal(merged: pd.DataFrame) -> pd.DataFrame:
+    """Each joint-model target beside its marginal-tier fit, per class.
+
+    Parameters
+    ----------
+    merged : pandas.DataFrame
+        Fractions merged with peaks, carrying ``tier``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per joint model, class and target that has a marginal fit:
+        ``joint_post_onset_mean``, ``marginal_post_onset_mean``,
+        ``joint_frac_pos`` and ``marginal_frac_pos``.
+    """
+    joint = merged.loc[merged["tier"] == "joint"]
+    marginal = merged.loc[merged["tier"] == "marginal"]
+    paired = joint.merge(
+        marginal[["event_class", "target", "post_onset_mean", "frac_pos"]],
+        on=["event_class", "target"],
+        suffixes=("", "_marginal"),
+    )
+    return pd.DataFrame(
+        {
+            "model": paired["model"],
+            "event_class": paired["event_class"],
+            "target": paired["target"],
+            "joint_post_onset_mean": paired["post_onset_mean"],
+            "marginal_post_onset_mean": paired["post_onset_mean_marginal"],
+            "joint_frac_pos": paired["frac_pos"],
+            "marginal_frac_pos": paired["frac_pos_marginal"],
+        }
+    )
+
+
 def plot_model(
     model: str,
     curves: dict,
     lag_time: np.ndarray,
     animal_of: dict[str, str],
     figure_dir: Path,
+    nulls: dict | None = None,
 ) -> Path:
-    """One figure per model: rows are targets, columns are replay classes."""
+    """One figure per model: rows are targets, columns are its classes.
+
+    The shuffled-mark band (grey) sits behind the observed population curve
+    when the bundles carry nulls; a target's marginal-tier population curve,
+    when fit, is overlaid dashed.
+    """
+    nulls = nulls or {}
     keys = [k for k in curves if k[0] == model]
     targets = list(dict.fromkeys(k[2] for k in keys))
+    classes = [c for c in CLASS_ORDER if any(k[1] == c for k in keys)]
     animals = sorted(set(animal_of.values()))
     colour = dict(zip(animals, ANIMAL_COLOURS, strict=False))
     fig, axes = plt.subplots(
         len(targets),
-        len(MARKED_EVENT_CLASSES),
-        figsize=(7.0, 1.9 * len(targets) + 0.6),
+        len(classes),
+        figsize=(3.5 * len(classes), 1.9 * len(targets) + 0.6),
         sharex=True,
         squeeze=False,
     )
     for row, target in enumerate(targets):
-        for col, event_class in enumerate(MARKED_EVENT_CLASSES):
+        for col, event_class in enumerate(classes):
             ax = axes[row, col]
             by_session = curves.get((model, event_class, target), {})
             if not by_session:
@@ -282,12 +541,37 @@ def plot_model(
                     alpha=0.8,
                     label=f"{animal} (n={len(group)})",
                 )
+            null = nulls.get((model, event_class, target))
+            if null:
+                draws, _ = animal_balanced_curve(
+                    {s: v for s, v in null.items() if s in by_session}, animal_of
+                )
+                low, high = np.nanpercentile(draws, [2.5, 97.5], axis=0)
+                ax.fill_between(
+                    lag_time * 1000,
+                    low,
+                    high,
+                    color="0.75",
+                    lw=0,
+                    label="shuffled 95 %",
+                )
             stack = np.stack(list(by_session.values()))
-            mean, sem = stack.mean(0), stack.std(0, ddof=1) / np.sqrt(len(stack))
+            mean = stack.mean(0)
+            sem = stack.std(0, ddof=1) / np.sqrt(len(stack)) if len(stack) > 1 else 0
             ax.fill_between(
                 lag_time * 1000, mean - sem, mean + sem, color="k", alpha=0.15, lw=0
             )
             ax.plot(lag_time * 1000, mean, color="k", lw=1.6, label="all sessions")
+            marginal = curves.get((f"marginal_{target}", event_class, target))
+            if marginal and not model.startswith("marginal_"):
+                ax.plot(
+                    lag_time * 1000,
+                    np.stack(list(marginal.values())).mean(0),
+                    color="k",
+                    lw=1.0,
+                    ls="--",
+                    label="marginal tier",
+                )
             ax.axhline(0, color="0.6", lw=0.6)
             ax.axvline(0, color="0.6", lw=0.6)
             if row == 0:
@@ -301,7 +585,9 @@ def plot_model(
     axes[-1, -1].set_xlabel("lag from replay onset (ms)", fontsize=8)
     axes[0, 0].legend(fontsize=6, frameon=False, loc="upper left")
     fig.suptitle(
-        f"{model}: one-SD slope kernels (session means; black = mean ± SEM)", fontsize=9
+        f"{model}: one-SD slope kernels (session means; black = mean ± SEM; "
+        "grey = shuffled-mark 95 %)",
+        fontsize=9,
     )
     fig.tight_layout()
     figure_dir.mkdir(parents=True, exist_ok=True)
@@ -327,6 +613,8 @@ def build_report(
     bundle_dir: Path,
     blowup: float,
     figure_paths: dict[str, Path],
+    bands: pd.DataFrame | None = None,
+    pairs: pd.DataFrame | None = None,
 ) -> str:
     """Render the markdown report."""
     merged = fractions.merge(peaks, on=["model", "event_class", "target"], how="left")
@@ -358,8 +646,10 @@ def build_report(
         "`sign` is how many session means and animal means share that sign at that lag. "
         "`pre / post` are the population curve's means over lags <= -100 ms and 0 to "
         "+150 ms: a kernel that is as large before onset as after is a stationary rate "
-        "difference between the contexts the events occur in (the model has one intercept "
-        "per session and no per-stop baseline terms), not an event-locked response. "
+        "difference between the contexts the events occur in, not an event-locked "
+        "response (contract-2 designs carry per-stop well and reward-outcome baseline "
+        "columns, so their typical kernel is the response at the reference well after "
+        "an unrewarded, known outcome). "
         "No p-values: these are descriptive.\n\n"
     )
     columns = [
@@ -375,11 +665,65 @@ def build_report(
         "sign",
     ]
     fmt = {"delta_median": "{:.2f}", "delta_p95": "{:.1f}"}
+    if bands is not None and len(bands):
+        merged = merged.merge(
+            bands[
+                [
+                    "model",
+                    "event_class",
+                    "target",
+                    "band_low_at_peak",
+                    "band_high_at_peak",
+                    "peak_outside_band",
+                    "animals_peak_outside_band",
+                    "n_null_animals",
+                ]
+            ],
+            on=["model", "event_class", "target"],
+            how="left",
+        )
+        merged["reference"] = merged.apply(
+            lambda r: (
+                ""
+                if pd.isna(r.band_low_at_peak)
+                else f"[{r.band_low_at_peak:+.3f}, {r.band_high_at_peak:+.3f}] "
+                f"{'outside' if r.peak_outside_band else 'inside'}; "
+                f"{int(r.animals_peak_outside_band)}/{int(r.n_null_animals)} animals outside"
+            ),
+            axis=1,
+        )
+        columns = [*columns, "reference"]
+        text += (
+            "`reference` is the 95 % band of the population curve (unit -> session "
+            "-> animal) over shuffled-mark refits, at the observed peak lag, and "
+            "whether the observed animal-balanced peak lies outside it.\n\n"
+        )
     for model, group in merged.groupby("model", sort=False):
         text += f"## {model}\n\n"
         text += _md(group, columns, fmt) + "\n"
         if model in figure_paths:
             text += f"Figure: `{figure_paths[model]}`\n\n"
+    if pairs is not None and len(pairs):
+        text += "## Joint versus marginal\n\n"
+        pairs = pairs.assign(**{"class": pairs["event_class"].map(CLASS_LABEL)})
+        text += _md(
+            pairs,
+            [
+                "model",
+                "class",
+                "target",
+                "joint_post_onset_mean",
+                "marginal_post_onset_mean",
+                "joint_frac_pos",
+                "marginal_frac_pos",
+            ],
+            {
+                "joint_post_onset_mean": "{:+.3f}",
+                "marginal_post_onset_mean": "{:+.3f}",
+                "joint_frac_pos": "{:.2f}",
+                "marginal_frac_pos": "{:.2f}",
+            },
+        )
     return text
 
 
@@ -393,22 +737,38 @@ def main() -> None:
         "--figure-dir", type=Path, default=Path("paper/figures/pfc_marked_family")
     )
     parser.add_argument("--blowup", type=float, default=DEFAULT_BLOWUP)
+    parser.add_argument(
+        "--summary-parquet",
+        type=Path,
+        help="Long statistics table (default: <bundle-dir>/summary.parquet).",
+    )
     args = parser.parse_args()
-    units, curves, lag_time = load_bundles(args.bundle_dir)
+    units, curves, nulls, lag_time = load_bundles(args.bundle_dir)
     animal_of = dict(units.drop_duplicates("session")[["session", "animal"]].to_numpy())
     fractions = animal_balanced_fraction_positive(units, args.blowup)
     peaks = population_curve_summary(curves, lag_time, animal_of)
+    bands = null_band_summary(curves, nulls, lag_time, animal_of)
+    tiers = units[["model", "tier"]].drop_duplicates()
+    merged = fractions.merge(peaks, on=["model", "event_class", "target"]).merge(
+        tiers, on="model"
+    )
+    pairs = joint_versus_marginal(merged)
     figure_paths = {
-        model: plot_model(model, curves, lag_time, animal_of, args.figure_dir)
+        model: plot_model(model, curves, lag_time, animal_of, args.figure_dir, nulls)
         for model in fractions["model"].unique()
     }
-    report = build_report(fractions, peaks, args.bundle_dir, args.blowup, figure_paths)
+    report = build_report(
+        fractions, peaks, args.bundle_dir, args.blowup, figure_paths, bands, pairs
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(report)
     fractions.merge(peaks, on=["model", "event_class", "target"]).to_csv(
         args.out.with_suffix(".csv"), index=False
     )
+    summary_path = args.summary_parquet or args.bundle_dir / "summary.parquet"
+    summary_table(fractions, peaks, bands, tiers).to_parquet(summary_path, index=False)
     print(report)
+    print(f"Wrote {summary_path}")
 
 
 if __name__ == "__main__":
