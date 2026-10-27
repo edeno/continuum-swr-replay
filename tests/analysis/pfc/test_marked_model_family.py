@@ -1074,3 +1074,128 @@ def test_ripple_power_fit_reads_one_curve_per_class_or_one_pooled_curve():
             assert (
                 f"{target}:{RIPPLE_POWER}: heldout_delta_deviance" in result.statistics
             )
+
+
+def test_stop_level_permutation_moves_whole_stops():
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        stop_level_permutation_weights,
+    )
+
+    stop_idx = np.array([0, 0, 0, 1, 2, 2, 3, 3, 4, 5, 5, 5])
+    stop_values = np.array([1.0, -1.0, 1.0, -1.0, 0.5, 2.0])
+    values = stop_values[stop_idx]
+    available = np.ones(len(values), dtype=bool)
+    available[stop_idx == 4] = False  # undefined: stays put
+    values[stop_idx == 4] = 0.0
+
+    draws = stop_level_permutation_weights(
+        np.random.default_rng(1), values, available, stop_idx, 50
+    )
+
+    assert draws.shape == (50, len(values))
+    moved = False
+    for draw in draws:
+        per_stop = {stop: np.unique(draw[stop_idx == stop]) for stop in range(6)}
+        assert all(len(value) == 1 for value in per_stop.values())
+        np.testing.assert_array_equal(draw[stop_idx == 4], 0.0)
+        assert sorted(per_stop[s][0] for s in (0, 1, 2, 3, 5)) == sorted(
+            stop_values[[0, 1, 2, 3, 5]]
+        )
+        moved |= not np.array_equal(draw, values)
+    assert moved
+    # A stop whose events disagree is split into one unit per value.
+    split = stop_level_permutation_weights(
+        np.random.default_rng(2),
+        np.array([1.0, 0.0, 0.0, 1.0]),
+        np.ones(4, dtype=bool),
+        np.array([7, 7, 8, 9]),
+        20,
+    )
+    assert all(sorted(draw) == [0.0, 0.0, 1.0, 1.0] for draw in split)
+
+
+def _null_fit(slope_permutations: int, seed: int, monkeypatch=None):
+    fit_mask, basis, lags, events = _eligibility_inputs(n_events=12)
+    for index, event_class in enumerate(MARKED_EVENT_CLASSES):
+        events[event_class]["stop_idx"] = np.repeat(np.arange(6), 2) + 10 * index
+        events[event_class][REWARDED_CONTEXT] = np.resize([1.0, 1.0, 0.0, 0.0], 12)
+    spec = MarkedFamilySpec(
+        "null_probe",
+        (CURRENT_ARM_FRACTION, REWARDED_CONTEXT),
+        (EVENT_DURATION_MARK,),
+        "which block does the reference shuffle?",
+    )
+    ladder = build_marked_family_ladder(events, fit_mask, basis, lags, spec)
+    counts = np.random.default_rng(4).poisson(0.2, size=(int(fit_mask.sum()), 3))
+    folds = np.repeat([0, 1], len(counts) // 2)
+    return ladder, fit_marked_family_ladder(
+        ladder,
+        counts,
+        folds,
+        penalty_sigma=3.0,
+        slope_permutations=slope_permutations,
+        slope_permutation_seed=seed,
+        slope_permutation_targets=(CURRENT_ARM_FRACTION, REWARDED_CONTEXT),
+        report_lags=np.abs(lags) <= 3,
+    )
+
+
+def test_slope_null_is_seeded_and_only_permutes_the_named_target(monkeypatch):
+    import continuum_swr_replay.analysis.pfc.marked_model_family as family
+
+    ladder, first = _null_fit(3, seed=11)
+    _, second = _null_fit(3, seed=11)
+    _, other_seed = _null_fit(3, seed=12)
+
+    for event_class in MARKED_EVENT_CLASSES:
+        for mark in (CURRENT_ARM_FRACTION, REWARDED_CONTEXT):
+            null = first.slope_null[event_class][mark]
+            assert null.dtype == np.float32
+            assert null.shape == (3, 7, 3)
+            np.testing.assert_array_equal(null, second.slope_null[event_class][mark])
+            assert not np.array_equal(null, other_seed.slope_null[event_class][mark])
+    assert first.diagnostics["slope_permutations"] == 3
+
+    # Every refit design differs from the observed one in exactly one block.
+    designs = []
+    original = family.fit_poisson_glms
+
+    def capture(design, *args, **kwargs):
+        designs.append(np.array(design))
+        return original(design, *args, **kwargs)
+
+    monkeypatch.setattr(family, "fit_poisson_glms", capture)
+    _null_fit(2, seed=11)
+    null_designs = designs[1:]  # the first fit is the observed one
+    order = [
+        (event_class, mark)
+        for event_class in MARKED_EVENT_CLASSES
+        for mark in (CURRENT_ARM_FRACTION, REWARDED_CONTEXT)
+    ]
+    assert len(null_designs) == 2 * len(order)
+    for index, design in enumerate(null_designs):
+        event_class, mark = order[index // 2]
+        changed = np.flatnonzero(np.any(design != ladder.full.matrix, axis=0))
+        span = ladder.full.block_slices[f"{event_class}:{mark}"]
+        assert changed.size and set(changed) <= set(range(span.start, span.stop))
+
+
+def test_pooled_slope_null_permutes_within_each_class():
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        FOLLOWUP_MODEL_SPECS,
+        _slope_null_weights,
+    )
+
+    fit_mask, basis, lags, events = _three_class_inputs()
+    ladder = build_marked_family_ladder(
+        events, fit_mask, basis, lags, FOLLOWUP_MODEL_SPECS["ripple_power_pooled"]
+    )
+    frame = ladder.events["pooled"]
+
+    weights = _slope_null_weights(np.random.default_rng(0), frame, RIPPLE_POWER, 5)
+
+    observed = frame[f"{RIPPLE_POWER}_z"].to_numpy()
+    for event_class in frame.event_class.unique():
+        rows = (frame.event_class == event_class).to_numpy()
+        for draw in weights:
+            np.testing.assert_allclose(np.sort(draw[rows]), np.sort(observed[rows]))

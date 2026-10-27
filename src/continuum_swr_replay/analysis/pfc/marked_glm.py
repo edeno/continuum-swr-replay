@@ -1434,20 +1434,43 @@ def permuted_mark_blocks(
             f"geometry was built for class {geometry.event_class!r} with "
             f"{geometry.n_events} events, not {event_class!r} with {len(events)}"
         )
-
     weights = events[ladder.scientific_mark_z].to_numpy(dtype=float)[draws]
+    return mark_blocks_from_weights(weights, geometry, ladder.spline_basis)
+
+
+def mark_blocks_from_weights(
+    weights: NDArray,
+    geometry: MarkBlockGeometry,
+    spline_basis: NDArray,
+) -> NDArray:
+    """Marked basis blocks on the fitted rows for given per-event weights.
+
+    Parameters
+    ----------
+    weights : NDArray, shape (n_draws, n_events) or (n_events,)
+        Each draw's weight per event of the geometry's frame.
+    geometry : MarkBlockGeometry
+        From :func:`mark_block_geometry` for that frame.
+    spline_basis : NDArray, shape (n_lags, n_basis)
+        Basis functions evaluated at the geometry's lags.
+
+    Returns
+    -------
+    NDArray, shape (n_draws, n_fit_bins, n_basis)
+        ``sum_e weights[e] * B(t - onset_e)`` on every fitted row, one block
+        per draw; identical to convolving the weighted onsets.
+    """
+    draws = np.atleast_2d(np.asarray(weights, dtype=float))
+    if draws.shape[1] != geometry.n_events:
+        raise ValueError(
+            f"weights have {draws.shape[1]} events; the geometry has "
+            f"{geometry.n_events}"
+        )
+    basis = np.asarray(spline_basis, dtype=float)
     values = (
-        weights[:, geometry.event_indices, None]
-        * ladder.spline_basis[geometry.lag_indices][None, :, :]
+        draws[:, geometry.event_indices, None] * basis[geometry.lag_indices][None, :, :]
     )
-    blocks = np.zeros(
-        (
-            draws.shape[0],
-            geometry.n_fit_rows,
-            ladder.spline_basis.shape[1],
-        ),
-        dtype=float,
-    )
+    blocks = np.zeros((draws.shape[0], geometry.n_fit_rows, basis.shape[1]))
     for draw_index in range(draws.shape[0]):
         np.add.at(blocks[draw_index], geometry.row_indices, values[draw_index])
     return blocks
@@ -1457,18 +1480,43 @@ def _mark_block_geometry(
     ladder: MarkedModelLadder, event_class: str
 ) -> MarkBlockGeometry:
     """Resolve sparse event/lag pairs to fitted output rows once per class."""
-    events = ladder.events[event_class]
-    time = ladder.fit_mask.index.to_numpy(dtype=float)
+    return mark_block_geometry(
+        ladder.events[event_class], ladder.fit_mask, ladder.lags, event_class
+    )
+
+
+def mark_block_geometry(
+    events: pd.DataFrame,
+    fit_mask: pd.Series,
+    lags: NDArray,
+    event_class: str,
+) -> MarkBlockGeometry:
+    """Resolve one frame's sparse event/lag pairs to fitted output rows.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, ...)
+        Events carrying ``start_time`` in seconds.
+    fit_mask : pd.Series of bool, shape (n_time,)
+        Fitted-bin mask indexed by session time.
+    lags : NDArray of int, shape (n_lags,)
+        Lag indices in samples.
+    event_class : str
+        Name recorded on the geometry.
+
+    Returns
+    -------
+    MarkBlockGeometry
+    """
+    time = fit_mask.index.to_numpy(dtype=float)
     onsets = pd.to_numeric(events["start_time"], errors="coerce").to_numpy(float)
     inside = (onsets >= time[0]) & (onsets <= time[-1])
     onset_bins = np.digitize(onsets, time[1:])
-    positions = onset_bins[:, None] + ladder.lags[None, :]
+    positions = onset_bins[:, None] + np.asarray(lags)[None, :]
     valid_position = (positions >= 0) & (positions < len(time)) & inside[:, None]
 
     fitted_row = np.full(len(time), -1, dtype=np.int64)
-    fitted_row[np.asarray(ladder.fit_mask, dtype=bool)] = np.arange(
-        int(ladder.fit_mask.sum())
-    )
+    fitted_row[np.asarray(fit_mask, dtype=bool)] = np.arange(int(fit_mask.sum()))
     clipped = np.clip(positions, 0, len(time) - 1)
     destinations = fitted_row[clipped]
     valid = valid_position & (destinations >= 0)
@@ -1477,7 +1525,7 @@ def _mark_block_geometry(
         event_indices=event_indices,
         lag_indices=lag_indices,
         row_indices=destinations[valid],
-        n_fit_rows=int(ladder.fit_mask.sum()),
+        n_fit_rows=int(fit_mask.sum()),
         event_class=event_class,
         n_events=len(events),
     )

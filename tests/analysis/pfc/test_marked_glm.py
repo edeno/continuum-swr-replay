@@ -556,6 +556,40 @@ def test_batched_permuted_blocks_match_the_scalar_reference_at_the_boundaries():
     np.testing.assert_allclose(batched, scalar, atol=1e-12, rtol=1e-12)
 
 
+def test_permuted_block_rebuild_is_ladder_agnostic():
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        mark_block_geometry,
+        mark_blocks_from_weights,
+    )
+
+    ladder = _small_ladder(
+        onset_bins={
+            "non_local_no_SWR": [2, 98, 60, 130, 160, 190],
+            "non_local_SWR": [40, 70, 125, 150, 175, 195],
+        }
+    )
+    event_class = "non_local_no_SWR"
+    permutations = np.array([[2, 0, 1, 5, 3, 4], [5, 4, 3, 2, 1, 0]])
+    events = ladder.events[event_class]
+    geometry = mark_block_geometry(events, ladder.fit_mask, ladder.lags, event_class)
+
+    explicit = mark_blocks_from_weights(
+        events["content_z"].to_numpy()[permutations], geometry, ladder.spline_basis
+    )
+
+    mark_slice = ladder.full.block_slices[f"{event_class}:content"]
+    scalar = np.stack(
+        [
+            _shuffled_full_design(ladder, event_class, permutation)[:, mark_slice]
+            for permutation in permutations
+        ]
+    )
+    np.testing.assert_allclose(explicit, scalar, atol=1e-12, rtol=1e-12)
+    np.testing.assert_array_equal(
+        explicit, permuted_mark_blocks(ladder, event_class, permutations)
+    )
+
+
 def test_permuted_blocks_refuse_a_geometry_built_for_another_class(small_ladder):
     other = _mark_block_geometry(small_ladder, "non_local_SWR")
 
