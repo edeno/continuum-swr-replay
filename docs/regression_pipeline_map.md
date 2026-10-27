@@ -100,6 +100,12 @@ The artifact detector's features: S window spectra, J5 and L20 steps, spike line
 
 `robust_scale`, `window_valid`, `window_centers`, `window_band_power`, `channel_specificity`, `level_jump`, `level_shift`, `robust_jump`, `reference_jump`, `persistent_step_count`, `nearest_mark_distance`, `spike_lines`
 
+### `src/continuum_swr_replay/analysis/hippocampus/brain_state_reference.py`
+
+Theta, ripple and MUA levels of running and of quiet rest, the references for an event's.
+
+`brain_state_reference`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
 Aggregation of analysis results over time.
@@ -123,6 +129,12 @@ What the replay detection runners read from a saved HPC decode and from each oth
 Analysis functions for manipulating and characterizing detected events.
 
 `get_immobile_events`, `get_event_start_end_times`, `get_event_durations_ms`
+
+### `src/continuum_swr_replay/analysis/hippocampus/gamma_power.py`
+
+Slow- and fast-gamma power of CA1, z-scored per epoch, on the decode grid.
+
+`band_power`, `zscore_on`, `event_means`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/hpc_raw_stats.py`
 
@@ -717,6 +729,18 @@ Add each compared event's Local, No-Spike, non-local and uncertain shares to an 
 Spike-evidence reality analysis for non-SWR non-local events.
 
 `animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+
+### `scripts/detection/measure_brain_state_reference.py`
+
+Measure each epoch's theta, ripple and MUA levels during running and during quiet rest.
+
+`main`
+
+### `scripts/detection/measure_event_gamma.py`
+
+Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
+
+`out_dir`, `epoch_gamma`, `main`
 
 ### `scripts/detection/report_event_features.py`
 
