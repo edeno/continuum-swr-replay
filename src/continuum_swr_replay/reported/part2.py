@@ -10,7 +10,7 @@ refitted here. The inputs (:class:`Part2Inputs`):
   every compared event of the other detectors, whether it overlaps a non-local
   event (``pair_membership`` against ``state_space``), and its state shares
   (``*_state_shares.parquet``, from ``scripts/detection/add_state_shares.py``);
-- the spike-evidence run (``paper/figures/reality_r11``, from
+- the spike-evidence run that scores every event (``paper/figures/reality_all``, from
   ``scripts/detection/analyze_event_spike_evidence.py``);
 - the held-out tetrode test split by SWR, from an untracked research script
   (every value from it is marked pending);
@@ -78,7 +78,7 @@ class Part2Inputs:
 
     event_table: Path
     event_features_run: Path
-    reality_metrics: Path
+    reality_dir: Path
     heldout_by_swr: Path
     content_occupancy: Path
 
@@ -87,8 +87,7 @@ def default_inputs() -> Part2Inputs:
     return Part2Inputs(
         event_table=table_path("event_table", replay_content_dir()),
         event_features_run=event_features_root() / EVENT_FEATURES_RUN,
-        reality_metrics=ROOT_DIR
-        / "paper/figures/reality_r11/event_spike_evidence_metrics.parquet",
+        reality_dir=ROOT_DIR / "paper/figures/reality_all/per_epoch",
         heldout_by_swr=ROOT_DIR
         / ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
         content_occupancy=ROOT_DIR
@@ -459,10 +458,38 @@ _REALITY_GROUPS = {
 }
 
 
+REALITY_METRICS = "event_spike_evidence_metrics.parquet"
+REALITY_EPOCHS = 242
+"""The spike-evidence run scores every analysed epoch."""
+
+
+def reality_metrics(per_epoch_dir: Path) -> pd.DataFrame:
+    """The spike-evidence run's per-event metrics, one table per epoch, concatenated.
+
+    Raises
+    ------
+    ValueError
+        The run does not hold :data:`REALITY_EPOCHS` epochs, or an epoch's
+        table names another epoch.
+    """
+    paths = sorted(per_epoch_dir.glob(f"*/{REALITY_METRICS}"))
+    if len(paths) != REALITY_EPOCHS:
+        raise ValueError(
+            f"{per_epoch_dir} holds {len(paths)} epochs' metrics, not {REALITY_EPOCHS}"
+        )
+    tables = []
+    for path in paths:
+        table = pd.read_parquet(path)
+        if set(table["epoch_id"]) != {path.parent.name}:
+            raise ValueError(f"{path} holds epochs {sorted(set(table['epoch_id']))}")
+        tables.append(table)
+    return pd.concat(tables, ignore_index=True)
+
+
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     """Claims 6, 7, 7b, 7c: each event group's spike evidence against matched
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
-    run scores at most 30 events per group per epoch."""
+    run scores every event and quiet window (no cap)."""
     make = _value_factory(source, ("6", "7", "7c"), ("paper", "figure: spike support"))
     values = [
         make(
@@ -486,7 +513,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 len(rows),
                 "count",
                 "count",
-                f"{label} scored (at most 30 per epoch)",
+                f"{label} scored",
             ),
             make(
                 f"{word}_spikes_median",
@@ -884,13 +911,18 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
         file_record(directional_path, ROOT_DIR),
     ]
 
-    metrics = pd.read_parquet(inputs.reality_metrics)
+    metrics = reality_metrics(inputs.reality_dir)
     summary.add(
         *spike_evidence_values(
-            metrics, f"{rel(inputs.reality_metrics)} (242-epoch run)"
+            metrics,
+            f"{rel(inputs.reality_dir)}/*/{REALITY_METRICS} (every event, no cap)",
         )
     )
-    summary.inputs.append(file_record(inputs.reality_metrics, ROOT_DIR))
+    summary.inputs.append(
+        files_record(
+            REALITY_METRICS, inputs.reality_dir.glob(f"*/{REALITY_METRICS}"), ROOT_DIR
+        )
+    )
 
     stats = pd.read_csv(inputs.heldout_by_swr)
     summary.add(*heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)))
