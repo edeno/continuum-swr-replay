@@ -49,6 +49,11 @@ and history counts past onsets only. With events lasting ~50-90 ms, the self-his
 mask plus onset- and offset-locked history on simulated data (own worktree; report
 `.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`). Hold the cross-history values out of
 Part 3 until then; then decide on refitting the real self- and cross-history models.
+Done 2026-10-26 21:30: branch `worktree-agent-ace075bd61a8ee966` (commits f3db33c0, 92f8a4f7, 4b296762; not merged).
+On simulation the current design reads non-overlap and end-locked fragmentation as refractoriness, a 90-120 ms
+burst and two-way cross coupling; the duration-aware design (opt-in `at_risk_events=`, `offset_history=`,
+`MODEL_CROSS_HISTORY_DURATION_RATE`) recovers each truth. Waiting on the lead: (1) pull the burst/refractory
+statements (claim 19c text) now; (2) run the real refit (measure duration log-SD first).
 
 ## Trends across sessions (2026-10-26, exploratory)
 
