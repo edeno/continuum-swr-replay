@@ -25,11 +25,21 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-26 | 0/1 | tests | — | — | `tests/analysis/pfc` + `tests/unit`: 5580 passed, 11 skipped, 1 failed — `test_session_keys.py::test_no_module_level_session_constant_defined_elsewhere` flags `scripts/detection/measure_event_gamma.py` from base commit `23e86d21`, not this branch |
 | 2026-10-26 | 1 | calibration and Part 4 summary rerun on a clean tree | at `96c60a83`, committed `fda7a938` | — | no value changed |
 
+| 2026-10-26 | lead | answers (~20:47): measure decreases properly before Phase B; 66471fd3 out; Phase B definition confirmed, no power matching, ripple power as a graded mark on every class; null-only fallback allowed above ~16 h; Phase C defaults accepted | — | overview.md Open Questions | — |
+| 2026-10-26 | 1 (A) decreases | reference-window baseline, `response_size`, `steepest_approach_lag`; calibration with decreases (−0.7, −0.3), two windows (±0.2 s, ±1.0 s) and a stop-level rate confound | `c7236a50` | — | tests green |
+| 2026-10-26 | 1 (A) decreases | calibration, CPU, 40 scenarios | run at `f173d89b` (clean) | `timing_calibration.json` | rise onset late by `timing_calibration_bias_ms_onset_rise_*` for both signs; stop-level confound: `timing_calibration_stop_offset_size` from zero vs `timing_calibration_stop_offset_rise_size` from −200 ms; wide window changes nothing (`timing_calibration_wide_*`) → no wide-window refit |
+| 2026-10-26 | 1 (A) decreases | Part 4 summary + emit | `718cb7d2` | `part4.json` (396 values), `overview.md` **When, and how much?** | decreases: `timing_population_rise_onset_ms_*_suppressed`, `timing_population_rise_onset_animals_negative_*_suppressed`, `timing_population_rise_size_*`; recommended rule per sign stated in the overview |
+| 2026-10-26 | 2 (B) | extended event set, models, null, curves, runner flags, comparison script | `44b20a72` | — | 604 passed (pfc/reported selection) |
+| 2026-10-26 | 2 (B) | worktree venv lacked CUDA jax (first smoke launch fell back to CPU and the runner refused it); installed with `uv sync --frozen --inexact --extra cuda` (no lockfile change) | — | `logs/pfc_response_followups/swr_without_replay_smoke/failed_cpu_jax/` | — |
+| 2026-10-26 | 2 (B) | smoke, 4 sessions (j1620210710 12_r6, senor20201101 06_r3, wilbur20210331 16_r8, peanut20201128 16_r8), GPUs 1–4, R = 1,000, started 21:11 | `44b20a72` (+ later commits that do not touch the fit path) | tmux `pfc_b_smoke`; logs `logs/pfc_response_followups/swr_without_replay_smoke/`; output `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | SWRs without replay per session (sidecar `n_swr_no_non_local`): 38, 2, 34, 9 |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
 |---|---|---|---|---|---|---|---|
 | timing calibration | — (foreground, CPU) | none | — | `Processed-Data/pfc_response_followups/` | 2026-10-26 | 2026-10-26 | 2 min 15 s CPU |
+| timing calibration with decreases | — (background, CPU) | none | — | `Processed-Data/pfc_response_followups/timing_calibration.json` | 2026-10-26 | 2026-10-26 | about 40 min CPU (shared with tests) |
+| Phase B smoke | `pfc_b_smoke` | 1–4 | `logs/pfc_response_followups/swr_without_replay_smoke/` | `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | 2026-10-26 21:11 | | |
 
 ## Findings (phase 1)
 
