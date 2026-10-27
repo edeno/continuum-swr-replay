@@ -3,37 +3,37 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "2893ef49ec70",
+ "commit": "8988058d211a",
  "inputs": [
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/*_mPFC_modulation.pkl",
+   "path": "Processed-Data/*_mPFC_modulation.pkl",
    "n_files": 75,
    "sha256": "81d31bd377ebacc41e93653ab34cd0ae7c746d59a2179a81389d09cc2988dab1"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/*_mPFC_modulation.*.npy",
+   "path": "Processed-Data/*_mPFC_modulation.*.npy",
    "n_files": 375,
    "sha256": "0fde031f85a5276463a857ed290b6aed04766b0baf673b8afa235cd9738ae1e2"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/*_mPFC_modulation.provenance.json",
+   "path": "Processed-Data/*_mPFC_modulation.provenance.json",
    "n_files": 75,
    "sha256": "a218d37a67b60805253460ceb854eab144ee5a18c9cc6533789df81986c8144c"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/pfc_cohort_mPFC.json",
+   "path": "Processed-Data/pfc_cohort_mPFC.json",
    "sha256": "2c177e90b77b56c8ba8ca4bab0faedcc1df8e9795c310089df228dde3ab5b621"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/replay_content/event_table.parquet",
+   "path": "Processed-Data/replay_content/event_table.parquet",
    "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/replay_content/stop_table.parquet",
+   "path": "Processed-Data/replay_content/stop_table.parquet",
    "sha256": "879e8d05775754f58c56afee5e08a4ef49c113c2937876eaf68b78038c6d6e80"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay-reported-part4/Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
+   "path": "Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
    "n_files": 71,
    "sha256": "58042fdf081b88313bb8f0dd606407ac8c61af80e2d9e840679d2481ed119f3c",
    "note": "superseded maximum-likelihood tree, for one comparison"
