@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -34,8 +34,10 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
+from continuum_swr_replay.analysis.pfc.event_sets import SWR_NO_NON_LOCAL
 from continuum_swr_replay.analysis.pfc.marked_glm import (
     EVENT_DURATION_MARK,
+    EXTENDED_MARKED_EVENT_CLASSES,
     MARKED_EVENT_CLASSES,
     MIN_MARKED_EVENTS_PER_CLASS,
     RIPPLE_POWER_MARK,
@@ -174,12 +176,26 @@ class MarkedFamilySpec:
         One-sentence scientific question the comparison answers.
     tier : str
         ``"core"`` or ``"interaction"``; interaction models carry product
-        marks and their two constituent main effects.
+        marks and their two constituent main effects. ``"marginal"`` is a
+        generated single-target spec (:func:`marginal_specs`).
     required_varying_nuisance_marks : tuple[str, ...]
         Nuisance marks that must vary within every class. They are the
         modifiers of an interaction target, whose product mark is otherwise
         identically zero; a session that lacks their variation is refused
         rather than fit.
+    event_classes : tuple[str, ...]
+        The marked event classes, in design-block order. A spec that lists
+        ``"SWR_no_non_local"`` may carry only :data:`SWR_ONLY_MARKS`.
+    pooled : bool
+        When True, each target gets one marked block shared by every class
+        (its events standardized within their own class, then convolved
+        together), so its slope kernel is one curve for all classes; every
+        class keeps its own base kernel and adjustment blocks.
+    baseline_context_marks : tuple[str, ...]
+        Stop-level context marks that also enter the per-stop baseline
+        (:func:`~continuum_swr_replay.analysis.pfc.marked_glm.build_baseline_columns`
+        ``context_columns``), so a stationary rate difference between stops is
+        not read as an event-locked effect of that mark.
     """
 
     name: str
@@ -188,6 +204,9 @@ class MarkedFamilySpec:
     question: str
     tier: str = "core"
     required_varying_nuisance_marks: tuple[str, ...] = ()
+    event_classes: tuple[str, ...] = MARKED_EVENT_CLASSES
+    pooled: bool = False
+    baseline_context_marks: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         all_marks = (*self.nuisance_marks, *self.scientific_marks)
@@ -198,16 +217,72 @@ class MarkedFamilySpec:
         unknown = sorted(set(all_marks) - set(MARK_DESCRIPTIONS))
         if unknown:
             raise ValueError(f"model {self.name!r} uses unknown marks {unknown}")
-        if self.tier not in {"core", "interaction"}:
-            raise ValueError("tier must be 'core' or 'interaction'")
+        if self.tier not in SPEC_TIERS:
+            raise ValueError(f"tier must be one of {SPEC_TIERS}")
         if not set(self.required_varying_nuisance_marks).issubset(self.nuisance_marks):
             raise ValueError("required varying marks must be nuisance marks")
+        if not self.event_classes or len(set(self.event_classes)) != len(
+            self.event_classes
+        ):
+            raise ValueError("event_classes must be non-empty and unique")
+        unknown_classes = set(self.event_classes) - set(EXTENDED_MARKED_EVENT_CLASSES)
+        if unknown_classes:
+            raise ValueError(f"unknown event classes {sorted(unknown_classes)}")
+        if SWR_NO_NON_LOCAL in self.event_classes and not set(all_marks) <= set(
+            SWR_ONLY_MARKS
+        ):
+            raise ValueError(
+                f"model {self.name!r}: {SWR_NO_NON_LOCAL} events carry only "
+                f"{list(SWR_ONLY_MARKS)}"
+            )
+        if not set(self.baseline_context_marks) <= set(STOP_LEVEL_MARKS):
+            raise ValueError("baseline context marks must be stop-level marks")
 
     @property
     def all_marks(self) -> tuple[str, ...]:
         """Marks in deterministic design order: adjustments, then targets."""
         return (*self.nuisance_marks, *self.scientific_marks)
 
+    @property
+    def target_classes(self) -> tuple[str, ...]:
+        """Classes keying the target blocks: ``("pooled",)`` when pooled."""
+        return (POOLED_CLASS,) if self.pooled else self.event_classes
+
+    def for_classes(self, available: tuple[str, ...]) -> MarkedFamilySpec:
+        """The spec restricted to the event classes a session was cut with.
+
+        Parameters
+        ----------
+        available : tuple of str
+            Marked classes the session's event set provides.
+
+        Returns
+        -------
+        MarkedFamilySpec
+            A copy keeping only ``event_classes`` present in ``available``.
+
+        Raises
+        ------
+        ValueError
+            If none is left.
+        """
+        kept = tuple(c for c in self.event_classes if c in available)
+        if not kept:
+            raise ValueError(f"model {self.name!r} has no class among {available}")
+        return replace(self, event_classes=kept)
+
+
+#: The marks an SWR without replay carries: it has no decoded content, no
+#: decode-quality summary and no stop-context join of its own.
+SWR_ONLY_MARKS = (EVENT_DURATION_MARK, RIPPLE_POWER_MARK)
+
+#: Pseudo-class of a pooled marked block: every class's events, each mark
+#: standardized within its own class, convolved into one block.
+POOLED_CLASS = "pooled"
+
+#: Spec tiers: the v1 core and interaction models, and the generated
+#: single-target marginal tier.
+SPEC_TIERS = ("core", "interaction", "marginal")
 
 # Six compact core designs carry six marked predictors per class. The three
 # content horse-races and all three interaction sensitivities carry nine. Thus
@@ -410,6 +485,133 @@ INTERACTION_MODEL_NAMES = tuple(
     name for name, spec in RECOMMENDED_MODEL_SPECS.items() if spec.tier == "interaction"
 )
 
+#: Content targets: their marginal specs also adjust for leaf content.
+CONTENT_TARGETS = (CURRENT_ARM_FRACTION, CONTENT_RECENT_REWARD, CONTENT_UNCERTAINTY)
+
+# The follow-up questions: what is replayed, how strong the event is, and the
+# stop it happens in. The ripple-power models also mark the SWRs without
+# replay when a session is cut with the extended event set.
+FOLLOWUP_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
+    {
+        "replay_content": MarkedFamilySpec(
+            name="replay_content",
+            scientific_marks=CONTENT_TARGETS,
+            nuisance_marks=(EVENT_DURATION_MARK, LEAF_CONTENT_FRACTION, DECODE_ENTROPY),
+            question=(
+                "Does the response change with replay of the current arm, of "
+                "recently rewarded arms, or of uncertain arms?"
+            ),
+        ),
+        "event_strength": MarkedFamilySpec(
+            name="event_strength",
+            scientific_marks=(EVENT_DURATION_MARK, RIPPLE_POWER, MUA_RATE),
+            nuisance_marks=(DECODE_ENTROPY,),
+            question=(
+                "Does the response scale with event duration, ripple power or "
+                "hippocampal multiunit rate?"
+            ),
+        ),
+        "stop_context": MarkedFamilySpec(
+            name="stop_context",
+            scientific_marks=(REWARDED_CONTEXT, TRIPS_TO_PATCH_SWITCH),
+            nuisance_marks=(EVENT_DURATION_MARK, CURRENT_ARM_FRACTION, DECODE_ENTROPY),
+            question=(
+                "Does the response change with the stop's reward outcome or with "
+                "how close the next patch switch is?"
+            ),
+            baseline_context_marks=(TRIPS_TO_PATCH_SWITCH,),
+        ),
+        "ripple_power": MarkedFamilySpec(
+            name="ripple_power",
+            scientific_marks=(RIPPLE_POWER,),
+            nuisance_marks=(EVENT_DURATION_MARK,),
+            question=(
+                "How does the response scale with ripple power in each class, "
+                "SWRs without replay included?"
+            ),
+            event_classes=EXTENDED_MARKED_EVENT_CLASSES,
+        ),
+        "ripple_power_pooled": MarkedFamilySpec(
+            name="ripple_power_pooled",
+            scientific_marks=(RIPPLE_POWER,),
+            nuisance_marks=(EVENT_DURATION_MARK,),
+            question=(
+                "How does the response scale with ripple power over all classes "
+                "together?"
+            ),
+            event_classes=EXTENDED_MARKED_EVENT_CLASSES,
+            pooled=True,
+        ),
+    }
+)
+FOLLOWUP_MODEL_NAMES = tuple(FOLLOWUP_MODEL_SPECS)
+
+
+def marginal_specs(
+    joint_specs: Mapping[str, MarkedFamilySpec] = FOLLOWUP_MODEL_SPECS,
+    *,
+    extra_targets: tuple[str, ...] = (NEXT_TRIP_SWITCHES_PATCH,),
+) -> Mapping[str, MarkedFamilySpec]:
+    """One single-target spec per distinct target of the joint models.
+
+    The marginal tier is the family's total effect: each target fit alone,
+    adjusted only for event duration and decode entropy (duration itself only
+    for entropy), content targets also for leaf content. Shared variance the
+    joint models credit to no target goes to each target here. Every marginal
+    spec is fit on the two replay classes; a stop-level context target other
+    than the reward outcome (already a baseline column) is also a baseline
+    context column.
+
+    Parameters
+    ----------
+    joint_specs : Mapping of str to MarkedFamilySpec
+        The joint models whose targets are generated, in order.
+    extra_targets : tuple of str
+        Further targets with a marginal spec but no joint model.
+
+    Returns
+    -------
+    Mapping of str to MarkedFamilySpec
+        Keyed ``marginal_<mark>``, in first-appearance order.
+    """
+    targets = list(
+        dict.fromkeys(
+            [
+                *(m for spec in joint_specs.values() for m in spec.scientific_marks),
+                *extra_targets,
+            ]
+        )
+    )
+    specs: dict[str, MarkedFamilySpec] = {}
+    for mark in targets:
+        if mark == EVENT_DURATION_MARK:
+            adjustments: tuple[str, ...] = (DECODE_ENTROPY,)
+        elif mark in CONTENT_TARGETS:
+            adjustments = (EVENT_DURATION_MARK, LEAF_CONTENT_FRACTION, DECODE_ENTROPY)
+        else:
+            adjustments = (EVENT_DURATION_MARK, DECODE_ENTROPY)
+        name = f"marginal_{mark}"
+        specs[name] = MarkedFamilySpec(
+            name=name,
+            scientific_marks=(mark,),
+            nuisance_marks=adjustments,
+            question=f"How does the response change with {mark} alone?",
+            tier="marginal",
+            baseline_context_marks=(
+                (mark,) if mark in STOP_LEVEL_MARKS and mark != REWARDED_CONTEXT else ()
+            ),
+        )
+    return MappingProxyType(specs)
+
+
+MARGINAL_MODEL_SPECS = marginal_specs()
+MARGINAL_MODEL_NAMES = tuple(MARGINAL_MODEL_SPECS)
+
+#: Every spec a runner can fit, by name.
+ALL_MODEL_SPECS: Mapping[str, MarkedFamilySpec] = MappingProxyType(
+    {**RECOMMENDED_MODEL_SPECS, **FOLLOWUP_MODEL_SPECS, **MARGINAL_MODEL_SPECS}
+)
+
 
 @dataclass(frozen=True)
 class MarkedFamilyLadder:
@@ -420,18 +622,23 @@ class MarkedFamilyLadder:
     spec : MarkedFamilySpec
         The question this ladder was built for.
     reduced : dict[tuple[str, str], KernelDesign]
-        Keyed by ``(event_class, scientific_mark)``: the full design minus
-        only that class's block for that target mark.
+        Keyed by ``(target_class, scientific_mark)``: the full design minus
+        only that target block.
     full : KernelDesign
         The joint design holding every class's ordinary, nuisance and target
         block, of shape ``(n_fit_bins, 1 + n_blocks * n_basis)``.
     events : dict[str, pd.DataFrame]
         Per event class, the standardized event frame the design was built
-        from, carrying ``<mark>_z`` and ``<mark>_available`` columns.
+        from, carrying ``<mark>_z`` and ``<mark>_available`` columns; for a
+        pooled spec also ``"pooled"``, every class's rows stacked in class
+        order with their class in ``event_class``.
     scales : dict[str, dict[str, MarkScale]]
         Per event class and mark, the centering and scaling reference.
     classes : tuple[str, ...]
-        Event classes, in design-block and comparison order.
+        Event classes, in design-block order; each has a base kernel.
+    target_classes : tuple[str, ...]
+        Keys of the target blocks, in comparison order: ``classes``, or
+        ``("pooled",)`` for a pooled spec.
     fit_mask : pd.Series of bool
         Fitted-bin mask indexed by session time, shape ``(n_time,)``.
     spline_basis : NDArray, shape (n_lags, n_basis)
@@ -446,6 +653,7 @@ class MarkedFamilyLadder:
     events: dict[str, pd.DataFrame]
     scales: dict[str, dict[str, MarkScale]]
     classes: tuple[str, ...]
+    target_classes: tuple[str, ...]
     fit_mask: pd.Series
     spline_basis: NDArray
     lags: NDArray
@@ -469,16 +677,22 @@ class MarkedFamilyResults:
     mark_curves : dict[str, dict[str, NDArray]]
         ``mark_curves[c][mark]``, shape ``(n_lags, n_units)``: the change in
         class ``c``'s log-rate kernel per within-session, within-class SD of
-        that target mark. Non-converged units are ``nan``.
+        that target mark (``c`` is ``"pooled"`` for a pooled spec).
+        Non-converged units are ``nan``.
     diagnostics : dict[str, Any]
         JSON-serializable audit record: mark scales, design widths, ranks,
         mark geometry, NaN-channel counts and timings.
+    slope_null : dict[str, dict[str, NDArray]]
+        ``slope_null[c][mark]``, shape ``(n_draws, n_report_lags, n_units)``,
+        float32: the same slope kernel refit with the target's values
+        shuffled (:func:`fit_marked_family_ladder`). Empty without draws.
     """
 
     statistics: pd.DataFrame
     typical_curves: dict[str, NDArray]
     mark_curves: dict[str, dict[str, NDArray]]
     diagnostics: dict[str, Any]
+    slope_null: dict[str, dict[str, NDArray]] = field(default_factory=dict)
 
 
 class ModelIneligibleError(ValueError):
@@ -1196,7 +1410,7 @@ def build_marked_family_ladder(
     lags: NDArray,
     spec: MarkedFamilySpec,
     *,
-    classes: tuple[str, ...] = MARKED_EVENT_CLASSES,
+    classes: tuple[str, ...] | None = None,
     min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
     baseline: NDArray | None = None,
 ) -> MarkedFamilyLadder:
@@ -1219,8 +1433,9 @@ def build_marked_family_ladder(
         Lag indices in samples, ascending by one sample.
     spec : MarkedFamilySpec
         The question whose full and reduced designs are built.
-    classes : tuple[str, ...]
+    classes : tuple[str, ...], optional
         Event classes, in design-block order; each must be in ``events``.
+        Defaults to ``spec.event_classes``.
     min_marked_events : int
         Fewest finite events a class may contribute to a marked kernel.
     baseline : NDArray, shape (n_fit_bins, n_baseline), optional
@@ -1242,6 +1457,8 @@ def build_marked_family_ladder(
         does not permit it. The message names the model, the class and the
         mark.
     """
+    if classes is None:
+        classes = spec.event_classes
     standardized: dict[str, pd.DataFrame] = {}
     scales: dict[str, dict[str, MarkScale]] = {}
     for event_class in classes:
@@ -1272,13 +1489,35 @@ def build_marked_family_ladder(
         for event_class in classes
         for mark in spec.nuisance_marks
     )
+    target_classes = (POOLED_CLASS,) if spec.pooled else tuple(classes)
+    design_events = dict(standardized)
+    if spec.pooled:
+        # One block for every class: the classes' events, each mark already
+        # standardized within its own class, convolve into the same columns.
+        # It equals the sum of the per-class blocks (the convolution is
+        # linear), which is a shared slope across the classes.
+        columns = [
+            "start_time",
+            *(
+                f"{mark}_{suffix}"
+                for mark in spec.scientific_marks
+                for suffix in ("z", "available")
+            ),
+        ]
+        design_events[POOLED_CLASS] = pd.concat(
+            [
+                standardized[event_class][columns].assign(event_class=event_class)
+                for event_class in classes
+            ],
+            ignore_index=True,
+        )
     scientific_blocks = tuple(
-        EventKernelBlock(_block_name(event_class, mark), event_class, f"{mark}_z")
-        for event_class in classes
+        EventKernelBlock(_block_name(target, mark), target, f"{mark}_z")
+        for target in target_classes
         for mark in spec.scientific_marks
     )
     full = build_kernel_design(
-        standardized,
+        design_events,
         fit_mask,
         spline_basis,
         lags,
@@ -1286,17 +1525,18 @@ def build_marked_family_ladder(
         baseline=baseline,
     )
     reduced = {
-        (event_class, mark): _without_block(full, _block_name(event_class, mark))
-        for event_class in classes
+        (target, mark): _without_block(full, _block_name(target, mark))
+        for target in target_classes
         for mark in spec.scientific_marks
     }
     return MarkedFamilyLadder(
         spec=spec,
         reduced=reduced,
         full=full,
-        events=standardized,
+        events=design_events,
         scales=scales,
-        classes=classes,
+        classes=tuple(classes),
+        target_classes=target_classes,
         fit_mask=fit_mask,
         spline_basis=np.asarray(spline_basis, dtype=float),
         lags=np.asarray(lags),
@@ -1596,12 +1836,13 @@ def fit_marked_family_ladder(
         parameters = np.asarray(fitted.params[:, base], dtype=float).copy()
         parameters[~usable] = np.nan
         typical_curves[event_class] = ladder.spline_basis @ parameters.T
-        mark_curves[event_class] = {}
+    for target_class in ladder.target_classes:
+        mark_curves[target_class] = {}
         for mark in ladder.spec.scientific_marks:
-            span = ladder.full.block_slices[_block_name(event_class, mark)]
+            span = ladder.full.block_slices[_block_name(target_class, mark)]
             parameters = np.asarray(fitted.params[:, span], dtype=float).copy()
             parameters[~usable] = np.nan
-            mark_curves[event_class][mark] = ladder.spline_basis @ parameters.T
+            mark_curves[target_class][mark] = ladder.spline_basis @ parameters.T
 
     diagnostics: dict[str, Any] = {
         "model_name": ladder.spec.name,
@@ -1612,6 +1853,9 @@ def fit_marked_family_ladder(
         "tier": ladder.spec.tier,
         "scientific_marks": list(ladder.spec.scientific_marks),
         "nuisance_marks": list(ladder.spec.nuisance_marks),
+        "event_classes": list(ladder.classes),
+        "target_classes": list(ladder.target_classes),
+        "n_baseline_columns": int(ladder.full.n_baseline),
         "comparison_order": [list(key) for key in comparison_order],
         "scales": {
             event_class: {mark: scale._asdict() for mark, scale in class_scales.items()}

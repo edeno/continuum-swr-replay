@@ -882,3 +882,195 @@ def test_stop_marks_join_each_event_through_its_stop():
         build_recommended_event_mark_table(arm, event, stop_marks)
     # Without stop marks the forward marks are simply absent.
     assert TRIPS_TO_PATCH_SWITCH not in build_recommended_event_mark_table(arm, event)
+
+
+def test_followup_specs_use_known_marks():
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+    )
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        FOLLOWUP_MODEL_SPECS,
+        RECOMMENDED_MODEL_SPECS,
+    )
+
+    # Marked blocks per class (adjustments plus targets); this pins the
+    # compiled design widths the follow-up family adds to a session.
+    widths = {name: len(spec.all_marks) for name, spec in FOLLOWUP_MODEL_SPECS.items()}
+    assert widths == {
+        "replay_content": 6,
+        "event_strength": 4,
+        "stop_context": 5,
+        "ripple_power": 2,
+        "ripple_power_pooled": 2,
+    }
+    for spec in FOLLOWUP_MODEL_SPECS.values():
+        assert set(spec.all_marks) <= set(MARK_DESCRIPTIONS)
+    for name in ("replay_content", "event_strength", "stop_context"):
+        assert FOLLOWUP_MODEL_SPECS[name].event_classes == MARKED_EVENT_CLASSES
+    for name in ("ripple_power", "ripple_power_pooled"):
+        assert FOLLOWUP_MODEL_SPECS[name].event_classes == EXTENDED_MARKED_EVENT_CLASSES
+    assert FOLLOWUP_MODEL_SPECS["ripple_power_pooled"].pooled
+    assert FOLLOWUP_MODEL_SPECS["stop_context"].baseline_context_marks == (
+        TRIPS_TO_PATCH_SWITCH,
+    )
+    # The v1 inventory is untouched.
+    assert len(RECOMMENDED_MODEL_SPECS) == 12
+    # A canonical-set session fits the ripple-power models on the replay
+    # classes only.
+    restricted = FOLLOWUP_MODEL_SPECS["ripple_power"].for_classes(MARKED_EVENT_CLASSES)
+    assert restricted.event_classes == MARKED_EVENT_CLASSES
+
+
+def test_marginal_specs_cover_every_followup_target_once():
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        FOLLOWUP_MODEL_SPECS,
+        MARGINAL_MODEL_NAMES,
+        MARGINAL_MODEL_SPECS,
+        MUA_RATE,
+    )
+
+    targets = {
+        m for spec in FOLLOWUP_MODEL_SPECS.values() for m in spec.scientific_marks
+    }
+    assert set(MARGINAL_MODEL_NAMES) == {
+        f"marginal_{mark}" for mark in (*targets, NEXT_TRIP_SWITCHES_PATCH)
+    }
+    for name, spec in MARGINAL_MODEL_SPECS.items():
+        assert spec.tier == "marginal"
+        assert len(spec.scientific_marks) == 1
+        assert name == f"marginal_{spec.scientific_marks[0]}"
+        assert spec.event_classes == MARKED_EVENT_CLASSES
+    duration = MARGINAL_MODEL_SPECS[f"marginal_{EVENT_DURATION_MARK}"]
+    assert duration.nuisance_marks == (DECODE_ENTROPY,)
+    for content in (CURRENT_ARM_FRACTION, CONTENT_RECENT_REWARD, CONTENT_UNCERTAINTY):
+        assert MARGINAL_MODEL_SPECS[f"marginal_{content}"].nuisance_marks == (
+            EVENT_DURATION_MARK,
+            LEAF_CONTENT_FRACTION,
+            DECODE_ENTROPY,
+        )
+    for other in (RIPPLE_POWER, MUA_RATE, REWARDED_CONTEXT, TRIPS_TO_PATCH_SWITCH):
+        assert MARGINAL_MODEL_SPECS[f"marginal_{other}"].nuisance_marks == (
+            EVENT_DURATION_MARK,
+            DECODE_ENTROPY,
+        )
+    # Stop-level context targets other than the reward outcome (already a
+    # baseline column) are also baseline context columns.
+    for mark in (TRIPS_TO_PATCH_SWITCH, NEXT_TRIP_SWITCHES_PATCH):
+        assert MARGINAL_MODEL_SPECS[f"marginal_{mark}"].baseline_context_marks == (
+            mark,
+        )
+    assert (
+        MARGINAL_MODEL_SPECS[f"marginal_{REWARDED_CONTEXT}"].baseline_context_marks
+        == ()
+    )
+
+
+def test_swrs_without_replay_carry_only_duration_and_ripple_power():
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+    )
+
+    with pytest.raises(ValueError, match="carry only"):
+        MarkedFamilySpec(
+            "content_on_swrs",
+            (CURRENT_ARM_FRACTION,),
+            (EVENT_DURATION_MARK,),
+            "an SWR without replay has no content",
+            event_classes=EXTENDED_MARKED_EVENT_CLASSES,
+        )
+
+
+def _three_class_inputs(n_events: int = 12):
+    """Both replay classes and SWRs without replay, carrying ripple power."""
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+    )
+
+    fit_mask, basis, lags, _ = _eligibility_inputs(n_events)
+    time = fit_mask.index.to_numpy()
+    rng = np.random.default_rng(31)
+    events = {
+        event_class: pd.DataFrame(
+            {
+                "start_time": time[20 + 40 * np.arange(n_events) + 3 * index],
+                EVENT_DURATION_MARK: rng.normal(-3.0, 0.5, n_events),
+                RIPPLE_POWER: rng.normal(index, 1.0 + index, n_events),
+            }
+        )
+        for index, event_class in enumerate(EXTENDED_MARKED_EVENT_CLASSES)
+    }
+    return fit_mask, basis, lags, events
+
+
+def test_pooled_block_equals_the_per_class_blocks_shared_slope():
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+    )
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        FOLLOWUP_MODEL_SPECS,
+    )
+
+    fit_mask, basis, lags, events = _three_class_inputs()
+    per_class = build_marked_family_ladder(
+        events, fit_mask, basis, lags, FOLLOWUP_MODEL_SPECS["ripple_power"]
+    )
+    pooled = build_marked_family_ladder(
+        events, fit_mask, basis, lags, FOLLOWUP_MODEL_SPECS["ripple_power_pooled"]
+    )
+
+    assert per_class.target_classes == EXTENDED_MARKED_EVENT_CLASSES
+    assert pooled.target_classes == ("pooled",)
+    assert tuple(pooled.reduced) == (("pooled", RIPPLE_POWER),)
+    n_basis = basis.shape[1]
+    assert per_class.full.matrix.shape[1] - pooled.full.matrix.shape[1] == 2 * n_basis
+    # Constraining the three per-class slopes to one curve sums their columns.
+    shared = sum(
+        per_class.full.matrix[:, per_class.full.block_slices[f"{c}:{RIPPLE_POWER}"]]
+        for c in EXTENDED_MARKED_EVENT_CLASSES
+    )
+    np.testing.assert_allclose(
+        pooled.full.matrix[:, pooled.full.block_slices[f"pooled:{RIPPLE_POWER}"]],
+        shared,
+        atol=1e-12,
+    )
+    # Every class keeps its own base kernel and duration block.
+    for event_class in EXTENDED_MARKED_EVENT_CLASSES:
+        for block in (f"{event_class}:event", f"{event_class}:{EVENT_DURATION_MARK}"):
+            np.testing.assert_array_equal(
+                pooled.full.matrix[:, pooled.full.block_slices[block]],
+                per_class.full.matrix[:, per_class.full.block_slices[block]],
+            )
+    # Each class's mark is standardized within that class before pooling.
+    for event_class in EXTENDED_MARKED_EVENT_CLASSES:
+        z = pooled.events["pooled"].loc[
+            pooled.events["pooled"].event_class == event_class, f"{RIPPLE_POWER}_z"
+        ]
+        assert z.mean() == pytest.approx(0.0, abs=1e-12)
+        assert z.std(ddof=0) == pytest.approx(1.0)
+
+
+def test_ripple_power_fit_reads_one_curve_per_class_or_one_pooled_curve():
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+    )
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        FOLLOWUP_MODEL_SPECS,
+    )
+
+    fit_mask, basis, lags, events = _three_class_inputs()
+    counts = np.random.default_rng(3).poisson(0.2, size=(int(fit_mask.sum()), 2))
+    folds = np.repeat([0, 1], len(counts) // 2)
+    for name, targets in (
+        ("ripple_power", EXTENDED_MARKED_EVENT_CLASSES),
+        ("ripple_power_pooled", ("pooled",)),
+    ):
+        ladder = build_marked_family_ladder(
+            events, fit_mask, basis, lags, FOLLOWUP_MODEL_SPECS[name]
+        )
+        result = fit_marked_family_ladder(ladder, counts, folds, penalty_sigma=3.0)
+        assert tuple(result.mark_curves) == targets
+        assert tuple(result.typical_curves) == EXTENDED_MARKED_EVENT_CLASSES
+        for target in targets:
+            assert (
+                f"{target}:{RIPPLE_POWER}: heldout_delta_deviance" in result.statistics
+            )
