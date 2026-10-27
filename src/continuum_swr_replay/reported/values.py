@@ -150,7 +150,7 @@ def file_record(path: Path, root: Path) -> dict[str, Any]:
     """An input file's path (relative to ``root`` when under it) and sha256."""
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     try:
-        shown = str(path.resolve().relative_to(root.resolve()))
+        shown = str(path.absolute().relative_to(root.absolute()))
     except ValueError:
         shown = str(path)
     return {"path": shown, "sha256": digest}
@@ -167,7 +167,7 @@ def files_record(
         digest.update(path.name.encode())
         digest.update(hashlib.sha256(path.read_bytes()).digest())
     try:
-        folder = str(paths[0].parent.resolve().relative_to(root.resolve()))
+        folder = str(paths[0].parent.absolute().relative_to(root.absolute()))
     except (ValueError, IndexError):
         folder = str(paths[0].parent) if paths else ""
     record: dict[str, Any] = {
