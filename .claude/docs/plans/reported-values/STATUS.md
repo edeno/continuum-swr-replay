@@ -56,6 +56,13 @@ An agent (own worktree, read-only on real data) is checking whether event proper
 the decoder's transition matrix and mPFC response shares change across days and within days, with confound
 checks. Output: `scripts/exploratory/_learning_trends.py` and `.claude/docs/reviews/2026-10-26-learning-trends.md`
 on its branch. Memory: project-learning-evolution-followup.
+Done 2026-10-26 20:40: branch `worktree-agent-a52c665f3acd09fe4` commit `8dc03829` (not merged). No change
+generalises across animals (smallest q 0.12 on slopes over animals); across-day content trends track each
+animal's HPC spike-rate drift and the per-epoch fitted transitions. Next checks: re-decode with a common
+transition matrix; match epochs on spike count; within-day reward vs reward delivered so far.
+
+The mPFC agent finished Phases A (timing) and 0 (port) on `pfc-response-followups`; six questions for the lead
+before Phase B (in its `overview.md` Open Questions).
 
 ## Next project: mPFC response (approved 2026-10-26)
 
