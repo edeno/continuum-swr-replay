@@ -1171,6 +1171,7 @@ def per_bin_detail_values(
         ("swr_to_non_local", "swr", "non_local"),
         ("swr_coupled_to_swr", "non_local_swr", "swr"),
         ("no_swr_to_swr", "non_local_no_swr", "swr"),
+        ("swr_coupled_to_non_local", "non_local_swr", "non_local"),
     )
     for word, a, b in pairs:
         A = null.loc[null["outcome"] == a, SC + ["coef_Intercept"]]
@@ -1517,6 +1518,24 @@ def stop_table_values(
                 f"share of {event_type} onsets within the first {TMAX:g} s of their stop (event_onset_table)",
             )
         )
+    incomplete = stops.set_index("stop_id")["reward_history_incomplete"]
+    nl_onsets = onsets.loc[onsets["event_type"] == "non_local", "stop_id"]
+    values += [
+        make(
+            "stops_reward_history_incomplete_fraction",
+            (stops["reward_history_incomplete"] == 1).mean(),
+            "fraction",
+            "sig2",
+            "share of stops flagged reward_history_incomplete (fewer than two known outcomes)",
+        ),
+        make(
+            "onsets_reward_history_incomplete_fraction_non_local",
+            (nl_onsets.map(incomplete) == 1).mean(),
+            "fraction",
+            "sig2",
+            "share of non-local onsets in those stops",
+        ),
+    ]
     t = onsets.loc[onsets["event_type"] == "non_local", "t_since_stop_onset"].dropna()
     values.append(
         make(
@@ -2719,7 +2738,7 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     record(inputs.stop_table)
     onsets = pd.read_parquet(
-        inputs.onset_table, columns=["event_type", "t_since_stop_onset"]
+        inputs.onset_table, columns=["event_type", "t_since_stop_onset", "stop_id"]
     )
     summary.add(
         *stop_table_values(
