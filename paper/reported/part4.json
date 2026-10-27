@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "985abafc4d3a-dirty",
+ "commit": "96c60a838d50",
  "inputs": [
   {
    "path": "Processed-Data/*_mPFC_modulation.pkl",
@@ -34,7 +34,7 @@
   },
   {
    "path": "Processed-Data/pfc_response_followups/timing_calibration.json",
-   "sha256": "0551e0d9ddf3273bafbc3412d64f480cd398b3b758a6c4913301f286b6c6ba4e"
+   "sha256": "0397631535ac389394eb7b4a80803995f989e5a41bf4ea107420d65dff4aefd5"
   },
   {
    "path": "Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",

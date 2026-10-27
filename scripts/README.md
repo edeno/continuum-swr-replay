@@ -402,6 +402,12 @@ them importable.
   correlation with log event duration and with session time, and the share of its
   variance the occupied arm explains. Reported for the reader of the label-shuffle
   reference, not acted on. `--event-arm-table`, `--out <markdown>`.
+- `calibrate_pfc_kernel_timing.py` — how far the shipped kernel estimator (basis,
+  σ = 3 prior, fitter) moves the onset and peak of a response of known start: plants
+  boxcar and alpha responses in simulated Poisson units, fits them as `run_session`
+  does, and writes `Processed-Data/pfc_response_followups/timing_calibration.json`,
+  which Part 4's timing values read. CPU only (`JAX_PLATFORMS=cpu`); `--quick` for a
+  two-scenario check.
 - `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
   retired run-time event construction yielded against the canonical event table it now
   reads: the two event counts, how many events change SWR class once the lists are
