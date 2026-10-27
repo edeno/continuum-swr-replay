@@ -47,6 +47,10 @@ HISTCOS := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3  # raised-cosin
                                                                   # a 10-bin (150 ms) window
 CROSSCOS:= cross_hist_rcos_0 + ... + cross_hist_rcos_3            # HISTCOS over the OTHER stream's
                                                                   # onsets (cross-history coupling)
+OFFCOS  := offhist_rcos_0 + ... + offhist_rcos_3                  # HISTCOS over the stream's own
+                                                                  # event ENDS (duration-aware)
+XOFFCOS := cross_offhist_rcos_0 + ... + cross_offhist_rcos_3      # CROSSCOS over the other stream's
+                                                                  # event ENDS (duration-aware)
 ARMFE   := is_candidate_arm_0 + ... + is_candidate_arm_7          # arm 8 is reference
 RECSPL  := visit_recency_trials_event_leaf_centered_spline_{1,2,3}
            + is_candidate_arm_never_visited
@@ -278,6 +282,24 @@ drop and held-out bits per event).
 ```rungs
 Mself       count ~ BS_TC + REWBASIS + HISTCOS
 Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
+```
+
+## Cross-history coupling, duration-aware — per-bin Poisson (auxiliary)
+Not fitted on real data yet (opt-in; simulation only:
+`analysis/replay/duration_history_simulation.py`, review
+`.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`).
+
+`MODEL_CROSS_HISTORY_DURATION_RATE` in `model_specs.py`. Non-local events have
+duration and one decoder's events never overlap, so these rungs are fit on the
+at-risk design: `aggregate_to_timebins(at_risk_events=<every event of the
+decoder>, offset_history=True)` drops the bins inside an ongoing event and sets
+each bin's exposure to the time no event covers. History is measured from past
+events' onsets and from their ends (`*_history_anchors`), so an end-locked
+dependence (fragmentation) is not read as an onset-locked one.
+
+```rungs
+Mself_dur       count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS
+Mselfcross_dur  count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + XOFFCOS
 ```
 
 ## Per-stop rate — Family A

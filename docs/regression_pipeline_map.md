@@ -400,6 +400,12 @@ Dirichlet-multinomial fitter for replay content over candidate categories.
 
 `event_loglik`, `multinomial_log_constant`, `fit_dirichlet_multinomial`, `cross_validate_dirichlet_multinomial`, `concentration_cols_for_cohort`, `animal_pooled_log_phi`, `resolve_pooled_log_phi`, `fit_sessions_dirichlet_multinomial`
 
+### `src/continuum_swr_replay/analysis/replay/duration_history_simulation.py`
+
+Simulated non-local events with duration, for the per-bin history design.
+
+`HistoryKernel`, `Scenario`, `simulate_interval_streams`, `true_lag_kernel`, `history_kernels`, `lag_support`, `onset_offset_collinearity`, `fit_history_direction`, `summarize_direction`
+
 ### `src/continuum_swr_replay/analysis/replay/fitting.py`
 
 Per-session model fitting for the replay content model hierarchy.
