@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "96c60a838d50",
+ "commit": "f173d89bcb26",
  "inputs": [
   {
    "path": "Processed-Data/*_mPFC_modulation.pkl",
@@ -34,7 +34,7 @@
   },
   {
    "path": "Processed-Data/pfc_response_followups/timing_calibration.json",
-   "sha256": "0397631535ac389394eb7b4a80803995f989e5a41bf4ea107420d65dff4aefd5"
+   "sha256": "33101ea1f210d83d52d10128c3fc494d4865281408157aa39a69b795bd3d900a"
   },
   {
    "path": "Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
@@ -1444,12 +1444,342 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
+  "timing_calibration_bias_ms_onset_rise_alpha_enhanced": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_rise_alpha_shallow_suppressed": {
+   "value": 6.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_rise_alpha_suppressed": {
+   "value": 6.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_rise_boxcar_enhanced": {
+   "value": 0.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_rise_boxcar_shallow_suppressed": {
+   "value": 16.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_rise_boxcar_suppressed": {
+   "value": 12.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_zero_alpha_enhanced": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_zero_alpha_shallow_suppressed": {
+   "value": 0.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_zero_alpha_suppressed": {
+   "value": 6.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_zero_boxcar_enhanced": {
+   "value": 0.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_zero_boxcar_shallow_suppressed": {
+   "value": 14.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_onset_zero_boxcar_suppressed": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_peak_alpha_enhanced": {
+   "value": 18.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_peak_alpha_shallow_suppressed": {
+   "value": 18.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_peak_alpha_suppressed": {
+   "value": 20.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_steepest_alpha_enhanced": {
+   "value": 12.000000000000002,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_steepest_alpha_shallow_suppressed": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_steepest_alpha_suppressed": {
+   "value": 14.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_steepest_boxcar_enhanced": {
+   "value": -4.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_steepest_boxcar_shallow_suppressed": {
+   "value": 18.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_bias_ms_steepest_boxcar_suppressed": {
+   "value": 14.000000000000002,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
   "timing_calibration_onset_before_zero_fraction_alpha_enhanced": {
-   "value": 0.34,
+   "value": 0.35,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose apparent half-maximum onset is before event onset: the noise floor of the per-unit share",
+   "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_onset_before_zero_fraction_alpha_shallow_suppressed": {
+   "value": 0.465,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
    "claims": [
     "20"
    ],
@@ -1460,11 +1790,11 @@
    "pending": null
   },
   "timing_calibration_onset_before_zero_fraction_alpha_suppressed": {
-   "value": 0.28,
+   "value": 0.245,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose apparent half-maximum onset is before event onset: the noise floor of the per-unit share",
+   "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
    "claims": [
     "20"
    ],
@@ -1475,11 +1805,26 @@
    "pending": null
   },
   "timing_calibration_onset_before_zero_fraction_boxcar_enhanced": {
+   "value": 0.44,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_onset_before_zero_fraction_boxcar_shallow_suppressed": {
    "value": 0.38,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose apparent half-maximum onset is before event onset: the noise floor of the per-unit share",
+   "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
    "claims": [
     "20"
    ],
@@ -1490,11 +1835,11 @@
    "pending": null
   },
   "timing_calibration_onset_before_zero_fraction_boxcar_suppressed": {
-   "value": 0.365,
+   "value": 0.245,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose apparent half-maximum onset is before event onset: the noise floor of the per-unit share",
+   "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
    "claims": [
     "20"
    ],
@@ -1504,12 +1849,102 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_onset_bias_ms_alpha_enhanced": {
-   "value": 0.0,
+  "timing_calibration_size_bias_alpha_enhanced": {
+   "value": -0.12759158742697352,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_size_bias_alpha_shallow_suppressed": {
+   "value": -0.07945241689057286,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_size_bias_alpha_suppressed": {
+   "value": -0.07274620777544727,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_size_bias_boxcar_enhanced": {
+   "value": 0.06857997012007899,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_size_bias_boxcar_shallow_suppressed": {
+   "value": 0.05347087765102759,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_size_bias_boxcar_suppressed": {
+   "value": 0.1360249886110697,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_stop_offset_plus_response_bias_ms_onset_rise": {
+   "value": 14.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "half-maximum onset of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (8 ms) read by the same rule",
+   "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's",
    "claims": [
     "20"
    ],
@@ -1519,42 +1954,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_onset_bias_ms_alpha_suppressed": {
-   "value": 6.0,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "half-maximum onset of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (8 ms) read by the same rule",
-   "claims": [
-    "20"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
-   "pending": null
-  },
-  "timing_calibration_population_onset_bias_ms_boxcar_enhanced": {
-   "value": 4.0,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "half-maximum onset of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (0 ms) read by the same rule",
-   "claims": [
-    "20"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
-   "pending": null
-  },
-  "timing_calibration_population_onset_bias_ms_boxcar_suppressed": {
+  "timing_calibration_stop_offset_plus_response_bias_ms_onset_zero": {
    "value": 8.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "half-maximum onset of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (0 ms) read by the same rule",
+   "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's",
    "claims": [
     "20"
    ],
@@ -1564,12 +1969,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_peak_bias_ms_alpha_enhanced": {
+  "timing_calibration_stop_offset_plus_response_bias_ms_steepest": {
    "value": 16.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's peak (30 ms)",
+   "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's",
    "claims": [
     "20"
    ],
@@ -1579,12 +1984,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_peak_bias_ms_alpha_suppressed": {
-   "value": 20.0,
+  "timing_calibration_stop_offset_plus_response_rise_size": {
+   "value": 0.8622028012756628,
    "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's peak (30 ms)",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset",
    "claims": [
     "20"
    ],
@@ -1594,12 +1999,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_rise_onset_bias_ms_alpha_enhanced": {
-   "value": 0.0,
+  "timing_calibration_stop_offset_plus_response_size": {
+   "value": 1.066902118287522,
    "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "rise onset of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (8 ms) read by the same rule",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset",
    "claims": [
     "20"
    ],
@@ -1609,12 +2014,27 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_rise_onset_bias_ms_alpha_suppressed": {
-   "value": 6.0,
+  "timing_calibration_stop_offset_plus_response_suppressed_fraction": {
+   "value": 1.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset whose peak is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_stop_offset_rise_size": {
+   "value": 0.011165883173820002,
    "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "rise onset of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (8 ms) read by the same rule",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response",
    "claims": [
     "20"
    ],
@@ -1624,12 +2044,42 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_rise_onset_bias_ms_boxcar_enhanced": {
+  "timing_calibration_stop_offset_size": {
+   "value": 0.1912729122169291,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_stop_offset_suppressed_fraction": {
+   "value": 0.965,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response whose peak is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_wide_bias_ms_onset_rise_alpha_enhanced": {
    "value": 2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "rise onset of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (0 ms) read by the same rule",
+   "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
    "claims": [
     "20"
    ],
@@ -1639,12 +2089,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_population_rise_onset_bias_ms_boxcar_suppressed": {
-   "value": 10.0,
+  "timing_calibration_wide_bias_ms_onset_rise_alpha_shallow_suppressed": {
+   "value": 2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "rise onset of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (0 ms) read by the same rule",
+   "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
    "claims": [
     "20"
    ],
@@ -1654,12 +2104,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_unit_onset_bias_ms_alpha_enhanced": {
-   "value": 0.0,
+  "timing_calibration_wide_bias_ms_onset_rise_alpha_suppressed": {
+   "value": 6.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median half-maximum onset of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (8 ms) read by the same rule",
+   "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
    "claims": [
     "20"
    ],
@@ -1669,12 +2119,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_unit_onset_bias_ms_alpha_suppressed": {
-   "value": 8.0,
+  "timing_calibration_wide_bias_ms_onset_rise_boxcar_enhanced": {
+   "value": 2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median half-maximum onset of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (8 ms) read by the same rule",
+   "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
    "claims": [
     "20"
    ],
@@ -1684,12 +2134,12 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_unit_onset_bias_ms_boxcar_enhanced": {
-   "value": 4.0,
+  "timing_calibration_wide_bias_ms_onset_rise_boxcar_shallow_suppressed": {
+   "value": 18.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median half-maximum onset of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (0 ms) read by the same rule",
+   "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
    "claims": [
     "20"
    ],
@@ -1699,12 +2149,27 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
-  "timing_calibration_unit_onset_bias_ms_boxcar_suppressed": {
-   "value": 8.0,
+  "timing_calibration_wide_bias_ms_onset_rise_boxcar_suppressed": {
+   "value": 12.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median half-maximum onset of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's own half-maximum onset (0 ms) read by the same rule",
+   "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_calibration_wide_stop_offset_size": {
+   "value": 0.19681942196870786,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size from zero of the stop-offset scenario's sign-aligned mean curve for a kernel fit on +/-1.05 s and read on +/-1.0 s",
    "claims": [
     "20"
    ],
@@ -1929,7 +2394,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size",
+   "description": "median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase; onset is rise_size",
    "claims": [
     "20"
    ],
@@ -1944,7 +2409,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size",
+   "description": "median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease; onset is rise_size",
    "claims": [
     "20"
    ],
@@ -1974,7 +2439,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size",
+   "description": "median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase; onset is rise_size",
    "claims": [
     "20"
    ],
@@ -1989,7 +2454,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size",
+   "description": "median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease; onset is rise_size",
    "claims": [
     "20"
    ],
@@ -2004,7 +2469,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median response onset of units called for SWR (raw p < 0.05) whose peak is a decrease; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size",
+   "description": "median response onset of units called for SWR (raw p < 0.05) whose peak is a decrease; onset is rise_size",
    "claims": [
     "20"
    ],
@@ -2494,6 +2959,96 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
+  "timing_population_control_pre_event_level_fraction_non_swr_replay_enhanced": {
+   "value": 0.03949117065425468,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_control_pre_event_level_fraction_non_swr_replay_suppressed": {
+   "value": 0.10534347448750948,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_control_pre_event_level_fraction_swr_enhanced": {
+   "value": 0.03616587917177103,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_control_pre_event_level_fraction_swr_replay_enhanced": {
+   "value": 0.0284789343171702,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_control_pre_event_level_fraction_swr_replay_suppressed": {
+   "value": 0.09289238512555126,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_control_pre_event_level_fraction_swr_suppressed": {
+   "value": 0.10559766776111208,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
   "timing_population_onset_animals_negative_non_swr_replay_enhanced": {
    "value": 4,
    "kind": "count",
@@ -2859,7 +3414,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
+   "description": "onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
    "claims": [
     "20"
    ],
@@ -2874,7 +3429,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
+   "description": "onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
    "claims": [
     "20"
    ],
@@ -2904,7 +3459,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
+   "description": "onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
    "claims": [
     "20"
    ],
@@ -2919,7 +3474,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
+   "description": "onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
    "claims": [
     "20"
    ],
@@ -2934,7 +3489,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
+   "description": "onset (rise_size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
    "claims": [
     "20"
    ],
@@ -4114,6 +4669,996 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
+  "timing_population_rise_size_ci_high_non_swr_replay_enhanced": {
+   "value": 0.3623449016888823,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_high_non_swr_replay_suppressed": {
+   "value": 0.301079927669998,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_high_swr_enhanced": {
+   "value": 0.4036410925469176,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_high_swr_replay_enhanced": {
+   "value": 0.5045686686248133,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_high_swr_replay_suppressed": {
+   "value": 0.3422153843632908,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_high_swr_suppressed": {
+   "value": 0.29030871374737055,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_low_non_swr_replay_enhanced": {
+   "value": 0.2839765272767734,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_low_non_swr_replay_suppressed": {
+   "value": 0.24001148933614708,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_low_swr_enhanced": {
+   "value": 0.28504151880792006,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_low_swr_replay_enhanced": {
+   "value": 0.3813933806302308,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_low_swr_replay_suppressed": {
+   "value": 0.27667289549112967,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_ci_low_swr_suppressed": {
+   "value": 0.1748129559678675,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_non_swr_replay_enhanced": {
+   "value": 0.3304929160076045,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_non_swr_replay_suppressed": {
+   "value": 0.2716526355324813,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_swr_enhanced": {
+   "value": 0.3438299083651655,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_swr_replay_enhanced": {
+   "value": 0.45448526714067133,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_swr_replay_suppressed": {
+   "value": 0.31020917372857937,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_rise_size_swr_suppressed": {
+   "value": 0.2262230189267559,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_high_non_swr_replay_enhanced": {
+   "value": 0.3780770592748268,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_high_non_swr_replay_suppressed": {
+   "value": 0.5239129281394027,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_high_swr_enhanced": {
+   "value": 0.4428705764363464,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_high_swr_replay_enhanced": {
+   "value": 0.5300883922062966,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_high_swr_replay_suppressed": {
+   "value": 0.5809875907956809,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_high_swr_suppressed": {
+   "value": 0.4712983321750539,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_low_non_swr_replay_enhanced": {
+   "value": 0.29874052746325025,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_low_non_swr_replay_suppressed": {
+   "value": 0.39585196251441274,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_low_swr_enhanced": {
+   "value": 0.3278759033535054,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_low_swr_replay_enhanced": {
+   "value": 0.40392662824293835,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_low_swr_replay_suppressed": {
+   "value": 0.4646353495553417,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_ci_low_swr_suppressed": {
+   "value": 0.35839582956315225,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_non_swr_replay_enhanced": {
+   "value": 0.34348574783725216,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_non_swr_replay_suppressed": {
+   "value": 0.46721139388535815,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_swr_enhanced": {
+   "value": 0.38854627122043733,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_swr_replay_enhanced": {
+   "value": 0.48389799805296935,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_swr_replay_suppressed": {
+   "value": 0.5313099961013938,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_swr_suppressed": {
+   "value": 0.4092881821088916,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_vs_control_non_swr_replay_enhanced": {
+   "value": 0.3505234493420765,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_vs_control_non_swr_replay_suppressed": {
+   "value": 0.41970867298217984,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_vs_control_swr_enhanced": {
+   "value": 0.3839009907387519,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_vs_control_swr_replay_enhanced": {
+   "value": 0.47837952599422456,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_vs_control_swr_replay_suppressed": {
+   "value": 0.4891422834421278,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_size_vs_control_swr_suppressed": {
+   "value": 0.35931684648187373,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_animals_negative_non_swr_replay_enhanced": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_animals_negative_non_swr_replay_suppressed": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_animals_negative_swr_enhanced": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_animals_negative_swr_replay_enhanced": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_animals_negative_swr_replay_suppressed": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_animals_negative_swr_suppressed": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_high_non_swr_replay_enhanced": {
+   "value": 15.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_high_non_swr_replay_suppressed": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_high_swr_enhanced": {
+   "value": 55.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_high_swr_replay_enhanced": {
+   "value": 28.999999999999996,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_high_swr_replay_suppressed": {
+   "value": 7.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_high_swr_suppressed": {
+   "value": -9.000000000000002,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_low_non_swr_replay_enhanced": {
+   "value": -109.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_low_non_swr_replay_suppressed": {
+   "value": -27.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_low_swr_enhanced": {
+   "value": -7.049999999999997,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_low_swr_replay_enhanced": {
+   "value": -13.000000000000002,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_low_swr_replay_suppressed": {
+   "value": -27.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_ci_low_swr_suppressed": {
+   "value": -20.999999999999996,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_non_swr_replay_enhanced": {
+   "value": -27.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_non_swr_replay_suppressed": {
+   "value": -17.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_swr_enhanced": {
+   "value": 20.999999999999996,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_swr_replay_enhanced": {
+   "value": 17.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_swr_replay_suppressed": {
+   "value": -17.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_population_steepest_ms_swr_suppressed": {
+   "value": -17.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
   "timing_rise_onset_median_ms_non_swr_replay_enhanced": {
    "value": -10.0,
    "kind": "quantity",
@@ -4195,6 +5740,96 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for SWR (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_steepest_median_ms_non_swr_replay_enhanced": {
+   "value": -71.00000000000001,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_steepest_median_ms_non_swr_replay_suppressed": {
+   "value": -67.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_steepest_median_ms_swr_enhanced": {
+   "value": -67.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_steepest_median_ms_swr_replay_enhanced": {
+   "value": -67.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_steepest_median_ms_swr_replay_suppressed": {
+   "value": -35.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "timing_steepest_median_ms_swr_suppressed": {
+   "value": -37.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak)",
    "claims": [
     "20"
    ],
