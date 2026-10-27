@@ -34,6 +34,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     score_poisson_designs_heldout,
 )
 from continuum_swr_replay.analysis.pfc.design import convolve_event_basis
+from continuum_swr_replay.analysis.pfc.event_sets import EVENT_SETS, SWR_NO_NON_LOCAL
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import table_path
@@ -48,6 +49,12 @@ CONTENT_MARK_COLUMNS = {
     "arm_fraction_posterior": "current_arm_fraction_posterior",
 }
 EVENT_DURATION_MARK = "log_event_duration_s"
+RIPPLE_POWER_MARK = "ripple_power_z"
+
+#: The marked classes of a session cut with the extended event set: the two
+#: replay classes, then the SWRs without replay. The last carries only the
+#: marks an SWR has without decoded content: duration and ripple power.
+EXTENDED_MARKED_EVENT_CLASSES = (*MARKED_EVENT_CLASSES, SWR_NO_NON_LOCAL)
 
 #: The well whose indicator the per-stop baseline omits; the intercept carries
 #: it. A session without it falls back to its lowest kept well.
@@ -475,6 +482,7 @@ def prepare_marked_session_context(
     cohort_stops: pd.DataFrame,
     event_arm_table_path: str | Path | None = None,
     baseline_terms: str = "well_and_reward_outcome",
+    event_set: str = "canonical",
 ) -> MarkedSessionContext:
     """Load and align one at-well session without running the legacy ladder.
 
@@ -506,18 +514,34 @@ def prepare_marked_session_context(
     baseline_terms : {"well_and_reward_outcome", "none"}
         Per-stop baseline columns to build (:func:`build_baseline_columns`);
         ``"none"`` stores an empty ``(n_fit_bins, 0)`` baseline.
+    event_set : {"canonical", "with_swr_without_replay"}
+        ``"with_swr_without_replay"`` also returns the SWRs that overlap no
+        non-local event (``"SWR_no_non_local"``, the extended event set of
+        :func:`~continuum_swr_replay.analysis.pfc.session.run_session`), each
+        with ``log_event_duration_s`` (sampled bounds plus one bin, the
+        replay table's inclusive rule) and ``ripple_power_z`` (the mean of the
+        decode frame's ``SWR_zscore`` over its own bins, the event table's
+        rule, :func:`~continuum_swr_replay.analysis.pfc.canonical_events.event_mean_ripple_power`).
 
     Returns
     -------
     MarkedSessionContext
     """
+    if event_set not in EVENT_SETS:
+        raise ValueError(f"event_set must be one of {EVENT_SETS}; got {event_set!r}")
     if baseline_terms not in BASELINE_TERMS:
         raise ValueError(
             f"baseline_terms must be one of {BASELINE_TERMS}; got {baseline_terms!r}"
         )
     # These imports open Spyglass/DataJoint resources at import time, so keep
     # them off the pure marked-design import path used by unit tests.
-    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+    from continuum_swr_replay.analysis.constants import (
+        DEFAULT_NON_LOCAL_THRESHOLD,
+        DEFAULT_SAMPLING_FREQUENCY_HZ,
+    )
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        load_session_event_ripple_power,
+    )
     from continuum_swr_replay.analysis.pfc.design import (
         event_basis_functions,
         symmetric_lags,
@@ -563,6 +587,7 @@ def prepare_marked_session_context(
         stop_cohort=stop_cohort,
         non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
         logger=logger,
+        event_set=event_set,
     )
     arm_path = (
         table_path("event_arm_table")
@@ -575,6 +600,21 @@ def prepare_marked_session_context(
         {event_class: event_times[event_class] for event_class in MARKED_EVENT_CLASSES},
         event_arm_table_path=arm_path,
     )
+    if event_set == "with_swr_without_replay":
+        swrs = event_times[SWR_NO_NON_LOCAL].copy()
+        start = swrs["start_time"].to_numpy(dtype=float)
+        end = swrs["end_time"].to_numpy(dtype=float)
+        # Inclusive of one sampled decode bin, as the replay table's duration.
+        swrs[EVENT_DURATION_MARK] = np.log(
+            end - start + 1.0 / DEFAULT_SAMPLING_FREQUENCY_HZ
+        )
+        swrs[RIPPLE_POWER_MARK], _ = load_session_event_ripple_power(
+            nwb_file_name,
+            epoch_name,
+            swrs,
+            non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        )
+        marked_events[SWR_NO_NON_LOCAL] = swrs
     spline_basis, lag_time, _ = event_basis_functions(fit_lags, sampling_frequency)
 
     spike_times = data.get("spike_times", {}).get(brain_area, [])
@@ -607,6 +647,7 @@ def prepare_marked_session_context(
             **event_counts,
             "n_excluded_intervals": int(len(excluded)),
             "alignment": alignment,
+            "event_set": event_set,
         },
         input_provenance={
             **event_provenance,

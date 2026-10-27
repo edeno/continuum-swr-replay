@@ -35,7 +35,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.constants import (
     DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
@@ -47,6 +49,7 @@ from continuum_swr_replay.analysis.events.immobility import (
     intervals_from_labels,
     require_canonical_speed_threshold,
 )
+from continuum_swr_replay.analysis.replay.trajectory import brain_state_means
 from continuum_swr_replay.decoding.files import (
     decode_paths,
     non_local_threshold_percent,
@@ -64,6 +67,8 @@ __all__ = [
     "IS_SWR_DEFINITION",
     "canonical_event_provenance",
     "canonical_event_input_hashes",
+    "event_mean_ripple_power",
+    "load_session_event_ripple_power",
     "load_session_canonical_events",
     "load_session_swr_intervals",
     "session_data_over_time_path",
@@ -292,6 +297,123 @@ def load_session_swr_intervals(
         .astype(float)
     )
     return intervals, sha256_file(path)
+
+
+#: The decode frame's ripple-power column: the Kay consensus z-score
+#: (``swr_source.ripple_power_inputs``). Its event mean is the event table's
+#: ``ripple_power_z`` (``analysis/replay/trajectory.py``, ``_SIGNAL_COLUMNS``).
+RIPPLE_POWER_COLUMN = "SWR_zscore"
+
+
+def event_mean_ripple_power(
+    frame: pd.DataFrame, start_time: NDArray, end_time: NDArray
+) -> NDArray:
+    """Each event's mean ripple-power z-score over its own sampled bins.
+
+    The rule the event table's ``ripple_power_z`` is built by: the NaN-aware
+    mean of the frame's ``SWR_zscore`` over the event's bins
+    (:func:`~continuum_swr_replay.analysis.replay.trajectory.brain_state_means`).
+    An event's bins are the frame rows from its ``start_time`` to its
+    ``end_time``, both included: the bounds are sampled bounds of a contiguous
+    label, so these are exactly the label's rows.
+
+    Parameters
+    ----------
+    frame : pd.DataFrame
+        Decode frame, indexed by time in seconds, carrying ``SWR_zscore``.
+    start_time, end_time : NDArray, shape (n_events,)
+        Sampled event bounds, seconds; the events must not overlap.
+
+    Returns
+    -------
+    NDArray, shape (n_events,)
+        Mean ``SWR_zscore`` per event, in input order; NaN for an event with
+        no finite bin.
+
+    Raises
+    ------
+    ValueError
+        If the bounds differ in length, an event ends before it starts, or
+        two events overlap.
+    """
+    starts = np.asarray(start_time, dtype=float)
+    ends = np.asarray(end_time, dtype=float)
+    if starts.shape != ends.shape or starts.ndim != 1:
+        raise ValueError("start_time and end_time must be one-dimensional and paired")
+    if np.any(ends < starts):
+        raise ValueError("an event ends before it starts")
+    order = np.argsort(starts, kind="stable")
+    if np.any(starts[order][1:] <= ends[order][:-1]):
+        raise ValueError("events overlap; each bin must belong to one event")
+    time = frame.index.to_numpy(dtype=float)
+    position = np.searchsorted(starts[order], time, side="right") - 1
+    inside = (position >= 0) & (time <= ends[order][np.clip(position, 0, None)])
+    out = np.full(len(starts), np.nan)
+    if not inside.any():
+        return out
+    ids, means = brain_state_means(
+        event_id=order[position[inside]],
+        state_probs={},
+        extra_means={
+            "ripple_power_z": frame[RIPPLE_POWER_COLUMN].to_numpy(dtype=float)[inside]
+        },
+    )
+    out[np.asarray(ids, dtype=int)] = means["ripple_power_z"]
+    return out
+
+
+def load_session_event_ripple_power(
+    nwb_file_name: str,
+    epoch_name: str,
+    events: pd.DataFrame,
+    *,
+    dot_path: str | Path | None = None,
+    non_local_threshold: float = DEFAULT_NON_LOCAL_THRESHOLD,
+) -> tuple[NDArray, str]:
+    """Mean ripple power of each event, from the session's cached decode frame.
+
+    The frame is read through the SWR source
+    (:func:`~continuum_swr_replay.analysis.events.analysed_time.read_dot_with_swr_source`),
+    as :func:`load_session_swr_intervals` reads it.
+
+    Parameters
+    ----------
+    nwb_file_name : str
+        NWB file name, e.g. ``"wilbur20210329_.nwb"``.
+    epoch_name : str
+        Epoch name, e.g. ``"02_r1"``.
+    events : pd.DataFrame, shape (n_events, ...)
+        ``start_time`` and ``end_time``, sampled bounds in seconds.
+    dot_path : str or Path, optional
+        Cached decode frame; defaults to :func:`session_data_over_time_path`.
+    non_local_threshold : float
+        Threshold tag of the cached frame.
+
+    Returns
+    -------
+    ripple_power_z : NDArray, shape (n_events,)
+        :func:`event_mean_ripple_power` of each event.
+    sha256 : str
+        Hash of the frame read.
+    """
+    path = (
+        session_data_over_time_path(
+            nwb_file_name, epoch_name, non_local_threshold=non_local_threshold
+        )
+        if dot_path is None
+        else Path(dot_path)
+    )
+    frame = analysed_time.read_dot_with_swr_source(
+        path, non_local_threshold=non_local_threshold
+    )
+    return (
+        event_mean_ripple_power(
+            frame,
+            events["start_time"].to_numpy(dtype=float),
+            events["end_time"].to_numpy(dtype=float),
+        ),
+        sha256_file(path),
+    )
 
 
 def canonical_event_provenance(

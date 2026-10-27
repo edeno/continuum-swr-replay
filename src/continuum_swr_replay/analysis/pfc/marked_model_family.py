@@ -38,6 +38,7 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     EVENT_DURATION_MARK,
     MARKED_EVENT_CLASSES,
     MIN_MARKED_EVENTS_PER_CLASS,
+    RIPPLE_POWER_MARK,
     EventKernelBlock,
     KernelDesign,
     MarkScale,
@@ -69,7 +70,7 @@ LOG_SPATIAL_EXTENT = "log1p_spatial_extent_cm"
 LOG_REVERSALS = "log1p_n_reversals"
 PAUSE_FRACTION = "pause_fraction"
 RETROSPECTIVE_BIAS = "retrospective_bias_cm"
-RIPPLE_POWER = "ripple_power_z"
+RIPPLE_POWER = RIPPLE_POWER_MARK
 MUA_RATE = "mua_rate_z"
 THETA_POWER = "theta_z"
 DECODE_ENTROPY = "posterior_entropy_mean"

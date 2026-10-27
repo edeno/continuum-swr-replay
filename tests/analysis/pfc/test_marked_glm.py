@@ -861,3 +861,104 @@ def test_marked_context_matches_canonical_assembly(monkeypatch):
     assert context.cohort_info["n_bins_fit"] == int(fit.sum())
     assert "n_artifact_dropped_events" in context.cohort_info
     assert context.input_provenance["swr_events_sha256"] is not None
+
+
+@pytest.mark.real_data
+def test_event_ripple_power_rule_reproduces_the_event_table():
+    """The SWRs-without-replay ripple power uses the event table's own rule.
+
+    ``event_mean_ripple_power`` on the cached decode frame, given the
+    non-local events' sampled bounds, must return the event table's
+    ``ripple_power_z`` for every event of the session. CPU only; reads the
+    event table and one decode frame (opt-in, ``-m real_data``).
+    """
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        load_session_event_ripple_power,
+    )
+    from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+    from continuum_swr_replay.paths import table_path
+    from continuum_swr_replay.tables.io import read_table
+
+    nwb_file_name, epoch_name = REAL_SESSION
+    animal, session_date = parse_nwb_filename(nwb_file_name)
+    table = read_table(table_path("event_table"))
+    session = table.loc[
+        table.animal.eq(animal)
+        & table.session_date.eq(session_date)
+        & table.epoch.eq(epoch_name)
+    ]
+    assert len(session) > 0
+    events = pd.DataFrame(
+        {
+            "start_time": session["event_start_s"].to_numpy(dtype=float),
+            "end_time": session["event_end_s"].to_numpy(dtype=float),
+        }
+    )
+
+    ripple_power, _ = load_session_event_ripple_power(nwb_file_name, epoch_name, events)
+
+    np.testing.assert_allclose(
+        ripple_power,
+        session["ripple_power_z"].to_numpy(dtype=float),
+        rtol=0.0,
+        atol=1e-12,
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.real_data
+def test_extended_marked_context_carries_swrs_without_replay():
+    """The extended context's SWRs without replay carry duration and power."""
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        load_session_event_ripple_power,
+    )
+    from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        EXTENDED_MARKED_EVENT_CLASSES,
+        RIPPLE_POWER_MARK,
+        prepare_marked_session_context,
+    )
+
+    nwb_file_name, epoch_name = REAL_SESSION
+    cohort_stops, _ = load_session_stop_cohort(
+        nwb_file_name, epoch_name, cohort="at_well"
+    )
+    context = prepare_marked_session_context(
+        nwb_file_name,
+        epoch_name,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        cohort_stops=cohort_stops,
+        event_set="with_swr_without_replay",
+    )
+
+    swrs = context.events[EXTENDED_MARKED_EVENT_CLASSES[-1]]
+    assert set(EXTENDED_MARKED_EVENT_CLASSES) <= set(context.events)
+    assert len(swrs) == context.cohort_info["n_swr_no_non_local"] > 0
+    assert np.isfinite(swrs[EVENT_DURATION_MARK]).all()
+    expected, _ = load_session_event_ripple_power(nwb_file_name, epoch_name, swrs)
+    np.testing.assert_array_equal(swrs[RIPPLE_POWER_MARK].to_numpy(), expected)
+    assert np.isfinite(expected).all()
+
+
+def test_event_mean_ripple_power_averages_each_events_own_bins():
+    from continuum_swr_replay.analysis.pfc.canonical_events import (
+        event_mean_ripple_power,
+    )
+
+    time = np.arange(20) / SAMPLING_FREQUENCY
+    power = np.arange(20, dtype=float)
+    power[6] = np.nan  # a gap bin is skipped, not zero-filled
+    frame = pd.DataFrame({"SWR_zscore": power}, index=time)
+
+    # Events out of time order; bounds are sampled bins, both included.
+    means = event_mean_ripple_power(
+        frame,
+        start_time=time[[10, 2, 15]],
+        end_time=time[[12, 7, 15]],
+    )
+
+    np.testing.assert_allclose(means, [11.0, np.mean([2, 3, 4, 5, 7]), 15.0])
+    no_bins = event_mean_ripple_power(frame, [1.0], [1.1])
+    assert np.isnan(no_bins).all()
+    with pytest.raises(ValueError, match="overlap"):
+        event_mean_ripple_power(frame, time[[2, 4]], time[[5, 8]])
