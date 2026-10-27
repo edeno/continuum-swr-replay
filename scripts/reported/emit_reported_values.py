@@ -1,7 +1,8 @@
 """Write the reported values into paper/reported_values.tex and the docs' inline markers.
 
 Reads every summary file in ``paper/reported/`` (``summarize_part.py`` writes
-them), writes the LaTeX macros, and rewrites the number inside every
+them), writes the LaTeX macros and ``paper/reported/values_index.md`` (every
+value, by part and claim), and rewrites the number inside every
 ``<!--v:part{n}.key-->...<!--/v-->`` marker in the markdown under ``paper/``
 and ``docs/``. Every number it changes is listed on the screen and in
 ``paper/reported/changes.md`` (a dated section is appended for each emit that
@@ -19,12 +20,13 @@ from collections.abc import Sequence
 from datetime import date
 
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.emit import emit, marked_docs
+from continuum_swr_replay.reported.emit import emit, marked_docs, values_index
 from continuum_swr_replay.reported.values import read_summary
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
 TEX_PATH = ROOT_DIR / "paper" / "reported_values.tex"
 CHANGES_PATH = SUMMARY_DIR / "changes.md"
+INDEX_PATH = SUMMARY_DIR / "values_index.md"
 DOC_ROOTS = (ROOT_DIR / "paper", ROOT_DIR / "docs")
 
 
@@ -37,6 +39,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     }
     docs = marked_docs(DOC_ROOTS)
     changes = emit(summaries, TEX_PATH, docs, ROOT_DIR)
+    INDEX_PATH.write_text(values_index(summaries))
     print(f"wrote {TEX_PATH.relative_to(ROOT_DIR)}; filled {len(docs)} docs")
     if changes:
         if not CHANGES_PATH.exists():

@@ -1467,3 +1467,173 @@ marker, and the computed value now there. Newest last.
 | `docs/replay_rate_content_swr_synthesis.md` | `part3.stop_duration_mean_ratio` | 3.5 | 3.6 |
 | `docs/replay_rate_content_swr_synthesis.md` | `part3.stop_duration_mean_rewarded` | 1.8 | 2.2 |
 | `docs/replay_rate_content_swr_synthesis.md` | `part3.stop_duration_mean_unrewarded` | 0.52 | 0.60 |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part1.heldout_local_immobile_estimate` | … | 2.8 |
+| `paper/reported/overview.md` | `part1.heldout_local_immobile_animals_positive` | … | 5 |
+| `paper/reported/overview.md` | `part1.state_evidence_animals` | … | 5 |
+| `paper/reported/overview.md` | `part1.heldout_local_immobile_epochs_positive` | … | 242 |
+| `paper/reported/overview.md` | `part1.heldout_local_immobile_epochs` | … | 242 |
+| `paper/reported/overview.md` | `part1.heldout_no_spike_immobile_estimate` | … | 7.7 |
+| `paper/reported/overview.md` | `part1.heldout_no_spike_immobile_animals_positive` | … | 5 |
+| `paper/reported/overview.md` | `part1.state_evidence_animals` | … | 5 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_immobile_estimate` | … | 6.1 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_immobile_ci_low` | … | 4.2 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_immobile_ci_high` | … | 7.9 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_immobile_animals_positive` | … | 5 |
+| `paper/reported/overview.md` | `part1.state_evidence_animals` | … | 5 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_immobile_epochs_positive` | … | 239 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_immobile_epochs` | … | 242 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_running_estimate` | … | −1.2 |
+| `paper/reported/overview.md` | `part1.heldout_continuous_running_animals_positive` | … | 0 |
+| `paper/reported/overview.md` | `part1.state_evidence_animals` | … | 5 |
+| `paper/reported/overview.md` | `part1.heldout_fragmented_immobile_mismatched_estimate` | … | 0.12 |
+| `paper/reported/overview.md` | `part1.heldout_fragmented_immobile_mismatched_ci_low` | … | −0.56 |
+| `paper/reported/overview.md` | `part1.heldout_fragmented_immobile_mismatched_ci_high` | … | 0.79 |
+| `paper/reported/overview.md` | `part1.heldout_fragmented_immobile_mismatched_animals_positive` | … | 3 |
+| `paper/reported/overview.md` | `part1.state_evidence_animals` | … | 5 |
+| `paper/reported/overview.md` | `part1.sweep_replays` | … | 4,536 |
+| `paper/reported/overview.md` | `part1.sweep_state_space_fraction` | … | 91 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_fraction` | … | 18 |
+| `paper/reported/overview.md` | `part1.sweep_domain_state_space_fraction` | … | 99 |
+| `paper/reported/overview.md` | `part1.sweep_domain_sliding_fraction` | … | 63 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_only_replays` | … | 0 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_not_the_replay_fraction` | … | 23 |
+| `paper/reported/overview.md` | `part1.sweep_state_space_edge_error_max_ms` | … | 5 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_start_early_min_ms` | … | 18 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_start_early_max_ms` | … | 28 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_end_late_min_ms` | … | 21 |
+| `paper/reported/overview.md` | `part1.sweep_sliding_end_late_max_ms` | … | 65 |
+| `paper/reported/overview.md` | `part1.controls_no_replay_minutes` | … | 1.7 |
+| `paper/reported/overview.md` | `part1.controls_no_replay_rate_bound` | … | 1.8 |
+| `paper/reported/overview.md` | `part2.nonlocal_events` | … | 75,675 |
+| `paper/reported/overview.md` | `part2.nonlocal_events_non_swr` | … | 42,974 |
+| `paper/reported/overview.md` | `part2.non_swr_fraction` | … | 57 % |
+| `paper/reported/overview.md` | `part2.animals_non_swr_plurality` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals_non_swr_majority` | … | 4 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.non_swr_fraction_animal_min` | … | 47 |
+| `paper/reported/overview.md` | `part2.non_swr_fraction_animal_max` | … | 65 % |
+| `paper/reported/overview.md` | `part2.kay_no_nonlocal_fraction` | … | 17 % |
+| `paper/reported/overview.md` | `part2.kay_no_nonlocal_fraction_animal_min` | … | 8 |
+| `paper/reported/overview.md` | `part2.kay_no_nonlocal_fraction_animal_max` | … | 28 % |
+| `paper/reported/overview.md` | `part2.kay_no_nonlocal_mostly_local_fraction` | … | 74 % |
+| `paper/reported/overview.md` | `part2.kay_no_nonlocal_mostly_no_spike_fraction` | … | 1 % |
+| `paper/reported/overview.md` | `part2.kay_no_nonlocal_mixed_fraction` | … | 26 % |
+| `paper/reported/overview.md` | `part2.kay_overlap_nonlocal_share_median` | … | 88 % |
+| `paper/reported/overview.md` | `part2.kay_overlap_any_local_fraction` | … | 32 % |
+| `paper/reported/overview.md` | `part2.mua_no_nonlocal_fraction` | … | 15 % |
+| `paper/reported/overview.md` | `part2.carey_no_nonlocal_fraction` | … | 20 % |
+| `paper/reported/overview.md` | `part2.zugaro_no_nonlocal_fraction` | … | 35 % |
+| `paper/reported/overview.md` | `part2.karlsson_no_nonlocal_fraction` | … | 38 % |
+| `paper/reported/overview.md` | `part2.yu_no_nonlocal_fraction` | … | 56 % |
+| `paper/reported/overview.md` | `part2.widloski_no_nonlocal_fraction` | … | 3 % |
+| `paper/reported/overview.md` | `part2.swr_overlapping_events` | … | 32,701 |
+| `paper/reported/overview.md` | `part2.start_offset_median_ms` | … | 4 |
+| `paper/reported/overview.md` | `part2.end_offset_median_ms` | … | −4 |
+| `paper/reported/overview.md` | `part2.non_swr_close_dll_per_spike_median` | … | 0.51 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_dll_per_spike_median` | … | 0.71 |
+| `paper/reported/overview.md` | `part2.swr_remote_dll_per_spike_median` | … | 1.14 |
+| `paper/reported/overview.md` | `part2.baseline_dll_per_spike_median` | … | 0.00 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_spikes_median` | … | 33 |
+| `paper/reported/overview.md` | `part2.swr_remote_spikes_median` | … | 109 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_tetrodes_median` | … | 10 |
+| `paper/reported/overview.md` | `part2.swr_remote_tetrodes_median` | … | 14 |
+| `paper/reported/overview.md` | `part2.heldout_non_swr_per_spike` | … | 0.20 |
+| `paper/reported/overview.md` | `part2.heldout_swr_per_spike` | … | 0.60 |
+| `paper/reported/overview.md` | `part2.duration_median_non_swr` | … | 48 |
+| `paper/reported/overview.md` | `part2.duration_median_swr` | … | 94 |
+| `paper/reported/overview.md` | `part2.extent_median_non_swr` | … | 8.0 |
+| `paper/reported/overview.md` | `part2.extent_median_swr` | … | 50 |
+| `paper/reported/overview.md` | `part2.speed_median_non_swr` | … | 320 |
+| `paper/reported/overview.md` | `part2.speed_median_swr` | … | 490 |
+| `paper/reported/overview.md` | `part2.pause_median_non_swr` | … | 1.00 |
+| `paper/reported/overview.md` | `part2.pause_median_swr` | … | 0.93 |
+| `paper/reported/overview.md` | `part2.max_step_median_non_swr` | … | 2.0 |
+| `paper/reported/overview.md` | `part2.max_step_median_swr` | … | 14 |
+| `paper/reported/overview.md` | `part2.reversals_median_non_swr` | … | 0 |
+| `paper/reported/overview.md` | `part2.reversals_median_swr` | … | 3 |
+| `paper/reported/overview.md` | `part2.peak_median_non_swr` | … | 0.90 |
+| `paper/reported/overview.md` | `part2.peak_median_swr` | … | 0.82 |
+| `paper/reported/overview.md` | `part2.peak_animals_in_direction` | … | 4 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.hpd_median_non_swr` | … | 44 |
+| `paper/reported/overview.md` | `part2.hpd_median_swr` | … | 80 |
+| `paper/reported/overview.md` | `part2.hpd_animals_in_direction` | … | 4 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.non_swr_content_remote_well_fraction` | … | 45 % |
+| `paper/reported/overview.md` | `part2.non_swr_content_own_well_fraction` | … | 13 % |
+| `paper/reported/overview.md` | `part2.non_swr_content_remote_path_fraction` | … | 41 % |
+| `paper/reported/overview.md` | `part2.swr_content_remote_path_fraction` | … | 73 % |
+| `paper/reported/overview.md` | `part2.swr_content_remote_well_fraction` | … | 21 % |
+| `paper/reported/overview.md` | `part3.rate_baseline_non_local_no_swr` | … | 0.22 |
+| `paper/reported/overview.md` | `part3.rate_baseline_non_local_swr` | … | 0.21 |
+| `paper/reported/overview.md` | `part3.rate_baseline_ratio_swr_coupled_to_no_swr` | … | 0.98 |
+| `paper/reported/overview.md` | `part3.rate_baseline_ratio_swr_coupled_to_no_swr_p` | … | 0.30 |
+| `paper/reported/overview.md` | `part3.rate_kernel_lag_one_non_local_swr` | … | 1.51 |
+| `paper/reported/overview.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | … | 1.01 |
+| `paper/reported/overview.md` | `part3.rate_paired_positive_fraction` | … | 77 % |
+| `paper/reported/overview.md` | `part3.rate_paired_sessions` | … | 240 |
+| `paper/reported/overview.md` | `part3.rate_paired_p` | … | 1.1e-19 |
+| `paper/reported/overview.md` | `part3.per_stop_delta_aic_session_non_local_swr` | … | −3.1 |
+| `paper/reported/overview.md` | `part3.per_stop_delta_aic_session_non_local_no_swr` | … | +0.88 |
+| `paper/reported/overview.md` | `part3.base_current_all` | … | +0.73 |
+| `paper/reported/overview.md` | `part3.base_current_all_animals_positive` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part3.base_current_swr` | … | +0.88 |
+| `paper/reported/overview.md` | `part3.base_current_non_swr` | … | +0.53 |
+| `paper/reported/overview.md` | `part3.swr_current_total` | … | −0.41 |
+| `paper/reported/overview.md` | `part3.swr_current_direct` | … | −0.071 |
+| `paper/reported/overview.md` | `part3.dm_breadth_ratio` | … | 5.6 |
+| `paper/reported/overview.md` | `part3.dm_breadth_length_adjusted_ratio` | … | 3.9 |
+| `paper/reported/overview.md` | `part3.dm_breadth_length_share` | … | 21 % |
+| `paper/reported/overview.md` | `part3.armreward_non_swr` | … | +0.027 |
+| `paper/reported/overview.md` | `part3.armreward_non_swr_q` | … | 0.35 |
+| `paper/reported/overview.md` | `part3.armreward_swr` | … | −0.26 |
+| `paper/reported/overview.md` | `part3.armreward_swr_animals_positive` | … | 0 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part3.armuncert_all` | … | +0.31 |
+| `paper/reported/overview.md` | `part3.armuncert_all_animals_positive` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part3.armuncert_all_q` | … | 2.7e-27 |
+| `paper/reported/overview.md` | `part3.armuncert_non_swr` | … | +0.18 |
+| `paper/reported/overview.md` | `part3.armuncert_swr` | … | +0.37 |
+| `paper/reported/overview.md` | `part3.leaf_step_uncertainty` | … | +1.3 |
+| `paper/reported/overview.md` | `part3.leaf_step_uncertainty_animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part3.leaf_step_value` | … | −2.4 |
+| `paper/reported/overview.md` | `part3.leaf_step_value_animals` | … | 0 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part3.armvalue_all` | … | +0.078 |
+| `paper/reported/overview.md` | `part3.armvalue_all_animals_positive` | … | 4 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part3.armvalue_all_q` | … | 0.11 |
+| `paper/reported/overview.md` | `part3.swr_armvalue_direct` | … | −0.014 |
+| `paper/reported/overview.md` | `part3.swr_armvalue_total` | … | −0.25 |
+| `paper/reported/overview.md` | `part3.choice_non_swr` | … | +0.040 |
+| `paper/reported/overview.md` | `part3.choice_non_swr_p` | … | 0.84 |
+| `paper/reported/overview.md` | `part3.choice_swr` | … | +0.041 |
+| `paper/reported/overview.md` | `part3.choice_swr_p` | … | 0.66 |
+| `paper/reported/overview.md` | `part3.choice_raw` | … | −0.65 |
+| `paper/reported/overview.md` | `part3.choice_raw_p` | … | 2.3e-13 |
+| `paper/reported/overview.md` | `part3.stay_min_q_signrank` | … | 0.44 |
+| `paper/reported/overview.md` | `part3.stay_min_q_gee` | … | 0.52 |
+| `paper/reported/overview.md` | `part4.units` | … | 11,604 |
+| `paper/reported/overview.md` | `part4.sessions` | … | 75 |
+| `paper/reported/overview.md` | `part4.engagement_called_fraction` | … | 23 % |
+| `paper/reported/overview.md` | `part4.engagement_units_called` | … | 2,718 |
+| `paper/reported/overview.md` | `part4.engagement_bh_fraction` | … | 10 % |
+| `paper/reported/overview.md` | `part4.engagement_called_fraction_jsixteen` | … | 20 % |
+| `paper/reported/overview.md` | `part4.engagement_called_fraction_chimi` | … | 44 % |
+| `paper/reported/overview.md` | `part4.swr_called_fraction` | … | 31 % |
+| `paper/reported/overview.md` | `part4.nonlocal_called_fraction` | … | 40 % |
+| `paper/reported/overview.md` | `part4.swr_replay_called_fraction` | … | 33 % |
+| `paper/reported/overview.md` | `part4.non_swr_replay_called_fraction` | … | 23 % |
+| `paper/reported/overview.md` | `part4.best_model_constant_fraction` | … | 48 % |
+| `paper/reported/overview.md` | `part4.best_model_nonlocal_fraction` | … | 33 % |
+| `paper/reported/overview.md` | `part4.best_model_swr_fraction` | … | 14 % |
+| `paper/reported/overview.md` | `part4.best_model_joint_fraction` | … | 5 % |
