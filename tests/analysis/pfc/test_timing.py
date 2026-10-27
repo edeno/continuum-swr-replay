@@ -112,3 +112,20 @@ def test_rise_onset_measures_from_the_window_start():
     assert from_zero.onset_at_edge[0]
     assert from_start.onset_lag[0] == pytest.approx(0.050 - 1.1774 * 0.020, abs=0.004)
     assert from_start.peak_lag[0] == from_zero.peak_lag[0]
+
+
+def test_population_timing_weights_units_not_sessions():
+    # Session a: 3 units peaking at +20 ms; session b: 1 unit peaking at +100 ms.
+    # The unit-weighted mean curve peaks near +20 ms, not half way.
+    curves = np.column_stack(
+        [_bump(0.020, 0.010, 1.0)] * 3 + [_bump(0.100, 0.010, 1.0)]
+    )
+    peaks = peak_and_onset(curves, LAG_TIME).peak
+    groups = np.array(["a", "a", "a", "b"])
+
+    result = population_timing(curves, peaks, groups, LAG_TIME, n_boot=50, seed=0)
+
+    assert result.peak_lag == pytest.approx(0.020)
+    assert result.n_groups == 2
+    # Resamples drawing only session b peak at +100 ms.
+    assert result.peak_lag_interval[1] == pytest.approx(0.100)

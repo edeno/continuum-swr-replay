@@ -45,7 +45,9 @@ class PeakOnset(NamedTuple):
         curve keeps the peak's sign and at least ``fraction`` of its size, in
         seconds.
     onset_at_edge : NDArray of bool, shape (n_units,)
-        True where that run reaches the first lag of the window.
+        True where that run reaches the first lag of the window. Only the
+        ``"zero"`` baseline can set it: measured from its own first-lag value,
+        a curve's first lag belongs to the run only if it is the peak.
 
     All are NaN (False for ``onset_at_edge``) for a curve that is not finite
     or is identically zero.

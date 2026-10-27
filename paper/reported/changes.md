@@ -2037,3 +2037,59 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_swr_replay_suppressed` | ? | 42 % |
 | `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed` | ? | 42 % |
 | `paper/reported/overview.md` | `part4.timing_matched_control_peak_before_onset_fraction` | ? | 50 % |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_replay_enhanced` | ? | 92 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_swr_replay_enhanced` | ? | 80 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_swr_replay_enhanced` | ? | 106 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_non_swr_replay_enhanced` | ? | 84 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_non_swr_replay_enhanced` | ? | 58 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_non_swr_replay_enhanced` | ? | 94 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_enhanced` | ? | 104 |
+| `paper/reported/overview.md` | `part4.timing_calibration_population_peak_bias_ms_alpha_enhanced` | ? | 16 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced` | ? | −44 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced` | ? | −56 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced` | ? | −22 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_animals_negative_non_swr_replay_enhanced` | ? | 4 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_chimi` | ? | −54 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_jsixteen` | ? | −22 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_peanut` | ? | 36 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_senor` | ? | −36 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_wilbur` | ? | −56 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced` | ? | −22 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_replay_enhanced` | ? | −38 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_swr_replay_enhanced` | ? | 8 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_animals_negative_swr_replay_enhanced` | ? | 2 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_chimi` | ? | 2 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_jsixteen` | ? | 16 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_peanut` | ? | 28 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_senor` | ? | −26 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_wilbur` | ? | −40 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced` | ? | −12 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_enhanced` | ? | −28 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_swr_enhanced` | ? | 16 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_animals_negative_swr_enhanced` | ? | 2 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_chimi` | ? | 6 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_jsixteen` | ? | 32 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_peanut` | ? | 30 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_senor` | ? | −30 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_wilbur` | ? | −30 |
+| `paper/reported/overview.md` | `part4.timing_calibration_population_rise_onset_bias_ms_boxcar_enhanced` | ? | 2 |
+| `paper/reported/overview.md` | `part4.timing_calibration_population_rise_onset_bias_ms_alpha_enhanced` | ? | 0 |
+| `paper/reported/overview.md` | `part2.start_offset_median_ms` | ? | 4 |
+| `paper/reported/overview.md` | `part4.timing_paired_units` | ? | 1,219 |
+| `paper/reported/overview.md` | `part4.timing_peak_lag_difference_median_ms` | ? | −14 |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_swr_replay_suppressed` | ? | 42 % |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed` | ? | 42 % |
+| `paper/reported/overview.md` | `part4.timing_calibration_onset_before_zero_fraction_boxcar_enhanced` | ? | 38 % |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.animals` | ? | 5 |
+| `paper/reported/overview.md` | `part4.animals` | ? | 5 |
+| `paper/reported/overview.md` | `part4.animals` | ? | 5 |

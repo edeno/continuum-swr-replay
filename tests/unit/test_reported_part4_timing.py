@@ -27,13 +27,16 @@ def population_and_curves():
             "animal": np.repeat(["chimi", "wilbur"], n // 2),
         }
     )
-    for name in ("SWR", "non_local_SWR", "non_local_no_SWR"):
+    # Every fourth unit is not called for the replay classes; for all SWRs it is
+    # every fifth instead, so swapping the p columns changes the counts.
+    for name in ("non_local_SWR", "non_local_no_SWR"):
         population[HELDOUT_P_COLUMNS[name]] = np.where(np.arange(n) % 4 == 3, 0.5, 0.01)
+    population[HELDOUT_P_COLUMNS["SWR"]] = np.where(np.arange(n) % 5 == 4, 0.5, 0.01)
     signs = np.where(np.arange(n) % 2 == 0, 1.0, -1.0)
     swr_centers = rng.normal(0.040, 0.005, n)
     curves = {
         "swr": np.column_stack(
-            [_bump(c, s) for c, s in zip(swr_centers, signs, strict=True)]
+            [_bump(c + 0.040, s) for c, s in zip(swr_centers, signs, strict=True)]
         ),
         "non_local_swr": np.column_stack(
             [_bump(c, s) for c, s in zip(swr_centers, signs, strict=True)]
@@ -51,8 +54,11 @@ def population_and_curves():
                 "shape": "boxcar",
                 "gain": gain,
                 "true_onset_ms": onset,
+                "true_half_max_onset_ms": onset,
                 "true_peak_ms": onset + 50,
-                "onset_bias_ms_median": 4.0,
+                "unit_onset_bias_ms_median": 4.0,
+                "population_rise_onset_bias_ms": 2.0,
+                "population_onset_bias_ms": 1.0,
                 "fraction_onset_before_zero": 0.2,
                 "apparent_peak_ms": {"median": 48.0},
                 "n_units": 200,
@@ -75,11 +81,10 @@ def test_timing_values_keys_kinds_and_directions(population_and_curves):
     for word in ("swr", "swr_replay", "non_swr_replay"):
         for direction in ("enhanced", "suppressed"):
             stem = f"{word}_{direction}"
-            # Every fourth unit (all odd, so all suppressed) is not called.
-            assert values[f"timing_units_{stem}"].value == (
-                20 if direction == "enhanced" else 10
-            )
-            center = 40 + (20 if word == "non_swr_replay" else 0)
+            # Even units are enhanced, odd suppressed; see the fixture's p-values.
+            expected = 16 if word == "swr" else 20 if direction == "enhanced" else 10
+            assert values[f"timing_units_{stem}"].value == expected
+            center = {"swr": 80, "swr_replay": 40, "non_swr_replay": 60}[word]
             peak_ms = values[f"timing_peak_lag_median_ms_{stem}"].value
             assert peak_ms == pytest.approx(center, abs=6)
             assert (
@@ -95,12 +100,24 @@ def test_timing_values_keys_kinds_and_directions(population_and_curves):
                 pytest.approx(values[f"timing_population_onset_ms_{stem}"].value, abs=4)
             )
             assert values[f"timing_peak_at_edge_fraction_{stem}"].value == 0.0
+            for animal in ("chimi", "wilbur"):
+                assert f"timing_population_rise_onset_ms_{stem}_{animal}" in values
+            assert (
+                values[f"timing_population_rise_onset_animals_negative_{stem}"].value
+                == 0
+            )
     assert values["timing_peak_lag_difference_median_ms"].value == pytest.approx(
         20, abs=2
     )
     assert values["timing_non_swr_later_fraction"].value == 1.0
-    assert values["timing_calibration_onset_bias_ms_boxcar_enhanced"].value == 4.0
-    assert "timing_calibration_onset_bias_ms_boxcar_suppressed" in values
+    assert values["timing_calibration_unit_onset_bias_ms_boxcar_enhanced"].value == 4.0
+    assert (
+        values[
+            "timing_calibration_population_rise_onset_bias_ms_boxcar_suppressed"
+        ].value
+        == 2.0
+    )
+    assert "timing_calibration_population_peak_bias_ms_boxcar_enhanced" not in values
     for value in values.values():
         assert not any(ch.isdigit() for ch in value.key)
         if value.kind == "fraction":

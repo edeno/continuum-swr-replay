@@ -15,9 +15,16 @@ log-rate gain ``gain * h(t - onset)`` with ``h`` a 100 ms boxcar or an alpha
 function peaking 30 ms after its start, for gains +/-0.7 and true onsets
 -50, 0, +25, +50 ms, in ``--n-units`` independent units.
 
-Writes ``<output>`` (JSON): per scenario the true onset and the median and
-2.5th/97.5th percentiles of the apparent onset and peak lag, in ms, and the
-share of units whose apparent onset or peak lag is negative.
+Writes ``<output>`` (JSON): per scenario the true onset, the truth's own
+half-maximum onset and peak (read by the same rules on the same lags), the
+median and 2.5th/97.5th percentiles of the units' apparent onsets and peak
+lags, the biases of the unit-level and population (sign-aligned mean)
+estimators against the truth's own onset and peak, in ms, and the share of
+units whose apparent onset or peak lag is negative.
+
+Limits: every bin is fit (no immobility mask), one event class is fit (the
+shipped curves come from two-class models), events are at least 0.6 s apart
+(no overlapping events), and there is one signal-to-noise ratio.
 
 Usage
 -----
@@ -98,7 +105,10 @@ def simulate_and_fit(
         DEFAULT_BASIS_HALF_WINDOW_S,
     )
     from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
-    from continuum_swr_replay.analysis.pfc.timing import peak_and_onset
+    from continuum_swr_replay.analysis.pfc.timing import (
+        peak_and_onset,
+        sign_aligned_mean,
+    )
 
     rng = np.random.default_rng(seed)
     onsets = event_onsets(n_bins, n_events, rng)
@@ -133,8 +143,23 @@ def simulate_and_fit(
     )
     params = np.asarray(fit.params)[:, 1:]
     report = np.abs(lag_time) <= REPORT_HALF_WINDOW_S + 1e-12
+    report_lags = lag_time[report]
     curves = basis[report] @ params.T  # (n_report_lags, n_units)
-    timing = peak_and_onset(curves, lag_time[report])
+    timing = peak_and_onset(curves, report_lags)
+    rise = peak_and_onset(curves, report_lags, baseline="window_start")
+    # The population estimator Part 4 quotes: the mean of the curves signed by
+    # their own peaks, its half-maximum onset and its rise onset.
+    population_curve = sign_aligned_mean(curves, timing.peak)
+    population = peak_and_onset(population_curve, report_lags)
+    population_rise = peak_and_onset(
+        population_curve, report_lags, baseline="window_start"
+    )
+    # The truth read by the same rules on the same lags, so a bias is the
+    # estimator's displacement and not the shape's own rise to half maximum.
+    truth_report = gain * response_shape(shape, report_lags, onset_ms / 1e3)
+    true_timing = peak_and_onset(truth_report, report_lags)
+    true_onset = float(true_timing.onset_lag[0] * 1e3)
+    true_peak = float(true_timing.peak_lag[0] * 1e3)
 
     onset_ms_apparent = timing.onset_lag * 1e3
     peak_ms_apparent = timing.peak_lag * 1e3
@@ -147,13 +172,23 @@ def simulate_and_fit(
         "shape": shape,
         "gain": float(gain),
         "true_onset_ms": float(onset_ms),
-        "true_peak_ms": float(
-            onset_ms
-            + (ALPHA_PEAK_S * 1e3 if shape == "alpha" else BOXCAR_WIDTH_S * 5e2)
-        ),
+        "true_half_max_onset_ms": true_onset,
+        "true_peak_ms": true_peak,
         "apparent_onset_ms": summary(onset_ms_apparent),
+        "apparent_rise_onset_ms": summary(rise.onset_lag * 1e3),
         "apparent_peak_ms": summary(peak_ms_apparent),
-        "onset_bias_ms_median": float(np.nanmedian(onset_ms_apparent) - onset_ms),
+        "unit_onset_bias_ms_median": float(
+            np.nanmedian(onset_ms_apparent) - true_onset
+        ),
+        "unit_rise_onset_bias_ms_median": float(
+            np.nanmedian(rise.onset_lag * 1e3) - true_onset
+        ),
+        "unit_peak_bias_ms_median": float(np.nanmedian(peak_ms_apparent) - true_peak),
+        "population_onset_bias_ms": float(population.onset_lag[0] * 1e3 - true_onset),
+        "population_rise_onset_bias_ms": float(
+            population_rise.onset_lag[0] * 1e3 - true_onset
+        ),
+        "population_peak_bias_ms": float(population.peak_lag[0] * 1e3 - true_peak),
         "fraction_onset_at_edge": float(np.mean(timing.onset_at_edge)),
         # What a unit-level "starts before onset" share looks like when the
         # response really starts at ``onset_ms``: the noise floor of that share.

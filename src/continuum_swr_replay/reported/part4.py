@@ -47,6 +47,7 @@ from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_timing,
+    sign_aligned_mean,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import (
@@ -1113,9 +1114,9 @@ def timing_values(
         if np.isfinite(float(value)):
             values.append(make(key, value, *args, **kwargs))
 
-    sessions = (
-        population["nwb_file_name"].astype(str) + "|" + population["epoch_name"]
-    ).to_numpy()
+    # Resample recording days (NWB files), not epochs: the epochs of one day
+    # are recorded on the same tetrodes and need not be independent.
+    sessions = population["nwb_file_name"].astype(str).to_numpy()
     animals = population["animal"].to_numpy()
     ms = 1e3
     rule = (
@@ -1310,15 +1311,24 @@ def timing_values(
                     "ms",
                 )
             onsets_by_animal = []
+            rises_by_animal = []
             for animal in np.unique(animals[chosen]):
                 own = chosen & (animals == animal)
+                own_curve = sign_aligned_mean(
+                    curves[curve_key][:, own], timing.peak[own]
+                )
                 onsets_by_animal.append(
-                    peak_and_onset(
-                        (curves[curve_key][:, own] * np.sign(timing.peak[own])).mean(
-                            axis=1
-                        ),
-                        lag_time,
-                    ).onset_lag[0]
+                    peak_and_onset(own_curve, lag_time).onset_lag[0]
+                )
+                rise = peak_and_onset(own_curve, lag_time, baseline="window_start")
+                rises_by_animal.append(rise.onset_lag[0])
+                add(
+                    f"timing_population_rise_onset_ms_{stem}_{ANIMAL_WORDS[animal]}",
+                    rise.onset_lag[0] * ms,
+                    "quantity",
+                    "int",
+                    f"rise onset of the sign-aligned mean curve of {animal}'s {who}",
+                    "ms",
                 )
             add(
                 f"timing_population_onset_animals_{stem}",
@@ -1332,8 +1342,16 @@ def timing_values(
                 int(np.sum(np.asarray(onsets_by_animal) < 0)),
                 "count",
                 "count",
-                f"of those animals, how many have the onset of their own mean curve of {who} "
-                "before event onset",
+                f"of those animals, how many have the half-maximum onset of their own "
+                f"mean curve of {who} before event onset",
+            )
+            add(
+                f"timing_population_rise_onset_animals_negative_{stem}",
+                int(np.sum(np.asarray(rises_by_animal) < 0)),
+                "count",
+                "count",
+                f"of those animals, how many have the rise onset of their own mean curve "
+                f"of {who} before event onset",
             )
 
     swr_called, swr_timing = timing_by_class["swr_replay"]
@@ -1395,30 +1413,52 @@ def timing_values(
                 f"log-rate gain {scenario['gain']:+g}, starts exactly at event onset, "
                 "fit by the shipped basis, prior and fitter"
             )
+            truth = (
+                f"the truth's own half-maximum onset "
+                f"({scenario['true_half_max_onset_ms']:g} ms) read by the same rule"
+            )
             add(
-                f"timing_calibration_onset_bias_ms_{stem}",
-                scenario["onset_bias_ms_median"],
+                f"timing_calibration_unit_onset_bias_ms_{stem}",
+                scenario["unit_onset_bias_ms_median"],
                 "quantity",
                 "int",
-                f"median apparent onset of {what} (true onset 0 ms)",
+                f"median half-maximum onset of {what}, minus {truth}",
                 "ms",
             )
+            add(
+                f"timing_calibration_population_rise_onset_bias_ms_{stem}",
+                scenario["population_rise_onset_bias_ms"],
+                "quantity",
+                "int",
+                f"rise onset of the sign-aligned mean curve of {what}, minus {truth}",
+                "ms",
+            )
+            add(
+                f"timing_calibration_population_onset_bias_ms_{stem}",
+                scenario["population_onset_bias_ms"],
+                "quantity",
+                "int",
+                f"half-maximum onset of the sign-aligned mean curve of {what}, minus "
+                f"{truth}",
+                "ms",
+            )
+            if scenario["shape"] == "alpha":
+                add(
+                    f"timing_calibration_population_peak_bias_ms_{stem}",
+                    scenario["population_peak_bias_ms"],
+                    "quantity",
+                    "int",
+                    f"peak lag of the sign-aligned mean curve of {what}, minus the "
+                    f"truth's peak ({scenario['true_peak_ms']:g} ms)",
+                    "ms",
+                )
             add(
                 f"timing_calibration_onset_before_zero_fraction_{stem}",
                 scenario["fraction_onset_before_zero"],
                 "fraction",
                 "pct",
-                f"share of {what} whose apparent onset is before event onset: the noise "
-                "floor of the per-unit share",
-            )
-            add(
-                f"timing_calibration_peak_ms_{stem}",
-                scenario["apparent_peak_ms"]["median"],
-                "quantity",
-                "int",
-                f"median apparent peak lag of {what} (true peak "
-                f"{scenario['true_peak_ms']:g} ms)",
-                "ms",
+                f"share of {what} whose apparent half-maximum onset is before event "
+                "onset: the noise floor of the per-unit share",
             )
     return values
 

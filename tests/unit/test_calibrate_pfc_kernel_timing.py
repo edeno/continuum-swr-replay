@@ -42,4 +42,9 @@ def test_calibration_quick_recovers_a_late_onset(tmp_path, monkeypatch):
     assert late - early == pytest.approx(50.0, abs=15.0)
     for scenario in record["scenarios"]:
         assert scenario["fraction_peak_sign_correct"] >= 0.8
-        assert {"onset_bias_ms_median", "apparent_peak_ms", "n_units"} <= set(scenario)
+        assert {
+            "unit_onset_bias_ms_median",
+            "population_rise_onset_bias_ms",
+            "apparent_peak_ms",
+            "n_units",
+        } <= set(scenario)

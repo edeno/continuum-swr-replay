@@ -264,23 +264,35 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   suppresses or excites.
 - **When?** Over the units called for each class whose peak is an increase, the mean curve peaks
   <!--v:part4.timing_population_peak_ms_swr_replay_enhanced-->92<!--/v--> ms after onset for SWR-coupled replay
-  (<!--v:part4.timing_population_peak_ms_ci_low_swr_replay_enhanced-->82<!--/v-->–<!--v:part4.timing_population_peak_ms_ci_high_swr_replay_enhanced-->100<!--/v-->, session resamples),
+  (<!--v:part4.timing_population_peak_ms_ci_low_swr_replay_enhanced-->80<!--/v-->–<!--v:part4.timing_population_peak_ms_ci_high_swr_replay_enhanced-->106<!--/v-->, resampling recording days),
   <!--v:part4.timing_population_peak_ms_non_swr_replay_enhanced-->84<!--/v--> ms for non-SWR replay
-  (<!--v:part4.timing_population_peak_ms_ci_low_non_swr_replay_enhanced-->68<!--/v-->–<!--v:part4.timing_population_peak_ms_ci_high_non_swr_replay_enhanced-->92<!--/v-->) and
-  <!--v:part4.timing_population_peak_ms_swr_enhanced-->104<!--/v--> ms for all SWRs. It is half way up from its pre-event level
-  <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced-->−22<!--/v--> ms from onset for SWR-coupled replay
-  (<!--v:part4.timing_population_rise_onset_ms_ci_low_swr_replay_enhanced-->−32<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_swr_replay_enhanced-->−8<!--/v-->),
-  <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced-->−44<!--/v--> ms for non-SWR replay
-  (<!--v:part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced-->−56<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced-->−30<!--/v-->) and
-  <!--v:part4.timing_population_rise_onset_ms_swr_enhanced-->−12<!--/v--> ms for all SWRs
-  (<!--v:part4.timing_population_rise_onset_ms_ci_low_swr_enhanced-->−24<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_swr_enhanced-->2<!--/v-->).
-  In simulation the estimator moves the onset of a response that starts exactly at onset by
-  <!--v:part4.timing_calibration_onset_bias_ms_boxcar_enhanced-->4<!--/v--> to <!--v:part4.timing_calibration_onset_bias_ms_alpha_enhanced-->8<!--/v--> ms (later, for an increase).
-  In the <!--v:part4.timing_paired_units-->1,219<!--/v--> units called for both replay classes with peaks of one sign, the non-SWR peak
-  minus the SWR-coupled peak has median <!--v:part4.timing_peak_lag_difference_median_ms-->−14<!--/v--> ms. Units whose peak is a decrease
-  sit at <!--v:part4.timing_population_pre_event_level_fraction_swr_replay_suppressed-->42 %<!--/v--> (SWR-coupled) and
-  <!--v:part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed-->42 %<!--/v--> (non-SWR) of their peak already at −200 ms, so their
-  timing is not read here. Single-unit timing is noisy: <!--v:part4.timing_matched_control_peak_before_onset_fraction-->50 %<!--/v--> of the
-  matched-control curves peak before onset.
+  (<!--v:part4.timing_population_peak_ms_ci_low_non_swr_replay_enhanced-->58<!--/v-->–<!--v:part4.timing_population_peak_ms_ci_high_non_swr_replay_enhanced-->94<!--/v-->) and
+  <!--v:part4.timing_population_peak_ms_swr_enhanced-->104<!--/v--> ms for all SWRs; in simulation the estimator puts a peak
+  <!--v:part4.timing_calibration_population_peak_bias_ms_alpha_enhanced-->16<!--/v--> ms late. The curve is half way up from its −200 ms level
+  (the rise onset) at:
+  - non-SWR replay <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced-->−44<!--/v--> ms
+    (<!--v:part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced-->−56<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced-->−22<!--/v-->), before onset in
+    <!--v:part4.timing_population_rise_onset_animals_negative_non_swr_replay_enhanced-->4<!--/v-->/<!--v:part4.animals-->5<!--/v--> animals (chimi <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_chimi-->−54<!--/v-->, j16 <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_jsixteen-->−22<!--/v-->, peanut <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_peanut-->36<!--/v-->, senor <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_senor-->−36<!--/v-->, wilbur <!--v:part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_wilbur-->−56<!--/v-->);
+  - SWR-coupled replay <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced-->−22<!--/v--> ms
+    (<!--v:part4.timing_population_rise_onset_ms_ci_low_swr_replay_enhanced-->−38<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_swr_replay_enhanced-->8<!--/v-->), before onset in only
+    <!--v:part4.timing_population_rise_onset_animals_negative_swr_replay_enhanced-->2<!--/v-->/<!--v:part4.animals-->5<!--/v--> animals (chimi <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced_chimi-->2<!--/v-->, j16 <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced_jsixteen-->16<!--/v-->, peanut <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced_peanut-->28<!--/v-->, senor <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced_senor-->−26<!--/v-->, wilbur <!--v:part4.timing_population_rise_onset_ms_swr_replay_enhanced_wilbur-->−40<!--/v-->);
+  - all SWRs <!--v:part4.timing_population_rise_onset_ms_swr_enhanced-->−12<!--/v--> ms
+    (<!--v:part4.timing_population_rise_onset_ms_ci_low_swr_enhanced-->−28<!--/v--> to <!--v:part4.timing_population_rise_onset_ms_ci_high_swr_enhanced-->16<!--/v-->), before onset in
+    <!--v:part4.timing_population_rise_onset_animals_negative_swr_enhanced-->2<!--/v-->/<!--v:part4.animals-->5<!--/v--> (chimi <!--v:part4.timing_population_rise_onset_ms_swr_enhanced_chimi-->6<!--/v-->, j16 <!--v:part4.timing_population_rise_onset_ms_swr_enhanced_jsixteen-->32<!--/v-->, peanut <!--v:part4.timing_population_rise_onset_ms_swr_enhanced_peanut-->30<!--/v-->, senor <!--v:part4.timing_population_rise_onset_ms_swr_enhanced_senor-->−30<!--/v-->, wilbur <!--v:part4.timing_population_rise_onset_ms_swr_enhanced_wilbur-->−30<!--/v-->).
+
+  So only the non-SWR replay response starts before the event in most animals; the SWR-coupled and all-SWR leads
+  come from senor and wilbur. Smoothing does not explain an early onset: for
+  simulated responses that start at a known lag, the same rise-onset estimator is
+  <!--v:part4.timing_calibration_population_rise_onset_bias_ms_boxcar_enhanced-->2<!--/v--> ms (boxcar) and
+  <!--v:part4.timing_calibration_population_rise_onset_bias_ms_alpha_enhanced-->0<!--/v--> ms (alpha) off, measured against the truth's own half-way point.
+  Three things the calibration does not cover: events cluster, so a preceding event's response can sit before an onset;
+  an SWR-coupled event's onset is the non-local start, which follows the SWR start by a median
+  <!--v:part2.start_offset_median_ms-->4<!--/v--> ms; and a unit counts as enhanced wherever its largest change lies, before onset included.
+  In the <!--v:part4.timing_paired_units-->1,219<!--/v--> units called for both replay classes, with peaks of one sign, the non-SWR peak
+  minus the SWR-coupled peak has median <!--v:part4.timing_peak_lag_difference_median_ms-->−14<!--/v--> ms.
+  Units whose peak is a decrease already sit at <!--v:part4.timing_population_pre_event_level_fraction_swr_replay_suppressed-->42 %<!--/v--> (SWR-coupled) and
+  <!--v:part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed-->42 %<!--/v--> (non-SWR) of their peak at −200 ms, so their timing is not read here.
+  Single units are noisy: of simulated units whose response starts exactly at onset,
+  <!--v:part4.timing_calibration_onset_before_zero_fraction_boxcar_enhanced-->38 %<!--/v--> show a half-maximum onset before it.
 - *Reading:* a sizeable minority of mPFC units respond to non-SWR replay beyond matched rest. These are unit-level,
   uncorrected fractions; the population-level SWR against non-SWR test is still to do, and only mPFC is fitted.

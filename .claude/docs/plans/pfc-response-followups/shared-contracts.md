@@ -29,6 +29,8 @@ Semantics, do not weaken:
 - Curves are read on the ±200 ms report window (`REPORT_HALF_WINDOW_S`, 201 lags at 500 Hz), never on the ±250 ms fit window. The per-unit `*_max_mod_time` columns in the bundles are taken on the fit window and are **not** used.
 - "Called for class k" = `HELDOUT_P_COLUMNS[k] < 0.05` (raw empirical p against class k's own matched null), the Figure 4 rule. The population is Figure 4's (`load_population_data`, 1 Hz gate).
 - Peak = lag of the largest `|curve|` on the report window, as `peak_log_modulation`; the peak sign splits enhanced from suppressed units.
+- Rise onset (added 2026-10-26 after phase 1's spot checks): the same walk, but a lag belongs to the run when the curve, signed by the peak, is at least half way from its value at −200 ms to the peak. Both onsets are reported; which one the paper reads is overview Open Questions 2.
+- Population intervals resample recording days (NWB files), not epochs: the epochs of a day share tetrodes. Per-animal values are reported beside every population onset.
 - Onset (default, see overview Open Questions 2): from the peak, walk toward negative lags while the curve keeps the peak's sign and `|curve| >= 0.5 * |peak|`; the onset is the earliest lag reached. A unit whose run reaches the window edge (−200 ms) has onset `-0.2` and is counted as `onset_at_edge`.
 
 ## Bundle trees
