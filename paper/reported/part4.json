@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "f0bc3d0780a0",
+ "commit": "521b2c85da59",
  "inputs": [
   {
    "path": "Processed-Data/*_mPFC_modulation.pkl",
@@ -196,6 +196,216 @@
    "style": "pctnum",
    "unit": "",
    "description": "lowest such share over the four event classes (non_local_SWR)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_abs_peak_median_called_non_swr_replay": {
+   "value": 0.703056814703753,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median absolute peak log-rate modulation of the units called for non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_abs_peak_median_called_swr_replay": {
+   "value": 0.7885899267536578,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median absolute peak log-rate modulation of the units called for SWR-coupled replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_abs_peak_median_matched_control": {
+   "value": 0.387942121277281,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for matched quiet-rest control windows (the noise floor)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_abs_peak_median_non_swr_replay": {
+   "value": 0.6261189535708895,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_abs_peak_median_swr": {
+   "value": 0.5646908263095245,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for SWRs",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_abs_peak_median_swr_replay": {
+   "value": 0.6890498918060011,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "log rate",
+   "description": "median over units of the absolute peak log-rate modulation for SWR-coupled replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_rate_multiplier_median_matched_control": {
+   "value": 1.47394447179589,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for matched quiet-rest control windows (the noise floor), as a multiplier (up or down)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_rate_multiplier_median_non_swr_replay": {
+   "value": 1.8703376079292486,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for non-SWR replay, as a multiplier (up or down)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_rate_multiplier_median_swr": {
+   "value": 1.7589038918403401,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for SWRs, as a multiplier (up or down)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_rate_multiplier_median_swr_replay": {
+   "value": 1.9918221873625905,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "x",
+   "description": "exp of that median: the median unit's largest rate change for SWR-coupled replay, as a multiplier (up or down)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_suppressed_fraction_matched_control": {
+   "value": 0.6097897276801103,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose peak modulation for matched quiet-rest control windows (the noise floor) is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_suppressed_fraction_non_swr_replay": {
+   "value": 0.6272836952774905,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose peak modulation for non-SWR replay is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_suppressed_fraction_swr": {
+   "value": 0.6005687693898656,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose peak modulation for SWRs is a decrease",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "effect_suppressed_fraction_swr_replay": {
+   "value": 0.6202171664943124,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose peak modulation for SWR-coupled replay is a decrease",
    "claims": [
     "20"
    ],
@@ -714,6 +924,201 @@
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
    "pending": null
   },
+  "overlap_animals_odds_ratio_above_one": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose odds ratio is above 1",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_odds_ratio": {
+   "value": 3.264616812766588,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_odds_ratio_animal_max": {
+   "value": 5.517970401691332,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "highest per-animal odds ratio",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_odds_ratio_animal_min": {
+   "value": 2.1746472951508924,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "lowest per-animal odds ratio",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_rank_correlation": {
+   "value": 0.3475759932710823,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_rank_correlation_called": {
+   "value": 0.4551326973505879,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "the same over units called for either",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_same_sign_fraction_both": {
+   "value": 0.8447678447678447,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of the units called for both, the share whose two peak modulations have the same sign (both up or both down)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_units_both": {
+   "value": 1443,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, units called (raw p < 0.05) for both",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_units_both_expected": {
+   "value": 877.8955532574975,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "units",
+   "description": "units called for both expected if the two calls were independent (product of the two called shares times the units tested)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_units_neither": {
+   "value": 6551,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for neither",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_units_non_swr_replay_only": {
+   "value": 1203,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for non-SWR replay and not for SWR-coupled replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_units_swr_replay_only": {
+   "value": 2407,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units called for SWR-coupled replay and not for non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "overlap_units_tested": {
+   "value": 11604,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "units with a finite p-value for both SWR-coupled and non-SWR replay",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
   "penalty_sigma": {
    "value": 3.0,
    "kind": "quantity",
@@ -855,6 +1260,51 @@
    "style": "count",
    "unit": "",
    "description": "epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "split_best_model_fraction": {
+   "value": 0.08927955877283696,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "split_improves_fraction": {
+   "value": 0.1399517407790417,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "split_swr_larger_fraction_called": {
+   "value": 0.6475361171581239,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay",
    "claims": [
     "20"
    ],

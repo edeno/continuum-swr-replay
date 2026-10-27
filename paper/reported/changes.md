@@ -1637,3 +1637,30 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.best_model_nonlocal_fraction` | … | 33 % |
 | `paper/reported/overview.md` | `part4.best_model_swr_fraction` | … | 14 % |
 | `paper/reported/overview.md` | `part4.best_model_joint_fraction` | … | 5 % |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.overlap_units_tested` | … | 11,604 |
+| `paper/reported/overview.md` | `part4.overlap_units_both` | … | 1,443 |
+| `paper/reported/overview.md` | `part4.overlap_units_both_expected` | … | 878 |
+| `paper/reported/overview.md` | `part4.overlap_odds_ratio` | … | 3.3 |
+| `paper/reported/overview.md` | `part4.overlap_odds_ratio_animal_min` | … | 2.2 |
+| `paper/reported/overview.md` | `part4.overlap_odds_ratio_animal_max` | … | 5.5 |
+| `paper/reported/overview.md` | `part4.overlap_animals_odds_ratio_above_one` | … | 5 |
+| `paper/reported/overview.md` | `part4.overlap_units_swr_replay_only` | … | 2,407 |
+| `paper/reported/overview.md` | `part4.overlap_units_non_swr_replay_only` | … | 1,203 |
+| `paper/reported/overview.md` | `part4.overlap_rank_correlation` | … | 0.35 |
+| `paper/reported/overview.md` | `part4.overlap_rank_correlation_called` | … | 0.46 |
+| `paper/reported/overview.md` | `part4.overlap_same_sign_fraction_both` | … | 84 % |
+| `paper/reported/overview.md` | `part4.split_improves_fraction` | … | 14 % |
+| `paper/reported/overview.md` | `part4.split_best_model_fraction` | … | 9 % |
+| `paper/reported/overview.md` | `part4.effect_rate_multiplier_median_swr_replay` | … | 2.0 |
+| `paper/reported/overview.md` | `part4.effect_rate_multiplier_median_non_swr_replay` | … | 1.9 |
+| `paper/reported/overview.md` | `part4.effect_rate_multiplier_median_matched_control` | … | 1.5 |
+| `paper/reported/overview.md` | `part4.effect_abs_peak_median_called_swr_replay` | … | 0.79 |
+| `paper/reported/overview.md` | `part4.effect_abs_peak_median_called_non_swr_replay` | … | 0.70 |
+| `paper/reported/overview.md` | `part4.split_swr_larger_fraction_called` | … | 65 % |
+| `paper/reported/overview.md` | `part4.effect_suppressed_fraction_non_swr_replay` | … | 63 % |
+| `paper/reported/overview.md` | `part4.effect_suppressed_fraction_matched_control` | … | 61 % |

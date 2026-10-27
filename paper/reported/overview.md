@@ -147,5 +147,22 @@ close on average.
   SWR-coupled replay <!--v:part4.swr_replay_called_fraction-->33 %<!--/v-->, non-SWR replay <!--v:part4.non_swr_replay_called_fraction-->23 %<!--/v-->.
 - Best model by held-out deviance: constant <!--v:part4.best_model_constant_fraction-->48 %<!--/v-->, non-local <!--v:part4.best_model_nonlocal_fraction-->33 %<!--/v-->,
   SWR <!--v:part4.best_model_swr_fraction-->14 %<!--/v-->, both <!--v:part4.best_model_joint_fraction-->5 %<!--/v-->.
+- **Same units?** Of <!--v:part4.overlap_units_tested-->11,604<!--/v--> units, <!--v:part4.overlap_units_both-->1,443<!--/v--> respond to both SWR-coupled and non-SWR
+  replay (raw p < 0.05), against <!--v:part4.overlap_units_both_expected-->878<!--/v--> expected if the two were independent (odds ratio
+  <!--v:part4.overlap_odds_ratio-->3.3<!--/v-->; <!--v:part4.overlap_odds_ratio_animal_min-->2.2<!--/v-->–<!--v:part4.overlap_odds_ratio_animal_max-->5.5<!--/v--> by animal, above 1 in
+  <!--v:part4.overlap_animals_odds_ratio_above_one-->5<!--/v-->/5). Another <!--v:part4.overlap_units_swr_replay_only-->2,407<!--/v--> respond only to SWR-coupled replay and
+  <!--v:part4.overlap_units_non_swr_replay_only-->1,203<!--/v--> only to non-SWR replay.
+- **Alike?** Across units the two peak modulations correlate <!--v:part4.overlap_rank_correlation-->0.35<!--/v--> (Spearman;
+  <!--v:part4.overlap_rank_correlation_called-->0.46<!--/v--> among units called for either), and <!--v:part4.overlap_same_sign_fraction_both-->84 %<!--/v--> of the units called for
+  both change in the same direction. Splitting the non-local response by SWR status improves held-out prediction in
+  only <!--v:part4.split_improves_fraction-->14 %<!--/v--> of units (best model for <!--v:part4.split_best_model_fraction-->9 %<!--/v-->).
+- **How much?** The median unit's largest rate change is <!--v:part4.effect_rate_multiplier_median_swr_replay-->2.0<!--/v-->× for SWR-coupled replay and
+  <!--v:part4.effect_rate_multiplier_median_non_swr_replay-->1.9<!--/v-->× for non-SWR replay, against <!--v:part4.effect_rate_multiplier_median_matched_control-->1.5<!--/v-->× for matched
+  quiet-rest control windows (the noise floor of a peak taken over lags). Among called units:
+  <!--v:part4.effect_abs_peak_median_called_swr_replay-->0.79<!--/v--> and <!--v:part4.effect_abs_peak_median_called_non_swr_replay-->0.70<!--/v--> log units. In
+  <!--v:part4.split_swr_larger_fraction_called-->65 %<!--/v--> of the units called for either, the SWR-coupled response is the larger.
+- The share of peaks that are decreases is about the same for events (<!--v:part4.effect_suppressed_fraction_non_swr_replay-->63 %<!--/v-->) and for the
+  control windows (<!--v:part4.effect_suppressed_fraction_matched_control-->61 %<!--/v-->), so the peak measure does not show whether replay mostly
+  suppresses or excites.
 - *Reading:* a sizeable minority of mPFC units respond to non-SWR replay beyond matched rest. These are unit-level,
   uncorrected fractions; the population-level SWR against non-SWR test is still to do, and only mPFC is fitted.

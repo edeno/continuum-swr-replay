@@ -1192,7 +1192,7 @@
 \newcommand{\PartThreeUpdateCurrentSwrQ}{\ensuremath{1.3\times10^{-19}}}  % part3.update_current_swr_q: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population)
 \newcommand{\PartThreeUpdateCurrentSwrSessions}{241}  % part3.update_current_swr_sessions: C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps
 
-% --- Part 4 (commit f0bc3d0780a0)
+% --- Part 4 (commit 521b2c85da59)
 \newcommand{\PartFourAnalysedEpochs}{242}  % part4.analysed_epochs: analysed epochs the PFC cohort is drawn from
 \newcommand{\PartFourAnimals}{5}  % part4.animals: animals in the mPFC population
 \newcommand{\PartFourBestModelConstantFraction}{48}  % part4.best_model_constant_fraction: share of units whose best model by held-out deviance is constant
@@ -1204,6 +1204,20 @@
 \newcommand{\PartFourBinsImmobile}{22{,}360{,}999}  % part4.bins_immobile: immobile 2 ms bins before the stop restriction, summed over sessions
 \newcommand{\PartFourClassCalledFlatFractionMax}{9}  % part4.class_called_flat_fraction_max: highest such share over the four event classes (non_local_no_SWR)
 \newcommand{\PartFourClassCalledFlatFractionMin}{5}  % part4.class_called_flat_fraction_min: lowest such share over the four event classes (non_local_SWR)
+\newcommand{\PartFourEffectAbsPeakMedianCalledNonSwrReplay}{0.70}  % part4.effect_abs_peak_median_called_non_swr_replay: median absolute peak log-rate modulation of the units called for non-SWR replay
+\newcommand{\PartFourEffectAbsPeakMedianCalledSwrReplay}{0.79}  % part4.effect_abs_peak_median_called_swr_replay: median absolute peak log-rate modulation of the units called for SWR-coupled replay
+\newcommand{\PartFourEffectAbsPeakMedianMatchedControl}{0.39}  % part4.effect_abs_peak_median_matched_control: median over units of the absolute peak log-rate modulation for matched quiet-rest control windows (the noise floor)
+\newcommand{\PartFourEffectAbsPeakMedianNonSwrReplay}{0.63}  % part4.effect_abs_peak_median_non_swr_replay: median over units of the absolute peak log-rate modulation for non-SWR replay
+\newcommand{\PartFourEffectAbsPeakMedianSwr}{0.56}  % part4.effect_abs_peak_median_swr: median over units of the absolute peak log-rate modulation for SWRs
+\newcommand{\PartFourEffectAbsPeakMedianSwrReplay}{0.69}  % part4.effect_abs_peak_median_swr_replay: median over units of the absolute peak log-rate modulation for SWR-coupled replay
+\newcommand{\PartFourEffectRateMultiplierMedianMatchedControl}{1.5}  % part4.effect_rate_multiplier_median_matched_control: exp of that median: the median unit's largest rate change for matched quiet-rest control windows (the noise floor), as a multiplier (up or down)
+\newcommand{\PartFourEffectRateMultiplierMedianNonSwrReplay}{1.9}  % part4.effect_rate_multiplier_median_non_swr_replay: exp of that median: the median unit's largest rate change for non-SWR replay, as a multiplier (up or down)
+\newcommand{\PartFourEffectRateMultiplierMedianSwr}{1.8}  % part4.effect_rate_multiplier_median_swr: exp of that median: the median unit's largest rate change for SWRs, as a multiplier (up or down)
+\newcommand{\PartFourEffectRateMultiplierMedianSwrReplay}{2.0}  % part4.effect_rate_multiplier_median_swr_replay: exp of that median: the median unit's largest rate change for SWR-coupled replay, as a multiplier (up or down)
+\newcommand{\PartFourEffectSuppressedFractionMatchedControl}{61}  % part4.effect_suppressed_fraction_matched_control: share of units whose peak modulation for matched quiet-rest control windows (the noise floor) is a decrease
+\newcommand{\PartFourEffectSuppressedFractionNonSwrReplay}{63}  % part4.effect_suppressed_fraction_non_swr_replay: share of units whose peak modulation for non-SWR replay is a decrease
+\newcommand{\PartFourEffectSuppressedFractionSwr}{60}  % part4.effect_suppressed_fraction_swr: share of units whose peak modulation for SWRs is a decrease
+\newcommand{\PartFourEffectSuppressedFractionSwrReplay}{62}  % part4.effect_suppressed_fraction_swr_replay: share of units whose peak modulation for SWR-coupled replay is a decrease
 \newcommand{\PartFourEngagementBhFraction}{10}  % part4.engagement_bh_fraction: share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid
 \newcommand{\PartFourEngagementCalledFlat}{253}  % part4.engagement_called_flat: units called by the engagement test with no positive observed improvement
 \newcommand{\PartFourEngagementCalledFlatFraction}{9}  % part4.engagement_called_flat_fraction: of the units called by the engagement test, the share whose own observed held-out improvement is not positive
@@ -1237,6 +1251,19 @@
 \newcommand{\PartFourNonlocalUnitsCalled}{4{,}661}  % part4.nonlocal_units_called: units at raw empirical p < 0.05 for all non-local events
 \newcommand{\PartFourNonlocalUnitsTested}{11{,}604}  % part4.nonlocal_units_tested: units with a finite p-value for all non-local events
 \newcommand{\PartFourNullDraws}{1{,}000}  % part4.null_draws: matched-control draws in each unit's null
+\newcommand{\PartFourOverlapAnimalsOddsRatioAboveOne}{5}  % part4.overlap_animals_odds_ratio_above_one: animals whose odds ratio is above 1
+\newcommand{\PartFourOverlapOddsRatio}{3.3}  % part4.overlap_odds_ratio: odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent)
+\newcommand{\PartFourOverlapOddsRatioAnimalMax}{5.5}  % part4.overlap_odds_ratio_animal_max: highest per-animal odds ratio
+\newcommand{\PartFourOverlapOddsRatioAnimalMin}{2.2}  % part4.overlap_odds_ratio_animal_min: lowest per-animal odds ratio
+\newcommand{\PartFourOverlapRankCorrelation}{0.35}  % part4.overlap_rank_correlation: Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay
+\newcommand{\PartFourOverlapRankCorrelationCalled}{0.46}  % part4.overlap_rank_correlation_called: the same over units called for either
+\newcommand{\PartFourOverlapSameSignFractionBoth}{84}  % part4.overlap_same_sign_fraction_both: of the units called for both, the share whose two peak modulations have the same sign (both up or both down)
+\newcommand{\PartFourOverlapUnitsBoth}{1{,}443}  % part4.overlap_units_both: of those, units called (raw p < 0.05) for both
+\newcommand{\PartFourOverlapUnitsBothExpected}{878}  % part4.overlap_units_both_expected: units called for both expected if the two calls were independent (product of the two called shares times the units tested)
+\newcommand{\PartFourOverlapUnitsNeither}{6{,}551}  % part4.overlap_units_neither: units called for neither
+\newcommand{\PartFourOverlapUnitsNonSwrReplayOnly}{1{,}203}  % part4.overlap_units_non_swr_replay_only: units called for non-SWR replay and not for SWR-coupled replay
+\newcommand{\PartFourOverlapUnitsSwrReplayOnly}{2{,}407}  % part4.overlap_units_swr_replay_only: units called for SWR-coupled replay and not for non-SWR replay
+\newcommand{\PartFourOverlapUnitsTested}{11{,}604}  % part4.overlap_units_tested: units with a finite p-value for both SWR-coupled and non-SWR replay
 \newcommand{\PartFourPenaltySigma}{3}  % part4.penalty_sigma: prior standard deviation of an event-basis coefficient
 \newcommand{\PartFourPriorBindsPercentMax}{2.7}  % part4.prior_binds_percent_max: highest per-curve percent of well-posed units the prior binds on (non_local_no_SWR)
 \newcommand{\PartFourPriorBindsPercentMin}{1.3}  % part4.prior_binds_percent_min: lowest per-curve percent of well-posed units the prior binds on (matched_control)
@@ -1247,6 +1274,9 @@
 \newcommand{\PartFourPriorSdPerLag}{2.07}  % part4.prior_sd_per_lag: the prior's implied standard deviation of a curve at one lag
 \newcommand{\PartFourPriorSdSustained}{0.90}  % part4.prior_sd_sustained: the prior's implied standard deviation of a curve sustained over the reported window
 \newcommand{\PartFourSessions}{75}  % part4.sessions: epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting)
+\newcommand{\PartFourSplitBestModelFraction}{9}  % part4.split_best_model_fraction: share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status
+\newcommand{\PartFourSplitImprovesFraction}{14}  % part4.split_improves_fraction: share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local)
+\newcommand{\PartFourSplitSwrLargerFractionCalled}{65}  % part4.split_swr_larger_fraction_called: of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay
 \newcommand{\PartFourSwrCalledFraction}{31}  % part4.swr_called_fraction: share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive)
 \newcommand{\PartFourSwrCoupledShareSessionMedian}{0.51}  % part4.swr_coupled_share_session_median: median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr)
 \newcommand{\PartFourSwrReplayCalledFraction}{33}  % part4.swr_replay_called_fraction: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)
