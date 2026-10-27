@@ -712,6 +712,16 @@ _PROPERTIES = (
         ("16b",),
         ("paper", "figure: 3"),
     ),
+    (
+        "multimodal",
+        "multimodal_fraction",
+        1.0,
+        "",
+        "dec2",
+        "lower",
+        ("17",),
+        ("supplement",),
+    ),
 )
 
 
@@ -719,8 +729,7 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Claims 15–18 and 16b: per-event properties, non-SWR against SWR.
 
     Plain medians of all events, and the number of animals whose own medians
-    differ in the claim's direction. Not duration-controlled: the claims'
-    duration-controlled contrasts have no tracked analysis.
+    differ in the claim's direction. Not duration-controlled.
     """
     values = []
     for word, column, scale, unit, style, direction, claims, used_in in _PROPERTIES:
