@@ -187,6 +187,7 @@ A decision-grain rebuild of the choice models is planned:
 |---|---|---|---|
 | Per-unit modulation by SWR and non-SWR non-local events (penalised GLM, held-out deviance) | `pfc/run_pfc_analysis_bandit.py` (GPU; about 14–17 h per card) | `Processed-Data/{epoch}_mPFC_modulation.pkl` | 20 |
 | Figure 4, drawn from those bundles | `figures/generate_figure04.py` | Figure 4 | 20 |
+| Claim 20's numbers, read from those bundles by Figure 4's loader and rules | `reported/summarize_part.py --part 4` (`continuum_swr_replay.reported.part4`) | `paper/reported/part4.json` | 20 |
 
 Only mPFC is fitted. The runner takes `--brain_area OFC`, but no OFC fits exist.
 
