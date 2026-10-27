@@ -142,24 +142,34 @@ def fits():
     cache: dict = {}
     sims: dict = {}
 
-    def get(scenario: str, response: str, duration_aware: bool) -> dict:
-        key = (scenario, response, duration_aware)
+    def get(
+        scenario: str,
+        response: str,
+        duration_aware: bool,
+        sigma: float | None = None,
+    ) -> dict:
+        """``sigma`` replaces both streams' duration log-SD (None: as given)."""
+        key = (scenario, response, duration_aware, sigma)
         if key not in cache:
-            if scenario not in sims:
+            if (scenario, sigma) not in sims:
                 sc = SCENARIOS[scenario]
+                if sigma is not None:
+                    sc = sc.with_durations(sigma)
                 sc = dataclasses.replace(
                     sc,
                     base_rate_hz={
                         k: v * RATE_SCALE for k, v in sc.base_rate_hz.items()
                     },
                 )
-                sims[scenario] = simulate_interval_streams(
+                sims[scenario, sigma] = simulate_interval_streams(
                     sc, n_stops=N_STOPS, seed=SEED
                 )
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 result = fit_history_direction(
-                    *sims[scenario], response=response, duration_aware=duration_aware
+                    *sims[scenario, sigma],
+                    response=response,
+                    duration_aware=duration_aware,
                 )
             cache[key] = (result, summarize_direction(result))
         return cache[key]
@@ -274,3 +284,19 @@ def test_d_duration_aware_design_finds_the_direction_and_lag(fits):
     assert log_rr == pytest.approx(truth.max(), abs=0.4)
     _, reverse = fits("d_cross_swr_to_nonswr", "swr", True)
     assert reverse["delta_aic_cross"] < 10
+
+
+def test_constant_durations_hide_the_anchor_of_an_onset_rhythm(fits):
+    """Identifiability. With constant durations an offset is an onset shifted
+    by a fixed lag, so the two blocks nearly coincide: the first canonical
+    correlation between them is > 0.9 (0.938 here), and the onset-locked rhythm
+    of (c) is no longer told from an offset-locked one (|AIC contrast| < 15;
+    -6.0 here, -25 to +6 over seeds 0-2 at log-SD <= 0.1). With the default
+    spread (log-SD 0.45) the correlation is < 0.75 (0.694) and onset wins by
+    > 50 AIC (70.1)."""
+    constant, constant_summary = fits("c_onset_rhythm", "no_swr", True, sigma=0.0)
+    spread, spread_summary = fits("c_onset_rhythm", "no_swr", True)
+    assert constant["collinearity"]["canonical_corr_self"] > 0.9
+    assert spread["collinearity"]["canonical_corr_self"] < 0.75
+    assert abs(constant_summary["self_offset_vs_onset"]) < 15
+    assert spread_summary["self_offset_vs_onset"] < -50

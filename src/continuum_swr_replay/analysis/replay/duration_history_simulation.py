@@ -464,30 +464,40 @@ def lag_support(design: pd.DataFrame) -> dict[str, np.ndarray]:
 
 
 def onset_offset_collinearity(design: pd.DataFrame) -> dict[str, float]:
-    """Largest variance inflation of the onset and offset blocks of one stream.
+    """How nearly the onset block's span contains the offset block's.
 
-    For the self and the cross stream, the VIFs of the eight columns of the
-    onset (``*hist_rcos_k``) and offset (``*offhist_rcos_k``) blocks within
-    the design's (at-risk) bins, ``diag(inv(corr))``. With constant durations
-    an offset is an onset shifted by a fixed lag, so the two blocks span nearly
-    the same columns and the VIFs grow; varying durations break the tie.
+    For the self and the cross stream: the first canonical correlation between
+    the onset (``*hist_rcos_k``) and offset (``*offhist_rcos_k``) blocks, over
+    the design's bins with any history in either block. With constant durations
+    an offset is an onset shifted by a fixed lag, so some combination of one
+    block nearly reproduces one of the other and the correlation nears 1 (the
+    two anchors cannot be told apart); varying durations lower it. The
+    raised-cosine bumps within one block are correlated by construction, which
+    this measure, unlike a VIF over all eight columns, does not count.
 
     Returns
     -------
     dict
-        ``max_vif_self`` / ``max_vif_cross`` for each stream whose two blocks
-        ``design`` carries.
+        ``canonical_corr_self`` / ``canonical_corr_cross`` for each stream whose
+        two blocks ``design`` carries.
     """
     out = {}
     for rel, prefix in (("self", ""), ("cross", "cross_")):
-        cols = [
-            f"{prefix}{anchor}hist_rcos_{k}"
+        blocks = [
+            [f"{prefix}{anchor}hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
             for anchor in ("", "off")
-            for k in range(N_HISTORY_BASIS)
         ]
-        if all(c in design.columns for c in cols):
-            corr = np.corrcoef(design[cols].to_numpy(dtype=float), rowvar=False)
-            out[f"max_vif_{rel}"] = float(np.max(np.diag(np.linalg.inv(corr))))
+        if not all(c in design.columns for cols in blocks for c in cols):
+            continue
+        onset, offset = (design[cols].to_numpy(dtype=float) for cols in blocks)
+        rows = (onset != 0).any(axis=1) | (offset != 0).any(axis=1)
+        bases = []
+        for x in (onset[rows], offset[rows]):
+            u, s, _ = np.linalg.svd(x - x.mean(axis=0), full_matrices=False)
+            bases.append(u[:, s > s[0] * 1e-8])
+        out[f"canonical_corr_{rel}"] = float(
+            np.linalg.svd(bases[0].T @ bases[1], compute_uv=False)[0]
+        )
     return out
 
 
