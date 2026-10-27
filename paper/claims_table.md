@@ -102,22 +102,23 @@ introduce it where first needed.
 The #7 spike-likelihood analysis recomputes the prior-excluded likelihood from
 the saved encoding model and spikes (without re-running the decoder), over
 native track-distance bins. **Every event group, including the near-animal
-(close) subset, is above the matched non-event baseline in 5/5 animals and
-242/242 epochs; the baseline sits at 0** (ordering SWR > non-SWR-remote >
+(close) subset, is above the matched non-event baseline in every animal and
+epoch (#7); the baseline sits at 0** (ordering SWR > non-SWR-remote >
 non-SWR-close > baseline). This test is not held out, so passing it is close to
 built in; it rules out events with no spike support. The held-out tetrode test
 (`detection/run_state_evidence.py`) is the evidence that the decoded location is
-real: immobile Non-Local Continuous bouts are supported in 5/5 animals, both
-with and without SWR. Two things do not hold up: Non-Local Continuous while
-running (0/5 animals) and immobile Fragmented against a mismatched location
-(3/5). **Lesson:** the *matched non-event immobility baseline* is the right
+real: immobile Non-Local Continuous bouts are supported in <!--v:part1.heldout_continuous_immobile_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals, both
+with and without SWR (#7). Two things do not hold up: Non-Local Continuous while
+running (<!--v:part1.heldout_continuous_running_animals_positive-->0<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals) and immobile Fragmented against a mismatched location
+(<!--v:part1.heldout_fragmented_immobile_mismatched_animals_positive-->3<!--/v-->/<!--v:part2.animals-->5<!--/v-->). **Lesson:** the *matched non-event immobility baseline* is the right
 null — a random-remote-position null is muddier, because the animal's own
 position is itself spike-supported and so also beats a random remote bin.
 
 **Status caveats.** The 242-epoch run caps each group at 30 events per epoch;
-the SWR split of the held-out test is an untracked research script; and one
-epoch (chimi20200221_08_r4) fails the held-out test's internal check while its
-events stay in the canonical tables. **Open question:** #7 + #8 decide whether
+and the SWR split of the held-out test is an untracked research script (its
+values are marked pending). The epoch that failed the held-out test's internal
+check (chimi20200221_08_r4) passes since its 2026-10-17 rerun with the
+occupancy-floor fix. **Open question:** #7 + #8 decide whether
 the **close** (near-animal) subset counts; if #8 fails, the headline claims (and
 the #2 denominator) restrict to the **remote** subset (#13/#9). The feasibility
 test (#7) is cleared and the close subset passes the spike-evidence test in all
