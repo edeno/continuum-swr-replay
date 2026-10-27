@@ -1153,6 +1153,277 @@ def _heldout_prediction_batch(
     )
 
 
+@partial(jax.jit, static_argnames=("maxiter", "chunk_rows"))
+def _full_fit_batch(
+    designs: jax.Array,
+    counts: jax.Array,
+    penalties: jax.Array,
+    initial_beta: jax.Array,
+    *,
+    maxiter: int,
+    tol: float,
+    rcond: float,
+    chunk_rows: int,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Full-data IRLS for a batch of equal-width designs, on device.
+
+    The same reduction, rank rule, penalty and per-unit stopping rule as the
+    held-out engine, with every row in the fit. A unit whose
+    ``initial_beta`` row is finite starts from those coefficients (mapped
+    into the design's basis); any other unit starts from statsmodels'
+    starting mean, as a cold fit does.
+    """
+    n_designs, n_time, n_features = designs.shape
+    n_units = counts.shape[1]
+    reduced = jnp.linalg.qr(designs, mode="r")
+    _, singular_values, right = jnp.linalg.svd(reduced, full_matrices=False)
+    tolerance = (
+        singular_values[:, :1] * max(n_time, n_features) * jnp.finfo(designs.dtype).eps
+    )
+    kept = singular_values > tolerance
+    inverse = jnp.where(kept, 1.0 / jnp.where(kept, singular_values, 1.0), 0.0)
+    back = right.transpose(0, 2, 1) * inverse[:, None, :]
+    basis = jnp.einsum("mtp,mpr->mtr", designs, back)
+    rank = kept.sum(axis=1)
+    penalty_matrix = jnp.einsum("mpr,mp,mps->mrs", back, penalties, back)
+
+    n_pad = (-n_time) % chunk_rows
+    basis = _pad_axis_one(basis, n_pad)
+    count_padded = jnp.pad(counts, ((0, n_pad), (0, 0)))
+    n_chunks = count_padded.shape[0] // chunk_rows
+    basis_chunks = basis.reshape(n_designs, n_chunks, chunk_rows, n_features)
+    valid = jnp.arange(n_time + n_pad) < n_time
+    valid_chunks = jnp.broadcast_to(
+        valid.reshape(n_chunks, chunk_rows)[None], (n_designs, n_chunks, chunk_rows)
+    )
+    count_chunks = count_padded.reshape(n_chunks, chunk_rows, n_units)
+    mean_count = jnp.broadcast_to(counts.mean(axis=0)[None, :], (n_designs, n_units))
+
+    information, rhs, initial_deviance = _sweep_prediction_batch(
+        basis_chunks,
+        count_chunks,
+        valid_chunks,
+        jnp.zeros((n_designs, n_units, n_features), dtype=counts.dtype),
+        mean_count,
+        start=True,
+    )
+    failed = jnp.isnan(initial_deviance)
+    cold = _solve_prediction_batch(
+        information + penalty_matrix[:, None, :, :], rhs, rcond
+    )
+    # eta = X beta = U (S V' beta): the warm start in the basis's coordinates.
+    warm_params = (
+        jnp.einsum("mrp,mnp->mnr", right, initial_beta)
+        * jnp.where(kept, singular_values, 0.0)[:, None, :]
+    )
+    warm = jnp.all(jnp.isfinite(initial_beta), axis=-1) & ~failed
+    active = ~failed
+    params = jnp.where(
+        warm[:, :, None],
+        jnp.where(jnp.isfinite(warm_params), warm_params, 0.0),
+        jnp.where(active[:, :, None], cold, 0.0),
+    )
+    # A warm unit has no previous deviance, so its first sweep never counts
+    # as converged; a cold one compares with the starting mean's, as a cold
+    # fit does.
+    previous = jnp.where(warm, jnp.inf, initial_deviance)
+    converged = jnp.zeros_like(active)
+    diverged = jnp.zeros_like(active)
+    n_iter = jnp.zeros_like(active, dtype=jnp.int32)
+
+    def condition(carry):
+        iteration, _, active_now, _, _, _, _ = carry
+        return (iteration < maxiter) & jnp.any(active_now)
+
+    def body(carry):
+        (
+            iteration,
+            params_now,
+            active_now,
+            converged_now,
+            diverged_now,
+            iters,
+            previous_now,
+        ) = carry
+        information_now, rhs_now, deviance_now = _sweep_prediction_batch(
+            basis_chunks,
+            count_chunks,
+            valid_chunks,
+            params_now,
+            mean_count,
+            start=False,
+        )
+        penalized = deviance_now + jnp.einsum(
+            "mnr,mrs,mns->mn", params_now, penalty_matrix, params_now
+        )
+        next_iteration = iteration + 1
+        iters = jnp.where(active_now, next_iteration, iters)
+        just_converged = active_now & (jnp.abs(penalized - previous_now) <= tol)
+        converged_now = converged_now | just_converged
+        diverged_now = diverged_now | (active_now & ~jnp.isfinite(penalized))
+        next_active = active_now & ~just_converged & ~diverged_now
+        previous_now = jnp.where(next_active, penalized, previous_now)
+        stepped = _solve_prediction_batch(
+            information_now + penalty_matrix[:, None, :, :], rhs_now, rcond
+        )
+        should_step = next_active & (next_iteration < maxiter)
+        params_now = jnp.where(should_step[:, :, None], stepped, params_now)
+        return (
+            next_iteration,
+            params_now,
+            next_active,
+            converged_now,
+            diverged_now,
+            iters,
+            previous_now,
+        )
+
+    _, params, _, converged, diverged, n_iter, _ = jax.lax.while_loop(
+        condition,
+        body,
+        (
+            jnp.asarray(0, dtype=jnp.int32),
+            params,
+            active,
+            converged,
+            diverged,
+            n_iter,
+            previous,
+        ),
+    )
+    beta = jnp.einsum("mpr,mnr->mnp", back, params)
+    usable = converged & ~failed & ~diverged & jnp.all(jnp.isfinite(beta), axis=-1)
+    return jnp.where(usable[:, :, None], beta, jnp.nan), usable, n_iter, rank
+
+
+@dataclass(frozen=True)
+class BatchedDesignFits:
+    """Full-data fits of several equal-width designs to the same units.
+
+    Attributes
+    ----------
+    params : NDArray, shape (n_designs, n_units, n_features)
+        Coefficients in each design's own columns; ``nan`` where the unit's
+        fit did not converge.
+    converged : NDArray of bool, shape (n_designs, n_units)
+    n_iter : NDArray of int, shape (n_designs, n_units)
+    rank : NDArray of int, shape (n_designs,)
+    """
+
+    params: NDArray
+    converged: NDArray
+    n_iter: NDArray
+    rank: NDArray
+
+
+@_in_float64
+def fit_poisson_designs(
+    designs: NDArray,
+    counts: NDArray,
+    penalties: NDArray | None = None,
+    *,
+    initial_params: NDArray | None = None,
+    design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
+    maxiter: int = DEFAULT_MAXITER,
+    tol: float = DEFAULT_TOL,
+    rcond: float = DEFAULT_RCOND,
+) -> BatchedDesignFits:
+    """Fit several equal-width designs to the same counts, in device batches.
+
+    The full-data counterpart of :func:`score_poisson_designs_heldout`: one
+    compiled IRLS fits a microbatch of designs for every unit at once, with
+    the stopping rule, rank rule and penalty of :func:`fit_poisson_glms`. It
+    is meant for many refits of one design that differ in a few columns (a
+    permutation reference), where ``initial_params`` -- typically the observed
+    fit's coefficients -- starts each refit near its answer. The penalised
+    objective is strictly concave, so a warm start changes the iterations, not
+    the optimum: the result agrees with a cold :func:`fit_poisson_glms` to
+    within the convergence tolerance.
+
+    Parameters
+    ----------
+    designs : NDArray, shape (n_designs, n_time, n_features)
+    counts : NDArray, shape (n_time, n_units)
+    penalties : NDArray, shape (n_features,) or (n_designs, n_features), optional
+        Per-column ``lambda``, as :func:`fit_poisson_glms`'s ``penalty``.
+    initial_params : NDArray, shape (n_units, n_features) or
+        (n_designs, n_units, n_features), optional
+        Starting coefficients in the designs' own columns; a unit row with a
+        non-finite value starts cold. ``None`` starts every unit cold.
+    design_batch_size : int
+        Designs fit together per device call.
+    maxiter, tol, rcond
+        As :func:`fit_poisson_glms`.
+
+    Returns
+    -------
+    BatchedDesignFits
+    """
+    require_configured_device()
+    design_array = np.asarray(designs, dtype=float)
+    if design_array.ndim != 3:
+        raise ValueError(
+            f"designs must have shape (n_designs, n_time, n_features), got "
+            f"{design_array.shape}"
+        )
+    n_designs, n_time, n_features = design_array.shape
+    counts_array = np.asarray(counts, dtype=float)
+    if counts_array.ndim == 1:
+        counts_array = counts_array[:, None]
+    if counts_array.shape[0] != n_time:
+        raise ValueError(
+            f"designs have {n_time} rows but counts {counts_array.shape[0]}"
+        )
+    if design_batch_size < 1:
+        raise ValueError("design_batch_size must be positive")
+    n_units = counts_array.shape[1]
+    penalty_array = (
+        np.zeros((n_designs, n_features))
+        if penalties is None
+        else np.broadcast_to(
+            np.asarray(penalties, dtype=float), (n_designs, n_features)
+        )
+    )
+    if np.any(penalty_array < 0) or not np.all(np.isfinite(penalty_array)):
+        raise ValueError("penalties must be finite and non-negative")
+    initial = (
+        np.full((n_designs, n_units, n_features), np.nan)
+        if initial_params is None
+        else np.broadcast_to(
+            np.asarray(initial_params, dtype=float), (n_designs, n_units, n_features)
+        )
+    )
+    counts_device = jax.device_put(counts_array)
+    chunk_rows = _heldout_chunk_rows(design_batch_size, n_units, n_features)
+    parts: list[tuple] = []
+    for start in range(0, n_designs, design_batch_size):
+        stop = min(start + design_batch_size, n_designs)
+        n_actual = stop - start
+        # Fixed-size batches keep one compiled shape; padding rows repeat the
+        # first design and are dropped on the way out.
+        index = np.r_[
+            np.arange(start, stop), np.full(design_batch_size - n_actual, start)
+        ]
+        beta, usable, n_iter, rank = _full_fit_batch(
+            jax.device_put(design_array[index]),
+            counts_device,
+            jax.device_put(np.ascontiguousarray(penalty_array[index])),
+            jax.device_put(np.ascontiguousarray(initial[index])),
+            maxiter=maxiter,
+            tol=tol,
+            rcond=rcond,
+            chunk_rows=chunk_rows,
+        )
+        host = jax.device_get((beta, usable, n_iter, rank))
+        parts.append(tuple(np.asarray(part)[:n_actual] for part in host))
+    return BatchedDesignFits(
+        params=np.concatenate([part[0] for part in parts]),
+        converged=np.concatenate([part[1] for part in parts]),
+        n_iter=np.concatenate([part[2] for part in parts]),
+        rank=np.concatenate([part[3] for part in parts]),
+    )
+
+
 @_in_float64
 def score_poisson_designs_heldout(
     designs: NDArray,

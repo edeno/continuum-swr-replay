@@ -929,3 +929,55 @@ class TestImpliedPriorSd:
 
     def test_the_default_is_the_documented_one(self):
         assert DEFAULT_PENALTY_SIGMA == 3.0
+
+
+def _design_batch(seed: int = 0):
+    """Three related designs: a shared block plus one block that changes."""
+    rng = np.random.default_rng(seed)
+    n_time, n_units = 3000, 4
+    shared = np.column_stack([np.ones(n_time), rng.normal(size=(n_time, 4)) * 0.3])
+    designs = np.stack(
+        [
+            np.column_stack([shared, rng.normal(size=(n_time, 3)) * 0.3])
+            for _ in range(3)
+        ]
+    )
+    # Design 2 has an all-zero column, so its rank is one short.
+    designs[2, :, -1] = 0.0
+    truth = np.r_[np.log(0.1), rng.normal(0, 0.3, 7)]
+    counts = rng.poisson(
+        np.exp(designs[0] @ truth)[:, None], size=(n_time, n_units)
+    ).astype(float)
+    counts[:, 3] = 0.0  # a silent unit has no fit
+    penalty = np.r_[0.0, np.full(7, 1 / 9)]
+    return designs, counts, penalty
+
+
+@pytest.mark.parametrize("warm", [False, True])
+def test_batched_design_fits_match_one_design_at_a_time(warm):
+    from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_designs
+
+    designs, counts, penalty = _design_batch()
+    reference = [
+        fit_poisson_glms(design, counts, penalty=penalty, compute_covariance=False)
+        for design in designs
+    ]
+    initial = None
+    if warm:
+        # Start from a nearby fit (the first design's), as a permutation
+        # reference starts each draw from the observed fit.
+        initial = np.where(np.isfinite(reference[0].params), reference[0].params, 0.0)
+        initial[3] = np.nan
+
+    batched = fit_poisson_designs(
+        designs, counts, penalty, initial_params=initial, design_batch_size=2
+    )
+
+    assert batched.params.shape == (3, 4, 8)
+    for index, fit in enumerate(reference):
+        np.testing.assert_array_equal(batched.converged[index], fit.converged)
+        np.testing.assert_allclose(
+            batched.params[index], fit.params, atol=1e-6, rtol=0.0, equal_nan=True
+        )
+        assert batched.rank[index] == fit.rank
+    assert np.isnan(batched.params[:, 3]).all()
