@@ -65,6 +65,7 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     EXTENDED_MARKED_EVENT_CLASSES,
     MARKED_EVENT_CLASSES,
 )
+from continuum_swr_replay.analysis.pfc.marked_model_family import model_set_of
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -83,6 +84,14 @@ PRE_ONSET_MAX_S = -0.1
 POST_ONSET_WINDOW_S = (0.0, 0.15)
 #: Okabe-Ito, one colour per animal, in the corpus's animal order.
 ANIMAL_COLOURS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00"]
+
+
+def _model_set(model: str) -> str:
+    """The model set a bundle without a ``model_set`` key belongs to."""
+    try:
+        return model_set_of(model)
+    except KeyError:
+        return "unknown"
 
 
 class MixedContractError(ValueError):
@@ -119,7 +128,8 @@ def load_bundles(
     ------
     MixedContractError
         If the complete bundles record more than one
-        ``bundle_contract_version`` or ``event_set``.
+        ``bundle_contract_version``, ``event_set`` or model set
+        (``recommended`` versus ``followup``).
     FileNotFoundError
         If there is no complete bundle.
     """
@@ -129,6 +139,7 @@ def load_bundles(
     lag_time = None
     contracts: set = set()
     event_sets: set = set()
+    model_sets: set = set()
     for sidecar in sorted(bundle_dir.glob("*_marked_family.provenance.json")):
         record = json.load(open(sidecar))
         extra = record.get("extra", record)
@@ -137,6 +148,7 @@ def load_bundles(
         contracts.add(extra.get("bundle_contract_version"))
         event_sets.add(extra.get("event_set", "canonical"))
         model = extra["model_name"]
+        model_sets.add(extra.get("model_set") or _model_set(model))
         tier = extra.get("tier", "joint")
         animal, _ = parse_nwb_filename(extra["nwb_file_name"])
         session = f"{extra['nwb_file_name'].replace('_.nwb', '')}_{extra['epoch_name']}"
@@ -177,10 +189,11 @@ def load_bundles(
                     )
     if lag_time is None:
         raise FileNotFoundError(f"no complete bundle under {bundle_dir}")
-    if len(contracts) > 1 or len(event_sets) > 1:
+    if len(contracts) > 1 or len(event_sets) > 1 or len(model_sets) > 1:
         raise MixedContractError(
-            f"{bundle_dir} mixes bundle contracts {sorted(map(str, contracts))} "
-            f"or event sets {sorted(event_sets)}; summarize one corpus at a time"
+            f"{bundle_dir} mixes bundle contracts {sorted(map(str, contracts))}, "
+            f"event sets {sorted(event_sets)} or model sets {sorted(model_sets)}; "
+            "summarize one corpus at a time"
         )
     return pd.DataFrame(rows), curves, nulls, lag_time
 
@@ -246,7 +259,11 @@ def animal_balanced_fraction_positive(
 def population_curve_summary(
     curves: dict, lag_time: np.ndarray, animal_of: dict[str, str]
 ) -> pd.DataFrame:
-    """Session-mean curves -> population mean, peak, and sign consistency.
+    """Session-mean curves -> animal-balanced population curve, peak, signs.
+
+    The population curve is unit -> session -> animal
+    (:func:`animal_balanced_curve`), the weighting every population quantity
+    here uses, the shuffled-mark reference included.
 
     Parameters
     ----------
@@ -262,8 +279,9 @@ def population_curve_summary(
     -------
     pandas.DataFrame
         One row per key with ``peak_value`` (log rate per SD at the lag where
-        the population mean curve is largest in magnitude), ``peak_lag_ms``,
-        ``sem_at_peak`` over sessions, ``sessions_same_sign`` (fraction of
+        the population curve is largest in magnitude), ``peak_lag_ms``,
+        ``sem_at_peak`` over animal means (NaN with one animal),
+        ``sessions_same_sign`` (fraction of
         session-mean curves sharing the peak's sign at that lag) and
         ``animals_same_sign`` (count of animals whose mean curve does, of
         ``curve_n_animals``), ``pre_onset_mean`` (mean of the population
@@ -274,7 +292,7 @@ def population_curve_summary(
     out = []
     for (model, event_class, target), by_session in curves.items():
         stack = np.stack(list(by_session.values()))  # (n_sessions, n_lags)
-        mean = stack.mean(axis=0)
+        mean, per_animal = animal_balanced_curve(by_session, animal_of)
         peak = int(np.argmax(np.abs(mean)))
         # A kernel that is as large before onset as after it is a stationary
         # rate difference between the contexts the events occur in, not an
@@ -284,10 +302,8 @@ def population_curve_summary(
         pre_mean = float(mean[pre].mean())
         post_mean = float(mean[post].mean())
         sign = np.sign(mean[peak])
-        animals = defaultdict(list)
-        for session, curve in by_session.items():
-            animals[animal_of[session]].append(curve[peak])
-        animal_means = {a: float(np.mean(v)) for a, v in animals.items()}
+        animal_means = {a: float(curve[peak]) for a, curve in per_animal.items()}
+        animal_values = np.array(list(animal_means.values()))
         out.append(
             {
                 "model": model,
@@ -298,7 +314,11 @@ def population_curve_summary(
                 "pre_onset_mean": pre_mean,
                 "post_onset_mean": post_mean,
                 "post_minus_pre": post_mean - pre_mean,
-                "sem_at_peak": float(stack[:, peak].std(ddof=1) / np.sqrt(len(stack))),
+                "sem_at_peak": (
+                    float(animal_values.std(ddof=1) / np.sqrt(len(animal_values)))
+                    if len(animal_values) > 1
+                    else float("nan")
+                ),
                 "sessions_same_sign": float(np.mean(np.sign(stack[:, peak]) == sign)),
                 "animals_same_sign": int(
                     sum(np.sign(v) == sign for v in animal_means.values())
@@ -352,6 +372,14 @@ def null_band_summary(
     every session forms population draw ``r``). The band is the per-lag
     2.5th and 97.5th percentile over draws.
 
+    The observed peak is the lag of the largest ``|curve|``, so comparing it
+    with the band at that lag selects the most extreme of many lags. The
+    max-statistic call accounts for that: each draw's largest ``|curve|``
+    over the window forms the reference for the observed largest ``|curve|``,
+    with the plus-one empirical p ``(1 + #draws >= observed) / (R + 1)``.
+    That call is the one to quote for "outside the reference"; the per-lag
+    band is descriptive.
+
     Parameters
     ----------
     curves, nulls : dict
@@ -364,10 +392,12 @@ def null_band_summary(
     Returns
     -------
     pandas.DataFrame
-        One row per key with a null: ``animal_balanced_peak_value`` and
-        ``animal_balanced_peak_lag_ms`` of the observed curve,
-        ``band_low_at_peak``/``band_high_at_peak``, ``peak_outside_band``,
-        ``animal_balanced_window_mean`` (over every lag) and its band
+        One row per key with a null: ``band_low_at_peak`` /
+        ``band_high_at_peak`` and ``peak_outside_band`` (per-lag band at the
+        observed peak lag), ``max_abs_value`` (observed largest ``|curve|``),
+        ``max_abs_null_p95`` (95th percentile of the draws' largest
+        ``|curve|``), ``max_outside_reference`` and ``max_p_value``,
+        ``window_mean`` (over every lag) and its band
         (``window_band_low``/``window_band_high``), ``window_outside_band``,
         ``n_draws``, ``n_null_sessions``, and ``animals_peak_outside_band``
         (animals whose own curve's value at the population peak lag lies
@@ -387,6 +417,8 @@ def null_band_summary(
         )
         low, high = np.nanpercentile(null, [2.5, 97.5], axis=0)
         peak = int(np.argmax(np.abs(observed)))
+        observed_max = float(np.abs(observed).max())
+        null_max = np.nanmax(np.abs(null), axis=1)
         window = observed.mean()
         window_low, window_high = np.nanpercentile(null.mean(axis=1), [2.5, 97.5])
         animals_outside = 0
@@ -401,14 +433,20 @@ def null_band_summary(
                 "model": model,
                 "event_class": event_class,
                 "target": target,
-                "animal_balanced_peak_value": float(observed[peak]),
-                "animal_balanced_peak_lag_ms": float(lag_time[peak] * 1000),
                 "band_low_at_peak": float(low[peak]),
                 "band_high_at_peak": float(high[peak]),
                 "peak_outside_band": bool(
                     not low[peak] <= observed[peak] <= high[peak]
                 ),
-                "animal_balanced_window_mean": float(window),
+                "max_abs_value": observed_max,
+                "max_abs_null_p95": float(np.percentile(null_max, 95)),
+                "max_outside_reference": bool(
+                    observed_max > np.percentile(null_max, 95)
+                ),
+                "max_p_value": float(
+                    (1 + np.sum(null_max >= observed_max)) / (len(null_max) + 1)
+                ),
+                "window_mean": float(window),
                 "window_band_low": float(window_low),
                 "window_band_high": float(window_high),
                 "window_outside_band": bool(not window_low <= window <= window_high),
@@ -555,18 +593,22 @@ def plot_model(
                     lw=0,
                     label="shuffled 95 %",
                 )
-            stack = np.stack(list(by_session.values()))
-            mean = stack.mean(0)
-            sem = stack.std(0, ddof=1) / np.sqrt(len(stack)) if len(stack) > 1 else 0
+            mean, animal_curves = animal_balanced_curve(by_session, animal_of)
+            animal_stack = np.stack(list(animal_curves.values()))
+            sem = (
+                animal_stack.std(0, ddof=1) / np.sqrt(len(animal_stack))
+                if len(animal_stack) > 1
+                else 0
+            )
             ax.fill_between(
                 lag_time * 1000, mean - sem, mean + sem, color="k", alpha=0.15, lw=0
             )
-            ax.plot(lag_time * 1000, mean, color="k", lw=1.6, label="all sessions")
+            ax.plot(lag_time * 1000, mean, color="k", lw=1.6, label="all animals")
             marginal = curves.get((f"marginal_{target}", event_class, target))
             if marginal and not model.startswith("marginal_"):
                 ax.plot(
                     lag_time * 1000,
-                    np.stack(list(marginal.values())).mean(0),
+                    animal_balanced_curve(marginal, animal_of)[0],
                     color="k",
                     lw=1.0,
                     ls="--",
@@ -585,8 +627,8 @@ def plot_model(
     axes[-1, -1].set_xlabel("lag from replay onset (ms)", fontsize=8)
     axes[0, 0].legend(fontsize=6, frameon=False, loc="upper left")
     fig.suptitle(
-        f"{model}: one-SD slope kernels (session means; black = mean ± SEM; "
-        "grey = shuffled-mark 95 %)",
+        f"{model}: one-SD slope kernels (animal means; black = mean over animals "
+        "± SEM over animals; grey = shuffled-mark 95 %)",
         fontsize=9,
     )
     fig.tight_layout()
@@ -642,7 +684,8 @@ def build_report(
         "held-out deviance improved with the target's kernel, with the range across animals. "
         f"Units with a non-finite delta or |delta| > {blowup:g} are excluded from that "
         "comparison and counted. `peak` is the population mean one-SD slope kernel "
-        "(mean over session means ± SEM over sessions) at the lag of its largest magnitude; "
+        "(unit -> session -> animal: mean over animals of each animal's mean over its "
+        "sessions, ± SEM over animals) at the lag of its largest magnitude; "
         "`sign` is how many session means and animal means share that sign at that lag. "
         "`pre / post` are the population curve's means over lags <= -100 ms and 0 to "
         "+150 ms: a kernel that is as large before onset as after is a stationary rate "
@@ -650,7 +693,8 @@ def build_report(
         "response (contract-2 designs carry per-stop well and reward-outcome baseline "
         "columns, so their typical kernel is the response at the reference well after "
         "an unrewarded, known outcome). "
-        "No p-values: these are descriptive.\n\n"
+        "No per-unit p-values: the only p is the shuffled-mark reference's for the "
+        "population curve, a descriptive check.\n\n"
     )
     columns = [
         "class",
@@ -675,6 +719,8 @@ def build_report(
                     "band_low_at_peak",
                     "band_high_at_peak",
                     "peak_outside_band",
+                    "max_outside_reference",
+                    "max_p_value",
                     "animals_peak_outside_band",
                     "n_null_animals",
                 ]
@@ -686,7 +732,9 @@ def build_report(
             lambda r: (
                 ""
                 if pd.isna(r.band_low_at_peak)
-                else f"[{r.band_low_at_peak:+.3f}, {r.band_high_at_peak:+.3f}] "
+                else f"max abs curve {'outside' if r.max_outside_reference else 'inside'} "
+                f"(p {r.max_p_value:.3f}); per-lag band at peak "
+                f"[{r.band_low_at_peak:+.3f}, {r.band_high_at_peak:+.3f}] "
                 f"{'outside' if r.peak_outside_band else 'inside'}; "
                 f"{int(r.animals_peak_outside_band)}/{int(r.n_null_animals)} animals outside"
             ),
@@ -694,9 +742,12 @@ def build_report(
         )
         columns = [*columns, "reference"]
         text += (
-            "`reference` is the 95 % band of the population curve (unit -> session "
-            "-> animal) over shuffled-mark refits, at the observed peak lag, and "
-            "whether the observed animal-balanced peak lies outside it.\n\n"
+            "`reference` compares the population curve (unit -> session -> animal) "
+            "with the same curve over shuffled-mark refits. The quoted call is the "
+            "max statistic: the observed largest |curve| over the window against "
+            "the 95th percentile of each draw's largest |curve|, with the plus-one "
+            "p. The per-lag band at the observed peak lag is descriptive (the peak "
+            "lag is selected as the most extreme).\n\n"
         )
     for model, group in merged.groupby("model", sort=False):
         text += f"## {model}\n\n"

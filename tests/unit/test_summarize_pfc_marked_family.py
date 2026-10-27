@@ -72,7 +72,9 @@ def test_population_curve_peak_and_sign_consistency():
     )
     row = out.iloc[0]
     assert row.peak_lag_ms == 0.0
-    assert row.peak_value == np.mean([2, 0.5, -0.5])
+    # unit -> session -> animal: animal a's sessions average first.
+    assert row.peak_value == np.mean([np.mean([2, 0.5]), -0.5])
+    assert row.sem_at_peak == pytest.approx(np.std([1.25, -0.5], ddof=1) / np.sqrt(2))
     assert row.sessions_same_sign == 2 / 3
     assert row.animals_same_sign == 1 and row.curve_n_animals == 2
 
@@ -89,15 +91,20 @@ def test_summary_band_and_peak_call():
 
     out = summarize.null_band_summary(curves, nulls, lag, animal_of).iloc[0]
 
-    # animal a: mean(0.9, 0.7) = 0.8; animal b: 0.8 -> population 0.8
-    assert out.animal_balanced_peak_value == pytest.approx(0.8)
-    assert out.animal_balanced_peak_lag_ms == 0.0
     expected_low, expected_high = np.percentile(draws[:, 0], [2.5, 97.5])
     assert out.band_low_at_peak == pytest.approx(expected_low)
     assert out.band_high_at_peak == pytest.approx(expected_high)
     assert out.peak_outside_band
     assert out.animals_peak_outside_band == 2 and out.n_null_animals == 2
-    assert out.animal_balanced_window_mean == pytest.approx(0.16)
+    # animal a: mean(0.9, 0.7) = 0.8; animal b: 0.8 -> population 0.8 at the
+    # peak lag, 0.16 over the window.
+    assert out.window_mean == pytest.approx(0.16)
+    # Max statistic: every draw's largest |curve| is |r/100 - 0.495|, at most
+    # 0.505, so the observed 0.8 exceeds all 100 draws.
+    assert out.max_abs_value == pytest.approx(0.8)
+    assert out.max_abs_null_p95 == pytest.approx(np.percentile(np.abs(draws[:, 0]), 95))
+    assert out.max_outside_reference
+    assert out.max_p_value == pytest.approx(1 / 101)
     assert not out.window_outside_band
     assert out.n_draws == 100
 
@@ -197,4 +204,51 @@ def test_summary_refuses_mixed_contracts(tmp_path):
         tmp_path, "j1620210711_02_r1", version=2, event_set="with_swr_without_replay"
     )
     with pytest.raises(summarize.MixedContractError, match="event sets"):
+        summarize.load_bundles(tmp_path)
+
+
+def test_observed_curve_and_reference_share_the_animal_weighting():
+    """Two sessions of animal a and one of b: every quantity weights animals equally."""
+    lag = np.linspace(-0.2, 0.2, 5)
+    bump = np.array([0.0, 0.0, 1.0, 0.0, 0.0])
+    key = ("m", "non_local_no_SWR", "t")
+    animal_of = {"a1": "a", "a2": "a", "b1": "b"}
+    curves = {key: {"a1": 0.6 * bump, "a2": 0.6 * bump, "b1": 0.0 * bump}}
+    # Each session's draws are constant; the population draw is 0.3 when the
+    # animals are weighted equally and 0.4 when the sessions are.
+    nulls = {
+        key: {
+            "a1": np.full((20, 5), 0.6),
+            "a2": np.full((20, 5), 0.6),
+            "b1": np.zeros((20, 5)),
+        }
+    }
+
+    peaks = summarize.population_curve_summary(curves, lag, animal_of).iloc[0]
+    band = summarize.null_band_summary(curves, nulls, lag, animal_of).iloc[0]
+
+    assert peaks.peak_value == pytest.approx(0.3)
+    assert band.band_low_at_peak == pytest.approx(0.3)
+    assert band.band_high_at_peak == pytest.approx(0.3)
+    assert band.max_abs_value == pytest.approx(peaks.peak_value)
+    assert band.max_abs_null_p95 == pytest.approx(0.3)
+    marginal = {("marginal_t", "non_local_no_SWR", "t"): curves[key]}
+    marginal_peaks = summarize.population_curve_summary(marginal, lag, animal_of)
+    assert marginal_peaks.iloc[0].post_onset_mean == pytest.approx(
+        peaks.post_onset_mean
+    )
+
+
+def test_summary_refuses_mixed_model_sets(tmp_path):
+    _write_bundle(tmp_path, "j1620210710_08_r4", version=2)
+    sidecar = tmp_path / "j1620210710_08_r4_mPFC_m_marked_family.provenance.json"
+    record = json.loads(sidecar.read_text())
+    sidecar.write_text(json.dumps({**record, "model_set": "followup"}))
+    _write_bundle(tmp_path, "j1620210710_12_r6", version=2)
+    other = tmp_path / "j1620210710_12_r6_mPFC_m_marked_family.provenance.json"
+    other.write_text(
+        json.dumps({**json.loads(other.read_text()), "model_set": "recommended"})
+    )
+
+    with pytest.raises(summarize.MixedContractError, match="model sets"):
         summarize.load_bundles(tmp_path)
