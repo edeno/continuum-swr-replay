@@ -1,30 +1,50 @@
-"""How far the shipped mPFC kernel estimator moves a response's onset and peak.
+"""What the mPFC kernel estimator does to the timing and size of a known response.
 
 The Figure 4 curves are ridge-penalised (sigma = 3) cubic B-spline kernels
-with knots every 50 ms, fit on +/-250 ms and read on +/-200 ms. A smooth
-kernel spreads a response into earlier lags, so the half-maximum onset
-(``analysis/pfc/timing.py``) of a fitted curve can precede the response's true
-start. This script plants responses of known onset in simulated Poisson spike
-trains, fits them exactly as ``run_session`` does (same lags, basis, prior and
-fitter), and records the apparent onset and peak lag.
+with knots every 50 ms, fit on +/-250 ms and read on +/-200 ms. This script
+plants responses of known onset and size in simulated Poisson units, fits them
+as ``run_session`` does (same knot spacing, prior and fitter), and reads them
+with every rule in ``analysis/pfc/timing.py``:
 
-Simulated session: 500 Hz bins, ``--n-bins`` fitted bins (default: the median
-canonical session's), ``--n-events`` onsets (default: the median per-class
-count) at least 0.6 s apart, baseline ``--rate-hz``. Each scenario plants a
-log-rate gain ``gain * h(t - onset)`` with ``h`` a 100 ms boxcar or an alpha
-function peaking 30 ms after its start, for gains +/-0.7 and true onsets
--50, 0, +25, +50 ms, in ``--n-units`` independent units.
+- onsets: half-maximum from zero (``onset_zero``), half way from the -200 ms
+  value (``onset_rise``), half way from the mean over -1.0 to -0.6 s
+  (``onset_reference``, wide window only), and the steepest approach to the
+  peak (``steepest``);
+- the peak lag (``peak``);
+- sizes: the peak itself (``size_zero``), the peak less the value at the
+  window's first lag (``size_rise``), the peak less the -1.0 to -0.6 s mean
+  (``size_reference``, wide window only).
 
-Writes ``<output>`` (JSON): per scenario the true onset, the truth's own
-half-maximum onset and peak (read by the same rules on the same lags), the
-median and 2.5th/97.5th percentiles of the units' apparent onsets and peak
-lags, the biases of the unit-level and population (sign-aligned mean)
-estimators against the truth's own onset and peak, in ms, and the share of
-units whose apparent onset or peak lag is negative.
+Each rule is read on every unit (median over units) and on the population
+curve (the mean of the curves signed by their own peaks), and compared with
+the same rule applied to the planted truth on the same lags, so a bias is the
+estimator's displacement and not the shape's own rise.
+
+Scenarios, crossed over two windows (``canonical``: fit +/-0.25 s, read
++/-0.2 s; ``wide``: fit +/-1.05 s, read +/-1.0 s):
+
+- ``response``: a 100 ms boxcar or an alpha function peaking 30 ms after its
+  start; log-rate gains +0.7, -0.7 and -0.3 (a shallow decrease); true starts
+  -50, 0 and +50 ms;
+- ``stop_offset``: no event-locked response at all, but the session is cut
+  into 20 s stretches, 40 % of them at a log rate 0.3 lower, and 80 % of the
+  events fall in those lower stretches (events occur where the unit fires
+  less);
+- ``stop_offset_plus_response``: the same, plus a -0.7 boxcar from 0 ms.
+
+Simulated session: 500 Hz bins, ``--n-bins`` bins (default: the median
+canonical session's fitted bins), ``--n-events`` onsets (default: the median
+per-class count) at least 0.6 s apart, baseline ``--rate-hz``,
+``--n-units`` independent units per scenario.
 
 Limits: every bin is fit (no immobility mask), one event class is fit (the
-shipped curves come from two-class models), events are at least 0.6 s apart
-(no overlapping events), and there is one signal-to-noise ratio.
+shipped curves come from two-class models), there is one baseline rate and
+one event count, and units are not selected by a held-out test.
+
+Writes ``<output>`` (JSON): per scenario its settings, the truth read by each
+rule, and each rule's unit median, 2.5th/97.5th unit percentiles, population
+value and bias, plus the share of units whose apparent onset (zero rule) or
+peak lag is negative.
 
 Usage
 -----
@@ -51,10 +71,20 @@ DEFAULT_N_EVENTS = 100
 SAMPLING_FREQUENCY = 500.0
 MIN_EVENT_SPACING_S = 0.6
 SHAPES = ("boxcar", "alpha")
-GAINS = (0.7, -0.7)
-TRUE_ONSETS_MS = (-50.0, 0.0, 25.0, 50.0)
+GAINS = (0.7, -0.7, -0.3)
+TRUE_ONSETS_MS = (-50.0, 0.0, 50.0)
 BOXCAR_WIDTH_S = 0.100
 ALPHA_PEAK_S = 0.030
+
+#: Fit and read half-windows, in seconds.
+WINDOWS = {"canonical": (0.25, 0.20), "wide": (1.05, 1.00)}
+#: Lags (s) the wide window's pre-event reference level is averaged over.
+REFERENCE_LAGS_S = (-1.0, -0.6)
+
+STRETCH_S = 20.0
+LOW_STRETCH_FRACTION = 0.4
+LOW_STRETCH_LOG_RATE = -0.3
+EVENTS_IN_LOW_STRETCHES = 0.8
 
 
 def response_shape(shape: str, lag_time: NDArray, onset_s: float) -> NDArray:
@@ -70,7 +100,7 @@ def response_shape(shape: str, lag_time: NDArray, onset_s: float) -> NDArray:
 
 def event_onsets(n_bins: int, n_events: int, rng: np.random.Generator) -> NDArray:
     """Onset bins, uniformly placed, at least ``MIN_EVENT_SPACING_S`` apart."""
-    margin = int(0.3 * SAMPLING_FREQUENCY)
+    margin = int(1.1 * SAMPLING_FREQUENCY)
     spacing = int(MIN_EVENT_SPACING_S * SAMPLING_FREQUENCY)
     slack = n_bins - 2 * margin - spacing * (n_events - 1)
     if slack <= 0:
@@ -79,19 +109,100 @@ def event_onsets(n_bins: int, n_events: int, rng: np.random.Generator) -> NDArra
     return margin + gaps + spacing * np.arange(n_events)
 
 
+def stretch_offset_and_onsets(
+    n_bins: int, n_events: int, rng: np.random.Generator
+) -> tuple[NDArray, NDArray]:
+    """A stretch-wise log-rate offset and onsets crowded into the low stretches.
+
+    Returns
+    -------
+    log_offset : NDArray, shape (n_bins,)
+    onsets : NDArray of int, shape (n_events,)
+    """
+    stretch = int(STRETCH_S * SAMPLING_FREQUENCY)
+    n_stretches = n_bins // stretch
+    low = rng.permutation(n_stretches) < round(LOW_STRETCH_FRACTION * n_stretches)
+    log_offset = np.zeros(n_bins)
+    for index in np.flatnonzero(low):
+        log_offset[index * stretch : (index + 1) * stretch] = LOW_STRETCH_LOG_RATE
+    n_low = int(round(EVENTS_IN_LOW_STRETCHES * n_events))
+    spacing = int(MIN_EVENT_SPACING_S * SAMPLING_FREQUENCY)
+    margin = int(1.1 * SAMPLING_FREQUENCY)
+    onsets: list[int] = []
+    for want_low, count in ((True, n_low), (False, n_events - n_low)):
+        pool = np.flatnonzero(low == want_low)
+        placed = 0
+        while placed < count:
+            index = int(rng.choice(pool))
+            onset = int(
+                rng.integers(index * stretch + margin, (index + 1) * stretch - margin)
+            )
+            if all(abs(onset - other) >= spacing for other in onsets):
+                onsets.append(onset)
+                placed += 1
+    return log_offset, np.sort(np.asarray(onsets))
+
+
+def read_curves(
+    curves: NDArray, lag_time: NDArray, window: str
+) -> dict[str, NDArray | float]:
+    """Every rule on every unit, and on the sign-aligned population curve."""
+    from continuum_swr_replay.analysis.pfc.timing import (
+        peak_and_onset,
+        response_size,
+        sign_aligned_mean,
+        steepest_approach_lag,
+    )
+
+    rules: dict[str, dict] = {
+        "onset_zero": {"baseline": "zero"},
+        "onset_rise": {"baseline": "window_start"},
+    }
+    sizes: dict[str, str | tuple[float, float]] = {
+        "size_zero": "zero",
+        "size_rise": "window_start",
+    }
+    if window == "wide":
+        rules["onset_reference"] = {"baseline": REFERENCE_LAGS_S}
+        sizes["size_reference"] = REFERENCE_LAGS_S
+
+    def read(values: NDArray) -> dict[str, NDArray]:
+        timing = peak_and_onset(values, lag_time)
+        out = {"peak": timing.peak_lag * 1e3}
+        for name, kwargs in rules.items():
+            out[name] = peak_and_onset(values, lag_time, **kwargs).onset_lag * 1e3
+        out["steepest"] = steepest_approach_lag(values, lag_time) * 1e3
+        for name, baseline in sizes.items():
+            out[name] = response_size(values, lag_time, baseline=baseline)
+        return out
+
+    units = read(curves)
+    peaks = peak_and_onset(curves, lag_time).peak
+    population = read(sign_aligned_mean(curves, peaks))
+    units["_fraction_onset_before_zero"] = float(np.mean(units["onset_zero"] < 0))
+    units["_fraction_peak_before_zero"] = float(np.mean(units["peak"] < 0))
+    units["_fraction_peak_sign_negative"] = float(np.mean(peaks < 0))
+    return {
+        "units": units,
+        "population": {k: float(v[0]) for k, v in population.items()},
+    }
+
+
 def simulate_and_fit(
+    *,
+    window: str,
+    scenario: str,
     shape: str,
     gain: float,
     onset_ms: float,
-    *,
     n_bins: int,
     n_events: int,
     n_units: int,
     rate_hz: float,
     sigma: float,
     seed: int,
-) -> dict[str, float]:
-    """One scenario: plant, simulate, fit, read the timing."""
+) -> dict:
+    """One scenario: plant, simulate, fit, read every rule."""
     from continuum_swr_replay.analysis.pfc.batched_glm import (
         fit_poisson_glms,
         make_ridge_penalty,
@@ -101,37 +212,30 @@ def simulate_and_fit(
         event_basis_functions,
         symmetric_lags,
     )
-    from continuum_swr_replay.analysis.pfc.event_sets import (
-        DEFAULT_BASIS_HALF_WINDOW_S,
-    )
-    from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
-    from continuum_swr_replay.analysis.pfc.timing import (
-        peak_and_onset,
-        sign_aligned_mean,
-    )
 
     rng = np.random.default_rng(seed)
-    onsets = event_onsets(n_bins, n_events, rng)
-    indicator = np.zeros(n_bins)
-    indicator[onsets] = 1.0
-
-    # The truth: a log-rate modulation that is zero outside the response.
+    if scenario == "response":
+        log_rate = np.zeros(n_bins)
+        onsets = event_onsets(n_bins, n_events, rng)
+    else:
+        log_rate, onsets = stretch_offset_and_onsets(n_bins, n_events, rng)
+    planted_gain = 0.0 if scenario == "stop_offset" else gain
     truth_lags = np.arange(
-        -int(0.3 * SAMPLING_FREQUENCY), int(0.3 * SAMPLING_FREQUENCY)
+        -int(1.1 * SAMPLING_FREQUENCY), int(1.1 * SAMPLING_FREQUENCY)
     )
-    truth = gain * response_shape(
+    truth = planted_gain * response_shape(
         shape, truth_lags / SAMPLING_FREQUENCY, onset_ms / 1e3
     )
-    log_gain = np.zeros(n_bins)
     for onset in onsets:
-        positions = onset + truth_lags
-        valid = (positions >= 0) & (positions < n_bins)
-        log_gain[positions[valid]] += truth[valid]
-    mean = rate_hz / SAMPLING_FREQUENCY * np.exp(log_gain)
+        log_rate[onset + truth_lags] += truth
+    mean = rate_hz / SAMPLING_FREQUENCY * np.exp(log_rate)
     counts = rng.poisson(mean[:, None] * np.ones((1, n_units))).astype(float)
 
-    lags = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, SAMPLING_FREQUENCY)
+    fit_half, read_half = WINDOWS[window]
+    lags = symmetric_lags(fit_half, SAMPLING_FREQUENCY)
     basis, lag_time, _ = event_basis_functions(lags, SAMPLING_FREQUENCY)
+    indicator = np.zeros(n_bins)
+    indicator[onsets] = 1.0
     design = np.concatenate(
         [np.ones((n_bins, 1)), convolve_event_basis(indicator, basis, lags)], axis=1
     )
@@ -141,65 +245,86 @@ def simulate_and_fit(
         penalty=make_ridge_penalty(design.shape[1], sigma),
         compute_covariance=False,
     )
-    params = np.asarray(fit.params)[:, 1:]
-    report = np.abs(lag_time) <= REPORT_HALF_WINDOW_S + 1e-12
+    report = np.abs(lag_time) <= read_half + 1e-12
     report_lags = lag_time[report]
-    curves = basis[report] @ params.T  # (n_report_lags, n_units)
-    timing = peak_and_onset(curves, report_lags)
-    rise = peak_and_onset(curves, report_lags, baseline="window_start")
-    # The population estimator Part 4 quotes: the mean of the curves signed by
-    # their own peaks, its half-maximum onset and its rise onset.
-    population_curve = sign_aligned_mean(curves, timing.peak)
-    population = peak_and_onset(population_curve, report_lags)
-    population_rise = peak_and_onset(
-        population_curve, report_lags, baseline="window_start"
-    )
-    # The truth read by the same rules on the same lags, so a bias is the
-    # estimator's displacement and not the shape's own rise to half maximum.
-    truth_report = gain * response_shape(shape, report_lags, onset_ms / 1e3)
-    true_timing = peak_and_onset(truth_report, report_lags)
-    true_onset = float(true_timing.onset_lag[0] * 1e3)
-    true_peak = float(true_timing.peak_lag[0] * 1e3)
+    curves = basis[report] @ np.asarray(fit.params)[:, 1:].T  # (n_lags, n_units)
+    read = read_curves(curves, report_lags, window)
 
-    onset_ms_apparent = timing.onset_lag * 1e3
-    peak_ms_apparent = timing.peak_lag * 1e3
-
-    def summary(values: NDArray) -> dict[str, float]:
-        low, mid, high = np.nanpercentile(values, [2.5, 50, 97.5])
-        return {"median": float(mid), "p2_5": float(low), "p97_5": float(high)}
-
-    return {
+    record: dict = {
+        "window": window,
+        "scenario": scenario,
         "shape": shape,
-        "gain": float(gain),
+        "gain": float(planted_gain),
         "true_onset_ms": float(onset_ms),
-        "true_half_max_onset_ms": true_onset,
-        "true_peak_ms": true_peak,
-        "apparent_onset_ms": summary(onset_ms_apparent),
-        "apparent_rise_onset_ms": summary(rise.onset_lag * 1e3),
-        "apparent_peak_ms": summary(peak_ms_apparent),
-        "unit_onset_bias_ms_median": float(
-            np.nanmedian(onset_ms_apparent) - true_onset
-        ),
-        "unit_rise_onset_bias_ms_median": float(
-            np.nanmedian(rise.onset_lag * 1e3) - true_onset
-        ),
-        "unit_peak_bias_ms_median": float(np.nanmedian(peak_ms_apparent) - true_peak),
-        "population_onset_bias_ms": float(population.onset_lag[0] * 1e3 - true_onset),
-        "population_rise_onset_bias_ms": float(
-            population_rise.onset_lag[0] * 1e3 - true_onset
-        ),
-        "population_peak_bias_ms": float(population.peak_lag[0] * 1e3 - true_peak),
-        "fraction_onset_at_edge": float(np.mean(timing.onset_at_edge)),
-        # What a unit-level "starts before onset" share looks like when the
-        # response really starts at ``onset_ms``: the noise floor of that share.
-        "fraction_onset_before_zero": float(np.mean(timing.onset_lag < 0)),
-        "fraction_peak_before_zero": float(np.mean(timing.peak_lag < 0)),
-        "fraction_converged": float(np.mean(np.asarray(fit.converged))),
-        "fraction_peak_sign_correct": float(
-            np.mean(np.sign(timing.peak) == np.sign(gain))
-        ),
         "n_units": int(n_units),
+        "fraction_converged": float(np.mean(np.asarray(fit.converged))),
+        "fraction_onset_before_zero": read["units"].pop("_fraction_onset_before_zero"),
+        "fraction_peak_before_zero": read["units"].pop("_fraction_peak_before_zero"),
+        "fraction_peak_sign_negative": read["units"].pop(
+            "_fraction_peak_sign_negative"
+        ),
+        "rules": {},
     }
+    if planted_gain != 0.0:
+        truth_curve = planted_gain * response_shape(shape, report_lags, onset_ms / 1e3)
+        truth_read = read_curves(truth_curve[:, None], report_lags, window)[
+            "population"
+        ]
+    else:
+        truth_read = {}
+    for name, values in read["units"].items():
+        low, mid, high = np.nanpercentile(values, [2.5, 50, 97.5])
+        population = read["population"][name]
+        true = truth_read.get(name, 0.0 if name.startswith("size") else None)
+        record["rules"][name] = {
+            "truth": true,
+            "unit_median": float(mid),
+            "unit_p2_5": float(low),
+            "unit_p97_5": float(high),
+            "population": population,
+            "unit_bias": None if true is None else float(mid - true),
+            "population_bias": None if true is None else float(population - true),
+        }
+    return record
+
+
+def scenario_list(quick: bool) -> list[dict]:
+    if quick:
+        return [
+            {
+                "window": "canonical",
+                "scenario": "response",
+                "shape": "boxcar",
+                "gain": 0.7,
+                "onset_ms": onset,
+            }
+            for onset in (0.0, 50.0)
+        ]
+    scenarios = [
+        {
+            "window": window,
+            "scenario": "response",
+            "shape": shape,
+            "gain": gain,
+            "onset_ms": onset,
+        }
+        for window in WINDOWS
+        for shape in SHAPES
+        for gain in GAINS
+        for onset in TRUE_ONSETS_MS
+    ]
+    scenarios += [
+        {
+            "window": window,
+            "scenario": scenario,
+            "shape": "boxcar",
+            "gain": -0.7,
+            "onset_ms": 0.0,
+        }
+        for window in WINDOWS
+        for scenario in ("stop_offset", "stop_offset_plus_response")
+    ]
+    return scenarios
 
 
 def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -222,7 +347,7 @@ def parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--quick",
         action="store_true",
-        help="20 units, the boxcar enhanced scenarios at onsets 0 and +50 ms only",
+        help="20 units; the canonical-window boxcar increase at 0 and +50 ms only",
     )
     args = parser.parse_args(argv)
     if args.output is None:
@@ -240,20 +365,10 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     if args.quick:
         args.n_units = 20
-        scenarios = [("boxcar", 0.7, 0.0), ("boxcar", 0.7, 50.0)]
-    else:
-        scenarios = [
-            (shape, gain, onset)
-            for shape in SHAPES
-            for gain in GAINS
-            for onset in TRUE_ONSETS_MS
-        ]
     results = []
-    for index, (shape, gain, onset) in enumerate(scenarios):
+    for index, scenario in enumerate(scenario_list(args.quick)):
         result = simulate_and_fit(
-            shape,
-            gain,
-            onset,
+            **scenario,
             n_bins=args.n_bins,
             n_events=args.n_events,
             n_units=args.n_units,
@@ -261,10 +376,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             sigma=args.penalty_sigma,
             seed=args.seed + index,
         )
+        rules = result["rules"]
         print(
-            f"{shape:6s} gain {gain:+.1f} onset {onset:+5.0f} ms -> apparent onset "
-            f"{result['apparent_onset_ms']['median']:+6.1f} ms, peak "
-            f"{result['apparent_peak_ms']['median']:+6.1f} ms",
+            f"{scenario['window']:9s} {scenario['scenario']:26s} {scenario['shape']:6s} "
+            f"gain {scenario['gain']:+.1f} start {scenario['onset_ms']:+4.0f} ms -> "
+            f"population onset_rise {rules['onset_rise']['population']:+6.0f}, "
+            f"steepest {rules['steepest']['population']:+6.0f}, "
+            f"peak {rules['peak']['population']:+6.0f} ms",
             flush=True,
         )
         results.append(result)
@@ -279,8 +397,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                     for key, value in vars(args).items()
                 },
                 "sampling_frequency_hz": SAMPLING_FREQUENCY,
-                "onset_rule": "half-maximum run ending at the peak "
-                "(analysis/pfc/timing.py:peak_and_onset)",
+                "windows_s": {
+                    k: {"fit": f, "read": r} for k, (f, r) in WINDOWS.items()
+                },
+                "reference_lags_s": list(REFERENCE_LAGS_S),
                 "scenarios": results,
             },
             indent=2,

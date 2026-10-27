@@ -6,7 +6,9 @@ import pytest
 from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_timing,
+    response_size,
     sign_aligned_mean,
+    steepest_approach_lag,
 )
 
 # The report window: +/-200 ms at 500 Hz.
@@ -129,3 +131,30 @@ def test_population_timing_weights_units_not_sessions():
     assert result.n_groups == 2
     # Resamples drawing only session b peak at +100 ms.
     assert result.peak_lag_interval[1] == pytest.approx(0.100)
+
+
+def test_reference_window_baseline_and_size():
+    # A dip of depth 0.6 centred at +50 ms on an offset of -0.4: from a
+    # reference window before the dip the onset is at the dip's half depth and
+    # the size is the dip's depth, not the offset plus the dip.
+    curve = -0.4 + _bump(0.050, 0.020, -0.6)
+    from_window = peak_and_onset(curve, LAG_TIME, baseline=(-0.2, -0.15))
+    size_zero = response_size(curve, LAG_TIME)
+    size_window = response_size(curve, LAG_TIME, baseline=(-0.2, -0.15))
+
+    assert from_window.onset_lag[0] == pytest.approx(0.050 - 1.1774 * 0.020, abs=0.004)
+    assert size_zero[0] == pytest.approx(-1.0, abs=1e-6)
+    assert size_window[0] == pytest.approx(-0.6, abs=1e-3)
+    with pytest.raises(ValueError):
+        peak_and_onset(curve, LAG_TIME, baseline=(1.0, 2.0))
+
+
+def test_steepest_approach_ignores_a_constant_offset():
+    # A Gaussian dip is steepest one SD before its trough.
+    dip = _bump(0.080, 0.025, -0.5)
+
+    first = steepest_approach_lag(dip, LAG_TIME)
+    second = steepest_approach_lag(dip - 0.3, LAG_TIME)
+
+    assert first[0] == pytest.approx(0.055, abs=0.002)
+    assert first[0] == second[0]

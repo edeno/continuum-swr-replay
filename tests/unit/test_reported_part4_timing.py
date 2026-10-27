@@ -48,23 +48,53 @@ def population_and_curves():
             [_bump(c, 0.1) for c in rng.uniform(-0.15, 0.15, n)]
         ),
     }
+
+    def rule(population, bias):
+        return {"population": population, "population_bias": bias}
+
     calibration = {
         "scenarios": [
             {
+                "window": window,
+                "scenario": "response",
                 "shape": "boxcar",
                 "gain": gain,
                 "true_onset_ms": onset,
-                "true_half_max_onset_ms": onset,
-                "true_peak_ms": onset + 50,
-                "unit_onset_bias_ms_median": 4.0,
-                "population_rise_onset_bias_ms": 2.0,
-                "population_onset_bias_ms": 1.0,
-                "fraction_onset_before_zero": 0.2,
-                "apparent_peak_ms": {"median": 48.0},
                 "n_units": 200,
+                "fraction_onset_before_zero": 0.2,
+                "fraction_peak_sign_negative": 0.0 if gain > 0 else 1.0,
+                "rules": {
+                    "onset_zero": rule(onset + 4.0, 4.0),
+                    "onset_rise": rule(onset + 2.0, 2.0),
+                    "steepest": rule(onset, 0.0),
+                    "peak": rule(onset + 50, 0.0),
+                    "size_zero": rule(0.8, 0.1),
+                    "size_rise": rule(0.75, 0.05),
+                },
             }
+            for window in ("canonical", "wide")
             for gain in (0.7, -0.7)
             for onset in (0.0, 50.0)
+        ]
+        + [
+            {
+                "window": "canonical",
+                "scenario": "stop_offset",
+                "shape": "boxcar",
+                "gain": 0.0,
+                "true_onset_ms": 0.0,
+                "n_units": 200,
+                "fraction_onset_before_zero": 0.5,
+                "fraction_peak_sign_negative": 0.95,
+                "rules": {
+                    "onset_zero": rule(-200.0, None),
+                    "onset_rise": rule(130.0, None),
+                    "steepest": rule(120.0, None),
+                    "peak": rule(150.0, None),
+                    "size_zero": rule(0.19, 0.19),
+                    "size_rise": rule(0.01, 0.01),
+                },
+            }
         ]
     }
     return population, curves, calibration
@@ -110,14 +140,17 @@ def test_timing_values_keys_kinds_and_directions(population_and_curves):
         20, abs=2
     )
     assert values["timing_non_swr_later_fraction"].value == 1.0
-    assert values["timing_calibration_unit_onset_bias_ms_boxcar_enhanced"].value == 4.0
+    assert values["timing_calibration_bias_ms_onset_zero_boxcar_enhanced"].value == 4.0
     assert (
-        values[
-            "timing_calibration_population_rise_onset_bias_ms_boxcar_suppressed"
-        ].value
-        == 2.0
+        values["timing_calibration_bias_ms_onset_rise_boxcar_suppressed"].value == 2.0
     )
-    assert "timing_calibration_population_peak_bias_ms_boxcar_enhanced" not in values
+    assert "timing_calibration_bias_ms_peak_boxcar_enhanced" not in values
+    assert values["timing_calibration_stop_offset_suppressed_fraction"].value == 0.95
+    assert values["timing_calibration_stop_offset_rise_size"].value == 0.01
+    for stem in ("swr_replay_suppressed", "non_swr_replay_enhanced"):
+        assert f"timing_population_steepest_ms_{stem}" in values
+        assert values[f"timing_population_rise_size_{stem}"].value > 0
+        assert f"timing_population_size_vs_control_{stem}" in values
     for value in values.values():
         assert not any(ch.isdigit() for ch in value.key)
         if value.kind == "fraction":

@@ -64,7 +64,7 @@ def peak_and_onset(
     lag_time: NDArray,
     *,
     fraction: float = 0.5,
-    baseline: str = "zero",
+    baseline: str | tuple[float, float] = "zero",
 ) -> PeakOnset:
     """Peak and half-maximum onset of each curve.
 
@@ -77,12 +77,13 @@ def peak_and_onset(
         Lag of each row, in seconds, ascending.
     fraction : float
         Share of the peak's size the curve must keep to belong to the run.
-    baseline : {"zero", "window_start"}
-        Where the size is measured from: zero (the half-maximum onset), or
-        the curve's value at the first lag (the rise onset). With
-        ``"window_start"`` a lag belongs to the run when the curve, signed by
-        the peak, is at least ``fraction`` of the way from its first-lag value
-        to the peak.
+    baseline : {"zero", "window_start"} or (float, float)
+        Where the size is measured from: zero (the half-maximum onset), the
+        curve's value at the first lag (the rise onset), or the curve's mean
+        over the lags ``[start, stop]`` in seconds (for a window wide enough
+        to hold a pre-event reference). Other than ``"zero"``, a lag belongs to
+        the run when the curve, signed by the peak, is at least ``fraction``
+        of the way from the reference level to the peak.
 
     Returns
     -------
@@ -90,9 +91,8 @@ def peak_and_onset(
     """
     if not 0.0 < fraction <= 1.0:
         raise ValueError(f"fraction must be in (0, 1], got {fraction}")
-    if baseline not in ("zero", "window_start"):
-        raise ValueError(f"baseline must be 'zero' or 'window_start', got {baseline!r}")
     lag_time = np.asarray(lag_time, dtype=float)
+    reference_lags = _reference_lags(baseline, lag_time)
     values = np.asarray(curves, dtype=float)
     if values.ndim == 1:
         values = values[:, None]
@@ -107,13 +107,13 @@ def peak_and_onset(
     peak = filled[np.arange(n_units), at]
     usable = np.isfinite(by_unit).all(axis=1) & (peak != 0)
 
-    if baseline == "zero":
+    if reference_lags is None:
         above = (np.sign(filled) == np.sign(peak)[:, None]) & (
             np.abs(filled) >= fraction * np.abs(peak)[:, None]
         )
     else:
         aligned = filled * np.sign(peak)[:, None]
-        start = aligned[:, :1]
+        start = aligned[:, reference_lags].mean(axis=1, keepdims=True)
         above = aligned >= start + fraction * (np.abs(peak)[:, None] - start)
     lag_index = np.arange(n_lags)
     breaks = ~above & (lag_index[None, :] < at[:, None])
@@ -127,6 +127,93 @@ def peak_and_onset(
         onset_lag=np.where(usable, lag_time[onset_index], nan),
         onset_at_edge=usable & (onset_index == 0),
     )
+
+
+def _reference_lags(
+    baseline: str | tuple[float, float], lag_time: NDArray
+) -> NDArray | None:
+    """Rows the reference level is averaged over; None for a zero reference."""
+    if isinstance(baseline, str):
+        if baseline == "zero":
+            return None
+        if baseline == "window_start":
+            return np.array([0])
+        raise ValueError(
+            f"baseline must be 'zero', 'window_start' or (start, stop), got {baseline!r}"
+        )
+    start, stop = baseline
+    rows = np.flatnonzero((lag_time >= start - 1e-12) & (lag_time <= stop + 1e-12))
+    if rows.size == 0:
+        raise ValueError(f"no lag in the reference window {baseline}")
+    return rows
+
+
+def response_size(
+    curves: NDArray,
+    lag_time: NDArray,
+    baseline: str | tuple[float, float] = "zero",
+) -> NDArray:
+    """Size of each curve's peak above (or below) a reference level.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags,) or (n_lags, n_units)
+    lag_time : NDArray, shape (n_lags,)
+    baseline : {"zero", "window_start"} or (float, float)
+        Reference level, as in :func:`peak_and_onset`.
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+        Signed peak minus the reference level (negative for a decrease that
+        goes below its reference), on the log-rate scale; NaN for a curve
+        with no peak.
+    """
+    lag_time = np.asarray(lag_time, dtype=float)
+    values = np.asarray(curves, dtype=float)
+    if values.ndim == 1:
+        values = values[:, None]
+    timing = peak_and_onset(values, lag_time)
+    rows = _reference_lags(baseline, lag_time)
+    reference = 0.0 if rows is None else values[rows].mean(axis=0)
+    return timing.peak - reference
+
+
+def steepest_approach_lag(curves: NDArray, lag_time: NDArray) -> NDArray:
+    """Lag of the steepest change toward each curve's peak, before the peak.
+
+    The lag between two samples at which the curve moves fastest in the
+    direction of its own peak (up for an increase, down for a decrease), over
+    the lags before the peak. It does not depend on the curve's level, so a
+    constant offset across the window leaves it unchanged.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags,) or (n_lags, n_units)
+    lag_time : NDArray, shape (n_lags,)
+
+    Returns
+    -------
+    NDArray, shape (n_units,)
+        Seconds (midpoint of the steepest step); NaN for a curve with no peak
+        or a peak at the first lag.
+    """
+    lag_time = np.asarray(lag_time, dtype=float)
+    values = np.asarray(curves, dtype=float)
+    if values.ndim == 1:
+        values = values[:, None]
+    timing = peak_and_onset(values, lag_time)
+    at = np.searchsorted(lag_time, np.nan_to_num(timing.peak_lag, nan=lag_time[0]))
+    step = (
+        np.diff(np.nan_to_num(values.T), axis=1)
+        * np.sign(np.nan_to_num(timing.peak))[:, None]
+    )
+    before = np.arange(step.shape[1])[None, :] < at[:, None]
+    step = np.where(before, step, -np.inf)
+    best = np.argmax(step, axis=1)
+    midpoints = 0.5 * (lag_time[1:] + lag_time[:-1])
+    ok = np.isfinite(timing.peak) & (at > 0)
+    return np.where(ok, midpoints[best], np.nan)
 
 
 def sign_aligned_mean(curves: NDArray, peak: NDArray) -> NDArray:
@@ -161,6 +248,14 @@ class PopulationTiming(NamedTuple):
         Its peak lag and half-maximum onset, in seconds.
     peak_lag_interval, onset_lag_interval : tuple of float
         2.5th and 97.5th percentiles over session resamples, in seconds.
+    steepest_lag : float
+        Its steepest approach to the peak (:func:`steepest_approach_lag`), s.
+    steepest_lag_interval : tuple of float
+    size : float
+        Its peak less the reference level of ``baseline``
+        (:func:`response_size`), log-rate units; positive for both signs,
+        since the curve is signed by each unit's peak.
+    size_interval : tuple of float
     n_units, n_groups : int
         Units and sessions the curve averages.
     """
@@ -170,6 +265,10 @@ class PopulationTiming(NamedTuple):
     onset_lag: float
     peak_lag_interval: tuple[float, float]
     onset_lag_interval: tuple[float, float]
+    steepest_lag: float
+    steepest_lag_interval: tuple[float, float]
+    size: float
+    size_interval: tuple[float, float]
     n_units: int
     n_groups: int
 
@@ -183,7 +282,7 @@ def population_timing(
     n_boot: int = 1_000,
     seed: int = 0,
     fraction: float = 0.5,
-    baseline: str = "zero",
+    baseline: str | tuple[float, float] = "zero",
 ) -> PopulationTiming:
     """Timing of the sign-aligned population curve, resampling sessions.
 
@@ -218,7 +317,19 @@ def population_timing(
     nan_pair = (float("nan"), float("nan"))
     if n_groups == 0:
         empty = np.full(curves.shape[0], np.nan)
-        return PopulationTiming(empty, np.nan, np.nan, nan_pair, nan_pair, 0, 0)
+        return PopulationTiming(
+            empty,
+            np.nan,
+            np.nan,
+            nan_pair,
+            nan_pair,
+            np.nan,
+            nan_pair,
+            np.nan,
+            nan_pair,
+            0,
+            0,
+        )
 
     # Per-session sums make every resample one weighted average.
     sums = np.zeros((n_groups, curves.shape[0]))
@@ -234,6 +345,11 @@ def population_timing(
     boot_curves = (weights @ sums) / (weights @ sizes)[:, None]
     boot = peak_and_onset(boot_curves.T, lag_time, fraction=fraction, baseline=baseline)
 
+    observed_steepest = steepest_approach_lag(curve, lag_time)
+    boot_steepest = steepest_approach_lag(boot_curves.T, lag_time)
+    observed_size = response_size(curve, lag_time, baseline=baseline)
+    boot_size = response_size(boot_curves.T, lag_time, baseline=baseline)
+
     def interval(values: NDArray) -> tuple[float, float]:
         low, high = np.nanpercentile(values, [2.5, 97.5])
         return float(low), float(high)
@@ -244,6 +360,10 @@ def population_timing(
         onset_lag=float(observed.onset_lag[0]),
         peak_lag_interval=interval(boot.peak_lag),
         onset_lag_interval=interval(boot.onset_lag),
+        steepest_lag=float(observed_steepest[0]),
+        steepest_lag_interval=interval(boot_steepest),
+        size=float(observed_size[0]),
+        size_interval=interval(boot_size),
         n_units=int(curves.shape[1]),
         n_groups=n_groups,
     )

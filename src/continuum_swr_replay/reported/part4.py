@@ -48,6 +48,7 @@ from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_timing,
     sign_aligned_mean,
+    steepest_approach_lag,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import (
@@ -1310,8 +1311,99 @@ def timing_values(
                     "97.5th percentile of that over the same resamples",
                     "ms",
                 )
+            steepest_ms = (
+                steepest_approach_lag(curves[curve_key][:, chosen], lag_time) * ms
+            )
+            add(
+                f"timing_steepest_median_ms_{stem}",
+                np.nanmedian(steepest_ms),
+                "quantity",
+                "int",
+                f"median lag of the steepest approach to the peak of {who} (the "
+                "level-free rule: where the curve moves fastest toward its peak)",
+                "ms",
+            )
+            add(
+                f"timing_population_steepest_ms_{stem}",
+                population_curve.steepest_lag * ms,
+                "quantity",
+                "int",
+                f"lag of the steepest approach to the peak of the sign-aligned mean "
+                f"curve of {who}",
+                "ms",
+            )
+            for bound, value in zip(
+                ("low", "high"), population_curve.steepest_lag_interval, strict=True
+            ):
+                add(
+                    f"timing_population_steepest_ms_ci_{bound}_{stem}",
+                    value * ms,
+                    "quantity",
+                    "int",
+                    f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that over "
+                    f"{TIMING_BOOTSTRAP_DRAWS:,} recording-day resamples",
+                    "ms",
+                )
+            for rule, result, text in (
+                ("size", population_curve, "its peak, from zero"),
+                (
+                    "rise_size",
+                    population_rise,
+                    "its peak less its value at -200 ms",
+                ),
+            ):
+                add(
+                    f"timing_population_{rule}_{stem}",
+                    result.size,
+                    "quantity",
+                    "dec2",
+                    f"size of the sign-aligned mean curve of {who}: {text} (log-rate "
+                    "units; a decrease is counted as a positive size)",
+                    "log rate",
+                )
+                for bound, value in zip(
+                    ("low", "high"), result.size_interval, strict=True
+                ):
+                    add(
+                        f"timing_population_{rule}_ci_{bound}_{stem}",
+                        value,
+                        "quantity",
+                        "dec2",
+                        f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that "
+                        f"over {TIMING_BOOTSTRAP_DRAWS:,} recording-day resamples",
+                        "log rate",
+                    )
+            control = curves["matched_control"][:, chosen]
+            usable = np.isfinite(control).all(axis=0)
+            if usable.any():
+                at_peak = int(np.argmax(population_curve.curve))
+                control_mean = sign_aligned_mean(
+                    control[:, usable], timing.peak[chosen][usable]
+                )
+                add(
+                    f"timing_population_size_vs_control_{stem}",
+                    population_curve.curve[at_peak] - control_mean[at_peak],
+                    "quantity",
+                    "dec2",
+                    f"the sign-aligned mean curve of {who} at its peak, less the same "
+                    "units' matched quiet-rest control curves (signed the same way) at "
+                    "that lag",
+                    "log rate",
+                )
+                add(
+                    f"timing_population_control_pre_event_level_fraction_{stem}",
+                    float(
+                        np.clip(control_mean[0] / np.max(population_curve.curve), 0, 1)
+                    ),
+                    "fraction",
+                    "pct",
+                    "the same units' matched-control mean curve at -200 ms, signed by "
+                    "the event curve, as a share of the event curve's peak: how much "
+                    "of the event curve's pre-event level quiet-rest windows also show",
+                )
             onsets_by_animal = []
             rises_by_animal = []
+            steepest_by_animal = []
             for animal in np.unique(animals[chosen]):
                 own = chosen & (animals == animal)
                 own_curve = sign_aligned_mean(
@@ -1322,6 +1414,7 @@ def timing_values(
                 )
                 rise = peak_and_onset(own_curve, lag_time, baseline="window_start")
                 rises_by_animal.append(rise.onset_lag[0])
+                steepest_by_animal.append(steepest_approach_lag(own_curve, lag_time)[0])
                 add(
                     f"timing_population_rise_onset_ms_{stem}_{ANIMAL_WORDS[animal]}",
                     rise.onset_lag[0] * ms,
@@ -1343,6 +1436,14 @@ def timing_values(
                 "count",
                 "count",
                 f"of those animals, how many have the half-maximum onset of their own "
+                f"mean curve of {who} before event onset",
+            )
+            add(
+                f"timing_population_steepest_animals_negative_{stem}",
+                int(np.sum(np.asarray(steepest_by_animal) < 0)),
+                "count",
+                "count",
+                f"of those animals, how many have the steepest approach of their own "
                 f"mean curve of {who} before event onset",
             )
             add(
@@ -1398,69 +1499,127 @@ def timing_values(
     )
 
     if calibration is not None:
-        for scenario in calibration["scenarios"]:
-            if scenario["true_onset_ms"] != 0.0:
-                continue
-            direction = "enhanced" if scenario["gain"] > 0 else "suppressed"
-            stem = f"{scenario['shape']}_{direction}"
+        _calibration_values(calibration, add)
+    return values
+
+
+#: Gain words of the calibration's planted responses.
+CALIBRATION_GAIN_WORDS = {
+    0.7: "enhanced",
+    -0.7: "suppressed",
+    -0.3: "shallow_suppressed",
+}
+
+#: Calibration rules quoted, by key word and description.
+CALIBRATION_RULES = {
+    "onset_zero": "half-maximum onset from zero",
+    "onset_rise": "rise onset (half way from the -200 ms value to the peak)",
+    "steepest": "steepest approach to the peak",
+    "peak": "peak lag",
+}
+
+
+def _calibration_values(calibration: dict[str, Any], add: Callable[..., None]) -> None:
+    """The timing calibration's reference values (simulated units, known truth).
+
+    Read from ``scripts/pfc/calibrate_pfc_kernel_timing.py``'s output, canonical
+    window only: for responses that start exactly at event onset, each rule's
+    population bias (sign-aligned mean curve, against the truth read by the same
+    rule) and the size bias; the unit-level noise floor of "onset before zero";
+    and what a stop-level rate difference with no event-locked response, alone
+    and under a planted decrease, looks like to each rule.
+    """
+    for scenario in calibration["scenarios"]:
+        if scenario["window"] != "canonical" or scenario["true_onset_ms"] != 0.0:
+            continue
+        rules = scenario["rules"]
+        if scenario["scenario"] == "response":
+            stem = f"{scenario['shape']}_{CALIBRATION_GAIN_WORDS[scenario['gain']]}"
             response = (
                 "a 100 ms boxcar"
                 if scenario["shape"] == "boxcar"
                 else "an alpha function peaking 30 ms after it starts"
             )
             what = (
-                f"simulated units ({scenario['n_units']}) whose response, {response} of "
-                f"log-rate gain {scenario['gain']:+g}, starts exactly at event onset, "
-                "fit by the shipped basis, prior and fitter"
+                f"simulated units ({scenario['n_units']}) whose response, {response} "
+                f"of log-rate gain {scenario['gain']:+g}, starts exactly at event "
+                "onset, fit by the shipped basis, prior and fitter"
             )
-            truth = (
-                f"the truth's own half-maximum onset "
-                f"({scenario['true_half_max_onset_ms']:g} ms) read by the same rule"
-            )
-            add(
-                f"timing_calibration_unit_onset_bias_ms_{stem}",
-                scenario["unit_onset_bias_ms_median"],
-                "quantity",
-                "int",
-                f"median half-maximum onset of {what}, minus {truth}",
-                "ms",
-            )
-            add(
-                f"timing_calibration_population_rise_onset_bias_ms_{stem}",
-                scenario["population_rise_onset_bias_ms"],
-                "quantity",
-                "int",
-                f"rise onset of the sign-aligned mean curve of {what}, minus {truth}",
-                "ms",
-            )
-            add(
-                f"timing_calibration_population_onset_bias_ms_{stem}",
-                scenario["population_onset_bias_ms"],
-                "quantity",
-                "int",
-                f"half-maximum onset of the sign-aligned mean curve of {what}, minus "
-                f"{truth}",
-                "ms",
-            )
-            if scenario["shape"] == "alpha":
+            for rule, text in CALIBRATION_RULES.items():
+                if rule == "peak" and scenario["shape"] == "boxcar":
+                    continue  # a boxcar's peak lag is not defined
                 add(
-                    f"timing_calibration_population_peak_bias_ms_{stem}",
-                    scenario["population_peak_bias_ms"],
+                    f"timing_calibration_bias_ms_{rule}_{stem}",
+                    rules[rule]["population_bias"],
                     "quantity",
                     "int",
-                    f"peak lag of the sign-aligned mean curve of {what}, minus the "
-                    f"truth's peak ({scenario['true_peak_ms']:g} ms)",
+                    f"{text} of the sign-aligned mean curve of {what}, minus the "
+                    "truth read by the same rule",
                     "ms",
                 )
+            add(
+                f"timing_calibration_size_bias_{stem}",
+                rules["size_rise"]["population_bias"],
+                "quantity",
+                "dec2",
+                f"size (peak less the -200 ms value) of the sign-aligned mean curve "
+                f"of {what}, minus the truth's",
+                "log rate",
+            )
             add(
                 f"timing_calibration_onset_before_zero_fraction_{stem}",
                 scenario["fraction_onset_before_zero"],
                 "fraction",
                 "pct",
-                f"share of {what} whose apparent half-maximum onset is before event "
-                "onset: the noise floor of the per-unit share",
+                f"share of {what} whose half-maximum onset is before event onset: "
+                "the noise floor of the per-unit share",
             )
-    return values
+            continue
+        name = scenario["scenario"]
+        what = (
+            "simulated units whose rate is lower (by log 0.3) in 40 % of 20 s "
+            "stretches, with 80 % of the events in those stretches"
+            + (
+                ", plus a -0.7 boxcar decrease from event onset"
+                if name == "stop_offset_plus_response"
+                else ", and no event-locked response"
+            )
+        )
+        add(
+            f"timing_calibration_{name}_size",
+            rules["size_zero"]["population"],
+            "quantity",
+            "dec2",
+            f"size from zero of the sign-aligned mean curve of {what}",
+            "log rate",
+        )
+        add(
+            f"timing_calibration_{name}_rise_size",
+            rules["size_rise"]["population"],
+            "quantity",
+            "dec2",
+            f"size (peak less the -200 ms value) of the sign-aligned mean curve of "
+            f"{what}",
+            "log rate",
+        )
+        add(
+            f"timing_calibration_{name}_suppressed_fraction",
+            scenario["fraction_peak_sign_negative"],
+            "fraction",
+            "pct",
+            f"share of {what} whose peak is a decrease",
+        )
+        if name == "stop_offset_plus_response":
+            for rule in ("onset_zero", "onset_rise", "steepest"):
+                add(
+                    f"timing_calibration_{name}_bias_ms_{rule}",
+                    rules[rule]["population_bias"],
+                    "quantity",
+                    "int",
+                    f"{CALIBRATION_RULES[rule]} of the sign-aligned mean curve of "
+                    f"{what}, minus the truth's",
+                    "ms",
+                )
 
 
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
