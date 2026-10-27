@@ -3,8 +3,12 @@
  "part": 3,
  "title": "behavior",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "81e163874790",
+ "commit": "dca377e0eecb",
  "inputs": [
+  {
+   "path": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl",
+   "sha256": "dc00fd6ed342a6ffde4e9714129ac44cfa69c52703cb4be80ec35c062e461110"
+  },
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/per_bin_rate_cohort_audit.csv",
    "sha256": "96f71710dc10bf9cc91f07b9f92cac78ce3455979c8154329322b170da7ffa61"
@@ -116,6 +120,14 @@
   {
    "path": "Processed-Data/replay_content/stop_table.parquet",
    "sha256": "879e8d05775754f58c56afee5e08a4ef49c113c2937876eaf68b78038c6d6e80"
+  },
+  {
+   "path": "Processed-Data/replay_content/event_onset_table.parquet",
+   "sha256": "3c894ead1df7122c861022631c14158c1a1fb778cd0d0507a25973246d762433"
+  },
+  {
+   "path": "Processed-Data/replay_content/_trunk_zscore_per_event.pkl",
+   "sha256": "d6c9b5a4e50836b2a3176b7c3cc9f677a5c569a7e8bfb3358ed97f1d871670e3"
   },
   {
    "path": "Processed-Data/replay_content/models_per_event_swr_power/swr_power_model.pkl",
@@ -4280,6 +4292,81 @@
    "source": "Processed-Data/replay_content/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu (content.arm_ladder.leaf_arms)",
    "pending": null
   },
+  "onset_median_s_non_local": {
+   "value": 2.3979971408843994,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "s",
+   "description": "median time of a non-local onset after its stop's speed-threshold crossing",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "onsets_reward_history_incomplete_fraction_non_local": {
+   "value": 0.014720845721836802,
+   "kind": "fraction",
+   "style": "sig2",
+   "unit": "",
+   "description": "share of non-local onsets in those stops",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "onsets_within_tmax_fraction_mua": {
+   "value": 0.791171560443877,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of MUA onsets within the first 4 s of their stop (event_onset_table)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "onsets_within_tmax_fraction_non_local": {
+   "value": 0.785173439048563,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of non_local onsets within the first 4 s of their stop (event_onset_table)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "onsets_within_tmax_fraction_swr": {
+   "value": 0.7983767101650021,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of SWR onsets within the first 4 s of their stop (event_onset_table)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
   "patch_current": {
    "value": 1.0514470247667438,
    "kind": "quantity",
@@ -4556,6 +4643,21 @@
    "style": "pct",
    "unit": "",
    "description": "detected SWR: share of sessions in which R1 has the lower AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_stop_rate/all_models.pkl (rate.per_stop.at_well)",
+   "pending": null
+  },
+  "per_stop_cv_finite_fraction_full": {
+   "value": 0.5228215767634855,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean",
    "claims": [
     "19c"
    ],
@@ -5075,6 +5177,51 @@
    "source": "Processed-Data/replay_content/models_per_event_swr_power/swr_power_model.pkl (coupling.ripple_power)",
    "pending": "the SWR-power model has no provenance sidecar, so it cannot be checked against the current tables; give its runner one before citing"
   },
+  "rate_allstops_arrival_bins_before": {
+   "value": 8230251,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "all-stops fit: bins before that removal",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_allstops_arrival_bins_dropped": {
+   "value": 92849,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "all-stops fit: bins the arrival clock removed from the common cohort",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_allstops_arrival_bins_dropped_fraction": {
+   "value": 0.011281429934518401,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "all-stops fit: share of bins the arrival clock removed",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_allstops_arrival_event_share_non_local": {
    "value": 0.857213371459695,
    "kind": "fraction",
@@ -5139,12 +5286,92 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_allstops_arrival_peak_edge_count": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit sits on the interval's edge",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_edge_non_local": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): 1 if that argmax sits on the edge of [1, 6] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_edge_non_local_no_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_edge_non_local_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_edge_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
   "rate_allstops_arrival_peak_s_high": {
    "value": 5.7250000000000005,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "highest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
+   "description": "highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5160,7 +5387,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "lowest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
+   "description": "lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5176,7 +5403,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local (all): peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
+   "description": "non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5192,7 +5419,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local without SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
+   "description": "non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5208,7 +5435,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local with SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
+   "description": "non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5224,7 +5451,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "detected SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
+   "description": "detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5235,12 +5462,121 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_allstops_arrival_peak_sessions_non_local": {
+   "value": 116,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_sessions_non_local_no_swr": {
+   "value": 112,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_sessions_non_local_swr": {
+   "value": 80,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_peak_sessions_swr": {
+   "value": 94,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_arrival_stops_dropped": {
+   "value": 1509,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "all-stops fit: stops the arrival clock removed",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_allstops_arrival_window_bins": {
+   "value": 7374525,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "all-stops fit: frozen-cohort bins inside the arrival window",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_allstops_arrival_window_fraction": {
+   "value": 0.9062505453214674,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "all-stops fit: share of frozen-cohort bins inside the arrival window",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_allstops_clock_ks_high": {
    "value": 0.0922612536897832,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "highest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit",
+   "description": "highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5256,7 +5592,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "lowest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit",
+   "description": "lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5329,6 +5665,21 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_frozen_bins": {
+   "value": 8137402,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "all-stops fit: bins in the frozen common cohort",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_allstops_immediate_animal_non_local": {
@@ -5523,6 +5874,36 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_allstops_marginal_reward_child_better_fraction_non_local_no_swr": {
+   "value": 0.44214876033057854,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "all-stops fit, non-local without SWR: share of sessions in which M1_rew has the lower AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_allstops_marginal_reward_delta_aic_non_local_no_swr": {
+   "value": 0.6494514490491383,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "AIC",
+   "description": "all-stops fit, non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_allstops_paired_p": {
    "value": 4.570241194359914e-26,
    "kind": "quantity",
@@ -5571,12 +5952,92 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_allstops_time_peak_edge_count": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "populations whose argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit sits on the interval's edge",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_edge_non_local": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): 1 if that argmax sits on the edge of [1, 3] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_edge_non_local_no_swr": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_edge_non_local_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_edge_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
   "rate_allstops_time_peak_s_high": {
-   "value": 3.0,
+   "value": 2.98,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "highest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
+   "description": "highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5592,7 +6053,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "lowest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
+   "description": "lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5608,7 +6069,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local (all): peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
+   "description": "non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5624,7 +6085,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local without SWR: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
+   "description": "non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit; it sits on the interval's edge, so it bounds the peak rather than locating it",
    "claims": [
     "19c"
    ],
@@ -5640,7 +6101,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local with SWR: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
+   "description": "non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5656,7 +6117,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "detected SWR: peak of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
+   "description": "detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit",
    "claims": [
     "19c"
    ],
@@ -5665,6 +6126,130 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_sessions_non_local": {
+   "value": 241,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_sessions_non_local_no_swr": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_sessions_non_local_swr": {
+   "value": 204,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_allstops_time_peak_sessions_swr": {
+   "value": 236,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: unflagged session curves behind that median, all-stops fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_const_sessions_non_local": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): M0a_const_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_const_sessions_non_local_no_swr": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: M0a_const_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_const_sessions_non_local_swr": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: M0a_const_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_const_sessions_swr": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: M0a_const_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_arrival_event_share_non_local": {
@@ -5731,12 +6316,182 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_arrival_full_cv_nan_fraction_non_local": {
+   "value": 0.9529914529914529,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local (all): share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_full_cv_nan_fraction_non_local_swr": {
+   "value": 1.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local with SWR: share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_full_sessions_non_local": {
+   "value": 234,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): M7ra_time_arrival_histcos_rew fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_full_sessions_non_local_no_swr": {
+   "value": 233,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_full_sessions_non_local_swr": {
+   "value": 219,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_full_sessions_swr": {
+   "value": 231,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_peak_edge_count": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s sits on the interval's edge",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_edge_non_local": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): 1 if that argmax sits on the edge of [1, 6] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_edge_non_local_no_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_edge_non_local_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_edge_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: 1 if that argmax sits on the edge of [1, 6] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
   "rate_arrival_peak_s_high": {
    "value": 4.0,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "highest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "description": "highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s",
    "claims": [
     "19c"
    ],
@@ -5752,7 +6507,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "lowest over the four populations: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "description": "lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s",
    "claims": [
     "19c"
    ],
@@ -5768,7 +6523,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local (all): peak of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "description": "non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s",
    "claims": [
     "19c"
    ],
@@ -5784,7 +6539,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local without SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "description": "non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s",
    "claims": [
     "19c"
    ],
@@ -5800,7 +6555,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local with SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "description": "non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s",
    "claims": [
     "19c"
    ],
@@ -5816,7 +6571,71 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "detected SWR: peak of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "description": "detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_sessions_non_local": {
+   "value": 99,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): unflagged session curves behind that median",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_sessions_non_local_no_swr": {
+   "value": 96,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: unflagged session curves behind that median",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_sessions_non_local_swr": {
+   "value": 83,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: unflagged session curves behind that median",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_peak_sessions_swr": {
+   "value": 86,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: unflagged session curves behind that median",
    "claims": [
     "19c"
    ],
@@ -5832,7 +6651,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "highest over the four populations: share of M5a_time_arrival fits flagged separated",
+   "description": "highest over the populations: share of M5a_time_arrival fits flagged separated",
    "claims": [
     "19c"
    ],
@@ -5848,7 +6667,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "lowest over the four populations: share of M5a_time_arrival fits flagged separated",
+   "description": "lowest over the populations: share of M5a_time_arrival fits flagged separated",
    "claims": [
     "19c"
    ],
@@ -5921,6 +6740,96 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_arrival_time_cv_nan_fraction_non_local": {
+   "value": 0.9240506329113924,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local (all): share of M5a_time_arrival fits whose held-out score is not finite",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_time_cv_nan_fraction_non_local_swr": {
+   "value": 1.0,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local with SWR: share of M5a_time_arrival fits whose held-out score is not finite",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_time_sessions_non_local": {
+   "value": 237,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): M5a_time_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_time_sessions_non_local_no_swr": {
+   "value": 236,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: M5a_time_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_time_sessions_non_local_swr": {
+   "value": 222,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: M5a_time_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_arrival_time_sessions_swr": {
+   "value": 233,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: M5a_time_arrival fits with a finite AIC",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_audit_stops_common_drop": {
@@ -5998,6 +6907,66 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/per_bin_rate_cohort_audit.csv (cohort audit)",
    "pending": null
   },
+  "rate_baseline_lower_quartile_non_local": {
+   "value": 0.3246610367050303,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "non-local (all): 25th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_lower_quartile_non_local_no_swr": {
+   "value": 0.1476769067273786,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "non-local without SWR: 25th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_lower_quartile_non_local_swr": {
+   "value": 0.17508359050453448,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "non-local with SWR: 25th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_lower_quartile_swr": {
+   "value": 0.22948911082610482,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "detected SWR: 25th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_baseline_non_local": {
    "value": 0.43054203178597666,
    "kind": "quantity",
@@ -6046,6 +7015,156 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_baseline_ratio_no_swr_to_swr": {
+   "value": 0.7742379766199711,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "ratio",
+   "description": "median within-session M0_const rate ratio, non_local_no_swr over swr",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_no_swr_to_swr_p": {
+   "value": 8.29614620332791e-11,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "its paired signed-rank p",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_coupled_to_no_swr": {
+   "value": 0.9775337790361005,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "ratio",
+   "description": "median within-session M0_const rate ratio, non_local_swr over non_local_no_swr",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_coupled_to_no_swr_p": {
+   "value": 0.2992910450224049,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "its paired signed-rank p",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_coupled_to_non_local": {
+   "value": 0.49431946450514,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "ratio",
+   "description": "median within-session M0_const rate ratio, non_local_swr over non_local",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_coupled_to_non_local_p": {
+   "value": 1.8889132518617737e-41,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "its paired signed-rank p",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_coupled_to_swr": {
+   "value": 0.802680788413084,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "ratio",
+   "description": "median within-session M0_const rate ratio, non_local_swr over swr",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_coupled_to_swr_p": {
+   "value": 2.991127787515412e-41,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "its paired signed-rank p",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_to_non_local": {
+   "value": 0.6322056686909229,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "ratio",
+   "description": "median within-session M0_const rate ratio, swr over non_local",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_ratio_swr_to_non_local_p": {
+   "value": 6.32601054892088e-39,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "its paired signed-rank p",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_baseline_swr": {
    "value": 0.2667496326526487,
    "kind": "quantity",
@@ -6060,6 +7179,126 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_baseline_upper_quartile_non_local": {
+   "value": 0.562131793672206,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "non-local (all): 75th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_upper_quartile_non_local_no_swr": {
+   "value": 0.29975066967522807,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "non-local without SWR: 75th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_upper_quartile_non_local_swr": {
+   "value": 0.2551258998958879,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "non-local with SWR: 75th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_baseline_upper_quartile_swr": {
+   "value": 0.30661224220960304,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "events/s",
+   "description": "detected SWR: 75th percentile over sessions of the M0_const rate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bin_count_non_local": {
+   "value": 0.00645813047678965,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "events/bin",
+   "description": "non-local (all): median M0_const rate times the 15 ms bin, the mean per-bin count",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bin_count_non_local_no_swr": {
+   "value": 0.0032357611928588315,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "events/bin",
+   "description": "non-local without SWR: median M0_const rate times the 15 ms bin, the mean per-bin count",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bin_count_non_local_swr": {
+   "value": 0.0031743783991843347,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "events/bin",
+   "description": "non-local with SWR: median M0_const rate times the 15 ms bin, the mean per-bin count",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bin_count_swr": {
+   "value": 0.004001244489789731,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "events/bin",
+   "description": "detected SWR: median M0_const rate times the 15 ms bin, the mean per-bin count",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_bins": {
@@ -6078,12 +7317,492 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_bump_one_animals_non_local": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_animals_non_local_no_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_animals_non_local_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_animals_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_positive_fraction_non_local": {
+   "value": 0.18181818181818182,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local (all): share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_positive_fraction_non_local_no_swr": {
+   "value": 0.3541666666666667,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local without SWR: share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_positive_fraction_non_local_swr": {
+   "value": 0.1322314049586777,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local with SWR: share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_positive_fraction_swr": {
+   "value": 0.1446280991735537,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "detected SWR: share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_session_non_local": {
+   "value": 0.04995845668239904,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local (all): exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_session_non_local_no_swr": {
+   "value": 0.16934833114056128,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_session_non_local_swr": {
+   "value": 0.006492120943469247,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_one_session_swr": {
+   "value": 0.021424108339494544,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "detected SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_animals_non_local": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_animals_non_local_no_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_animals_non_local_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_animals_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: animals whose median has the across-session median's sign",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_positive_fraction_non_local": {
+   "value": 0.7975206611570248,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local (all): share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_positive_fraction_non_local_no_swr": {
+   "value": 0.6083333333333333,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local without SWR: share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_positive_fraction_non_local_swr": {
+   "value": 0.8347107438016529,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local with SWR: share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_positive_fraction_swr": {
+   "value": 0.8016528925619835,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "detected SWR: share of sessions with that coefficient positive",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_session_non_local": {
+   "value": 5.228910881735936,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local (all): exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_session_non_local_no_swr": {
+   "value": 2.446628233203664,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_session_non_local_swr": {
+   "value": 15.075631247998572,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_bump_two_session_swr": {
+   "value": 7.690815907419913,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "detected SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_lag_ms_non_local": {
+   "value": 135.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "non-local (all): lag of that gated peak",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_lag_ms_non_local_no_swr": {
+   "value": 105.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "non-local without SWR: lag of that gated peak",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_lag_ms_non_local_swr": {
+   "value": 135.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "non-local with SWR: lag of that gated peak",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_lag_ms_swr": {
+   "value": 105.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "detected SWR: lag of that gated peak",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_non_local": {
+   "value": 1.9242354695026123,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): peak of the median self-history kernel over the fits that flag no hist_rcos term",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_non_local_no_swr": {
+   "value": 1.8641949489125282,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: peak of the median self-history kernel over the fits that flag no hist_rcos term",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_non_local_swr": {
+   "value": 2.1796587026950602,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: peak of the median self-history kernel over the fits that flag no hist_rcos term",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_burst_peak_gated_swr": {
+   "value": 2.807693156769585,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: peak of the median self-history kernel over the fits that flag no hist_rcos term",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_burst_peak_high": {
    "value": 2.670787665236209,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "highest over the four populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew",
+   "description": "highest over the populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew",
    "claims": [
     "19c"
    ],
@@ -6092,14 +7811,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_lag_ms_high": {
    "value": 120.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "highest over the four populations: lag of that peak (15 ms lags)",
+   "description": "highest over the populations: lag of that peak (15 ms lags)",
    "claims": [
     "19c"
    ],
@@ -6108,14 +7827,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_lag_ms_low": {
    "value": 105.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "lowest over the four populations: lag of that peak (15 ms lags)",
+   "description": "lowest over the populations: lag of that peak (15 ms lags)",
    "claims": [
     "19c"
    ],
@@ -6124,7 +7843,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_lag_ms_non_local": {
    "value": 120.0,
@@ -6140,7 +7859,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_lag_ms_non_local_no_swr": {
    "value": 105.0,
@@ -6156,7 +7875,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_lag_ms_non_local_swr": {
    "value": 120.0,
@@ -6172,7 +7891,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_lag_ms_swr": {
    "value": 105.0,
@@ -6188,14 +7907,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_low": {
    "value": 1.5613837270933524,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "lowest over the four populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew",
+   "description": "lowest over the populations: peak of the median reconstructed self-history kernel of M7r_time_histcos_rew",
    "claims": [
     "19c"
    ],
@@ -6204,7 +7923,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_non_local": {
    "value": 1.9522359270374097,
@@ -6220,7 +7939,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_non_local_no_swr": {
    "value": 1.5613837270933524,
@@ -6236,7 +7955,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_non_local_swr": {
    "value": 1.9836594627026887,
@@ -6252,7 +7971,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_burst_peak_swr": {
    "value": 2.670787665236209,
@@ -6268,14 +7987,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_clock_ks_high": {
    "value": 0.09013862986990567,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "highest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position",
+   "description": "highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position",
    "claims": [
     "19c"
    ],
@@ -6291,7 +8010,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
-   "description": "lowest over the four populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position",
+   "description": "lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position",
    "claims": [
     "19c"
    ],
@@ -6430,6 +8149,171 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_contrast_audited_rows": {
+   "value": 32,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "rows the audited is_swr-contrast rate aggregate publishes",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: rate_models"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_expanded_fits_high": {
+   "value": 240,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "most fits over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_expanded_fits_low": {
+   "value": 235,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "fewest fits over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_expanded_flagged_high": {
+   "value": 196,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "most fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_expanded_flagged_low": {
+   "value": 173,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "fewest fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_expanded_separated_high": {
+   "value": 206,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "most fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_expanded_separated_low": {
+   "value": 193,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "fewest fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_most_dropped": {
+   "value": 23,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "most sessions a key contrast term loses to the gate (S3_periswitch is_swr:periswitch_index_trials)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: rate_models"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_most_dropped_of": {
+   "value": 236,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "sessions fit for that term (S3_periswitch)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: rate_models"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_plain_fits": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "S1_rew contrast fits",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_plain_flagged": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "S1_rew contrast fits flagging reward_history_rcos_1 separated",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
   "rate_contrast_separated_fraction_post_outcome": {
    "value": 0.6680613668061367,
    "kind": "fraction",
@@ -6473,6 +8357,21 @@
     "docs: replay_rate_content_swr_synthesis"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl (rate.swr_contrast.at_well)",
+   "pending": null
+  },
+  "rate_contrast_terms_losing_sessions": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "key is_swr contrast terms that lose any session to the per-term gate",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "docs: rate_models"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl (rate.swr_contrast.at_well)",
    "pending": null
   },
   "rate_full_sessions_non_local": {
@@ -6537,6 +8436,126 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_hist_separated_fraction_non_local": {
+   "value": 0.2809917355371901,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local (all): share of those fits flagging a hist_rcos term separated",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_separated_fraction_non_local_no_swr": {
+   "value": 0.3958333333333333,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local without SWR: share of those fits flagging a hist_rcos term separated",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_separated_fraction_non_local_swr": {
+   "value": 0.41735537190082644,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local with SWR: share of those fits flagging a hist_rcos term separated",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_separated_fraction_swr": {
+   "value": 0.4049586776859504,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "detected SWR: share of those fits flagging a hist_rcos term separated",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_sessions_non_local": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions whose M7r_time_histcos_rew fit carries the self-history block",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_sessions_non_local_no_swr": {
+   "value": 240,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_sessions_non_local_swr": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_hist_sessions_swr": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_immediate_animal_non_local": {
@@ -6939,6 +8958,96 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_intransit_arrival_event_share_high": {
+   "value": 0.36850763807285547,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "highest over populations of the in-transit fit's arrival-window event share",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_intransit_arrival_event_share_low": {
+   "value": 0.1791044776119403,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "lowest over populations of the in-transit fit's arrival-window event share",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_intransit_arrival_event_share_non_local": {
+   "value": 0.33429616791835165,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "non-local (all): share of its event bins the arrival window keeps on the in-transit fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_intransit_arrival_event_share_non_local_no_swr": {
+   "value": 0.36850763807285547,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "non-local without SWR: share of its event bins the arrival window keeps on the in-transit fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_intransit_arrival_event_share_non_local_swr": {
+   "value": 0.1791044776119403,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "non-local with SWR: share of its event bins the arrival window keeps on the in-transit fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_intransit_arrival_event_share_swr": {
+   "value": 0.3014749262536873,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "detected SWR: share of its event bins the arrival window keeps on the in-transit fit",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_intransit_sessions": {
    "value": 52,
    "kind": "count",
@@ -7012,6 +9121,246 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.in_transit)",
+   "pending": null
+  },
+  "rate_kernel_lag_eight_non_local": {
+   "value": 0.9784848274742222,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 8",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_eight_non_local_no_swr": {
+   "value": 0.9798662769966261,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 8",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_eight_non_local_swr": {
+   "value": 0.9806873758823478,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 8",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_eight_swr": {
+   "value": 0.9722709364487347,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 8",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_five_non_local": {
+   "value": 0.9148830179817099,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 5",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_five_non_local_no_swr": {
+   "value": 0.9420615409644497,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 5",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_five_non_local_swr": {
+   "value": 0.8865108260263026,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 5",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_five_swr": {
+   "value": 0.9019666445846112,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 5",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_four_non_local": {
+   "value": 0.9086465930717845,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 4",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_four_non_local_no_swr": {
+   "value": 0.9306255366094285,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 4",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_four_non_local_swr": {
+   "value": 0.8922387733477753,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 4",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_four_swr": {
+   "value": 0.8952091913841458,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 4",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_nine_non_local": {
+   "value": 1.0072277968779715,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 9",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_nine_non_local_no_swr": {
+   "value": 0.9954377136353603,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 9",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_nine_non_local_swr": {
+   "value": 1.0240796943786417,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 9",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_nine_swr": {
+   "value": 1.004778044025214,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 9",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_kernel_lag_one_animal_non_local": {
@@ -7206,6 +9555,126 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_kernel_lag_seven_non_local": {
+   "value": 0.9503071900152329,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 7",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_seven_non_local_no_swr": {
+   "value": 0.9723302154049247,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 7",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_seven_non_local_swr": {
+   "value": 0.9343794693914136,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 7",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_seven_swr": {
+   "value": 0.9414047839185278,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 7",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_six_non_local": {
+   "value": 0.9314736595325142,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 6",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_six_non_local_no_swr": {
+   "value": 0.9581727522633863,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 6",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_six_non_local_swr": {
+   "value": 0.9078641757901986,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 6",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_six_swr": {
+   "value": 0.9175727680875891,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 6",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_kernel_lag_ten_non_local": {
    "value": 1.036957468353805,
    "kind": "quantity",
@@ -7268,6 +9737,126 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_kernel_lag_three_non_local": {
+   "value": 0.9261677241430839,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 3",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_three_non_local_no_swr": {
+   "value": 0.9356861114297323,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 3",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_three_non_local_swr": {
+   "value": 0.9354700455023801,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 3",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_three_swr": {
+   "value": 0.9303850252175296,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 3",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_two_non_local": {
+   "value": 0.9936717568123536,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): median reconstructed reward kernel at lag 2",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_two_non_local_no_swr": {
+   "value": 0.9522775268637319,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: median reconstructed reward kernel at lag 2",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_two_non_local_swr": {
+   "value": 1.072555156171838,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: median reconstructed reward kernel at lag 2",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_kernel_lag_two_swr": {
+   "value": 1.0438250200513246,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: median reconstructed reward kernel at lag 2",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_kernel_late_max_non_local": {
@@ -7339,7 +9928,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "highest over the four populations: lowest median reconstructed kernel over lags 3-10",
+   "description": "highest over the populations: lowest median reconstructed kernel over lags 3-10",
    "claims": [
     "19c"
    ],
@@ -7355,7 +9944,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "lowest over the four populations: lowest median reconstructed kernel over lags 3-10",
+   "description": "lowest over the populations: lowest median reconstructed kernel over lags 3-10",
    "claims": [
     "19c"
    ],
@@ -7462,6 +10051,36 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_ladder_aic_histcos": {
+   "value": 2207.3966603111276,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "AIC",
+   "description": "non-local (all): median AIC of M3r_histcos",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_aic_rew": {
+   "value": 2221.4270736625667,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "AIC",
+   "description": "non-local (all): median AIC of M1_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_ladder_aic_reward_by_time": {
    "value": 2133.3466957380856,
    "kind": "quantity",
@@ -7492,6 +10111,21 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_ladder_aic_time_histcos": {
+   "value": 2127.6828847986417,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "AIC",
+   "description": "non-local (all): median AIC of M6r_time_histcos",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_ladder_cv_bits_const": {
@@ -7526,6 +10160,36 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_ladder_cv_bits_histcos": {
+   "value": 0.049271067670787955,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "bits/event",
+   "description": "non-local (all): median held-out bits per event of M3r_histcos, over sessions with a finite score",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_cv_bits_rew": {
+   "value": 0.02447453015353391,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "bits/event",
+   "description": "non-local (all): median held-out bits per event of M1_rew, over sessions with a finite score",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_ladder_cv_bits_reward_by_time": {
    "value": 0.17747899870586825,
    "kind": "quantity",
@@ -7556,6 +10220,21 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_ladder_cv_bits_time_histcos": {
+   "value": 0.22041913439683636,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "bits/event",
+   "description": "non-local (all): median held-out bits per event of M6r_time_histcos, over sessions with a finite score",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_ladder_cv_sessions_const": {
@@ -7590,6 +10269,36 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_ladder_cv_sessions_histcos": {
+   "value": 67,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite held-out score for M3r_histcos",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_cv_sessions_rew": {
+   "value": 238,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite held-out score for M1_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_ladder_cv_sessions_reward_by_time": {
    "value": 40,
    "kind": "count",
@@ -7620,6 +10329,21 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_ladder_cv_sessions_time_histcos": {
+   "value": 62,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite held-out score for M6r_time_histcos",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_ladder_ks_band_const": {
@@ -7654,6 +10378,36 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_ladder_ks_band_histcos": {
+   "value": 0.3677685950413223,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "non-local (all): share of M3r_histcos fits inside the KS band",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_ks_band_rew": {
+   "value": 0.3677685950413223,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "non-local (all): share of M1_rew fits inside the KS band",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_ladder_ks_band_reward_by_time": {
    "value": 0.9545454545454546,
    "kind": "fraction",
@@ -7684,6 +10438,186 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_ladder_ks_band_time_histcos": {
+   "value": 0.9628099173553719,
+   "kind": "fraction",
+   "style": "dec2",
+   "unit": "",
+   "description": "non-local (all): share of M6r_time_histcos fits inside the KS band",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_const": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M0_const",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_full": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M7r_time_histcos_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_histcos": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M3r_histcos",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_rew": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M1_rew",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_reward_by_time": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M9r_rew_x_time",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_time": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M5_time",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_ladder_sessions_time_histcos": {
+   "value": 242,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): sessions with a finite-AIC fit of M6r_time_histcos",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_marginal_reward_child_better_fraction_non_local": {
+   "value": 0.8388429752066116,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local (all): share of sessions in which M1_rew has the lower AIC than M0_const",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_marginal_reward_child_better_fraction_non_local_no_swr": {
+   "value": 0.49173553719008267,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local without SWR: share of sessions in which M1_rew has the lower AIC than M0_const",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_marginal_reward_child_better_fraction_non_local_swr": {
+   "value": 0.8264462809917356,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-local with SWR: share of sessions in which M1_rew has the lower AIC than M0_const",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_marginal_reward_child_better_fraction_swr": {
+   "value": 0.7851239669421488,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "detected SWR: share of sessions in which M1_rew has the lower AIC than M0_const",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
    "pending": null
   },
   "rate_marginal_reward_delta_aic_non_local": {
@@ -7814,12 +10748,132 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_raw_burst_peak_non_local": {
+   "value": 2.8285766415781852,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local (all): peak of the median self-history kernel of M3r_histcos (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
+  },
+  "rate_raw_burst_peak_non_local_no_swr": {
+   "value": 2.148244924271754,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: peak of the median self-history kernel of M3r_histcos (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
+  },
+  "rate_raw_burst_peak_non_local_swr": {
+   "value": 3.4866239018802645,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: peak of the median self-history kernel of M3r_histcos (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
+  },
+  "rate_raw_burst_peak_swr": {
+   "value": 4.182443142271717,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "rate ratio",
+   "description": "detected SWR: peak of the median self-history kernel of M3r_histcos (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
+  },
+  "rate_raw_immediate_session_non_local": {
+   "value": 30.30012047762476,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local (all): exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_raw_immediate_session_non_local_no_swr": {
+   "value": 11.866167592873792,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local without SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_raw_immediate_session_non_local_swr": {
+   "value": 125.39441245694366,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "non-local with SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
+  "rate_raw_immediate_session_swr": {
+   "value": 58.13361580859525,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "rate ratio",
+   "description": "detected SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl, Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl and Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl (rate.per_bin.*)",
+   "pending": null
+  },
   "rate_refractory_ms_non_local": {
    "value": 60.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "non-local (all): longest lag at which the median self-history kernel is below 1",
+   "description": "non-local (all): end of the first run of lags, from lag 1, at which the median self-history kernel is below 1",
    "claims": [
     "19c"
    ],
@@ -7828,14 +10882,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_refractory_ms_non_local_no_swr": {
    "value": 60.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "non-local without SWR: longest lag at which the median self-history kernel is below 1",
+   "description": "non-local without SWR: end of the first run of lags, from lag 1, at which the median self-history kernel is below 1",
    "claims": [
     "19c"
    ],
@@ -7844,14 +10898,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_refractory_ms_non_local_swr": {
    "value": 60.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "non-local with SWR: longest lag at which the median self-history kernel is below 1",
+   "description": "non-local with SWR: end of the first run of lags, from lag 1, at which the median self-history kernel is below 1",
    "claims": [
     "19c"
    ],
@@ -7860,14 +10914,14 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_refractory_ms_swr": {
    "value": 60.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "detected SWR: longest lag at which the median self-history kernel is below 1",
+   "description": "detected SWR: end of the first run of lags, from lag 1, at which the median self-history kernel is below 1",
    "claims": [
     "19c"
    ],
@@ -7876,7 +10930,7 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
-   "pending": null
+   "pending": "read over every session, as the producing summarizer (summarize_per_bin_rate_models.py) reads it, without the per-term separation gate; many sessions flag a hist_rcos term separated, and leaving them out moves the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
   },
   "rate_sessions": {
    "value": 242,
@@ -7910,12 +10964,92 @@
    "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
    "pending": null
   },
+  "rate_time_peak_edge_count": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "populations whose argmax of the median fitted M5_time time course, read on [1, 3] s sits on the interval's edge",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_edge_non_local": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): 1 if that argmax sits on the edge of [1, 3] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_edge_non_local_no_swr": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_edge_non_local_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_edge_swr": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: 1 if that argmax sits on the edge of [1, 3] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
   "rate_time_peak_s_high": {
-   "value": 3.0,
+   "value": 2.955,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "highest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s",
+   "description": "highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s",
    "claims": [
     "19c"
    ],
@@ -7931,7 +11065,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "lowest over the four populations: peak of the median fitted M5_time time course, read on [1, 3] s",
+   "description": "lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s",
    "claims": [
     "19c"
    ],
@@ -7947,7 +11081,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local (all): peak of the median fitted M5_time time course, read on [1, 3] s",
+   "description": "non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s",
    "claims": [
     "19c"
    ],
@@ -7963,7 +11097,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local without SWR: peak of the median fitted M5_time time course, read on [1, 3] s",
+   "description": "non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s; it sits on the interval's edge, so it bounds the peak rather than locating it",
    "claims": [
     "19c"
    ],
@@ -7979,7 +11113,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local with SWR: peak of the median fitted M5_time time course, read on [1, 3] s",
+   "description": "non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s",
    "claims": [
     "19c"
    ],
@@ -7995,7 +11129,71 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "detected SWR: peak of the median fitted M5_time time course, read on [1, 3] s",
+   "description": "detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_sessions_non_local": {
+   "value": 236,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local (all): unflagged session curves behind that median",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_sessions_non_local_no_swr": {
+   "value": 233,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local without SWR: unflagged session curves behind that median",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_sessions_non_local_swr": {
+   "value": 192,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "non-local with SWR: unflagged session curves behind that median",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_time_peak_sessions_swr": {
+   "value": 233,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "detected SWR: unflagged session curves behind that median",
    "claims": [
     "19c"
    ],
@@ -8581,7 +11779,7 @@
    "pending": null
   },
   "stop_duration_mean_ratio": {
-   "value": 3.508046907206202,
+   "value": 3.568758163709998,
    "kind": "quantity",
    "style": "sig2",
    "unit": "ratio",
@@ -8592,37 +11790,112 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet",
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
    "pending": null
   },
   "stop_duration_mean_rewarded": {
-   "value": 1.8266239603326637,
+   "value": 2.155194523433844,
    "kind": "quantity",
    "style": "sig2",
    "unit": "s",
-   "description": "mean immobility duration of rewarded-outcome stops",
+   "description": "well-anchored stops with a rewarded outcome: mean immobility duration",
    "claims": [
     "19c"
    ],
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet",
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
    "pending": null
   },
   "stop_duration_mean_unrewarded": {
-   "value": 0.5206954207426439,
+   "value": 0.6039060156414057,
    "kind": "quantity",
    "style": "sig2",
    "unit": "s",
-   "description": "mean immobility duration of unrewarded-outcome stops",
+   "description": "well-anchored stops with an omitted outcome: mean immobility duration",
    "claims": [
     "19c"
    ],
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet",
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stop_duration_median_ratio": {
+   "value": 3.56337948357178,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "ratio",
+   "description": "ratio of those medians",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stop_duration_median_rewarded": {
+   "value": 1.011999487876892,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "s",
+   "description": "well-anchored stops with a rewarded outcome: median immobility duration",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stop_duration_median_unrewarded": {
+   "value": 0.2839999198913574,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "s",
+   "description": "well-anchored stops with an omitted outcome: median immobility duration",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stop_survival_four_s": {
+   "value": 0.14348011970927746,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of well-anchored stops still immobile at 4 s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stop_survival_two_s": {
+   "value": 0.24912355707567335,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of well-anchored stops still immobile at 2 s",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
    "pending": null
   },
   "stops_at_well_with_stay": {
@@ -8638,6 +11911,36 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet",
+   "pending": null
+  },
+  "stops_crossing_outcome": {
+   "value": 16353,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "stops with stop_start < outcome_known_time_s <= stop_end (all stops)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stops_crossing_outcome_fraction": {
+   "value": 0.1359125664893617,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "their share of all stops",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
    "pending": null
   },
   "stops_dropped": {
@@ -8670,6 +11973,21 @@
    "source": "Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet",
    "pending": null
   },
+  "stops_in_transit": {
+   "value": 25768,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "in-transit stops in the canonical stop table",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
   "stops_mixed": {
    "value": 16061,
    "kind": "count",
@@ -8698,6 +12016,81 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet",
+   "pending": null
+  },
+  "stops_outcome_shifted": {
+   "value": 16066,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stops_outcome_shifted_fraction": {
+   "value": 0.13352726063829787,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "their share of all stops",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stops_reward_history_incomplete_fraction": {
+   "value": 0.013164893617021277,
+   "kind": "fraction",
+   "style": "sig2",
+   "unit": "",
+   "description": "share of stops flagged reward_history_incomplete (fewer than two known outcomes)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stops_spanning_arrival": {
+   "value": 185,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "stops containing a later well arrival",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
+   "pending": null
+  },
+  "stops_spanning_arrival_crossing": {
+   "value": 0,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "of those, stops that also cross their outcome boundary",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet",
    "pending": null
   },
   "stops_total": {
@@ -9909,6 +13302,51 @@
    ],
    "source": "Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited.pkl (audited aggregate)",
    "pending": null
+  },
+  "trunk_share_mean_non_swr": {
+   "value": 0.16652963134275575,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "mean share of a non-SWR event's posterior mass on trunk arms",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/_trunk_zscore_per_event.pkl (exploratory)",
+   "pending": "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it"
+  },
+  "trunk_share_mean_swr": {
+   "value": 0.36313854414268687,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "mean share of an SWR event's posterior mass on trunk arms",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/_trunk_zscore_per_event.pkl (exploratory)",
+   "pending": "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it"
+  },
+  "trunk_share_ratio": {
+   "value": 2.1806242001176677,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "ratio",
+   "description": "ratio of those means",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "docs: replay_rate_content_swr_synthesis"
+   ],
+   "source": "Processed-Data/replay_content/_trunk_zscore_per_event.pkl (exploratory)",
+   "pending": "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it"
   },
   "update_current_all": {
    "value": 0.24314095285533346,

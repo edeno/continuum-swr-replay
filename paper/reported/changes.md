@@ -1079,3 +1079,383 @@ marker, and the computed value now there. Newest last.
 | Doc | Key | Was | Now |
 |---|---|---|---|
 | `paper/claims_table.md` | `part2.end_offset_median_ms` | -4 | −4 |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/per_bin_rate_results.md` | `part3.rate_sessions` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.stops_well_anchored` | 84,069 | 93,560 |
+| `docs/per_bin_rate_results.md` | `part3.stops_total` | 107,400 | 120,320 |
+| `docs/per_bin_rate_results.md` | `part3.rate_stops` | 83,549 | 92,942 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bins` | 6,777,953 | 7,535,050 |
+| `docs/per_bin_rate_results.md` | `part3.rate_intransit_sessions` | 50 | 52 |
+| `docs/per_bin_rate_results.md` | `part3.rate_sessions` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_swr` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_non_local` | 217 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_non_local_swr` | 216 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_non_local_no_swr` | 218 | 240 |
+| `docs/per_bin_rate_results.md` | `part3.stops_outcome_shifted_fraction` | 13.4 % | 13 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_sessions` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_non_local` | 0.407 | 0.43 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_lower_quartile_non_local` | 0.319 | 0.32 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_upper_quartile_non_local` | 0.534 | 0.56 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_swr` | 0.289 | 0.27 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_lower_quartile_swr` | 0.223 | 0.23 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_upper_quartile_swr` | 0.346 | 0.31 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_non_local_no_swr` | 0.225 | 0.22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_lower_quartile_non_local_no_swr` | 0.156 | 0.15 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_upper_quartile_non_local_no_swr` | 0.286 | 0.30 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_non_local_swr` | 0.184 | 0.21 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_lower_quartile_non_local_swr` | 0.137 | 0.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_upper_quartile_non_local_swr` | 0.249 | 0.26 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_coupled_to_no_swr` | 0.83 | 0.98 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_coupled_to_no_swr_p` | 5.1e-09 | 0.30 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_to_non_local_p` | 1.3e-24 | 6.3e-39 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_coupled_to_swr` | 0.75 | 0.80 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_coupled_to_swr_p` | 9.6e-37 | 3.0e-41 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_no_swr_to_swr` | 0.81 | 0.77 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_no_swr_to_swr_p` | 2.4e-09 | 8.3e-11 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_non_local_swr` | 0.184 | 0.21 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_non_local_no_swr` | 0.225 | 0.22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_non_local` | 0.407 | 0.43 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_coupled_to_swr` | 0.75 | 0.80 |
+| `docs/per_bin_rate_results.md` | `part3.rate_baseline_ratio_swr_coupled_to_non_local` | 0.45 | 0.49 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_s_swr` | 2.63 | 2.62 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_s_non_local` | 2.82 | 2.96 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_s_non_local_swr` | 2.31 | 2.48 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_s_non_local_no_swr` | 2.68 | 3.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_sessions_swr` | … | 233 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_sessions_non_local` | … | 236 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_sessions_non_local_swr` | … | 192 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_sessions_non_local_no_swr` | … | 233 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_edge_count` | … | 1 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_time_peak_edge_count` | … | 1 |
+| `docs/per_bin_rate_results.md` | `part3.stop_duration_mean_rewarded` | 1.858 | 2.2 |
+| `docs/per_bin_rate_results.md` | `part3.stop_duration_mean_unrewarded` | 0.519 | 0.60 |
+| `docs/per_bin_rate_results.md` | `part3.stop_duration_median_ratio` | 2.3 | 3.6 |
+| `docs/per_bin_rate_results.md` | `part3.stop_duration_median_rewarded` | 0.518 | 1.0 |
+| `docs/per_bin_rate_results.md` | `part3.stop_duration_median_unrewarded` | 0.228 | 0.28 |
+| `docs/per_bin_rate_results.md` | `part3.stop_survival_two_s` | 20 % | 25 % |
+| `docs/per_bin_rate_results.md` | `part3.stop_survival_four_s` | 12 % | 14 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_s_low` | 2.31 | 2.48 |
+| `docs/per_bin_rate_results.md` | `part3.rate_time_peak_s_high` | 2.82 | 2.96 |
+| `docs/per_bin_rate_results.md` | `part3.rate_arrival_peak_s_low` | 2.80 | 2.94 |
+| `docs/per_bin_rate_results.md` | `part3.rate_arrival_peak_s_high` | 3.80 | 4.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_clock_ks_low` | 0.06 | 0.08 |
+| `docs/per_bin_rate_results.md` | `part3.rate_clock_ks_high` | 0.11 | 0.09 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_time_peak_s_low` | 2.2 | 2.57 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_time_peak_s_high` | 3.0 | 2.98 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_arrival_peak_s_low` | 3.0 | 2.91 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_arrival_peak_s_high` | 3.6 | 5.73 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_clock_ks_low` | 0.06 | 0.08 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_clock_ks_high` | 0.12 | 0.09 |
+| `docs/per_bin_rate_results.md` | `part3.rate_arrival_separated_fraction_low` | 42.9 % | 58 |
+| `docs/per_bin_rate_results.md` | `part3.rate_arrival_separated_fraction_high` | 63.6 % | 63 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_arrival_event_share_non_local_no_swr` | 88.9 % | 88 |
+| `docs/per_bin_rate_results.md` | `part3.rate_arrival_event_share_swr` | 94.3 % | 95 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_arrival_event_share_non_local_no_swr` | 81.4 % | 81 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_arrival_event_share_swr` | 91.2 % | 91 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_immediate_session_swr` | 20.0 | 58 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_swr` | 3.44 | 6.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_positive_fraction_swr` | 76 % | 83 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_p_swr` | 3.5e-19 | 7.9e-28 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_swr` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_immediate_session_non_local` | 32.4 | 30 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_non_local` | 3.44 | 3.3 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_positive_fraction_non_local` | 81 % | 79 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_p_non_local` | 3.0e-21 | 1.3e-22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_non_local` | 217 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_immediate_session_non_local_swr` | 99.5 | 130 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_non_local_swr` | 7.18 | 9.9 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_positive_fraction_non_local_swr` | 85 % | 87 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_p_non_local_swr` | 1.3e-26 | 8.0e-33 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_non_local_swr` | 216 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_immediate_session_non_local_no_swr` | 18.8 | 12 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_non_local_no_swr` | 2.00 | 1.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_positive_fraction_non_local_no_swr` | 66 % | 58 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_p_non_local_no_swr` | 3.1e-06 | 0.0026 |
+| `docs/per_bin_rate_results.md` | `part3.rate_full_sessions_non_local_no_swr` | 218 | 240 |
+| `docs/per_bin_rate_results.md` | `part3.rate_paired_positive_fraction` | 69.4 % | 77 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_paired_p` | 1.1e-11 | 1.1e-19 |
+| `docs/per_bin_rate_results.md` | `part3.rate_paired_sessions` | 216 | 240 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_non_local_no_swr` | 2.00 | 1.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_session_p_non_local_no_swr` | 3.1e-06 | 0.0026 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_immediate_session_no_swr` | 1.24 | 0.83 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_immediate_session_p_no_swr` | 0.22 | 0.74 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_immediate_session_animals_no_swr` | 4 | 3 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_ratio_swr_to_no_swr` | 3.6 | 7.0 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_animal_swr` | 4.91 | 5.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_animal_non_local` | 2.96 | 2.9 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_animal_non_local_swr` | 6.86 | 8.8 |
+| `docs/per_bin_rate_results.md` | `part3.rate_immediate_animal_non_local_no_swr` | 2.28 | 1.2 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_session_swr` | 0.05 | 0.021 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_positive_fraction_swr` | 21 % | 14 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_session_swr` | 5.39 | 7.7 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_positive_fraction_swr` | 72 % | 80 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_session_non_local` | 0.04 | 0.050 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_positive_fraction_non_local` | 17 % | 18 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_session_non_local` | 5.19 | 5.2 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_session_non_local_swr` | 0.01 | 0.0065 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_positive_fraction_non_local_swr` | 15 % | 13 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_session_non_local_swr` | 13.84 | 15 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_positive_fraction_non_local_swr` | 80 % | 83 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_session_non_local_no_swr` | 0.08 | 0.17 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_positive_fraction_non_local_no_swr` | 31 % | 35 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_session_non_local_no_swr` | 3.29 | 2.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_two_positive_fraction_non_local_no_swr` | 67 % | 61 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_swr` | 1.23 | 1.38 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_two_swr` | 0.99 | 1.04 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_five_swr` | 0.91 | 0.90 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_ten_swr` | 1.03 | 1.04 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local` | 1.21 | 1.19 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_three_non_local` | 0.92 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_four_non_local` | 0.90 | 0.91 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_six_non_local` | 0.92 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_seven_non_local` | 0.94 | 0.95 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_nine_non_local` | 1.00 | 1.01 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.41 | 1.51 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_two_non_local_swr` | 1.05 | 1.07 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_three_non_local_swr` | 0.93 | 0.94 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_five_non_local_swr` | 0.90 | 0.89 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_seven_non_local_swr` | 0.94 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_ten_non_local_swr` | 1.06 | 1.07 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.09 | 1.01 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_three_non_local_no_swr` | 0.92 | 0.94 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_four_non_local_no_swr` | 0.91 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_five_non_local_no_swr` | 0.92 | 0.94 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_six_non_local_no_swr` | 0.93 | 0.96 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_seven_non_local_no_swr` | 0.95 | 0.97 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_eight_non_local_no_swr` | 0.97 | 0.98 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_nine_non_local_no_swr` | 0.98 | 1.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_ten_non_local_no_swr` | 1.00 | 1.01 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.41 | 1.51 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.09 | 1.01 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_late_min_high` | 0.97 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_kernel_lag_one_no_swr` | 0.99 | 0.95 |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_separated_fraction_non_local` | … | 28 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_separated_fraction_non_local_swr` | … | 42 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_swr` | 2.59 | 2.67 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_lag_ms_swr` | 135 | 105 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_gated_swr` | … | 2.81 |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_sessions_swr` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_non_local` | 2.02 | 1.95 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_gated_non_local` | … | 1.92 |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_sessions_non_local` | 217 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_refractory_ms_non_local_swr` | 45 | 60 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_non_local_swr` | 2.43 | 1.98 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_lag_ms_non_local_swr` | 150 | 120 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_gated_non_local_swr` | … | 2.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_sessions_non_local_swr` | 216 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_non_local_no_swr` | 1.57 | 1.56 |
+| `docs/per_bin_rate_results.md` | `part3.rate_burst_peak_gated_non_local_no_swr` | … | 1.86 |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_sessions_non_local_no_swr` | 218 | 240 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_burst_peak_swr` | 3.45 | 4.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_burst_peak_non_local` | 3.02 | 2.83 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_burst_peak_non_local_swr` | 4.04 | 3.49 |
+| `docs/per_bin_rate_results.md` | `part3.rate_raw_burst_peak_non_local_no_swr` | 2.18 | 2.15 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_const` | 2172 | 2227 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_const` | 0.000 | 0.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_const` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_const` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_const` | 0.44 | 0.45 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_rew` | 2159 | 2221 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_rew` | 0.032 | 0.02 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_rew` | 214 | 238 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_rew` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_rew` | 0.38 | 0.37 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_time` | 2083 | 2138 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_time` | 0.266 | 0.24 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_time` | 208 | 226 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_time` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_time` | 0.91 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_histcos` | 2165 | 2207 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_histcos` | 0.044 | 0.05 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_histcos` | 75 | 67 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_histcos` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_histcos` | 0.33 | 0.37 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_time_histcos` | 2078 | 2128 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_time_histcos` | 0.262 | 0.22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_time_histcos` | 73 | 62 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_time_histcos` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_time_histcos` | 0.91 | 0.96 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_full` | 2077 | 2128 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_full` | 0.244 | 0.22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_full` | 74 | 61 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_full` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_full` | 0.93 | 0.96 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_reward_by_time` | 2083 | 2133 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_reward_by_time` | 0.200 | 0.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_reward_by_time` | 43 | 40 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_reward_by_time` | … | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_reward_by_time` | 0.91 | 0.95 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_const` | 0.44 | 0.45 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_time` | 0.91 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_rew` | 0.38 | 0.37 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_ks_band_histcos` | 0.33 | 0.37 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_time` | 0.266 | 0.24 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_time` | 208 | 226 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_sessions_time` | 218 | 242 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_time_histcos` | 0.262 | 0.22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_time_histcos` | 73 | 62 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_full` | 0.244 | 0.22 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_full` | 74 | 61 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_reward_by_time` | 0.200 | 0.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_reward_by_time` | 43 | 40 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_histcos` | 0.044 | 0.05 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_sessions_histcos` | 75 | 67 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_full` | 2077 | 2128 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_time_histcos` | 2078 | 2128 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_time` | 2083 | 2138 |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_delta_aic_swr` | −3.23 | −6.8 |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_delta_aic_non_local` | −8.18 | −7.8 |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_delta_aic_non_local_swr` | −3.96 | −5.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_delta_aic_non_local_no_swr` | −0.75 | +0.089 |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_child_better_fraction_swr` | … | 79 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_child_better_fraction_non_local` | … | 84 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_child_better_fraction_non_local_swr` | … | 83 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_marginal_reward_child_better_fraction_non_local_no_swr` | 58.3 % | 49 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_marginal_reward_delta_aic_non_local_no_swr` | +0.14 | +0.65 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_marginal_reward_child_better_fraction_non_local_no_swr` | 48.2 % | 44 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_conditional_reward_delta_aic_swr` | +1.58 | +0.94 |
+| `docs/per_bin_rate_results.md` | `part3.rate_conditional_reward_delta_aic_non_local` | +1.19 | +1.0 |
+| `docs/per_bin_rate_results.md` | `part3.rate_conditional_reward_delta_aic_non_local_swr` | +2.41 | +1.6 |
+| `docs/per_bin_rate_results.md` | `part3.rate_conditional_reward_delta_aic_non_local_no_swr` | +2.28 | +2.4 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_reward_by_time` | 2083 | 2133 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_aic_full` | 2077 | 2128 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_reward_by_time` | 0.200 | 0.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_ladder_cv_bits_full` | 0.244 | 0.22 |
+| `docs/rate_models.md` | `part3.stops_reward_history_incomplete_fraction` | 0.01296 | 0.013 |
+| `docs/rate_models.md` | `part3.onsets_reward_history_incomplete_fraction_non_local` | 0.01576 | 0.015 |
+| `docs/rate_models.md` | `part3.stops_in_transit` | 22,850 | 25,768 |
+| `docs/rate_models.md` | `part3.rate_arrival_const_sessions_swr` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_arrival_const_sessions_non_local` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_arrival_const_sessions_non_local_swr` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_arrival_const_sessions_non_local_no_swr` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_arrival_time_sessions_swr` | 212 | 233 |
+| `docs/rate_models.md` | `part3.rate_arrival_time_sessions_non_local` | 213 | 237 |
+| `docs/rate_models.md` | `part3.rate_arrival_time_sessions_non_local_swr` | 206 | 222 |
+| `docs/rate_models.md` | `part3.rate_arrival_time_sessions_non_local_no_swr` | 212 | 236 |
+| `docs/rate_models.md` | `part3.rate_arrival_full_sessions_swr` | 206 | 231 |
+| `docs/rate_models.md` | `part3.rate_arrival_full_sessions_non_local` | 216 | 234 |
+| `docs/rate_models.md` | `part3.rate_arrival_full_sessions_non_local_swr` | 200 | 219 |
+| `docs/rate_models.md` | `part3.rate_arrival_full_sessions_non_local_no_swr` | 210 | 233 |
+| `docs/rate_models.md` | `part3.rate_time_peak_edge_count` | … | 1 |
+| `docs/rate_models.md` | `part3.rate_arrival_peak_edge_count` | … | 0 |
+| `docs/rate_models.md` | `part3.rate_time_peak_s_high` | 3.00 | 2.96 |
+| `docs/rate_models.md` | `part3.rate_allstops_time_peak_s_high` | 3.00 | 2.98 |
+| `docs/rate_models.md` | `part3.rate_arrival_peak_sessions_swr` | … | 86 |
+| `docs/rate_models.md` | `part3.rate_arrival_peak_sessions_non_local` | … | 99 |
+| `docs/rate_models.md` | `part3.rate_arrival_peak_sessions_non_local_swr` | … | 83 |
+| `docs/rate_models.md` | `part3.rate_arrival_peak_sessions_non_local_no_swr` | … | 96 |
+| `docs/rate_models.md` | `part3.rate_allstops_arrival_bins_dropped` | 84,502 | 92,849 |
+| `docs/rate_models.md` | `part3.rate_allstops_arrival_bins_before` | 7,400,248 | 8,230,251 |
+| `docs/rate_models.md` | `part3.rate_allstops_arrival_bins_dropped_fraction` | 1.14 % | 1 % |
+| `docs/rate_models.md` | `part3.rate_allstops_arrival_stops_dropped` | 1,322 | 1,509 |
+| `docs/rate_models.md` | `part3.rate_allstops_arrival_window_bins` | 6,618,107 | 7,374,525 |
+| `docs/rate_models.md` | `part3.rate_allstops_frozen_bins` | 7,315,746 | 8,137,402 |
+| `docs/rate_models.md` | `part3.rate_allstops_arrival_window_fraction` | 90.5 % | 91 % |
+| `docs/rate_models.md` | `part3.rate_intransit_arrival_event_share_low` | 0.17 | 0.18 |
+| `docs/rate_models.md` | `part3.rate_intransit_arrival_event_share_high` | 0.35 | 0.37 |
+| `docs/rate_models.md` | `part3.rate_arrival_time_cv_nan_fraction_non_local` | 91.5 % | 92 % |
+| `docs/rate_models.md` | `part3.rate_arrival_full_cv_nan_fraction_non_local` | 93.5 % | 95 % |
+| `docs/rate_models.md` | `part3.rate_arrival_time_cv_nan_fraction_non_local_swr` | 99.5 % | 100 % |
+| `docs/rate_models.md` | `part3.stops_crossing_outcome_fraction` | 13.5 % | 14 % |
+| `docs/rate_models.md` | `part3.stops_crossing_outcome` | 14,494 | 16,353 |
+| `docs/rate_models.md` | `part3.stops_total` | 107,400 | 120,320 |
+| `docs/rate_models.md` | `part3.stops_outcome_shifted_fraction` | 13.4 % | 13 % |
+| `docs/rate_models.md` | `part3.stops_outcome_shifted` | 14,343 | 16,066 |
+| `docs/rate_models.md` | `part3.stops_spanning_arrival` | 173 | 185 |
+| `docs/rate_models.md` | `part3.stops_spanning_arrival_crossing` | none | 0 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_animal_non_local` | −5.97 | −4.3 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_session_non_local` | −5.37 | −4.2 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_animal_non_local_swr` | −2.10 | −2.6 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_session_non_local_swr` | −1.79 | −3.1 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_animal_swr` | −1.30 | −2.7 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_session_swr` | −2.43 | −4.3 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_animal_non_local_no_swr` | −0.07 | +0.88 |
+| `docs/rate_models.md` | `part3.per_stop_delta_aic_session_non_local_no_swr` | −0.44 | +0.88 |
+| `docs/rate_models.md` | `part3.per_stop_sessions_non_local` | 217 | 241 |
+| `docs/rate_models.md` | `part3.per_stop_child_better_fraction_non_local` | 76.0 % | 74 % |
+| `docs/rate_models.md` | `part3.per_stop_child_better_fraction_non_local_no_swr` | 52.1 % | 46 % |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.41 | 1.51 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.09 | 1.01 |
+| `docs/rate_models.md` | `part3.rate_paired_positive_fraction` | 69.4 % | 77 % |
+| `docs/rate_models.md` | `part3.rate_paired_sessions` | 216 | 240 |
+| `docs/rate_models.md` | `part3.rate_paired_p` | 1.1e-11 | 1.1e-19 |
+| `docs/rate_models.md` | `part3.rate_allstops_paired_positive_fraction` | 79.2 % | 83 % |
+| `docs/rate_models.md` | `part3.rate_allstops_paired_p` | 7.8e-22 | 4.6e-26 |
+| `docs/rate_models.md` | `part3.rate_immediate_session_non_local_no_swr` | … | 1.4 |
+| `docs/rate_models.md` | `part3.rate_immediate_session_p_non_local_no_swr` | … | 0.0026 |
+| `docs/rate_models.md` | `part3.rate_contrast_expanded_separated_low` | 172 | 193 |
+| `docs/rate_models.md` | `part3.rate_contrast_expanded_separated_high` | 186 | 206 |
+| `docs/rate_models.md` | `part3.rate_contrast_expanded_fits_low` | 211 | 235 |
+| `docs/rate_models.md` | `part3.rate_contrast_expanded_fits_high` | 216 | 240 |
+| `docs/rate_models.md` | `part3.rate_contrast_expanded_flagged_low` | 151 | 173 |
+| `docs/rate_models.md` | `part3.rate_contrast_expanded_flagged_high` | 181 | 196 |
+| `docs/rate_models.md` | `part3.rate_contrast_plain_flagged` | 44 | 0 |
+| `docs/rate_models.md` | `part3.rate_contrast_plain_fits` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_contrast_most_dropped` | 22 | 23 |
+| `docs/rate_models.md` | `part3.rate_contrast_most_dropped_of` | 212 | 236 |
+| `docs/rate_models.md` | `part3.per_stop_cv_finite_fraction_full` | 83.5 % | 52 % |
+| `docs/rate_models.md` | `part3.rate_sessions` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_ladder_ks_band_const` | 0.44 | 0.45 |
+| `docs/rate_models.md` | `part3.rate_ladder_ks_band_rew` | 0.38 | 0.37 |
+| `docs/rate_models.md` | `part3.rate_ladder_ks_band_histcos` | 0.33 | 0.37 |
+| `docs/rate_models.md` | `part3.rate_ladder_ks_band_time` | 0.91 | 0.93 |
+| `docs/rate_models.md` | `part3.rate_ladder_ks_band_time_histcos` | 0.91 | 0.96 |
+| `docs/rate_models.md` | `part3.rate_ladder_ks_band_full` | 0.93 | 0.96 |
+| `docs/rate_models.md` | `part3.rate_bin_count_non_local_swr` | 0.003 | 0.0032 |
+| `docs/rate_models.md` | `part3.rate_bin_count_non_local` | 0.006 | 0.0065 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_bits_time` | 0.266 | 0.24 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_sessions_time` | 208 | 226 |
+| `docs/rate_models.md` | `part3.rate_ladder_sessions_time` | 218 | 242 |
+| `docs/rate_models.md` | `part3.rate_ladder_aic_time` | 2083 | 2138 |
+| `docs/rate_models.md` | `part3.rate_ladder_aic_full` | 2077 | 2128 |
+| `docs/rate_models.md` | `part3.rate_ladder_aic_time_histcos` | 2078 | 2128 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_bits_time_histcos` | 0.262 | 0.22 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_bits_full` | … | 0.22 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_bits_reward_by_time` | 0.200 | 0.18 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_sessions_time_histcos` | … | 62 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_sessions_full` | … | 61 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_sessions_reward_by_time` | … | 40 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_bits_histcos` | 0.044 | 0.05 |
+| `docs/rate_models.md` | `part3.rate_ladder_cv_sessions_histcos` | 75 | 67 |
+| `docs/rate_models.md` | `part3.rate_marginal_reward_delta_aic_non_local` | −8.18 | −7.8 |
+| `docs/rate_models.md` | `part3.rate_marginal_reward_delta_aic_non_local_swr` | −3.96 | −5.4 |
+| `docs/rate_models.md` | `part3.rate_marginal_reward_delta_aic_swr` | −3.23 | −6.8 |
+| `docs/rate_models.md` | `part3.rate_marginal_reward_delta_aic_non_local_no_swr` | −0.75 | +0.089 |
+| `docs/rate_models.md` | `part3.rate_marginal_reward_child_better_fraction_non_local_no_swr` | 58.3 % | 49 % |
+| `docs/rate_models.md` | `part3.rate_conditional_reward_delta_aic_swr` | +1.58 | +0.94 |
+| `docs/rate_models.md` | `part3.rate_conditional_reward_delta_aic_non_local` | +1.19 | +1.0 |
+| `docs/rate_models.md` | `part3.rate_conditional_reward_delta_aic_non_local_swr` | +2.41 | +1.6 |
+| `docs/rate_models.md` | `part3.rate_conditional_reward_delta_aic_non_local_no_swr` | +2.28 | +2.4 |
+| `docs/rate_models.md` | `part3.onsets_within_tmax_fraction_non_local` | 79.7 % | 79 % |
+| `docs/rate_models.md` | `part3.onset_median_s_non_local` | 2.39 | 2.4 |
+| `docs/rate_models.md` | `part3.onsets_within_tmax_fraction_swr` | 82.2 % | 80 % |
+| `docs/rate_models.md` | `part3.onsets_within_tmax_fraction_mua` | 79.4 % | 79 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.dm_swr_armvalue_total` | … | −0.46 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.dm_swr_armuncert_direct` | … | −0.070 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.swr_armvalue_total` | … | −0.25 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.swr_armuncert_direct` | … | −0.058 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_time_peak_edge_count` | … | 1 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_time_peak_edge_count` | … | 1 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_arrival_peak_edge_count` | … | 0 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_allstops_time_peak_edge_count` | … | 1 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_allstops_arrival_peak_edge_count` | … | 0 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_time_peak_s_high` | 3.00 | 2.96 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_allstops_time_peak_s_high` | 3.00 | 2.98 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.swr_patch_current_direct` | … | +0.015 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.swr_patch_current_direct_animals_positive` | … | 3 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.swr_patch_current_direct_q` | … | 0.0016 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.entropy_current_swr` | … | −0.14 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.entropy_current_swr_animals_positive` | … | 0 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.entropy_current_swr_q` | … | 0.023 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.trunk_share_mean_swr` | … | 36 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.trunk_share_mean_non_swr` | … | 17 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.trunk_share_ratio` | 3.55 | 2.2 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_time_peak_s_low` | … | 2.48 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_time_peak_s_high` | … | 2.96 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.stop_duration_mean_ratio` | 3.5 | 3.6 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.stop_duration_mean_rewarded` | 1.8 | 2.2 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.stop_duration_mean_unrewarded` | 0.52 | 0.60 |
