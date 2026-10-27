@@ -80,6 +80,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     self_history_rate_ratios,
 )
 from continuum_swr_replay.paths import (
+    CANONICAL_TABLE_BASENAMES,
     ROOT_DIR,
     model_dir,
     replay_content_dir,
@@ -1662,6 +1663,53 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
         )
         for cohort in ("primary", "post_outcome")
     ]
+    expanded = contrast[contrast["model"].str.match(r"S([2-9]|10)_")]
+    per_rung = expanded.groupby("model").agg(
+        fits=("separated", "size"),
+        separated=("separated", lambda x: int((x == True).sum())),  # noqa: E712
+        flagged=(
+            "separated_terms",
+            lambda x: int(
+                x.map(lambda v: isinstance(v, str) and term in v.split("|")).sum()
+            ),
+        ),
+    )
+    plain = contrast[contrast["model"] == "S1_rew"]
+    plain_flag = plain["separated_terms"].map(
+        lambda v: isinstance(v, str) and "reward_history_rcos_1" in v.split("|")
+    )
+    for column, what in (
+        ("fits", "fits"),
+        ("separated", "fits flagged separated"),
+        ("flagged", f"fits flagging {term}"),
+    ):
+        for end, pick in (("low", "min"), ("high", "max")):
+            values.append(
+                make(
+                    f"rate_contrast_expanded_{column}_{end}",
+                    getattr(per_rung[column], pick)(),
+                    "count",
+                    "count",
+                    f"{'fewest' if end == 'low' else 'most'} {what} over the contrast "
+                    "rungs carrying an is_swr reward expansion (S2-S10)",
+                )
+            )
+    values += [
+        make(
+            "rate_contrast_plain_fits",
+            len(plain),
+            "count",
+            "count",
+            "S1_rew contrast fits",
+        ),
+        make(
+            "rate_contrast_plain_flagged",
+            plain_flag.sum(),
+            "count",
+            "count",
+            "S1_rew contrast fits flagging reward_history_rcos_1 separated",
+        ),
+    ]
     values.append(
         make(
             "rate_contrast_term_separated_fraction",
@@ -1672,6 +1720,44 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
         )
     )
     return values
+
+
+def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value]:
+    """The is_swr-contrast rate ladder's audited aggregate: how many rows it
+    publishes, and how many sessions its key contrast terms lose to the gate."""
+    make = _value_factory(source, ("19c",), ("docs: rate_models",))
+    key = audited[audited["population"] == "contrast"]
+    worst = key.loc[key["n_dropped"].idxmax()]
+    return [
+        make(
+            "rate_contrast_audited_rows",
+            len(audited),
+            "count",
+            "count",
+            "rows the audited is_swr-contrast rate aggregate publishes",
+        ),
+        make(
+            "rate_contrast_terms_losing_sessions",
+            (key["n_dropped"] > 0).sum(),
+            "count",
+            "count",
+            "key is_swr contrast terms that lose any session to the per-term gate",
+        ),
+        make(
+            "rate_contrast_most_dropped",
+            worst["n_dropped"],
+            "count",
+            "count",
+            f"most sessions a key contrast term loses to the gate ({worst['model']} {worst['term']})",
+        ),
+        make(
+            "rate_contrast_most_dropped_of",
+            worst["n_dropped"] + worst["n_sessions"],
+            "count",
+            "count",
+            f"sessions fit for that term ({worst['model']})",
+        ),
+    ]
 
 
 def cohort_audit_values(inputs: Part3Inputs) -> list[Value]:
@@ -1738,7 +1824,16 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
     _require(
         set(fits["stop_cohort"]) == {"at_well"}, "per-stop fit is not the at_well one"
     )
-    values = []
+    r1 = fits[fits["model"] == "R1"]
+    values = [
+        make(
+            "per_stop_cv_finite_fraction_full",
+            r1["cv_ll_per_stop_mean"].notna().mean(),
+            "fraction",
+            "pct",
+            "share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean",
+        ),
+    ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
         sub = fits[fits["outcome"] == outcome]
         a = sub.loc[sub["model"] == "R1", SC + ["aic", "n_stops"]]
@@ -2453,7 +2548,14 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
 def _check_fresh(artifact: Path) -> None:
     """Refuse a fit whose provenance sidecar says a table it read has changed."""
     recorded = json.loads(fit_provenance_path(artifact).read_text())["inputs"]
-    inputs = {name: table_path(name, replay_content_dir()) for name in recorded}
+    inputs = {
+        name: (
+            table_path(name, replay_content_dir())
+            if name in CANONICAL_TABLE_BASENAMES
+            else artifact.with_name(f"{name}.pkl")  # an upstream fit beside it
+        )
+        for name in recorded
+    }
     stale = check_fit_provenance(artifact, inputs)
     if stale:
         raise ValueError(f"{artifact}: stale against {stale}; refit before summarizing")
@@ -2482,6 +2584,15 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     for artifact in rate_fits:
         _check_fresh(artifact)
+    contrast_audited = inputs.rate_contrast.with_name("swr_contrast_rate_audited.pkl")
+    _check_fresh(contrast_audited)
+    summary.add(
+        *rate_contrast_audit_values(
+            pd.read_pickle(contrast_audited),
+            f"{rel(contrast_audited)} (rate.swr_contrast.at_well)",
+        )
+    )
+    record(contrast_audited)
     summary.add(
         *rate_contrast_separation_values(
             pd.read_pickle(inputs.rate_contrast),
