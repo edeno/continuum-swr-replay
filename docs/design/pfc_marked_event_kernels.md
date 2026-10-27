@@ -32,6 +32,14 @@ typical content and typical duration in that class, while the content kernel
 is the lag-by-lag change in log firing rate per within-session/class SD of
 current-arm content.
 
+Since bundle contract 2 the design also carries unpenalised per-stop baseline
+columns after the intercept -- a well indicator per kept well other than the
+reference well, `rewarded_outcome` and `outcome_unknown`
+(`marked_glm.build_baseline_columns`; `--no-baseline` drops them) -- so the
+ordinary kernel is the response at the reference well after an unrewarded,
+known outcome, and stationary rate differences between stops are not read as
+event-locked effects.
+
 The fit uses the same 500 Hz axis, ±250 ms spline support, ±200 ms reporting
 window, at-well stop cohort, ridge-Poisson estimator, and support-separated
 blocked folds as the canonical PFC analysis. The session is assembled by the

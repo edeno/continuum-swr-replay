@@ -344,7 +344,9 @@ them importable.
   the epoch register's analysed epochs), `--gpu` / `--allow-cpu`, `--output-dir`
   (default `pfc_marked_kernels/` under the processed-data root) and `--overwrite`
   with the canonical runner. It has no `--stop-cohort`: it always fits the
-  well-anchored cohort. **No bundle has been produced yet.**
+  well-anchored cohort. `--no-baseline` drops the per-stop well and
+  reward-outcome baseline columns (bundle contract 2 carries them by default).
+  **No bundle has been produced yet.**
 - `run_pfc_marked_model_family.py` fits the recommended descriptive extension
   without decoding mPFC activity or computing p-values. Its nine default core
   families jointly characterize spatial role, content-weighted uncertainty and
@@ -360,16 +362,30 @@ them importable.
   the measured single-mark memory workload. It supports the same session/GPU,
   penalty, fold, output, overwrite, and event-arm-table options as the
   single-mark runner plus `--event-table`, `--mark-penalty-sigma` and
-  `--min-marked-events` (default 10 per class). Output goes to
-  `pfc_marked_model_family/` under the processed-data root; the bundles there are
-  the 71-session corpus of 2026-09-19
-  (`.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md`), fit before the
-  analysed-time rule.
+  `--min-marked-events` (default 10 per class), and `--no-baseline` (drop the
+  per-stop well and reward-outcome baseline columns). `--model-set followup`
+  fits the follow-up models instead (replay content, event strength, stop
+  context, ripple power per class and pooled; `docs/design/pfc_marked_model_family.md`),
+  with `--tier {joint,marginal,all}` for their generated single-target marginal
+  tier, `--event-set with_swr_without_replay` to add the SWRs without replay to
+  the ripple-power models, and `--slope-permutations` (default 30 for the
+  follow-up set, 0 otherwise) with `--slope-permutation-seed` for the
+  shuffled-mark reference of every slope kernel. The follow-up set requires an
+  explicit `--output-dir` (use `Processed-Data/pfc_response_followups/marked_family`).
+  Recommended-set output goes to `pfc_marked_model_family/` under the
+  processed-data root; the bundles there are the 71-session corpus of
+  2026-09-19 (`.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md`), fit
+  before the analysed-time rule under bundle contract 1 -- a default-directory
+  rerun under contract 2 removes them as stale, so do not point a run there.
 - `summarize_pfc_marked_family.py` aggregates those bundles unit → session →
   animal (fraction of units with a positive held-out gain, population mean
-  slope kernels with pre- and post-onset means, one figure per model); no
-  p-values. `--bundle-dir`, `--out <markdown>`, `--figure-dir`, `--blowup`
-  (default 1000).
+  slope kernels with pre- and post-onset means, the shuffled-mark 95 % band
+  and an inside/outside call when the bundles carry nulls, each joint target
+  beside its marginal fit, one figure per model); no p-values. It refuses a
+  directory that mixes bundle contracts or event sets. `--bundle-dir`,
+  `--out <markdown>`, `--figure-dir`, `--blowup` (default 1000),
+  `--summary-parquet` (default `<bundle-dir>/summary.parquet`, one row per
+  model, tier, class, target and statistic).
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,

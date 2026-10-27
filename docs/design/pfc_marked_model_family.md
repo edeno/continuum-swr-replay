@@ -29,6 +29,23 @@ property. Both replay classes and every mark in a named family are fit jointly.
 The ordinary kernel is the response to an event whose marks are at their
 within-class means.
 
+**Per-stop baseline (bundle contract 2).** Every design also carries
+unpenalised per-stop columns right after the intercept
+(`marked_glm.build_baseline_columns`): one indicator per kept well other than
+the reference well (well 0, or the session's lowest kept well when well 0 has
+no fitted bin), `rewarded_outcome` (the stop's known outcome was rewarded) and
+`outcome_unknown`. A column constant over the fitted bins is dropped and named
+in the sidecar. These columns take up stationary rate differences between
+stops, which a design with one intercept per session would otherwise read as
+event-locked effects of a context mark (the contract-1 corpus showed reward,
+switch and previous-arm "effects" as large 200 ms before onset as after). The
+typical-event kernel is now the response at the reference well after an
+unrewarded, known outcome. A model whose target is a stop-level context mark
+other than the reward outcome (`trips_to_patch_switch`,
+`next_trip_switches_patch`) adds that mark as a baseline column too, z-scored
+over the fitted bins with an `_unknown` indicator. `--no-baseline` fits the
+contract-1 single-intercept designs.
+
 For each class × target, the descriptive comparison removes only that target's
 spline block and refits the model on the same blocked folds. The reported
 held-out deviance change is predictive evidence that the target carries unique
@@ -125,6 +142,76 @@ context/coupling modifier is required to vary; this prevents an interaction
 that collapses onto its content main effect from being interpreted as
 separately identified.
 
+## Follow-up models
+
+`FOLLOWUP_MODEL_SPECS` (`--model-set followup`) asks three questions of the
+two replay classes and one of every class, SWRs without replay included when
+the session is cut with `--event-set with_swr_without_replay`:
+
+| model | targets | adjustments | classes |
+|---|---|---|---|
+| `replay_content` | `current_arm_fraction`, `content_weighted_recent_reward`, `content_weighted_belief_uncertainty` | `log_event_duration_s`, `leaf_content_fraction`, `posterior_entropy_mean` | replay |
+| `event_strength` | `log_event_duration_s`, `ripple_power_z`, `mua_rate_z` | `posterior_entropy_mean` | replay |
+| `stop_context` | `rewarded_context`, `trips_to_patch_switch` (also a baseline column) | `log_event_duration_s`, `current_arm_fraction`, `posterior_entropy_mean` | replay |
+| `ripple_power` | `ripple_power_z` | `log_event_duration_s` | replay + SWRs without replay |
+| `ripple_power_pooled` | `ripple_power_z`, one block shared by every class | `log_event_duration_s` | replay + SWRs without replay |
+
+The "recently rewarded arm" is `content_weighted_recent_reward` (each arm's
+reward fraction over its last ten visits) and the uncertain arm
+`content_weighted_belief_uncertainty`. The SWRs without replay carry only
+duration and ripple power; their `ripple_power_z` is the event table's rule,
+the mean of the decode frame's `SWR_zscore` over the SWR's own bins
+(`canonical_events.event_mean_ripple_power`, which reproduces the event
+table's column exactly), and their duration is the sampled span plus one bin.
+Ripple power is not matched between classes: the models measure how the
+response scales with it in each class (`ripple_power`) and overall
+(`ripple_power_pooled`: each event's mark is standardized within its class,
+then every class's events feed one marked block, the sum of the per-class
+blocks; each class keeps its own base kernel and duration block). A session
+with fewer than ten SWRs without replay makes the two ripple-power models
+ineligible there.
+
+`trips_to_patch_switch` (`marked_model_family.stop_patch_switch_marks`) is a
+forward mark of the stop. The session's completed trials are rebuilt from the
+stop table (`completed_trial_arm` of trial k agrees with the `next_arm` of the
+stops after trial k-1 in every session); the trip that starts at a stop whose
+last completed trial is k is trial k+1. The mark is the number of trips, from
+that one on, that stay in the patch before the first that leaves it -- 0 when
+the next trip leaves -- capped at 3, and undefined for a stop with no
+completed trial and after the session's last switch.
+`next_trip_switches_patch` is `trips_to_patch_switch == 0`.
+
+## Marginal tier
+
+`marginal_specs()` (`--tier marginal`, or `all` for joint then marginal)
+generates one model per follow-up target, plus `next_trip_switches_patch`,
+named `marginal_<mark>`: the target alone, adjusted for
+`log_event_duration_s` and `posterior_entropy_mean` (duration itself only for
+entropy), content targets also for `leaf_content_fraction`, on the replay
+classes. A joint model credits variance its targets share to none of them; the
+marginal tier credits it to each. The marginal tier is the family's total
+effect and the joint tier its direct effect; neither supersedes the other, and
+the summary prints them side by side.
+
+## Slope reference
+
+With `--slope-permutations R` (30 by default for the follow-up set) each
+slope kernel gets a shuffled-mark reference: R full-data refits (no held-out
+scoring, the observed fit's prior) in which only that target block is rebuilt
+from the target shuffled within its class, every other block -- the other
+classes' included -- keeping its observed values. An event-level mark is
+permuted among the events where it is defined. A stop-level mark
+(`rewarded_context`, `trips_to_patch_switch`, `next_trip_switches_patch`) is
+permuted among stops: each stop's value moves to another stop and all its
+events take it, so the reference keeps the within-stop dependence (a stop
+whose events disagree on the value -- the latest known outcome can change
+inside a stop -- is split into one unit per value). A pooled block is
+permuted within each class. The summary aggregates the observed and every
+shuffled population curve the same way (unit -> session -> animal) and calls
+the observed peak inside or outside the 95 % band over draws, overall and per
+animal. The band is a reference for the population curve, not a per-unit
+test.
+
 ## Missing values and denominators
 
 Undefined marks never remove an onset from the ordinary kernel. Standardization
@@ -195,7 +282,10 @@ model under `Processed-Data/pfc_marked_model_family/`:
   difference, per-fold values, convergence flags, spike count, and firing rate;
 - `.lag_time.npy`: the reported ±200 ms lag axis;
 - `.{class}.typical.npy`: the typical-event kernel for each replay class;
-- `.{class}.{target}.slope.npy`: each target's one-SD modulation kernel; and
+- `.{class}.{target}.slope.npy`: each target's one-SD modulation kernel (the
+  class is `pooled` for a pooled model);
+- `.{class}.{target}.slope_null.npy`: with a slope reference, the shuffled
+  refits' kernels, float32, shape `(R, 201, n_units)`; and
 - `.provenance.json`: exact inputs, hashes, model definition, mark scales,
   ranks, timing, device, eligibility, and NaN/convergence counts.
 
@@ -207,4 +297,10 @@ That corpus predates the analysed-time rule: its sessions were assembled
 without excluded time and without the artifact-dropped events, on the
 218-session tables of that date. The runner now assembles each session with
 the canonical PFC assembly (`analysis/pfc/session.py`), so a refit's fit mask
-and event onsets are the Figure 4 ones.
+and event onsets are the Figure 4 ones. Contract-2 bundles (per-stop baseline,
+`tier`, `event_set`, the slope-reference keys) never match a contract-1
+sidecar; the follow-up corpus is written to its own directory
+(`pfc_response_followups/marked_family/`, an explicit `--output-dir`), and
+`summarize_pfc_marked_family.py` refuses a directory that mixes contracts or
+event sets. It writes `summary.parquet` there, one row per model, tier,
+class, target and statistic.
