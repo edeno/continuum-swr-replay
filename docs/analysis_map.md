@@ -21,7 +21,7 @@ For each analysis, this page lists:
   the same four parts.
 
 Reported numbers are read from one summary file per part, `paper/reported/part{n}.json`
-(`scripts/reported/`; [design](design/2026-10-26-reported-values-design.md)); Parts 2 and 3 are built. Other current numbers live in the results docs ([replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
+(`scripts/reported/`; [design](design/2026-10-26-reported-values-design.md)). Other current numbers live in the results docs ([replay_rate_content_swr_synthesis.md](replay_rate_content_swr_synthesis.md),
 [per_bin_rate_results.md](per_bin_rate_results.md)) and in the claims table. Model formulas live in
 [models_table.md](models_table.md).
 

@@ -1,6 +1,6 @@
 # Reported values: every number read from a computed file
 
-Date: 2026-10-26. Status: Parts 2 and 3 built (`paper/reported/part2.json`, `part3.json`, `scripts/reported/`); Parts 1 and 4 not yet.
+Date: 2026-10-26. Status: all four parts built (`paper/reported/part{1,2,3,4}.json`, `scripts/reported/`).
 
 ## Why
 

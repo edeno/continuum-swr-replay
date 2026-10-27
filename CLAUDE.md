@@ -458,7 +458,7 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 
 Every number the project reports is read from a summary file, `paper/reported/part{n}.json`, one per part
 of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_reported_values.py`; design
-`docs/design/2026-10-26-reported-values-design.md`). Part 2 is built; Parts 1, 3 and 4 are not yet.
+`docs/design/2026-10-26-reported-values-design.md`). All four parts are built.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it
