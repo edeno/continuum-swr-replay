@@ -16,7 +16,8 @@ function peaking 30 ms after its start, for gains +/-0.7 and true onsets
 -50, 0, +25, +50 ms, in ``--n-units`` independent units.
 
 Writes ``<output>`` (JSON): per scenario the true onset and the median and
-2.5th/97.5th percentiles of the apparent onset and peak lag, in ms.
+2.5th/97.5th percentiles of the apparent onset and peak lag, in ms, and the
+share of units whose apparent onset or peak lag is negative.
 
 Usage
 -----
@@ -154,6 +155,10 @@ def simulate_and_fit(
         "apparent_peak_ms": summary(peak_ms_apparent),
         "onset_bias_ms_median": float(np.nanmedian(onset_ms_apparent) - onset_ms),
         "fraction_onset_at_edge": float(np.mean(timing.onset_at_edge)),
+        # What a unit-level "starts before onset" share looks like when the
+        # response really starts at ``onset_ms``: the noise floor of that share.
+        "fraction_onset_before_zero": float(np.mean(timing.onset_lag < 0)),
+        "fraction_peak_before_zero": float(np.mean(timing.peak_lag < 0)),
         "fraction_converged": float(np.mean(np.asarray(fit.converged))),
         "fraction_peak_sign_correct": float(
             np.mean(np.sign(timing.peak) == np.sign(gain))

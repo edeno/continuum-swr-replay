@@ -43,6 +43,10 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     load_population_data,
     significant_fraction,
 )
+from continuum_swr_replay.analysis.pfc.timing import (
+    peak_and_onset,
+    population_timing,
+)
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import (
     ROOT_DIR,
@@ -113,6 +117,24 @@ BEST_MODELS = {
 }
 
 
+TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
+"""The timing calibration ``scripts/pfc/calibrate_pfc_kernel_timing.py`` writes,
+relative to the processed-data root."""
+
+#: The curves the timing values are read from, by the word their keys use: the
+#: class (``HELDOUT_P_COLUMNS`` key) a unit must be called for, and the curve
+#: ``load_population_data`` returns for it.
+TIMING_CLASSES = {
+    "swr": ("SWR", "swr"),
+    "swr_replay": ("non_local_SWR", "non_local_swr"),
+    "non_swr_replay": ("non_local_no_SWR", "non_local_no_swr"),
+}
+
+#: Session resamples behind the population timing intervals, and their seed.
+TIMING_BOOTSTRAP_DRAWS = 1_000
+TIMING_BOOTSTRAP_SEED = 0
+
+
 @dataclass(frozen=True)
 class Part4Inputs:
     """The files Part 4 reads."""
@@ -122,6 +144,7 @@ class Part4Inputs:
     event_table: Path
     stop_table: Path
     ml_tree: Path
+    timing_calibration: Path
 
 
 def default_inputs() -> Part4Inputs:
@@ -132,6 +155,7 @@ def default_inputs() -> Part4Inputs:
         event_table=table_path("event_table", replay_content_dir()),
         stop_table=table_path("stop_table", replay_content_dir()),
         ml_tree=data / ML_TREE,
+        timing_calibration=data / TIMING_CALIBRATION,
     )
 
 
@@ -1051,12 +1075,288 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
     return values
 
 
+# --- timing ----------------------------------------------------------------------
+
+
+def timing_values(
+    population: pd.DataFrame,
+    curves: dict[str, np.ndarray],
+    lag_time: np.ndarray,
+    calibration: dict[str, Any] | None,
+    make: Callable[..., Value],
+) -> list[Value]:
+    """When does the response peak, and does it start before event onset?
+
+    For SWR-coupled replay, non-SWR replay and all SWRs, over the units called
+    for that class (raw empirical p < 0.05 against its own matched null),
+    split by the sign of each unit's peak (enhanced or suppressed):
+
+    - per unit, the peak lag (largest ``|curve|`` on +/-200 ms) and the
+      half-maximum onset (:func:`~continuum_swr_replay.analysis.pfc.timing.peak_and_onset`),
+      their medians and the shares before event onset;
+    - for the population, the peak lag and onset of the sign-aligned mean
+      curve, with a 95 % interval from resampling sessions, and the animals
+      whose own mean curve has its onset before event onset.
+
+    Beside them: the share of all units whose matched quiet-rest control curve
+    peaks before onset (the floor for a peak lag drawn by noise), units called
+    for both replay classes compared pairwise, and the timing calibration
+    (simulated responses of known onset fit by the same estimator), which says
+    how the estimator moves an onset and how often noise puts a unit's onset
+    before zero when the response starts at zero.
+    """
+    values: list[Value] = []
+
+    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
+        # A statistic over an empty set is absent, never invented.
+        if np.isfinite(float(value)):
+            values.append(make(key, value, *args, **kwargs))
+
+    sessions = (
+        population["nwb_file_name"].astype(str) + "|" + population["epoch_name"]
+    ).to_numpy()
+    animals = population["animal"].to_numpy()
+    ms = 1e3
+    rule = (
+        "the half-maximum onset: the earliest lag of the run, ending at the peak, "
+        "over which the curve keeps the peak's sign and at least half its size"
+    )
+    timing_by_class = {}
+    for word, (name, curve_key) in TIMING_CLASSES.items():
+        label = CLASS_LABELS[name]
+        pvalue = population[HELDOUT_P_COLUMNS[name]].to_numpy(dtype=float)
+        called = pvalue < ALPHA
+        timing = peak_and_onset(curves[curve_key], lag_time)
+        timing_by_class[word] = (called, timing)
+        for direction, sign in (("enhanced", 1.0), ("suppressed", -1.0)):
+            chosen = called & (np.sign(timing.peak) == sign)
+            stem = f"{word}_{direction}"
+            who = f"units called for {label} (raw p < {ALPHA:g}) whose peak is {'an increase' if sign > 0 else 'a decrease'}"
+            peak_ms = timing.peak_lag[chosen] * ms
+            onset_ms = timing.onset_lag[chosen] * ms
+            add(f"timing_units_{stem}", int(chosen.sum()), "count", "count", who)
+            if not chosen.any():
+                continue
+            add(
+                f"timing_peak_lag_median_ms_{stem}",
+                np.median(peak_ms),
+                "quantity",
+                "int",
+                f"median peak lag (largest |modulation| within +/-200 ms of onset) of {who}",
+                "ms",
+            )
+            low, high = np.percentile(peak_ms, [25, 75])
+            add(
+                f"timing_peak_lag_quartile_low_ms_{stem}",
+                low,
+                "quantity",
+                "int",
+                f"25th percentile of the peak lag of {who}",
+                "ms",
+            )
+            add(
+                f"timing_peak_lag_quartile_high_ms_{stem}",
+                high,
+                "quantity",
+                "int",
+                f"75th percentile of the peak lag of {who}",
+                "ms",
+            )
+            add(
+                f"timing_peak_before_onset_fraction_{stem}",
+                float((peak_ms < 0).mean()),
+                "fraction",
+                "pct",
+                f"share of {who} whose peak lag is before event onset",
+            )
+            add(
+                f"timing_onset_median_ms_{stem}",
+                np.median(onset_ms),
+                "quantity",
+                "int",
+                f"median response onset of {who}; onset is {rule}",
+                "ms",
+            )
+            add(
+                f"timing_onset_before_onset_fraction_{stem}",
+                float((onset_ms < 0).mean()),
+                "fraction",
+                "pct",
+                f"share of {who} whose response onset is before event onset",
+            )
+            add(
+                f"timing_onset_at_edge_fraction_{stem}",
+                float(timing.onset_at_edge[chosen].mean()),
+                "fraction",
+                "pct",
+                f"share of {who} whose half-maximum run reaches the window edge "
+                "(-200 ms), so their onset is at or before it",
+            )
+            population_curve = population_timing(
+                curves[curve_key][:, chosen],
+                timing.peak[chosen],
+                sessions[chosen],
+                lag_time,
+                n_boot=TIMING_BOOTSTRAP_DRAWS,
+                seed=TIMING_BOOTSTRAP_SEED,
+            )
+            for what, point, (ci_low, ci_high) in (
+                ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
+                (
+                    "onset",
+                    population_curve.onset_lag,
+                    population_curve.onset_lag_interval,
+                ),
+            ):
+                text = (
+                    f"{'peak lag' if what == 'peak' else 'onset (' + rule + ')'} of the "
+                    f"mean curve of {who}, each unit's curve signed by its peak"
+                )
+                add(
+                    f"timing_population_{what}_ms_{stem}",
+                    point * ms,
+                    "quantity",
+                    "int",
+                    text,
+                    "ms",
+                )
+                add(
+                    f"timing_population_{what}_ms_ci_low_{stem}",
+                    ci_low * ms,
+                    "quantity",
+                    "int",
+                    f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} session "
+                    f"resamples (seed {TIMING_BOOTSTRAP_SEED})",
+                    "ms",
+                )
+                add(
+                    f"timing_population_{what}_ms_ci_high_{stem}",
+                    ci_high * ms,
+                    "quantity",
+                    "int",
+                    "97.5th percentile of that over the same resamples",
+                    "ms",
+                )
+            onsets_by_animal = []
+            for animal in np.unique(animals[chosen]):
+                own = chosen & (animals == animal)
+                onsets_by_animal.append(
+                    peak_and_onset(
+                        (curves[curve_key][:, own] * np.sign(timing.peak[own])).mean(
+                            axis=1
+                        ),
+                        lag_time,
+                    ).onset_lag[0]
+                )
+            add(
+                f"timing_population_onset_animals_{stem}",
+                len(onsets_by_animal),
+                "count",
+                "count",
+                f"animals with at least one of the {who}",
+            )
+            add(
+                f"timing_population_onset_animals_negative_{stem}",
+                int(np.sum(np.asarray(onsets_by_animal) < 0)),
+                "count",
+                "count",
+                f"of those animals, how many have the onset of their own mean curve of {who} "
+                "before event onset",
+            )
+
+    swr_called, swr_timing = timing_by_class["swr_replay"]
+    non_called, non_timing = timing_by_class["non_swr_replay"]
+    paired = (
+        swr_called & non_called & (np.sign(swr_timing.peak) == np.sign(non_timing.peak))
+    )
+    difference = (non_timing.peak_lag[paired] - swr_timing.peak_lag[paired]) * ms
+    add(
+        "timing_paired_units",
+        int(paired.sum()),
+        "count",
+        "count",
+        "units called for both SWR-coupled and non-SWR replay whose two peaks have the "
+        "same sign",
+    )
+    if paired.any():
+        add(
+            "timing_peak_lag_difference_median_ms",
+            np.median(difference),
+            "quantity",
+            "int",
+            "over those units, the median of the non-SWR replay peak lag minus the "
+            "SWR-coupled replay peak lag",
+            "ms",
+        )
+        add(
+            "timing_non_swr_later_fraction",
+            float((difference > 0).mean()),
+            "fraction",
+            "pct",
+            "share of those units whose non-SWR replay peak is later than their "
+            "SWR-coupled replay peak",
+        )
+    control = peak_and_onset(curves["matched_control"], lag_time)
+    usable = np.isfinite(control.peak_lag)
+    add(
+        "timing_matched_control_peak_before_onset_fraction",
+        float((control.peak_lag[usable] < 0).mean()),
+        "fraction",
+        "pct",
+        "share of all units whose matched quiet-rest control curve peaks before the "
+        "control window's onset (what a peak lag drawn by noise gives)",
+    )
+
+    if calibration is not None:
+        for scenario in calibration["scenarios"]:
+            if scenario["true_onset_ms"] != 0.0:
+                continue
+            direction = "enhanced" if scenario["gain"] > 0 else "suppressed"
+            stem = f"{scenario['shape']}_{direction}"
+            response = (
+                "a 100 ms boxcar"
+                if scenario["shape"] == "boxcar"
+                else "an alpha function peaking 30 ms after it starts"
+            )
+            what = (
+                f"simulated units ({scenario['n_units']}) whose response, {response} of "
+                f"log-rate gain {scenario['gain']:+g}, starts exactly at event onset, "
+                "fit by the shipped basis, prior and fitter"
+            )
+            add(
+                f"timing_calibration_onset_bias_ms_{stem}",
+                scenario["onset_bias_ms_median"],
+                "quantity",
+                "int",
+                f"median apparent onset of {what} (true onset 0 ms)",
+                "ms",
+            )
+            add(
+                f"timing_calibration_onset_before_zero_fraction_{stem}",
+                scenario["fraction_onset_before_zero"],
+                "fraction",
+                "pct",
+                f"share of {what} whose apparent onset is before event onset: the noise "
+                "floor of the per-unit share",
+            )
+            add(
+                f"timing_calibration_peak_ms_{stem}",
+                scenario["apparent_peak_ms"]["median"],
+                "quantity",
+                "int",
+                f"median apparent peak lag of {what} (true peak "
+                f"{scenario['true_peak_ms']:g} ms)",
+                "ms",
+            )
+    return values
+
+
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     """Part 4's summary from ``inputs``."""
     summary = Summary(part=4, produced_by=produced_by, commit=commit)
     sidecars = read_sidecars(inputs.bundle_dir)
     pending = staleness(sidecars, inputs.event_table, inputs.stop_table)
-    population, _, _ = load_population_data(
+    population, curves, lag_time = load_population_data(
         inputs.bundle_dir, min_firing_rate=MIN_FIRING_RATE_HZ
     )
     cohort = json.loads(inputs.pfc_cohort.read_text())
@@ -1074,6 +1374,12 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     summary.add(*called_fraction_values(population, figure))
     summary.add(*null_geometry_values(population, sidecars, make))
     summary.add(*overlap_and_effect_values(population, make))
+    calibration = (
+        json.loads(inputs.timing_calibration.read_text())
+        if inputs.timing_calibration.exists()
+        else None
+    )
+    summary.add(*timing_values(population, curves, lag_time, calibration, make))
     summary.add(
         *ml_comparator_values(
             inputs.ml_tree,
@@ -1096,6 +1402,11 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
         file_record(inputs.pfc_cohort, ROOT_DIR),
         file_record(inputs.event_table, ROOT_DIR),
         file_record(inputs.stop_table, ROOT_DIR),
+        *(
+            [file_record(inputs.timing_calibration, ROOT_DIR)]
+            if inputs.timing_calibration.exists()
+            else []
+        ),
         files_record(
             f"*{STEM}.provenance.json",
             inputs.ml_tree.glob(f"*{STEM}.provenance.json"),
