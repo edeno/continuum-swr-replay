@@ -252,3 +252,27 @@ def test_summary_refuses_mixed_model_sets(tmp_path):
 
     with pytest.raises(summarize.MixedContractError, match="model sets"):
         summarize.load_bundles(tmp_path)
+
+
+def test_max_statistic_call_is_the_plus_one_p_not_the_interpolated_percentile():
+    lag = np.linspace(-0.2, 0.2, 5)
+    key = ("m", "non_local_no_SWR", "t")
+    animal_of = {"a1": "a"}
+    # 20 draws whose largest |curve| is 0.05, 0.10, ..., 1.00.
+    draws = (np.arange(1, 21) / 20)[:, None] * np.array([0.0, 0.0, 1.0, 0.0, 0.0])
+    nulls = {key: {"a1": draws}}
+
+    def call(observed_peak):
+        curves = {key: {"a1": observed_peak * np.array([0.0, 0.0, 1.0, 0.0, 0.0])}}
+        return summarize.null_band_summary(curves, nulls, lag, animal_of).iloc[0]
+
+    # 0.97 is above the interpolated 95th percentile (0.9525) but one draw
+    # (1.00) is at least as large: p = 2/21, inside.
+    near = call(0.97)
+    assert near.max_abs_value > near.max_abs_null_p95
+    assert near.max_p_value == pytest.approx(2 / 21)
+    assert not near.max_outside_reference
+    # Above every draw: p = 1/21 <= 0.05, outside.
+    above = call(1.2)
+    assert above.max_p_value == pytest.approx(1 / 21)
+    assert above.max_outside_reference

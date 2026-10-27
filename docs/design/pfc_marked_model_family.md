@@ -234,8 +234,21 @@ time, cold, the curves agree to 1.5e-8.
 The summary aggregates the observed and every shuffled population curve the
 same way (unit -> session -> animal, as every population quantity in the
 summary is). The call to quote is the max statistic: the observed largest
-`|curve|` over the ±200 ms window against the 95th percentile of each draw's
-largest `|curve|`, with the plus-one p `(1 + #draws >= observed) / (R + 1)`.
+`|curve|` over the ±200 ms window against each draw's largest `|curve|`,
+outside when the plus-one p `(1 + #draws >= observed) / (R + 1)` is at most
+0.05. (Comparing with the interpolated 95th percentile of 30 draws instead
+would call about 8 % of exchangeable observations outside.)
+
+Under the shipped mark prior the target's slope picks up part of a correlated
+mark's effect (ridge leakage). Simulated with the target correlated r 0.75
+with an adjustment that carries a planted kernel and no target effect (120
+sessions, 30 draws): the target's window mean is +0.0088 ± 0.0010 and its peak
++0.023 ± 0.003 at σ_mark = 0.5, and −0.0012 ± 0.0016 at σ_mark = 3. The
+residualized reference carries the same leakage (its window mean +0.0086 ±
+0.0002), so the call stays calibrated: 5 of 120 sessions outside at p ≤ 0.05.
+A raw-permutation reference does not (18 of 40 outside). A small slope on a
+target strongly correlated with another mark should therefore be read with
+the reference, not against zero.
 The per-lag 95 % band at the observed peak lag (overall and per animal) is
 descriptive, since the peak lag is selected as the most extreme. In
 simulation the stop-shuffled reference of `rewarded_context` was well

@@ -79,6 +79,9 @@ CLASS_LABEL = {
 }
 #: Order of the target classes in tables and figure columns.
 CLASS_ORDER = (*EXTENDED_MARKED_EVENT_CLASSES, "pooled")
+#: The max-statistic call: outside the reference when the plus-one p is at
+#: most this.
+MAX_P_THRESHOLD = 0.05
 #: Lags of the pre-onset, post-onset and whole-window means, seconds.
 PRE_ONSET_MAX_S = -0.1
 POST_ONSET_WINDOW_S = (0.0, 0.15)
@@ -376,9 +379,14 @@ def null_band_summary(
     with the band at that lag selects the most extreme of many lags. The
     max-statistic call accounts for that: each draw's largest ``|curve|``
     over the window forms the reference for the observed largest ``|curve|``,
-    with the plus-one empirical p ``(1 + #draws >= observed) / (R + 1)``.
-    That call is the one to quote for "outside the reference"; the per-lag
-    band is descriptive.
+    with the plus-one empirical p ``(1 + #draws >= observed) / (R + 1)``;
+    the call is ``p <= 0.05``. That call is the one to quote for "outside the
+    reference"; the per-lag band is descriptive. The call is not "observed
+    above the 95th percentile of the draws": with ``R = 30`` the interpolated
+    percentile sits between the 29th and 30th largest draw, so an observed
+    value exchangeable with the draws exceeds it about 8 % of the time, while
+    ``p <= 0.05`` (no draw at or above it, at R = 30) holds about 3 % of the
+    time.
 
     Parameters
     ----------
@@ -396,7 +404,8 @@ def null_band_summary(
         ``band_high_at_peak`` and ``peak_outside_band`` (per-lag band at the
         observed peak lag), ``max_abs_value`` (observed largest ``|curve|``),
         ``max_abs_null_p95`` (95th percentile of the draws' largest
-        ``|curve|``), ``max_outside_reference`` and ``max_p_value``,
+        ``|curve|``, descriptive), ``max_p_value`` and
+        ``max_outside_reference`` (``max_p_value <= 0.05``),
         ``window_mean`` (over every lag) and its band
         (``window_band_low``/``window_band_high``), ``window_outside_band``,
         ``n_draws``, ``n_null_sessions``, and ``animals_peak_outside_band``
@@ -419,6 +428,7 @@ def null_band_summary(
         peak = int(np.argmax(np.abs(observed)))
         observed_max = float(np.abs(observed).max())
         null_max = np.nanmax(np.abs(null), axis=1)
+        max_p = (1 + np.sum(null_max >= observed_max)) / (len(null_max) + 1)
         window = observed.mean()
         window_low, window_high = np.nanpercentile(null.mean(axis=1), [2.5, 97.5])
         animals_outside = 0
@@ -440,12 +450,8 @@ def null_band_summary(
                 ),
                 "max_abs_value": observed_max,
                 "max_abs_null_p95": float(np.percentile(null_max, 95)),
-                "max_outside_reference": bool(
-                    observed_max > np.percentile(null_max, 95)
-                ),
-                "max_p_value": float(
-                    (1 + np.sum(null_max >= observed_max)) / (len(null_max) + 1)
-                ),
+                "max_outside_reference": bool(max_p <= MAX_P_THRESHOLD),
+                "max_p_value": float(max_p),
                 "window_mean": float(window),
                 "window_band_low": float(window_low),
                 "window_band_high": float(window_high),
@@ -745,8 +751,9 @@ def build_report(
             "`reference` compares the population curve (unit -> session -> animal) "
             "with the same curve over shuffled-mark refits. The quoted call is the "
             "max statistic: the observed largest |curve| over the window against "
-            "the 95th percentile of each draw's largest |curve|, with the plus-one "
-            "p. The per-lag band at the observed peak lag is descriptive (the peak "
+            "each draw's largest |curve|, outside when the plus-one p "
+            f"(1 + #draws >= observed) / (R + 1) is at most {MAX_P_THRESHOLD}. "
+            "The per-lag band at the observed peak lag is descriptive (the peak "
             "lag is selected as the most extreme).\n\n"
         )
     for model, group in merged.groupby("model", sort=False):
