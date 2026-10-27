@@ -3,7 +3,7 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "8522b316f47a",
+ "commit": "2f4504188203",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/event_table.parquet",
@@ -1414,6 +1414,51 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
+   "pending": null
+  },
+  "multimodal_animals_in_direction": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median multimodal fraction is lower than their SWR median",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "multimodal_median_non_swr": {
+   "value": 0.027777777777777776,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median multimodal fraction of immobile non-SWR non-local events",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "multimodal_median_swr": {
+   "value": 0.1111111111111111,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "median multimodal fraction of immobile SWR-overlapping non-local events",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "non_swr_close_animals_above_baseline": {

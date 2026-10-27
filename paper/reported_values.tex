@@ -2,7 +2,7 @@
 % Every value is read from a summary file, paper/reported/part{n}.json;
 % each macro's comment names its key and what it is.
 
-% --- Part 2 (commit 8522b316f47a)
+% --- Part 2 (commit 2f4504188203)
 \newcommand{\PartTwoAnimals}{5}  % part2.animals: animals in the event table
 \newcommand{\PartTwoAnimalsNonSwrMajority}{4}  % part2.animals_non_swr_majority: animals in which more than half the events are non-SWR
 \newcommand{\PartTwoAnimalsNonSwrMoreAtWell}{5}  % part2.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content
@@ -88,6 +88,9 @@
 \newcommand{\PartTwoMuaOverlapNoSpikeShareMedian}{0}  % part2.mua_overlap_no_spike_share_median: median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8
 \newcommand{\PartTwoMuaOverlapNonlocalShareMedian}{81}  % part2.mua_overlap_nonlocal_share_median: median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8
 \newcommand{\PartTwoMuaOverlapUncertainShareMedian}{13}  % part2.mua_overlap_uncertain_share_median: median over mua events overlapping a non-local event of the share of their rows with no state above 0.8
+\newcommand{\PartTwoMultimodalAnimalsInDirection}{4}  % part2.multimodal_animals_in_direction: animals whose non-SWR median multimodal fraction is lower than their SWR median
+\newcommand{\PartTwoMultimodalMedianNonSwr}{0.03}  % part2.multimodal_median_non_swr: median multimodal fraction of immobile non-SWR non-local events
+\newcommand{\PartTwoMultimodalMedianSwr}{0.11}  % part2.multimodal_median_swr: median multimodal fraction of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoNonSwrCloseAnimalsAboveBaseline}{5}  % part2.non_swr_close_animals_above_baseline: animals whose median nonSWR-close event scores above their median quiet window, per spike
 \newcommand{\PartTwoNonSwrCloseDllPerSpikeMedian}{0.51}  % part2.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
 \newcommand{\PartTwoNonSwrCloseEpochsAboveBaseline}{242}  % part2.non_swr_close_epochs_above_baseline: epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike
