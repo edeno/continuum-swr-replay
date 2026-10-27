@@ -38,6 +38,12 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-26 | 2 (B) | extrapolation: canonical batch 80.9 GPU-h × ~1.2 ≈ 97 GPU-h; LPT partition over 9 cards ≈ 10.6–11.2 h per card (< 16 h) → full refit, all classes' nulls | — | `logs/pfc_response_followups/swr_without_replay/gpu<N>.sessions` | — |
 | 2026-10-26 | 2 (B) | **full batch launched 22:55**, 75 sessions, GPUs 1–9, R = 1,000, ETA about 10:00 on 2026-10-27 | `ccb5b8d0` | tmux `pfc_b_swr_without_replay` (window `gpumem` samples memory each minute); logs `logs/pfc_response_followups/swr_without_replay/`; output `Processed-Data/pfc_response_followups/swr_without_replay/` | running |
 
+| 2026-10-27 | lead | ~01:45: start Phase C; rare-class rule NOT decided — report the new class both ways (all sessions, ≥10-event sessions) | — | — | — |
+| 2026-10-27 | 4 (D, part) | `swr_without_replay_values` in Part 4 (both subsets, pending note while the batch is incomplete), tested on the smoke tree | `0695b326` | — | — |
+| 2026-10-27 | 3a (C code) | opus worker: baseline columns (contract 2), forward patch-switch marks, extended event set with ripple power for SWRs without replay (real-data check: event table's `ripple_power_z` reproduced exactly for 136 events of j1620210710 08_r4), follow-up specs + pooled ripple block, marginal tier, shuffled-mark reference (stop-level marks permuted as whole stops), runner flags, summary.parquet, docs, slow planted tests | `ed5356ad`..`b000330c` | — | 150 passed, 3 skipped; CPU smoke of one model stopped after 60 min unfinished (no runtime figure) |
+| 2026-10-27 | 3a | `trips_to_patch_switch` takes the cap when ≥3 staying trips are known and no switch follows | `3bd90f08` | — | — |
+| 2026-10-27 | 3a | cost warning: `--tier all --slope-permutations 30` ≈ 1,140 full-data refits per session; must be measured on the GPU smoke before a corpus launch | — | — | open |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
