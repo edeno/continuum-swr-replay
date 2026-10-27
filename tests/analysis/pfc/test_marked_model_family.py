@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.pfc.glm import event_basis_functions
+from continuum_swr_replay.analysis.pfc.design import event_basis_functions
 from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
 from continuum_swr_replay.analysis.pfc.marked_glm import (
     EVENT_DURATION_MARK,

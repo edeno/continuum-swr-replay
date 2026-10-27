@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.pfc.glm import (
+from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
     event_basis_functions,
     event_onset_counts,
@@ -792,3 +792,72 @@ def test_ordinary_and_unit_weighted_basis_blocks_are_identical():
     weighted = event_basis_block(events, time, basis, lags, mark_column="one")
 
     np.testing.assert_array_equal(weighted, ordinary)
+
+
+# ---------------------------------------------------------------------------
+# Real data: the marked context is the canonical session assembly
+# ---------------------------------------------------------------------------
+
+#: The mPFC session with the fewest units among the canonical bundles (74 units).
+REAL_SESSION = ("j1620210710_.nwb", "08_r4")
+
+
+class _StopBeforeFit(Exception):
+    """Raised in place of the unit fits, once ``run_session`` has handed over."""
+
+
+@pytest.mark.slow
+@pytest.mark.real_data
+def test_marked_context_matches_canonical_assembly(monkeypatch):
+    """The marked fit mask and replay onsets are the canonical ones, exactly.
+
+    ``run_session`` is stopped where the unit fits would start, after it has
+    filled ``scoring_out`` with the fit mask, counts and event sets the
+    canonical fit uses; no model is fit. Needs session inputs on disk and a
+    reachable Spyglass, so it is opt-in (``-m real_data``).
+    """
+    from continuum_swr_replay.analysis.pfc import session
+    from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+    from continuum_swr_replay.analysis.pfc.marked_glm import (
+        prepare_marked_session_context,
+    )
+
+    nwb_file_name, epoch_name = REAL_SESSION
+    cohort_stops, _ = load_session_stop_cohort(
+        nwb_file_name, epoch_name, cohort="at_well"
+    )
+    context = prepare_marked_session_context(
+        nwb_file_name,
+        epoch_name,
+        sampling_frequency=SAMPLING_FREQUENCY,
+        cohort_stops=cohort_stops,
+    )
+
+    def stop_before_fit(*args, **kwargs):
+        raise _StopBeforeFit
+
+    monkeypatch.setattr(session, "_fit_session_neurons", stop_before_fit)
+    canonical: dict = {}
+    with pytest.raises(_StopBeforeFit):
+        session.run_session(
+            nwb_file_name,
+            epoch_name,
+            sampling_frequency=SAMPLING_FREQUENCY,
+            run_parallel=False,
+            stop_cohort="at_well",
+            cohort_stops=cohort_stops,
+            scoring_out=canonical,
+        )
+
+    pd.testing.assert_series_equal(context.fit_mask, canonical["fit_mask"])
+    fit = np.asarray(canonical["fit_mask"], dtype=bool)
+    np.testing.assert_array_equal(context.counts, canonical["counts"][fit])
+    np.testing.assert_array_equal(context.lags, canonical["lags"])
+    for event_class in MARKED_EVENT_CLASSES:
+        np.testing.assert_array_equal(
+            context.events[event_class]["start_time"].to_numpy(),
+            canonical["event_times"][event_class]["start_time"].to_numpy(),
+        )
+    assert context.cohort_info["n_bins_fit"] == int(fit.sum())
+    assert "n_artifact_dropped_events" in context.cohort_info
+    assert context.input_provenance["swr_events_sha256"] is not None

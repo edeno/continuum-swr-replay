@@ -59,10 +59,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     canonical_event_input_hashes,
 )
-from continuum_swr_replay.analysis.pfc.cohort import (
-    DEFAULT_STOP_TABLE_PATH,
-    load_session_stop_cohort,
-)
+from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import (
     EMPIRICAL_PVALUE_METHOD,
@@ -71,7 +68,6 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     required_usable_null_draws,
 )
 from continuum_swr_replay.analysis.pfc.marked_glm import (
-    DEFAULT_EVENT_ARM_TABLE_PATH,
     EVENT_DURATION_MARK,
     MARKED_EVENT_CLASSES,
     build_marked_model_ladder,
@@ -92,16 +88,17 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.data_loaders import get_epoch_info
-from continuum_swr_replay.decoding_common import setup_logger
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.paths import processed_data_dir, table_path
+from continuum_swr_replay.runs.batch import setup_logger
 
 # This reference is descriptive, not a selection rule. A real 430-unit A100 profile
 # projected 1,000 exact five-fold refits at about 5.2 GPU-hours per session;
 # 100 gives 1/101 tail-fraction resolution without making a descriptive
 # analysis several GPU-days long across the corpus.
 DEFAULT_MARK_SHUFFLES = 100
-DEFAULT_OUTPUT_DIR = PROCESSED_DATA_DIR / "pfc_marked_kernels"
+OUTPUT_SUBDIR = "pfc_marked_kernels"
 ESTIMATOR = "joint_marked_ridge_poisson_glm"
 INFERENCE = "descriptive_blocked_heldout_association_with_label_shuffle_reference"
 MARK_SCALING = "within_session_within_replay_class_population_sd_ddof0"
@@ -215,8 +212,10 @@ def build_fit_contract(
     brain_area : str
         Recorded area the units come from.
     input_hashes : Mapping of str to object
-        SHA-256 digests of the tables the fit reads, including
-        ``stop_table_sha256`` and ``event_arm_table_sha256``.
+        SHA-256 digests of the inputs the fit reads, including
+        ``stop_table_sha256``, ``event_arm_table_sha256`` and
+        ``swr_events_sha256``, and the SWR source's name
+        (``swr_interval_source``).
 
     Returns
     -------
@@ -475,7 +474,7 @@ def run_analysis(
         artifact = marked_artifact_path(output_dir, epoch_identifier, scientific_mark)
         input_records = record_inputs(
             {
-                "stop_table": DEFAULT_STOP_TABLE_PATH,
+                "stop_table": table_path("stop_table"),
                 "event_arm_table": event_arm_table_path,
             }
         )
@@ -500,6 +499,8 @@ def run_analysis(
                     "canonical_event_table_sha256"
                 ],
                 "data_over_time_sha256": input_provenance["data_over_time_sha256"],
+                "swr_interval_source": input_provenance["swr_interval_source"],
+                "swr_events_sha256": input_provenance["swr_events_sha256"],
             },
         )
         # write_fit_provenance records the estimator from its own argument and
@@ -733,10 +734,12 @@ def get_command_line_arguments() -> Namespace:
     parser.add_argument("--gpu", type=int)
     parser.add_argument("--allow-cpu", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--output-dir", type=Path, default=processed_data_dir() / OUTPUT_SUBDIR
+    )
     parser.add_argument("--log-directory", type=Path, default=Path("logs"))
     parser.add_argument(
-        "--event-arm-table", type=Path, default=DEFAULT_EVENT_ARM_TABLE_PATH
+        "--event-arm-table", type=Path, default=table_path("event_arm_table")
     )
     parser.add_argument(
         "--scientific-mark",
@@ -808,7 +811,7 @@ def main() -> None:
     args.log_directory.mkdir(parents=True, exist_ok=True)
 
     epoch_info = filter_epoch_info(
-        get_epoch_info(),
+        analysed_epochs(),
         sessions=args.sessions,
         animal=args.animal,
         date=args.date,

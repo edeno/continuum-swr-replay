@@ -39,6 +39,8 @@ INPUT_HASHES = {
     "event_arm_table_sha256": "arm",
     "canonical_event_table_sha256": "event",
     "data_over_time_sha256": "dot",
+    "swr_interval_source": "kay",
+    "swr_events_sha256": "swr",
 }
 
 
@@ -86,6 +88,8 @@ def _make_context(*, n_units: int = 2) -> SimpleNamespace:
             "event_arm_table_sha256": "arm",
             "canonical_event_table_sha256": "event",
             "data_over_time_sha256": "dot",
+            "swr_interval_source": "kay",
+            "swr_events_sha256": "swr",
         },
     )
 
@@ -165,6 +169,8 @@ def _install_session_mocks(monkeypatch, context, *, fit) -> None:
         lambda *a, **k: {
             "canonical_event_table_sha256": "event",
             "data_over_time_sha256": "dot",
+            "swr_interval_source": "kay",
+            "swr_events_sha256": "swr",
         },
     )
     monkeypatch.setattr(

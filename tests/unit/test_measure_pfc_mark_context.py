@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from scripts.qa.measure_pfc_mark_context import (
+from scripts.pfc.measure_pfc_mark_context import (
     group_context_table,
     load_current_arm_marks,
     summarize,

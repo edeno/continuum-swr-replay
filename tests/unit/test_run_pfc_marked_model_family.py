@@ -36,6 +36,8 @@ INPUT_HASHES = {
     "event_table_sha256": "event",
     "canonical_event_table_sha256": "event",
     "data_over_time_sha256": "dot",
+    "swr_interval_source": "kay",
+    "swr_events_sha256": "swr",
 }
 GPU_RECORD = {
     "jax_backend": "cpu",
@@ -85,6 +87,8 @@ def _context(n_units: int = 2) -> SimpleNamespace:
             "event_arm_table_sha256": "arm",
             "canonical_event_table_sha256": "event",
             "data_over_time_sha256": "dot",
+            "swr_interval_source": "kay",
+            "swr_events_sha256": "swr",
         },
     )
 
@@ -140,6 +144,8 @@ def _install_mocks(monkeypatch, context: SimpleNamespace, *, build=None, fit=Non
         lambda *a, **k: {
             "canonical_event_table_sha256": "event",
             "data_over_time_sha256": "dot",
+            "swr_interval_source": "kay",
+            "swr_events_sha256": "swr",
         },
     )
     monkeypatch.setattr(

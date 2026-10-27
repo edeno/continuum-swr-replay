@@ -59,10 +59,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
 from continuum_swr_replay.analysis.pfc.canonical_events import (
     canonical_event_input_hashes,
 )
-from continuum_swr_replay.analysis.pfc.cohort import (
-    DEFAULT_STOP_TABLE_PATH,
-    load_session_stop_cohort,
-)
+from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import assign_blocked_folds
 from continuum_swr_replay.analysis.pfc.marked_glm import (
@@ -72,8 +69,6 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
 )
 from continuum_swr_replay.analysis.pfc.marked_model_family import (
     CORE_MODEL_NAMES,
-    DEFAULT_EVENT_ARM_TABLE_PATH,
-    DEFAULT_EVENT_TABLE_PATH,
     DEFAULT_MARK_PENALTY_SIGMA,
     INTERACTION_MODEL_NAMES,
     MARK_DESCRIPTIONS,
@@ -99,11 +94,12 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.data_loaders import get_epoch_info
-from continuum_swr_replay.decoding_common import setup_logger
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR, SAMPLING_FREQUENCY
+from continuum_swr_replay.data_loaders.epoch_register import analysed_epochs
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+from continuum_swr_replay.paths import processed_data_dir, table_path
+from continuum_swr_replay.runs.batch import setup_logger
 
-DEFAULT_OUTPUT_DIR = PROCESSED_DATA_DIR / "pfc_marked_model_family"
+OUTPUT_SUBDIR = "pfc_marked_model_family"
 ESTIMATOR = "joint_multimark_ridge_poisson_temporal_glm"
 INFERENCE = "descriptive_blocked_heldout_leave_one_mark_block_out"
 BUNDLE_CONTRACT_VERSION = 1
@@ -198,7 +194,8 @@ def build_fit_contract(
     brain_area : str
         Recorded area the units come from.
     input_hashes : Mapping of str to object
-        SHA-256 digests of every table the fit reads.
+        SHA-256 digests of every input the fit reads, and the SWR source's
+        name (``swr_interval_source``).
 
     Returns
     -------
@@ -447,7 +444,7 @@ def run_analysis(
     *,
     model_names: tuple[str, ...],
     brain_area: str = "mPFC",
-    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    output_dir: Path | None = None,
     log_directory: Path = Path("logs"),
     overwrite: bool = False,
     penalty_sigma: float = DEFAULT_PENALTY_SIGMA,
@@ -456,8 +453,8 @@ def run_analysis(
     fold_seed: int | None = None,
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
     min_marked_events: int = MIN_MARKED_EVENTS_PER_CLASS,
-    event_arm_table_path: Path = DEFAULT_EVENT_ARM_TABLE_PATH,
-    event_table_path: Path = DEFAULT_EVENT_TABLE_PATH,
+    event_arm_table_path: Path | None = None,
+    event_table_path: Path | None = None,
     gpu_record: Mapping[str, object] | None = None,
     failure_sink: list[tuple[str, str]] | None = None,
 ) -> bool:
@@ -479,7 +476,8 @@ def run_analysis(
     brain_area : str, optional
         Recorded area whose units are fit (``"mPFC"`` or ``"OFC"``).
     output_dir : Path, optional
-        Directory the bundles are written to.
+        Directory the bundles are written to; ``processed_data_dir() /
+        OUTPUT_SUBDIR`` when None, resolved at the call.
     log_directory : Path, optional
         Directory the per-session log is written to.
     overwrite : bool, optional
@@ -497,9 +495,11 @@ def run_analysis(
     min_marked_events : int, optional
         Finite marked events required per mark and event class.
     event_arm_table_path : Path, optional
-        Event-arm table supplying the per-arm content marks.
+        Event-arm table supplying the per-arm content marks; the canonical
+        ``table_path("event_arm_table")`` when None.
     event_table_path : Path, optional
-        Event table supplying the per-event marks.
+        Event table supplying the per-event marks; the canonical
+        ``table_path("event_table")`` when None.
     gpu_record : Mapping of str to object, optional
         The accelerator record from ``configure_jax_gpu``.
     failure_sink : list of tuple of str, optional
@@ -513,6 +513,12 @@ def run_analysis(
         ineligible, or had no units. False when the session raised, or when any
         family raised or failed its convergence gate.
     """
+    if output_dir is None:
+        output_dir = processed_data_dir() / OUTPUT_SUBDIR
+    if event_arm_table_path is None:
+        event_arm_table_path = table_path("event_arm_table")
+    if event_table_path is None:
+        event_table_path = table_path("event_table")
     unknown = sorted(set(model_names) - set(RECOMMENDED_MODEL_SPECS))
     if unknown or not model_names:
         raise ValueError(f"unknown or empty model selection: {unknown}")
@@ -538,7 +544,7 @@ def run_analysis(
     try:
         input_records = record_inputs(
             {
-                "stop_table": DEFAULT_STOP_TABLE_PATH,
+                "stop_table": table_path("stop_table"),
                 "event_arm_table": event_arm_table_path,
                 "event_table": event_table_path,
             }
@@ -552,6 +558,8 @@ def run_analysis(
                 "canonical_event_table_sha256"
             ],
             "data_over_time_sha256": canonical_hashes["data_over_time_sha256"],
+            "swr_interval_source": canonical_hashes["swr_interval_source"],
+            "swr_events_sha256": canonical_hashes["swr_events_sha256"],
         }
         specs = {name: RECOMMENDED_MODEL_SPECS[name] for name in model_names}
         artifacts = {
@@ -622,6 +630,11 @@ def run_analysis(
             != input_hashes["data_over_time_sha256"]
         ):
             raise RuntimeError("data-over-time input changed during preparation")
+        if (
+            context.input_provenance["swr_events_sha256"]
+            != input_hashes["swr_events_sha256"]
+        ):
+            raise RuntimeError("SWR events input changed during preparation")
         _check_prepared_window(context.spline_basis, context.lags)
 
         common_extra = {
@@ -818,12 +831,14 @@ def get_command_line_arguments() -> Namespace:
     parser.add_argument("--gpu", type=int)
     parser.add_argument("--allow-cpu", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument(
+        "--output-dir", type=Path, default=processed_data_dir() / OUTPUT_SUBDIR
+    )
     parser.add_argument("--log-directory", type=Path, default=Path("logs"))
     parser.add_argument(
-        "--event-arm-table", type=Path, default=DEFAULT_EVENT_ARM_TABLE_PATH
+        "--event-arm-table", type=Path, default=table_path("event_arm_table")
     )
-    parser.add_argument("--event-table", type=Path, default=DEFAULT_EVENT_TABLE_PATH)
+    parser.add_argument("--event-table", type=Path, default=table_path("event_table"))
     parser.add_argument(
         "--models",
         nargs="+",
@@ -925,7 +940,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.log_directory.mkdir(parents=True, exist_ok=True)
     epochs = filter_epoch_info(
-        get_epoch_info(),
+        analysed_epochs(),
         sessions=args.sessions,
         animal=args.animal,
         date=args.date,

@@ -24,7 +24,7 @@ comparison's denominator and counted in the table.
 Usage
 -----
 ``uv run python scripts/pfc/summarize_pfc_marked_family.py \
-    --out docs/audits/<date>-pfc-marked-family-summary.md \
+    --out .claude/docs/reviews/<date>-pfc-marked-family-summary.md \
     --figure-dir paper/figures/pfc_marked_family``
 """
 
@@ -43,10 +43,10 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.marked_glm import MARKED_EVENT_CLASSES
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.paths import processed_data_dir
 
-DEFAULT_BUNDLE_DIR = PROCESSED_DATA_DIR / "pfc_marked_model_family"
+BUNDLE_SUBDIR = "pfc_marked_model_family"
 DEFAULT_BLOWUP = 1000.0
 CLASS_LABEL = {
     "non_local_no_SWR": "non-SWR replay",
@@ -385,7 +385,9 @@ def build_report(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--bundle-dir", type=Path, default=DEFAULT_BUNDLE_DIR)
+    parser.add_argument(
+        "--bundle-dir", type=Path, default=processed_data_dir() / BUNDLE_SUBDIR
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument(
         "--figure-dir", type=Path, default=Path("paper/figures/pfc_marked_family")

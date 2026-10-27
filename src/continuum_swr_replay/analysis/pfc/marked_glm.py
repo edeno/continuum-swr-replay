@@ -33,17 +33,15 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
-from continuum_swr_replay.analysis.pfc.glm import convolve_event_basis
+from continuum_swr_replay.analysis.pfc.design import convolve_event_basis
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, resolved_table_path, sha256_file
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.paths import table_path
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_table, resolved_table_path
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 MARKED_EVENT_CLASSES = ("non_local_no_SWR", "non_local_SWR")
-DEFAULT_EVENT_ARM_TABLE_PATH = (
-    PROCESSED_DATA_DIR / "replay_content" / "event_arm_table.parquet"
-)
 
 CONTENT_MARK_COLUMNS = {
     "arm_fraction": "current_arm_fraction",
@@ -289,9 +287,14 @@ class MarkedSessionContext:
     lags : NDArray of int, shape (n_lags,)
         Lag indices in samples, ascending by one sample.
     cohort_info : dict[str, object]
-        Bin, event and decode-alignment counts for the session.
+        Bin, event and decode-alignment counts for the session, including the
+        excluded-time counts (``n_excluded_intervals``, ``n_bins_excluded``)
+        and the events the analysed-time rule dropped
+        (``n_artifact_dropped_events``, ``n_artifact_dropped_overlapping_fit``).
     input_provenance : dict[str, object]
-        Paths and SHA-256 digests of every canonical table read.
+        Paths and SHA-256 digests of every canonical input read: the event
+        table, the cached decode frame, the SWR source's events file and the
+        event-arm table.
     """
 
     fit_mask: pd.Series
@@ -315,10 +318,14 @@ def prepare_marked_session_context(
 ) -> MarkedSessionContext:
     """Load and align one at-well session without running the legacy ladder.
 
-    This repeats no model fit: the decode and position axes are intersected
-    once, spikes are binned once, and only the two replay-class designs needed
-    by the marked analysis are built later.  The same canonical loaders and
-    cohort helpers used by :func:`pfc.glm.run_session` define every row.
+    This repeats no model fit. The session is assembled by the same steps
+    :func:`~continuum_swr_replay.analysis.pfc.session.run_session` takes --
+    decode/position alignment, the fit mask with the analysed-time rule (no
+    fitted bin's basis window reaches excluded time), the canonical event sets
+    with the Kay SWR intervals and the artifact-dropped events -- so the fit
+    mask and the event onsets are the canonical ones. Spikes are binned once,
+    and only the two replay-class designs the marked analysis needs are built
+    later. The matched non-event control the assembly draws is not used.
 
     Parameters
     ----------
@@ -334,8 +341,8 @@ def prepare_marked_session_context(
         The canonical stop table restricted to this session, defining the
         at-well fit cohort.
     event_arm_table_path : str or Path, optional
-        Event-arm table holding the content marks. Defaults to
-        :data:`DEFAULT_EVENT_ARM_TABLE_PATH`.
+        Event-arm table holding the content marks. Defaults to the canonical
+        one, ``table_path("event_arm_table")``, resolved at the call.
 
     Returns
     -------
@@ -343,68 +350,63 @@ def prepare_marked_session_context(
     """
     # These imports open Spyglass/DataJoint resources at import time, so keep
     # them off the pure marked-design import path used by unit tests.
-    from continuum_swr_replay.analysis.hippocampus import load_results
-    from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
-        align_results_to_position,
-    )
-    from continuum_swr_replay.analysis.pfc.canonical_events import (
-        DEFAULT_EVENT_TABLE_PATH,
-        canonical_event_provenance,
-        load_session_canonical_events,
-        load_session_swr_intervals,
-        session_data_over_time_path,
-    )
-    from continuum_swr_replay.analysis.pfc.glm import (
-        build_session_event_sets,
-        build_session_fit_mask,
+    from continuum_swr_replay.analysis.constants import DEFAULT_NON_LOCAL_THRESHOLD
+    from continuum_swr_replay.analysis.pfc.design import (
         event_basis_functions,
-        get_spikecount_per_time_bin,
+        symmetric_lags,
     )
-    from continuum_swr_replay.data_loaders import load_data
+    from continuum_swr_replay.analysis.pfc.event_sets import (
+        DEFAULT_BASIS_HALF_WINDOW_S,
+    )
+    from continuum_swr_replay.analysis.pfc.session import (
+        _load_aligned_session,
+        _session_events,
+        _session_fit_population,
+    )
+    from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 
+    stop_cohort = "at_well"
     logger = logging.getLogger(
         f"{nwb_file_name.replace('_.nwb', '')}_{epoch_name}_{brain_area}_marked"
     )
-    results, _, _ = load_results(
+    results, data, position_info, alignment = _load_aligned_session(
+        nwb_file_name, epoch_name, logger
+    )
+    time = position_info.index.to_numpy(dtype=float)
+    fit_lags = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, sampling_frequency)
+
+    data, excluded, _, fit_mask, bin_counts = _session_fit_population(
+        data,
         nwb_file_name,
         epoch_name,
-        decoding_brain_area="HPC",
-        load_detector=False,
-    )
-    data = load_data(nwb_file_name, epoch_name)
-    results, position_info, alignment = align_results_to_position(
-        results, data["position_info"]
-    )
-    data = {**data, "position_info": position_info}
-    time = position_info.index.to_numpy(dtype=float)
-
-    _, fit_mask, bin_counts = build_session_fit_mask(
-        position_info,
         cohort_stops=cohort_stops,
-        stop_cohort="at_well",
+        stop_cohort=stop_cohort,
+        logger=logger,
     )
-    fit_lags = np.arange(-125, 126, dtype=int)
-    canonical_events, event_table_sha256 = load_session_canonical_events(
-        nwb_file_name, epoch_name
-    )
-    swr_intervals, data_over_time_sha256 = load_session_swr_intervals(
-        nwb_file_name, epoch_name
-    )
-    event_times, event_counts = build_session_event_sets(
+    event_times, event_counts, event_provenance, _, _, _ = _session_events(
         data,
         results,
-        canonical_events=canonical_events,
-        swr_intervals=swr_intervals,
-        cohort_stops=cohort_stops,
-        stop_cohort="at_well",
+        nwb_file_name,
+        epoch_name,
+        time=time,
         fit_mask=fit_mask,
-        basis_half_window_s=float(np.abs(fit_lags).max()) / sampling_frequency,
+        fit_lags=fit_lags,
+        sampling_frequency=sampling_frequency,
+        cohort_stops=cohort_stops,
+        stop_cohort=stop_cohort,
+        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        logger=logger,
+    )
+    arm_path = (
+        table_path("event_arm_table")
+        if event_arm_table_path is None
+        else Path(event_arm_table_path)
     )
     marked_events, event_arm_sha256 = load_session_current_arm_marks(
         nwb_file_name,
         epoch_name,
         {event_class: event_times[event_class] for event_class in MARKED_EVENT_CLASSES},
-        event_arm_table_path=event_arm_table_path,
+        event_arm_table_path=arm_path,
     )
     spline_basis, lag_time, _ = event_basis_functions(fit_lags, sampling_frequency)
 
@@ -417,12 +419,6 @@ def prepare_marked_session_context(
         counts = np.empty((int(fit_mask.sum()), 0), dtype=float)
         logger.warning("No %s neurons found for this session", brain_area)
 
-    event_provenance = canonical_event_provenance(
-        event_table_path=DEFAULT_EVENT_TABLE_PATH,
-        event_table_sha256=event_table_sha256,
-        data_over_time_path=session_data_over_time_path(nwb_file_name, epoch_name),
-        data_over_time_sha256=data_over_time_sha256,
-    )
     return MarkedSessionContext(
         fit_mask=fit_mask,
         counts=counts,
@@ -430,14 +426,15 @@ def prepare_marked_session_context(
         spline_basis=spline_basis,
         lag_time=lag_time,
         lags=fit_lags,
-        cohort_info={**bin_counts, **event_counts, "alignment": alignment},
+        cohort_info={
+            **bin_counts,
+            **event_counts,
+            "n_excluded_intervals": int(len(excluded)),
+            "alignment": alignment,
+        },
         input_provenance={
             **event_provenance,
-            "event_arm_table_path": str(
-                DEFAULT_EVENT_ARM_TABLE_PATH
-                if event_arm_table_path is None
-                else Path(event_arm_table_path)
-            ),
+            "event_arm_table_path": str(arm_path),
             "event_arm_table_sha256": event_arm_sha256,
         },
     )
@@ -687,8 +684,8 @@ def load_session_current_arm_marks(
     events : dict[str, pd.DataFrame]
         Per event class, the canonical events to mark.
     event_arm_table_path : str or Path, optional
-        Event-arm table to read. Defaults to
-        :data:`DEFAULT_EVENT_ARM_TABLE_PATH`.
+        Event-arm table to read. Defaults to the canonical one,
+        ``table_path("event_arm_table")``, resolved at the call.
 
     Returns
     -------
@@ -698,7 +695,7 @@ def load_session_current_arm_marks(
         Digest of the table the marks were read from.
     """
     path = (
-        DEFAULT_EVENT_ARM_TABLE_PATH
+        table_path("event_arm_table")
         if event_arm_table_path is None
         else Path(event_arm_table_path)
     )
@@ -730,7 +727,7 @@ def weighted_event_onset_counts(
 ) -> NDArray:
     """Bin event-onset weights on the PFC time axis.
 
-    This is the weighted analogue of :func:`pfc.glm.event_onset_counts` and
+    This is the weighted analogue of :func:`pfc.design.event_onset_counts` and
     follows its half-open-bin convention.  Multiple events in one bin add.
     Events outside the sampled frame contribute nothing, matching the ordinary
     onset builder; the canonical session preparation audits those events before
@@ -744,7 +741,7 @@ def weighted_event_onset_counts(
         Strictly increasing session time axis, in seconds.
     weights : NDArray, shape (n_events,), optional
         Per-event weight. ``None`` weights every event by one, reproducing
-        :func:`pfc.glm.event_onset_counts`.
+        :func:`pfc.design.event_onset_counts`.
 
     Returns
     -------

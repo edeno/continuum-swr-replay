@@ -34,9 +34,7 @@ from continuum_swr_replay.analysis.pfc.batched_glm import (
     prepare_heldout_response,
     score_poisson_designs_heldout,
 )
-from continuum_swr_replay.analysis.pfc.canonical_events import DEFAULT_EVENT_TABLE_PATH
 from continuum_swr_replay.analysis.pfc.marked_glm import (
-    DEFAULT_EVENT_ARM_TABLE_PATH,
     EVENT_DURATION_MARK,
     MARKED_EVENT_CLASSES,
     MIN_MARKED_EVENTS_PER_CLASS,
@@ -48,9 +46,11 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     build_kernel_design,
     standardize_event_marks,
 )
-from continuum_swr_replay.data_loaders.utils import parse_nwb_filename
-from continuum_swr_replay.session_keys import SESSION_COLUMNS
-from continuum_swr_replay.table_io import read_table, resolved_table_path, sha256_file
+from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.paths import table_path
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.tables.io import read_table, resolved_table_path
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 CURRENT_ARM_FRACTION = "current_arm_fraction"
 PREVIOUS_ARM_FRACTION = "previous_arm_fraction"
@@ -908,8 +908,8 @@ def load_session_recommended_event_marks(
     epoch_name: str,
     events: dict[str, pd.DataFrame],
     *,
-    event_arm_table_path: str | Path = DEFAULT_EVENT_ARM_TABLE_PATH,
-    event_table_path: str | Path = DEFAULT_EVENT_TABLE_PATH,
+    event_arm_table_path: str | Path | None = None,
+    event_table_path: str | Path | None = None,
 ) -> tuple[dict[str, pd.DataFrame], dict[str, str]]:
     """Read, derive and attach all recommended marks for one session.
 
@@ -923,10 +923,10 @@ def load_session_recommended_event_marks(
         Per event class, the canonical events to mark.
     event_arm_table_path : str or Path, optional
         Canonical event-arm table to read. Defaults to
-        :data:`DEFAULT_EVENT_ARM_TABLE_PATH`.
+        ``table_path("event_arm_table")``, resolved at the call.
     event_table_path : str or Path, optional
         Canonical event table to read. Defaults to
-        :data:`DEFAULT_EVENT_TABLE_PATH`.
+        ``table_path("event_table")``, resolved at the call.
 
     Returns
     -------
@@ -943,8 +943,16 @@ def load_session_recommended_event_marks(
         If the session has no rows in either table, or if mark derivation or
         attachment refuses the session's tables.
     """
-    arm_path = Path(event_arm_table_path)
-    event_path = Path(event_table_path)
+    arm_path = (
+        table_path("event_arm_table")
+        if event_arm_table_path is None
+        else Path(event_arm_table_path)
+    )
+    event_path = (
+        table_path("event_table")
+        if event_table_path is None
+        else Path(event_table_path)
+    )
     arm_table = read_table(arm_path)
     event_table = read_table(event_path)
     for name, table in (("event-arm", arm_table), ("event", event_table)):
