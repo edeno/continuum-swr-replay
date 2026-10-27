@@ -40,6 +40,16 @@ the lead's OK). Design: `docs/design/2026-10-26-reported-values-design.md`. Ever
 - Claim 10's per-session quality output (`quality_summary.csv`, April, 218 epochs) predates the re-decode.
 - The three part worktrees (`continuum-swr-replay-reported-part{1,3,4}`) are merged and can be removed.
 
+## Duration-aware event history (2026-10-26, simulation stage)
+
+The per-bin rate design treats events as instantaneous onsets: bins inside an ongoing event count as at risk,
+and history counts past onsets only. With events lasting ~50-90 ms, the self-history "burst" (Part 3
+`rate_burst_*`, already pending) and the cross-history coupling (`models_per_bin_rate/cross_history_models.pkl`,
+2026-10-11, no provenance sidecar, NOT in part3.json) may be duration artifacts. An agent is testing an at-risk
+mask plus onset- and offset-locked history on simulated data (own worktree; report
+`.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`). Hold the cross-history values out of
+Part 3 until then; then decide on refitting the real self- and cross-history models.
+
 ## Next project: mPFC response (approved 2026-10-26)
 
 Items 2 (SWRs without replay), 3 (content), 4 (timing), 5 (event strength), 8 (behavioral context).
