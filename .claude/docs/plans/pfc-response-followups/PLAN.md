@@ -1,6 +1,6 @@
 # mPFC Response Follow-ups Implementation Plan
 
-**Status:** Phases 0 (port) and 1 (A, timing) done 2026-10-26; stopped for the lead before phase 2 (open questions in overview.md). See ledger.md.
+**Status:** Phases 0 and 1 (A, with decreases) done; phase 2 (B) code done, smoke passed, full batch running since 2026-10-26 22:55 (tmux `pfc_b_swr_without_replay`); phase 3 (C) not started. See ledger.md.
 
 Answers five questions about how mPFC units respond to hippocampal non-local events, comparing SWR-coupled replay (non-local events that overlap a Kay SWR) with non-SWR replay: (4) when the response peaks and whether it starts before event onset; (2) whether mPFC responds to Kay SWRs that overlap no non-local event as it does to SWR-coupled replay; (3) whether the response depends on what is replayed; (5) whether it scales with event strength; (8) whether it differs with the stop's reward outcome and in the trials before a patch switch. Timing is read from the canonical Figure 4 bundles. The other questions need new fits, which write to their own bundle trees. Every reported number goes through `paper/reported/part4.json`.
 

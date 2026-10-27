@@ -33,13 +33,19 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-26 | 2 (B) | worktree venv lacked CUDA jax (first smoke launch fell back to CPU and the runner refused it); installed with `uv sync --frozen --inexact --extra cuda` (no lockfile change) | — | `logs/pfc_response_followups/swr_without_replay_smoke/failed_cpu_jax/` | — |
 | 2026-10-26 | 2 (B) | smoke, 4 sessions (j1620210710 12_r6, senor20201101 06_r3, wilbur20210331 16_r8, peanut20201128 16_r8), GPUs 1–4, R = 1,000, started 21:11 | `44b20a72` (+ later commits that do not touch the fit path) | tmux `pfc_b_smoke`; logs `logs/pfc_response_followups/swr_without_replay_smoke/`; output `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | SWRs without replay per session (sidecar `n_swr_no_non_local`): 38, 2, 34, 9 |
 
+| 2026-10-26 | 2 (B) | smoke finished; wall times 48 min (j16, 74 units), 66 min (senor, 277), 70 min (peanut, 296), 102 min (wilbur, 511) — 1.09–1.26× the canonical batch's minutes for the same sessions; peak GPU memory about 17 GB per worker over an 8 GB baseline; host RSS ≤ 9.4 GB | `44b20a72` | smoke tree | `compare_pfc_event_set_bundles.py`: every canonical column and all five canonical curves **identical** (max difference 0) in all 4 sessions; 26 new columns per bundle |
+| 2026-10-26 | 2 (B) | smoke finding for the lead: in sessions with very few SWRs without replay the new class's empirical p is NaN for many units (the canonical rule needs all 1,000 null draws finite; a draw whose fit fails on a low-rate unit leaves the unit untested). Finite p: 72/74 (38 events), 296/296 (9), 83/277 (2), 504/511 (34) | — | — | reporting rule needed in phase 4 (e.g. a minimum number of events per session, as the marked family's 10) |
+| 2026-10-26 | 2 (B) | extrapolation: canonical batch 80.9 GPU-h × ~1.2 ≈ 97 GPU-h; LPT partition over 9 cards ≈ 10.6–11.2 h per card (< 16 h) → full refit, all classes' nulls | — | `logs/pfc_response_followups/swr_without_replay/gpu<N>.sessions` | — |
+| 2026-10-26 | 2 (B) | **full batch launched 22:55**, 75 sessions, GPUs 1–9, R = 1,000, ETA about 10:00 on 2026-10-27 | `ccb5b8d0` | tmux `pfc_b_swr_without_replay` (window `gpumem` samples memory each minute); logs `logs/pfc_response_followups/swr_without_replay/`; output `Processed-Data/pfc_response_followups/swr_without_replay/` | running |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
 |---|---|---|---|---|---|---|---|
 | timing calibration | — (foreground, CPU) | none | — | `Processed-Data/pfc_response_followups/` | 2026-10-26 | 2026-10-26 | 2 min 15 s CPU |
 | timing calibration with decreases | — (background, CPU) | none | — | `Processed-Data/pfc_response_followups/timing_calibration.json` | 2026-10-26 | 2026-10-26 | about 40 min CPU (shared with tests) |
-| Phase B smoke | `pfc_b_smoke` | 1–4 | `logs/pfc_response_followups/swr_without_replay_smoke/` | `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | 2026-10-26 21:11 | | |
+| Phase B smoke | `pfc_b_smoke` (closed) | 1–4 | `logs/pfc_response_followups/swr_without_replay_smoke/` | `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | 2026-10-26 21:11 | 2026-10-26 22:53 | 48–102 min per session |
+| Phase B batch | `pfc_b_swr_without_replay` | 1–9 | `logs/pfc_response_followups/swr_without_replay/` | `Processed-Data/pfc_response_followups/swr_without_replay/` | 2026-10-26 22:55 | | ETA ~10:00 2026-10-27 |
 
 ## Findings (phase 1)
 
