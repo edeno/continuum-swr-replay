@@ -141,7 +141,7 @@ There are two model families; see [rate_models.md](rate_models.md):
 
 | What it estimates | Run | Script | Figures | Claims |
 |---|---|---|---|---|
-| Rate per time bin: time course, reward kernel, history | `rate.per_bin.{at_well,all_stops,in_transit}` | `rate/fit_per_bin_rate_models.py` | `rate.fig.per_bin_ladder`, `rate.fig.per_bin_summary`, `rate.fig.model_checking`; `rate.doc.per_bin_results` writes [per_bin_rate_results.md](per_bin_rate_results.md) | 19c |
+| Rate per time bin: time course, reward kernel, history | `rate.per_bin.{at_well,all_stops,in_transit}` | `rate/fit_per_bin_rate_models.py` | `rate.fig.per_bin_ladder`, `rate.fig.per_bin_summary`, `rate.fig.model_checking`; `rate.doc.per_bin_results` prints the effects [per_bin_rate_results.md](per_bin_rate_results.md) reports (its numbers are filled from `paper/reported/part3.json`) | 19c |
 | Rate per stop | `rate.per_stop.{at_well,all_stops}` | `rate/fit_per_stop_rate_models.py` | — | 19c |
 | How SWR and non-SWR rates differ, term by term, paired within session | `rate.swr_contrast.{at_well,all_stops}` | `rate/fit_swr_contrast_rate.py` | `content.fig.swr_contrast_coefs` | 19c, 19f |
 | Rate against arm uncertainty and value | `rate.uncertainty.at_well` | `rate/fit_uncertainty_rate.py` | `rate.fig.uncertainty` | — |
