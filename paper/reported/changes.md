@@ -1079,3 +1079,13 @@ marker, and the computed value now there. Newest last.
 | Doc | Key | Was | Now |
 |---|---|---|---|
 | `paper/claims_table.md` | `part2.end_offset_median_ms` | -4 | −4 |
+
+## 2026-10-26
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_short_replay_p_spread` | 0.010 | 0.0099 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_outbound_p_spread` | 0.010 | 0.0099 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_inbound_p_spread` | 0.010 | 0.0099 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_stray_window_dispersion_cm` | 14.4 | 14 |
+| `paper/figures/memoryless_comparison/memoryless_comparison_caption.md` | `part1.recording_stray_window_pieces_dispersion_cm` | 0.5 | 0.53 |

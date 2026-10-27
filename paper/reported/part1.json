@@ -3,7 +3,7 @@
  "part": 1,
  "title": "the model",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "6e13b49e103e",
+ "commit": "7fb1dcfa84ad",
  "inputs": [
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",
@@ -20,6 +20,10 @@
   {
    "path": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/manifest.json",
    "sha256": "5538d333d003c1959e73503938ae63cf48c937bd0673e742a79f43dae27c39bd"
+  },
+  {
+   "path": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json",
+   "sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
   },
   {
    "path": "docs/design/replay_detection_comparison/detection_sweep_summary.csv",
@@ -1343,6 +1347,342 @@
     "figure: memoryless comparison"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "pending": null
+  },
+  "recording_inbound_p_jump": {
+   "value": 0.019801980198019802,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the inbound replay: jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_inbound_p_spread": {
+   "value": 0.009900990099009901,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the inbound replay: spread half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_outbound_draws_from_passing": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "how many more shuffle draws below the observed value than a pass allows",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_outbound_duration_ratio": {
+   "value": 5.779951100244497,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "the sliding window's reported duration of the continuous outbound replay over its true duration",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_outbound_local_fraction": {
+   "value": 0.8055555555555556,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of that reported event's kept windows decoding the animal's own place (within 15 cm)",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_outbound_p_jump": {
+   "value": 0.07920792079207921,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the outbound replay: jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_outbound_p_spread": {
+   "value": 0.009900990099009901,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the outbound replay: spread half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_remote_stationary_dispersion_cm": {
+   "value": 0.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "largest dispersion of a candidate over the remote stationary event",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_short_path_dispersion_cm": {
+   "value": 6.255837822237522,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "largest dispersion of a sliding-window candidate over the 30 cm replay",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_short_replay_duration_ratio": {
+   "value": 1.6000000000000356,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "",
+   "description": "the sliding window's reported duration of the 80 ms replay over its true duration",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_short_replay_local_fraction": {
+   "value": 0.0,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of that reported event's kept windows decoding the animal's own place",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_short_replay_p_jump": {
+   "value": 0.0297029702970297,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the 80 ms replay: jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_short_replay_p_spread": {
+   "value": 0.009900990099009901,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the 80 ms replay: spread half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_state_space_bound_error_ms": {
+   "value": 42.00000000000159,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "largest error in either bound of the state-space detector's reports of the four zoomed events",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_dispersion_cm": {
+   "value": 14.375550376708484,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "its dispersion with the window outside every piece",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_distance_cm": {
+   "value": 148.7499541695486,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "distance from the animal of the far cell whose two spikes fill the stray window",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_duration_ms": {
+   "value": 396.0000000000008,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "the stray-window event's reported duration",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_local_fraction": {
+   "value": 0.9896907216494846,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "share of the stray-window event's kept windows decoding within 15 cm of the animal",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_p_jump": {
+   "value": 0.31683168316831684,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the stray-window event: jump half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_p_spread": {
+   "value": 0.40594059405940597,
+   "kind": "quantity",
+   "style": "pval",
+   "unit": "",
+   "description": "significance test of the stray-window event: spread half",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "pending": null
+  },
+  "recording_stray_window_pieces_dispersion_cm": {
+   "value": 0.5337834065514341,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "its dispersion without that window",
+   "claims": [
+    "12"
+   ],
+   "used_in": [
+    "supplement",
+    "figure: memoryless comparison"
+   ],
+   "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
   },
   "state_evidence_animals": {

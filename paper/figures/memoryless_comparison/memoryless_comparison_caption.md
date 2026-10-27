@@ -38,13 +38,13 @@ and gives it <!--v:part1.recording_outbound_duration_ratio-->5.8<!--/v--> times 
 the animal's own place, absorbed by the merge rule. It also accepts the 80 ms
 replay, at <!--v:part1.recording_short_replay_duration_ratio-->1.6<!--/v--> times its length with <!--v:part1.recording_short_replay_local_fraction@pctnum-->0<!--/v-->% local coding in it: the window alone
 puts a floor under any duration it can report. It passes the significance test
-(p = <!--v:part1.recording_short_replay_p_spread-->0.010<!--/v--> on spread and <!--v:part1.recording_short_replay_p_jump-->0.030<!--/v--> on jump). It assembles a candidate from the 30
+(p = <!--v:part1.recording_short_replay_p_spread-->0.0099<!--/v--> on spread and <!--v:part1.recording_short_replay_p_jump-->0.030<!--/v--> on jump). It assembles a candidate from the 30
 cm replay and another from the remote stationary event and declines both for
 too little dispersion (<!--v:part1.recording_short_path_dispersion_cm-->6<!--/v--> and <!--v:part1.recording_remote_stationary_dispersion_cm-->0<!--/v--> cm against the 12 cm it requires). The
 state-space detector reports all four, with every bound within <!--v:part1.recording_state_space_bound_error_ms-->42<!--/v--> ms of the
-truth. The outbound continuous replay fails it (p = <!--v:part1.recording_outbound_p_spread-->0.010<!--/v--> on spread and <!--v:part1.recording_outbound_p_jump-->0.079<!--/v-->
+truth. The outbound continuous replay fails it (p = <!--v:part1.recording_outbound_p_spread-->0.0099<!--/v--> on spread and <!--v:part1.recording_outbound_p_jump-->0.079<!--/v-->
 on jump), <!--v:part1.recording_outbound_draws_from_passing-->3<!--/v--> draws from passing, and the inbound continuous replay passes it (p
-= <!--v:part1.recording_inbound_p_spread-->0.010<!--/v--> on spread and <!--v:part1.recording_inbound_p_jump-->0.020<!--/v--> on jump). Most of each reported continuous replay
+= <!--v:part1.recording_inbound_p_spread-->0.0099<!--/v--> on spread and <!--v:part1.recording_inbound_p_jump-->0.020<!--/v--> on jump). Most of each reported continuous replay
 is the animal's own place either way: the test asks whether a sequence is
 spatially coherent, not whether it is somewhere other than the animal. **(f)**
 A still event at the animal's own place, with spikes placed by hand so that one
@@ -55,7 +55,7 @@ the event is reported <!--v:part1.recording_stray_window_duration_ms-->396<!--/v
 too broad to keep, but the one after it centres near it, so it passes the jump
 rule; as a run of one window it is dropped before the merge, and the still
 parts either side merge across it. Its dispersion still counts toward the
-merged event's, as in the reference: <!--v:part1.recording_stray_window_dispersion_cm-->14.4<!--/v--> cm with it and <!--v:part1.recording_stray_window_pieces_dispersion_cm-->0.5<!--/v--> cm without,
+merged event's, as in the reference: <!--v:part1.recording_stray_window_dispersion_cm-->14<!--/v--> cm with it and <!--v:part1.recording_stray_window_pieces_dispersion_cm-->0.53<!--/v--> cm without,
 against the 12 cm required, so a still event is called replay on the strength
 of one window. Put through the significance test it fails it (p = <!--v:part1.recording_stray_window_p_spread-->0.41<!--/v--> on
 spread and <!--v:part1.recording_stray_window_p_jump-->0.32<!--/v--> on jump). The state-space detector reports no non-local event
