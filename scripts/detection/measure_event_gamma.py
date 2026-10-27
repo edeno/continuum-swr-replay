@@ -56,8 +56,9 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-KEYS = ["animal", "session_date", "epoch"]
+KEYS = list(SESSION_COLUMNS)
 
 
 def out_dir() -> Path:
