@@ -28,8 +28,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
+from continuum_swr_replay import intervals
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
@@ -446,6 +448,207 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                     f"highest per-animal share of {detector} events overlapping no non-local event",
                 ),
             ]
+    return values
+
+
+# --- 2a: what an analysis without the non-local detector leaves out -------------
+
+#: The other inventories an SWR- or rate-triggered analysis would use.
+SWR_DEFINITIONS = ("kay", "karlsson", "yu", "zugaro", "carey")
+TRIGGERS = (*SWR_DEFINITIONS, "mua")
+
+
+def _intervals(table: pd.DataFrame, detectors: tuple[str, ...]) -> np.ndarray:
+    rows = table[table["detector"].isin(detectors)]
+    return rows[["event_start_s", "event_end_s"]].to_numpy(dtype=np.float64)
+
+
+def left_out_seconds(run_dir: Path) -> dict[str, float]:
+    """Seconds of non-local event time outside each other inventory, summed over epochs.
+
+    Each epoch's compared events (``*_features.parquet``: every inventory's
+    whole-event-immobile events): the non-local detector's event time, and the
+    part of it that no event of Kay, of any of the five SWR definitions, of any
+    trigger (the five and MUA), or of the Widloski detector covers; and the
+    time Kay's SWRs span.
+    """
+    names = (
+        "nonlocal",
+        "kay",
+        "outside_kay",
+        "outside_swr",
+        "outside_trigger",
+        "outside_widloski",
+    )
+    totals = dict.fromkeys(names, 0.0)
+    for path in sorted(run_dir.glob("*_features.parquet")):
+        table = pd.read_parquet(
+            path, columns=["detector", "event_start_s", "event_end_s"]
+        )
+        nonlocal_ = _intervals(table, ("state_space",))
+        totals["nonlocal"] += intervals.total_duration(nonlocal_)
+        totals["kay"] += intervals.total_duration(_intervals(table, ("kay",)))
+        for name, detectors in (
+            ("outside_kay", ("kay",)),
+            ("outside_swr", SWR_DEFINITIONS),
+            ("outside_trigger", TRIGGERS),
+            ("outside_widloski", ("memoryless",)),
+        ):
+            outside = intervals.subtract(nonlocal_, _intervals(table, detectors))
+            totals[name] += intervals.total_duration(outside)
+    return totals
+
+
+def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]:
+    """Claims 2 and 21: how many non-local events, and how much of their time, an
+    analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
+    from the Widloski detector) does not include, in total and per hour of rest.
+    """
+    make = _value_factory(source, ("2", "21"), ("paper", "figure: main, left out"))
+    counts = pd.read_csv(report_dir / "counts_by_animal.csv")
+    exposure_s = float(
+        counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
+    )
+    hours = exposure_s / 3600.0
+    cells = pd.read_csv(report_dir / "cells_by_animal.csv")
+    no_trigger = cells[
+        (cells["cell"] == "sequence_matched_by_no_trigger")
+        & (cells["detector"] == "state_space")
+    ][["n_events", "n_unmatched", "n_unknown"]].sum()
+    membership = _read_epochs(
+        run_dir, "pair_membership", filters=[("detector", "==", "state_space")]
+    )
+    known = membership[membership["membership"].isin(["matched", "unmatched"])]
+    unmatched = (
+        known.assign(alone=known["membership"] == "unmatched")
+        .groupby("other_detector")["alone"]
+        .agg(["sum", "size"])
+    )
+    seconds = left_out_seconds(run_dir)
+    values = [
+        make(
+            "rest_hours",
+            hours,
+            "quantity",
+            "sig2",
+            "hours of analysed immobility the non-local detector observed (exposure), "
+            "summed over epochs",
+            "h",
+        ),
+        make(
+            "nonlocal_time_s",
+            seconds["nonlocal"],
+            "quantity",
+            "int",
+            "seconds of non-local event time (compared events), summed over epochs",
+            "s",
+        ),
+        make(
+            "kay_time_s",
+            seconds["kay"],
+            "quantity",
+            "int",
+            "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis "
+            "examines",
+            "s",
+        ),
+    ]
+    for word, key, label, pending in (
+        ("kay", "outside_kay", "Kay's SWRs", None),
+        ("swr", "outside_swr", "the five SWR definitions together", None),
+        (
+            "trigger",
+            "outside_trigger",
+            "the five SWR definitions and MUA together",
+            None,
+        ),
+        (
+            "widloski",
+            "outside_widloski",
+            "the Widloski detector's events",
+            WIDLOSKI_PENDING,
+        ),
+    ):
+        values += [
+            make(
+                f"nonlocal_time_outside_{word}_s",
+                seconds[key],
+                "quantity",
+                "int",
+                f"seconds of non-local event time that {label} do not cover",
+                "s",
+                pending=pending,
+            ),
+            make(
+                f"nonlocal_time_outside_{word}_fraction",
+                seconds[key] / seconds["nonlocal"],
+                "fraction",
+                "pct",
+                f"share of non-local event time that {label} do not cover",
+                pending=pending,
+            ),
+        ]
+    for word, other, label, pending in (
+        ("kay", "kay", "no Kay SWR overlaps", None),
+        ("widloski", "memoryless", "no Widloski event overlaps", WIDLOSKI_PENDING),
+    ):
+        n, total = int(unmatched.loc[other, "sum"]), int(unmatched.loc[other, "size"])
+        values += [
+            make(
+                f"nonlocal_events_outside_{word}",
+                n,
+                "count",
+                "count",
+                f"non-local events {label} (detector comparison memberships)",
+                pending=pending,
+            ),
+            make(
+                f"nonlocal_events_outside_{word}_fraction",
+                n / total,
+                "fraction",
+                "pct",
+                f"share of the non-local events with a known membership that {label}",
+                pending=pending,
+            ),
+            make(
+                f"nonlocal_events_outside_{word}_per_hour",
+                n / hours,
+                "quantity",
+                "sig2",
+                f"non-local events {label}, per hour of analysed immobility",
+                "per h",
+                pending=pending,
+            ),
+        ]
+    n_no_trigger = int(no_trigger["n_unmatched"])
+    n_known = int(no_trigger["n_events"] - no_trigger["n_unknown"])
+    values += [
+        make(
+            "nonlocal_events_outside_trigger",
+            n_no_trigger,
+            "count",
+            "count",
+            "non-local events no SWR definition and no MUA event overlaps "
+            "(cell sequence_matched_by_no_trigger)",
+        ),
+        make(
+            "nonlocal_events_outside_trigger_fraction",
+            n_no_trigger / n_known,
+            "fraction",
+            "pct",
+            "share of the non-local events with a known membership that no SWR "
+            "definition and no MUA event overlaps",
+        ),
+        make(
+            "nonlocal_events_outside_trigger_per_hour",
+            n_no_trigger / hours,
+            "quantity",
+            "sig2",
+            "non-local events no SWR definition and no MUA event overlaps, per hour of "
+            "analysed immobility",
+            "per h",
+        ),
+    ]
     return values
 
 
@@ -901,6 +1104,21 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
             "state_shares (scripts/detection/add_state_shares.py)",
         )
     )
+    report_dir = directional_path.parent
+    summary.add(
+        *left_out_values(
+            run,
+            report_dir,
+            f"event features run {run.name} (every inventory's compared events) and the "
+            f"detector comparison's report ({rel(report_dir)}: counts_by_animal.csv, "
+            "cells_by_animal.csv)",
+        )
+    )
+    summary.inputs += [
+        files_record("*_features.parquet", run.glob("*_features.parquet"), ROOT_DIR),
+        file_record(report_dir / "counts_by_animal.csv", ROOT_DIR),
+        file_record(report_dir / "cells_by_animal.csv", ROOT_DIR),
+    ]
     summary.inputs += [
         files_record(
             "*_state_shares.parquet", run.glob("*_state_shares.parquet"), ROOT_DIR
