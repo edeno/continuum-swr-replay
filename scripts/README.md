@@ -179,6 +179,9 @@ them importable.
 - `fit_per_bin_rate_models.py`, `fit_per_stop_rate_models.py` — Family B / A rate ladders.
 - `fit_swr_contrast_rate.py` — the `is_swr`-contrast per-bin ladder (G0–G8 / S0–S10).
 - `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
+- `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design (bins inside an
+  ongoing event dropped; history from event onsets and ends; `MODEL_CROSS_HISTORY_DURATION_RATE`), all four
+  populations, into `models_per_bin_rate/duration_aware_history_models.pkl` with its provenance sidecar.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
 - `summarize_per_bin_rate_models.py` — generates `docs/per_bin_rate_results.md`.
 

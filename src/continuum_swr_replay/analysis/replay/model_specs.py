@@ -36,7 +36,7 @@ sits next to a specific ``ModelSpec`` stays inline below.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import NamedTuple
 
 import pandas as pd
@@ -1074,18 +1074,52 @@ MODEL_CROSS_HISTORY_RATE: dict[str, PerBinRateModelSpec] = {
     "Mselfcross": _cross_history_spec("Mselfcross", cross=True),
 }
 
-# The duration-aware twin (opt-in; nothing fits it on real data yet). Events
-# have duration and one decoder's events never overlap, so the onset-only
-# design above counts the bins inside an ongoing event as at risk and can read
-# a dependence on the previous event's END as one on its onset. These rungs add
-# the offset-history blocks; their design is built with the at-risk time
-# (``aggregate_to_timebins(at_risk_events=<every event of the decoder>,
-# offset_history=True)``), which drops the bins inside an ongoing event. The
-# simulation behind them is ``analysis/replay/duration_history_simulation.py``.
+
+# The duration-aware twin. Events have duration and one detector's events never
+# overlap, so the onset-only design above counts the bins inside an ongoing
+# event as at risk and can read a dependence on the previous event's END as one
+# on its onset. These rungs measure history from onsets, ends or both; their
+# design is built with the at-risk time (``aggregate_to_timebins(at_risk_events=
+# <every event of the detector>, offset_history=True)``), which drops the bins
+# inside an ongoing event. The fixed blocks are ``Mnohist_dur`` -> ``Mself_dur``
+# (self history, both anchors) -> ``Mselfcross_dur`` (+ cross, both anchors);
+# the one-anchor rungs give the onset-vs-offset contrasts. Runner:
+# ``scripts/rate/fit_duration_aware_history_rate.py``; the simulation behind
+# them is ``analysis/replay/duration_history_simulation.py``.
+def _duration_aware_spec(
+    name: str,
+    *,
+    self_anchors: tuple[str, ...] | None,
+    cross_anchors: tuple[str, ...] | None = None,
+) -> PerBinRateModelSpec:
+    spec = _cross_history_spec(
+        name, cross=cross_anchors is not None, duration_aware=True
+    )
+    return replace(
+        spec,
+        self_history_lags=N_HISTORY_LAGS if self_anchors else 0,
+        self_history_basis=N_HISTORY_BASIS if self_anchors else 0,
+        self_history_anchors=self_anchors or ("onset",),
+        cross_history_anchors=cross_anchors or ("onset",),
+    )
+
+
+_BOTH = ("onset", "offset")
 MODEL_CROSS_HISTORY_DURATION_RATE: dict[str, PerBinRateModelSpec] = {
-    "Mself_dur": _cross_history_spec("Mself_dur", cross=False, duration_aware=True),
-    "Mselfcross_dur": _cross_history_spec(
-        "Mselfcross_dur", cross=True, duration_aware=True
+    "Mnohist_dur": _duration_aware_spec("Mnohist_dur", self_anchors=None),
+    "Mself_onset_dur": _duration_aware_spec("Mself_onset_dur", self_anchors=("onset",)),
+    "Mself_offset_dur": _duration_aware_spec(
+        "Mself_offset_dur", self_anchors=("offset",)
+    ),
+    "Mself_dur": _duration_aware_spec("Mself_dur", self_anchors=_BOTH),
+    "Mselfcross_onset_dur": _duration_aware_spec(
+        "Mselfcross_onset_dur", self_anchors=_BOTH, cross_anchors=("onset",)
+    ),
+    "Mselfcross_offset_dur": _duration_aware_spec(
+        "Mselfcross_offset_dur", self_anchors=_BOTH, cross_anchors=("offset",)
+    ),
+    "Mselfcross_dur": _duration_aware_spec(
+        "Mselfcross_dur", self_anchors=_BOTH, cross_anchors=_BOTH
     ),
 }
 

@@ -1,0 +1,83 @@
+{
+ "n_sessions_cohort": 242,
+ "n_stops_cohort": 93560,
+ "prep_seconds": 7.4,
+ "peak_rss_gb_after_load": 0.57,
+ "sessions": [
+  {
+   "session": [
+    "senor",
+    "20201028",
+    "04_r2"
+   ],
+   "n_stops": 205,
+   "n_fits": 22,
+   "n_fits_ok": 22,
+   "seconds": 14.4,
+   "peak_rss_gb_after": 1.26,
+   "n_onsets_not_at_risk": {
+    "swr": 0,
+    "non_local": 0,
+    "non_local_swr": 0,
+    "non_local_no_swr": 0
+   },
+   "canonical_corr_self": {
+    "swr": 0.591,
+    "non_local": 0.594,
+    "non_local_swr": 0.547,
+    "non_local_no_swr": 0.842
+   }
+  },
+  {
+   "session": [
+    "wilbur",
+    "20210330",
+    "04_r2"
+   ],
+   "n_stops": 353,
+   "n_fits": 22,
+   "n_fits_ok": 22,
+   "seconds": 15.2,
+   "peak_rss_gb_after": 1.26,
+   "n_onsets_not_at_risk": {
+    "swr": 0,
+    "non_local": 0,
+    "non_local_swr": 0,
+    "non_local_no_swr": 0
+   },
+   "canonical_corr_self": {
+    "swr": 0.686,
+    "non_local": 0.617,
+    "non_local_swr": 0.682,
+    "non_local_no_swr": 0.789
+   }
+  },
+  {
+   "session": [
+    "chimi",
+    "20200214",
+    "04_r2"
+   ],
+   "n_stops": 1664,
+   "n_fits": 22,
+   "n_fits_ok": 22,
+   "seconds": 17.1,
+   "peak_rss_gb_after": 1.26,
+   "n_onsets_not_at_risk": {
+    "swr": 0,
+    "non_local": 0,
+    "non_local_swr": 0,
+    "non_local_no_swr": 0
+   },
+   "canonical_corr_self": {
+    "swr": 0.56,
+    "non_local": 0.569,
+    "non_local_swr": 0.465,
+    "non_local_no_swr": 0.636
+   }
+  }
+ ],
+ "seconds_per_stop": 0.0016924482064742368,
+ "seconds_intercept": 14.313126695071423,
+ "cpu_hours_single_worker": 1.01
+}

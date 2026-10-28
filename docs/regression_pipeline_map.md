@@ -554,6 +554,12 @@ Bivariate per-bin conditional intensity: does one non-local stream's history dri
 
 `fit_cross_history`, `main`
 
+### `scripts/rate/fit_duration_aware_history_rate.py`
+
+Duration-aware self- and cross-history of the per-bin event rate.
+
+`attach_event_ends`, `fit_duration_aware_history`, `main`
+
 ### `scripts/rate/fit_per_bin_rate_models.py`
 
 Fit the per-bin conditional-intensity ladder (Family B) and persist it.

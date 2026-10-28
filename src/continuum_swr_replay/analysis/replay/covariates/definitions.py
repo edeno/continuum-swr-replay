@@ -883,6 +883,8 @@ for lag in range(1, N_HISTORY_LAGS + 1):
     for prefix, description in (
         ("onset_lag", "Own-population event occurrence"),
         ("cross_lag", "Other-population event occurrence"),
+        ("offset_lag", "Own-population event end"),
+        ("cross_offset_lag", "Other-population event end"),
     ):
         _DEFINITIONS.append(
             _definition(
@@ -902,6 +904,8 @@ for basis in range(N_HISTORY_BASIS):
     for prefix, description in (
         ("hist_rcos_", "Own-population event-history"),
         ("cross_hist_rcos_", "Other-population event-history"),
+        ("offhist_rcos_", "Own-population event-end history"),
+        ("cross_offhist_rcos_", "Other-population event-end history"),
     ):
         _DEFINITIONS.append(
             _definition(

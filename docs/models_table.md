@@ -285,21 +285,31 @@ Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
 ```
 
 ## Cross-history coupling, duration-aware — per-bin Poisson (auxiliary)
-Not fitted on real data yet (opt-in; simulation only:
-`analysis/replay/duration_history_simulation.py`, review
-`.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`).
+`scripts/rate/fit_duration_aware_history_rate.py` →
+`models_per_bin_rate/duration_aware_history_models.pkl` (+ `.provenance.json`).
+Simulation behind it: `analysis/replay/duration_history_simulation.py`, review
+`.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`.
 
-`MODEL_CROSS_HISTORY_DURATION_RATE` in `model_specs.py`. Non-local events have
-duration and one decoder's events never overlap, so these rungs are fit on the
-at-risk design: `aggregate_to_timebins(at_risk_events=<every event of the
-decoder>, offset_history=True)` drops the bins inside an ongoing event and sets
-each bin's exposure to the time no event covers. History is measured from past
-events' onsets and from their ends (`*_history_anchors`), so an end-locked
-dependence (fragmentation) is not read as an onset-locked one.
+`MODEL_CROSS_HISTORY_DURATION_RATE` in `model_specs.py`. Events have duration
+and one detector's events never overlap, so these rungs are fit on the at-risk
+design: `aggregate_to_timebins(at_risk_events=<every event of the detector>,
+offset_history=True)` drops the bins inside an ongoing event and sets each bin's
+exposure to the time no event covers. History is measured from past events'
+onsets, their ends, or both (`*_history_anchors`), so an end-locked dependence
+(fragmentation) is not read as an onset-locked one. The fixed blocks are
+`Mnohist_dur` → `Mself_dur` → `Mselfcross_dur`; the one-anchor rungs give the
+onset-vs-offset contrasts. Self-history rungs are fit on all four populations
+(detected SWR, at risk outside Kay SWRs; the non-local ones, at risk outside
+non-local events); the cross rungs on the two non-local streams.
 
 ```rungs
-Mself_dur       count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS
-Mselfcross_dur  count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + XOFFCOS
+Mnohist_dur            count ~ BS_TC + REWBASIS
+Mself_onset_dur        count ~ BS_TC + REWBASIS + HISTCOS
+Mself_offset_dur       count ~ BS_TC + REWBASIS + OFFCOS
+Mself_dur              count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS
+Mselfcross_onset_dur   count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS
+Mselfcross_offset_dur  count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + XOFFCOS
+Mselfcross_dur         count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + XOFFCOS
 ```
 
 ## Per-stop rate — Family A

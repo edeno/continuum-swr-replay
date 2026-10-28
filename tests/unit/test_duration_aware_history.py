@@ -200,11 +200,26 @@ def test_shipped_cross_history_formulas_are_unchanged():
 
 
 def test_duration_aware_rungs_add_the_offset_blocks():
-    dur_self, dur_cross = model_specs.MODEL_CROSS_HISTORY_DURATION_RATE.values()
+    ladder = model_specs.MODEL_CROSS_HISTORY_DURATION_RATE
+    dur_self, dur_cross = ladder["Mself_dur"], ladder["Mselfcross_dur"]
     m_self, m_cross = model_specs.MODEL_CROSS_HISTORY_RATE.values()
-    off = [f"offhist_rcos_{k}" for k in range(model_specs.N_HISTORY_BASIS)]
-    cross_off = [f"cross_offhist_rcos_{k}" for k in range(model_specs.N_HISTORY_BASIS)]
+    nb = model_specs.N_HISTORY_BASIS
+    on = [f"hist_rcos_{k}" for k in range(nb)]
+    off = [f"offhist_rcos_{k}" for k in range(nb)]
+    cross_on = [f"cross_hist_rcos_{k}" for k in range(nb)]
+    cross_off = [f"cross_offhist_rcos_{k}" for k in range(nb)]
+    base = [c for c in m_self.design_columns() if c not in on]
     assert dur_self.design_columns() == m_self.design_columns() + off
+    # the anchor-contrast rungs: each block from onsets, ends, or neither
+    assert ladder["Mnohist_dur"].design_columns() == base
+    assert ladder["Mself_onset_dur"].design_columns() == base + on
+    assert ladder["Mself_offset_dur"].design_columns() == base + off
+    assert ladder["Mselfcross_onset_dur"].design_columns() == (
+        base + on + off + cross_on
+    )
+    assert ladder["Mselfcross_offset_dur"].design_columns() == (
+        base + on + off + cross_off
+    )
     assert dur_cross.design_columns() == (
         m_self.design_columns()
         + off
