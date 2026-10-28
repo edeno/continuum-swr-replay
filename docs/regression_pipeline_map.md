@@ -106,6 +106,12 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 `brain_state_reference`
 
+### `src/continuum_swr_replay/analysis/hippocampus/class_or_continuum.py`
+
+One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
+
+`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
 Aggregation of analysis results over time.
@@ -741,6 +747,12 @@ Measure each epoch's theta, ripple and MUA levels during running and during quie
 Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
 
 `out_dir`, `epoch_gamma`, `main`
+
+### `scripts/detection/measure_ripple_class_structure.py`
+
+One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
+
+`out_dir`, `measure_epoch`, `epoch_identifier`, `run_measure`, `sha256_file`, `files_digest`, `load_events`, `distribution_table`, `distribution_simulation`, `plot_distributions`, `property_frame`, `design_rows`, `step_table`, `step_simulation`, `plot_property`, `spot_check_events`, `plot_spot_checks`, `run_analyze`, `main`
 
 ### `scripts/detection/report_event_features.py`
 
