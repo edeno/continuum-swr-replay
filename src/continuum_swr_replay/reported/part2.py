@@ -36,7 +36,6 @@ import pandas as pd
 from continuum_swr_replay import intervals
 from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
     KAY_ZSCORE_THRESHOLD,
-    SARLE_CUTOFF,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
@@ -992,14 +991,6 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
 
 # --- 2b: one class or two -------------------------------------------------------
 
-_POWER_LABELS = {
-    "peak": "the event's peak ripple power",
-    "mean": "the event's mean ripple power",
-    "criterion": "the Kay criterion around the event (the level the ripple it "
-    "touches sustains for 14 ms)",
-}
-_SEPARATIONS = {1.0: "observed", 2.0: "double", 3.0: "triple", 4.0: "quadruple"}
-
 #: property word -> (what it is, its claims besides 24)
 _STEP_PROPERTIES = {
     "duration": ("log event duration", ("18",)),
@@ -1014,6 +1005,10 @@ _STEP_PROPERTIES = {
 STEP_KNOTS = 8
 STEP_WINDOW_Z = 1.5
 """The step test's main settings (``measure_ripple_class_structure.py``'s defaults)."""
+_CRITERION = (
+    "the Kay criterion around the event (the level the ripple it touches sustains "
+    "for 14 ms)"
+)
 
 
 def class_distribution_values(
@@ -1022,22 +1017,38 @@ def class_distribution_values(
     simulation: pd.DataFrame,
     source: str,
 ) -> list[Value]:
-    """Claim 24, test 1: is event ripple power unimodal, and where is its mode
-    against the Kay threshold?
+    """Claim 24, test 1: is the events' peak ripple power unimodal, and where is
+    its mode against the Kay threshold?
 
-    Per animal and pooled over animals, Hartigan's dip test, the KDE's modes
-    (prominence above 5 % of the highest density) and Sarle's coefficient, for
-    the event's peak and mean ripple power and the Kay criterion. The
-    simulation checks are the dip test's rejection rate (p < 0.05) on samples
-    matched to each animal: unimodal (gamma and lognormal at its mean, SD and
-    skew) and two Gaussian classes at the labels' medians, robust SDs and
-    shares, the SWR class moved out to 1-4 times the observed separation.
+    Per animal, Hartigan's dip test and the KDE's main mode of the event's peak
+    ripple power (the z-scored Kay consensus on the decode grid). The simulation
+    checks are the dip test's rejection rate (p < 0.05) on samples matched to
+    each animal: unimodal (gamma and lognormal at its mean, SD and skew) and two
+    Gaussian classes at the labels' medians, robust SDs and shares, at the
+    observed separation and at double it. Every other measure stays in the
+    analysis's CSV outputs.
     """
     make = _value_factory(source, ("24",), ("supplement", "figure: one class or two"))
-    animals = distribution[distribution.animal != "pooled"]
+    peak = distribution[
+        (distribution.animal != "pooled") & (distribution.power == "peak")
+    ]
     pooled_labels = labels[labels.animal == "pooled"].iloc[0]
-    per_animal_labels = labels[labels.animal != "pooled"]
-    values = [
+    rejects = simulation.assign(rejects=simulation.dip_p < 0.05)
+    unimodal = (
+        rejects[rejects.scenario.str.startswith("unimodal")]
+        .groupby(["animal", "power", "scenario"])
+        .rejects.mean()
+    )
+
+    def two_classes(factor: float) -> pd.Series:
+        rows = rejects[
+            (rejects.scenario == "two_classes")
+            & np.isclose(rejects.separation_factor, factor)
+        ]
+        return rows.groupby(["animal", "power"]).rejects.mean()
+
+    methods = ("paper",)  # the methods section
+    return [
         make(
             "kay_threshold_z",
             KAY_ZSCORE_THRESHOLD,
@@ -1047,19 +1058,72 @@ def class_distribution_values(
             "z",
         ),
         make(
+            "ripple_peak_animals_unimodal",
+            (peak.dip_p >= 0.05).sum(),
+            "count",
+            "count",
+            "animals in which Hartigan's dip test does not reject one mode of the "
+            "events' peak ripple power (p at or above 0.05)",
+        ),
+        make(
+            "ripple_peak_dip_p_min",
+            peak.dip_p.min(),
+            "quantity",
+            "pval",
+            "smallest per-animal p-value of that dip test",
+        ),
+        make(
+            "ripple_peak_mode_animal_min",
+            peak.main_mode_z.min(),
+            "quantity",
+            "dec2",
+            "lowest per-animal location of the main KDE mode of the events' peak "
+            "ripple power",
+            "z",
+        ),
+        make(
+            "ripple_peak_mode_animal_max",
+            peak.main_mode_z.max(),
+            "quantity",
+            "dec2",
+            "highest per-animal location of that mode",
+            "z",
+        ),
+        make(
+            "dip_sim_unimodal_reject_max",
+            unimodal.max(),
+            "fraction",
+            "pct",
+            "simulation check: the highest rate at which the dip test (p < 0.05) calls "
+            "a unimodal sample matched to an animal's mean, SD and skew bimodal, over "
+            "animals, power measures and the gamma and lognormal laws",
+            used_in_=methods,
+        ),
+        make(
+            "dip_sim_two_classes_observed_power_max",
+            two_classes(1.0).max(),
+            "fraction",
+            "pct",
+            "simulation check: the highest rate at which the dip test detects two "
+            "Gaussian classes at the labels' observed separation (medians, robust SDs "
+            "and shares of the SWR and non-SWR events), over animals and power measures",
+            used_in_=methods,
+        ),
+        make(
+            "dip_sim_two_classes_double_power_min",
+            two_classes(2.0).min(),
+            "fraction",
+            "pct",
+            "simulation check: the lowest such rate at double the observed separation",
+            used_in_=methods,
+        ),
+        make(
             "non_swr_peak_above_threshold_fraction",
             pooled_labels.non_swr_peak_above_fraction,
             "fraction",
             "pct",
             "share of non-SWR events whose peak ripple power reaches the Kay threshold",
-        ),
-        make(
-            "swr_peak_below_threshold_fraction",
-            pooled_labels.swr_peak_below_fraction,
-            "fraction",
-            "pct",
-            "share of SWR-overlapping events whose own peak ripple power stays below "
-            "the Kay threshold",
+            used_in_=methods,
         ),
         make(
             "criterion_label_agreement",
@@ -1068,146 +1132,8 @@ def class_distribution_values(
             "pct",
             "share of events whose label is_swr equals 'Kay criterion at or above the "
             "threshold' (the criterion read on the 2 ms decode grid)",
+            used_in_=methods,
         ),
-        make(
-            "criterion_label_agreement_animal_min",
-            per_animal_labels.criterion_agrees.min(),
-            "fraction",
-            "pct",
-            "lowest per-animal share of that agreement",
-        ),
-        make(
-            "swr_below_criterion",
-            pooled_labels.swr_below_criterion,
-            "count",
-            "count",
-            "SWR-overlapping events whose Kay criterion is below the threshold",
-        ),
-        make(
-            "non_swr_above_criterion",
-            pooled_labels.non_swr_above_criterion,
-            "count",
-            "count",
-            "non-SWR events whose Kay criterion reaches the threshold on the decode grid",
-        ),
-    ]
-    for word, label in _POWER_LABELS.items():
-        mine = animals[animals.power == word]
-        pooled = distribution[
-            (distribution.animal == "pooled") & (distribution.power == word)
-        ].iloc[0]
-        key = f"ripple_{word}"
-        values += [
-            make(
-                f"{key}_dip_p_min",
-                mine.dip_p.min(),
-                "quantity",
-                "pval",
-                f"smallest per-animal p-value of Hartigan's dip test on {label}",
-            ),
-            make(
-                f"{key}_dip_p_pooled",
-                pooled.dip_p,
-                "quantity",
-                "pval",
-                f"dip-test p-value on {label}, every event pooled over animals",
-            ),
-            make(
-                f"{key}_animals_unimodal",
-                (mine.dip_p >= 0.05).sum(),
-                "count",
-                "count",
-                f"animals in which the dip test does not reject one mode of {label} "
-                "(p at or above 0.05)",
-            ),
-            make(
-                f"{key}_animals_one_mode",
-                (mine.n_modes == 1).sum(),
-                "count",
-                "count",
-                f"animals whose KDE of {label} has one mode",
-            ),
-            make(
-                f"{key}_mode_animal_min",
-                mine.main_mode_z.min(),
-                "quantity",
-                "dec2",
-                f"lowest per-animal location of the main mode of {label}",
-                "z",
-            ),
-            make(
-                f"{key}_mode_animal_max",
-                mine.main_mode_z.max(),
-                "quantity",
-                "dec2",
-                f"highest per-animal location of the main mode of {label}",
-                "z",
-            ),
-            make(
-                f"{key}_sarle_pooled",
-                pooled.sarle,
-                "quantity",
-                "dec2",
-                f"Sarle's bimodality coefficient of {label}, pooled (descriptive: above "
-                f"{SARLE_CUTOFF:.3f} is often read as bimodal, but a skewed unimodal law "
-                "exceeds it too)",
-            ),
-        ]
-    rejects = simulation.assign(rejects=simulation.dip_p < 0.05)
-    unimodal = rejects[rejects.scenario.str.startswith("unimodal")]
-    rates = unimodal.groupby(["animal", "power", "scenario"]).rejects.mean()
-    values += [
-        make(
-            "dip_sim_unimodal_reject_max",
-            rates.max(),
-            "fraction",
-            "pct",
-            "simulation check: the highest rate at which the dip test (p < 0.05) calls "
-            "a unimodal sample matched to an animal's (or the pooled) mean, SD and skew "
-            "bimodal, over animals, power measures and the gamma and lognormal laws",
-        ),
-        make(
-            "sarle_sim_unimodal_above_cutoff_fraction",
-            (unimodal.sarle > SARLE_CUTOFF).mean(),
-            "fraction",
-            "pct",
-            "simulation check: share of those unimodal samples whose Sarle coefficient "
-            "is above the uniform's (why Sarle is only descriptive here)",
-        ),
-    ]
-    mixtures = rejects[rejects.scenario == "two_classes"]
-    for factor, word in _SEPARATIONS.items():
-        power = (
-            mixtures[np.isclose(mixtures.separation_factor, factor)]
-            .groupby(["animal", "power"])
-            .rejects.mean()
-        )
-        values += [
-            make(
-                f"dip_sim_two_classes_{word}_power_min",
-                power.min(),
-                "fraction",
-                "pct",
-                f"simulation check: the lowest rate at which the dip test detects two "
-                f"Gaussian classes at {word} the labels' separation (medians, robust SDs "
-                "and shares of the SWR and non-SWR events), over animals and power measures",
-            ),
-            make(
-                f"dip_sim_two_classes_{word}_power_max",
-                power.max(),
-                "fraction",
-                "pct",
-                f"simulation check: the highest such rate at {word} the separation",
-            ),
-        ]
-    return values
-
-
-def _step_rows(steps: pd.DataFrame) -> pd.DataFrame:
-    """The step fits at the main settings."""
-    return steps[
-        (steps.n_knots == STEP_KNOTS)
-        & ((steps.power != "criterion") | np.isclose(steps.window_z, STEP_WINDOW_Z))
     ]
 
 
@@ -1216,204 +1142,105 @@ def class_step_values(
 ) -> list[Value]:
     """Claim 24 and the property claims, test 2: is there a step at the threshold?
 
-    Per animal and property, ``y ~ s(power)`` against ``y ~ s(power) + label``
-    (cubic B-spline of power, 8 knots), with and without a smooth of log
-    duration ("dur"). An animal has a step when the label term's 95 %
-    interval (clustered by epoch) excludes 0 and the label lowers the held-out
-    squared error (5 folds grouped by epoch). Three versions: "peak" and "mean"
-    (the event's own ripple power, label is_swr, rows in the power range where
-    both labels occur), and "criterion" (a sharp discontinuity design on the Kay
-    criterion around the event, label criterion >= 2 z, rows within 1.5 z of
-    the threshold). The share is the label term over the animal's SWR minus
-    non-SWR difference of the property over all its events.
+    A sharp discontinuity design on the Kay criterion around each event: per
+    animal and property, ``y ~ s(criterion)`` against ``y ~ s(criterion) +
+    (criterion >= 2 z)`` (cubic B-spline, 8 knots) on the events within 1.5 z of
+    the threshold, with and without a smooth of log duration ("dur"). An animal
+    has a step when the term's 95 % interval (clustered by epoch) excludes 0 and
+    it lowers the held-out squared error (5 folds grouped by epoch). The share is
+    the term over the animal's SWR minus non-SWR difference over all its events.
+    The simulation checks use one continuum of events labelled by the Kay rule on
+    a simulated ripple trace. The version on the event's own power, the
+    sensitivity settings and the other checks stay in the CSV outputs.
     """
-    main = _step_rows(steps)
+    main = steps[
+        (steps.n_knots == STEP_KNOTS)
+        & (steps.power == "criterion")
+        & np.isclose(steps.window_z, STEP_WINDOW_Z)
+    ]
+
+    def rows(prop: str, covariate: str) -> pd.DataFrame:
+        found = main[(main.property == prop) & (main.covariate == covariate)]
+        if len(found) != 5:
+            raise ValueError(f"{prop} {covariate}: {len(found)} animals")
+        return found
+
     values: list[Value] = []
     for prop, (label, claims) in _STEP_PROPERTIES.items():
         make = _value_factory(
             source, ("24", *claims), ("supplement", "figure: one class or two")
         )
-        for power in ("peak", "mean", "criterion"):
-            for covariate, suffix in (("none", ""), ("log_duration", "_dur")):
-                if prop == "duration" and covariate != "none":
-                    continue
-                rows = main[
-                    (main.property == prop)
-                    & (main.power == power)
-                    & (main.covariate == covariate)
-                ]
-                if len(rows) != 5:
-                    raise ValueError(f"{prop} {power} {covariate}: {len(rows)} animals")
-                what = f"{label} on {_POWER_LABELS[power]}" + (
-                    " and log duration" if suffix else ""
-                )
-                key = f"step_{prop}_{power}{suffix}"
-                values += [
-                    make(
-                        f"{key}_animals",
-                        rows.has_step.sum(),
-                        "count",
-                        "count",
-                        f"animals with a step in {what}: the label term's interval "
-                        "excludes 0 and it lowers the held-out error",
-                    ),
-                    make(
-                        f"{key}_share_median",
-                        rows.step_share_overall.median(),
-                        "quantity",
-                        "sig2s",
-                        f"median over animals of the label term in {what}, as a share of "
-                        "the animal's SWR minus non-SWR difference",
-                    ),
-                ]
-                if power == "criterion":
-                    bound = np.maximum(
-                        rows.share_overall_ci_low.abs(),
-                        rows.share_overall_ci_high.abs(),
-                    )
-                    values += [
-                        make(
-                            f"{key}_share_bound_max",
-                            bound.max(),
-                            "quantity",
-                            "sig2",
-                            f"largest over animals of the farther 95 % bound of the jump at "
-                            f"the threshold in {what}, as a share of the animal's SWR "
-                            "minus non-SWR difference",
-                        ),
-                        make(
-                            f"{key}_animals_same_sign",
-                            (rows.step_share_overall > 0).sum(),
-                            "count",
-                            "count",
-                            f"animals whose jump at the threshold in {what} points the "
-                            "way of their SWR minus non-SWR difference, whatever its "
-                            "interval",
-                        ),
-                    ]
-        sensitivity = steps[(steps.property == prop) & (steps.power == "criterion")]
         values.append(
             make(
-                f"step_{prop}_criterion_animals_sensitivity_max",
-                sensitivity.groupby(["window_z", "n_knots", "covariate"])
-                .has_step.sum()
-                .max(),
+                f"step_{prop}_criterion_animals",
+                rows(prop, "none").has_step.sum(),
                 "count",
                 "count",
-                f"the most animals with a step in {label} at the Kay criterion over the "
-                "sensitivity settings (windows 1, 1.5 and 2.5 z; 5, 8 and 12 knots; with "
-                "and without log duration)",
+                f"animals with a step in {label} at {_CRITERION}: the term's interval "
+                "excludes 0 and it lowers the held-out error",
             )
         )
-
-    make = _value_factory(source, ("24",), ("supplement", "figure: one class or two"))
-    durations = main[main.property == "duration"]
-    for power, word in (
-        ("peak", "support"),
-        ("mean", "support"),
-        ("criterion", "window"),
-    ):
-        rows = durations[durations.power == power]
-        values += [
-            make(
-                f"step_{power}_{word}_fraction_min",
-                rows.rows_fraction.min(),
-                "fraction",
-                "pct",
-                "lowest per-animal share of events in the rows compared on "
-                f"{_POWER_LABELS[power]}",
-            ),
-            make(
-                f"step_{power}_{word}_fraction_max",
-                rows.rows_fraction.max(),
-                "fraction",
-                "pct",
-                "highest per-animal share of events in those rows",
-            ),
-            make(
-                f"step_{power}_label_correlation_median",
-                rows.label_power_correlation.median(),
-                "quantity",
-                "dec2",
-                "median over animals of the correlation of the label with "
-                f"{_POWER_LABELS[power]}, in the rows compared",
-            ),
-            make(
-                f"step_{power}_label_vif_max",
-                rows.label_vif.max(),
-                "quantity",
-                "sig2",
-                "largest per-animal variance inflation of the label term given the smooth "
-                "of power (collinearity)",
-            ),
-        ]
-
-    sim = simulation.groupby(["scenario", "planted_step", "power", "covariate"])
-    rate = sim.has_step.mean()
-    covers = sim.covers_planted.mean()
-    share = sim.step_share.median()
+    make = _value_factory(
+        source, ("24", "7"), ("supplement", "figure: one class or two")
+    )
+    evidence = rows("evidence", "none")
     values += [
         make(
-            "step_sim_smooth_null_false_fraction",
-            rate[("smooth_label", 0.0, "power", "none")],
-            "fraction",
-            "pct",
-            "simulation check: share of simulated data sets with no step (a property "
-            "smooth in power, the label a noisy threshold of power) that the test calls "
-            "a step",
+            "step_evidence_criterion_animals_same_sign",
+            (evidence.step_share_overall > 0).sum(),
+            "count",
+            "count",
+            "animals whose jump in spike evidence per spike at the threshold points "
+            "the way of their SWR minus non-SWR difference, whatever its interval",
         ),
         make(
-            "step_sim_smooth_planted_found_fraction",
-            rate[("smooth_label", 0.3, "power", "none")],
-            "fraction",
-            "pct",
-            "simulation check: share of those data sets with a planted step (0.3 noise "
-            "SD) in which the test finds it",
+            "step_evidence_criterion_dur_animals",
+            rows("evidence", "log_duration").has_step.sum(),
+            "count",
+            "count",
+            "animals with a step in spike evidence per spike at the threshold, with a "
+            "smooth of log duration in both models",
+        ),
+        make(
+            "step_evidence_criterion_share_median",
+            evidence.step_share_overall.median(),
+            "quantity",
+            "sig2s",
+            "median over animals of the jump in spike evidence per spike at the "
+            "threshold, as a share of the animal's SWR minus non-SWR difference",
         ),
     ]
-    for power in ("peak", "mean", "criterion"):
-        for covariate, suffix in (("none", ""), ("log_duration", "_dur")):
-            what = _POWER_LABELS[power] + (" and log duration" if suffix else "")
-            values += [
-                make(
-                    f"step_sim_trace_null_{power}{suffix}_false_fraction",
-                    rate[("ripple_trace", 0.0, power, covariate)],
-                    "fraction",
-                    "pct",
-                    "simulation check: one continuum of events labelled by the Kay rule "
-                    "on a simulated ripple trace; share of data sets in which the test "
-                    f"on {what} calls a step",
-                ),
-                make(
-                    f"step_sim_trace_planted_{power}{suffix}_found_fraction",
-                    rate[("ripple_trace", 0.3, power, covariate)],
-                    "fraction",
-                    "pct",
-                    "simulation check: the same with a step planted at the label; share "
-                    "of data sets in which the test finds it",
-                ),
-            ]
-        values.append(
-            make(
-                f"step_sim_trace_null_{power}_share_median",
-                share[("ripple_trace", 0.0, power, "none")],
-                "quantity",
-                "sig2s",
-                "simulation check: in that one continuum, the median label term on "
-                f"{_POWER_LABELS[power]} as a share of the label difference in the rows "
-                "compared",
-            )
-        )
-    values.append(
+    make = _value_factory(source, ("24",), ("paper",))  # the methods section
+    rate = simulation.groupby(
+        ["scenario", "planted_step", "power", "covariate"]
+    ).has_step.mean()
+    values += [
         make(
-            "step_sim_trace_null_criterion_coverage",
-            covers[("ripple_trace", 0.0, "criterion", "none")],
+            "step_sim_trace_null_peak_false_fraction",
+            rate[("ripple_trace", 0.0, "peak", "none")],
             "fraction",
             "pct",
-            "simulation check: share of one-continuum data sets in which the 95 % "
-            "interval of the jump at the Kay criterion covers 0",
-        )
-    )
+            "simulation check: one continuum of events labelled by the Kay rule on a "
+            "simulated ripple trace; share of data sets in which the test on the "
+            "event's own peak ripple power (label is_swr) calls a step",
+        ),
+        make(
+            "step_sim_trace_null_criterion_false_fraction",
+            rate[("ripple_trace", 0.0, "criterion", "none")],
+            "fraction",
+            "pct",
+            f"simulation check: the same continuum; share of data sets in which the test "
+            f"on {_CRITERION} calls a step",
+        ),
+        make(
+            "step_sim_trace_planted_criterion_found_fraction",
+            rate[("ripple_trace", 0.3, "criterion", "none")],
+            "fraction",
+            "pct",
+            "simulation check: the same with a step of 0.3 noise SD planted at the "
+            "label; share of data sets in which the test on the criterion finds it",
+        ),
+    ]
     return values
 
 
