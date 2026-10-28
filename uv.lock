@@ -528,6 +528,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "dask", extra = ["distributed"] },
+    { name = "diptest" },
     { name = "h5netcdf" },
     { name = "holoviews" },
     { name = "jax" },
@@ -577,6 +578,7 @@ requires-dist = [
     { name = "dask", specifier = ">=2023.1.0" },
     { name = "dask", extras = ["distributed"] },
     { name = "dask-cuda", marker = "extra == 'gpu'", specifier = ">=24.12.0" },
+    { name = "diptest", specifier = ">=0.8" },
     { name = "h5netcdf", specifier = ">=1.0.0" },
     { name = "holoviews", specifier = ">=1.17.0" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -904,6 +906,25 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
+]
+
+[[package]]
+name = "diptest"
+version = "0.12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/ea/ce9f60b50d03c25509d244db0eaefa049a16aa7954f0e13f3b6740afe130/diptest-0.12.0.tar.gz", hash = "sha256:ade99868da603b674521718ed38e53aee2eb5d9bf47b03930eb149169cb973cd", size = 89047, upload-time = "2026-10-18T19:18:52.514Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/72/9686d5fcd88054b2d366ad300909e4554e7d086f4ff7ebf98c031e91bd04/diptest-0.12.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:91ebd42c1d3b61b2e35289a6588cee07e8b6a368e44bffe514276f03a4c387ba", size = 383724, upload-time = "2026-10-18T19:18:02.444Z" },
+    { url = "https://files.pythonhosted.org/packages/79/7d/187a05d5d9149614385ddf115d68137d9c6b7c5f122ca74258bf0ed03d86/diptest-0.12.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:62c7011ef7ac6d546768c703a4d0861b9bb9276c540e03cfdf068f709177910b", size = 421172, upload-time = "2026-10-18T19:18:04.141Z" },
+    { url = "https://files.pythonhosted.org/packages/58/f4/0c35f5c8af15d166f3c5c3f1b2909a576737c97f4f7bbf59c63c37ebb755/diptest-0.12.0-cp311-cp311-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0d62a9aa534aca3f22c2067f1ae459cb6455f7f78d7793f433c3b120df79bd5b", size = 241745, upload-time = "2026-10-18T19:18:05.964Z" },
+    { url = "https://files.pythonhosted.org/packages/08/3a/544e442b5efd06ec572451c9c420b8ef4e1593cec90e4e6d9adbbae46975/diptest-0.12.0-cp311-cp311-win_amd64.whl", hash = "sha256:4e6cb1466f1eaf9bfc4e4bc8d379c2ff180708d6f650dfce1c0d13815057498b", size = 420077, upload-time = "2026-10-18T19:18:07.36Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/56/abf79b4029ba09b238e1301b6bc4dc8f33a91865ae39567fd09d30428c53/diptest-0.12.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:493e7c8c61086cd2fcd3df0654eef8aa56d75cca206bb71f6e9a7b22c8af5c4b", size = 384575, upload-time = "2026-10-18T19:18:08.753Z" },
+    { url = "https://files.pythonhosted.org/packages/7d/6a/9361ce5e1da1beec03d1c899a0e07c15a6aebb26b807bf646823c5394821/diptest-0.12.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:14ae6dff90c74fb04aa1c3e492f5356ff6709f735afaf5e2a0ed754057f33b3f", size = 422781, upload-time = "2026-10-18T19:18:10.231Z" },
+    { url = "https://files.pythonhosted.org/packages/16/b6/05e7d38d37e5538ae6bc4cc03ce86b5b74cd5bde0cdcde1931cf03d99ec3/diptest-0.12.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:67c454dd69ab7e3cd95d48bc2d5db54e13b3f2a937822a255a21c1a8538f8f68", size = 242929, upload-time = "2026-10-18T19:18:11.82Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/76/1cc6d65b536da3b1576f48523c418e134b4b50a509f8598eaf0a663128c3/diptest-0.12.0-cp312-cp312-win_amd64.whl", hash = "sha256:92563ec70d1388b7490c0861339ebf317b14fe1b78d65cafe329640e36917454", size = 422774, upload-time = "2026-10-18T19:18:13.242Z" },
 ]
 
 [[package]]
