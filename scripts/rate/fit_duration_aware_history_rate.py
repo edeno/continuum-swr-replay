@@ -213,12 +213,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     require_covariate_schema(stop, table="stop")
     require_covariate_schema(onset_table, table="event_onset")
     require_covariate_schema(event_table, table="event")
-    for name, frame in (
-        ("stop_table", stop),
-        ("event_onset_table", onset_table),
-        ("event_table", event_table),
-    ):
-        require_swr_source(frame, what=str(inputs[name]))
+    require_swr_source(stop, what=str(inputs["stop_table"]))
+    require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
+    require_swr_source(event_table, what=str(inputs["event_table"]))
     fit_inputs = record_inputs(inputs)
     onsets = attach_event_ends(
         attach_is_swr_to_onsets(onset_table, event_table), event_table
