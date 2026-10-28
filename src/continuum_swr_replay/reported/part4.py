@@ -132,9 +132,9 @@ with_swr_without_replay``), relative to the processed-data root."""
 #: The new class's extra curves, as ``load_population_data`` reads them.
 SWR_WITHOUT_REPLAY_CURVES = ("SWR_no_non_local", "non_local_SWR_3class")
 
-#: A session-level event floor the lead may choose for the new class (not
-#: decided): values are given for every session and for sessions with at least
-#: this many SWRs without replay.
+#: A session-level event floor for the new class's check: the main values are
+#: over every session, and the same values over sessions with at least this
+#: many SWRs without replay are the check.
 SWR_WITHOUT_REPLAY_MIN_EVENTS = 10
 """The timing calibration ``scripts/pfc/calibrate_pfc_kernel_timing.py`` writes,
 relative to the processed-data root."""
@@ -1681,7 +1681,7 @@ def swr_without_replay_values(
     classes in one three-class model, from which both compared curves come.
     Every value is given twice: over every session (``_all``) and over the
     sessions with at least :data:`SWR_WITHOUT_REPLAY_MIN_EVENTS` such SWRs
-    (``_min_events``); which one to read is the lead's choice. In sessions with
+    (``_min_events``). All sessions are the main numbers; the subset is a check. In sessions with
     very few such SWRs many low-rate units have no p-value: the canonical rule
     needs all R null draws finite, and a draw's fit can fail when a unit has no
     spikes under the few windows. A curve fit on few events also wiggles more,
