@@ -61,7 +61,6 @@ from continuum_swr_replay.reported.values import (
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run Part 2 reads (242 epochs, all ``ok``)."""
 
-WIDLOSKI_PENDING = "Widloski detector: pending the Phase 2 pilot checks"
 HELDOUT_PENDING = (
     "computed by an untracked research script "
     "(.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); "
@@ -335,7 +334,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             if main
             else ("supplement",),
         )
-        pending = WIDLOSKI_PENDING if detector.startswith("memoryless") else None
         mine = events[events["detector"] == detector]
         alone = mine[~mine["matched"]]
         overlapping = mine[mine["matched"]]
@@ -350,7 +348,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{detector} events compared with the non-local detector",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_fraction",
@@ -358,7 +355,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_mostly_local_fraction",
@@ -367,7 +363,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with Local "
                 "above 0.8 in more than half their rows",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_mostly_no_spike_fraction",
@@ -376,7 +371,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with No-Spike "
                 "above 0.8 in more than half their rows",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_mixed_fraction",
@@ -385,7 +379,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with "
                 "neither state in more than half their rows",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_local_share_median",
@@ -394,7 +387,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with Local above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_no_spike_share_median",
@@ -403,7 +395,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with No-Spike above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_nonlocal_share_median",
@@ -412,7 +403,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with non-local above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_uncertain_share_median",
@@ -421,7 +411,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with no state above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_any_local_fraction",
@@ -430,7 +419,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
                 "least one row with Local above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_any_no_spike_fraction",
@@ -439,7 +427,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
                 "least one row with No-Spike above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_all_nonlocal_fraction",
@@ -448,7 +435,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"share of {detector} events overlapping a non-local event whose every row "
                 "is non-local above 0.8",
-                pending=pending,
             ),
         ]
         if main:
@@ -574,20 +560,18 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
             "s",
         ),
     ]
-    for word, key, label, pending in (
-        ("kay", "outside_kay", "Kay's SWRs", None),
-        ("swr", "outside_swr", "the five SWR definitions together", None),
+    for word, key, label in (
+        ("kay", "outside_kay", "Kay's SWRs"),
+        ("swr", "outside_swr", "the five SWR definitions together"),
         (
             "trigger",
             "outside_trigger",
             "the five SWR definitions and MUA together",
-            None,
         ),
         (
             "widloski",
             "outside_widloski",
             "the Widloski detector's events",
-            WIDLOSKI_PENDING,
         ),
     ):
         values += [
@@ -598,7 +582,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "int",
                 f"seconds of non-local event time that {label} do not cover",
                 "s",
-                pending=pending,
             ),
             make(
                 f"nonlocal_time_outside_{word}_fraction",
@@ -606,12 +589,11 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "fraction",
                 "pct",
                 f"share of non-local event time that {label} do not cover",
-                pending=pending,
             ),
         ]
-    for word, other, label, pending in (
-        ("kay", "kay", "no Kay SWR overlaps", None),
-        ("widloski", "memoryless", "no Widloski event overlaps", WIDLOSKI_PENDING),
+    for word, other, label in (
+        ("kay", "kay", "no Kay SWR overlaps"),
+        ("widloski", "memoryless", "no Widloski event overlaps"),
     ):
         n, total = int(unmatched.loc[other, "sum"]), int(unmatched.loc[other, "size"])
         values += [
@@ -621,7 +603,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "count",
                 "count",
                 f"non-local events {label} (detector comparison memberships)",
-                pending=pending,
             ),
             make(
                 f"nonlocal_events_outside_{word}_fraction",
@@ -629,7 +610,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "fraction",
                 "pct",
                 f"share of the non-local events with a known membership that {label}",
-                pending=pending,
             ),
             make(
                 f"nonlocal_events_outside_{word}_per_hour",
@@ -638,7 +618,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "sig2",
                 f"non-local events {label}, per hour of analysed immobility",
                 "per h",
-                pending=pending,
             ),
         ]
     n_no_trigger = int(no_trigger["n_unmatched"])

@@ -59,7 +59,7 @@ simulated replays:
   of their time bins, and <!--v:part2.kay_overlap_any_local_fraction-->32 %<!--/v--> of them hold at least one Local bin.
 - The other definitions (supplement) show the same two sides. Overlapping no non-local event: MUA
   <!--v:part2.mua_no_nonlocal_fraction-->15 %<!--/v-->, Carey <!--v:part2.carey_no_nonlocal_fraction-->20 %<!--/v-->, Zugaro <!--v:part2.zugaro_no_nonlocal_fraction-->35 %<!--/v-->,
-  Karlsson <!--v:part2.karlsson_no_nonlocal_fraction-->38 %<!--/v-->, Yu <!--v:part2.yu_no_nonlocal_fraction-->56 %<!--/v-->. Widloski (pending):
+  Karlsson <!--v:part2.karlsson_no_nonlocal_fraction-->38 %<!--/v-->, Yu <!--v:part2.yu_no_nonlocal_fraction-->56 %<!--/v-->. Widloski:
   <!--v:part2.widloski_no_nonlocal_fraction-->3 %<!--/v-->.
 - *Reading:* SWR detection and content detection measure different things. Many SWRs carry only local content,
   and even the overlapping ones are partly local. The Widloski detector, which requires a moving sequence, almost
@@ -73,7 +73,7 @@ simulated replays:
 - starting from any of the five SWR definitions: <!--v:part2.nonlocal_time_outside_swr_fraction-->31 %<!--/v--> of non-local time;
 - starting from any SWR definition or MUA: <!--v:part2.nonlocal_events_outside_trigger-->19,221<!--/v--> events (<!--v:part2.nonlocal_events_outside_trigger_fraction-->25 %<!--/v-->;
   about <!--v:part2.nonlocal_events_outside_trigger_per_hour-->480<!--/v--> per hour) and <!--v:part2.nonlocal_time_outside_trigger_fraction-->28 %<!--/v--> of the time;
-- starting from Widloski events (pending): <!--v:part2.nonlocal_events_outside_widloski_fraction-->94 %<!--/v--> of events and
+- starting from Widloski events: <!--v:part2.nonlocal_events_outside_widloski_fraction-->94 %<!--/v--> of events and
   <!--v:part2.nonlocal_time_outside_widloski_fraction-->93 %<!--/v--> of the time.
 
 **Are these immobility theta events?** No, in general. Non-SWR events sit at quiet-rest theta
