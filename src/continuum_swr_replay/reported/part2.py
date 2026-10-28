@@ -34,9 +34,6 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay import intervals
-from continuum_swr_replay.analysis.hippocampus.class_or_continuum import (
-    KAY_ZSCORE_THRESHOLD,
-)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
@@ -991,72 +988,36 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
 
 # --- 2b: one class or two -------------------------------------------------------
 
-#: property word -> (what it is, its claims besides 24)
-_STEP_PROPERTIES = {
-    "duration": ("log event duration", ("18",)),
-    "extent": ("log(1 + spatial extent)", ("16",)),
-    "speed": ("log(1 + replay speed)", ("15",)),
-    "posterior": ("posterior peak", ("17",)),
-    "hpd": ("log HPD coverage", ("17",)),
-    "spikes": ("log(1 + spike count)", ("6",)),
-    "evidence": ("spike evidence per spike (remote events)", ("7",)),
-    "breadth": ("log number of arms the decoded position visits", ("16",)),
+#: The properties of the step test (``measure_ripple_class_structure.PROPERTIES``)
+#: other than spike evidence, by their word in ``step_fits.csv``.
+_OTHER_STEP_PROPERTIES = {
+    "duration": "duration",
+    "extent": "spatial extent",
+    "speed": "replay speed",
+    "posterior": "posterior peak",
+    "hpd": "HPD coverage",
+    "spikes": "spike count",
+    "breadth": "arms visited",
 }
 STEP_KNOTS = 8
 STEP_WINDOW_Z = 1.5
 """The step test's main settings (``measure_ripple_class_structure.py``'s defaults)."""
-_CRITERION = (
-    "the Kay criterion around the event (the level the ripple it touches sustains "
-    "for 14 ms)"
-)
 
 
-def class_distribution_values(
-    labels: pd.DataFrame,
-    distribution: pd.DataFrame,
-    simulation: pd.DataFrame,
-    source: str,
-) -> list[Value]:
+def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[Value]:
     """Claim 24, test 1: is the events' peak ripple power unimodal, and where is
     its mode against the Kay threshold?
 
     Per animal, Hartigan's dip test and the KDE's main mode of the event's peak
-    ripple power (the z-scored Kay consensus on the decode grid). The simulation
-    checks are the dip test's rejection rate (p < 0.05) on samples matched to
-    each animal: unimodal (gamma and lognormal at its mean, SD and skew) and two
-    Gaussian classes at the labels' medians, robust SDs and shares, at the
-    observed separation and at double it. Every other measure stays in the
+    ripple power (the z-scored Kay consensus on the decode grid). The dip
+    p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs.
     """
     make = _value_factory(source, ("24",), ("supplement", "figure: one class or two"))
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
-    pooled_labels = labels[labels.animal == "pooled"].iloc[0]
-    rejects = simulation.assign(rejects=simulation.dip_p < 0.05)
-    unimodal = (
-        rejects[rejects.scenario.str.startswith("unimodal")]
-        .groupby(["animal", "power", "scenario"])
-        .rejects.mean()
-    )
-
-    def two_classes(factor: float) -> pd.Series:
-        rows = rejects[
-            (rejects.scenario == "two_classes")
-            & np.isclose(rejects.separation_factor, factor)
-        ]
-        return rows.groupby(["animal", "power"]).rejects.mean()
-
-    methods = ("paper",)  # the methods section
     return [
-        make(
-            "kay_threshold_z",
-            KAY_ZSCORE_THRESHOLD,
-            "quantity",
-            "dec2",
-            "the z-score the Kay detector's ripple power must reach for 15 ms",
-            "z",
-        ),
         make(
             "ripple_peak_animals_unimodal",
             (peak.dip_p >= 0.05).sum(),
@@ -1064,13 +1025,6 @@ def class_distribution_values(
             "count",
             "animals in which Hartigan's dip test does not reject one mode of the "
             "events' peak ripple power (p at or above 0.05)",
-        ),
-        make(
-            "ripple_peak_dip_p_min",
-            peak.dip_p.min(),
-            "quantity",
-            "pval",
-            "smallest per-animal p-value of that dip test",
         ),
         make(
             "ripple_peak_mode_animal_min",
@@ -1089,103 +1043,60 @@ def class_distribution_values(
             "highest per-animal location of that mode",
             "z",
         ),
-        make(
-            "dip_sim_unimodal_reject_max",
-            unimodal.max(),
-            "fraction",
-            "pct",
-            "simulation check: the highest rate at which the dip test (p < 0.05) calls "
-            "a unimodal sample matched to an animal's mean, SD and skew bimodal, over "
-            "animals, power measures and the gamma and lognormal laws",
-            used_in_=methods,
-        ),
-        make(
-            "dip_sim_two_classes_observed_power_max",
-            two_classes(1.0).max(),
-            "fraction",
-            "pct",
-            "simulation check: the highest rate at which the dip test detects two "
-            "Gaussian classes at the labels' observed separation (medians, robust SDs "
-            "and shares of the SWR and non-SWR events), over animals and power measures",
-            used_in_=methods,
-        ),
-        make(
-            "dip_sim_two_classes_double_power_min",
-            two_classes(2.0).min(),
-            "fraction",
-            "pct",
-            "simulation check: the lowest such rate at double the observed separation",
-            used_in_=methods,
-        ),
-        make(
-            "non_swr_peak_above_threshold_fraction",
-            pooled_labels.non_swr_peak_above_fraction,
-            "fraction",
-            "pct",
-            "share of non-SWR events whose peak ripple power reaches the Kay threshold",
-            used_in_=methods,
-        ),
-        make(
-            "criterion_label_agreement",
-            pooled_labels.criterion_agrees,
-            "fraction",
-            "pct",
-            "share of events whose label is_swr equals 'Kay criterion at or above the "
-            "threshold' (the criterion read on the 2 ms decode grid)",
-            used_in_=methods,
-        ),
     ]
 
 
-def class_step_values(
-    steps: pd.DataFrame, simulation: pd.DataFrame, source: str
-) -> list[Value]:
+def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     """Claim 24 and the property claims, test 2: is there a step at the threshold?
 
-    A sharp discontinuity design on the Kay criterion around each event: per
-    animal and property, ``y ~ s(criterion)`` against ``y ~ s(criterion) +
-    (criterion >= 2 z)`` (cubic B-spline, 8 knots) on the events within 1.5 z of
-    the threshold, with and without a smooth of log duration ("dur"). An animal
-    has a step when the term's 95 % interval (clustered by epoch) excludes 0 and
-    it lowers the held-out squared error (5 folds grouped by epoch). The share is
-    the term over the animal's SWR minus non-SWR difference over all its events.
-    The simulation checks use one continuum of events labelled by the Kay rule on
-    a simulated ripple trace. The version on the event's own power, the
-    sensitivity settings and the other checks stay in the CSV outputs.
+    A sharp discontinuity design on the Kay criterion around each event (the
+    level the ripple it touches sustains for 14 ms): per animal and property,
+    ``y ~ s(criterion)`` against ``y ~ s(criterion) + (criterion >= 2 z)``
+    (cubic B-spline, 8 knots) on the events within 1.5 z of the threshold. An
+    animal has a step when the term's 95 % interval (clustered by epoch)
+    excludes 0 and it lowers the held-out squared error (5 folds grouped by
+    epoch). The share is the term over the animal's SWR minus non-SWR difference
+    over all its events. The per-property counts, the version with log
+    duration, the version on the event's own power, the sensitivity settings and
+    the simulation checks stay in the CSV outputs.
     """
     main = steps[
         (steps.n_knots == STEP_KNOTS)
         & (steps.power == "criterion")
         & np.isclose(steps.window_z, STEP_WINDOW_Z)
+        & (steps.covariate == "none")
     ]
-
-    def rows(prop: str, covariate: str) -> pd.DataFrame:
-        found = main[(main.property == prop) & (main.covariate == covariate)]
-        if len(found) != 5:
-            raise ValueError(f"{prop} {covariate}: {len(found)} animals")
-        return found
-
-    values: list[Value] = []
-    for prop, (label, claims) in _STEP_PROPERTIES.items():
-        make = _value_factory(
-            source, ("24", *claims), ("supplement", "figure: one class or two")
-        )
-        values.append(
-            make(
-                f"step_{prop}_criterion_animals",
-                rows(prop, "none").has_step.sum(),
-                "count",
-                "count",
-                f"animals with a step in {label} at {_CRITERION}: the term's interval "
-                "excludes 0 and it lowers the held-out error",
-            )
-        )
-    make = _value_factory(
-        source, ("24", "7"), ("supplement", "figure: one class or two")
+    by_property = main.groupby("property").has_step.agg(["sum", "size"])
+    if not (by_property["size"] == 5).all():
+        raise ValueError(f"not every property has 5 animals:\n{by_property}")
+    others = by_property.loc[list(_OTHER_STEP_PROPERTIES), "sum"]
+    # the note names the property (or properties) that attain the maximum
+    attained = ", ".join(
+        _OTHER_STEP_PROPERTIES[p] for p in others.index[others == others.max()]
     )
-    evidence = rows("evidence", "none")
-    values += [
+    make = _value_factory(source, ("24", "15", "16", "17", "18"), ("paper",))
+    evidence = main[main.property == "evidence"]
+    make_evidence = _value_factory(source, ("24", "7"), ("paper",))
+    return [
         make(
+            "step_other_properties_criterion_animals_max",
+            others.max(),
+            "count",
+            "count",
+            "the most animals with a step at the threshold in any property but spike "
+            "evidence (duration, spatial extent, replay speed, posterior peak, HPD "
+            "coverage, spike count, arms visited): the term's interval excludes 0 and "
+            f"it lowers the held-out error; attained by {attained}",
+        ),
+        make_evidence(
+            "step_evidence_criterion_animals",
+            by_property.loc["evidence", "sum"],
+            "count",
+            "count",
+            "animals with a step at the threshold in spike evidence per spike (remote "
+            "events): the term's interval excludes 0 and it lowers the held-out error",
+        ),
+        make_evidence(
             "step_evidence_criterion_animals_same_sign",
             (evidence.step_share_overall > 0).sum(),
             "count",
@@ -1193,15 +1104,7 @@ def class_step_values(
             "animals whose jump in spike evidence per spike at the threshold points "
             "the way of their SWR minus non-SWR difference, whatever its interval",
         ),
-        make(
-            "step_evidence_criterion_dur_animals",
-            rows("evidence", "log_duration").has_step.sum(),
-            "count",
-            "count",
-            "animals with a step in spike evidence per spike at the threshold, with a "
-            "smooth of log duration in both models",
-        ),
-        make(
+        make_evidence(
             "step_evidence_criterion_share_median",
             evidence.step_share_overall.median(),
             "quantity",
@@ -1210,38 +1113,6 @@ def class_step_values(
             "threshold, as a share of the animal's SWR minus non-SWR difference",
         ),
     ]
-    make = _value_factory(source, ("24",), ("paper",))  # the methods section
-    rate = simulation.groupby(
-        ["scenario", "planted_step", "power", "covariate"]
-    ).has_step.mean()
-    values += [
-        make(
-            "step_sim_trace_null_peak_false_fraction",
-            rate[("ripple_trace", 0.0, "peak", "none")],
-            "fraction",
-            "pct",
-            "simulation check: one continuum of events labelled by the Kay rule on a "
-            "simulated ripple trace; share of data sets in which the test on the "
-            "event's own peak ripple power (label is_swr) calls a step",
-        ),
-        make(
-            "step_sim_trace_null_criterion_false_fraction",
-            rate[("ripple_trace", 0.0, "criterion", "none")],
-            "fraction",
-            "pct",
-            f"simulation check: the same continuum; share of data sets in which the test "
-            f"on {_CRITERION} calls a step",
-        ),
-        make(
-            "step_sim_trace_planted_criterion_found_fraction",
-            rate[("ripple_trace", 0.3, "criterion", "none")],
-            "fraction",
-            "pct",
-            "simulation check: the same with a step of 0.3 noise SD planted at the "
-            "label; share of data sets in which the test on the criterion finds it",
-        ),
-    ]
-    return values
 
 
 # --- 2c: properties -----------------------------------------------------------
@@ -1565,33 +1436,16 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
     summary.inputs.append(file_record(inputs.content_occupancy, ROOT_DIR))
 
     folder = inputs.class_structure
-    names = (
-        "labels.csv",
-        "distribution.csv",
-        "distribution_simulation.csv",
-        "step_fits.csv",
-        "step_simulation.csv",
-        "manifest.json",
-    )
-    tables = {name: pd.read_csv(folder / name) for name in names[:-1]}
+    names = ("distribution.csv", "step_fits.csv", "manifest.json")
     source = (
         f"{rel(folder)} (scripts/detection/measure_ripple_class_structure.py: the "
         f"event table, event features run {EVENT_FEATURES_RUN}, the decode frames and "
         "the spike-evidence run)"
     )
     summary.add(
-        *class_distribution_values(
-            tables["labels.csv"],
-            tables["distribution.csv"],
-            tables["distribution_simulation.csv"],
-            source,
-        )
+        *class_distribution_values(pd.read_csv(folder / "distribution.csv"), source)
     )
-    summary.add(
-        *class_step_values(
-            tables["step_fits.csv"], tables["step_simulation.csv"], source
-        )
-    )
+    summary.add(*class_step_values(pd.read_csv(folder / "step_fits.csv"), source))
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
     return summary
 
