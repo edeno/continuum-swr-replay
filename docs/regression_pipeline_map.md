@@ -104,7 +104,7 @@ The artifact detector's features: S window spectra, J5 and L20 steps, spike line
 
 Theta, ripple and MUA levels of running and of quiet rest, the references for an event's.
 
-`brain_state_reference`
+`regime_masks`, `matched_window_means`, `brain_state_reference`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/class_or_continuum.py`
 
@@ -140,7 +140,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 Slow- and fast-gamma power of CA1, z-scored per epoch, on the decode grid.
 
-`band_power`, `zscore_on`, `event_means`
+`band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/hpc_raw_stats.py`
 
@@ -152,7 +152,13 @@ Raw-data quality statistics for hippocampal clusterless decoding.
 
 Analysis of decoded posterior distributions.
 
-`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `get_map_speed`, `get_posterior_stats`
+`get_conditional_non_local_posterior`, `load_conditional_posterior`, `get_map_step_distance`, `step_distance_from_nodes`, `map_estimate_to_map_nodes`, `track_distance_cm`, `get_map_speed`, `get_posterior_stats`
+
+### `src/continuum_swr_replay/analysis/hippocampus/property_contrast.py`
+
+Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
+
+`nested_bootstrap_counts`, `weighted_median`, `duration_strata`, `matched_difference`, `bootstrap_contrasts`, `percentile_intervals`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py`
 
@@ -736,6 +742,12 @@ Spike-evidence reality analysis for non-SWR non-local events.
 
 `animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
+### `scripts/detection/bootstrap_event_properties.py`
+
+Bootstrap the SWR against non-SWR property contrasts: class medians, their difference, and the duration-matched difference.
+
+`load_events`, `main`
+
 ### `scripts/detection/measure_brain_state_reference.py`
 
 Measure each epoch's theta, ripple and MUA levels during running and during quiet rest.
@@ -747,6 +759,12 @@ Measure each epoch's theta, ripple and MUA levels during running and during quie
 Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
 
 `out_dir`, `epoch_gamma`, `main`
+
+### `scripts/detection/measure_event_start_and_rest_theta.py`
+
+Measure each event's start distance and the theta-like share of duration-matched quiet rest.
+
+`measure_epoch`, `main`
 
 ### `scripts/detection/measure_ripple_class_structure.py`
 
