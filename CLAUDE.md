@@ -465,7 +465,7 @@ of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_
   inline or quote it from memory.
 - In a doc, write a reported number inside a marker, `<!--v:part{n}.key-->…<!--/v-->`, and let the
   emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
-- A value with a `pending` note (for example the Widloski detector's) is not quoted as a finding.
+- A value with a `pending` note is not quoted as a finding.
 
 ## Important Conventions
 
