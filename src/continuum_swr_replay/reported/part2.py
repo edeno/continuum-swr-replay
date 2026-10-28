@@ -96,6 +96,7 @@ class Part2Inputs:
     class_structure: Path
     event_start_rest_theta: Path
     property_bootstrap: Path
+    event_gamma_power: Path
 
 
 def default_inputs() -> Part2Inputs:
@@ -114,6 +115,7 @@ def default_inputs() -> Part2Inputs:
         class_structure=processed_data_dir() / "ripple_class_structure",
         event_start_rest_theta=processed_data_dir() / "event_start_rest_theta",
         property_bootstrap=processed_data_dir() / "event_property_bootstrap",
+        event_gamma_power=processed_data_dir() / "event_gamma_power",
     )
 
 
@@ -758,6 +760,49 @@ def brain_state_values(
                         "reaches their epoch's median running level",
                     )
                 )
+    return values
+
+
+def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
+    """Claim 5: slow and fast gamma during events, as a change in band power
+    against the same epoch's quiet rest, in dB.
+
+    For each epoch and class: ``10 log10(mean band power over the class's event
+    samples / mean band power over quiet rest)`` (below 4 cm/s, in no non-local,
+    SWR or MUA event, outside excluded time), on the same band power the z
+    values are made from (``scripts/detection/measure_event_gamma.py``). The
+    median over epochs, and the animals whose median over their epochs is above
+    0 dB. The z values (``brain_state_values``) stay as they are.
+    """
+    make = _value_factory(source, ("5",), ("supplement",))
+    values: list[Value] = []
+    for word in ("slow_gamma", "fast_gamma"):
+        label = _SIGNAL_LABELS[word]
+        for group in ("non_swr", "swr"):
+            name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
+            column = f"{word}_db_{group}"
+            rows = reference.dropna(subset=[column])
+            per_animal = rows.groupby("animal")[column].median()
+            values += [
+                make(
+                    f"{word}_db_median_{group}",
+                    rows[column].median(),
+                    "quantity",
+                    "sig2s",
+                    f"median over epochs of the change in {label} during {name} events "
+                    "against the epoch's quiet rest: 10 log10 of the ratio of mean band "
+                    "powers",
+                    "dB",
+                ),
+                make(
+                    f"{word}_db_animals_above_rest_{group}",
+                    (per_animal > 0).sum(),
+                    "count",
+                    "count",
+                    f"animals whose median over epochs of that change ({name} events) "
+                    "is above 0 dB",
+                ),
+            ]
     return values
 
 
@@ -1520,6 +1565,20 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     summary.inputs.append(file_record(inputs.brain_state_reference, ROOT_DIR))
+    gamma_power = pd.read_parquet(inputs.event_gamma_power / "reference.parquet")
+    if len(gamma_power) != REALITY_EPOCHS:
+        raise ValueError(f"{inputs.event_gamma_power} does not hold every epoch")
+    summary.add(
+        *gamma_db_values(
+            gamma_power,
+            f"{rel(inputs.event_gamma_power)}/reference.parquet "
+            "(scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+        )
+    )
+    summary.inputs += [
+        file_record(inputs.event_gamma_power / name, ROOT_DIR)
+        for name in ("reference.parquet", "manifest.json")
+    ]
     summary.inputs.append(
         files_record(
             "*_events.parquet", inputs.event_gamma.glob("*_events.parquet"), ROOT_DIR

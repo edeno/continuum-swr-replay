@@ -83,8 +83,12 @@ running theta (SWR events <!--v:part2.theta_like_fraction_swr-->11 %<!--/v-->).
 - Ripple power: non-SWR events <!--v:part2.ripple_median_non_swr-->0.50<!--/v--> z, above quiet rest (<!--v:part2.ripple_rest_reference-->−0.60<!--/v--> z) in
   <!--v:part2.ripple_animals_above_rest_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; SWR events <!--v:part2.ripple_median_swr-->2.35<!--/v--> z.
 - Slow gamma (25–55 Hz): non-SWR <!--v:part2.slow_gamma_median_non_swr-->−0.10<!--/v--> z, SWR <!--v:part2.slow_gamma_median_swr-->0.36<!--/v--> z, quiet rest
-  <!--v:part2.slow_gamma_rest_reference-->−0.28<!--/v--> z. Fast gamma (65–100 Hz): <!--v:part2.fast_gamma_median_non_swr-->−0.21<!--/v-->, <!--v:part2.fast_gamma_median_swr-->0.11<!--/v-->
-  and <!--v:part2.fast_gamma_rest_reference-->−0.43<!--/v--> z. Spiking and the ripple leak broadband power into both bands, so part of
+  <!--v:part2.slow_gamma_rest_reference-->−0.28<!--/v--> z; as power against the same epoch's quiet rest, non-SWR
+  <!--v:part2.slow_gamma_db_median_non_swr-->…<!--/v--> dB (above rest in <!--v:part2.slow_gamma_db_animals_above_rest_non_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals) and SWR
+  <!--v:part2.slow_gamma_db_median_swr-->…<!--/v--> dB (<!--v:part2.slow_gamma_db_animals_above_rest_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->). Fast gamma (65–100 Hz): <!--v:part2.fast_gamma_median_non_swr-->−0.21<!--/v-->, <!--v:part2.fast_gamma_median_swr-->0.11<!--/v-->
+  and <!--v:part2.fast_gamma_rest_reference-->−0.43<!--/v--> z; non-SWR <!--v:part2.fast_gamma_db_median_non_swr-->…<!--/v--> dB
+  (<!--v:part2.fast_gamma_db_animals_above_rest_non_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->) and SWR <!--v:part2.fast_gamma_db_median_swr-->…<!--/v--> dB (<!--v:part2.fast_gamma_db_animals_above_rest_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->) against rest
+  (median over epochs). Spiking and the ripple leak broadband power into both bands, so part of
   these rises may be leakage rather than oscillation.
 - Quiet rest matched in duration to the events reaches running theta in <!--v:part2.theta_like_fraction_rest_matched_non_swr-->…<!--/v--> (matched to non-SWR
   events) and <!--v:part2.theta_like_fraction_rest_matched_swr-->…<!--/v--> (matched to SWR events) of windows; events exceed it in <!--v:part2.theta_like_animals_above_rest_matched_non_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->
