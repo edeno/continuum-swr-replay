@@ -58,6 +58,9 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-27 | 3b | cost re-estimate from the smoke's observed-fit times (no reference, no context models): senor 4,145 s, wilbur ≈ 7,050 s, j16 1,972 s → ≈ 710 s + 12.4 s per unit per session → ≈ 80 GPU-h for 75 sessions (18,552 units) | — | — | under the 250 GPU-h bound |
 | 2026-10-27 | 3b | revised smoke: senor20201101 06_r3 on GPU 5 (GPU 1 was taken by the lead's `nld-trace-gpu*` jobs started 17:18 on GPUs 0–4, 6–9), models in `logs/.../marked_family_revised_smoke/models.txt`, `--slope-permutations 0` | `f9008b88` | tmux `pfc_c_revised_smoke`; `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | running |
 
+| 2026-10-27 | 3b | revised smoke finished: senor 06_r3, 10 models, 1 h 10 min, host RSS 8.7 GB, EXIT 0; ripple models dropped `SWR_no_non_local` (2 events) as designed; summary fixed to skip a dropped class, then ran end to end (`summary.parquet`: held-out fractions, unit → session → animal slopes, sign consistency, mark correlations) | `60caaa8b` | `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | matches the 1.18 h estimate |
+| 2026-10-27 | 3b | **Phase C batch launched 18:33**, 75 sessions, GPUs 1–9 (all idle at launch), 10 models (`logs/pfc_response_followups/marked_family/models.txt`), no reference; estimate 78.7 GPU-h, 8.6–9.0 h per card, ETA ≈ 03:30 on 2026-10-28 | `60caaa8b` | tmux `pfc_c_marked_family`; logs `logs/pfc_response_followups/marked_family/`; output `Processed-Data/pfc_response_followups/marked_family/` | running |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
@@ -66,7 +69,10 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | timing calibration with decreases | — (background, CPU) | none | — | `Processed-Data/pfc_response_followups/timing_calibration.json` | 2026-10-26 | 2026-10-26 | about 40 min CPU (shared with tests) |
 | Phase B smoke | `pfc_b_smoke` (closed) | 1–4 | `logs/pfc_response_followups/swr_without_replay_smoke/` | `Processed-Data/pfc_response_followups/swr_without_replay_smoke/` | 2026-10-26 21:11 | 2026-10-26 22:53 | 48–102 min per session |
 | Phase B batch | `pfc_b_swr_without_replay` | 1–9 | `logs/pfc_response_followups/swr_without_replay/` | `Processed-Data/pfc_response_followups/swr_without_replay/` | 2026-10-26 22:55 | 2026-10-27 09:48 | 9.6–10.9 h per card |
-| Phase C smoke | `pfc_c_smoke` | 4, 2, 5 | `logs/pfc_response_followups/marked_family_smoke/` | `Processed-Data/pfc_response_followups/marked_family_smoke/` | 2026-10-27 08:30 | | |
+| Phase C smoke (reference timing; stopped) | `pfc_c_smoke` | 4, 2, 5 | `logs/pfc_response_followups/marked_family_smoke/` | `Processed-Data/pfc_response_followups/marked_family_smoke/` | 2026-10-27 08:30 | | |
+
+| Phase C revised smoke | `pfc_c_revised_smoke` | 5 | `logs/pfc_response_followups/marked_family_revised_smoke/` | `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | 2026-10-27 17:22 | 18:31 | 1 h 10 min |
+| Phase C batch | `pfc_c_marked_family` | 1–9 | `logs/pfc_response_followups/marked_family/` | `Processed-Data/pfc_response_followups/marked_family/` | 2026-10-27 18:33 | | ETA ≈ 03:30 2026-10-28 |
 
 ## Findings (phase 1)
 
