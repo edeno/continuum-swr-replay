@@ -428,6 +428,13 @@ them importable.
   does, and writes `Processed-Data/pfc_response_followups/timing_calibration.json`,
   which Part 4's timing values read. CPU only (`JAX_PLATFORMS=cpu`); `--quick` for a
   two-scenario check.
+- `part4_rate_threshold_sensitivity.py` — recomputes Part 4's per-unit mPFC values
+  (called fractions, overlap, split, effect sizes, SWRs without replay) with
+  `reported/part4.py`'s own functions at firing-rate gates of none (> 0 Hz on the fitted
+  bins), 0.1, 0.5 and 1 Hz — the bundles hold every unit, so no refit — with the
+  loader's drop counts per gate and the called fractions per rate band. Writes
+  `part4_rate_threshold_sensitivity{,_long}.csv` under
+  `.claude/research/pfc_response_followups_outputs/` (`--out-dir`).
 - `diagnose_pfc_event_definition.py` — reports, per session, what the mPFC unit GLM's
   retired run-time event construction yielded against the canonical event table it now
   reads: the two event counts, how many events change SWR class once the lists are
