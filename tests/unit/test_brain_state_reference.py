@@ -5,6 +5,8 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
     brain_state_reference,
+    matched_window_means,
+    regime_masks,
 )
 
 
@@ -49,3 +51,43 @@ def test_a_regime_with_no_bin_reads_nan():
     ref = brain_state_reference(dot)
     assert ref["n_running_bins"] == 0
     assert np.isnan(ref["theta_running_median"])
+
+
+def test_regime_masks():
+    masks = regime_masks(frame())
+    np.testing.assert_array_equal(np.flatnonzero(masks["running"]), np.arange(10))
+    np.testing.assert_array_equal(np.flatnonzero(masks["rest"]), np.arange(10, 20))
+
+
+def test_matched_windows_lie_in_eligible_runs_and_average_their_bins():
+    # two eligible runs: bins 2-5 (values 2..5) and 10-11 (values 10, 11)
+    values = np.arange(14, dtype=float)
+    eligible = np.zeros(14, dtype=bool)
+    eligible[2:6] = True
+    eligible[10:12] = True
+    rng = np.random.default_rng(0)
+    means = matched_window_means(values, eligible, np.array([1, 2, 4, 5]), 400, rng)
+    # length 1: every eligible bin
+    assert set(np.unique(means[0])) == {2.0, 3.0, 4.0, 5.0, 10.0, 11.0}
+    # length 2: the windows (2,3), (3,4), (4,5) and (10,11)
+    assert set(np.unique(means[1])) == {2.5, 3.5, 4.5, 10.5}
+    # length 4: only bins 2-5 hold it
+    assert set(np.unique(means[2])) == {3.5}
+    # length 5: no run holds it
+    assert np.isnan(means[3]).all()
+
+
+def test_matched_windows_draw_starts_uniformly():
+    eligible = np.ones(100, dtype=bool)
+    values = np.arange(100, dtype=float)
+    rng = np.random.default_rng(1)
+    means = matched_window_means(values, eligible, np.array([1]), 20_000, rng)
+    counts = np.bincount(means[0].astype(int), minlength=100)
+    assert counts.min() > 120 and counts.max() < 280
+
+
+def test_matched_windows_skip_nan_values():
+    values = np.array([1.0, np.nan, 3.0, np.nan])
+    rng = np.random.default_rng(2)
+    means = matched_window_means(values, np.ones(4, dtype=bool), np.array([4]), 3, rng)
+    np.testing.assert_allclose(means, [[2.0, 2.0, 2.0]])
