@@ -53,6 +53,11 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-27 | 3b (C) | smoke finding: `stop_context` and `marginal_rewarded_context` ineligible on j16 (unrewarded-stop replay too rare: 9/3 events), `marginal_next_trip_switches_patch` no variation; corpus check from the event table (well-anchored events, 75 PFC sessions): ≥10 events at each reward level in 23 (non-SWR) / 7 (SWR-coupled) sessions; ≥10 at each next-trip-switch level in 15 / 8 | — | — | Q8 is mostly not estimable within a session; lead decision |
 | 2026-10-27 | 3b (C) | summary pipeline run on the j16 smoke bundles (scratch copy): report, figures and `summary.parquet` (1,020 rows) written | — | scratchpad `csmoke/` | works end to end |
 
+| 2026-10-27 | lead | decisions: context leaves the marked family (stop-level design, stop before building); no shuffle reference; rare class read over all sessions with the ≥10-event subset as a check; ridge slopes as fitted; no power equalising; linearity worry noted, not a task | — | phase-3b file, `design-stop-level-context.md` | — |
+| 2026-10-27 | 3b | `pfc_c_smoke` stopped (served only reference timing); summary gains mark-pair correlations; Q8 design written; overview reads all sessions as the main number | `2d07ae2f`, `7609819a` | — | — |
+| 2026-10-27 | 3b | cost re-estimate from the smoke's observed-fit times (no reference, no context models): senor 4,145 s, wilbur ≈ 7,050 s, j16 1,972 s → ≈ 710 s + 12.4 s per unit per session → ≈ 80 GPU-h for 75 sessions (18,552 units) | — | — | under the 250 GPU-h bound |
+| 2026-10-27 | 3b | revised smoke: senor20201101 06_r3 on GPU 5 (GPU 1 was taken by the lead's `nld-trace-gpu*` jobs started 17:18 on GPUs 0–4, 6–9), models in `logs/.../marked_family_revised_smoke/models.txt`, `--slope-permutations 0` | `f9008b88` | tmux `pfc_c_revised_smoke`; `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | running |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |

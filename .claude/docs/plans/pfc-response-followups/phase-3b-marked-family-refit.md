@@ -12,6 +12,13 @@ Why: phase 3a's models answer questions 3, 5 and 8 only once fit on the corpus. 
 
 **Contracts referenced:** [Bundle trees](shared-contracts.md#bundle-trees), [Commits and GPU runs](shared-contracts.md#commits-and-gpu-runs).
 
+## Revised by the lead (2026-10-27) — supersedes the tasks below where they differ
+
+- **Models in the batch:** `replay_content`, `event_strength`, `ripple_power`, `ripple_power_pooled` (joint), and the marginals of `current_arm_fraction`, `content_weighted_recent_reward`, `content_weighted_belief_uncertainty`, `log_event_duration_s`, `ripple_power_z`, `mua_rate_z`. **Out:** `stop_context` and the reward and switch marginals — Q8 becomes a stop-level analysis pooled across sessions ([design-stop-level-context.md](design-stop-level-context.md), waiting for the lead).
+- **No shuffled-mark reference** (`--slope-permutations 0`), not even on a subset. Marks are read from (a) the held-out deviance per unit with vs without the mark (K = 5) and (b) the unit → session → animal slope summary with sign consistency across animals; the summary also reports every mark pair's correlation per class (`statistic = mark_correlation`), and a small slope on a strongly correlated mark is flagged as possible ridge leakage in the overview.
+- Ridge slopes stay as fitted; no linearity check yet.
+- Launch only if the re-estimated cost without reference and context is under about 250 GPU-hours, after one smoke session of this design.
+
 ## Tasks
 
 - **Before any run, protect the contract-1 corpus.** Since phase 0 every bundle in `Processed-Data/pfc_marked_model_family/` reads as stale (new contract keys), and the family runner's `_remove_stale_bundle` (`scripts/pfc/run_pfc_marked_model_family.py`, called before each refit) unlinks a stale bundle. `Processed-Data` is the main checkout's tree. So never run the runner against its default `--output-dir` until the rename below is done, and pass `--output-dir` explicitly on every follow-up run.
