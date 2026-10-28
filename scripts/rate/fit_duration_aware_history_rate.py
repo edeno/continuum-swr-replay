@@ -84,6 +84,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
+    MODEL_CROSS_HISTORY_RATE,
     STOP_COVARIATES,
     longest_history_window_s,
 )
@@ -176,6 +177,77 @@ def attach_event_ends(onsets: pd.DataFrame, event_table: pd.DataFrame) -> pd.Dat
     return out
 
 
+def build_design(
+    keys: tuple,
+    stops_g: pd.DataFrame,
+    onsets_g: pd.DataFrame,
+    outcome: str,
+    *,
+    duration_aware: bool = True,
+) -> tuple[pd.DataFrame, tuple[str, ...]]:
+    """One session's frozen design for ``outcome`` and the rungs it carries.
+
+    ``duration_aware=False`` builds the shipped design on the same arguments
+    (every bin at risk, onset history only), for a like-for-like comparison;
+    its frame still carries the cross block for the non-local streams.
+
+    Raises
+    ------
+    ValueError
+        If the freeze drops a stop (every required column is complete by
+        construction).
+    """
+    event_type, cross_pop = POPULATION_PLAN[outcome]
+    response = POPULATIONS[outcome](onsets_g)
+    # An event occupies its samples start..end (end is its last sample); the
+    # sample in which it starts is the sample it was at risk in. So it covers
+    # [start + one sample, end + one sample): otherwise an onset on a 15 ms bin
+    # edge would leave its own bin no at-risk time.
+    at_risk = onsets_g.loc[
+        onsets_g["event_type"] == event_type,
+        ["stop_id", "t_since_stop_onset", END_COLUMN],
+    ].copy()
+    at_risk[["t_since_stop_onset", END_COLUMN]] += DECODE_SAMPLE_S
+    cross_kwargs: dict = {}
+    rungs = SELF_RUNGS
+    if cross_pop is not None:
+        cross_kwargs = {
+            "cross_onset_times": POPULATIONS[cross_pop](onsets_g),
+            "cross_history_lags": N_HISTORY_LAGS,
+            "cross_history_basis": N_HISTORY_BASIS,
+        }
+        rungs = SELF_RUNGS + CROSS_RUNGS
+    design = aggregate_to_timebins(
+        stops_g,
+        response,
+        bin_s=BIN_S,
+        tmax=TMAX,
+        reward_basis=True,
+        self_history_lags=N_HISTORY_LAGS,
+        self_history_basis=N_HISTORY_BASIS,
+        stop_covariates=STOP_COVARIATES,
+        history_window_s=HISTORY_WINDOW_S,
+        arrival_clocks=False,
+        at_risk_events=at_risk if duration_aware else None,
+        offset_history=duration_aware,
+        **cross_kwargs,
+    )
+    specs = (
+        [LADDER[name] for name in rungs]
+        if duration_aware
+        else [
+            MODEL_CROSS_HISTORY_RATE["Mselfcross" if cross_pop is not None else "Mself"]
+        ]
+    )
+    design, freeze = freeze_per_bin_cohort(design, specs)
+    if freeze["n_stops_before"] != freeze["n_stops_after"]:
+        raise ValueError(
+            f"{keys}/{outcome}: freezing dropped "
+            f"{freeze['n_stops_before'] - freeze['n_stops_after']} stops"
+        )
+    return design, rungs
+
+
 def _fit_one_session(
     keys: tuple, stops_g: pd.DataFrame, onsets_g: pd.DataFrame
 ) -> tuple[tuple, list[dict], float]:
@@ -184,47 +256,8 @@ def _fit_one_session(
     t0 = time.perf_counter()
     rows: list[dict] = []
     for outcome, (event_type, cross_pop) in POPULATION_PLAN.items():
-        response = POPULATIONS[outcome](onsets_g)
-        # An event occupies its samples start..end (end is its last sample); the
-        # sample in which it starts is the sample it was at risk in. So it
-        # covers [start + one sample, end + one sample): otherwise an onset on a
-        # 15 ms bin edge would leave its own bin no at-risk time.
-        at_risk = onsets_g.loc[
-            onsets_g["event_type"] == event_type,
-            ["stop_id", "t_since_stop_onset", END_COLUMN],
-        ].copy()
-        at_risk[["t_since_stop_onset", END_COLUMN]] += DECODE_SAMPLE_S
-        cross_kwargs: dict = {}
-        rungs = SELF_RUNGS
-        if cross_pop is not None:
-            cross_kwargs = {
-                "cross_onset_times": POPULATIONS[cross_pop](onsets_g),
-                "cross_history_lags": N_HISTORY_LAGS,
-                "cross_history_basis": N_HISTORY_BASIS,
-            }
-            rungs = SELF_RUNGS + CROSS_RUNGS
+        design, rungs = build_design(keys, stops_g, onsets_g, outcome)
         specs = [LADDER[name] for name in rungs]
-        design = aggregate_to_timebins(
-            stops_g,
-            response,
-            bin_s=BIN_S,
-            tmax=TMAX,
-            reward_basis=True,
-            self_history_lags=N_HISTORY_LAGS,
-            self_history_basis=N_HISTORY_BASIS,
-            stop_covariates=STOP_COVARIATES,
-            history_window_s=HISTORY_WINDOW_S,
-            arrival_clocks=False,
-            at_risk_events=at_risk,
-            offset_history=True,
-            **cross_kwargs,
-        )
-        design, freeze = freeze_per_bin_cohort(design, specs)
-        if freeze["n_stops_before"] != freeze["n_stops_after"]:
-            raise ValueError(
-                f"{keys}/{outcome}: freezing dropped "
-                f"{freeze['n_stops_before'] - freeze['n_stops_after']} stops"
-            )
         shared = {
             "outcome": outcome,
             **dict(zip(SESSION_COLUMNS, keys, strict=True)),

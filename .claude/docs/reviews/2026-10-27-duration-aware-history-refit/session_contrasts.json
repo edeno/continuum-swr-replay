@@ -1,0 +1,1472 @@
+{
+ "cohorts": {
+  "at_well": {
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/duration_aware_history_models.pkl",
+   "n_sessions": 242,
+   "contrasts": {
+    "non_local": {
+     "self_both": {
+      "n_sessions": 242,
+      "session_median": 7.234463333141321,
+      "session_pct_positive": 70.66115702479338,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -0.26931375192452833,
+        "summed_lr": 1469.269680659712,
+        "df": 368.0,
+        "p": 3.0494287924711836e-131
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 4.099555785280927,
+        "summed_lr": -1.4152478478850284e+70,
+        "df": 464.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 12.03921349039706,
+        "summed_lr": 1337.0854761652824,
+        "df": 352.0,
+        "p": 1.3606234068263984e-114
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 29.752860219641207,
+        "summed_lr": 2327.8604875570354,
+        "df": 392.0,
+        "p": 1.0794438418231646e-271
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 0.26796284516285596,
+        "summed_lr": -420.60257231872913,
+        "df": 360.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 4,
+      "animals_significant_of_5": 3
+     },
+     "self_onset_only": {
+      "n_sessions": 242,
+      "session_median": 7.457577042907019,
+      "session_pct_positive": 74.3801652892562,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 1.5897791613931531,
+        "summed_lr": 891.1664215103635,
+        "df": 184.0,
+        "p": 3.20711313256663e-93
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 5.450395884998443,
+        "summed_lr": 827.1991246101265,
+        "df": 232.0,
+        "p": 9.067695338237815e-68
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 6.9439976709591065,
+        "summed_lr": 878.6018104804132,
+        "df": 176.0,
+        "p": 8.055065042082512e-94
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 20.308903715067572,
+        "summed_lr": 1486.3012140683609,
+        "df": 196.0,
+        "p": 6.694921424610845e-197
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 2.222698865043185,
+        "summed_lr": 587.3750689560728,
+        "df": 180.0,
+        "p": 1.079262072599284e-44
+       }
+      },
+      "animals_positive_of_5": 5,
+      "animals_significant_of_5": 5
+     },
+     "self_offset_only": {
+      "n_sessions": 242,
+      "session_median": 10.04857307978375,
+      "session_pct_positive": 78.92561983471074,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 1.9736466912652304,
+        "summed_lr": 1248.1251510782758,
+        "df": 184.0,
+        "p": 1.888695960727477e-157
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 4.649389995013962,
+        "summed_lr": 926.4575959745737,
+        "df": 232.0,
+        "p": 1.1121414639370044e-83
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 13.836907900535834,
+        "summed_lr": 1018.9084480592642,
+        "df": 176.0,
+        "p": 1.0526542192336236e-118
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 29.336989731478752,
+        "summed_lr": 1973.7803725441916,
+        "df": 196.0,
+        "p": 8.032511700902988e-291
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 3.4247986958289403,
+        "summed_lr": 681.743967630003,
+        "df": 180.0,
+        "p": 1.8833045295933481e-59
+       }
+      },
+      "animals_positive_of_5": 5,
+      "animals_significant_of_5": 5
+     },
+     "self_offset_adds_to_onset": {
+      "n_sessions": 242,
+      "session_median": -0.02732721529673654,
+      "session_pct_positive": 49.586776859504134,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -1.5884640992110235,
+        "summed_lr": 578.1032591493486,
+        "df": 184.0,
+        "p": 2.8019705668174444e-42
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": -2.3126604125963013,
+        "summed_lr": -1.4152478478850284e+70,
+        "df": 232.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 1.4171247925696662,
+        "summed_lr": 458.48366568486927,
+        "df": 176.0,
+        "p": 4.6636588889595126e-27
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 6.491214812721864,
+        "summed_lr": 841.5592734886743,
+        "df": 196.0,
+        "p": 8.342520398626104e-81
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -2.4963086317620764,
+        "summed_lr": -1007.977641274802,
+        "df": 180.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 2,
+      "animals_significant_of_5": 3
+     },
+     "self_onset_adds_to_offset": {
+      "n_sessions": 242,
+      "session_median": -2.838799926089223,
+      "session_pct_positive": 25.206611570247933,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -3.4581274918114104,
+        "summed_lr": 221.14452958143625,
+        "df": 184.0,
+        "p": 0.03189224377432734
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": -3.300170908221048,
+        "summed_lr": -1.4152478478850284e+70,
+        "df": 232.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -2.806966327842474,
+        "summed_lr": 318.17702810601827,
+        "df": 176.0,
+        "p": 2.9137152437500897e-10
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -1.2972058063369332,
+        "summed_lr": 354.08011501284363,
+        "df": 196.0,
+        "p": 3.394986786606725e-11
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -3.609521339127923,
+        "summed_lr": -1102.346539948732,
+        "df": 180.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 3
+     },
+     "self_offset_vs_onset": {
+      "n_sessions": 242,
+      "session_median": 2.5358303427890405,
+      "session_pct_positive": 64.87603305785123,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 1.6586211467290468
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 0.49538173532687324
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 3.1371388410734653
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 9.328095077401485
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 0.8758986573679977
+       }
+      },
+      "animals_positive_of_5": 5
+     }
+    },
+    "non_local_no_swr": {
+     "self_both": {
+      "n_sessions": 241,
+      "session_median": -5.202069616266499,
+      "session_pct_positive": 21.57676348547718,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -5.880108462178441,
+        "summed_lr": 904.387349602105,
+        "df": 368.0,
+        "p": 4.788151066831837e-47
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -6.0166219155553335,
+        "summed_lr": -7.345146849704226e+16,
+        "df": 456.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -3.387125127791535,
+        "summed_lr": 712.8127361117589,
+        "df": 352.0,
+        "p": 1.1097701239271823e-26
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -2.9153685529768154,
+        "summed_lr": 701.567623841838,
+        "df": 392.0,
+        "p": 7.494715720313894e-20
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -6.3510281364413,
+        "summed_lr": -2616765.5047700694,
+        "df": 360.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 3
+     },
+     "self_onset_only": {
+      "n_sessions": 241,
+      "session_median": -2.6029132373159882,
+      "session_pct_positive": 31.535269709543567,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -2.6514367450911323,
+        "summed_lr": 395.2000890840296,
+        "df": 184.0,
+        "p": 1.7128231472315805e-17
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -2.7935419449022447,
+        "summed_lr": 395.7074244118876,
+        "df": 228.0,
+        "p": 3.7396040220018084e-11
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -1.471413775932433,
+        "summed_lr": -199723497654.52936,
+        "df": 176.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -1.3357213639769725,
+        "summed_lr": 387.83031186381857,
+        "df": 196.0,
+        "p": 9.904744929630524e-15
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -3.4525711325039765,
+        "summed_lr": 241.46103012726525,
+        "df": 180.0,
+        "p": 0.001516398979387063
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 4
+     },
+     "self_offset_only": {
+      "n_sessions": 242,
+      "session_median": -1.2617818735384958,
+      "session_pct_positive": 38.84297520661157,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -1.5534043007567107,
+        "summed_lr": 697.2349979277041,
+        "df": 184.0,
+        "p": 8.931558334750277e-61
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": -1.82176211565843,
+        "summed_lr": 434.4510541643825,
+        "df": 232.0,
+        "p": 1.82617093657159e-14
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -0.8070472205195074,
+        "summed_lr": 484.664382035156,
+        "df": 176.0,
+        "p": 1.1695781878001755e-30
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 0.5018083223685608,
+        "summed_lr": 484.3579702473103,
+        "df": 196.0,
+        "p": 2.0959421554914103e-26
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -2.177667004536602,
+        "summed_lr": -474.2876313082527,
+        "df": 180.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 4
+     },
+     "self_offset_adds_to_onset": {
+      "n_sessions": 240,
+      "session_median": -3.8034626834455025,
+      "session_pct_positive": 21.25,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -2.606729193884007,
+        "summed_lr": 509.1872605180754,
+        "df": 184.0,
+        "p": 2.6495593003860505e-32
+       },
+       "j16": {
+        "n_sessions": 56,
+        "median": -4.088816715974531,
+        "summed_lr": -7.345146849704266e+16,
+        "df": 224.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -3.9822428355146258,
+        "summed_lr": 199723498367.34204,
+        "df": 176.0,
+        "p": 0.0
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -2.589895148864798,
+        "summed_lr": 313.7373119780194,
+        "df": 196.0,
+        "p": 1.837678382319024e-07
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -4.642876269544331,
+        "summed_lr": -2617006.9658001964,
+        "df": 180.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 3
+     },
+     "self_onset_adds_to_offset": {
+      "n_sessions": 241,
+      "session_median": -4.496696888381393,
+      "session_pct_positive": 11.618257261410788,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -4.391786947592436,
+        "summed_lr": 207.15235167440096,
+        "df": 184.0,
+        "p": 0.11621769654874094
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -4.45636689085336,
+        "summed_lr": -7.345146849704274e+16,
+        "df": 228.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -3.182520773149463,
+        "summed_lr": 228.1483540766029,
+        "df": 176.0,
+        "p": 0.004951644504412967
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -4.58126163994757,
+        "summed_lr": 217.2096535945277,
+        "df": 196.0,
+        "p": 0.14270063906667294
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -4.948146027876646,
+        "summed_lr": -2616291.217138761,
+        "df": 180.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 1
+     },
+     "self_offset_vs_onset": {
+      "n_sessions": 241,
+      "session_median": 0.8238105994787475,
+      "session_pct_positive": 64.73029045643153,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 1.632187117170929
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": 0.3261553894365079
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 0.38212015519604847
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 1.2931440446120632
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 0.7266525676784568
+       }
+      },
+      "animals_positive_of_5": 5
+     },
+     "cross_both": {
+      "n_sessions": 233,
+      "session_median": -6.066475957325565,
+      "session_pct_positive": 17.167381974248926,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -6.848382251454382,
+        "summed_lr": -8316.77655794911,
+        "df": 368.0,
+        "p": 1.0
+       },
+       "j16": {
+        "n_sessions": 54,
+        "median": -6.991627376942063,
+        "summed_lr": -412896.882481122,
+        "df": 432.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 42,
+        "median": -5.804172171330379,
+        "summed_lr": 486.48852536148786,
+        "df": 336.0,
+        "p": 1.3955320448746919e-07
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -2.5244907677870287,
+        "summed_lr": -3.231518796143082e+57,
+        "df": 392.0,
+        "p": 1.0
+       },
+       "wilbur": {
+        "n_sessions": 42,
+        "median": -7.265822320238385,
+        "summed_lr": 435.29520563809604,
+        "df": 336.0,
+        "p": 0.000205961992293644
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 2
+     },
+     "cross_onset_only": {
+      "n_sessions": 234,
+      "session_median": -3.683458926261551,
+      "session_pct_positive": 20.94017094017094,
+      "animals": {
+       "chimi": {
+        "n_sessions": 44,
+        "median": -4.235483351907078,
+        "summed_lr": -13561.967633558188,
+        "df": 176.0,
+        "p": 1.0
+       },
+       "j16": {
+        "n_sessions": 54,
+        "median": -3.951888114148119,
+        "summed_lr": -210504974.28193423,
+        "df": 216.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -2.0787647664717497,
+        "summed_lr": 275.27123356489847,
+        "df": 176.0,
+        "p": 2.4684344049206967e-06
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": -2.528774387224189,
+        "summed_lr": 89.23255355119659,
+        "df": 192.0,
+        "p": 0.9999999999825054
+       },
+       "wilbur": {
+        "n_sessions": 44,
+        "median": -4.166118476329245,
+        "summed_lr": 767.8002955747379,
+        "df": 176.0,
+        "p": 7.738148029396143e-75
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 2
+     },
+     "cross_offset_only": {
+      "n_sessions": 237,
+      "session_median": -1.7363186283662344,
+      "session_pct_positive": 34.177215189873415,
+      "animals": {
+       "chimi": {
+        "n_sessions": 44,
+        "median": -1.6336566565007615,
+        "summed_lr": 281.5300532526976,
+        "df": 176.0,
+        "p": 7.377435633818905e-07
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -2.1846774493445764,
+        "summed_lr": 7.34514684970307e+16,
+        "df": 228.0,
+        "p": 0.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -1.6035415967431845,
+        "summed_lr": 348.8998019886726,
+        "df": 176.0,
+        "p": 1.7143791175139852e-13
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 0.7942990275209922,
+        "summed_lr": 513.1080908389318,
+        "df": 196.0,
+        "p": 3.103508484224626e-30
+       },
+       "wilbur": {
+        "n_sessions": 43,
+        "median": -2.6189108468499853,
+        "summed_lr": 2616827.160484992,
+        "df": 172.0,
+        "p": 0.0
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 5
+     },
+     "cross_offset_vs_onset": {
+      "n_sessions": 231,
+      "session_median": 1.7346203346527318,
+      "session_pct_positive": 68.83116883116884,
+      "animals": {
+       "chimi": {
+        "n_sessions": 43,
+        "median": 2.078220420825346
+       },
+       "j16": {
+        "n_sessions": 54,
+        "median": 1.2590395567144697
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 1.1451547070903416
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": 2.474090467493056
+       },
+       "wilbur": {
+        "n_sessions": 42,
+        "median": 1.2195407774481737
+       }
+      },
+      "animals_positive_of_5": 5
+     }
+    },
+    "non_local_swr": {
+     "self_both": {
+      "n_sessions": 238,
+      "session_median": 1.301775286889324,
+      "session_pct_positive": 55.04201680672269,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -1.764670953001314,
+        "summed_lr": 1173.815914091024,
+        "df": 360.0,
+        "p": 6.2085133640795725e-87
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -0.08659632688318197,
+        "summed_lr": -100863.42141843952,
+        "df": 456.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 43,
+        "median": 4.174710891051859,
+        "summed_lr": -110564110.39410333,
+        "df": 344.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": 10.054150471179469,
+        "summed_lr": 1369.2563169553437,
+        "df": 384.0,
+        "p": 1.3074363019664909e-110
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -3.7936842755375437,
+        "summed_lr": 659.9729702370497,
+        "df": 360.0,
+        "p": 6.138424311097377e-20
+       }
+      },
+      "animals_positive_of_5": 2,
+      "animals_significant_of_5": 3
+     },
+     "self_onset_only": {
+      "n_sessions": 241,
+      "session_median": 1.8728539573962735,
+      "session_pct_positive": 59.33609958506224,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": -0.5420626533053792,
+        "summed_lr": 772.45519871021,
+        "df": 184.0,
+        "p": 4.482140808760589e-73
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 0.39273261176060714,
+        "summed_lr": 567.1272564321105,
+        "df": 232.0,
+        "p": 4.5995747818666164e-30
+       },
+       "peanut": {
+        "n_sessions": 43,
+        "median": 3.4218083355494855,
+        "summed_lr": 514.0515444549052,
+        "df": 172.0,
+        "p": 8.84093416731389e-36
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 7.567956895683892,
+        "summed_lr": -212782477519906.1,
+        "df": 196.0,
+        "p": 1.0
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -1.9768405956481274,
+        "summed_lr": 379.08819462236477,
+        "df": 180.0,
+        "p": 2.8329850265910665e-16
+       }
+      },
+      "animals_positive_of_5": 3,
+      "animals_significant_of_5": 4
+     },
+     "self_offset_only": {
+      "n_sessions": 242,
+      "session_median": 3.9054972903980456,
+      "session_pct_positive": 63.63636363636363,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 0.8359278448182295,
+        "summed_lr": 956.2240458790482,
+        "df": 184.0,
+        "p": 1.4329797499833057e-104
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 0.9216819291362981,
+        "summed_lr": 643.6981774462374,
+        "df": 232.0,
+        "p": 2.1253948354125316e-40
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 6.958294096622126,
+        "summed_lr": 693.081689987827,
+        "df": 176.0,
+        "p": 1.815649053013227e-62
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 13.21345796788546,
+        "summed_lr": 1153.4642223659669,
+        "df": 196.0,
+        "p": 2.7514923251653577e-135
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -1.6479466587074967,
+        "summed_lr": 416.8709072489391,
+        "df": 180.0,
+        "p": 7.720097352528604e-21
+       }
+      },
+      "animals_positive_of_5": 4,
+      "animals_significant_of_5": 5
+     },
+     "self_offset_adds_to_onset": {
+      "n_sessions": 237,
+      "session_median": -1.1397157718395192,
+      "session_pct_positive": 39.66244725738397,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -2.3909610515943314,
+        "summed_lr": 403.4843083990338,
+        "df": 180.0,
+        "p": 3.4952242429804526e-19
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -1.7910352782628252,
+        "summed_lr": -101426.93011323705,
+        "df": 228.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 42,
+        "median": -0.017844073593096255,
+        "summed_lr": -110564624.86299497,
+        "df": 168.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": 1.0416044420395565,
+        "summed_lr": 212782477521288.88,
+        "df": 192.0,
+        "p": 0.0
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -3.2558339960610283,
+        "summed_lr": 280.8847756146849,
+        "df": 180.0,
+        "p": 2.1844743897804512e-06
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 3
+     },
+     "self_onset_adds_to_offset": {
+      "n_sessions": 238,
+      "session_median": -3.5129871381111,
+      "session_pct_positive": 17.647058823529413,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -3.6417077154055733,
+        "summed_lr": 225.41841192664083,
+        "df": 180.0,
+        "p": 0.012156365596357748
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -3.397524178540607,
+        "summed_lr": -101501.56111652355,
+        "df": 228.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 43,
+        "median": -3.79125248276614,
+        "summed_lr": -110564789.89181727,
+        "df": 172.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": -3.2553395041500153,
+        "summed_lr": 230.70160536653623,
+        "df": 192.0,
+        "p": 0.02941379780402776
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -3.5103255943480463,
+        "summed_lr": 243.10206298811056,
+        "df": 180.0,
+        "p": 0.0012007181010139172
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 3
+     },
+     "self_offset_vs_onset": {
+      "n_sessions": 241,
+      "session_median": 2.221721917579771,
+      "session_pct_positive": 66.80497925311202,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 1.7140759876499487
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 2.167960348966517
+       },
+       "peanut": {
+        "n_sessions": 43,
+        "median": 3.128214928037778
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 4.702322757962065
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -0.2647563175645473
+       }
+      },
+      "animals_positive_of_5": 4
+     },
+     "cross_both": {
+      "n_sessions": 232,
+      "session_median": -5.453601667675798,
+      "session_pct_positive": 28.879310344827587,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -4.915681185250833,
+        "summed_lr": 608.7034003132294,
+        "df": 360.0,
+        "p": 4.773039886526158e-15
+       },
+       "j16": {
+        "n_sessions": 55,
+        "median": -7.606672597554052,
+        "summed_lr": 195.39672939833872,
+        "df": 440.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 42,
+        "median": -5.517964051078593,
+        "summed_lr": -39564.98873995531,
+        "df": 336.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 47,
+        "median": 2.363346417910634,
+        "summed_lr": 886.1680069569973,
+        "df": 376.0,
+        "p": 3.5020653123824655e-43
+       },
+       "wilbur": {
+        "n_sessions": 43,
+        "median": -5.493213360494224,
+        "summed_lr": -53416.74294174747,
+        "df": 344.0,
+        "p": 1.0
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 2
+     },
+     "cross_onset_only": {
+      "n_sessions": 235,
+      "session_median": -2.337320066617849,
+      "session_pct_positive": 32.76595744680851,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -1.247728391270357,
+        "summed_lr": -24734.430662455114,
+        "df": 180.0,
+        "p": 1.0
+       },
+       "j16": {
+        "n_sessions": 56,
+        "median": -2.9384756480244505,
+        "summed_lr": 102164.45865588952,
+        "df": 224.0,
+        "p": 0.0
+       },
+       "peanut": {
+        "n_sessions": 43,
+        "median": -3.0344727899828285,
+        "summed_lr": 110564295.21921432,
+        "df": 172.0,
+        "p": 0.0
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": 2.0673426911271804,
+        "summed_lr": -9503.703622688234,
+        "df": 192.0,
+        "p": 1.0
+       },
+       "wilbur": {
+        "n_sessions": 43,
+        "median": -2.8611553063935844,
+        "summed_lr": 247.67807142440347,
+        "df": 172.0,
+        "p": 0.0001390446432542238
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 3
+     },
+     "cross_offset_only": {
+      "n_sessions": 236,
+      "session_median": -1.283694278361395,
+      "session_pct_positive": 41.52542372881356,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -2.8185443318889156,
+        "summed_lr": 358.2350769548873,
+        "df": 180.0,
+        "p": 6.540739326552443e-14
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -2.931937292548355,
+        "summed_lr": -109656511.01665086,
+        "df": 228.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 42,
+        "median": -1.9178792755604945,
+        "summed_lr": 110565334.10256833,
+        "df": 168.0,
+        "p": 0.0
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": 3.598583326339167,
+        "summed_lr": 510.4707558903614,
+        "df": 192.0,
+        "p": 9.967273207817767e-31
+       },
+       "wilbur": {
+        "n_sessions": 44,
+        "median": -0.7346056206540084,
+        "summed_lr": 331.4446126902923,
+        "df": 176.0,
+        "p": 1.281033954304435e-11
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 4
+     },
+     "cross_offset_vs_onset": {
+      "n_sessions": 234,
+      "session_median": 0.4103830167929914,
+      "session_pct_positive": 55.98290598290598,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -0.35939504660495913
+       },
+       "j16": {
+        "n_sessions": 56,
+        "median": -0.37909374628725345
+       },
+       "peanut": {
+        "n_sessions": 43,
+        "median": 1.1544250573194859
+       },
+       "senor": {
+        "n_sessions": 48,
+        "median": 1.5828480105050176
+       },
+       "wilbur": {
+        "n_sessions": 42,
+        "median": 1.148817518649139
+       }
+      },
+      "animals_positive_of_5": 3
+     }
+    },
+    "swr": {
+     "self_both": {
+      "n_sessions": 241,
+      "session_median": 11.012671469417683,
+      "session_pct_positive": 80.91286307053942,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": 2.572587773143141,
+        "summed_lr": 1178.495393533024,
+        "df": 360.0,
+        "p": 1.2172902512260967e-87
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 11.392707064237811,
+        "summed_lr": 1678.4443063575602,
+        "df": 464.0,
+        "p": 6.794742516153031e-137
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 11.484107897847025,
+        "summed_lr": -37213.2207233069,
+        "df": 352.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 21.616375637620877,
+        "summed_lr": 1804.1647680044086,
+        "df": 392.0,
+        "p": 1.5689067852757273e-179
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 6.151332292089364,
+        "summed_lr": 1238.1398540301661,
+        "df": 360.0,
+        "p": 9.180679579810982e-97
+       }
+      },
+      "animals_positive_of_5": 5,
+      "animals_significant_of_5": 4
+     },
+     "self_onset_only": {
+      "n_sessions": 240,
+      "session_median": 10.260694798285272,
+      "session_pct_positive": 85.41666666666666,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": 3.299885075412476,
+        "summed_lr": 417.2121439161833,
+        "df": 180.0,
+        "p": 6.996701711093241e-21
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": 12.384605541296423,
+        "summed_lr": -125.28594586431541,
+        "df": 228.0,
+        "p": 1.0
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 10.983915296488817,
+        "summed_lr": 894.5862990083347,
+        "df": 176.0,
+        "p": 1.3013841194944466e-96
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 18.722290149490618,
+        "summed_lr": 1319.3165403749772,
+        "df": 196.0,
+        "p": 1.1852142536417137e-165
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 7.230838868234969,
+        "summed_lr": 836.8859110493635,
+        "df": 180.0,
+        "p": 3.0476853053819225e-85
+       }
+      },
+      "animals_positive_of_5": 5,
+      "animals_significant_of_5": 4
+     },
+     "self_offset_only": {
+      "n_sessions": 242,
+      "session_median": 11.96278046191685,
+      "session_pct_positive": 88.84297520661157,
+      "animals": {
+       "chimi": {
+        "n_sessions": 46,
+        "median": 6.553369629188751,
+        "summed_lr": 963.8419509579849,
+        "df": 184.0,
+        "p": 6.52879226733034e-106
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": 12.730288937370347,
+        "summed_lr": 1287.5927456927645,
+        "df": 232.0,
+        "p": 1.0666225464292394e-145
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 13.68526043512486,
+        "summed_lr": 1037.9164204527358,
+        "df": 176.0,
+        "p": 3.9039060601926946e-122
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 20.862780876011584,
+        "summed_lr": 1488.644744108272,
+        "df": 196.0,
+        "p": 2.4161451464946764e-197
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 9.89342990099135,
+        "summed_lr": 928.875142034099,
+        "df": 180.0,
+        "p": 3.375074896634578e-101
+       }
+      },
+      "animals_positive_of_5": 5,
+      "animals_significant_of_5": 5
+     },
+     "self_offset_adds_to_onset": {
+      "n_sessions": 240,
+      "session_median": -0.1562882068685667,
+      "session_pct_positive": 47.5,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -0.044974777915967934,
+        "summed_lr": 761.2832496168407,
+        "df": 180.0,
+        "p": 1.790254777181591e-72
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": -0.5453507209206236,
+        "summed_lr": 1788.5239751225047,
+        "df": 228.0,
+        "p": 7.120710451411158e-240
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -1.1093897714450804,
+        "summed_lr": -38107.80702231523,
+        "df": 176.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 0.6285055383270901,
+        "summed_lr": 484.84822762943145,
+        "df": 196.0,
+        "p": 1.8082251199363298e-26
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -0.06534294557832254,
+        "summed_lr": 401.25394298080255,
+        "df": 180.0,
+        "p": 6.537204416248478e-19
+       }
+      },
+      "animals_positive_of_5": 1,
+      "animals_significant_of_5": 4
+     },
+     "self_onset_adds_to_offset": {
+      "n_sessions": 241,
+      "session_median": -3.031191575293633,
+      "session_pct_positive": 28.21576763485477,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": -4.197429949374737,
+        "summed_lr": 218.77194653809715,
+        "df": 180.0,
+        "p": 0.025746084111591322
+       },
+       "j16": {
+        "n_sessions": 58,
+        "median": -2.5724959780670815,
+        "summed_lr": 390.85156066479567,
+        "df": 232.0,
+        "p": 3.1825709071270503e-10
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": -3.3022814793838506,
+        "summed_lr": -38251.137143759624,
+        "df": 176.0,
+        "p": 1.0
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": -3.367314164264144,
+        "summed_lr": 315.52002389613654,
+        "df": 196.0,
+        "p": 1.2947518265324397e-07
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": -2.5929751272437898,
+        "summed_lr": 309.26471199606704,
+        "df": 180.0,
+        "p": 6.885183288809588e-09
+       }
+      },
+      "animals_positive_of_5": 0,
+      "animals_significant_of_5": 4
+     },
+     "self_offset_vs_onset": {
+      "n_sessions": 240,
+      "session_median": 2.347943857894961,
+      "session_pct_positive": 60.83333333333333,
+      "animals": {
+       "chimi": {
+        "n_sessions": 45,
+        "median": 3.6424973141133705
+       },
+       "j16": {
+        "n_sessions": 57,
+        "median": 1.1593036924118678
+       },
+       "peanut": {
+        "n_sessions": 44,
+        "median": 2.069159512552801
+       },
+       "senor": {
+        "n_sessions": 49,
+        "median": 5.311589558993774
+       },
+       "wilbur": {
+        "n_sessions": 45,
+        "median": 1.7284223146689328
+       }
+      },
+      "animals_positive_of_5": 5
+     }
+    }
+   },
+   "fits": {
+    "non_local": {
+     "Mnohist_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 9,
+      "n_separated_history_term": 0
+     },
+     "Mself_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 40,
+      "n_separated_history_term": 36
+     },
+     "Mself_offset_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 10,
+      "n_separated_history_term": 3
+     },
+     "Mself_onset_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 42,
+      "n_separated_history_term": 39
+     }
+    },
+    "non_local_no_swr": {
+     "Mnohist_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 39,
+      "n_separated_history_term": 0
+     },
+     "Mself_dur": {
+      "n_sessions": 242,
+      "n_failed": 1,
+      "n_separated_any_term": 101,
+      "n_separated_history_term": 96
+     },
+     "Mself_offset_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 70,
+      "n_separated_history_term": 58
+     },
+     "Mself_onset_dur": {
+      "n_sessions": 242,
+      "n_failed": 1,
+      "n_separated_any_term": 96,
+      "n_separated_history_term": 87
+     },
+     "Mselfcross_dur": {
+      "n_sessions": 242,
+      "n_failed": 9,
+      "n_separated_any_term": 153,
+      "n_separated_history_term": 149
+     },
+     "Mselfcross_offset_dur": {
+      "n_sessions": 242,
+      "n_failed": 5,
+      "n_separated_any_term": 129,
+      "n_separated_history_term": 124
+     },
+     "Mselfcross_onset_dur": {
+      "n_sessions": 242,
+      "n_failed": 8,
+      "n_separated_any_term": 151,
+      "n_separated_history_term": 148
+     }
+    },
+    "non_local_swr": {
+     "Mnohist_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 70,
+      "n_separated_history_term": 0
+     },
+     "Mself_dur": {
+      "n_sessions": 242,
+      "n_failed": 4,
+      "n_separated_any_term": 104,
+      "n_separated_history_term": 69
+     },
+     "Mself_offset_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 86,
+      "n_separated_history_term": 32
+     },
+     "Mself_onset_dur": {
+      "n_sessions": 242,
+      "n_failed": 1,
+      "n_separated_any_term": 101,
+      "n_separated_history_term": 60
+     },
+     "Mselfcross_dur": {
+      "n_sessions": 242,
+      "n_failed": 9,
+      "n_separated_any_term": 142,
+      "n_separated_history_term": 128
+     },
+     "Mselfcross_offset_dur": {
+      "n_sessions": 242,
+      "n_failed": 5,
+      "n_separated_any_term": 121,
+      "n_separated_history_term": 97
+     },
+     "Mselfcross_onset_dur": {
+      "n_sessions": 242,
+      "n_failed": 6,
+      "n_separated_any_term": 139,
+      "n_separated_history_term": 122
+     }
+    },
+    "swr": {
+     "Mnohist_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 14,
+      "n_separated_history_term": 0
+     },
+     "Mself_dur": {
+      "n_sessions": 242,
+      "n_failed": 1,
+      "n_separated_any_term": 51,
+      "n_separated_history_term": 42
+     },
+     "Mself_offset_dur": {
+      "n_sessions": 242,
+      "n_failed": 0,
+      "n_separated_any_term": 19,
+      "n_separated_history_term": 6
+     },
+     "Mself_onset_dur": {
+      "n_sessions": 242,
+      "n_failed": 2,
+      "n_separated_any_term": 46,
+      "n_separated_history_term": 40
+     }
+    }
+   }
+  }
+ }
+}
