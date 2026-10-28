@@ -80,3 +80,12 @@ Items 2 (SWRs without replay), 3 (content), 4 (timing), 5 (event strength), 8 (b
 Plan: `.claude/docs/plans/pfc-response-followups/`. Order: Phase A (timing, no refit) and Phase 0 (port
 the marked-family branch) first; then Phase B (new event class, GPU refit) and Phase C (marked family v2:
 content, strength, context marks; GPU refit); results into `part4.json`.
+
+## Lead decisions 2026-10-27 (after Phase B)
+
+- mPFC Phase C: context marks (item 8) leave the marked family; answer the context question at the stop level,
+  pooled across sessions. Rare class: all sessions main, the >=10-event subset as a check. Ridge slopes stay as
+  fitted (no "unique part"). No power equalising; instead measure how the called share depends on event count and
+  firing rate. Open: is the shuffle reference needed at all; is a linear slope in the mark flexible enough.
+- Claim 19c burst/refractory text: marked pending on the duration artifact (claims table), not removed.
+- Duration-aware self/cross-history refit on real data: approved (measure the duration spread first).
