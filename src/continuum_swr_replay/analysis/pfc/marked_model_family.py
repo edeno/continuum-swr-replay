@@ -1719,6 +1719,7 @@ def family_ridge_penalty(
     design: KernelDesign,
     penalty_sigma: float,
     mark_penalty_sigma: float | None = None,
+    baseline_penalty_sigma: float | None = None,
 ) -> NDArray:
     """Per-column ridge penalty with a separate prior for the marked blocks.
 
@@ -1731,17 +1732,27 @@ def family_ridge_penalty(
     mark_penalty_sigma : float, optional
         Prior SD on every marked block's coefficients. ``None`` uses
         ``penalty_sigma`` for them too.
+    baseline_penalty_sigma : float, optional
+        Prior SD on the per-stop baseline columns, log-rate units. ``None``
+        leaves them free. A unit with no spikes in the stops at one well has
+        no finite estimate of that well's free baseline coefficient
+        (separation), so its fit cannot converge; a weak prior keeps it finite
+        and barely moves the estimate of a unit with spikes there.
 
     Returns
     -------
     NDArray, shape (n_columns,)
-        ``0`` for the intercept and the ``design.n_baseline`` baseline columns,
-        ``1 / penalty_sigma**2`` for base columns and
-        ``1 / mark_penalty_sigma**2`` for marked columns.
+        ``0`` for the intercept, ``0`` (or ``1 / baseline_penalty_sigma**2``)
+        for the ``design.n_baseline`` baseline columns, ``1 / penalty_sigma**2``
+        for base columns and ``1 / mark_penalty_sigma**2`` for marked columns.
     """
     penalty = make_ridge_penalty(
         design.matrix.shape[1], penalty_sigma, n_unpenalized=1 + design.n_baseline
     )
+    if baseline_penalty_sigma is not None:
+        if baseline_penalty_sigma <= 0 or not np.isfinite(baseline_penalty_sigma):
+            raise ValueError("baseline_penalty_sigma must be finite and positive")
+        penalty[1 : 1 + design.n_baseline] = 1.0 / baseline_penalty_sigma**2
     if mark_penalty_sigma is None:
         return penalty
     if mark_penalty_sigma <= 0 or not np.isfinite(mark_penalty_sigma):
@@ -2069,6 +2080,7 @@ def fit_marked_family_slope_null(
     *,
     penalty_sigma: float,
     mark_penalty_sigma: float | None = DEFAULT_MARK_PENALTY_SIGMA,
+    baseline_penalty_sigma: float | None = None,
     n_draws: int,
     seed: int,
     targets: tuple[str, ...] | None = None,
@@ -2093,8 +2105,8 @@ def fit_marked_family_slope_null(
     counts : NDArray, shape (n_fit_bins, n_units)
     observed : MarkedFamilyResults
         The observed fit of this ladder (its ``full_params`` start the draws).
-    penalty_sigma, mark_penalty_sigma : float
-        The observed fit's priors.
+    penalty_sigma, mark_penalty_sigma, baseline_penalty_sigma : float
+        The observed fit's priors (see :func:`family_ridge_penalty`).
     n_draws : int
         Refits per target block.
     seed : int
@@ -2139,7 +2151,9 @@ def fit_marked_family_slope_null(
     fit_counts = np.asarray(counts, dtype=float)
     if fit_counts.ndim == 1:
         fit_counts = fit_counts[:, None]
-    penalty = family_ridge_penalty(ladder.full, penalty_sigma, mark_penalty_sigma)
+    penalty = family_ridge_penalty(
+        ladder.full, penalty_sigma, mark_penalty_sigma, baseline_penalty_sigma
+    )
     width = ladder.full.matrix.shape[1]
     batch = slope_null_batch_size(batch_size, width)
     comparison_order = tuple(ladder.reduced)
@@ -2194,6 +2208,7 @@ def fit_marked_family_ladder(
     *,
     penalty_sigma: float,
     mark_penalty_sigma: float | None = DEFAULT_MARK_PENALTY_SIGMA,
+    baseline_penalty_sigma: float | None = None,
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
     prepared_response: PreparedHeldoutResponse | None = None,
     slope_permutations: int = 0,
@@ -2226,6 +2241,9 @@ def fit_marked_family_ladder(
     mark_penalty_sigma : float, optional
         Ridge prior SD on every marked block's coefficients; ``None`` shares
         ``penalty_sigma``. See :data:`DEFAULT_MARK_PENALTY_SIGMA`.
+    baseline_penalty_sigma : float, optional
+        Ridge prior SD on the per-stop baseline columns; ``None`` leaves them
+        free (see :func:`family_ridge_penalty`).
     design_batch_size : int
         Designs scored per device batch, before the width bound of
         :func:`bounded_design_batch_size`.
@@ -2303,9 +2321,14 @@ def fit_marked_family_ladder(
     # Every reduced design of one spec lays out intercept, base blocks, then
     # marked blocks in the same order, so one penalty vector serves the batch.
     reduced_penalty = family_ridge_penalty(
-        ladder.reduced[comparison_order[0]], penalty_sigma, mark_penalty_sigma
+        ladder.reduced[comparison_order[0]],
+        penalty_sigma,
+        mark_penalty_sigma,
+        baseline_penalty_sigma,
     )
-    full_penalty = family_ridge_penalty(ladder.full, penalty_sigma, mark_penalty_sigma)
+    full_penalty = family_ridge_penalty(
+        ladder.full, penalty_sigma, mark_penalty_sigma, baseline_penalty_sigma
+    )
     reduced_score = _score(
         reduced_designs,
         response,
@@ -2373,6 +2396,9 @@ def fit_marked_family_ladder(
         "mark_penalty_sigma_log_rate": (
             None if mark_penalty_sigma is None else float(mark_penalty_sigma)
         ),
+        "baseline_penalty_sigma_log_rate": (
+            None if baseline_penalty_sigma is None else float(baseline_penalty_sigma)
+        ),
         "tier": ladder.spec.tier,
         "scientific_marks": list(ladder.spec.scientific_marks),
         "nuisance_marks": list(ladder.spec.nuisance_marks),
@@ -2430,6 +2456,7 @@ def fit_marked_family_ladder(
         results,
         penalty_sigma=penalty_sigma,
         mark_penalty_sigma=mark_penalty_sigma,
+        baseline_penalty_sigma=baseline_penalty_sigma,
         n_draws=slope_permutations,
         seed=slope_permutation_seed,
         targets=slope_permutation_targets,

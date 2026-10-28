@@ -291,3 +291,65 @@ def test_empty_baseline_reproduces_the_contract_one_fit():
         rtol=1e-10,
         atol=1e-8,
     )
+
+
+def test_baseline_prior_penalises_only_the_baseline_columns():
+    fit_mask, basis, lags, events, baseline, _ = _design_inputs()
+    spec = MarkedFamilySpec(
+        "baseline_probe", (CURRENT_ARM_FRACTION,), (EVENT_DURATION_MARK,), "probe"
+    )
+    design = build_marked_family_ladder(
+        events, fit_mask, basis, lags, spec, baseline=baseline
+    ).full
+
+    penalty = family_ridge_penalty(design, 3.0, 0.5, baseline_penalty_sigma=3.0)
+
+    assert penalty[0] == 0.0
+    np.testing.assert_allclose(penalty[1:5], 1 / 9)
+    np.testing.assert_array_equal(
+        penalty[5:], family_ridge_penalty(design, 3.0, 0.5)[5:]
+    )
+    with pytest.raises(ValueError):
+        family_ridge_penalty(design, 3.0, 0.5, baseline_penalty_sigma=0.0)
+
+
+def test_baseline_prior_makes_a_unit_silent_at_one_well_converge():
+    """No spikes in one well's stops: the free baseline coefficient runs off and
+    the fit never converges; under the prior it converges and a unit with
+    spikes everywhere barely moves."""
+    from continuum_swr_replay.analysis.pfc.batched_glm import fit_poisson_glms
+
+    fit_mask, basis, lags, events, baseline, _ = _design_inputs()
+    spec = MarkedFamilySpec(
+        "baseline_probe", (CURRENT_ARM_FRACTION,), (EVENT_DURATION_MARK,), "probe"
+    )
+    design = build_marked_family_ladder(
+        events, fit_mask, basis, lags, spec, baseline=baseline
+    ).full
+    rng = np.random.default_rng(0)
+    n_rows = design.matrix.shape[0]
+    active = rng.poisson(0.05, size=n_rows).astype(float)
+    silent_at_one_well = rng.poisson(0.05, size=n_rows).astype(float)
+    # Column 1 is the first non-reference well's indicator.
+    silent_at_one_well[design.matrix[:, 1] > 0] = 0.0
+    counts = np.column_stack([active, silent_at_one_well])
+
+    free = fit_poisson_glms(
+        design.matrix,
+        counts,
+        penalty=family_ridge_penalty(design, 3.0, 0.5),
+        compute_covariance=False,
+    )
+    prior = fit_poisson_glms(
+        design.matrix,
+        counts,
+        penalty=family_ridge_penalty(design, 3.0, 0.5, baseline_penalty_sigma=3.0),
+        compute_covariance=False,
+    )
+
+    assert not bool(np.asarray(free.converged)[1])
+    assert np.asarray(prior.converged).all()
+    assert np.abs(np.asarray(prior.params)[1]).max() < 20
+    np.testing.assert_allclose(
+        np.asarray(prior.params)[0], np.asarray(free.params)[0], atol=0.05
+    )

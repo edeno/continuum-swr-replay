@@ -261,6 +261,7 @@ def build_fit_contract(
     penalty_sigma: float,
     mark_penalty_sigma: float | None,
     n_folds: int,
+    baseline_penalty_sigma: float | None = None,
     fold_seed: int,
     design_batch_size: int,
     min_marked_events: int,
@@ -348,10 +349,18 @@ def build_fit_contract(
             "retain event in ordinary kernel; zero only its centered marked "
             "regressor; record availability and scale"
         ),
-        "neuron_inclusion": "all recorded units; no firing-rate or p-value screen",
+        "neuron_inclusion": (
+            "all recorded units; no firing-rate or p-value screen"
+            if baseline_penalty_sigma is None
+            else "all recorded units with at least one spike in the fitted bins; "
+            "no firing-rate or p-value screen"
+        ),
         "penalty_sigma_log_rate": float(penalty_sigma),
         "mark_penalty_sigma_log_rate": (
             None if mark_penalty_sigma is None else float(mark_penalty_sigma)
+        ),
+        "baseline_penalty_sigma_log_rate": (
+            None if baseline_penalty_sigma is None else float(baseline_penalty_sigma)
         ),
         "n_folds": int(n_folds),
         "fold_seed": int(fold_seed),
@@ -588,6 +597,7 @@ def run_analysis(
     overwrite: bool = False,
     penalty_sigma: float = DEFAULT_PENALTY_SIGMA,
     mark_penalty_sigma: float | None = DEFAULT_MARK_PENALTY_SIGMA,
+    baseline_penalty_sigma: float | None = None,
     n_folds: int = 5,
     fold_seed: int | None = None,
     design_batch_size: int = DEFAULT_NULL_DESIGN_BATCH_SIZE,
@@ -630,6 +640,11 @@ def run_analysis(
         Ridge prior SD on the log-rate coefficients.
     mark_penalty_sigma : float or None, optional
         Ridge prior SD for the marked blocks; ``None`` shares ``penalty_sigma``.
+    baseline_penalty_sigma : float or None, optional
+        Ridge prior SD for the per-stop baseline columns; ``None`` leaves them
+        free. When given, units with no spike in the fitted bins carry no
+        information and are left out of the fit (counted in the sidecar as
+        ``n_units_without_spikes``, with the kept units' indices).
     n_folds : int, optional
         Number of blocked held-out folds.
     fold_seed : int or None, optional
@@ -737,6 +752,7 @@ def run_analysis(
                 spec,
                 penalty_sigma=penalty_sigma,
                 mark_penalty_sigma=mark_penalty_sigma,
+                baseline_penalty_sigma=baseline_penalty_sigma,
                 n_folds=n_folds,
                 fold_seed=fold_seed,
                 design_batch_size=design_batch_size,
@@ -822,6 +838,20 @@ def run_analysis(
         ):
             raise RuntimeError("SWR events input changed during preparation")
         _check_prepared_window(context.spline_basis, context.lags)
+        # With a prior on the baseline columns every unit with a spike has a
+        # finite fit; a unit with no spike in the fitted bins carries no
+        # information about any coefficient, so it is left out and counted.
+        n_units_recorded = int(context.counts.shape[1])
+        kept_units = np.arange(n_units_recorded)
+        if baseline_penalty_sigma is not None:
+            kept_units = np.flatnonzero(context.counts.sum(axis=0) > 0)
+            if len(kept_units) < n_units_recorded:
+                logger.info(
+                    "Leaving out %d of %d units with no spike in the fitted bins",
+                    n_units_recorded - len(kept_units),
+                    n_units_recorded,
+                )
+                context = replace(context, counts=context.counts[:, kept_units])
 
         common_extra = {
             "nwb_file_name": nwb_file_name,
@@ -829,6 +859,9 @@ def run_analysis(
             "cohort_report": cohort_report,
             "cohort_info": context.cohort_info,
             "n_units": int(context.counts.shape[1]),
+            "n_units_recorded": n_units_recorded,
+            "n_units_without_spikes": int(n_units_recorded - len(kept_units)),
+            "kept_unit_indices": kept_units.astype(int).tolist(),
             "n_fit_bins": int(context.counts.shape[0]),
             "n_events_by_class": {
                 event_class: int(len(marked_events[event_class]))
@@ -922,6 +955,7 @@ def run_analysis(
                     folds,
                     penalty_sigma=penalty_sigma,
                     mark_penalty_sigma=mark_penalty_sigma,
+                    baseline_penalty_sigma=baseline_penalty_sigma,
                     design_batch_size=design_batch_size,
                     prepared_response=prepared_response,
                 )
@@ -969,6 +1003,7 @@ def run_analysis(
                         fitted,
                         penalty_sigma=penalty_sigma,
                         mark_penalty_sigma=mark_penalty_sigma,
+                        baseline_penalty_sigma=baseline_penalty_sigma,
                         n_draws=slope_permutations,
                         seed=slope_seeds[name],
                         report_lags=report,
@@ -1178,6 +1213,16 @@ def get_command_line_arguments() -> Namespace:
             "2026-09-18 smoke sessions."
         ),
     )
+    parser.add_argument(
+        "--baseline-penalty-sigma",
+        type=float,
+        default=None,
+        help=(
+            "Ridge prior SD for the per-stop baseline columns (log-rate units). "
+            "Default: none (free). With a value, units with no spike in the "
+            "fitted bins are left out and counted."
+        ),
+    )
     parser.add_argument("--n-folds", type=int, default=5)
     parser.add_argument("--fold-seed", type=int)
     parser.add_argument(
@@ -1321,6 +1366,7 @@ def main() -> None:
             overwrite=args.overwrite,
             penalty_sigma=args.penalty_sigma,
             mark_penalty_sigma=args.mark_penalty_sigma,
+            baseline_penalty_sigma=args.baseline_penalty_sigma,
             n_folds=args.n_folds,
             fold_seed=args.fold_seed,
             design_batch_size=args.design_batch_size,
