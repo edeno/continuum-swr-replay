@@ -140,7 +140,32 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 - In the per-stop model, adding reward history improves the fit for SWR-coupled events
   (median AIC(with) − AIC(without), negative = better: <!--v:part3.per_stop_delta_aic_session_non_local_swr-->−3.1<!--/v-->) but not for non-SWR events
   (<!--v:part3.per_stop_delta_aic_session_non_local_no_swr-->+0.88<!--/v-->).
+- Event history, once event duration is handled (a bin inside an event is not at risk; history is read from the
+  previous event's end and its onset; each animal's sessions pooled, so the sizes are upper bounds):
+  - No suppression after an event ends: 15 ms after the end the rate ratio is at least
+    <!--v:part3.history_end_first_lag_rr_low-->…<!--/v-->, and it is below 1 in <!--v:part3.history_end_first_lag_suppressed_fits-->…<!--/v-->
+    of <!--v:part3.history_fits-->…<!--/v--> animal × population fits.
+  - The next event is <!--v:part3.history_end_peak_low-->…<!--/v-->–<!--v:part3.history_end_peak_high-->…<!--/v-->× likelier
+    <!--v:part3.history_end_peak_lag_ms_low-->…<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->…<!--/v--> ms after the previous one
+    ends (at least <!--v:part3.history_end_peak_animals_min-->…<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals in every population).
+  - A smaller onset-locked part remains: detected SWR <!--v:part3.history_onset_peak_swr-->…<!--/v-->× at
+    <!--v:part3.history_onset_peak_lag_ms_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals),
+    non-local <!--v:part3.history_onset_peak_non_local-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local-->…<!--/v--> ms
+    (<!--v:part3.history_onset_animals_non_local-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->), SWR-coupled
+    <!--v:part3.history_onset_peak_non_local_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->…<!--/v--> ms
+    (<!--v:part3.history_onset_animals_non_local_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+    <!--v:part3.history_onset_peak_non_local_no_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->…<!--/v--> ms
+    (<!--v:part3.history_onset_animals_non_local_no_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
+  - Cross: <!--v:part3.history_cross_end_rr_non_swr_from_swr-->…<!--/v-->× for a non-SWR event 45 ms after an SWR-coupled one ends
+    (<!--v:part3.history_cross_end_animals_non_swr_from_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals), and
+    <!--v:part3.history_cross_end_rr_swr_from_non_swr-->…<!--/v-->× the other way
+    (<!--v:part3.history_cross_end_animals_swr_from_non_swr-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->). Per session the cross block does not pay
+    for its parameters (median AIC gain <!--v:part3.history_cross_session_gain_non_swr_from_swr-->…<!--/v--> and
+    <!--v:part3.history_cross_session_gain_swr_from_non_swr-->…<!--/v-->, positive = pays).
 - *Reading:* reward gates SWR-coupled events; non-SWR events occur at a similar rate but barely respond to reward.
+  There is no refractory period beyond the event itself. Events cluster mostly right after the previous event ends,
+  with a weaker onset-locked rhythm; the cross "coupling" is the same end-locked succession in both directions, not
+  one stream driving the other.
 
 **What do events represent?** (content, log weights per arm; fraction estimator unless named; q is the false-discovery-adjusted p)
 - Current arm: <!--v:part3.base_current_all-->+0.73<!--/v--> (<!--v:part3.base_current_all_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals); fitted separately,
@@ -157,10 +182,28 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   (<!--v:part3.leaf_step_value-->−2.4<!--/v-->, <!--v:part3.leaf_step_value_animals-->0<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
 - Arm value: <!--v:part3.armvalue_all-->+0.078<!--/v--> (<!--v:part3.armvalue_all_animals_positive-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armvalue_all_q-->0.11<!--/v-->). The SWR × value contrast is
   near zero once event length is in (direct <!--v:part3.swr_armvalue_direct-->−0.014<!--/v-->) and negative without it (total <!--v:part3.swr_armvalue_total-->−0.25<!--/v-->).
+- Are uncertainty, value and visit history separated? Within each arm (the four entered together; arm fraction per SD;
+  non-current reward arms; design condition number <!--v:part3.horserace_condition_number_all-->…<!--/v-->, so they separate):
+  - uncertainty <!--v:part3.horserace_uncertainty_all-->…<!--/v--> (<!--v:part3.horserace_uncertainty_all_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals);
+    SWR <!--v:part3.horserace_uncertainty_swr-->…<!--/v--> (<!--v:part3.horserace_uncertainty_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+    <!--v:part3.horserace_uncertainty_non_swr-->…<!--/v--> (<!--v:part3.horserace_uncertainty_non_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->);
+  - value <!--v:part3.horserace_value_all-->…<!--/v--> (<!--v:part3.horserace_value_all_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->); SWR
+    <!--v:part3.horserace_value_swr-->…<!--/v--> (<!--v:part3.horserace_value_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+    <!--v:part3.horserace_value_non_swr-->…<!--/v--> (<!--v:part3.horserace_value_non_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->);
+  - distance <!--v:part3.horserace_distance_all-->…<!--/v--> (<!--v:part3.horserace_distance_all_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->); SWR
+    <!--v:part3.horserace_distance_swr-->…<!--/v--> (<!--v:part3.horserace_distance_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+    <!--v:part3.horserace_distance_non_swr-->…<!--/v--> (<!--v:part3.horserace_distance_non_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->);
+  - visit recency <!--v:part3.horserace_recency_all-->…<!--/v--> (<!--v:part3.horserace_recency_all_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->); SWR
+    <!--v:part3.horserace_recency_swr-->…<!--/v--> (<!--v:part3.horserace_recency_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+    <!--v:part3.horserace_recency_non_swr-->…<!--/v--> (<!--v:part3.horserace_recency_non_swr_animals-->…<!--/v-->/<!--v:part2.animals-->5<!--/v-->)
+    (condition numbers SWR <!--v:part3.horserace_condition_number_swr-->…<!--/v-->, non-SWR <!--v:part3.horserace_condition_number_non_swr-->…<!--/v-->).
+  - Yes: uncertainty is the only term whose sign agrees in every animal in all three populations, and it is much
+    larger than value or recency. Value is near zero once uncertainty, distance and recency are in; content leans
+    away from distant arms; recency is small, and near zero for non-SWR events.
 - *Reading:* the robust content facts are current-arm bias, preference for uncertain arms, broader SWR content, and SWR
   avoidance of recently rewarded arms. Value effects are weak or run through event length.
 
-**Does content relate to what the animal does next?** (pending: the choice fit has no provenance sidecar)
+**Does content relate to what the animal does next?**
 - Next choice: over the behavioural baseline, non-SWR content <!--v:part3.choice_non_swr-->+0.040<!--/v--> (p <!--v:part3.choice_non_swr_p-->0.84<!--/v-->),
   SWR content <!--v:part3.choice_swr-->+0.041<!--/v--> (p <!--v:part3.choice_swr_p-->0.66<!--/v-->). Without the baseline it is <!--v:part3.choice_raw-->−0.65<!--/v--> (p <!--v:part3.choice_raw_p-->2.3e-13<!--/v-->),
   so the raw association (content pointing away from the next choice) is carried by behaviour, not by content.
