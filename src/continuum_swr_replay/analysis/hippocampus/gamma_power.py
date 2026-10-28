@@ -102,3 +102,49 @@ def event_means(
     means = means.astype(np.float64)
     means[n <= 0] = np.nan
     return means
+
+
+def samples_in_intervals(
+    grid_time: NDArray[np.float64],
+    starts: NDArray[np.float64],
+    ends: NDArray[np.float64],
+) -> NDArray[np.bool_]:
+    """Which grid samples lie in any interval ``start <= t <= end`` (the rule of
+    :func:`event_means`)."""
+    first = np.searchsorted(grid_time, starts, side="left")
+    stop = np.searchsorted(grid_time, ends, side="right")
+    delta = np.zeros(grid_time.size + 1, dtype=np.int64)
+    np.add.at(delta, first, 1)
+    np.add.at(delta, stop, -1)
+    return np.cumsum(delta[:-1]) > 0
+
+
+def power_change_db(
+    power: NDArray[np.float64],
+    during: NDArray[np.bool_],
+    reference: NDArray[np.bool_],
+) -> float:
+    """``10 log10(mean power during / mean power in the reference)``, in dB.
+
+    On band power (not its z-score): an event's gamma against the same epoch's
+    quiet rest. 0 dB is no change, +3 dB about twice the power.
+
+    Parameters
+    ----------
+    power : NDArray, shape (n_time,)
+        Band power (``band_power``), on any grid.
+    during, reference : NDArray of bool, shape (n_time,)
+        The samples of the events and of the reference; non-finite samples are
+        left out.
+
+    Returns
+    -------
+    float
+        NaN when either set has no finite sample.
+    """
+    power = np.asarray(power, dtype=np.float64)
+    finite = np.isfinite(power)
+    a, b = power[during & finite], power[reference & finite]
+    if a.size == 0 or b.size == 0:
+        return float("nan")
+    return float(10.0 * np.log10(a.mean() / b.mean()))
