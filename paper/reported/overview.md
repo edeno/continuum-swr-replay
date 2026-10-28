@@ -119,12 +119,12 @@ close on average.
   SWR events. Because none of these contrasts is duration-controlled, "shorter" may account for much of the rest.
 
 **One class or two?** (claim 24; `scripts/detection/measure_ripple_class_structure.py`) The events' peak ripple power
-has one mode in <!--v:part2.ripple_peak_animals_unimodal-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> animals, lying at
-<!--v:part2.ripple_peak_mode_animal_min-->…<!--/v-->–<!--v:part2.ripple_peak_mode_animal_max-->…<!--/v--> z, so the SWR threshold cuts one mode rather than falling
+has one mode in <!--v:part2.ripple_peak_animals_unimodal-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals, lying at
+<!--v:part2.ripple_peak_mode_animal_min-->0.90<!--/v-->–<!--v:part2.ripple_peak_mode_animal_max-->1.99<!--/v--> z, so the SWR threshold cuts one mode rather than falling
 between two. On the Kay criterion around each event, no property but spike evidence jumps at the SWR threshold in
-more than <!--v:part2.step_other_properties_criterion_animals_max-->…<!--/v--> animal(s); spike evidence per spike rises there in
-<!--v:part2.step_evidence_criterion_animals_same_sign-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> animals (a step in <!--v:part2.step_evidence_criterion_animals-->…<!--/v-->), by a median
-<!--v:part2.step_evidence_criterion_share_median-->…<!--/v--> of the SWR minus non-SWR difference. *Reading:* one continuum of ripple power cut by
+more than <!--v:part2.step_other_properties_criterion_animals_max-->1<!--/v--> animal(s); spike evidence per spike rises there in
+<!--v:part2.step_evidence_criterion_animals_same_sign-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals (a step in <!--v:part2.step_evidence_criterion_animals-->3<!--/v-->), by a median
+<!--v:part2.step_evidence_criterion_share_median-->+0.19<!--/v--> of the SWR minus non-SWR difference. *Reading:* one continuum of ripple power cut by
 the detector's threshold, with spike evidence per spike the one hint of a boundary.
 
 ## Part 3. Behavior: how the events relate to the task, SWR against non-SWR

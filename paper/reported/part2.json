@@ -3,7 +3,7 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "1e674cff34f7",
+ "commit": "bb1389c0d2e8",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/event_table.parquet",
@@ -59,24 +59,12 @@
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/labels.csv",
-   "sha256": "d988aa8b1ded40e4a76a1ae587d24b636c988a0f795c7b018b71bb087b5e79f6"
-  },
-  {
    "path": "Processed-Data/ripple_class_structure/distribution.csv",
    "sha256": "57f6c311acca5da0023d27ec607d14799fff07d5449fee947ffda70ed74d4903"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/distribution_simulation.csv",
-   "sha256": "ecc006538ab1ed345baa721dbb9be493b7ff8c479a7730bb7383ff0ce2d5eb7d"
-  },
-  {
    "path": "Processed-Data/ripple_class_structure/step_fits.csv",
    "sha256": "4c1f5cce6cb492bec3ab3d60aa893c3a7cb29a8d2bfec181a2a394571146401d"
-  },
-  {
-   "path": "Processed-Data/ripple_class_structure/step_simulation.csv",
-   "sha256": "02d05b717cf5f687c29e0f25aa41204a93302a96077552141ad935d529cc8ebf"
   },
   {
    "path": "Processed-Data/ripple_class_structure/manifest.json",
@@ -424,66 +412,6 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": null
-  },
-  "criterion_label_agreement": {
-   "value": 0.9925602907168816,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "share of events whose label is_swr equals 'Kay criterion at or above the threshold' (the criterion read on the 2 ms decode grid)",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "dip_sim_two_classes_double_power_min": {
-   "value": 1.0,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "simulation check: the lowest such rate at double the observed separation",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "dip_sim_two_classes_observed_power_max": {
-   "value": 0.0,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "simulation check: the highest rate at which the dip test detects two Gaussian classes at the labels' observed separation (medians, robust SDs and shares of the SWR and non-SWR events), over animals and power measures",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "dip_sim_unimodal_reject_max": {
-   "value": 0.0,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "simulation check: the highest rate at which the dip test (p < 0.05) calls a unimodal sample matched to an animal's mean, SD and skew bimodal, over animals, power measures and the gamma and lognormal laws",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "duration_animals_in_direction": {
@@ -1403,22 +1331,6 @@
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
   },
-  "kay_threshold_z": {
-   "value": 2.0,
-   "kind": "quantity",
-   "style": "dec2",
-   "unit": "z",
-   "description": "the z-score the Kay detector's ripple power must reach for 15 ms",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
   "kay_time_s": {
    "value": 4127.039939403534,
    "kind": "quantity",
@@ -2104,21 +2016,6 @@
     "figure: 2b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
-   "pending": null
-  },
-  "non_swr_peak_above_threshold_fraction": {
-   "value": 0.2373295480988504,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "share of non-SWR events whose peak ripple power reaches the Kay threshold",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "non_swr_remote_animals_above_baseline": {
@@ -2917,22 +2814,6 @@
    "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
-  "ripple_peak_dip_p_min": {
-   "value": 0.9961338252427488,
-   "kind": "quantity",
-   "style": "pval",
-   "unit": "",
-   "description": "smallest per-animal p-value of that dip test",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
   "ripple_peak_mode_animal_max": {
    "value": 1.9901926125568277,
    "kind": "quantity",
@@ -3183,53 +3064,18 @@
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
-  "step_breadth_criterion_animals": {
-   "value": 0,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in log number of arms the decoded position visits at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "16"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_duration_criterion_animals": {
-   "value": 0,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in log event duration at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "18"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
   "step_evidence_criterion_animals": {
    "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals with a step in spike evidence per spike (remote events) at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
+   "description": "animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error",
    "claims": [
     "24",
     "7"
    ],
    "used_in": [
-    "supplement",
-    "figure: one class or two"
+    "paper"
    ],
    "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
@@ -3245,25 +3091,7 @@
     "7"
    ],
    "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_evidence_criterion_dur_animals": {
-   "value": 2,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in spike evidence per spike at the threshold, with a smooth of log duration in both models",
-   "claims": [
-    "24",
-    "7"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
+    "paper"
    ],
    "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
@@ -3279,138 +3107,26 @@
     "7"
    ],
    "used_in": [
-    "supplement",
-    "figure: one class or two"
+    "paper"
    ],
    "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
-  "step_extent_criterion_animals": {
+  "step_other_properties_criterion_animals_max": {
    "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "animals with a step in log(1 + spatial extent) at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
+   "description": "the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count",
    "claims": [
     "24",
-    "16"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_hpd_criterion_animals": {
-   "value": 0,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in log HPD coverage at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "17"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_posterior_criterion_animals": {
-   "value": 0,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in posterior peak at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "17"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_sim_trace_null_criterion_false_fraction": {
-   "value": 0.12,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "simulation check: the same continuum; share of data sets in which the test on the Kay criterion around the event (the level the ripple it touches sustains for 14 ms) calls a step",
-   "claims": [
-    "24"
+    "15",
+    "16",
+    "17",
+    "18"
    ],
    "used_in": [
     "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_sim_trace_null_peak_false_fraction": {
-   "value": 1.0,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "simulation check: one continuum of events labelled by the Kay rule on a simulated ripple trace; share of data sets in which the test on the event's own peak ripple power (label is_swr) calls a step",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_sim_trace_planted_criterion_found_fraction": {
-   "value": 0.47,
-   "kind": "fraction",
-   "style": "pct",
-   "unit": "",
-   "description": "simulation check: the same with a step of 0.3 noise SD planted at the label; share of data sets in which the test on the criterion finds it",
-   "claims": [
-    "24"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_speed_criterion_animals": {
-   "value": 0,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in log(1 + replay speed) at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "15"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
-   ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
-   "pending": null
-  },
-  "step_spikes_criterion_animals": {
-   "value": 1,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "animals with a step in log(1 + spike count) at the Kay criterion around the event (the level the ripple it touches sustains for 14 ms): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "6"
-   ],
-   "used_in": [
-    "supplement",
-    "figure: one class or two"
    ],
    "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null

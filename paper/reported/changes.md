@@ -1852,3 +1852,17 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part2.step_evidence_criterion_share_median` | … | +0.19 |
 | `paper/reported/overview.md` | `part2.step_sim_trace_null_criterion_false_fraction` | … | 12 % |
 | `paper/reported/overview.md` | `part2.step_sim_trace_planted_criterion_found_fraction` | … | 47 % |
+
+## 2026-10-28
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part2.ripple_peak_animals_unimodal` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.ripple_peak_mode_animal_min` | … | 0.90 |
+| `paper/reported/overview.md` | `part2.ripple_peak_mode_animal_max` | … | 1.99 |
+| `paper/reported/overview.md` | `part2.step_other_properties_criterion_animals_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_animals_same_sign` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_animals` | … | 3 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_share_median` | … | +0.19 |
