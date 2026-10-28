@@ -390,6 +390,19 @@ them importable.
   `--out <markdown>`, `--figure-dir`, `--blowup` (default 1000),
   `--summary-parquet` (default `<bundle-dir>/summary.parquet`, one row per
   model, tier, class, target and statistic).
+- `run_pfc_stop_context.py` — does the mPFC response to replay change with the
+  stop's context (Q8)? `assemble` builds, per session with a canonical mPFC
+  bundle, the unit × replay-event table (spikes in `[0, +200) ms` after onset,
+  the stop's event-free fitted baseline, `is_rewarded_outcome`,
+  `next_trip_switches_patch`, overlapping events) on the Figure 4 session
+  assembly and caches it under
+  `Processed-Data/pfc_response_followups/stop_context/sessions/` (`--workers`
+  for parallel sessions, CPU only). `fit` pools all sessions per class × response
+  sign × unit set (called / all) and writes `results.csv`: Poisson model with
+  per-unit intercepts, the stop baseline estimated jointly (conditional) or
+  plugged in, session-clustered CIs, per-animal and leave-one-animal-out fits
+  (`analysis/pfc/stop_context.py`; design
+  `.claude/docs/plans/pfc-response-followups/design-stop-level-context.md`).
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,
