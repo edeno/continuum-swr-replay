@@ -323,3 +323,19 @@ def test_a_class_dropped_from_a_session_is_skipped(tmp_path):
     units, _, _, _ = summarize.load_bundles(tmp_path)
 
     assert set(units["event_class"]) == {"non_local_no_SWR"}
+
+
+def test_a_pooled_target_class_is_kept(tmp_path):
+    """The pooled model's target class is not an event class; it stays."""
+    _write_bundle(tmp_path, "chimi20200212_02_r1", version=2)
+    path = tmp_path / "chimi20200212_02_r1_mPFC_m_marked_family.provenance.json"
+    record = json.loads(path.read_text())
+    record["target_classes"] = ["non_local_no_SWR"]
+    record["event_classes"] = ["non_local_SWR", "SWR_no_non_local"]
+    record["fitted_event_classes"] = ["non_local_SWR"]
+    path.write_text(json.dumps(record))
+
+    units, _, _, _ = summarize.load_bundles(tmp_path)
+
+    # Not one of the record's event classes, so it is treated like "pooled".
+    assert set(units["event_class"]) == {"non_local_no_SWR"}

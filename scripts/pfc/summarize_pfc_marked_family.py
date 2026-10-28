@@ -163,9 +163,14 @@ def load_bundles(
         target_classes = extra.get("target_classes", list(MARKED_EVENT_CLASSES))
         # A class too short for the model in this session was dropped from it
         # and has no columns; it is absent, not a failed read.
+        # (A pooled model's single target class, ``pooled``, is not an event
+        # class and is always kept.)
         fitted = extra.get("fitted_event_classes")
         if fitted is not None:
-            target_classes = [c for c in target_classes if c in set(fitted)]
+            event_classes = set(extra.get("event_classes", fitted))
+            target_classes = [
+                c for c in target_classes if c in set(fitted) or c not in event_classes
+            ]
         for event_class in target_classes:
             for target in targets:
                 delta = stats[
