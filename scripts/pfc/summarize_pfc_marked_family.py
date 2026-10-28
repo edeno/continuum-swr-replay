@@ -65,7 +65,10 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     EXTENDED_MARKED_EVENT_CLASSES,
     MARKED_EVENT_CLASSES,
 )
-from continuum_swr_replay.analysis.pfc.marked_model_family import model_set_of
+from continuum_swr_replay.analysis.pfc.marked_model_family import (
+    POOLED_CLASS,
+    model_set_of,
+)
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -163,13 +166,12 @@ def load_bundles(
         target_classes = extra.get("target_classes", list(MARKED_EVENT_CLASSES))
         # A class too short for the model in this session was dropped from it
         # and has no columns; it is absent, not a failed read.
-        # (A pooled model's single target class, ``pooled``, is not an event
-        # class and is always kept.)
+        # (A pooled model's single target class is not an event class and is
+        # always kept.)
         fitted = extra.get("fitted_event_classes")
         if fitted is not None:
-            event_classes = set(extra.get("event_classes", fitted))
             target_classes = [
-                c for c in target_classes if c in set(fitted) or c not in event_classes
+                c for c in target_classes if c in set(fitted) or c == POOLED_CLASS
             ]
         for event_class in target_classes:
             for target in targets:
