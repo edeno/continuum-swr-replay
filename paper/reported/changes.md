@@ -1757,3 +1757,66 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part2.non_swr_remote_spikes_median` | 33 | 34 |
 | `paper/reported/overview.md` | `part2.swr_remote_spikes_median` | 109 | 116 |
 | `paper/reported/overview.md` | `part2.swr_remote_tetrodes_median` | 14 | 15 |
+
+## 2026-10-27
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part2.kay_threshold_z` | … | 2.00 |
+| `paper/reported/overview.md` | `part2.ripple_peak_animals_unimodal` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.ripple_mean_animals_unimodal` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.ripple_criterion_animals_unimodal` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.ripple_peak_dip_p_min` | … | 1.0 |
+| `paper/reported/overview.md` | `part2.ripple_mean_dip_p_min` | … | 1.0 |
+| `paper/reported/overview.md` | `part2.ripple_criterion_dip_p_min` | … | 1.0 |
+| `paper/reported/overview.md` | `part2.ripple_peak_mode_animal_min` | … | 0.90 |
+| `paper/reported/overview.md` | `part2.ripple_peak_mode_animal_max` | … | 1.99 |
+| `paper/reported/overview.md` | `part2.dip_sim_unimodal_reject_max` | … | 0 % |
+| `paper/reported/overview.md` | `part2.sarle_sim_unimodal_above_cutoff_fraction` | … | 30 % |
+| `paper/reported/overview.md` | `part2.ripple_peak_sarle_pooled` | … | 0.67 |
+| `paper/reported/overview.md` | `part2.dip_sim_two_classes_observed_power_max` | … | 0 % |
+| `paper/reported/overview.md` | `part2.dip_sim_two_classes_double_power_min` | … | 100 % |
+| `paper/reported/overview.md` | `part2.non_swr_peak_above_threshold_fraction` | … | 24 % |
+| `paper/reported/overview.md` | `part2.swr_peak_below_threshold_fraction` | … | 1 % |
+| `paper/reported/overview.md` | `part2.criterion_label_agreement` | … | 99 % |
+| `paper/reported/overview.md` | `part2.step_criterion_window_fraction_min` | … | 47 |
+| `paper/reported/overview.md` | `part2.step_criterion_window_fraction_max` | … | 67 % |
+| `paper/reported/overview.md` | `part2.step_duration_criterion_animals` | … | 0 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_extent_criterion_animals` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_speed_criterion_animals` | … | 0 |
+| `paper/reported/overview.md` | `part2.step_posterior_criterion_animals` | … | 0 |
+| `paper/reported/overview.md` | `part2.step_hpd_criterion_animals` | … | 0 |
+| `paper/reported/overview.md` | `part2.step_spikes_criterion_animals` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_breadth_criterion_animals` | … | 0 |
+| `paper/reported/overview.md` | `part2.step_duration_criterion_animals_sensitivity_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_extent_criterion_animals_sensitivity_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_speed_criterion_animals_sensitivity_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_posterior_criterion_animals_sensitivity_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_hpd_criterion_animals_sensitivity_max` | … | 0 |
+| `paper/reported/overview.md` | `part2.step_spikes_criterion_animals_sensitivity_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_breadth_criterion_animals_sensitivity_max` | … | 1 |
+| `paper/reported/overview.md` | `part2.step_duration_criterion_share_bound_max` | … | 0.40 |
+| `paper/reported/overview.md` | `part2.step_extent_criterion_share_bound_max` | … | 0.39 |
+| `paper/reported/overview.md` | `part2.step_speed_criterion_share_bound_max` | … | 0.49 |
+| `paper/reported/overview.md` | `part2.step_spikes_criterion_share_bound_max` | … | 0.18 |
+| `paper/reported/overview.md` | `part2.step_breadth_criterion_share_bound_max` | … | 0.31 |
+| `paper/reported/overview.md` | `part2.step_posterior_criterion_share_bound_max` | … | 8.9 |
+| `paper/reported/overview.md` | `part2.step_hpd_criterion_share_bound_max` | … | 4.2 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_animals_same_sign` | … | 5 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_animals` | … | 3 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_dur_animals` | … | 2 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_animals_sensitivity_max` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_evidence_criterion_share_median` | … | +0.19 |
+| `paper/reported/overview.md` | `part2.step_extent_peak_animals` | … | 4 |
+| `paper/reported/overview.md` | `part2.animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_spikes_peak_animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_evidence_peak_animals` | … | 5 |
+| `paper/reported/overview.md` | `part2.step_sim_trace_null_peak_false_fraction` | … | 100 % |
+| `paper/reported/overview.md` | `part2.step_sim_trace_null_mean_false_fraction` | … | 69 % |
+| `paper/reported/overview.md` | `part2.step_sim_trace_null_criterion_false_fraction` | … | 12 % |
+| `paper/reported/overview.md` | `part2.step_sim_trace_planted_criterion_found_fraction` | … | 47 % |

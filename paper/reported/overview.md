@@ -121,49 +121,49 @@ close on average.
 **One class or two?** Do SWR-coupled and non-SWR events differ in kind, or are they one continuum of ripple power
 cut by the SWR threshold? (claim 24; `scripts/detection/measure_ripple_class_structure.py`. Ripple power is the
 z-scored Kay consensus the detector thresholds, read on the 2 ms decode grid; the threshold is
-<!--v:part2.kay_threshold_z-->…<!--/v--> z.)
-- *One mode, not two.* The dip test does not reject one mode in <!--v:part2.ripple_peak_animals_unimodal-->…<!--/v-->/<!--v:part2.animals-->…<!--/v-->
-  animals for the event's peak ripple power, <!--v:part2.ripple_mean_animals_unimodal-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> for its mean
-  and <!--v:part2.ripple_criterion_animals_unimodal-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> for the Kay criterion (smallest p
-  <!--v:part2.ripple_peak_dip_p_min-->…<!--/v-->, <!--v:part2.ripple_mean_dip_p_min-->…<!--/v--> and <!--v:part2.ripple_criterion_dip_p_min-->…<!--/v-->). The peak's single mode
-  lies at <!--v:part2.ripple_peak_mode_animal_min-->…<!--/v-->–<!--v:part2.ripple_peak_mode_animal_max-->…<!--/v--> z by animal, at or just below the threshold: the
+<!--v:part2.kay_threshold_z-->2.00<!--/v--> z.)
+- *One mode, not two.* The dip test does not reject one mode in <!--v:part2.ripple_peak_animals_unimodal-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->
+  animals for the event's peak ripple power, <!--v:part2.ripple_mean_animals_unimodal-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> for its mean
+  and <!--v:part2.ripple_criterion_animals_unimodal-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> for the Kay criterion (smallest p
+  <!--v:part2.ripple_peak_dip_p_min-->1.0<!--/v-->, <!--v:part2.ripple_mean_dip_p_min-->1.0<!--/v--> and <!--v:part2.ripple_criterion_dip_p_min-->1.0<!--/v-->). The peak's single mode
+  lies at <!--v:part2.ripple_peak_mode_animal_min-->0.90<!--/v-->–<!--v:part2.ripple_peak_mode_animal_max-->1.99<!--/v--> z by animal, below or at the threshold: the
   threshold cuts the upper side of one mode; it does not fall between two.
 - *What this test can rule out.* On unimodal samples matched to each animal's mean, SD and skew the dip test called
-  two modes in at most <!--v:part2.dip_sim_unimodal_reject_max-->…<!--/v--> of runs, while Sarle's coefficient passed its cutoff in
-  <!--v:part2.sarle_sim_unimodal_above_cutoff_fraction-->…<!--/v--> of them, so Sarle is descriptive only (pooled peak
-  <!--v:part2.ripple_peak_sarle_pooled-->…<!--/v-->). Two Gaussian classes at the labels' observed separation are themselves unimodal: the
-  dip test finds them in at most <!--v:part2.dip_sim_two_classes_observed_power_max-->…<!--/v--> of runs, and at double the separation in at
-  least <!--v:part2.dip_sim_two_classes_double_power_min-->…<!--/v-->. So it rules out well-separated classes, not overlapping ones.
-- *The label is not a cut of the event's own power.* <!--v:part2.non_swr_peak_above_threshold_fraction-->…<!--/v--> of non-SWR events reach the
-  threshold, but for less than the 15 ms Kay needs; <!--v:part2.swr_peak_below_threshold_fraction-->…<!--/v--> of SWR events overlap only the tail
+  two modes in at most <!--v:part2.dip_sim_unimodal_reject_max-->0 %<!--/v--> of runs, while Sarle's coefficient passed its cutoff in
+  <!--v:part2.sarle_sim_unimodal_above_cutoff_fraction-->30 %<!--/v--> of them, so Sarle is descriptive only (pooled peak
+  <!--v:part2.ripple_peak_sarle_pooled-->0.67<!--/v-->). Two Gaussian classes at the labels' observed separation are themselves unimodal: the
+  dip test finds them in at most <!--v:part2.dip_sim_two_classes_observed_power_max-->0 %<!--/v--> of runs, and at double the separation in at
+  least <!--v:part2.dip_sim_two_classes_double_power_min-->100 %<!--/v-->. So it rules out well-separated classes, not overlapping ones.
+- *The label is not a cut of the event's own power.* <!--v:part2.non_swr_peak_above_threshold_fraction-->24 %<!--/v--> of non-SWR events reach the
+  threshold, but for less than the 15 ms Kay needs; <!--v:part2.swr_peak_below_threshold_fraction-->1 %<!--/v--> of SWR events overlap only the tail
   of an SWR whose peak lies outside the event. The Kay criterion around the event (the level the ripple it touches
-  sustains for 14 ms) reproduces the label for <!--v:part2.criterion_label_agreement-->…<!--/v--> of events.
+  sustains for 14 ms) reproduces the label for <!--v:part2.criterion_label_agreement-->99 %<!--/v--> of events.
 - *No step at the threshold, except perhaps in spike evidence.* As a discontinuity design on the Kay criterion
-  (events within 1.5 z of the threshold, <!--v:part2.step_criterion_window_fraction_min@pctnum-->…<!--/v-->–<!--v:part2.step_criterion_window_fraction_max-->…<!--/v--> of each
+  (events within 1.5 z of the threshold, <!--v:part2.step_criterion_window_fraction_min@pctnum-->47<!--/v-->–<!--v:part2.step_criterion_window_fraction_max-->67 %<!--/v--> of each
   animal's events), the animals with a jump at the threshold are: duration
-  <!--v:part2.step_duration_criterion_animals-->…<!--/v-->/<!--v:part2.animals-->…<!--/v-->, spatial extent <!--v:part2.step_extent_criterion_animals-->…<!--/v-->, replay speed
-  <!--v:part2.step_speed_criterion_animals-->…<!--/v-->, posterior peak <!--v:part2.step_posterior_criterion_animals-->…<!--/v-->, HPD <!--v:part2.step_hpd_criterion_animals-->…<!--/v-->, spike
-  count <!--v:part2.step_spikes_criterion_animals-->…<!--/v-->, arms visited <!--v:part2.step_breadth_criterion_animals-->…<!--/v-->. Under the other
-  windows and spline sizes, at most: duration <!--v:part2.step_duration_criterion_animals_sensitivity_max-->…<!--/v-->, extent
-  <!--v:part2.step_extent_criterion_animals_sensitivity_max-->…<!--/v-->, speed <!--v:part2.step_speed_criterion_animals_sensitivity_max-->…<!--/v-->, posterior peak
-  <!--v:part2.step_posterior_criterion_animals_sensitivity_max-->…<!--/v-->, HPD <!--v:part2.step_hpd_criterion_animals_sensitivity_max-->…<!--/v-->, spike count
-  <!--v:part2.step_spikes_criterion_animals_sensitivity_max-->…<!--/v-->, arms visited <!--v:part2.step_breadth_criterion_animals_sensitivity_max-->…<!--/v-->. In
-  the worst animal, the jump's 95 % bound is <!--v:part2.step_duration_criterion_share_bound_max-->…<!--/v--> of its SWR minus non-SWR difference
-  for duration, <!--v:part2.step_extent_criterion_share_bound_max-->…<!--/v--> for extent, <!--v:part2.step_speed_criterion_share_bound_max-->…<!--/v--> for speed,
-  <!--v:part2.step_spikes_criterion_share_bound_max-->…<!--/v--> for spike count and <!--v:part2.step_breadth_criterion_share_bound_max-->…<!--/v--> for arms visited
+  <!--v:part2.step_duration_criterion_animals-->0<!--/v-->/<!--v:part2.animals-->5<!--/v-->, spatial extent <!--v:part2.step_extent_criterion_animals-->1<!--/v-->, replay speed
+  <!--v:part2.step_speed_criterion_animals-->0<!--/v-->, posterior peak <!--v:part2.step_posterior_criterion_animals-->0<!--/v-->, HPD <!--v:part2.step_hpd_criterion_animals-->0<!--/v-->, spike
+  count <!--v:part2.step_spikes_criterion_animals-->1<!--/v-->, arms visited <!--v:part2.step_breadth_criterion_animals-->0<!--/v-->. Under the other
+  windows and spline sizes, at most: duration <!--v:part2.step_duration_criterion_animals_sensitivity_max-->1<!--/v-->, extent
+  <!--v:part2.step_extent_criterion_animals_sensitivity_max-->1<!--/v-->, speed <!--v:part2.step_speed_criterion_animals_sensitivity_max-->1<!--/v-->, posterior peak
+  <!--v:part2.step_posterior_criterion_animals_sensitivity_max-->1<!--/v-->, HPD <!--v:part2.step_hpd_criterion_animals_sensitivity_max-->0<!--/v-->, spike count
+  <!--v:part2.step_spikes_criterion_animals_sensitivity_max-->1<!--/v-->, arms visited <!--v:part2.step_breadth_criterion_animals_sensitivity_max-->1<!--/v-->. In
+  the worst animal, the jump's 95 % bound is <!--v:part2.step_duration_criterion_share_bound_max-->0.40<!--/v--> of its SWR minus non-SWR difference
+  for duration, <!--v:part2.step_extent_criterion_share_bound_max-->0.39<!--/v--> for extent, <!--v:part2.step_speed_criterion_share_bound_max-->0.49<!--/v--> for speed,
+  <!--v:part2.step_spikes_criterion_share_bound_max-->0.18<!--/v--> for spike count and <!--v:part2.step_breadth_criterion_share_bound_max-->0.31<!--/v--> for arms visited
   (for posterior peak and HPD the difference itself is near zero in some animals, so their bounds,
-  <!--v:part2.step_posterior_criterion_share_bound_max-->…<!--/v--> and <!--v:part2.step_hpd_criterion_share_bound_max-->…<!--/v-->, say nothing). Spike evidence per spike
-  (remote events only) is the exception: its jump points up in <!--v:part2.step_evidence_criterion_animals_same_sign-->…<!--/v-->/<!--v:part2.animals-->…<!--/v-->
-  animals and is a step in <!--v:part2.step_evidence_criterion_animals-->…<!--/v--> (<!--v:part2.step_evidence_criterion_dur_animals-->…<!--/v--> with log duration;
-  up to <!--v:part2.step_evidence_criterion_animals_sensitivity_max-->…<!--/v--> under other settings), a median
-  <!--v:part2.step_evidence_criterion_share_median-->…<!--/v--> of the SWR minus non-SWR difference.
+  <!--v:part2.step_posterior_criterion_share_bound_max-->8.9<!--/v--> and <!--v:part2.step_hpd_criterion_share_bound_max-->4.2<!--/v-->, say nothing). Spike evidence per spike
+  (remote events only) is the exception: its jump points up in <!--v:part2.step_evidence_criterion_animals_same_sign-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->
+  animals and is a step in <!--v:part2.step_evidence_criterion_animals-->3<!--/v--> (<!--v:part2.step_evidence_criterion_dur_animals-->2<!--/v--> with log duration;
+  up to <!--v:part2.step_evidence_criterion_animals_sensitivity_max-->5<!--/v--> under other settings), a median
+  <!--v:part2.step_evidence_criterion_share_median-->+0.19<!--/v--> of the SWR minus non-SWR difference.
 - *Why not the event's own power.* Compared at equal peak power, the label does add a step (spatial extent
-  <!--v:part2.step_extent_peak_animals-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> animals, spike count <!--v:part2.step_spikes_peak_animals-->…<!--/v-->, spike evidence
-  <!--v:part2.step_evidence_peak_animals-->…<!--/v-->), but so it does in a simulated single continuum labelled by the Kay rule: a false step in
-  <!--v:part2.step_sim_trace_null_peak_false_fraction-->…<!--/v--> of simulated data sets on the peak and <!--v:part2.step_sim_trace_null_mean_false_fraction-->…<!--/v-->
+  <!--v:part2.step_extent_peak_animals-->4<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals, spike count <!--v:part2.step_spikes_peak_animals-->5<!--/v-->, spike evidence
+  <!--v:part2.step_evidence_peak_animals-->5<!--/v-->), but so it does in a simulated single continuum labelled by the Kay rule: a false step in
+  <!--v:part2.step_sim_trace_null_peak_false_fraction-->100 %<!--/v--> of simulated data sets on the peak and <!--v:part2.step_sim_trace_null_mean_false_fraction-->69 %<!--/v-->
   on the mean, because the event window sees only part of the ripple the label sees. On the criterion the same
-  continuum gives a false step in <!--v:part2.step_sim_trace_null_criterion_false_fraction-->…<!--/v--> of data sets, and a planted step is
-  found in <!--v:part2.step_sim_trace_planted_criterion_found_fraction-->…<!--/v-->.
+  continuum gives a false step in <!--v:part2.step_sim_trace_null_criterion_false_fraction-->12 %<!--/v--> of data sets, and a planted step is
+  found in <!--v:part2.step_sim_trace_planted_criterion_found_fraction-->47 %<!--/v-->.
 - *Reading:* by both tests, SWR and non-SWR events look like one continuum of ripple power cut by the detector's
   threshold, not two classes: one mode, and no consistent jump at the threshold in duration, extent, speed,
   posterior, spike count or arms visited. The one hint of a boundary is spike evidence per spike, which rises at
