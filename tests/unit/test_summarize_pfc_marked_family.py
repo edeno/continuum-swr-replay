@@ -309,3 +309,17 @@ def test_mark_correlations_are_animal_balanced(tmp_path):
     assert table["statistic"].tolist() == ["mark_correlation"]
     assert table["value"].iloc[0] == pytest.approx(0.6)
     assert table["n_sessions"].iloc[0] == 3
+
+
+def test_a_class_dropped_from_a_session_is_skipped(tmp_path):
+    """A target class the session dropped (too few events) has no columns."""
+    _write_bundle(tmp_path, "chimi20200212_02_r1", version=2)
+    path = tmp_path / "chimi20200212_02_r1_mPFC_m_marked_family.provenance.json"
+    record = json.loads(path.read_text())
+    record["target_classes"] = ["non_local_no_SWR", "SWR_no_non_local"]
+    record["fitted_event_classes"] = ["non_local_no_SWR"]
+    path.write_text(json.dumps(record))
+
+    units, _, _, _ = summarize.load_bundles(tmp_path)
+
+    assert set(units["event_class"]) == {"non_local_no_SWR"}

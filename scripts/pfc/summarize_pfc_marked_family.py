@@ -161,6 +161,11 @@ def load_bundles(
             lag_time = np.load(base.with_suffix(".lag_time.npy"))
         targets = extra["marked_family_diagnostics"]["scientific_marks"]
         target_classes = extra.get("target_classes", list(MARKED_EVENT_CLASSES))
+        # A class too short for the model in this session was dropped from it
+        # and has no columns; it is absent, not a failed read.
+        fitted = extra.get("fitted_event_classes")
+        if fitted is not None:
+            target_classes = [c for c in target_classes if c in set(fitted)]
         for event_class in target_classes:
             for target in targets:
                 delta = stats[
