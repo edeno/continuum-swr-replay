@@ -61,6 +61,10 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-27 | 3b | revised smoke finished: senor 06_r3, 10 models, 1 h 10 min, host RSS 8.7 GB, EXIT 0; ripple models dropped `SWR_no_non_local` (2 events) as designed; summary fixed to skip a dropped class, then ran end to end (`summary.parquet`: held-out fractions, unit → session → animal slopes, sign consistency, mark correlations) | `60caaa8b` | `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | matches the 1.18 h estimate |
 | 2026-10-27 | 3b | **Phase C batch launched 18:33**, 75 sessions, GPUs 1–9 (all idle at launch), 10 models (`logs/pfc_response_followups/marked_family/models.txt`), no reference; estimate 78.7 GPU-h, 8.6–9.0 h per card, ETA ≈ 03:30 on 2026-10-28 | `60caaa8b` | tmux `pfc_c_marked_family`; logs `logs/pfc_response_followups/marked_family/`; output `Processed-Data/pfc_response_followups/marked_family/` | running |
 
+| 2026-10-28 | 3b | **batch ended**: 736 of 750 (session, model) bundles complete; 14 pairs in 12 sessions failed the 10 % full-fit convergence gate (no bundle written): j1620210706 08_r4 replay_content; j1620210708 16_r8 event_strength; j1620210709 06_r3 replay_content, event_strength; senor20201030 02_r1 ripple_power; senor20201030 04_r2 ripple_power, ripple_power_pooled; wilbur20210331 02_r1 event_strength; 04_r2 replay_content; 06_r3 event_strength; 08_r4 replay_content, event_strength; 10_r5 replay_content; 14_r7 ripple_power | `60caaa8b` | `logs/pfc_response_followups/marked_family/` | — |
+| 2026-10-28 | 3b | diagnosis (refit on GPU, scratchpad `conv/`): j1620210709 06_r3 replay_content 8/76, wilbur20210331 04_r2 replay_content 52/511, senor20201030 02_r1 ripple_power 42/304 non-converged. Not an iteration issue: maxiter 100 → 300/400 converges none of them. The non-converged units are near-silent in the fitted bins (wilbur: 49 of 52 below 1 Hz, 39 below 0.2 Hz; senor: 42 of 42 below 1 Hz, 40 below 0.2 Hz; j16: all 8 below 0.12 Hz) and their runaway coefficients are the unpenalised intercept and per-stop baseline columns (51/52, 41/42): a unit with no spikes in some well's stops has no finite baseline estimate (separation). Design full rank, column-normalised condition number 15–17, so not collinear marks | — | — | needs the lead: options in the report |
+| 2026-10-28 | 3b | summary fixes found on the full tree: skip a class the session dropped; keep the pooled target class | `39be9eff` | — | — |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
@@ -72,7 +76,7 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | Phase C smoke (reference timing; stopped) | `pfc_c_smoke` | 4, 2, 5 | `logs/pfc_response_followups/marked_family_smoke/` | `Processed-Data/pfc_response_followups/marked_family_smoke/` | 2026-10-27 08:30 | | |
 
 | Phase C revised smoke | `pfc_c_revised_smoke` | 5 | `logs/pfc_response_followups/marked_family_revised_smoke/` | `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | 2026-10-27 17:22 | 18:31 | 1 h 10 min |
-| Phase C batch | `pfc_c_marked_family` | 1–9 | `logs/pfc_response_followups/marked_family/` | `Processed-Data/pfc_response_followups/marked_family/` | 2026-10-27 18:33 | | ETA ≈ 03:30 2026-10-28 |
+| Phase C batch | `pfc_c_marked_family` (ended) | 1–9 | `logs/pfc_response_followups/marked_family/` | `Processed-Data/pfc_response_followups/marked_family/` | 2026-10-27 18:33 | 2026-10-28 ≈ 06:10 | 10.2–11.6 h per card; 8 of 9 workers exit 1 (gate) |
 
 ## Findings (phase 1)
 
