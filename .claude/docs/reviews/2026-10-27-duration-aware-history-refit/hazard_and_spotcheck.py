@@ -44,16 +44,16 @@ from continuum_swr_replay.analysis.replay.design_constants import (  # noqa: E40
     N_HISTORY_LAGS,
     TMAX,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import (  # noqa: E402
+    END_COLUMN,
+    attach_event_ends,
+)
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     raised_cosine_history_basis,
 )
 from continuum_swr_replay.paths import model_dir, table_path  # noqa: E402
 from continuum_swr_replay.tables.io import read_table  # noqa: E402
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS  # noqa: E402
-from scripts.rate.fit_duration_aware_history_rate import (  # noqa: E402
-    END_COLUMN,
-    attach_event_ends,
-)
 
 OUT = Path(__file__).resolve().parent
 EDGES = np.arange(0, 0.3 + 1e-9, BIN_S)  # 20 bins of 15 ms

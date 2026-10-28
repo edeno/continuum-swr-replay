@@ -23,13 +23,13 @@ import numpy as np
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_stop_cohort
 from continuum_swr_replay.analysis.replay import attach_is_swr_to_onsets
+from continuum_swr_replay.analysis.replay.duration_aware_history import (
+    attach_event_ends,
+)
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
-from scripts.rate.fit_duration_aware_history_rate import (
-    _fit_one_session,
-    attach_event_ends,
-)
+from scripts.rate.fit_duration_aware_history_rate import _fit_one_session  # noqa: E402
 
 OUT = Path(__file__).resolve().parent
 

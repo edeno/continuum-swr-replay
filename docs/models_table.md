@@ -286,7 +286,9 @@ Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
 
 ## Cross-history coupling, duration-aware — per-bin Poisson (auxiliary)
 `scripts/rate/fit_duration_aware_history_rate.py` →
-`models_per_bin_rate/duration_aware_history_models.pkl` (+ `.provenance.json`).
+`models_per_bin_rate/duration_aware_history_models.pkl` (per session, `--mode session`) and
+`duration_aware_history_pooled.pkl` (each animal's sessions stacked with a session fixed effect,
+`--mode pooled`), each with its `.provenance.json`.
 Simulation behind it: `analysis/replay/duration_history_simulation.py`, review
 `.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`.
 

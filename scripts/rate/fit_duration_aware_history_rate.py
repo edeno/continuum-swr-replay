@@ -6,34 +6,42 @@ bin of a stop is at risk, including the bins inside an ongoing event, and
 self-/cross-history count past onsets. On simulated data that alone produces a
 short-lag "refractory" dip, a self-history burst near 90-120 ms and two-way
 cross coupling (``.claude/docs/reviews/2026-10-26-duration-aware-history-
-simulation.md``). This runner refits the history on the at-risk design:
+simulation.md``). This runner refits the history on the at-risk design
+(``analysis/replay/duration_aware_history.py:build_design``):
 
 - a bin's exposure is the time no event of the response's detector covers (bins
   inside an ongoing event drop out): Kay SWR intervals for the detected-SWR
   population, every non-local event for the three non-local populations;
 - history is measured from past events' onsets, their ends, or both.
 
-Per session and population it fits the ``MODEL_CROSS_HISTORY_DURATION_RATE``
-rungs on ONE frozen cohort: ``Mnohist_dur``, ``Mself_onset_dur``,
-``Mself_offset_dur``, ``Mself_dur`` for every population (``Mself_dur`` is
-``M7r_time_histcos_rew`` on the at-risk design plus the offset block), and the
-three cross rungs for the two non-local streams (cross = the other stream).
-Fixed-block contrasts are ``Mnohist_dur -> Mself_dur`` and ``Mself_dur ->
-Mselfcross_dur``; the one-anchor rungs give the onset-vs-offset contrasts. Each
-row also carries the lag support (expected onsets per lag) and the onset/offset
-canonical correlation, so a kernel is read only where it is identified.
+Two modes:
+
+- ``--mode session`` (default): per session and population, the
+  ``MODEL_CROSS_HISTORY_DURATION_RATE`` rungs on ONE frozen cohort:
+  ``Mnohist_dur``, ``Mself_onset_dur``, ``Mself_offset_dur``, ``Mself_dur`` for
+  every population (``Mself_dur`` is ``M7r_time_histcos_rew`` on the at-risk
+  design plus the offset block), and the three cross rungs for the two
+  non-local streams (cross = the other stream). Each row carries the lag
+  support (expected onsets per lag) and the onset/offset canonical
+  correlation. Writes ``duration_aware_history_models{suffix}.pkl``.
+- ``--mode pooled``: a session carries about one expected onset per history
+  lag, too few to read a kernel. Per animal and population, the sessions'
+  designs are stacked and every rung is fit with a session fixed effect
+  (``fit_pooled_history``), on the at-risk design and, for comparison, the
+  shipped rungs (``Mself``, ``Mselfcross``) on the shipped design. Each fit
+  keeps its AIC and each history block's kernel with Wald SEs; each
+  (animal, population) keeps its pooled lag support. Writes
+  ``duration_aware_history_pooled{suffix}.pkl``.
 
 The design otherwise matches ``fit_per_bin_rate_models.py``: same stop cohort
 (``--stop-cohort``, default at-well), bins, TMAX, reward basis with the outcome
-shift, excluded time and history window. No CV and no GOF.
-
-Writes ``models_per_bin_rate/duration_aware_history_models{suffix}.pkl`` and its
-``.provenance.json``; it never touches ``cross_history_models.pkl``.
+shift, excluded time and history window. No CV and no GOF. Each output gets a
+``.provenance.json`` sidecar; ``cross_history_models.pkl`` is never touched.
 
 Usage::
 
-    python scripts/rate/fit_duration_aware_history_rate.py [--workers N]
-        [--stop-cohort at_well] [--max-per-animal N]
+    python scripts/rate/fit_duration_aware_history_rate.py [--mode session|pooled]
+        [--workers N] [--stop-cohort at_well] [--max-per-animal N]
 """
 
 from __future__ import annotations
@@ -46,7 +54,6 @@ import warnings
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
@@ -55,26 +62,19 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from continuum_swr_replay.analysis.events.swr_source import (
-    read_swr_inventory,
-    swr_epoch_id_of_session,
-    swr_source_name,
-)
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.analysis.replay import (
-    BIN_S,
-    N_HISTORY_BASIS,
-    N_HISTORY_LAGS,
-    POPULATIONS,
-    TMAX,
-    aggregate_to_timebins,
     attach_is_swr_to_onsets,
     fit_per_bin_rate_model,
-    freeze_per_bin_cohort,
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
-from continuum_swr_replay.analysis.replay.duration_history_simulation import (
+from continuum_swr_replay.analysis.replay.duration_aware_history import (
+    POPULATION_PLAN,
+    attach_event_ends,
+    build_design,
+    fit_pooled_history,
     lag_support,
     onset_offset_collinearity,
 )
@@ -85,10 +85,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
     MODEL_CROSS_HISTORY_RATE,
-    STOP_COVARIATES,
-    longest_history_window_s,
 )
-from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import require_covariate_schema
 from continuum_swr_replay.tables.io import read_table
@@ -98,154 +95,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 LADDER = MODEL_CROSS_HISTORY_DURATION_RATE
-SELF_RUNGS = ("Mnohist_dur", "Mself_onset_dur", "Mself_offset_dur", "Mself_dur")
-CROSS_RUNGS = ("Mselfcross_onset_dur", "Mselfcross_offset_dur", "Mselfcross_dur")
-HISTORY_WINDOW_S = longest_history_window_s(LADDER.values())
-END_COLUMN = "t_end_since_stop_onset"
-#: The decode's sample (2 ms at 500 Hz).
-DECODE_SAMPLE_S = 1 / SAMPLING_FREQUENCY
-#: An SWR onset matches its Kay event when their starts differ by at most this
-#: (one 2 ms sample, with rounding).
-SWR_START_TOLERANCE_S = 0.0025
-
-#: Population -> (event type whose events set the at-risk time, cross population).
-POPULATION_PLAN: dict[str, tuple[str, str | None]] = {
-    "swr": ("SWR", None),
-    "non_local": ("non_local", None),
-    "non_local_swr": ("non_local", "non_local_no_swr"),
-    "non_local_no_swr": ("non_local", "non_local_swr"),
+OUTPUT_STEM = {
+    "session": "duration_aware_history_models",
+    "pooled": "duration_aware_history_pooled",
 }
-
-
-def attach_event_ends(onsets: pd.DataFrame, event_table: pd.DataFrame) -> pd.DataFrame:
-    """Add ``t_end_since_stop_onset`` to the non-local and SWR onset rows.
-
-    Non-local: the matched ``event_table`` event's duration (``event_end_s -
-    event_start_s``) added to its onset, matched on (session, stop, onset time
-    == ``event_start_s``) exactly. SWR: the Kay inventory event whose start is
-    nearest the onset (within :data:`SWR_START_TOLERANCE_S`). MUA rows keep NaN.
-
-    Raises
-    ------
-    ValueError
-        If a non-local onset has no event, or an SWR onset no Kay event within
-        tolerance.
-    """
-    out = onsets.copy()
-    out[END_COLUMN] = np.nan
-    keys = [*SESSION_COLUMNS, "stop_id"]
-    nl = out["event_type"] == "non_local"
-    ev = event_table[[*keys, "event_start_s", "event_end_s"]].rename(
-        columns={"event_start_s": "onset_time"}
-    )
-    merged = (
-        out.loc[nl, [*keys, "onset_time"]]
-        .reset_index()
-        .merge(ev, on=[*keys, "onset_time"], how="left", validate="one_to_one")
-        .set_index("index")
-    )
-    if merged["event_end_s"].isna().any():
-        raise ValueError(
-            f"{int(merged['event_end_s'].isna().sum())} non-local onsets have no "
-            "event_table event"
-        )
-    out.loc[merged.index, END_COLUMN] = (
-        out.loc[merged.index, "t_since_stop_onset"].to_numpy()
-        + (merged["event_end_s"] - merged["onset_time"]).to_numpy()
-    )
-
-    swr = out["event_type"] == "SWR"
-    for session, g in out.loc[swr].groupby(list(SESSION_COLUMNS), sort=False):
-        inv = read_swr_inventory(swr_epoch_id_of_session(*session))
-        starts = inv["start_time"].to_numpy(dtype=float)
-        ends = inv["end_time"].to_numpy(dtype=float)
-        t = g["onset_time"].to_numpy(dtype=float)
-        right = np.clip(np.searchsorted(starts, t), 0, len(starts) - 1)
-        left = np.clip(right - 1, 0, len(starts) - 1)
-        pick = np.where(
-            np.abs(starts[left] - t) < np.abs(starts[right] - t), left, right
-        )
-        err = np.abs(starts[pick] - t)
-        if (err > SWR_START_TOLERANCE_S).any():
-            raise ValueError(
-                f"{session}: {int((err > SWR_START_TOLERANCE_S).sum())} SWR onsets "
-                f"have no Kay event within {SWR_START_TOLERANCE_S} s"
-            )
-        out.loc[g.index, END_COLUMN] = (
-            g["t_since_stop_onset"].to_numpy() + ends[pick] - starts[pick]
-        )
-    return out
-
-
-def build_design(
-    keys: tuple,
-    stops_g: pd.DataFrame,
-    onsets_g: pd.DataFrame,
-    outcome: str,
-    *,
-    duration_aware: bool = True,
-) -> tuple[pd.DataFrame, tuple[str, ...]]:
-    """One session's frozen design for ``outcome`` and the rungs it carries.
-
-    ``duration_aware=False`` builds the shipped design on the same arguments
-    (every bin at risk, onset history only), for a like-for-like comparison;
-    its frame still carries the cross block for the non-local streams.
-
-    Raises
-    ------
-    ValueError
-        If the freeze drops a stop (every required column is complete by
-        construction).
-    """
-    event_type, cross_pop = POPULATION_PLAN[outcome]
-    response = POPULATIONS[outcome](onsets_g)
-    # An event occupies its samples start..end (end is its last sample); the
-    # sample in which it starts is the sample it was at risk in. So it covers
-    # [start + one sample, end + one sample): otherwise an onset on a 15 ms bin
-    # edge would leave its own bin no at-risk time.
-    at_risk = onsets_g.loc[
-        onsets_g["event_type"] == event_type,
-        ["stop_id", "t_since_stop_onset", END_COLUMN],
-    ].copy()
-    at_risk[["t_since_stop_onset", END_COLUMN]] += DECODE_SAMPLE_S
-    cross_kwargs: dict = {}
-    rungs = SELF_RUNGS
-    if cross_pop is not None:
-        cross_kwargs = {
-            "cross_onset_times": POPULATIONS[cross_pop](onsets_g),
-            "cross_history_lags": N_HISTORY_LAGS,
-            "cross_history_basis": N_HISTORY_BASIS,
-        }
-        rungs = SELF_RUNGS + CROSS_RUNGS
-    design = aggregate_to_timebins(
-        stops_g,
-        response,
-        bin_s=BIN_S,
-        tmax=TMAX,
-        reward_basis=True,
-        self_history_lags=N_HISTORY_LAGS,
-        self_history_basis=N_HISTORY_BASIS,
-        stop_covariates=STOP_COVARIATES,
-        history_window_s=HISTORY_WINDOW_S,
-        arrival_clocks=False,
-        at_risk_events=at_risk if duration_aware else None,
-        offset_history=duration_aware,
-        **cross_kwargs,
-    )
-    specs = (
-        [LADDER[name] for name in rungs]
-        if duration_aware
-        else [
-            MODEL_CROSS_HISTORY_RATE["Mselfcross" if cross_pop is not None else "Mself"]
-        ]
-    )
-    design, freeze = freeze_per_bin_cohort(design, specs)
-    if freeze["n_stops_before"] != freeze["n_stops_after"]:
-        raise ValueError(
-            f"{keys}/{outcome}: freezing dropped "
-            f"{freeze['n_stops_before'] - freeze['n_stops_after']} stops"
-        )
-    return design, rungs
 
 
 def _fit_one_session(
@@ -257,7 +110,6 @@ def _fit_one_session(
     rows: list[dict] = []
     for outcome, (event_type, cross_pop) in POPULATION_PLAN.items():
         design, rungs = build_design(keys, stops_g, onsets_g, outcome)
-        specs = [LADDER[name] for name in rungs]
         shared = {
             "outcome": outcome,
             **dict(zip(SESSION_COLUMNS, keys, strict=True)),
@@ -272,8 +124,8 @@ def _fit_one_session(
             },
             **onset_offset_collinearity(design),
         }
-        for name, spec in zip(rungs, specs, strict=True):
-            fit = fit_per_bin_rate_model(design, spec)
+        for name in rungs:
+            fit = fit_per_bin_rate_model(design, LADDER[name])
             row = {**shared, "model": name, "fit_ok": fit is not None}
             if fit is not None:
                 row.update({k: v for k, v in fit.items() if k != "predicted"})
@@ -281,45 +133,67 @@ def _fit_one_session(
     return keys, rows, time.perf_counter() - t0
 
 
-def fit_duration_aware_history(
-    stop_table: pd.DataFrame, onsets: pd.DataFrame, *, workers: int = 1
-) -> pd.DataFrame:
-    """One row per (session, population, rung)."""
-    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
-    items = [
-        (keys, stops_g, onset_groups[keys])
-        for keys, stops_g in stop_table.groupby(list(SESSION_COLUMNS), sort=False)
-        if keys in onset_groups
-    ]
-    rows: list[dict] = []
-    done = 0
-
-    def _collect(keys, r, elapsed):
-        nonlocal done
-        done += 1
-        rows.extend(r)
-        logger.info(
-            "  [%d/%d] %s: %d fits in %.1fs",
-            done,
-            len(items),
-            "_".join(map(str, keys)),
-            len(r),
-            elapsed,
+def _stacked(sessions: list, outcome: str, duration_aware: bool):
+    frames, rungs = [], ()
+    for keys, stops_g, onsets_g in sessions:
+        design, rungs = build_design(
+            keys, stops_g, onsets_g, outcome, duration_aware=duration_aware
         )
+        design["session"] = "_".join(map(str, keys))
+        frames.append(design)
+    return pd.concat(frames, ignore_index=True), rungs
 
+
+def _fit_one_animal(
+    animal: str, outcome: str, sessions: list
+) -> tuple[tuple, dict, float]:
+    """Fit one animal's stacked sessions for one population. For workers."""
+    warnings.filterwarnings("ignore")
+    t0 = time.perf_counter()
+    rec: dict = {"animal": animal, "outcome": outcome, "n_sessions": len(sessions)}
+    design, rungs = _stacked(sessions, outcome, duration_aware=True)
+    rec |= {
+        "n_bins": int(len(design)),
+        "n_events": int(design["count"].sum()),
+        "support": {k: v.tolist() for k, v in lag_support(design).items()},
+        "duration_aware": {
+            name: fit_pooled_history(design, LADDER[name]) for name in rungs
+        },
+    }
+    del design
+    shipped, _ = _stacked(sessions, outcome, duration_aware=False)
+    names = ["Mself"] + (["Mselfcross"] if POPULATION_PLAN[outcome][1] else [])
+    rec["shipped_support"] = {k: v.tolist() for k, v in lag_support(shipped).items()}
+    rec["shipped"] = {
+        name: fit_pooled_history(shipped, MODEL_CROSS_HISTORY_RATE[name])
+        for name in names
+    }
+    return (animal, outcome), rec, time.perf_counter() - t0
+
+
+def _run(fn, items: list[tuple], workers: int) -> list:
+    results = []
+    done = 0
     if workers > 1:
         with ProcessPoolExecutor(max_workers=workers) as ex:
-            futures = [ex.submit(_fit_one_session, *item) for item in items]
+            futures = [ex.submit(fn, *item) for item in items]
             for fut in as_completed(futures):
-                _collect(*fut.result())
+                keys, out, elapsed = fut.result()
+                done += 1
+                results.append(out)
+                logger.info("  [%d/%d] %s in %.1fs", done, len(items), keys, elapsed)
     else:
         for item in items:
-            _collect(*_fit_one_session(*item))
-    return pd.DataFrame(rows)
+            keys, out, elapsed = fn(*item)
+            done += 1
+            results.append(out)
+            logger.info("  [%d/%d] %s in %.1fs", done, len(items), keys, elapsed)
+    return results
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--mode", choices=sorted(OUTPUT_STEM), default="session")
     p.add_argument("--max-per-animal", type=int, default=None, help="smoke subset")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--stop-cohort", choices=STOP_COHORTS, default="at_well")
@@ -365,24 +239,39 @@ def main(argv: Sequence[str] | None = None) -> None:
             .head(args.max_per_animal)
         )
         stop = stop.merge(keep, on=list(SESSION_COLUMNS))
-    n_sessions = stop.groupby(list(SESSION_COLUMNS)).ngroups
+    onset_groups = dict(tuple(onsets.groupby(list(SESSION_COLUMNS), sort=False)))
+    sessions = [
+        (keys, stops_g, onset_groups[keys])
+        for keys, stops_g in stop.groupby(list(SESSION_COLUMNS), sort=False)
+        if keys in onset_groups
+    ]
     logger.info(
-        "Fitting %s over %d sessions with %d worker(s)",
-        list(LADDER),
-        n_sessions,
-        args.workers,
+        "mode=%s: %d sessions, %d worker(s)", args.mode, len(sessions), args.workers
     )
     t0 = time.perf_counter()
-    models = fit_duration_aware_history(stop, onsets, workers=args.workers)
-    models["stop_cohort"] = args.stop_cohort
+    if args.mode == "session":
+        rows = _run(_fit_one_session, sessions, args.workers)
+        result = pd.DataFrame([r for session_rows in rows for r in session_rows])
+        result["stop_cohort"] = args.stop_cohort
+    else:
+        by_animal: dict[str, list] = {}
+        for item in sessions:
+            by_animal.setdefault(item[0][0], []).append(item)
+        jobs = [
+            (animal, outcome, by_animal[animal])
+            for animal in sorted(by_animal)
+            for outcome in POPULATION_PLAN
+        ]
+        result = {
+            "stop_cohort": args.stop_cohort,
+            "results": _run(_fit_one_animal, jobs, args.workers),
+        }
 
     out_dir = model_dir("per_bin_rate")
     out_dir.mkdir(parents=True, exist_ok=True)
-    smoke = args.max_per_animal is not None
-    out = out_dir / (
-        f"duration_aware_history_models{stop_cohort_suffix(args.stop_cohort, smoke=smoke)}.pkl"
-    )
-    models.to_pickle(out)
+    suffix = stop_cohort_suffix(args.stop_cohort, smoke=args.max_per_animal is not None)
+    out = out_dir / f"{OUTPUT_STEM[args.mode]}{suffix}.pkl"
+    pd.to_pickle(result, out)
     write_fit_provenance(
         out,
         fit_inputs,
@@ -392,15 +281,10 @@ def main(argv: Sequence[str] | None = None) -> None:
             "stop_cohort": args.stop_cohort,
             "swr_source": swr_source_name(),
             "design": "at-risk time + onset/offset history (duration-aware)",
+            "mode": args.mode,
         },
     )
-    logger.info(
-        "Saved %d rows (%d sessions) to %s in %.1fs",
-        len(models),
-        n_sessions,
-        out,
-        time.perf_counter() - t0,
-    )
+    logger.info("Saved %s in %.1fs", out, time.perf_counter() - t0)
 
 
 if __name__ == "__main__":

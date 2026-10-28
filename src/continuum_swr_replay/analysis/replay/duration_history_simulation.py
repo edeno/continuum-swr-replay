@@ -41,17 +41,19 @@ from .design_constants import (
     REWARD_HISTORY_INCOMPLETE,
     TMAX,
 )
+from .duration_aware_history import (
+    HISTORY_BLOCKS,
+    history_kernels,
+    lag_support,
+    onset_offset_collinearity,
+)
 from .model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
     MODEL_CROSS_HISTORY_RATE,
     PerBinRateModelSpec,
     longest_history_window_s,
 )
-from .per_bin_design import (
-    NO_EXCLUDED_TIME,
-    aggregate_to_timebins,
-    raised_cosine_history_basis,
-)
+from .per_bin_design import NO_EXCLUDED_TIME, aggregate_to_timebins
 from .per_bin_rate_model import fit_per_bin_rate_model, freeze_per_bin_cohort
 
 __all__ = [
@@ -80,14 +82,6 @@ KERNEL_SUPPORT_S = 0.25
 # Window over which the hazard is evaluated after an event ends. Longer than
 # the kernel support, so past it the hazard is the base rate.
 _WINDOW_S = 0.3
-
-#: Fitted history blocks: name -> (basis column prefix, anchor, self/cross).
-HISTORY_BLOCKS: dict[str, tuple[str, str, str]] = {
-    "self_onset": ("hist_rcos_", "onset", "self"),
-    "self_offset": ("offhist_rcos_", "offset", "self"),
-    "cross_onset": ("cross_hist_rcos_", "onset", "cross"),
-    "cross_offset": ("cross_offhist_rcos_", "offset", "cross"),
-}
 
 
 @dataclass(frozen=True)
@@ -397,108 +391,12 @@ def true_lag_kernel(
     return out
 
 
-def history_kernels(fit: dict) -> dict[str, np.ndarray]:
-    """Per-lag log rate ratio of each fitted history block.
-
-    Parameters
-    ----------
-    fit : dict
-        A :func:`per_bin_rate_model.fit_per_bin_rate_model` result.
-
-    Returns
-    -------
-    dict
-        Block name (:data:`HISTORY_BLOCKS`) -> shape ``(N_HISTORY_LAGS,)``
-        log rate ratio of one past event at each lag (the raw raised-cosine
-        bumps weighted by the block's coefficients), for each block the fit
-        carries.
-    """
-    basis = raised_cosine_history_basis(N_HISTORY_LAGS, N_HISTORY_BASIS)
-    out = {}
-    for name, (prefix, _, _) in HISTORY_BLOCKS.items():
-        cols = [f"coef_{prefix}{k}" for k in range(N_HISTORY_BASIS)]
-        if all(c in fit for c in cols):
-            out[name] = np.array([fit[c] for c in cols]) @ basis
-    return out
-
-
-#: Per-lag count columns of each history block in the design.
-_LAG_COLUMNS = {
-    "self_onset": "onset_lag",
-    "self_offset": "offset_lag",
-    "cross_onset": "cross_lag",
-    "cross_offset": "cross_offset_lag",
-}
 #: Anchor sets a history block is fit with, by label.
 ANCHOR_SETS: dict[str, tuple[str, ...]] = {
     "onset": ("onset",),
     "offset": ("offset",),
     "both": ("onset", "offset"),
 }
-
-
-def lag_support(design: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Expected response onsets at each lag of each history block.
-
-    The design's mean onset rate times the exposure of the bins that have a
-    past event at that lag: how many onsets a lag's coefficient is estimated
-    from if history had no effect. In the at-risk design a short onset lag has
-    almost no support (the event that began then is usually still ongoing, so
-    the bin is not at risk), and its coefficient is not identified.
-
-    Returns
-    -------
-    dict
-        Block name -> shape ``(N_HISTORY_LAGS,)``, for each block whose lag
-        columns ``design`` carries.
-    """
-    rate = design["count"].sum() / design["exposure"].sum()
-    exposure = design["exposure"].to_numpy(dtype=float)
-    out = {}
-    for name, prefix in _LAG_COLUMNS.items():
-        cols = [f"{prefix}{j}" for j in range(1, N_HISTORY_LAGS + 1)]
-        if all(c in design.columns for c in cols):
-            present = design[cols].to_numpy() > 0  # (n_bins, n_lags)
-            out[name] = rate * (exposure @ present)
-    return out
-
-
-def onset_offset_collinearity(design: pd.DataFrame) -> dict[str, float]:
-    """How nearly the onset block's span contains the offset block's.
-
-    For the self and the cross stream: the first canonical correlation between
-    the onset (``*hist_rcos_k``) and offset (``*offhist_rcos_k``) blocks, over
-    the design's bins with any history in either block. With constant durations
-    an offset is an onset shifted by a fixed lag, so some combination of one
-    block nearly reproduces one of the other and the correlation nears 1 (the
-    two anchors cannot be told apart); varying durations lower it. The
-    raised-cosine bumps within one block are correlated by construction, which
-    this measure, unlike a VIF over all eight columns, does not count.
-
-    Returns
-    -------
-    dict
-        ``canonical_corr_self`` / ``canonical_corr_cross`` for each stream whose
-        two blocks ``design`` carries.
-    """
-    out = {}
-    for rel, prefix in (("self", ""), ("cross", "cross_")):
-        blocks = [
-            [f"{prefix}{anchor}hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
-            for anchor in ("", "off")
-        ]
-        if not all(c in design.columns for cols in blocks for c in cols):
-            continue
-        onset, offset = (design[cols].to_numpy(dtype=float) for cols in blocks)
-        rows = (onset != 0).any(axis=1) | (offset != 0).any(axis=1)
-        bases = []
-        for x in (onset[rows], offset[rows]):
-            u, s, _ = np.linalg.svd(x - x.mean(axis=0), full_matrices=False)
-            bases.append(u[:, s > s[0] * 1e-8])
-        out[f"canonical_corr_{rel}"] = float(
-            np.linalg.svd(bases[0].T @ bases[1], compute_uv=False)[0]
-        )
-    return out
 
 
 def _rung(

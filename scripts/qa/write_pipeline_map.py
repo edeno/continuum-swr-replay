@@ -107,6 +107,7 @@ STAGES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "*/analysis/replay/shuffles.py",
             "*/analysis/replay/simulation.py",
             "*/analysis/replay/duration_history_simulation.py",
+            "*/analysis/replay/duration_aware_history.py",
         ),
     ),
     (

@@ -49,6 +49,11 @@ from continuum_swr_replay.analysis.replay.design_constants import (
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import (
+    POPULATION_PLAN,
+    attach_event_ends,
+    build_design,
+)
 from continuum_swr_replay.analysis.replay.duration_history_simulation import (
     HISTORY_BLOCKS,
     lag_support,
@@ -63,11 +68,6 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.io import read_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
-from scripts.rate.fit_duration_aware_history_rate import (
-    POPULATION_PLAN,
-    attach_event_ends,
-    build_design,
-)
 
 OUT = Path(__file__).resolve().parent
 BASIS = raised_cosine_history_basis(N_HISTORY_LAGS, N_HISTORY_BASIS)

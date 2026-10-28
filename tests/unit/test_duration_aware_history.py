@@ -248,3 +248,113 @@ def test_invalid_anchors_raise(anchors):
         dataclasses.replace(
             model_specs.MODEL_CROSS_HISTORY_RATE["Mself"], self_history_anchors=anchors
         )
+
+
+# ── The real-data helpers (analysis/replay/duration_aware_history.py) ──
+
+
+def test_attach_event_ends_gives_non_local_onsets_their_event_end():
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        END_COLUMN,
+        attach_event_ends,
+    )
+
+    keys = {"animal": "x", "session_date": 1, "epoch": "02_r1", "stop_id": 1}
+    onsets = pd.DataFrame(
+        [
+            {
+                **keys,
+                "event_type": "non_local",
+                "onset_time": 10.0,
+                "t_since_stop_onset": 0.5,
+            },
+            {
+                **keys,
+                "event_type": "MUA",
+                "onset_time": 10.2,
+                "t_since_stop_onset": 0.7,
+            },
+        ]
+    )
+    events = pd.DataFrame([{**keys, "event_start_s": 10.0, "event_end_s": 10.08}])
+    out = attach_event_ends(onsets, events)
+    assert out.loc[0, END_COLUMN] == pytest.approx(0.58)
+    assert np.isnan(out.loc[1, END_COLUMN])
+    with pytest.raises(ValueError, match="no event_table event"):
+        attach_event_ends(onsets, events.assign(event_start_s=10.002))
+
+
+def _simulated_design(n_stops: int = 300) -> pd.DataFrame:
+    """Scenario (b) at 4x the base rate: the non-SWR stream's at-risk design."""
+    import dataclasses
+
+    from continuum_swr_replay.analysis.replay.duration_history_simulation import (
+        SCENARIOS,
+        simulate_interval_streams,
+    )
+
+    sc = SCENARIOS["b_fragmentation"]
+    sc = dataclasses.replace(
+        sc, base_rate_hz={k: 4 * v for k, v in sc.base_rate_hz.items()}
+    )
+    stops, events = simulate_interval_streams(sc, n_stops=n_stops, seed=0)
+    return aggregate_to_timebins(
+        stops,
+        events[events["stream"] == "no_swr"],
+        bin_s=model_specs.BIN_S,
+        tmax=model_specs.TMAX,
+        reward_basis=True,
+        self_history_lags=model_specs.N_HISTORY_LAGS,
+        self_history_basis=model_specs.N_HISTORY_BASIS,
+        excluded_intervals=NO_EXCLUDED_TIME,
+        arrival_clocks=False,
+        outcome_shift=False,
+        at_risk_events=events,
+        offset_history=True,
+    )
+
+
+def test_pooled_fit_of_one_session_matches_the_per_session_fitter():
+    """With one session the fixed effect is the intercept, so the pooled fit is
+    the shipped fitter's (coefficients and AIC equal to 1e-6)."""
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        fit_pooled_history,
+    )
+    from continuum_swr_replay.analysis.replay.per_bin_rate_model import (
+        fit_per_bin_rate_model,
+        freeze_per_bin_cohort,
+    )
+
+    spec = model_specs.MODEL_CROSS_HISTORY_DURATION_RATE["Mself_offset_dur"]
+    design, _ = freeze_per_bin_cohort(_simulated_design(), [spec])
+    design["session"] = "only"
+    pooled = fit_pooled_history(design, spec)
+    single = fit_per_bin_rate_model(design, spec)
+    assert pooled["ok"]
+    coef = [single[f"coef_offhist_rcos_{k}"] for k in range(4)]
+    np.testing.assert_allclose(
+        pooled["kernels"]["self_offset"]["coef"], coef, atol=1e-6
+    )
+    assert pooled["aic"] == pytest.approx(single["aic"], abs=1e-6)
+
+
+def test_pooled_fit_recovers_the_end_locked_kernel_with_a_session_effect():
+    """The stops split into two sessions, each with its own baseline term: the
+    end-only kernel still peaks at lag 2-3 (30-45 ms; the truth peaks at
+    45 ms), with finite positive SEs."""
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        fit_pooled_history,
+    )
+    from continuum_swr_replay.analysis.replay.per_bin_rate_model import (
+        freeze_per_bin_cohort,
+    )
+
+    spec = model_specs.MODEL_CROSS_HISTORY_DURATION_RATE["Mself_offset_dur"]
+    design, _ = freeze_per_bin_cohort(_simulated_design(), [spec])
+    design["session"] = np.where(design["stop_id"] % 2 == 0, "a", "b")
+    fit = fit_pooled_history(design, spec)
+    kernel = np.array(fit["kernels"]["self_offset"]["log_rr"])
+    se = np.array(fit["kernels"]["self_offset"]["se"])
+    assert fit["ok"] and fit["converged"]
+    assert int(np.argmax(kernel)) + 1 in (2, 3)
+    assert np.all(np.isfinite(se)) and np.all(se > 0)

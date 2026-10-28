@@ -181,7 +181,9 @@ them importable.
 - `fit_uncertainty_rate.py`, `fit_cross_history_rate.py` — MU / cross-history rate models.
 - `fit_duration_aware_history_rate.py` — self- and cross-history refit on the at-risk design (bins inside an
   ongoing event dropped; history from event onsets and ends; `MODEL_CROSS_HISTORY_DURATION_RATE`), all four
-  populations, into `models_per_bin_rate/duration_aware_history_models.pkl` with its provenance sidecar.
+  populations. `--mode session` fits each session (`models_per_bin_rate/duration_aware_history_models.pkl`);
+  `--mode pooled` stacks each animal's sessions with a session fixed effect, for kernels a session is too sparse
+  to measure (`duration_aware_history_pooled.pkl`). Each output has its provenance sidecar.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
 - `summarize_per_bin_rate_models.py` — generates `docs/per_bin_rate_results.md`.
 
