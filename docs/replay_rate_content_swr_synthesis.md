@@ -433,12 +433,12 @@ Built into `event_arm_table` (leaf arm *j* to `betadist_var{j+1}`, trunk arms
 - **The within-arm horse-race is re-derived on the fraction response**
   (`uncertainty_content/horserace_summary.csv`, `content.uncertainty`, 242 sessions; per-session OLS with the four
   predictors entered together, arm-demeaned): uncertainty
-  <!--v:part3.horserace_uncertainty_all-->…<!--/v--> arm fraction per SD
-  (<!--v:part3.horserace_uncertainty_all_animals-->…<!--/v-->/5 animals), value
-  <!--v:part3.horserace_value_all-->…<!--/v--> (<!--v:part3.horserace_value_all_animals-->…<!--/v-->/5),
-  distance <!--v:part3.horserace_distance_all-->…<!--/v--> (<!--v:part3.horserace_distance_all_animals-->…<!--/v-->/5),
-  recency <!--v:part3.horserace_recency_all-->…<!--/v--> (<!--v:part3.horserace_recency_all_animals-->…<!--/v-->/5);
-  median condition number <!--v:part3.horserace_condition_number_all-->…<!--/v-->, so the four separate.
+  <!--v:part3.horserace_uncertainty_all-->+0.037<!--/v--> arm fraction per SD
+  (<!--v:part3.horserace_uncertainty_all_animals-->5<!--/v-->/5 animals), value
+  <!--v:part3.horserace_value_all-->−0.0012<!--/v--> (<!--v:part3.horserace_value_all_animals-->4<!--/v-->/5),
+  distance <!--v:part3.horserace_distance_all-->−0.014<!--/v--> (<!--v:part3.horserace_distance_all_animals-->5<!--/v-->/5),
+  recency <!--v:part3.horserace_recency_all-->+0.0026<!--/v--> (<!--v:part3.horserace_recency_all_animals-->3<!--/v-->/5);
+  median condition number <!--v:part3.horserace_condition_number_all-->3.09<!--/v-->, so the four separate.
   The SWR and non-SWR splits are in `paper/reported/overview.md`.
 - **PENDING (not re-derived on the fraction response):** the
   recency-orthogonalized uncertainty effect, the recency VIF
@@ -571,8 +571,8 @@ discriminating fit does not.
 **Uncertainty-to-content vs their visit-recency bias (their Fig 7)** remains a
 distinction of *estimand* — theirs is between-arm binned recency, ours is
 within-arm. The within-arm horse-race backing it is re-derived on the fraction
-response: uncertainty <!--v:part3.horserace_uncertainty_all-->…<!--/v--> against recency
-<!--v:part3.horserace_recency_all-->…<!--/v--> arm fraction per SD, entered together.
+response: uncertainty <!--v:part3.horserace_uncertainty_all-->+0.037<!--/v--> against recency
+<!--v:part3.horserace_recency_all-->+0.0026<!--/v--> arm fraction per SD, entered together.
 
 The remaining structurally-novel axes (no Gillespie analog): the **SWR/non-SWR
 dissociation** and the **rate/intensity models** (they modeled content only).
@@ -681,7 +681,7 @@ with their estimand named.
   Within-arm (arm-demeaned, non-current-leaf) beta value
   `reward_belief_mean_candidate_arm_preoutcome` and beta uncertainty
   `reward_belief_variance_candidate_arm_preoutcome` are separately identifiable
-  (median condition number <!--v:part3.horserace_condition_number_all-->…<!--/v-->), and no HMM
+  (median condition number <!--v:part3.horserace_condition_number_all-->3.09<!--/v-->), and no HMM
   value is needed (HMM retired). The horse-race coefficients are re-derived on the
   per-event fraction response (`horserace_*` in Part 3). The `Mvu` conditioning
   diagnostics were count-response fits and are still **PENDING** re-derivation.
