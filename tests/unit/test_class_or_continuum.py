@@ -158,13 +158,21 @@ def _simulated_sessions(rng, step, n=12):
 
 
 def test_discontinuity_design_on_one_continuum_and_a_planted_step():
+    # over repeated simulations: one continuum mostly gives an interval
+    # covering 0, a planted step mostly an interval above 0 that covers it
     rng = np.random.default_rng(8)
     for step in (0.0, 1.0):
-        d = _simulated_sessions(rng, step)
-        window = d[(d.power_criterion >= 0.5) & (d.power_criterion <= 3.5)]
-        above = window.power_criterion >= cc.KAY_ZSCORE_THRESHOLD
-        fit = cc.fit_step(
-            window.y, window.power_criterion, above, window.group, n_knots=5
-        )
-        assert fit.step_ci_low < step < fit.step_ci_high
-        assert (fit.step_ci_low > 0) is (step > 0)
+        covers, positive = 0, 0
+        for _ in range(6):
+            d = _simulated_sessions(rng, step, n=12)
+            window = d[(d.power_criterion >= 0.5) & (d.power_criterion <= 3.5)]
+            above = window.power_criterion >= cc.KAY_ZSCORE_THRESHOLD
+            fit = cc.fit_step(
+                window.y, window.power_criterion, above, window.group, n_knots=5
+            )
+            covers += fit.step_ci_low < step < fit.step_ci_high
+            positive += fit.step_ci_low > 0
+        # a 95 % interval misses now and then (the script measures the rate
+        # over many more repeats); six repeats allow one or two misses
+        assert covers >= 4
+        assert positive >= 5 if step > 0 else positive <= 2

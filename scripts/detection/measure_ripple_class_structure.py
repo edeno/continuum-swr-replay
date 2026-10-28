@@ -923,7 +923,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     analyze.add_argument("--n-knots", type=int, default=8)
     analyze.add_argument("--sensitivity-knots", type=int, nargs="*", default=[5, 12])
     analyze.add_argument("--n-dip-reps", type=int, default=200)
-    analyze.add_argument("--n-step-reps", type=int, default=50)
+    analyze.add_argument("--n-step-reps", type=int, default=100)
     args = parser.parse_args(argv)
     if args.stage == "measure":
         run_measure(args)

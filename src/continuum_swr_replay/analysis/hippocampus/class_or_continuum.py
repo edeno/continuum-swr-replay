@@ -434,11 +434,13 @@ def simulate_step_data(
     return pd.DataFrame({"power": power, "is_swr": is_swr, "y": y, "group": group})
 
 
-GRID_MINIMUM_SAMPLES = 7
+GRID_MINIMUM_SAMPLES = 8
 """The Kay minimum duration on the 2 ms decode grid. At the detector's 1 kHz,
-15 ms is 15 consecutive samples (``ripple_detection.core.minimum_sample_count``);
-on the decode frame's 2 ms grid, nearest samples of the same trace, such a run
-leaves 7 or 8 samples, and 7 is the fewest."""
+15 ms is 15 consecutive samples (``ripple_detection.core.minimum_sample_count``),
+which span 14 ms; on the decode frame's 2 ms grid (every other sample of the
+same trace) such a run leaves 7 or 8 samples. 8 (14 ms) reproduces the
+inventory's labels better than 7 on a check of one epoch per animal (7 calls
+more brief crossings SWRs); the choice reads the labels only, no property."""
 
 
 def _runs(mask: NDArray[np.bool_]) -> NDArray[np.int64]:
