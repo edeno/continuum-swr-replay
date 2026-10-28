@@ -201,6 +201,75 @@ def load_bundles(
     return pd.DataFrame(rows), curves, nulls, lag_time
 
 
+#: Absolute mark-pair correlation from which the report flags possible ridge
+#: leakage between the two marks' slopes.
+STRONG_MARK_CORRELATION = 0.5
+
+
+def mark_correlations(bundle_dir: Path) -> pd.DataFrame:
+    """Correlation of every pair of marks in each model and class.
+
+    Read from each complete bundle's sidecar
+    (``marked_family_diagnostics.event_mark_geometry_by_class``: the
+    within-session correlation of the standardized event marks), then
+    averaged unit -> session -> animal like every other statistic here: the
+    mean over animals of each animal's mean over sessions. A slope on a mark
+    strongly correlated with another can carry part of that mark's effect
+    under the shared ridge prior (a same-sign bias in every animal), so these
+    are reported beside the slopes.
+
+    Parameters
+    ----------
+    bundle_dir : Path
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``model``, ``event_class``, ``target`` (``"<mark a> & <mark b>"``),
+        ``statistic`` (``"mark_correlation"``), ``value``, ``n_sessions``.
+    """
+    per_session: dict = defaultdict(lambda: defaultdict(list))
+    for sidecar in sorted(bundle_dir.glob("*_marked_family.provenance.json")):
+        record = json.load(open(sidecar))
+        extra = record.get("extra", record)
+        if extra.get("bundle_status") != "complete":
+            continue
+        animal, _ = parse_nwb_filename(extra["nwb_file_name"])
+        geometry = extra.get("marked_family_diagnostics", {}).get(
+            "event_mark_geometry_by_class", {}
+        )
+        for event_class, entry in geometry.items():
+            marks = entry.get("marks") or []
+            matrix = np.asarray(entry.get("correlation") or [], dtype=float)
+            if matrix.shape != (len(marks), len(marks)):
+                continue
+            for i in range(len(marks)):
+                for j in range(i + 1, len(marks)):
+                    key = (extra["model_name"], event_class, f"{marks[i]} & {marks[j]}")
+                    per_session[key][animal].append(matrix[i, j])
+    rows = []
+    for (model, event_class, pair), by_animal in per_session.items():
+        animal_means = [
+            float(np.nanmean(values))
+            for values in by_animal.values()
+            if np.isfinite(values).any()
+        ]
+        rows.append(
+            {
+                "model": model,
+                "event_class": event_class,
+                "target": pair,
+                "statistic": "mark_correlation",
+                "value": float(np.mean(animal_means)) if animal_means else np.nan,
+                "n_sessions": int(sum(len(v) for v in by_animal.values())),
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=["model", "event_class", "target", "statistic", "value", "n_sessions"],
+    )
+
+
 def usable_delta(delta: pd.Series, blowup: float) -> pd.Series:
     """Return ``delta`` with non-finite and exploding values set to NaN."""
     values = pd.to_numeric(delta, errors="coerce")
@@ -823,8 +892,34 @@ def main() -> None:
     fractions.merge(peaks, on=["model", "event_class", "target"]).to_csv(
         args.out.with_suffix(".csv"), index=False
     )
+    correlations = mark_correlations(args.bundle_dir)
+    if len(correlations):
+        strong = correlations[correlations["value"].abs() >= STRONG_MARK_CORRELATION]
+        report += (
+            "\n\n## Correlated marks\n\n"
+            "Pairs of marks in one model and class whose within-session correlation "
+            f"(mean over animals of session means) is at least {STRONG_MARK_CORRELATION} "
+            "in absolute value. Under the shared ridge prior a small slope on either "
+            "mark of such a pair can carry part of the other's effect, with the same "
+            "sign in every animal; read it as possible leakage.\n\n"
+            + _md(
+                strong.rename(columns={"target": "pair"}),
+                ["model", "event_class", "pair", "value", "n_sessions"],
+                {"value": "{:+.2f}"},
+            )
+        )
+        args.out.write_text(report)
     summary_path = args.summary_parquet or args.bundle_dir / "summary.parquet"
-    summary_table(fractions, peaks, bands, tiers).to_parquet(summary_path, index=False)
+    tiers_of = tiers.drop_duplicates("model").set_index("model")["tier"]
+    pd.concat(
+        [
+            summary_table(fractions, peaks, bands, tiers),
+            correlations.drop(columns="n_sessions").assign(
+                tier=correlations["model"].map(tiers_of)
+            ),
+        ],
+        ignore_index=True,
+    ).to_parquet(summary_path, index=False)
     print(report)
     print(f"Wrote {summary_path}")
 

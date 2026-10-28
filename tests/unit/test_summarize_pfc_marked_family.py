@@ -276,3 +276,36 @@ def test_max_statistic_call_is_the_plus_one_p_not_the_interpolated_percentile():
     above = call(1.2)
     assert above.max_p_value == pytest.approx(1 / 21)
     assert above.max_outside_reference
+
+
+def test_mark_correlations_are_animal_balanced(tmp_path):
+    """Two chimi sessions at r = 0.2 and 0.4 and one wilbur session at 0.9
+    give the mean of the animal means, 0.6, not the session mean."""
+
+    def geometry(r):
+        return {
+            "non_local_no_SWR": {
+                "marks": ["a", "b"],
+                "correlation": [[1.0, r], [r, 1.0]],
+            }
+        }
+
+    for session, r in (
+        ("chimi20200212_02_r1", 0.2),
+        ("chimi20200212_04_r2", 0.4),
+        ("wilbur20210329_02_r1", 0.9),
+    ):
+        _write_bundle(tmp_path, session, version=2)
+        path = tmp_path / f"{session}_mPFC_m_marked_family.provenance.json"
+        record = json.loads(path.read_text())
+        record["marked_family_diagnostics"]["event_mark_geometry_by_class"] = geometry(
+            r
+        )
+        path.write_text(json.dumps(record))
+
+    table = summarize.mark_correlations(tmp_path)
+
+    assert table["target"].tolist() == ["a & b"]
+    assert table["statistic"].tolist() == ["mark_correlation"]
+    assert table["value"].iloc[0] == pytest.approx(0.6)
+    assert table["n_sessions"].iloc[0] == 3
