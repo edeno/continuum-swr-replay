@@ -126,6 +126,34 @@ BEST_MODELS = {
 TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
 
 SWR_WITHOUT_REPLAY_TREE = "pfc_response_followups/swr_without_replay"
+
+MARKED_FAMILY_SUMMARY = (
+    "pfc_response_followups/marked_family_baseline_prior/summary.parquet"
+)
+"""The marked-family summary (``scripts/pfc/summarize_pfc_marked_family.py``)
+of the follow-up models fit with the per-stop baseline prior."""
+
+#: Joint follow-up models and targets quoted in Part 4, by key word.
+MARKED_MODELS = {
+    "content": "replay_content",
+    "strength": "event_strength",
+    "ripple": "ripple_power",
+    "ripplepooled": "ripple_power_pooled",
+}
+MARKED_TARGETS = {
+    "current_arm_fraction": "current_arm",
+    "content_weighted_recent_reward": "recent_reward",
+    "content_weighted_belief_uncertainty": "uncertainty",
+    "log_event_duration_s": "duration",
+    "ripple_power_z": "ripple_power",
+    "mua_rate_z": "mua_rate",
+}
+MARKED_CLASSES = {
+    "non_local_SWR": "swr_replay",
+    "non_local_no_SWR": "non_swr_replay",
+    "SWR_no_non_local": "swr_no_replay",
+    "pooled": "pooled",
+}
 """The extended-event-set bundles (``run_pfc_analysis_bandit.py --event-set
 with_swr_without_replay``), relative to the processed-data root."""
 
@@ -164,6 +192,7 @@ class Part4Inputs:
     ml_tree: Path
     timing_calibration: Path
     swr_without_replay_dir: Path
+    marked_family_summary: Path
 
 
 def default_inputs() -> Part4Inputs:
@@ -176,6 +205,7 @@ def default_inputs() -> Part4Inputs:
         ml_tree=data / ML_TREE,
         timing_calibration=data / TIMING_CALIBRATION,
         swr_without_replay_dir=data / SWR_WITHOUT_REPLAY_TREE,
+        marked_family_summary=data / MARKED_FAMILY_SUMMARY,
     )
 
 
@@ -2004,6 +2034,107 @@ def swr_without_replay_values(
     return values
 
 
+# --- marked family: content, strength, ripple power --------------------------------
+
+
+def marked_family_values(
+    summary: pd.DataFrame, make: Callable[..., Value]
+) -> list[Value]:
+    """How the mPFC response changes with what is replayed and how strong the event is.
+
+    Read from the marked-family summary of the follow-up joint models (fit with
+    a weak prior on the per-stop baseline columns, every unit with a spike
+    kept, no rate gate). For each model, target mark and event class: the
+    population slope at its peak (log-rate change of the peri-event response
+    per within-session SD of the mark; unit -> session -> animal), how many
+    animals' mean curves share that sign there, and the share of units whose
+    held-out deviance improves when the mark's block is added (K = 5). No
+    shuffle reference was run. Beside them, the within-session correlation of
+    ripple power and multiunit rate in each replay class: under the shared
+    ridge prior a small slope on either can carry part of the other's effect,
+    with the same sign in every animal (possible leakage). Full tables are in
+    the summary's CSV and parquet.
+    """
+    values: list[Value] = []
+
+    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
+        if np.isfinite(float(value)):
+            values.append(make(key, value, *args, **kwargs))
+
+    wide = summary[summary["statistic"] != "mark_correlation"].pivot_table(
+        index=["model", "event_class", "target"], columns="statistic", values="value"
+    )
+    for model_word, model in MARKED_MODELS.items():
+        for (row_model, event_class, target), row in wide.iterrows():
+            if row_model != model or target not in MARKED_TARGETS:
+                continue
+            stem = (
+                f"marked_{model_word}_{MARKED_TARGETS[target]}_"
+                f"{MARKED_CLASSES[event_class]}"
+            )
+            what = (
+                f"{target} in model {model}, "
+                f"{'all classes pooled' if event_class == 'pooled' else event_class}"
+            )
+            add(
+                f"{stem}_peak",
+                row["peak_value"],
+                "quantity",
+                "sig2",
+                f"population slope at its peak: change of the peri-event log rate per "
+                f"within-session SD of {what} (unit -> session -> animal)",
+                "log rate",
+            )
+            add(
+                f"{stem}_peak_lag_ms",
+                row["peak_lag_ms"],
+                "quantity",
+                "int",
+                f"lag of that peak, {what}",
+                "ms",
+            )
+            add(
+                f"{stem}_animals_same_sign",
+                row["animals_same_sign"],
+                "count",
+                "count",
+                f"animals whose mean slope curve has the population peak's "
+                f"sign at that lag, {what}",
+            )
+            add(
+                f"{stem}_heldout_gain_fraction",
+                row["frac_pos"],
+                "fraction",
+                "pct",
+                f"share of units whose held-out deviance improves when the {target} "
+                f"block is added (animal-balanced), {what}",
+            )
+    correlations = summary[
+        (summary["statistic"] == "mark_correlation")
+        & (summary["model"] == "event_strength")
+        & (summary["target"] == "ripple_power_z & mua_rate_z")
+    ]
+    for _, row in correlations.iterrows():
+        add(
+            f"marked_ripple_mua_correlation_{MARKED_CLASSES[row['event_class']]}",
+            row["value"],
+            "quantity",
+            "dec2",
+            "within-session correlation of ripple power and hippocampal multiunit rate "
+            f"over {row['event_class']} events (mean over animals of session means): "
+            "their slopes may carry each other's effect (ridge leakage)",
+        )
+    animals = wide["n_animals"].max() if "n_animals" in wide else np.nan
+    add(
+        "marked_animals",
+        animals,
+        "count",
+        "count",
+        "animals in the marked-family summary",
+    )
+    return values
+
+
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     """Part 4's summary from ``inputs``."""
     summary = Summary(part=4, produced_by=produced_by, commit=commit)
@@ -2033,6 +2164,22 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
         else None
     )
     summary.add(*timing_values(population, curves, lag_time, calibration, make))
+    if inputs.marked_family_summary.exists():
+        summary.add(
+            *marked_family_values(
+                pd.read_parquet(inputs.marked_family_summary),
+                _value_factory(
+                    f"{rel(inputs.marked_family_summary)} "
+                    "(scripts/pfc/summarize_pfc_marked_family.py over "
+                    "scripts/pfc/run_pfc_marked_model_family.py --model-set followup "
+                    "--baseline-penalty-sigma 3 bundles)",
+                    claims,
+                    ("paper",),
+                    None,
+                ),
+            )
+        )
+        summary.inputs.append(file_record(inputs.marked_family_summary, ROOT_DIR))
     extended_dir = inputs.swr_without_replay_dir
     extended_bundles = sorted(extended_dir.glob(f"*{STEM}.pkl"))
     if extended_bundles:
