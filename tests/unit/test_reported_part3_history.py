@@ -95,7 +95,9 @@ def test_history_values_read_measurable_lags_and_count_animals():
     assert values["history_end_peak_lag_ms_low"].value == 30
     assert values["history_end_peak_animals_min"].value == 5
     assert values["history_end_first_lag_rr_low"].value == pytest.approx(3.0)
+    assert values["history_end_first_lag_rr_high"].value == pytest.approx(3.0)
     assert values["history_end_first_lag_suppressed_fits"].value == 0
+    assert values["history_end_first_lag_raised_fits"].value == 20
     assert values["history_fits"].value == 20
     assert values["history_cross_end_rr_non_swr_from_swr"].value == pytest.approx(2.5)
     assert values["history_cross_end_animals_swr_from_non_swr"].value == 5
@@ -114,6 +116,7 @@ def test_history_values_count_a_suppression_after_the_end():
         )
     }
     assert values["history_end_first_lag_suppressed_fits"].value == 20
+    assert values["history_end_first_lag_raised_fits"].value == 0
     assert values["history_cross_session_animals_positive_swr_from_non_swr"].value == 5
 
 

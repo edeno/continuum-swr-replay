@@ -142,9 +142,10 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   (<!--v:part3.per_stop_delta_aic_session_non_local_no_swr-->+0.88<!--/v-->).
 - Event history, once event duration is handled (a bin inside an event is not at risk; history is read from the
   previous event's end and its onset; each animal's sessions pooled, so the sizes are upper bounds):
-  - No suppression after an event ends: 15 ms after the end the rate ratio is at least
-    <!--v:part3.history_end_first_lag_rr_low-->…<!--/v-->, and it is below 1 in <!--v:part3.history_end_first_lag_suppressed_fits-->…<!--/v-->
-    of <!--v:part3.history_fits-->…<!--/v--> animal × population fits.
+  - No suppression after an event ends: 15 ms after the end the rate ratio is
+    <!--v:part3.history_end_first_lag_rr_low-->…<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->…<!--/v-->× (animal medians per
+    population); it is above 1 in <!--v:part3.history_end_first_lag_raised_fits-->…<!--/v--> and below 1 in
+    <!--v:part3.history_end_first_lag_suppressed_fits-->…<!--/v--> of <!--v:part3.history_fits-->…<!--/v--> animal × population fits (95 % CI).
   - The next event is <!--v:part3.history_end_peak_low-->…<!--/v-->–<!--v:part3.history_end_peak_high-->…<!--/v-->× likelier
     <!--v:part3.history_end_peak_lag_ms_low-->…<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->…<!--/v--> ms after the previous one
     ends (at least <!--v:part3.history_end_peak_animals_min-->…<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals in every population).

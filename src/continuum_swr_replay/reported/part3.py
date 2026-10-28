@@ -2638,20 +2638,23 @@ def duration_aware_history_values(
     )
     values: list[Value] = []
     first_lag, end_peaks, end_lags, end_animals = [], [], [], []
-    n_fits = n_suppressed = 0
+    n_fits = n_suppressed = n_raised = 0
     for word, (outcome, label) in RATE_POPULATIONS.items():
-        ends, onsets = [], []
+        ends, onsets, first = [], [], []
         for rec in by_pop[outcome].values():
             end = _pooled_kernel(rec, "Mself_dur", "self_offset")
             onset = _pooled_kernel(rec, "Mself_dur", "self_onset")
             _require(end is not None, f"{outcome}/{rec['animal']}: Mself_dur failed")
             n_fits += 1
-            first_lag.append(float(np.exp(end["log_rr"][0])))
-            n_suppressed += bool(end["log_rr"][0] + 1.96 * end["se"][0] < 0)
+            lr, se = end["log_rr"][0], end["se"][0]
+            first.append(float(np.exp(lr)))
+            n_suppressed += bool(lr + 1.96 * se < 0)
+            n_raised += bool(lr - 1.96 * se > 0)
             if (peak := _peak(end)) is not None:
                 ends.append(peak)
             if onset is not None and (peak := _peak(onset)) is not None:
                 onsets.append(peak)
+        first_lag.append(float(np.median(first)))
         end_peaks.append(np.median([p[0] for p in ends]))
         end_lags.append(np.median([p[1] for p in ends]))
         end_animals.append(sum(p[2] for p in ends))
@@ -2688,9 +2691,18 @@ def duration_aware_history_values(
             min(first_lag),
             "quantity",
             "dec2",
-            "lowest, over the animal x population fits, rate ratio 15 ms after the "
-            "previous event's end (end-locked part of Mself_dur, at-risk design); "
-            f"{UPPER_BOUND}",
+            "lowest over the four populations of the median (over animals) rate ratio "
+            "15 ms after the previous event's end (end-locked part of Mself_dur, "
+            f"at-risk design); {UPPER_BOUND}",
+            "rate ratio",
+        ),
+        make(
+            "history_end_first_lag_rr_high",
+            max(first_lag),
+            "quantity",
+            "dec2",
+            "highest over the four populations of that median rate ratio 15 ms after "
+            "the previous event's end",
             "rate ratio",
         ),
         make(
@@ -2700,6 +2712,14 @@ def duration_aware_history_values(
             "count",
             "animal x population fits whose rate 15 ms after the previous event's end "
             "is below 1 with its 95 % CI (suppression after the end)",
+        ),
+        make(
+            "history_end_first_lag_raised_fits",
+            n_raised,
+            "count",
+            "count",
+            "animal x population fits whose rate 15 ms after the previous event's end "
+            "is above 1 with its 95 % CI",
         ),
         make(
             "history_fits",
