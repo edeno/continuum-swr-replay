@@ -119,27 +119,27 @@ close on average.
   SWR events. Because none of these contrasts is duration-controlled, "shorter" may account for much of the rest.
 
 **One class or two?** Are SWR-coupled and non-SWR events two kinds, or one continuum of ripple power cut by the
-SWR threshold (<!--v:part2.kay_threshold_z-->…<!--/v--> z)? (claim 24; `scripts/detection/measure_ripple_class_structure.py`)
+SWR threshold (<!--v:part2.kay_threshold_z-->2.00<!--/v--> z)? (claim 24; `scripts/detection/measure_ripple_class_structure.py`)
 - *One mode.* The events' peak ripple power is unimodal by the dip test in
-  <!--v:part2.ripple_peak_animals_unimodal-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> animals (smallest p <!--v:part2.ripple_peak_dip_p_min-->…<!--/v-->); its mode lies
-  at <!--v:part2.ripple_peak_mode_animal_min-->…<!--/v-->–<!--v:part2.ripple_peak_mode_animal_max-->…<!--/v--> z, below or at the threshold, which cuts one mode rather than
+  <!--v:part2.ripple_peak_animals_unimodal-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals (smallest p <!--v:part2.ripple_peak_dip_p_min-->1.0<!--/v-->); its mode lies
+  at <!--v:part2.ripple_peak_mode_animal_min-->0.90<!--/v-->–<!--v:part2.ripple_peak_mode_animal_max-->1.99<!--/v--> z, below or at the threshold, which cuts one mode rather than
   falling between two. In simulation the dip test called matched skewed unimodal samples bimodal in at most
-  <!--v:part2.dip_sim_unimodal_reject_max-->…<!--/v--> of runs, and found two classes at the labels' observed separation in at most
-  <!--v:part2.dip_sim_two_classes_observed_power_max-->…<!--/v--> but at double it in at least <!--v:part2.dip_sim_two_classes_double_power_min-->…<!--/v-->: it rules
+  <!--v:part2.dip_sim_unimodal_reject_max-->0 %<!--/v--> of runs, and found two classes at the labels' observed separation in at most
+  <!--v:part2.dip_sim_two_classes_observed_power_max-->0 %<!--/v--> but at double it in at least <!--v:part2.dip_sim_two_classes_double_power_min-->100 %<!--/v-->: it rules
   out well-separated classes, not overlapping ones.
 - *No step at the threshold, except in spike evidence.* The event's own power is the wrong ruler:
-  <!--v:part2.non_swr_peak_above_threshold_fraction-->…<!--/v--> of non-SWR events reach the threshold only briefly, and on a simulated single
-  continuum a step test on it finds a false step in <!--v:part2.step_sim_trace_null_peak_false_fraction-->…<!--/v--> of data sets. On the Kay
-  criterion around the event, which reproduces the label for <!--v:part2.criterion_label_agreement-->…<!--/v--> of events, the animals with
-  a jump at the threshold are: duration <!--v:part2.step_duration_criterion_animals-->…<!--/v-->/<!--v:part2.animals-->…<!--/v-->, extent
-  <!--v:part2.step_extent_criterion_animals-->…<!--/v-->, speed <!--v:part2.step_speed_criterion_animals-->…<!--/v-->, posterior peak
-  <!--v:part2.step_posterior_criterion_animals-->…<!--/v-->, HPD <!--v:part2.step_hpd_criterion_animals-->…<!--/v-->, spike count
-  <!--v:part2.step_spikes_criterion_animals-->…<!--/v-->, arms visited <!--v:part2.step_breadth_criterion_animals-->…<!--/v-->, spike evidence per spike
-  <!--v:part2.step_evidence_criterion_animals-->…<!--/v-->. The spike-evidence jump points up in
-  <!--v:part2.step_evidence_criterion_animals_same_sign-->…<!--/v-->/<!--v:part2.animals-->…<!--/v--> animals (a step in <!--v:part2.step_evidence_criterion_dur_animals-->…<!--/v-->
-  with log duration), a median <!--v:part2.step_evidence_criterion_share_median-->…<!--/v--> of the SWR minus non-SWR difference. In
-  simulation this test gives a false step in <!--v:part2.step_sim_trace_null_criterion_false_fraction-->…<!--/v--> of data sets and finds a
-  planted step in <!--v:part2.step_sim_trace_planted_criterion_found_fraction-->…<!--/v-->, so small jumps are not excluded.
+  <!--v:part2.non_swr_peak_above_threshold_fraction-->24 %<!--/v--> of non-SWR events reach the threshold only briefly, and on a simulated single
+  continuum a step test on it finds a false step in <!--v:part2.step_sim_trace_null_peak_false_fraction-->100 %<!--/v--> of data sets. On the Kay
+  criterion around the event, which reproduces the label for <!--v:part2.criterion_label_agreement-->99 %<!--/v--> of events, the animals with
+  a jump at the threshold are: duration <!--v:part2.step_duration_criterion_animals-->0<!--/v-->/<!--v:part2.animals-->5<!--/v-->, extent
+  <!--v:part2.step_extent_criterion_animals-->1<!--/v-->, speed <!--v:part2.step_speed_criterion_animals-->0<!--/v-->, posterior peak
+  <!--v:part2.step_posterior_criterion_animals-->0<!--/v-->, HPD <!--v:part2.step_hpd_criterion_animals-->0<!--/v-->, spike count
+  <!--v:part2.step_spikes_criterion_animals-->1<!--/v-->, arms visited <!--v:part2.step_breadth_criterion_animals-->0<!--/v-->, spike evidence per spike
+  <!--v:part2.step_evidence_criterion_animals-->3<!--/v-->. The spike-evidence jump points up in
+  <!--v:part2.step_evidence_criterion_animals_same_sign-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals (a step in <!--v:part2.step_evidence_criterion_dur_animals-->2<!--/v-->
+  with log duration), a median <!--v:part2.step_evidence_criterion_share_median-->+0.19<!--/v--> of the SWR minus non-SWR difference. In
+  simulation this test gives a false step in <!--v:part2.step_sim_trace_null_criterion_false_fraction-->12 %<!--/v--> of data sets and finds a
+  planted step in <!--v:part2.step_sim_trace_planted_criterion_found_fraction-->47 %<!--/v-->, so small jumps are not excluded.
 - *Reading:* one continuum of ripple power cut by the detector's threshold, not two classes; the one hint of a
   boundary is spike evidence per spike.
 
