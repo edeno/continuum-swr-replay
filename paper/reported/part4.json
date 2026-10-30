@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "84415f84975f",
+ "commit": "19b4866d99ec",
  "inputs": [
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/pfc_response_followups/marked_family_well_unknown/summary.parquet",
@@ -53,12 +53,6 @@
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/pfc_response_followups/timing_calibration.json",
    "sha256": "33101ea1f210d83d52d10128c3fc494d4865281408157aa39a69b795bd3d900a"
-  },
-  {
-   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
-   "n_files": 71,
-   "sha256": "58042fdf081b88313bb8f0dd606407ac8c61af80e2d9e840679d2481ed119f3c",
-   "note": "superseded maximum-likelihood tree, for one comparison"
   }
  ],
  "values": {
@@ -1929,36 +1923,6 @@
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
    "pending": null
-  },
-  "ml_nonconverged_percent": {
-   "value": 14.837706511175899,
-   "kind": "quantity",
-   "style": "sig2",
-   "unit": "%",
-   "description": "non-converged fits as a percent of model fits in the maximum-likelihood tree (22902 of 154350, 71 sessions)",
-   "claims": [
-    "20"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
-   "pending": "read from the superseded maximum-likelihood tree (Processed-Data/_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; it is a comparison of estimators, not refit on the current tables"
-  },
-  "ml_sessions": {
-   "value": 71,
-   "kind": "count",
-   "style": "count",
-   "unit": "",
-   "description": "sessions in the maximum-likelihood tree",
-   "claims": [
-    "20"
-   ],
-   "used_in": [
-    "paper"
-   ],
-   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_pre_ridge_backup_20260915/*_mPFC_modulation.provenance.json",
-   "pending": "read from the superseded maximum-likelihood tree (Processed-Data/_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; it is a comparison of estimators, not refit on the current tables"
   },
   "model_fits": {
    "value": 166968,
