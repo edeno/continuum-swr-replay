@@ -416,7 +416,7 @@ The duration-aware per-bin history design on real events, and its readouts.
 
 Simulated non-local events with duration, for the per-bin history design.
 
-`HistoryKernel`, `Scenario`, `simulate_interval_streams`, `true_lag_kernel`, `fit_history_direction`, `summarize_direction`
+`HistoryKernel`, `Scenario`, `simulate_interval_streams`, `true_lag_kernel`, `fit_history_direction`, `summarize_direction`, `simulate_pooled_design`
 
 ### `src/continuum_swr_replay/analysis/replay/fitting.py`
 
@@ -441,6 +441,12 @@ Per-bin conditional-intensity Poisson model for replay event onsets (Family B).
 Poisson rate model for replay event occurrence.
 
 `fit_per_stop_rate_model`, `cross_validate_per_stop_rate_model`
+
+### `src/continuum_swr_replay/analysis/replay/ridge_history_cv.py`
+
+Ridge-penalised, cross-validated self vs self+cross history comparison.
+
+`RidgeFit`, `ridge_design`, `fit_ridge_poisson`, `heldout_loglik`, `assign_stop_folds`, `fit_ridge_poisson_batch`, `nested_cv`, `ridge_kernels`, `compare_cross_history`
 
 ### `src/continuum_swr_replay/analysis/replay/shuffles.py`
 
@@ -565,6 +571,12 @@ Run Carey's candidate detector on every epoch's CA1 LFP and multiunit spikes.
 Bivariate per-bin conditional intensity: does one non-local stream's history drive the other's rate?
 
 `fit_cross_history`, `main`
+
+### `scripts/rate/fit_cross_history_ridge_cv.py`
+
+Ridge cross-validated comparison of self vs self+cross history, per animal.
+
+`main`
 
 ### `scripts/rate/fit_duration_aware_history_rate.py`
 
