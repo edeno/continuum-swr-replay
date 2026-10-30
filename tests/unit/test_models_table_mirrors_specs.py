@@ -47,6 +47,9 @@ EXPECTED: dict[str, frozenset[str]] = {
     "Cross-history coupling, duration-aware — per-bin Poisson (auxiliary)": (
         frozenset(specs.MODEL_CROSS_HISTORY_DURATION_RATE)
     ),
+    "Cross-history coupling, long window — ridge cross-validated (auxiliary)": (
+        frozenset(specs.MODEL_CROSS_HISTORY_LONG_RATE)
+    ),
     "Per-stop rate — Family A": frozenset(specs.MODEL_PER_STOP_RATE),
     "Content — arm": frozenset(specs.MODEL_HIERARCHY),
     "Content — patch": frozenset(specs.MODEL_PATCH),

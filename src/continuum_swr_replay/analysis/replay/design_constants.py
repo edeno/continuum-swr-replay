@@ -131,3 +131,11 @@ ARRIVAL_SPLINE_KNOTS = (1.0, 2.0, 4.0, 6.0)
 ARRIVAL_CLOCK_COLUMN = "time_since_last_well_arrival_s"
 N_HISTORY_LAGS = 10  # onset_lag1..10 = 150 ms self-history window
 N_HISTORY_BASIS = 4  # raised-cosine bumps over the history window (*_histcos models)
+# The long cross-history window of the ridge cross-validated comparison
+# (MODEL_CROSS_HISTORY_LONG_RATE): 67 lags = 1.005 s after the other stream's
+# event, so the cross block reaches past the 150 ms self window. Six log-spaced
+# bumps keep about the self basis's resolution: neighbouring centres are
+# exp(log(67) / 5) = 2.3x apart in lag (self: exp(log(10) / 3) = 2.2x), so the
+# bumps sit near 15, 35, 80, 185, 430 and 1005 ms.
+N_CROSS_LONG_LAGS = 67
+N_CROSS_LONG_BASIS = 6

@@ -28,6 +28,7 @@ by inverting the cumulative hazard after each event ends.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -69,6 +70,7 @@ __all__ = [
     "lag_support",
     "onset_offset_collinearity",
     "simulate_interval_streams",
+    "simulate_pooled_design",
     "summarize_direction",
     "true_lag_kernel",
 ]
@@ -564,3 +566,59 @@ def summarize_direction(result: dict) -> dict:
         "best_self": best_self,
         "best": result["best"],
     }
+
+
+def simulate_pooled_design(
+    scenario: Scenario,
+    *,
+    response: str,
+    ladder: Mapping[str, PerBinRateModelSpec],
+    n_sessions: int,
+    n_stops: int,
+    seed: int,
+) -> pd.DataFrame:
+    """Several simulated sessions' duration-aware designs, stacked.
+
+    Each session is :func:`simulate_interval_streams` with seed ``seed + i``;
+    its design is built as :func:`fit_history_direction` builds the
+    duration-aware one, but with ``ladder``'s cross window and basis and
+    frozen on ``ladder``'s rungs, so the stacked frame is what the ridge
+    comparison (:mod:`.ridge_history_cv`) fits with a ``session`` effect.
+
+    Returns
+    -------
+    pd.DataFrame
+        The stacked (stop x bin) design with a ``session`` column; ``stop_id``
+        is made unique across sessions.
+    """
+    cross = next(s for s in STREAMS if s != response)
+    specs = list(ladder.values())
+    frames = []
+    for i in range(n_sessions):
+        stop_table, events = simulate_interval_streams(
+            scenario, n_stops=n_stops, seed=seed + i
+        )
+        stop_table["stop_id"] += i * n_stops
+        events["stop_id"] += i * n_stops
+        design = aggregate_to_timebins(
+            stop_table,
+            events[events["stream"] == response],
+            bin_s=BIN_S,
+            tmax=TMAX,
+            reward_basis=True,
+            self_history_lags=N_HISTORY_LAGS,
+            self_history_basis=N_HISTORY_BASIS,
+            cross_onset_times=events[events["stream"] == cross],
+            cross_history_lags=max(s.cross_history_lags for s in specs),
+            cross_history_basis=max(s.cross_history_basis for s in specs),
+            history_window_s=longest_history_window_s(specs),
+            excluded_intervals=NO_EXCLUDED_TIME,
+            arrival_clocks=False,
+            outcome_shift=False,
+            at_risk_events=events,
+            offset_history=True,
+        )
+        design, _ = freeze_per_bin_cohort(design, specs)
+        design["session"] = f"sim{i:02d}"
+        frames.append(design)
+    return pd.concat(frames, ignore_index=True)

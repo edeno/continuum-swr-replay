@@ -22,6 +22,7 @@ This module holds what the runners and the Part 3 summary share:
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -173,6 +174,7 @@ def build_design(
     outcome: str,
     *,
     duration_aware: bool = True,
+    ladder: Mapping[str, PerBinRateModelSpec] | None = None,
 ) -> tuple[pd.DataFrame, tuple[str, ...]]:
     """One session's frozen design for ``outcome`` and the rungs it carries.
 
@@ -194,13 +196,20 @@ def build_design(
         :data:`END_COLUMN` (:func:`attach_event_ends`).
     outcome : str
         A key of :data:`POPULATION_PLAN`.
+    ladder : mapping of str to PerBinRateModelSpec, optional
+        Duration-aware rungs to build and freeze the design for instead of
+        ``MODEL_CROSS_HISTORY_DURATION_RATE`` (e.g.
+        ``MODEL_CROSS_HISTORY_LONG_RATE``): the cross block's lags and basis
+        and the history window are the ladder's longest. Requires a population
+        with a cross stream.
 
     Returns
     -------
     design : pd.DataFrame
         The frozen (stop x bin) design.
     rungs : tuple of str
-        The ``MODEL_CROSS_HISTORY_DURATION_RATE`` rungs the population fits.
+        The ``MODEL_CROSS_HISTORY_DURATION_RATE`` (or ``ladder``) rungs the
+        population fits.
 
     Raises
     ------
@@ -217,13 +226,24 @@ def build_design(
     at_risk[["t_since_stop_onset", END_COLUMN]] += DECODE_SAMPLE_S
     cross_kwargs: dict = {}
     rungs = SELF_RUNGS
+    cross_lags, cross_basis, window_s = (
+        N_HISTORY_LAGS,
+        N_HISTORY_BASIS,
+        HISTORY_WINDOW_S,
+    )
+    if ladder is not None:
+        if cross_pop is None or not duration_aware:
+            raise ValueError(f"{outcome}: a ladder needs a duration-aware cross design")
+        cross_lags = max(spec.cross_history_lags for spec in ladder.values())
+        cross_basis = max(spec.cross_history_basis for spec in ladder.values())
+        window_s = longest_history_window_s(ladder.values())
     if cross_pop is not None:
         cross_kwargs = {
             "cross_onset_times": POPULATIONS[cross_pop](onsets_g),
-            "cross_history_lags": N_HISTORY_LAGS,
-            "cross_history_basis": N_HISTORY_BASIS,
+            "cross_history_lags": cross_lags,
+            "cross_history_basis": cross_basis,
         }
-        rungs = SELF_RUNGS + CROSS_RUNGS
+        rungs = SELF_RUNGS + CROSS_RUNGS if ladder is None else tuple(ladder)
     design = aggregate_to_timebins(
         stops_g,
         response,
@@ -233,14 +253,16 @@ def build_design(
         self_history_lags=N_HISTORY_LAGS,
         self_history_basis=N_HISTORY_BASIS,
         stop_covariates=STOP_COVARIATES,
-        history_window_s=HISTORY_WINDOW_S,
+        history_window_s=window_s,
         arrival_clocks=False,
         at_risk_events=at_risk if duration_aware else None,
         offset_history=duration_aware,
         **cross_kwargs,
     )
     specs = (
-        [LADDER[name] for name in rungs]
+        list(ladder.values())
+        if ladder is not None
+        else [LADDER[name] for name in rungs]
         if duration_aware
         else [
             MODEL_CROSS_HISTORY_RATE["Mselfcross" if cross_pop is not None else "Mself"]
@@ -293,15 +315,19 @@ def lag_support(design: pd.DataFrame) -> dict[str, np.ndarray]:
     Returns
     -------
     dict
-        Block name -> shape ``(N_HISTORY_LAGS,)``, for each block whose lag
-        columns ``design`` carries.
+        Block name -> shape ``(n_lags,)``, for each block whose lag columns
+        ``design`` carries (``n_lags`` is the block's own window: the long
+        cross block has more lags than the self block).
     """
     rate = design["count"].sum() / design["exposure"].sum()
     exposure = design["exposure"].to_numpy(dtype=float)
     out = {}
     for name, prefix in _LAG_COLUMNS.items():
-        cols = [f"{prefix}{j}" for j in range(1, N_HISTORY_LAGS + 1)]
-        if all(c in design.columns for c in cols):
+        n_lags = 0
+        while f"{prefix}{n_lags + 1}" in design.columns:
+            n_lags += 1
+        cols = [f"{prefix}{j}" for j in range(1, n_lags + 1)]
+        if n_lags:
             present = design[cols].to_numpy() > 0  # (n_bins, n_lags)
             out[name] = rate * (exposure @ present)
     return out

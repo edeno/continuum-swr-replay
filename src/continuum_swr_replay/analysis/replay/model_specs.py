@@ -53,6 +53,8 @@ from .design_constants import (
     ARRIVAL_CLOCK_COLUMN,
     ARRIVAL_SPLINE_KNOTS,
     BIN_S,
+    N_CROSS_LONG_BASIS,
+    N_CROSS_LONG_LAGS,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
@@ -76,6 +78,7 @@ __all__ = [
     "BELIEF_DEPENDENT_CONTENT_MODELS",
     "MODEL_CHOICE",
     "MODEL_CROSS_HISTORY_DURATION_RATE",
+    "MODEL_CROSS_HISTORY_LONG_RATE",
     "MODEL_CROSS_HISTORY_RATE",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
@@ -1120,6 +1123,28 @@ MODEL_CROSS_HISTORY_DURATION_RATE: dict[str, PerBinRateModelSpec] = {
     ),
     "Mselfcross_dur": _duration_aware_spec(
         "Mselfcross_dur", self_anchors=_BOTH, cross_anchors=_BOTH
+    ),
+}
+
+
+# The long-window pair of the ridge cross-validated comparison
+# (``analysis/replay/ridge_history_cv.py``). A single session holds about one
+# expected cross-stream onset in the 150 ms cross window, so the unpenalised
+# per-session cross rungs above mostly fail to converge. These two rungs are
+# ``Mself_dur`` and ``Mselfcross_dur`` with the cross block (onset- and
+# end-locked) reaching 1 s (``N_CROSS_LONG_LAGS``, ``N_CROSS_LONG_BASIS``
+# bumps); both are frozen on the long window's cohort, so they share rows. They
+# are fit pooled within animal with a ridge penalty on the history coefficients
+# and compared by held-out log-likelihood, not by AIC.
+MODEL_CROSS_HISTORY_LONG_RATE: dict[str, PerBinRateModelSpec] = {
+    "Mself_long_dur": replace(
+        MODEL_CROSS_HISTORY_DURATION_RATE["Mself_dur"], name="Mself_long_dur"
+    ),
+    "Mselfcross_long_dur": replace(
+        MODEL_CROSS_HISTORY_DURATION_RATE["Mselfcross_dur"],
+        name="Mselfcross_long_dur",
+        cross_history_lags=N_CROSS_LONG_LAGS,
+        cross_history_basis=N_CROSS_LONG_BASIS,
     ),
 }
 

@@ -314,6 +314,22 @@ Mselfcross_offset_dur  count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + XOFFCOS
 Mselfcross_dur         count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + XOFFCOS
 ```
 
+## Cross-history coupling, long window — ridge cross-validated (auxiliary)
+`scripts/rate/fit_cross_history_ridge_cv.py` → `cross_history_ridge_cv.pkl` in its `--out-dir`, with its
+`.provenance.json`. Module: `analysis/replay/ridge_history_cv.py`.
+
+`MODEL_CROSS_HISTORY_LONG_RATE` in `model_specs.py`: `Mself_dur` and `Mselfcross_dur` with the cross
+block (onset- and end-locked) reaching 1 s after the other stream's event (`N_CROSS_LONG_LAGS` = 67
+lags, `N_CROSS_LONG_BASIS` = 6 log-spaced bumps), both frozen on the 1 s window's cohort. Each animal's
+sessions are stacked with a session effect; the history coefficients carry a ridge prior whose SD is
+chosen by inner cross-validation, and the pair is compared by outer held-out log-likelihood over five
+folds of whole stops, not by AIC.
+
+```rungs
+Mself_long_dur         count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + C(session)
+Mselfcross_long_dur    count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS_1S + XOFFCOS_1S + C(session)
+```
+
 ## Per-stop rate — Family A
 `scripts/rate/fit_per_stop_rate_models.py` → `models_per_stop_rate/`
 

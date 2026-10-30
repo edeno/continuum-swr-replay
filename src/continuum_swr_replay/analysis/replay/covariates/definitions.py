@@ -23,6 +23,7 @@ from enum import StrEnum
 import pandas as pd
 
 from ..design_constants import (
+    N_CROSS_LONG_BASIS,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
     N_REWARD_LAGS,
@@ -918,6 +919,29 @@ for basis in range(N_HISTORY_BASIS):
                 support="per-bin rate design",
                 producer="replay.per_bin_design.aggregate_to_timebins",
                 window="past 150 ms",
+                missingness="none; pre-stop history is structural zero",
+            )
+        )
+
+# The long cross window (MODEL_CROSS_HISTORY_LONG_RATE) spans 1 s with more
+# bumps; its first N_HISTORY_BASIS cross columns share the names above.
+for basis in range(N_HISTORY_BASIS, N_CROSS_LONG_BASIS):
+    for prefix, description in (
+        ("cross_hist_rcos_", "Other-population event-history"),
+        ("cross_offhist_rcos_", "Other-population event-end history"),
+    ):
+        _DEFINITIONS.append(
+            _definition(
+                f"{prefix}{basis}",
+                f"Raised-cosine basis {basis} for {description.lower()} "
+                "(long cross window only).",
+                grain="stop × response bin",
+                units="basis-weighted event history",
+                clock=QueryClock.EVENT_RESPONSE,
+                availability=Availability.PRE_OUTCOME,
+                support="per-bin rate design",
+                producer="replay.per_bin_design.aggregate_to_timebins",
+                window="past 1 s",
                 missingness="none; pre-stop history is structural zero",
             )
         )
