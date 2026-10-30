@@ -71,6 +71,10 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-28 | Part 4 sensitivity | opus worker: bundles hold every unit (no refit needed); rate-gate table at none / 0.1 / 0.5 / 1 Hz; the 1 Hz row reproduces all 137 overlapping part4.json keys | `4e58a78d` | `.claude/research/pfc_response_followups_outputs/part4_rate_threshold_sensitivity*.csv` | for the lead |
 | 2026-10-28 | 3b | **full refit with the baseline prior launched 09:44**, 75 sessions × 10 models, GPUs 1–9; estimate from validation ≈ 20–25 GPU-h (≈ 3 h) | `2d23c59e` | tmux `pfc_c_marked_family_prior`; logs `logs/pfc_response_followups/marked_family_baseline_prior/`; output `Processed-Data/pfc_response_followups/marked_family_baseline_prior/` (validation bundles reused by the skip check) | running |
 
+| 2026-10-29 | 3b | **prior refit finished**: 9/9 workers EXIT 0, 2.2–2.6 h per card (≈ 22 GPU-h); 750/750 bundles complete, 0 non-converged units | `2d23c59e` | `Processed-Data/pfc_response_followups/marked_family_baseline_prior/` | — |
+| 2026-10-29 | 3b/4 | summary over all units (no rate gate) → `summary.parquet`; full tables `.claude/research/pfc_response_followups_outputs/marked_family_baseline_prior/report.{md,csv}`; Part 4 quoted values (peak, lag, 0–150 ms mean, animals with the sign; ripple–MUA correlation) and overview bullet **What is replayed, and how strong?** | `3c6a3be5` | `part4.json` (545 values) | `marked_content_current_arm_*`, `marked_ripple_mua_correlation_*` |
+| 2026-10-29 | Q8 | stop-context code committed by the worker (`dd3bd1cd`); 75 session tables assembled; the worker stopped on an API limit before the fit; resumed | `dd3bd1cd` | `Processed-Data/pfc_response_followups/stop_context/sessions/` | pending |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
@@ -82,7 +86,7 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | Phase C smoke (reference timing; stopped) | `pfc_c_smoke` | 4, 2, 5 | `logs/pfc_response_followups/marked_family_smoke/` | `Processed-Data/pfc_response_followups/marked_family_smoke/` | 2026-10-27 08:30 | | |
 
 | Phase C revised smoke | `pfc_c_revised_smoke` | 5 | `logs/pfc_response_followups/marked_family_revised_smoke/` | `Processed-Data/pfc_response_followups/marked_family_revised_smoke/` | 2026-10-27 17:22 | 18:31 | 1 h 10 min |
-| Phase C batch | `pfc_c_marked_family` (ended) | 1–9 | `logs/pfc_response_followups/marked_family/` | `Processed-Data/pfc_response_followups/marked_family/` | 2026-10-27 18:33 | 2026-10-28 ≈ 06:10 | 10.2–11.6 h per card; 8 of 9 workers exit 1 (gate) |
+| Phase C batch (free baselines; superseded) | `pfc_c_marked_family` (ended) | 1–9 | `logs/pfc_response_followups/marked_family/` | `Processed-Data/pfc_response_followups/marked_family/` | 2026-10-27 18:33 | 2026-10-28 ≈ 06:10 | 10.2–11.6 h per card; 8 of 9 workers exit 1 (gate) |
 
 ## Findings (phase 1)
 
