@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "5a95beeb65d2",
+ "commit": "b13d7c9ad54f-dirty",
  "inputs": [
   {
    "path": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet",
@@ -11,7 +11,7 @@
   },
   {
    "path": "Processed-Data/pfc_response_followups/stop_context/results.csv",
-   "sha256": "b949dcec67365c9a96b8d75e8649a5bdd83f35af08bf939918604e2924b72a8e"
+   "sha256": "57bd3baf9546ad0f60ea57f6452c08603ee64e506f24606d160a64ec42f27d59"
   },
   {
    "path": "Processed-Data/pfc_response_followups/swr_without_replay/swr_without_replay/*_mPFC_modulation.pkl",
@@ -787,7 +787,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_non_swr_replay_animals_same_sign": {
@@ -802,7 +802,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_non_swr_replay_heldout_gain_fraction": {
@@ -810,14 +810,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_non_swr_replay_peak": {
@@ -832,7 +832,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_non_swr_replay_peak_lag_ms": {
@@ -847,7 +847,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_non_swr_replay_post_onset_mean": {
@@ -862,7 +862,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_swr_replay_animals_same_sign": {
@@ -877,7 +877,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_swr_replay_heldout_gain_fraction": {
@@ -885,14 +885,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_swr_replay_peak": {
@@ -907,7 +907,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_swr_replay_peak_lag_ms": {
@@ -922,7 +922,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_current_arm_swr_replay_post_onset_mean": {
@@ -937,7 +937,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_non_swr_replay_animals_same_sign": {
@@ -952,7 +952,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_non_swr_replay_heldout_gain_fraction": {
@@ -960,14 +960,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_non_swr_replay_peak": {
@@ -982,7 +982,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_non_swr_replay_peak_lag_ms": {
@@ -997,7 +997,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_non_swr_replay_post_onset_mean": {
@@ -1012,7 +1012,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_swr_replay_animals_same_sign": {
@@ -1027,7 +1027,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_swr_replay_heldout_gain_fraction": {
@@ -1035,14 +1035,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_swr_replay_peak": {
@@ -1057,7 +1057,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_swr_replay_peak_lag_ms": {
@@ -1072,7 +1072,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_recent_reward_swr_replay_post_onset_mean": {
@@ -1087,7 +1087,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_non_swr_replay_animals_same_sign": {
@@ -1102,7 +1102,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_non_swr_replay_peak": {
@@ -1117,7 +1117,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_non_swr_replay_peak_lag_ms": {
@@ -1132,7 +1132,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_non_swr_replay_post_onset_mean": {
@@ -1147,7 +1147,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_swr_replay_animals_same_sign": {
@@ -1162,7 +1162,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_swr_replay_peak": {
@@ -1177,7 +1177,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_swr_replay_peak_lag_ms": {
@@ -1192,7 +1192,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_content_uncertainty_swr_replay_post_onset_mean": {
@@ -1207,7 +1207,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_mua_correlation_non_swr_replay": {
@@ -1222,7 +1222,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_mua_correlation_swr_replay": {
@@ -1237,7 +1237,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_non_swr_replay_animals_same_sign": {
@@ -1252,7 +1252,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_non_swr_replay_peak": {
@@ -1267,7 +1267,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_non_swr_replay_peak_lag_ms": {
@@ -1282,7 +1282,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_non_swr_replay_post_onset_mean": {
@@ -1297,7 +1297,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_no_replay_animals_same_sign": {
@@ -1312,7 +1312,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_no_replay_peak": {
@@ -1327,7 +1327,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_no_replay_peak_lag_ms": {
@@ -1342,7 +1342,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_no_replay_post_onset_mean": {
@@ -1357,7 +1357,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_replay_animals_same_sign": {
@@ -1372,7 +1372,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_replay_peak": {
@@ -1387,7 +1387,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_replay_peak_lag_ms": {
@@ -1402,7 +1402,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripple_ripple_power_swr_replay_post_onset_mean": {
@@ -1417,7 +1417,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripplepooled_ripple_power_pooled_animals_same_sign": {
@@ -1432,7 +1432,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripplepooled_ripple_power_pooled_peak": {
@@ -1447,7 +1447,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripplepooled_ripple_power_pooled_peak_lag_ms": {
@@ -1462,7 +1462,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_ripplepooled_ripple_power_pooled_post_onset_mean": {
@@ -1477,7 +1477,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_non_swr_replay_animals_same_sign": {
@@ -1492,7 +1492,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_non_swr_replay_peak": {
@@ -1507,7 +1507,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_non_swr_replay_peak_lag_ms": {
@@ -1522,7 +1522,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_non_swr_replay_post_onset_mean": {
@@ -1537,7 +1537,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_swr_replay_animals_same_sign": {
@@ -1552,7 +1552,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_swr_replay_peak": {
@@ -1567,7 +1567,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_swr_replay_peak_lag_ms": {
@@ -1582,7 +1582,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_duration_swr_replay_post_onset_mean": {
@@ -1597,7 +1597,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_non_swr_replay_animals_same_sign": {
@@ -1612,7 +1612,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction": {
@@ -1620,14 +1620,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_non_swr_replay_peak": {
@@ -1642,7 +1642,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_non_swr_replay_peak_lag_ms": {
@@ -1657,7 +1657,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_non_swr_replay_post_onset_mean": {
@@ -1672,7 +1672,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_swr_replay_animals_same_sign": {
@@ -1687,7 +1687,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_swr_replay_heldout_gain_fraction": {
@@ -1695,14 +1695,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_swr_replay_peak": {
@@ -1717,7 +1717,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_swr_replay_peak_lag_ms": {
@@ -1732,7 +1732,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_mua_rate_swr_replay_post_onset_mean": {
@@ -1747,7 +1747,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_non_swr_replay_animals_same_sign": {
@@ -1762,7 +1762,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction": {
@@ -1770,14 +1770,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_non_swr_replay_peak": {
@@ -1792,7 +1792,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_non_swr_replay_peak_lag_ms": {
@@ -1807,7 +1807,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_non_swr_replay_post_onset_mean": {
@@ -1822,7 +1822,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_swr_replay_animals_same_sign": {
@@ -1837,7 +1837,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_swr_replay_heldout_gain_fraction": {
@@ -1845,14 +1845,14 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_swr_replay_peak": {
@@ -1867,7 +1867,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_swr_replay_peak_lag_ms": {
@@ -1882,7 +1882,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "marked_strength_ripple_power_swr_replay_post_onset_mean": {
@@ -1897,7 +1897,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
    "pending": null
   },
   "min_pvalue": {
@@ -2582,7 +2582,7 @@
    "pending": null
   },
   "stop_context_reward_gain_non_swr_replay_decrease_ci_high": {
-   "value": 1.0387652167438963,
+   "value": 1.0648166620542396,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2597,11 +2597,11 @@
    "pending": null
   },
   "stop_context_reward_gain_non_swr_replay_decrease_ci_low": {
-   "value": 0.9692708467511691,
+   "value": 0.9455569931321488,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
    "claims": [
     "20"
    ],
@@ -2642,7 +2642,7 @@
    "pending": null
   },
   "stop_context_reward_gain_non_swr_replay_increase_all_units_ci_high": {
-   "value": 1.0676701280375485,
+   "value": 1.0751581380888786,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2657,11 +2657,11 @@
    "pending": null
   },
   "stop_context_reward_gain_non_swr_replay_increase_all_units_ci_low": {
-   "value": 1.0131407587426489,
+   "value": 1.0060846728366608,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
    "claims": [
     "20"
    ],
@@ -2702,7 +2702,7 @@
    "pending": null
   },
   "stop_context_reward_gain_non_swr_replay_increase_ci_high": {
-   "value": 1.1062685524564282,
+   "value": 1.1170509591756936,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2717,11 +2717,11 @@
    "pending": null
   },
   "stop_context_reward_gain_non_swr_replay_increase_ci_low": {
-   "value": 1.0073409596053224,
+   "value": 0.9976175357612974,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
    "claims": [
     "20"
    ],
@@ -2777,7 +2777,7 @@
    "pending": null
   },
   "stop_context_reward_gain_swr_replay_decrease_ci_high": {
-   "value": 1.002253220032587,
+   "value": 1.0029818937359118,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2792,11 +2792,11 @@
    "pending": null
   },
   "stop_context_reward_gain_swr_replay_decrease_ci_low": {
-   "value": 0.9199095864850454,
+   "value": 0.919241265422328,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
    "claims": [
     "20"
    ],
@@ -2837,7 +2837,7 @@
    "pending": null
   },
   "stop_context_reward_gain_swr_replay_increase_all_units_ci_high": {
-   "value": 1.1241770683525265,
+   "value": 1.1235225545355156,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2852,11 +2852,11 @@
    "pending": null
   },
   "stop_context_reward_gain_swr_replay_increase_all_units_ci_low": {
-   "value": 1.0363491161531733,
+   "value": 1.036952846637293,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_SWR, units whose peak is an increase, all units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, all units",
    "claims": [
     "20"
    ],
@@ -2897,7 +2897,7 @@
    "pending": null
   },
   "stop_context_reward_gain_swr_replay_increase_ci_high": {
-   "value": 1.142592900395848,
+   "value": 1.1455475181810153,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2912,11 +2912,11 @@
    "pending": null
   },
   "stop_context_reward_gain_swr_replay_increase_ci_low": {
-   "value": 1.0195832645782412,
+   "value": 1.0169535361739883,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, called units",
    "claims": [
     "20"
    ],
@@ -2972,7 +2972,7 @@
    "pending": null
   },
   "stop_context_switch_gain_non_swr_replay_decrease_ci_high": {
-   "value": 1.055215582008149,
+   "value": 1.0601100678572306,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -2987,11 +2987,11 @@
    "pending": null
   },
   "stop_context_switch_gain_non_swr_replay_decrease_ci_low": {
-   "value": 0.9878582744205882,
+   "value": 0.9832973722165156,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
    "claims": [
     "20"
    ],
@@ -3047,7 +3047,7 @@
    "pending": null
   },
   "stop_context_switch_gain_non_swr_replay_increase_ci_high": {
-   "value": 1.047699813185076,
+   "value": 1.0540989557726257,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -3062,11 +3062,11 @@
    "pending": null
   },
   "stop_context_switch_gain_non_swr_replay_increase_ci_low": {
-   "value": 0.9775104608929364,
+   "value": 0.9715762658291626,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
    "claims": [
     "20"
    ],
@@ -3122,7 +3122,7 @@
    "pending": null
   },
   "stop_context_switch_gain_swr_replay_decrease_ci_high": {
-   "value": 1.02979960602591,
+   "value": 1.040487555690584,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -3137,11 +3137,11 @@
    "pending": null
   },
   "stop_context_switch_gain_swr_replay_decrease_ci_low": {
-   "value": 0.9614714673071492,
+   "value": 0.951595175572186,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
    "claims": [
     "20"
    ],
@@ -3197,7 +3197,7 @@
    "pending": null
   },
   "stop_context_switch_gain_swr_replay_increase_ci_high": {
-   "value": 1.0251271969557705,
+   "value": 1.0291466236929672,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
@@ -3212,11 +3212,11 @@
    "pending": null
   },
   "stop_context_switch_gain_swr_replay_increase_ci_low": {
-   "value": 0.9625751979305868,
+   "value": 0.9588157720158992,
    "kind": "quantity",
    "style": "dec2",
    "unit": "x",
-   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
    "claims": [
     "20"
    ],

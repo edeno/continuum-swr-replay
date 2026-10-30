@@ -3,7 +3,7 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "9329614f5e06",
+ "commit": "b13d7c9ad54f",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/event_table.parquet",
@@ -20,28 +20,32 @@
   },
   {
    "path": "Processed-Data/event_property_bootstrap/intervals.csv",
-   "sha256": "0385104f50530fa0a3b45cabd03a8dba585afb2ee0efef071d25ca06edf67791"
+   "sha256": "d7b8c27a1cca74868b71ba2b87ac4baf302aaeb5c1b45cc7e790354cf492d6fd"
   },
   {
    "path": "Processed-Data/event_property_bootstrap/manifest.json",
-   "sha256": "3e4dd5806443125484acfdca1f21d2f32079b8dabfc0b32e1391d11c74f7df5c"
+   "sha256": "ef0ddfadea03733f048567516e4fc5a2d59a75d6e416d10c528c9c4394fc634f"
   },
   {
    "path": "Processed-Data/brain_state_reference/reference.parquet",
    "sha256": "f7120f54f539fc6afe114f9c25b60487822c6f25b3347ee083566dc7bb2e4f54"
   },
   {
+   "path": "Processed-Data/event_gamma/manifest.json",
+   "sha256": "1b3bc6f40e5c4a53969d83fd8113ac4cd3969a21909f40967fd6ff44f865c7d8"
+  },
+  {
    "path": "Processed-Data/event_gamma_power/reference.parquet",
-   "sha256": "bf5ac34c1bb458829a84069807345718b36501e22f74e2749f9f302d0ec16ca3"
+   "sha256": "253abe749df602af0f91aad47c93778765cd0188ec5c0c7a77810e883eb6fd29"
   },
   {
    "path": "Processed-Data/event_gamma_power/manifest.json",
-   "sha256": "2441b49db92604a193526c82a51e6321ba76b9e8544ccfb31b4aa39773260f04"
+   "sha256": "3656684da13e79c0c513ee2ff9fa2eca0f588912710d4b6bbb4f60d207fb7ba2"
   },
   {
    "path": "Processed-Data/event_gamma/*_events.parquet",
    "n_files": 242,
-   "sha256": "782529b6714cb876176f8e2d10c26a9a123fc5f168ed2cdbbdd9b33153a25b56"
+   "sha256": "4c7fabece8e648c85f0da19f623c16b798414bf38073098deb925fddb0332d50"
   },
   {
    "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_features.parquet",
@@ -93,7 +97,7 @@
   },
   {
    "path": "Processed-Data/ripple_class_structure/manifest.json",
-   "sha256": "631553d3df5e80f93f33d7abd938c7326eabb7ac04e71d17a0b9a807d8cf7385"
+   "sha256": "d8840cf38caa08dfe99d784d58715c00800f234bde28ba14251f122b627153ef"
   }
  ],
  "values": {
@@ -214,7 +218,7 @@
    "pending": null
   },
   "arms_matched_difference": {
-   "value": 0.992414932276181,
+   "value": 0.9804558969276512,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -230,7 +234,7 @@
    "pending": null
   },
   "arms_matched_difference_high": {
-   "value": 1.2742055703810902,
+   "value": 1.2698676996489435,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -246,11 +250,11 @@
    "pending": null
   },
   "arms_matched_difference_low": {
-   "value": 0.8142339075335128,
+   "value": 0.8245068814593088,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "16"
    ],
@@ -760,7 +764,7 @@
    "pending": null
   },
   "extent_matched_difference": {
-   "value": 34.65161704013706,
+   "value": 34.56950693115291,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -776,7 +780,7 @@
    "pending": null
   },
   "extent_matched_difference_high": {
-   "value": 44.92981570327141,
+   "value": 44.760822739911575,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -792,11 +796,11 @@
    "pending": null
   },
   "extent_matched_difference_low": {
-   "value": 23.84102849809838,
+   "value": 23.83648534554771,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "16"
    ],
@@ -1225,7 +1229,7 @@
    "pending": null
   },
   "hpd_matched_difference": {
-   "value": 38.28887806024027,
+   "value": 38.06367476551236,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1240,7 +1244,7 @@
    "pending": null
   },
   "hpd_matched_difference_high": {
-   "value": 57.03339122563062,
+   "value": 56.66378995969362,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1255,11 +1259,11 @@
    "pending": null
   },
   "hpd_matched_difference_low": {
-   "value": -1.4803881456342702,
+   "value": -1.28299087858383,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "17"
    ],
@@ -1795,7 +1799,7 @@
    "pending": null
   },
   "max_step_matched_difference": {
-   "value": 23.69542706752765,
+   "value": 23.59127436357653,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1811,7 +1815,7 @@
    "pending": null
   },
   "max_step_matched_difference_high": {
-   "value": 34.25657735457281,
+   "value": 34.14679461143871,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -1827,11 +1831,11 @@
    "pending": null
   },
   "max_step_matched_difference_low": {
-   "value": 13.783768700721495,
+   "value": 13.833201479839571,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "16b"
    ],
@@ -2232,7 +2236,7 @@
    "pending": null
   },
   "multimodal_matched_difference": {
-   "value": 0.0676164609925697,
+   "value": 0.0718386281980034,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -2247,7 +2251,7 @@
    "pending": null
   },
   "multimodal_matched_difference_high": {
-   "value": 0.1191057738448384,
+   "value": 0.1183681468594172,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -2262,11 +2266,11 @@
    "pending": null
   },
   "multimodal_matched_difference_low": {
-   "value": 0.0058054922871853,
+   "value": 0.0050288679715136,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "17"
    ],
@@ -3140,7 +3144,7 @@
    "pending": null
   },
   "pause_matched_difference": {
-   "value": -0.0498972790936483,
+   "value": -0.049660962810071,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3156,7 +3160,7 @@
    "pending": null
   },
   "pause_matched_difference_high": {
-   "value": -0.0343371623159765,
+   "value": -0.0340058821311469,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3172,11 +3176,11 @@
    "pending": null
   },
   "pause_matched_difference_low": {
-   "value": -0.0790596960598705,
+   "value": -0.0791962528522657,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "16b"
    ],
@@ -3265,7 +3269,7 @@
    "pending": null
   },
   "peak_matched_difference": {
-   "value": -0.0916663979146148,
+   "value": -0.0913461092168111,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3280,7 +3284,7 @@
    "pending": null
   },
   "peak_matched_difference_high": {
-   "value": -0.0327098640724876,
+   "value": -0.0324069123152115,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3295,11 +3299,11 @@
    "pending": null
   },
   "peak_matched_difference_low": {
-   "value": -0.1277020503939642,
+   "value": -0.1271936188070005,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "17"
    ],
@@ -3405,7 +3409,7 @@
    "pending": null
   },
   "reversals_matched_difference": {
-   "value": 1.6878361413941196,
+   "value": 1.6750578130161875,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3421,7 +3425,7 @@
    "pending": null
   },
   "reversals_matched_difference_high": {
-   "value": 2.276424996376704,
+   "value": 2.302368700475361,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
@@ -3437,11 +3441,11 @@
    "pending": null
   },
   "reversals_matched_difference_low": {
-   "value": 0.9238046781675344,
+   "value": 0.9397167922189464,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "16b"
    ],
@@ -3897,7 +3901,7 @@
    "pending": null
   },
   "speed_matched_difference": {
-   "value": 180.57343159609115,
+   "value": 180.5828213086388,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
@@ -3913,7 +3917,7 @@
    "pending": null
   },
   "speed_matched_difference_high": {
-   "value": 248.8611746826058,
+   "value": 249.50519414864655,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
@@ -3929,11 +3933,11 @@
    "pending": null
   },
   "speed_matched_difference_low": {
-   "value": 106.89945398782834,
+   "value": 107.15692646063094,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm/s",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "15"
    ],
@@ -4025,7 +4029,7 @@
    "pending": null
   },
   "start_distance_matched_difference": {
-   "value": -13.390396140369962,
+   "value": -13.275153579974614,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -4041,7 +4045,7 @@
    "pending": null
   },
   "start_distance_matched_difference_high": {
-   "value": 3.830936997357757,
+   "value": 4.059850869845084,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
@@ -4057,11 +4061,11 @@
    "pending": null
   },
   "start_distance_matched_difference_low": {
-   "value": -28.95142534094037,
+   "value": -28.87617831428696,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "cm",
-   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
    "claims": [
     "14"
    ],
