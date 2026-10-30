@@ -348,6 +348,15 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
     Ripple power and multiunit rate correlate within a session (<!--v:part4.marked_ripple_mua_correlation_swr_replay-->0.79<!--/v--> for SWR-coupled,
     <!--v:part4.marked_ripple_mua_correlation_non_swr_replay-->0.65<!--/v--> for non-SWR replay), so a small slope on either may carry part of the other's effect
     (ridge leakage: the same sign in every animal).
+  - Held-out gain: the share of units whose held-out deviance improves when the mark's kernel is in the model
+    (animal-balanced). Current arm: SWR-coupled <!--v:part4.marked_content_current_arm_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR
+    <!--v:part4.marked_content_current_arm_non_swr_replay_heldout_gain_fraction--><!--/v-->. Recently rewarded arms: SWR-coupled
+    <!--v:part4.marked_content_recent_reward_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR <!--v:part4.marked_content_recent_reward_non_swr_replay_heldout_gain_fraction--><!--/v-->.
+    Multiunit rate: SWR-coupled <!--v:part4.marked_strength_mua_rate_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR
+    <!--v:part4.marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction--><!--/v-->. Ripple power: SWR-coupled
+    <!--v:part4.marked_strength_ripple_power_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR <!--v:part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction--><!--/v-->.
+    No chance reference was computed, so the share expected by chance is not known: these shares are not a test,
+    and a mark with no effect could still improve the held-out deviance of some units.
   - Ripple power alone, each class in one model: SWR-coupled <!--v:part4.marked_ripple_ripple_power_swr_replay_peak-->0.014<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_replay_peak_lag_ms-->6<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_replay_post_onset_mean-->0.0077<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
     non-SWR <!--v:part4.marked_ripple_ripple_power_non_swr_replay_peak-->0.0088<!--/v--> at <!--v:part4.marked_ripple_ripple_power_non_swr_replay_peak_lag_ms-->−96<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_non_swr_replay_post_onset_mean-->−0.0041<!--/v-->; <!--v:part4.marked_ripple_ripple_power_non_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); SWRs without replay <!--v:part4.marked_ripple_ripple_power_swr_no_replay_peak-->−0.0099<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_no_replay_peak_lag_ms-->−98<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_no_replay_post_onset_mean-->−0.0059<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_no_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
     all classes pooled <!--v:part4.marked_ripplepooled_ripple_power_pooled_peak-->0.012<!--/v--> at <!--v:part4.marked_ripplepooled_ripple_power_pooled_peak_lag_ms-->−82<!--/v--> ms.
