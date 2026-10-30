@@ -164,33 +164,32 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 - In the per-stop model, adding reward history improves the fit for SWR-coupled events
   (median AIC(with) − AIC(without), negative = better: <!--v:part3.per_stop_delta_aic_session_non_local_swr-->−3.1<!--/v-->) but not for non-SWR events
   (<!--v:part3.per_stop_delta_aic_session_non_local_no_swr-->+0.88<!--/v-->).
-- Event history, once event duration is handled (a bin inside an event is not at risk; history is read from the
-  previous event's end and its onset; each animal's sessions pooled, so the sizes are upper bounds):
-  - No suppression after an event ends: 15 ms after the end the rate ratio is
-    <!--v:part3.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->4.53<!--/v-->× (animal medians per
-    population); it is above 1 in <!--v:part3.history_end_first_lag_raised_fits-->15<!--/v--> and below 1 in
-    <!--v:part3.history_end_first_lag_suppressed_fits-->0<!--/v--> of <!--v:part3.history_fits-->20<!--/v--> animal × population fits (95 % CI).
-  - The next event is <!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× likelier
-    <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the previous one
-    ends (at least <!--v:part3.history_end_peak_animals_min-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals in every population).
-  - A smaller onset-locked part remains: detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at
-    <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals),
-    non-local <!--v:part3.history_onset_peak_non_local-->1.59<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local-->120<!--/v--> ms
-    (<!--v:part3.history_onset_animals_non_local-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), SWR-coupled
-    <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms
-    (<!--v:part3.history_onset_animals_non_local_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
-    <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms
-    (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
-  - Cross: <!--v:part3.history_cross_end_rr_non_swr_from_swr-->2.28<!--/v-->× for a non-SWR event 45 ms after an SWR-coupled one ends
-    (<!--v:part3.history_cross_end_animals_non_swr_from_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals), and
-    <!--v:part3.history_cross_end_rr_swr_from_non_swr-->2.57<!--/v-->× the other way
-    (<!--v:part3.history_cross_end_animals_swr_from_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->). Per session the cross block does not pay
-    for its parameters (median AIC gain <!--v:part3.history_cross_session_gain_non_swr_from_swr-->−6.1<!--/v--> and
-    <!--v:part3.history_cross_session_gain_swr_from_non_swr-->−5.5<!--/v-->, positive = pays).
 - *Reading:* reward gates SWR-coupled events; non-SWR events occur at a similar rate but barely respond to reward.
-  There is no refractory period beyond the event itself. Events cluster mostly right after the previous event ends,
-  with a weaker onset-locked rhythm; the cross "coupling" is the same end-locked succession in both directions, not
-  one stream driving the other.
+
+**Do events come in clusters, and do the two types follow each other?** Event history, once event duration is handled (a bin inside an event is not at risk; history is read from the previous event's end and its onset; each animal's sessions pooled, so the sizes are upper bounds):
+- No suppression after an event ends: 15 ms after the end the rate ratio is
+  <!--v:part3.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->4.53<!--/v-->× (animal medians per
+  population); it is above 1 in <!--v:part3.history_end_first_lag_raised_fits-->15<!--/v--> and below 1 in
+  <!--v:part3.history_end_first_lag_suppressed_fits-->0<!--/v--> of <!--v:part3.history_fits-->20<!--/v--> animal × population fits (95 % CI).
+- The next event is <!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× likelier
+  <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the previous one
+  ends (at least <!--v:part3.history_end_peak_animals_min-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals in every population).
+- A smaller onset-locked part remains: detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at
+  <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals),
+  non-local <!--v:part3.history_onset_peak_non_local-->1.59<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local-->120<!--/v--> ms
+  (<!--v:part3.history_onset_animals_non_local-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), SWR-coupled
+  <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms
+  (<!--v:part3.history_onset_animals_non_local_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+  <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms
+  (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
+- Cross: <!--v:part3.history_cross_end_rr_non_swr_from_swr-->2.28<!--/v-->× for a non-SWR event 45 ms after an SWR-coupled one ends
+  (<!--v:part3.history_cross_end_animals_non_swr_from_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals), and
+  <!--v:part3.history_cross_end_rr_swr_from_non_swr-->2.57<!--/v-->× the other way
+  (<!--v:part3.history_cross_end_animals_swr_from_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->). Per session the cross block does not pay
+  for its parameters (median AIC gain <!--v:part3.history_cross_session_gain_non_swr_from_swr-->−6.1<!--/v--> and
+  <!--v:part3.history_cross_session_gain_swr_from_non_swr-->−5.5<!--/v-->, positive = pays).
+- *Reading:* There is no refractory period beyond the event itself. Events cluster mostly right after the previous event ends, with a weaker onset-locked rhythm; the cross "coupling" is the same end-locked succession in both directions, not one stream driving the other. The same succession in both directions fits one continuum of events rather than two classes
+  (Part 2, "One class or two?").
 
 **What do events represent?** (content, log weights per arm; fraction estimator unless named; q is the false-discovery-adjusted p)
 - Current arm: <!--v:part3.base_current_all-->+0.73<!--/v--> (<!--v:part3.base_current_all_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals); fitted separately,
