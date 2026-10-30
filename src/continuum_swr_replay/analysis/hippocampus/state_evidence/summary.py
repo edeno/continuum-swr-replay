@@ -1321,3 +1321,65 @@ def summarize_state_evidence(
         "rate_calibration": rate_calibration(windows),
         "silence": coordinated_silence(windows, seed=seed, window_level=window_level),
     }
+
+
+#: The decoder states split by SWR coupling (:func:`split_non_local_by_swr`).
+NON_LOCAL_STATES = ("Non-Local Continuous", "Non-Local Fragmented")
+
+
+def split_non_local_by_swr(windows: pd.DataFrame, swr: np.ndarray) -> pd.DataFrame:
+    """One epoch's Non-Local bouts and their matched windows, labelled by SWR.
+
+    A bout is "SWR" when some bin of its full span ``[bout_s, bout_e]`` is in
+    an SWR, else "no SWR"; its matched window takes the bout's label. The
+    label is appended to ``state`` (``"Non-Local Continuous | SWR"``), so
+    :func:`bout_statistics` runs on each subset as on any state.
+
+    Parameters
+    ----------
+    windows : pd.DataFrame
+        One epoch's per-window table (``kind``, ``state``, ``regime``,
+        ``bout_s``, ``bout_e``, ``matched_bout_s``).
+    swr : np.ndarray, shape (n_time,)
+        Whether each decode bin is in an SWR, on the decode's time bins.
+
+    Returns
+    -------
+    pd.DataFrame
+        The Non-Local bout and baseline rows with an ``swr`` column and the
+        label appended to ``state``.
+
+    Raises
+    ------
+    ValueError
+        When two bouts share a (state, regime, start) key, or a matched window
+        has no bout.
+    """
+    w = windows[
+        windows["kind"].isin(["bout", "baseline"])
+        & windows["state"].isin(NON_LOCAL_STATES)
+    ].copy()
+    in_swr = np.r_[0, np.cumsum(np.asarray(swr, dtype=bool))]
+    bouts = w[w["kind"] == "bout"]
+    start = bouts["bout_s"].to_numpy(dtype=int)
+    end = bouts["bout_e"].to_numpy(dtype=int)
+    label = pd.Series(
+        np.where(in_swr[end + 1] - in_swr[start] > 0, "SWR", "no SWR"),
+        index=pd.MultiIndex.from_arrays(
+            [bouts["state"], bouts["regime"], bouts["bout_s"].astype(int)]
+        ),
+    )
+    if label.index.duplicated().any():
+        raise ValueError("duplicate bout keys")
+    key = pd.MultiIndex.from_arrays(
+        [
+            w["state"],
+            w["regime"],
+            np.where(w["kind"] == "bout", w["bout_s"], w["matched_bout_s"]).astype(int),
+        ]
+    )
+    w["swr"] = label.reindex(key).to_numpy()
+    if w["swr"].isna().any():
+        raise ValueError("a matched window has no bout")
+    w["state"] = w["state"] + " | " + w["swr"]
+    return w

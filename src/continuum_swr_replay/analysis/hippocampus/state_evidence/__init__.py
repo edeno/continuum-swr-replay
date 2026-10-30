@@ -165,6 +165,7 @@ from continuum_swr_replay.analysis.hippocampus.state_evidence.summary import (
     paired_bouts,
     rate_calibration,
     sign_flip_p,
+    split_non_local_by_swr,
     stratified_bootstrap_ci,
     summarize_state_evidence,
 )
@@ -249,6 +250,7 @@ __all__ = [
     "regimes",
     "saved_decode_masks",
     "sign_flip_p",
+    "split_non_local_by_swr",
     "state_bouts",
     "stratified_bootstrap_ci",
     "summarize_state_evidence",
