@@ -832,6 +832,12 @@ Does each detector's content reproduce in cells it never saw?
 
 `folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `summarize`, `main`
 
+### `scripts/pfc/calibrate_pfc_kernel_timing.py`
+
+What the mPFC kernel estimator does to the timing and size of a known response.
+
+`response_shape`, `event_onsets`, `stretch_offset_and_onsets`, `read_curves`, `simulate_and_fit`, `scenario_list`, `parse_arguments`, `main`
+
 ### `scripts/pfc/check_pfc_ridge_lambda0.py`
 
 Check that the penalised solver reproduces maximum likelihood at lambda = 0.
@@ -844,11 +850,23 @@ Write the before/after audit of the mPFC unit-GLM stop cohort.
 
 `read_sidecars`, `runner_code`, `provenance_table`, `bundle_sessions`, `session_cohort_table`, `coverage_summary`, `alignment_prose`, `gate_counts`, `significance_table`, `population_comparison`, `try_read_sidecars`, `same_events_precondition`, `event_count_agreement`, `shared_statistic_differences`, `matched_control_arrays`, `matched_control_significance`, `fitter_table`, `session_fit_counts_table`, `worker_time_table`, `curve_peaks`, `peak_shrinkage`, `shrinkage_table`, `implied_prior_per_lag`, `empirical_bayes_sigma`, `heldout_fraction_table`, `restrict_to_sessions`, `legacy_fdr_table`, `separated_column_table`, `engagement_overlap_table`, `null_window_table`, `fold_spread_table`, `sigma_sensitivity_table`, `estimator_provenance_table`, `rerun_sections`, `build_report`, `geometry_section`, `build_estimator_report`, `main`
 
+### `scripts/pfc/compare_pfc_event_set_bundles.py`
+
+Does an extended-event-set mPFC bundle reproduce the canonical bundle where they overlap?
+
+`compare_session`, `main`
+
 ### `scripts/pfc/compare_pfc_fitters.py`
 
 Write the equivalence audit of the batched JAX fitter against statsmodels.
 
 `bundle_stems`, `load_bundle`, `compare_statistics`, `compare_modulations`, `compare_diagnostics`, `parse_time_file`, `build_report`, `main`
+
+### `scripts/pfc/compare_pfc_marked_family_trees.py`
+
+How much do two marked-family bundle trees differ for the same sessions and models?
+
+`compare_pair`, `main`
 
 ### `scripts/pfc/diagnose_pfc_event_definition.py`
 
@@ -856,11 +874,47 @@ Compare the PFC path's old, run-time event definition against the canonical one.
 
 `build_old_event_sets`, `total_overlap_seconds`, `match_by_overlap`, `build_comparison`, `get_command_line_arguments`, `main`
 
+### `scripts/pfc/measure_pfc_mark_context.py`
+
+What the marked-kernel content mark is entangled with, session by session.
+
+`load_current_arm_marks`, `group_context_table`, `summarize`, `build_report`, `main`
+
 ### `scripts/pfc/measure_pfc_null_geometry.py`
 
 What the mPFC held-out null's windows look like, beside the real events.
 
 `bundle_paths`, `session_of`, `read_sidecar`, `spacing_summary`, `draw_spacing_summary`, `session_window_sets`, `spacing_section`, `overlap_section`, `non_positive_section`, `excluded_section`, `main`
+
+### `scripts/pfc/part4_rate_threshold_sensitivity.py`
+
+How much do Part 4's mPFC values depend on the firing-rate gate?
+
+`spikes_on_fitted_bins`, `raw_units`, `funnel`, `band_rows`, `main`
+
+### `scripts/pfc/run_pfc_marked_kernels.py`
+
+Fit content-marked mPFC replay kernels on the canonical at-well cohort.
+
+`marked_artifact_path`, `marked_companion_paths`, `build_fit_contract`, `run_analysis`, `get_command_line_arguments`, `main`
+
+### `scripts/pfc/run_pfc_marked_model_family.py`
+
+Fit the recommended descriptive mPFC marked-kernel model family.
+
+`available_marked_classes`, `model_slope_seed`, `resolve_model_names`, `family_artifact_path`, `family_companion_paths`, `build_fit_contract`, `run_analysis`, `get_command_line_arguments`, `main`
+
+### `scripts/pfc/run_pfc_stop_context.py`
+
+Stop-level context of the mPFC replay response, pooled across sessions (Q8).
+
+`default_output_dir`, `bundle_path`, `selected_sessions`, `assemble`, `unit_table`, `fit`, `get_command_line_arguments`, `main`
+
+### `scripts/pfc/summarize_pfc_marked_family.py`
+
+Population summary of the mPFC marked-model family bundles.
+
+`MixedContractError`, `load_bundles`, `mark_correlations`, `usable_delta`, `animal_balanced_fraction_positive`, `population_curve_summary`, `animal_balanced_curve`, `null_band_summary`, `summary_table`, `joint_versus_marginal`, `plot_model`, `build_report`, `main`
 
 ### `scripts/qa/_memoryless_reference.py`
 

@@ -7,7 +7,8 @@ refitted here. The inputs (:class:`Part4Inputs`):
   and their ``*.provenance.json`` sidecars, from
   ``scripts/pfc/run_pfc_analysis_bandit.py``), read through Figure 4's loader
   (:func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`,
-  firing-rate gate 1 Hz) for every per-unit value;
+  no firing-rate cutoff: every unit with a usable fit) for every per-unit value,
+  with a 1 Hz cutoff as a check;
 - the PFC cohort record the runner writes (``pfc_cohort_mPFC.json``);
 - the canonical event and stop tables, only to check that the bundles were fit
   on the current ones;
@@ -28,7 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -74,8 +75,24 @@ a suffix after it."""
 ALPHA = 0.05
 """Figure 4's raw empirical-p threshold."""
 
-MIN_FIRING_RATE_HZ = 1.0
-"""Figure 4's firing-rate gate."""
+MIN_FIRING_RATE_HZ = 0.0
+"""No firing-rate cutoff (the lead, 2026-10-29): every unit with a usable fit.
+A unit with no spike in the fitted bins has no fit and drops out in the loader."""
+
+CHECK_FIRING_RATE_HZ = 1.0
+"""The cutoff the main values used before 2026-10-29, kept as a check; the full
+table over cutoffs is ``scripts/pfc/part4_rate_threshold_sensitivity.py``'s CSV."""
+
+#: The check keys quoted at :data:`CHECK_FIRING_RATE_HZ`, by their main key.
+CHECK_KEYS = (
+    "units",
+    "swr_replay_called_fraction",
+    "non_swr_replay_called_fraction",
+    "engagement_called_fraction",
+    "overlap_odds_ratio",
+    "overlap_rank_correlation",
+    "swr_no_replay_called_fraction_all",
+)
 
 ML_TREE = "_pre_ridge_backup_20260915"
 ML_PENDING = (
@@ -374,9 +391,9 @@ def cohort_values(
             len(population),
             "count",
             "count",
-            "mPFC units in Figure 4's population: a usable fit, an immobility firing "
-            f"rate of at least {MIN_FIRING_RATE_HZ:g} Hz on the fitted bins, and "
-            "finite modulation curves",
+            "mPFC units in the population: every unit with a usable fit (no "
+            "firing-rate cutoff; a unit with no spike in the fitted bins has none) "
+            "and finite modulation curves",
             used_in_=("paper", "figure: 4c", "figure: 4d"),
         ),
         make(
@@ -2247,6 +2264,60 @@ def stop_context_values(
     return values
 
 
+# --- the 1 Hz check ----------------------------------------------------------------
+
+
+def rate_cutoff_check_values(
+    population: pd.DataFrame,
+    extended: tuple[pd.DataFrame, dict, np.ndarray, list] | None,
+    make: Callable[..., Value],
+) -> list[Value]:
+    """A few main values recomputed with a :data:`CHECK_FIRING_RATE_HZ` cutoff.
+
+    The same functions as the main values, on the population restricted to
+    units at or above the cutoff (``immobility_avg_firing_rate``); only the keys
+    of :data:`CHECK_KEYS` are kept, renamed ``check_one_hz_<key>``.
+    """
+    gated = population[
+        population["immobility_avg_firing_rate"] >= CHECK_FIRING_RATE_HZ
+    ].reset_index(drop=True)
+    computed = [
+        make(
+            "units",
+            len(gated),
+            "count",
+            "count",
+            "mPFC units in the population (a usable fit and finite curves)",
+        )
+    ]
+    computed += called_fraction_values(gated, make)
+    computed += overlap_and_effect_values(gated, make)
+    if extended is not None:
+        ext_population, ext_curves, ext_lag, ext_sidecars = extended
+        rate = ext_population["immobility_avg_firing_rate"].to_numpy(dtype=float)
+        keep = rate >= CHECK_FIRING_RATE_HZ
+        computed += swr_without_replay_values(
+            ext_population[keep].reset_index(drop=True),
+            {k: v[:, keep] for k, v in ext_curves.items()},
+            ext_lag,
+            ext_sidecars,
+            make,
+        )
+    values = []
+    for value in computed:
+        if value.key in CHECK_KEYS:
+            values.append(
+                replace(
+                    value,
+                    key=f"check_one_hz_{value.key}",
+                    description=f"check, units at or above "
+                    f"{CHECK_FIRING_RATE_HZ:g} Hz on the fitted bins: "
+                    + value.description,
+                )
+            )
+    return values
+
+
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     """Part 4's summary from ``inputs``."""
     summary = Summary(part=4, produced_by=produced_by, commit=commit)
@@ -2259,7 +2330,8 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     source = (
         f"{rel(inputs.bundle_dir)}/*{STEM}.pkl and their provenance sidecars "
         f"(scripts/pfc/run_pfc_analysis_bandit.py), {len(sidecars)} bundles, "
-        "read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)"
+        "read by Figure 4's loader (analysis/pfc/load_population.py, no "
+        "firing-rate cutoff)"
     )
     claims = ("20",)
     make = _value_factory(source, claims, ("paper",), pending)
@@ -2308,6 +2380,7 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
         summary.inputs.append(file_record(inputs.stop_context_results, ROOT_DIR))
     extended_dir = inputs.swr_without_replay_dir
     extended_bundles = sorted(extended_dir.glob(f"*{STEM}.pkl"))
+    extended_check = None
     if extended_bundles:
         extended_sidecars = read_sidecars(extended_dir)
         incomplete = len(extended_sidecars) < len(sidecars)
@@ -2324,6 +2397,12 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
             min_firing_rate=MIN_FIRING_RATE_HZ,
             extra_curves=SWR_WITHOUT_REPLAY_CURVES,
         )
+        extended_check = (
+            extended_population,
+            extended_curves,
+            lag_time,
+            extended_sidecars,
+        )
         summary.add(
             *swr_without_replay_values(
                 extended_population,
@@ -2334,7 +2413,7 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
                     f"{rel(extended_dir)}/*{STEM}.pkl and sidecars "
                     "(scripts/pfc/run_pfc_analysis_bandit.py --event-set "
                     f"with_swr_without_replay), {len(extended_sidecars)} bundles, "
-                    "Figure 4's loader (1 Hz gate)",
+                    "Figure 4's loader (no firing-rate cutoff)",
                     claims,
                     ("paper",),
                     extended_pending,
@@ -2360,6 +2439,8 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
             ),
         )
     )
+
+    summary.add(*rate_cutoff_check_values(population, extended_check, make))
 
     data = inputs.bundle_dir
     summary.inputs += [

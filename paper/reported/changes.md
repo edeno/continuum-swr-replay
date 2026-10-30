@@ -2404,3 +2404,175 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.stop_context_switch_gain_swr_replay_increase_ci_high` | 1.0 | 1.03 |
 | `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase` | 1.0 | 1.01 |
 | `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase_ci_high` | 1.0 | 1.05 |
+
+## 2026-10-29
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/README.md` | `part4.prior_binds_percent_min` | 1.3 | 2.6 |
+| `docs/README.md` | `part4.prior_binds_percent_max` | 2.7 | 4.9 |
+| `docs/README.md` | `part4.class_called_flat_fraction_min` | 5 | 4 |
+| `docs/README.md` | `part4.class_called_flat_fraction_max` | 9 % | 8 % |
+| `paper/claims_table.md` | `part4.engagement_called_fraction` | 23 % | 19 % |
+| `paper/claims_table.md` | `part4.engagement_units_tested` | 11,604 | 18,410 |
+| `paper/claims_table.md` | `part4.engagement_called_fraction_chimi` | 44 % | 32 % |
+| `paper/claims_table.md` | `part4.engagement_called_fraction_jsixteen` | 20 % | 17 % |
+| `paper/claims_table.md` | `part4.engagement_called_fraction_peanut` | 29 % | 22 % |
+| `paper/claims_table.md` | `part4.engagement_called_fraction_senor` | 27 % | 20 % |
+| `paper/claims_table.md` | `part4.engagement_called_fraction_wilbur` | 21 % | 18 % |
+| `paper/claims_table.md` | `part4.engagement_bh_fraction` | 10 % | 6 % |
+| `paper/claims_table.md` | `part4.swr_called_fraction` | 31 % | 25 % |
+| `paper/claims_table.md` | `part4.nonlocal_called_fraction` | 40 % | 32 % |
+| `paper/claims_table.md` | `part4.non_swr_replay_called_fraction` | 23 % | 19 % |
+| `paper/claims_table.md` | `part4.swr_replay_called_fraction` | 33 % | 27 % |
+| `paper/claims_table.md` | `part4.engagement_called_flat_fraction` | 9 % | 7 % |
+| `paper/claims_table.md` | `part4.engagement_called_flat` | 253 | 259 |
+| `paper/claims_table.md` | `part4.engagement_units_called` | 2,718 | 3,531 |
+| `paper/claims_table.md` | `part4.class_called_flat_fraction_min` | 5 | 4 |
+| `paper/claims_table.md` | `part4.class_called_flat_fraction_max` | 9 % | 8 % |
+| `paper/reported/overview.md` | `part4.units` | ? | 18,410 |
+| `paper/reported/overview.md` | `part4.sessions` | ? | 75 |
+| `paper/reported/overview.md` | `part4.check_one_hz_units` | ? | 11,604 |
+| `paper/reported/overview.md` | `part4.check_one_hz_swr_replay_called_fraction` | ? | 33 % |
+| `paper/reported/overview.md` | `part4.check_one_hz_non_swr_replay_called_fraction` | ? | 23 % |
+| `paper/reported/overview.md` | `part4.check_one_hz_swr_no_replay_called_fraction_all` | ? | 8 % |
+| `paper/reported/overview.md` | `part4.check_one_hz_engagement_called_fraction` | ? | 23 % |
+| `paper/reported/overview.md` | `part4.check_one_hz_overlap_odds_ratio` | ? | 3.3 |
+| `paper/reported/overview.md` | `part4.check_one_hz_overlap_rank_correlation` | ? | 0.35 |
+| `paper/reported/overview.md` | `part4.engagement_called_fraction` | 23 % | 19 % |
+| `paper/reported/overview.md` | `part4.engagement_units_called` | 2,718 | 3,531 |
+| `paper/reported/overview.md` | `part4.engagement_bh_fraction` | 10 % | 6 % |
+| `paper/reported/overview.md` | `part4.engagement_called_fraction_jsixteen` | 20 % | 17 % |
+| `paper/reported/overview.md` | `part4.engagement_called_fraction_chimi` | 44 % | 32 % |
+| `paper/reported/overview.md` | `part4.swr_called_fraction` | 31 % | 25 % |
+| `paper/reported/overview.md` | `part4.nonlocal_called_fraction` | 40 % | 32 % |
+| `paper/reported/overview.md` | `part4.swr_replay_called_fraction` | 33 % | 27 % |
+| `paper/reported/overview.md` | `part4.non_swr_replay_called_fraction` | 23 % | 19 % |
+| `paper/reported/overview.md` | `part4.best_model_constant_fraction` | 48 % | 52 % |
+| `paper/reported/overview.md` | `part4.best_model_nonlocal_fraction` | 33 % | 28 % |
+| `paper/reported/overview.md` | `part4.best_model_joint_fraction` | 5 % | 6 % |
+| `paper/reported/overview.md` | `part4.overlap_units_tested` | 11,604 | 18,410 |
+| `paper/reported/overview.md` | `part4.overlap_units_both` | 1,443 | 1,634 |
+| `paper/reported/overview.md` | `part4.overlap_units_both_expected` | 878 | 923 |
+| `paper/reported/overview.md` | `part4.overlap_odds_ratio` | 3.3 | 3.2 |
+| `paper/reported/overview.md` | `part4.overlap_odds_ratio_animal_min` | 2.2 | 2.7 |
+| `paper/reported/overview.md` | `part4.overlap_odds_ratio_animal_max` | 5.5 | 5.7 |
+| `paper/reported/overview.md` | `part4.overlap_units_swr_replay_only` | 2,407 | 3,318 |
+| `paper/reported/overview.md` | `part4.overlap_units_non_swr_replay_only` | 1,203 | 1,797 |
+| `paper/reported/overview.md` | `part4.overlap_rank_correlation` | 0.35 | 0.33 |
+| `paper/reported/overview.md` | `part4.overlap_rank_correlation_called` | 0.46 | 0.41 |
+| `paper/reported/overview.md` | `part4.split_improves_fraction` | 14 % | 21 % |
+| `paper/reported/overview.md` | `part4.split_best_model_fraction` | 9 % | 10 % |
+| `paper/reported/overview.md` | `part4.effect_rate_multiplier_median_swr_replay` | 2.0 | 2.5 |
+| `paper/reported/overview.md` | `part4.effect_rate_multiplier_median_non_swr_replay` | 1.9 | 2.4 |
+| `paper/reported/overview.md` | `part4.effect_rate_multiplier_median_matched_control` | 1.5 | 1.8 |
+| `paper/reported/overview.md` | `part4.effect_abs_peak_median_called_swr_replay` | 0.79 | 0.93 |
+| `paper/reported/overview.md` | `part4.effect_abs_peak_median_called_non_swr_replay` | 0.70 | 0.85 |
+| `paper/reported/overview.md` | `part4.split_swr_larger_fraction_called` | 65 % | 63 % |
+| `paper/reported/overview.md` | `part4.effect_suppressed_fraction_non_swr_replay` | 63 % | 66 % |
+| `paper/reported/overview.md` | `part4.effect_suppressed_fraction_matched_control` | 61 % | 64 % |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_swr_replay_enhanced` | 80 | 78 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_swr_replay_enhanced` | 106 | 104 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_replay_enhanced` | −38 | −34 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_swr_replay_enhanced` | 17 | 5 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_low_swr_replay_enhanced` | −13 | −23 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_swr_replay_enhanced` | 0.45 | 0.52 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_low_swr_replay_enhanced` | 0.38 | 0.42 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_high_swr_replay_enhanced` | 0.50 | 0.57 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_non_swr_replay_enhanced` | 84 | 92 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_non_swr_replay_enhanced` | 58 | 74 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_non_swr_replay_enhanced` | 94 | 100 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced` | −44 | −36 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced` | −56 | −50 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced` | −22 | −18 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_non_swr_replay_enhanced` | −27 | −29 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_low_non_swr_replay_enhanced` | −109 | −63 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_high_non_swr_replay_enhanced` | 15 | 59 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_animals_negative_non_swr_replay_enhanced` | 4 | 3 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_non_swr_replay_enhanced` | 0.33 | 0.35 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_high_non_swr_replay_enhanced` | 0.36 | 0.40 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_enhanced` | 104 | 96 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_swr_enhanced` | 88 | 78 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_swr_enhanced` | 116 | 114 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced` | −12 | −14 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_enhanced` | −28 | −32 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_swr_enhanced` | 21 | 13 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_low_swr_enhanced` | −7 | −17 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_high_swr_enhanced` | 55 | 37 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_animals_negative_swr_enhanced` | 2 | 1 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_swr_enhanced` | 0.34 | 0.39 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_low_swr_enhanced` | 0.29 | 0.30 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_high_swr_enhanced` | 0.40 | 0.46 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_replay_suppressed` | 52 | 54 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_swr_replay_suppressed` | 40 | 46 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_swr_replay_suppressed` | 58 | 62 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_suppressed` | −28 | −32 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_replay_suppressed` | −38 | −42 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_swr_replay_suppressed` | −18 | −24 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_animals_negative_swr_replay_suppressed` | 5 | 4 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_swr_replay_suppressed` | −17 | −15 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_high_swr_replay_suppressed` | 7 | 9 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_animals_negative_swr_replay_suppressed` | 5 | 4 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_swr_replay_suppressed` | 0.31 | 0.35 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_low_swr_replay_suppressed` | 0.28 | 0.31 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_high_swr_replay_suppressed` | 0.34 | 0.38 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_non_swr_replay_suppressed` | 34 | 32 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_non_swr_replay_suppressed` | 24 | 18 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_suppressed` | −34 | −46 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_non_swr_replay_suppressed` | −46 | −62 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_non_swr_replay_suppressed` | −18 | −30 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_animals_negative_non_swr_replay_suppressed` | 3 | 4 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_non_swr_replay_suppressed` | −17 | −21 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_low_non_swr_replay_suppressed` | −27 | −33 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_non_swr_replay_suppressed` | 0.27 | 0.29 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_low_non_swr_replay_suppressed` | 0.24 | 0.26 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_high_non_swr_replay_suppressed` | 0.30 | 0.33 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_swr_suppressed` | 78 | 64 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_low_swr_suppressed` | 56 | 52 |
+| `paper/reported/overview.md` | `part4.timing_population_peak_ms_ci_high_swr_suppressed` | 92 | 84 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_suppressed` | −22 | −18 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_low_swr_suppressed` | −28 | −26 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_ci_high_swr_suppressed` | −10 | −6 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_animals_negative_swr_suppressed` | 5 | 4 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_swr_suppressed` | −17 | −13 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_low_swr_suppressed` | −21 | −19 |
+| `paper/reported/overview.md` | `part4.timing_population_steepest_ms_ci_high_swr_suppressed` | −9 | −3 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_swr_suppressed` | 0.23 | 0.27 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_low_swr_suppressed` | 0.17 | 0.21 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_size_ci_high_swr_suppressed` | 0.29 | 0.35 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_chimi` | −54 | −46 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_jsixteen` | −22 | −18 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_peanut` | 36 | 34 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_senor` | −36 | −38 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_non_swr_replay_enhanced_wilbur` | −56 | −44 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_chimi` | 2 | 38 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_jsixteen` | 16 | 12 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_peanut` | 28 | 30 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_senor` | −26 | −36 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_replay_enhanced_wilbur` | −40 | −38 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_chimi` | 6 | 72 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_jsixteen` | 32 | 16 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_senor` | −30 | −42 |
+| `paper/reported/overview.md` | `part4.timing_population_rise_onset_ms_swr_enhanced_wilbur` | −30 | −28 |
+| `paper/reported/overview.md` | `part4.timing_paired_units` | 1,219 | 1,368 |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_swr_replay_suppressed` | 42 % | 44 % |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_non_swr_replay_suppressed` | 42 % | 49 % |
+| `paper/reported/overview.md` | `part4.timing_population_control_pre_event_level_fraction_swr_replay_suppressed` | 9 % | 12 % |
+| `paper/reported/overview.md` | `part4.timing_population_control_pre_event_level_fraction_non_swr_replay_suppressed` | 11 % | 16 % |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_swr_replay_enhanced` | 6 % | 8 % |
+| `paper/reported/overview.md` | `part4.timing_population_pre_event_level_fraction_non_swr_replay_enhanced` | 4 % | 3 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all` | 8 % | 7 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_units_called_all` | 919 | 1,324 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_units_tested_all` | 11,471 | 17,944 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_min_events` | 9 % | 8 % |
+| `paper/reported/overview.md` | `part4.swr_replay_called_fraction` | 33 % | 27 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_chimi` | 31 % | 24 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_jsixteen` | 12 % | 10 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_peanut` | 8 % | 6 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_senor` | 4 % | 6 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_called_fraction_all_wilbur` | 7 % | 6 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_overlap_both_all` | 372 | 438 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_overlap_expected_all` | 305 | 359 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_rank_correlation_all` | 0.09 | 0.07 |
+| `paper/reported/overview.md` | `part4.swr_no_replay_adds_to_split_fraction_all` | 16 % | 25 % |
+| `paper/reported/overview.md` | `part4.swr_no_replay_effect_abs_peak_median_swr_no_replay_all` | 0.96 | 1.09 |

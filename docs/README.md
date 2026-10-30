@@ -440,9 +440,9 @@ Three tiers:
    comparable test by test. In the current bundles (`paper/reported/part4.json`),
    non-converged fits are **<!--v:part4.nonconverged_percent-->0.26<!--/v-->%** of model fits (<!--v:part4.nonconverged_model_fits-->432<!--/v--> of <!--v:part4.model_fits-->166,968<!--/v-->,
    over <!--v:part4.nonconverged_neurons-->48<!--/v--> neurons). For reference only, and pending (a different tree, not a before/after on these sessions), the superseded maximum-likelihood tree (<!--v:part4.ml_sessions-->71<!--/v--> sessions, fit on the tables before the R11 re-decode) left <!--v:part4.ml_nonconverged_percent-->15<!--/v-->% unconverged. The prior binds on
-   <!--v:part4.prior_binds_percent_min-->1.3<!--/v-->–<!--v:part4.prior_binds_percent_max-->2.7<!--/v-->% of well-posed units per curve. The null's geometry, by the rules of
+   <!--v:part4.prior_binds_percent_min-->2.6<!--/v-->–<!--v:part4.prior_binds_percent_max-->4.9<!--/v-->% of well-posed units per curve. The null's geometry, by the rules of
    `scripts/pfc/measure_pfc_null_geometry.py`: the engagement null's draws land on the
-   shipped control they are entered beside on a median <!--v:part4.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:part4.class_called_flat_fraction_min@pctnum-->5<!--/v-->–<!--v:part4.class_called_flat_fraction_max-->9 %<!--/v--> of
+   shipped control they are entered beside on a median <!--v:part4.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:part4.class_called_flat_fraction_min@pctnum-->4<!--/v-->–<!--v:part4.class_called_flat_fraction_max-->8 %<!--/v--> of
    the units called at raw p < .05 for an event class have no positive held-out improvement of their own,
    and <!--v:part4.unmatchable_percent_class_min-->0.27<!--/v-->–<!--v:part4.unmatchable_percent_class_max-->0.60<!--/v-->% of a class's events have no legal within-bout control and enter neither
    side of its test. Figure 4 is regenerated from these bundles; claim 20's numbers are read from
