@@ -10,11 +10,24 @@ refitted here. The inputs (:class:`Part4Inputs`):
   no firing-rate cutoff: every unit with a usable fit) for every per-unit value,
   with a 1 Hz cutoff as a check;
 - the PFC cohort record the runner writes (``pfc_cohort_mPFC.json``);
-- the canonical event and stop tables, only to check that the bundles were fit
-  on the current ones;
+- the canonical event and stop tables, only to check that the bundles and the
+  follow-up fits below were made from the current ones;
 - the superseded maximum-likelihood tree (``_pre_ridge_backup_20260915``), for
   the one comparison the prior is justified by (marked pending: it was fit on
-  earlier tables).
+  earlier tables);
+- the timing calibration (``pfc_response_followups/timing_calibration.json``,
+  from ``scripts/pfc/calibrate_pfc_kernel_timing.py``);
+- the extended-event-set bundles with SWRs without replay
+  (``pfc_response_followups/swr_without_replay``, from
+  ``scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay``);
+- the marked-family summary of the follow-up models and the bundle sidecars
+  beside it (``pfc_response_followups/marked_family_baseline_prior``, from
+  ``scripts/pfc/run_pfc_marked_model_family.py`` and
+  ``scripts/pfc/summarize_pfc_marked_family.py``), pending when a sidecar
+  records other tables (:func:`marked_family_staleness`);
+- the stop-context fits (``pfc_response_followups/stop_context``, from
+  ``scripts/pfc/run_pfc_stop_context.py``), pending when a bundle, cached
+  session table or table they read has changed (:func:`stop_context_staleness`).
 
 The derived values follow the rules of the scripts that first reported them:
 Figure 4 (``scripts/figures/generate_figure04.py``) for the unit fractions,
@@ -141,8 +154,12 @@ BEST_MODELS = {
 
 
 TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
+"""The timing calibration ``scripts/pfc/calibrate_pfc_kernel_timing.py`` writes,
+relative to the processed-data root."""
 
 SWR_WITHOUT_REPLAY_TREE = "pfc_response_followups/swr_without_replay"
+"""The extended-event-set bundles (``run_pfc_analysis_bandit.py --event-set
+with_swr_without_replay``), relative to the processed-data root."""
 
 STOP_CONTEXT_RESULTS = "pfc_response_followups/stop_context/results.csv"
 """The stop-level context fits (``scripts/pfc/run_pfc_stop_context.py fit``)."""
@@ -184,8 +201,8 @@ MARKED_HELDOUT_SHARES = {
     ("event_strength", "ripple_power_z"),
 }
 MARKED_HELDOUT_SHARE_CLASSES = ("non_local_SWR", "non_local_no_SWR")
-"""The extended-event-set bundles (``run_pfc_analysis_bandit.py --event-set
-with_swr_without_replay``), relative to the processed-data root."""
+"""The replay classes whose held-out-gain share is quoted for the pairs of
+:data:`MARKED_HELDOUT_SHARES` (not the pooled fit, nor SWRs without replay)."""
 
 #: The new class's extra curves, as ``load_population_data`` reads them.
 SWR_WITHOUT_REPLAY_CURVES = ("SWR_no_non_local", "non_local_SWR_3class")
@@ -194,8 +211,6 @@ SWR_WITHOUT_REPLAY_CURVES = ("SWR_no_non_local", "non_local_SWR_3class")
 #: over every session, and the same values over sessions with at least this
 #: many SWRs without replay are the check.
 SWR_WITHOUT_REPLAY_MIN_EVENTS = 10
-"""The timing calibration ``scripts/pfc/calibrate_pfc_kernel_timing.py`` writes,
-relative to the processed-data root."""
 
 #: The curves the timing values are read from, by the word their keys use: the
 #: class (``HELDOUT_P_COLUMNS`` key) a unit must be called for, and the curve
@@ -206,7 +221,7 @@ TIMING_CLASSES = {
     "non_swr_replay": ("non_local_no_SWR", "non_local_no_swr"),
 }
 
-#: Session resamples behind the population timing intervals, and their seed.
+#: Recording-day resamples behind the population timing intervals, and their seed.
 TIMING_BOOTSTRAP_DRAWS = 1_000
 TIMING_BOOTSTRAP_SEED = 0
 
@@ -315,10 +330,7 @@ def staleness(
     A bundle records the SHA-256 of the canonical event table and the stop
     table it was fit on; a bundle fit on other tables describes other events.
     """
-    current = {
-        "canonical_event_table_sha256": _sha256(event_table),
-        "stop_table_sha256": _sha256(stop_table),
-    }
+    current = table_hashes(event_table, stop_table)
     stale = {
         name: sum(s.get(name) != sha for s in sidecars) for name, sha in current.items()
     }
@@ -329,6 +341,115 @@ def staleness(
         f"({', '.join(f'{n} differs in {k} bundles' for n, k in stale.items() if k)}); "
         "refit before citing"
     )
+
+
+def table_hashes(event_table: Path, stop_table: Path) -> dict[str, str]:
+    """The SHA-256 of the current canonical event and stop tables, under the
+    names the bundles' provenance records them by."""
+    return {
+        "canonical_event_table_sha256": _sha256(event_table),
+        "stop_table_sha256": _sha256(stop_table),
+    }
+
+
+def _stale_note(what: str, stale: dict[str, int], total: int) -> str | None:
+    """A pending note naming each recorded input that differs, or None."""
+    if not any(stale.values()):
+        return None
+    return (
+        f"{what} were made from other inputs than the current ones "
+        f"({', '.join(f'{name} differs in {k} of {total}' for name, k in stale.items() if k)}); "
+        "refit before citing"
+    )
+
+
+def stop_context_staleness(
+    results: Path, bundle_dir: Path, current: dict[str, str], n_cohort: int
+) -> str | None:
+    """Why the stop-context fit is stale against the current inputs, or None.
+
+    The fit's ``results.provenance.json`` records the SHA-256 of every canonical
+    bundle and cached session table it read; each session table's provenance
+    records the event and stop tables it was assembled from. Any of them that
+    differs from the current file (matched by file name) makes the fit stale.
+
+    Raises
+    ------
+    ValueError
+        If the fit does not cover the ``n_cohort`` PFC epochs.
+    """
+    provenance = json.loads(results.with_name("results.provenance.json").read_text())
+    if len(provenance["bundles"]) != n_cohort:
+        raise ValueError(
+            f"{results}: fit on {len(provenance['bundles'])} sessions, not the "
+            f"{n_cohort} of the PFC cohort"
+        )
+    sessions_dir = results.parent / "sessions"
+    tables = {
+        Path(path).name: sha for path, sha in provenance["session_tables"].items()
+    }
+    records = [
+        json.loads((sessions_dir / name).with_suffix(".provenance.json").read_text())
+        for name in tables
+    ]
+
+    def differs(path: Path, sha: str) -> bool:
+        return not path.exists() or _sha256(path) != sha
+
+    stale = {
+        "bundle_sha256": sum(
+            differs(bundle_dir / Path(path).name, sha)
+            for path, sha in provenance["bundles"].items()
+        ),
+        "session_table_sha256": sum(
+            differs(sessions_dir / name, sha) for name, sha in tables.items()
+        ),
+        **{
+            name: sum(r["input_provenance"].get(name) != sha for r in records)
+            for name, sha in current.items()
+        },
+    }
+    return _stale_note("the stop-context fits", stale, n_cohort)
+
+
+def marked_family_staleness(
+    summary_path: Path, current: dict[str, str], n_cohort: int
+) -> str | None:
+    """Why the marked-family summary is stale, or None.
+
+    Reads every bundle sidecar (``*_marked_family.provenance.json``) beside the
+    summary, wherever it lives: each records the event and stop tables its fit
+    read. A sidecar recording other tables, or a bundle written after the
+    summary, makes the summary stale.
+
+    Raises
+    ------
+    ValueError
+        If the sidecars do not cover the ``n_cohort`` PFC epochs.
+    """
+    folder = summary_path.parent
+    sidecars = [
+        json.loads(path.read_text())
+        for path in sorted(folder.glob("*_marked_family.provenance.json"))
+    ]
+    sessions = {(s["nwb_file_name"], s["epoch_name"]) for s in sidecars}
+    if len(sessions) != n_cohort:
+        raise ValueError(
+            f"{folder}: marked-family bundles of {len(sessions)} sessions, not the "
+            f"{n_cohort} of the PFC cohort"
+        )
+    written = summary_path.stat().st_mtime
+    stale = {
+        **{
+            name: sum(s.get(name) != sha for s in sidecars)
+            for name, sha in current.items()
+        },
+        "bundle written after the summary": sum(
+            path.stat().st_mtime > written
+            for path in folder.glob("*_marked_family.pkl")
+        ),
+    }
+    return _stale_note("the marked-family bundles", stale, len(sidecars))
 
 
 def _uniform(sidecars: list[dict[str, Any]], name: str) -> Any:
@@ -1177,7 +1298,8 @@ def timing_values(
       half-maximum onset (:func:`~continuum_swr_replay.analysis.pfc.timing.peak_and_onset`),
       their medians and the shares before event onset;
     - for the population, the peak lag and onset of the sign-aligned mean
-      curve, with a 95 % interval from resampling sessions, and the animals
+      curve, with a 95 % interval from resampling recording days (NWB files),
+      and the animals
       whose own mean curve has its onset before event onset.
 
     Beside them: the share of all units whose matched quiet-rest control curve
@@ -2154,9 +2276,12 @@ def marked_family_values(
                     "pct",
                     f"share of units whose held-out deviance improves when the mark's "
                     f"kernel is in the model, {what} (per session, median over sessions "
-                    "within animal, median over animals). No chance reference was "
-                    "computed, so the share expected by chance is unknown: this is "
-                    "not a test",
+                    "within animal, median over animals; over "
+                    f"{row['n_usable']:.0f} usable of {row['n_units']:.0f} unit fits, "
+                    f"{row['n_excluded_blowup']:.0f} left out as blow-ups, in "
+                    f"{row['n_sessions']:.0f} sessions of {row['n_animals']:.0f} "
+                    "animals). No chance reference was computed, so the share expected "
+                    "by chance is unknown: this is not a test",
                 )
     correlations = summary[
         (summary["statistic"] == "mark_correlation")
@@ -2204,8 +2329,10 @@ def stop_context_values(
     (conditional estimator); all units are a check (reward, increases only).
     ``exp(beta)`` is the multiplicative change of the post-onset response
     relative to the stop baseline at rewarded stops (or before a patch-leaving
-    trip); intervals are session-clustered 95 % intervals; animals counted with
-    the pooled sign out of those estimated; leave-one-animal-out range.
+    trip); intervals are 95 % intervals clustered by recording day (mPFC units
+    recur in every epoch of a day; CR1 factor, t with ``G - 1`` degrees of
+    freedom); animals counted with the pooled sign out of those estimated;
+    leave-one-animal-out range, which needs every leave-out to have an estimate.
     """
     values: list[Value] = []
 
@@ -2245,7 +2372,8 @@ def stop_context_values(
             row["ci_low"],
             "quantity",
             "dec2",
-            f"lower end of the session-clustered 95 % interval of that, {what}",
+            f"lower end of the recording-day-clustered 95 % interval of that (t with "
+            f"G - 1 degrees of freedom), {what}",
             "x",
         )
         add(
@@ -2257,6 +2385,11 @@ def stop_context_values(
             "x",
         )
         if unit_set == "called" and sign == "increase":
+            if row["n_loao_estimated"] != row["n_animals"]:
+                raise ValueError(
+                    f"{stem}: {row['n_loao_estimated']:.0f} of {row['n_animals']:.0f} "
+                    "leave-one-animal-out fits have an estimate"
+                )
             add(
                 f"{stem}_animals_pooled_sign",
                 row["n_animals_pooled_sign"],
@@ -2344,6 +2477,57 @@ def rate_cutoff_check_values(
     return values
 
 
+def followup_values(
+    inputs: Part4Inputs,
+    current: dict[str, str],
+    n_cohort: int,
+    claims: tuple[str, ...],
+) -> tuple[list[Value], list[dict[str, Any]]]:
+    """The marked-family and stop-context values, each pending when its inputs
+    are stale (:func:`marked_family_staleness`, :func:`stop_context_staleness`),
+    and the records of the files read. A missing output gives no values."""
+    values: list[Value] = []
+    records: list[dict[str, Any]] = []
+    if inputs.marked_family_summary.exists():
+        values += marked_family_values(
+            pd.read_parquet(inputs.marked_family_summary),
+            _value_factory(
+                f"{rel(inputs.marked_family_summary)} "
+                "(scripts/pfc/summarize_pfc_marked_family.py over "
+                "scripts/pfc/run_pfc_marked_model_family.py --model-set followup "
+                "--baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
+                claims,
+                ("paper",),
+                marked_family_staleness(
+                    inputs.marked_family_summary, current, n_cohort
+                ),
+            ),
+        )
+        records.append(file_record(inputs.marked_family_summary, ROOT_DIR))
+    if inputs.stop_context_results.exists():
+        results = pd.read_csv(inputs.stop_context_results)
+        if not results["n_sessions"].eq(n_cohort).all():
+            raise ValueError(
+                f"{inputs.stop_context_results}: a fit covers "
+                f"{sorted(results['n_sessions'].unique())} sessions, not the "
+                f"{n_cohort} of the PFC cohort"
+            )
+        values += stop_context_values(
+            results,
+            _value_factory(
+                f"{rel(inputs.stop_context_results)} "
+                "(scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+                claims,
+                ("paper",),
+                stop_context_staleness(
+                    inputs.stop_context_results, inputs.bundle_dir, current, n_cohort
+                ),
+            ),
+        )
+        records.append(file_record(inputs.stop_context_results, ROOT_DIR))
+    return values, records
+
+
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     """Part 4's summary from ``inputs``."""
     summary = Summary(part=4, produced_by=produced_by, commit=commit)
@@ -2374,36 +2558,10 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
         else None
     )
     summary.add(*timing_values(population, curves, lag_time, calibration, make))
-    if inputs.marked_family_summary.exists():
-        summary.add(
-            *marked_family_values(
-                pd.read_parquet(inputs.marked_family_summary),
-                _value_factory(
-                    f"{rel(inputs.marked_family_summary)} "
-                    "(scripts/pfc/summarize_pfc_marked_family.py over "
-                    "scripts/pfc/run_pfc_marked_model_family.py --model-set followup "
-                    "--baseline-penalty-sigma 3 bundles)",
-                    claims,
-                    ("paper",),
-                    None,
-                ),
-            )
-        )
-        summary.inputs.append(file_record(inputs.marked_family_summary, ROOT_DIR))
-    if inputs.stop_context_results.exists():
-        summary.add(
-            *stop_context_values(
-                pd.read_csv(inputs.stop_context_results),
-                _value_factory(
-                    f"{rel(inputs.stop_context_results)} "
-                    "(scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
-                    claims,
-                    ("paper",),
-                    None,
-                ),
-            )
-        )
-        summary.inputs.append(file_record(inputs.stop_context_results, ROOT_DIR))
+    current = table_hashes(inputs.event_table, inputs.stop_table)
+    values, records = followup_values(inputs, current, cohort["n_pfc_cohort"], claims)
+    summary.add(*values)
+    summary.inputs += records
     extended_dir = inputs.swr_without_replay_dir
     extended_bundles = sorted(extended_dir.glob(f"*{STEM}.pkl"))
     extended_check = None

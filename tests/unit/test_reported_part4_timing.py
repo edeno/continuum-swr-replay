@@ -165,3 +165,43 @@ def test_timing_values_without_calibration_omit_its_keys(population_and_curves):
 
     assert not any(key.startswith("timing_calibration") for key in keys)
     assert "timing_matched_control_peak_before_onset_fraction" in keys
+
+
+def test_rise_onset_is_measured_from_each_unit_window_start(population_and_curves):
+    """A constant offset of each unit's curve (its level at -200 ms, with the
+    peak's sign) moves the half-maximum onset measured from zero earlier, but
+    not the rise onset measured from the curve's value at -200 ms."""
+    population, curves, _ = population_and_curves
+    make = _value_factory("synthetic", ("20",), ("paper",))
+    rng = np.random.default_rng(1)
+    shifted = dict(curves)
+    for key in ("swr", "non_local_swr", "non_local_no_swr"):
+        sign = np.sign(
+            curves[key][np.argmax(np.abs(curves[key]), axis=0), :].diagonal()
+        )
+        offset = sign * rng.uniform(0.7, 0.9, curves[key].shape[1])
+        shifted[key] = curves[key] + offset[None, :]
+
+    plain = {
+        v.key: v.value for v in timing_values(population, curves, LAG_TIME, None, make)
+    }
+    moved = {
+        v.key: v.value for v in timing_values(population, shifted, LAG_TIME, None, make)
+    }
+    for word in ("swr", "swr_replay", "non_swr_replay"):
+        for direction in ("enhanced", "suppressed"):
+            stem = f"{word}_{direction}"
+            for rise, onset in (
+                (
+                    f"timing_population_rise_onset_ms_{stem}",
+                    f"timing_population_onset_ms_{stem}",
+                ),
+                (
+                    f"timing_rise_onset_median_ms_{stem}",
+                    f"timing_onset_median_ms_{stem}",
+                ),
+            ):
+                # measured from -200 ms: the offset is removed
+                assert moved[rise] == pytest.approx(plain[onset], abs=4)
+                # measured from zero: the offset widens the half-maximum run
+                assert moved[onset] < plain[onset] - 10

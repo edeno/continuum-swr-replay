@@ -14,6 +14,10 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
             ("animals_same_sign", 5.0),
             ("frac_pos", 0.35),
             ("n_animals", 5.0),
+            ("n_units", 120.0),
+            ("n_usable", 118.0),
+            ("n_excluded_blowup", 2.0),
+            ("n_sessions", 75.0),
         ):
             rows.append(
                 (
@@ -64,3 +68,10 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
     assert values["marked_ripplepooled_ripple_power_pooled_peak"] == 0.01
     assert not any(key.startswith("marked_marginal") for key in values)
     assert all(not any(ch.isdigit() for ch in key) for key in values)
+    # The share's denominators are named in its description.
+    assert (
+        "118 usable of 120 unit fits, 2 left out as blow-ups, in 75 sessions"
+        in share[
+            "marked_content_current_arm_swr_replay_heldout_gain_fraction"
+        ].description
+    )

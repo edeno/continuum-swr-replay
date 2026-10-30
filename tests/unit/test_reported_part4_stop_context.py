@@ -3,11 +3,12 @@
 import itertools
 
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.reported.part4 import _value_factory, stop_context_values
 
 
-def test_stop_context_values_main_and_check_rows():
+def _rows(n_loao_estimated: int = 5) -> list[dict]:
     rows = []
     for event_class, sign, unit_set, estimator, term in itertools.product(
         ("non_local_SWR", "non_local_no_SWR"),
@@ -30,11 +31,17 @@ def test_stop_context_values_main_and_check_rows():
                 "n_animals_estimated": 5,
                 "loao_exp_coef_min": 1.02,
                 "loao_exp_coef_max": 1.10,
+                "n_animals": 5,
+                "n_loao_estimated": n_loao_estimated,
             }
         )
+    return rows
+
+
+def test_stop_context_values_main_and_check_rows():
     make = _value_factory("synthetic", ("20",), ("paper",))
 
-    values = {v.key: v.value for v in stop_context_values(pd.DataFrame(rows), make)}
+    values = {v.key: v.value for v in stop_context_values(pd.DataFrame(_rows()), make)}
 
     assert values["stop_context_reward_gain_swr_replay_increase"] == 1.08
     assert (
@@ -45,3 +52,9 @@ def test_stop_context_values_main_and_check_rows():
     assert "stop_context_switch_gain_swr_replay_increase_all_units" not in values
     assert not any("overlap" in key for key in values)
     assert all(not any(ch.isdigit() for ch in key) for key in values)
+
+
+def test_a_failed_leave_one_out_fit_is_refused():
+    make = _value_factory("synthetic", ("20",), ("paper",))
+    with pytest.raises(ValueError, match="4 of 5 leave-one-animal-out fits"):
+        stop_context_values(pd.DataFrame(_rows(n_loao_estimated=4)), make)
