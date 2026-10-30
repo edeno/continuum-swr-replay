@@ -67,15 +67,20 @@ def compare_pair(
     ref_stats = pd.read_pickle(reference)
     cand_stats = pd.read_pickle(candidate)
     targets = ref_extra["marked_family_diagnostics"]["scientific_marks"]
+
+    # A class either session dropped (too few events) has no curves in that
+    # tree, so only classes both trees fitted are compared.
+    def fitted(extra: dict) -> set[str]:
+        return set(
+            extra.get("fitted_event_classes", extra.get("target_classes", []))
+        ) | {"pooled"}
+
     classes = [
         c
         for c in ref_extra.get("target_classes", [])
         if c in set(cand_extra.get("target_classes", []))
-        and c
-        in set(
-            cand_extra.get("fitted_event_classes", cand_extra.get("target_classes", []))
-        )
-        | {"pooled"}
+        and c in fitted(ref_extra)
+        and c in fitted(cand_extra)
     ]
     rows = []
     for event_class in classes:
