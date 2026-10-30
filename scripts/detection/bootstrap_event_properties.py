@@ -4,15 +4,17 @@ For each Part 2 event property (``reported.part2`` ``property_values`` and the
 two added ones, start distance and arms visited), over the immobile non-local
 events of the canonical event table: the median of each class, the SWR minus
 non-SWR difference, and the duration-matched difference (within ten quantile
-strata of the pooled event durations, averaged by stratum size;
-``analysis.hippocampus.property_contrast``), each with a 95 % percentile
+strata of the pooled event durations in whole decode samples, averaged by
+stratum size; ``analysis.hippocampus.property_contrast``), each with a 95 % percentile
 interval from a nested bootstrap (animals, then epochs within animal, then
 events within epoch; fixed seed). Values are on the scale Part 2 reports
 (duration in ms).
 
 Writes ``Processed-Data/event_property_bootstrap/``: ``replicates.parquet``
-(every replicate), ``intervals.csv`` (estimates and intervals) and
-``manifest.json``.
+(every replicate), ``intervals.csv`` (estimates and intervals, with each
+column's count of replicates that have no estimate and the count of replicates
+whose matched difference left out a stratum; more than 1 % without an estimate
+raises) and ``manifest.json``.
 
 Usage::
 
@@ -32,6 +34,8 @@ from pathlib import Path
 import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
+    DECODE_SAMPLE_S,
+    MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
     percentile_intervals,
 )
@@ -132,8 +136,12 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "seed": SEED,
                 "levels": "animals, then epochs within animal, then events within "
                 "epoch, each with replacement",
-                "duration_strata": f"{N_STRATA} quantiles of the pooled event durations; "
-                f"a stratum with fewer than {MIN_PER_CLASS} events of a class is left out",
+                "duration_strata": f"{N_STRATA} quantiles of the pooled event durations "
+                f"in whole {DECODE_SAMPLE_S * 1e3:g} ms decode samples; a stratum with "
+                f"fewer than {MIN_PER_CLASS} events of a class is left out, and a "
+                "replicate drawing no event of a class in a stratum leaves it out "
+                "(counted in intervals.csv)",
+                "max_nan_replicate_share": MAX_NAN_REPLICATE_SHARE,
                 "interval": "95 % percentile",
                 "properties": {w: list(PROPERTIES[w]) for w in args.properties},
                 "cpu_seconds": cpu_s,

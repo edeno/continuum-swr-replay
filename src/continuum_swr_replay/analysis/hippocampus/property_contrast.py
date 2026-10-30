@@ -9,12 +9,15 @@ then each drawn session's events with replacement. A replicate is a vector of
 counts, how many times each event was drawn, so every property and both
 classes are read from the same resample.
 
-Non-SWR events are about half as long as SWR events, so a raw contrast mixes
-any class difference with a duration difference. :func:`matched_difference`
+Non-SWR events are shorter than SWR events, so a raw contrast mixes any class
+difference with a duration difference. :func:`matched_difference`
 compares the classes within strata of event duration (quantiles of the pooled
-durations) and averages the within-stratum differences of medians, weighted by
-each stratum's events: the contrast the classes would show if both had the
-pooled duration distribution. Stratification is used rather than a regression
+durations, in whole decode samples) and averages the within-stratum
+differences of medians, weighted by each stratum's events: the contrast the
+classes would show if both had the pooled duration distribution. A bootstrap
+replicate that draws no event of a class in a stratum leaves that stratum out,
+so replicates can average over different strata; the count of such replicates,
+and of replicates with no estimate (NaN), is kept beside each interval. Stratification is used rather than a regression
 on log duration because it keeps the medians the property contrasts report and
 makes no assumption about the shape of the duration effect; it removes any
 duration effect to within one stratum's width (checked on simulated data in
@@ -28,6 +31,13 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+
+from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
+
+#: An event's duration is a whole number of decode samples of this length (s).
+DECODE_SAMPLE_S = 1.0 / SAMPLING_FREQUENCY
+#: The largest share of bootstrap replicates allowed to have no estimate.
+MAX_NAN_REPLICATE_SHARE = 0.01
 
 
 def nested_bootstrap_counts(
@@ -101,14 +111,18 @@ def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
     return float((values_sorted[low] + values_sorted[high]) / 2.0)
 
 
-def duration_strata(duration: NDArray, n_strata: int) -> NDArray[np.int64]:
+def duration_strata(
+    duration: NDArray, n_strata: int, *, sample_s: float = DECODE_SAMPLE_S
+) -> NDArray[np.int64]:
     """Each event's stratum: quantile bins of the pooled durations, ``0..k-1``.
 
-    Tied durations share a stratum, so there can be fewer than ``n_strata``.
+    Durations are first rounded to whole samples of ``sample_s`` seconds, so
+    events with the same number of samples share a stratum even when their
+    float durations differ in the last digits; tied durations make fewer than
+    ``n_strata`` strata possible.
     """
-    codes = pd.qcut(
-        np.asarray(duration, dtype=float), n_strata, labels=False, duplicates="drop"
-    )
+    samples = np.round(np.asarray(duration, dtype=float) / sample_s)
+    codes = pd.qcut(samples, n_strata, labels=False, duplicates="drop")
     return np.asarray(codes, dtype=np.int64)
 
 
@@ -137,13 +151,17 @@ class _SortedGroups:
         idx = self.classes[label]
         return weighted_median(self.values[idx], weights[idx])
 
-    def matched(self, weights: NDArray, eligible: list[int]) -> float:
+    def matched(self, weights: NDArray, eligible: list[int]) -> tuple[float, int]:
+        """The weighted matched difference, and how many eligible strata were
+        left out because ``weights`` draw no event of a class in them."""
         diffs, sizes = [], []
+        skipped = 0
         for stratum in eligible:
             swr = self.cells[(True, stratum)]
             non = self.cells[(False, stratum)]
             w_swr, w_non = weights[swr], weights[non]
             if w_swr.sum() == 0 or w_non.sum() == 0:
+                skipped += 1
                 continue
             diffs.append(
                 weighted_median(self.values[swr], w_swr)
@@ -151,8 +169,8 @@ class _SortedGroups:
             )
             sizes.append(w_swr.sum() + w_non.sum())
         if not sizes:
-            return float("nan")
-        return float(np.average(diffs, weights=sizes))
+            return float("nan"), skipped
+        return float(np.average(diffs, weights=sizes)), skipped
 
 
 def matched_difference(
@@ -184,7 +202,7 @@ def matched_difference(
     groups = _SortedGroups(values, is_swr, strata)
     eligible = _eligible_strata(groups, min_per_class)
     w = np.ones(is_swr.size, dtype=np.int64) if weights is None else np.asarray(weights)
-    return groups.matched(w, eligible)
+    return groups.matched(w, eligible)[0]
 
 
 def _eligible_strata(groups: _SortedGroups, min_per_class: int) -> list[int]:
@@ -231,8 +249,9 @@ def bootstrap_contrasts(
     -------
     pd.DataFrame
         One row per replicate and property: ``replicate``, ``property``,
-        ``median_non_swr``, ``median_swr``, ``difference`` (SWR minus non-SWR)
-        and ``matched_difference``.
+        ``median_non_swr``, ``median_swr``, ``difference`` (SWR minus non-SWR),
+        ``matched_difference`` and ``matched_strata_skipped`` (eligible strata
+        the replicate drew no event of a class in, left out of its average).
     """
     is_swr = np.asarray(is_swr, dtype=bool)
     _, animal_codes = np.unique(np.asarray(animal), return_inverse=True)
@@ -253,6 +272,7 @@ def bootstrap_contrasts(
         )
         for name, g in groups.items():
             non, swr = g.median(False, weights), g.median(True, weights)
+            matched, skipped = g.matched(weights, eligible[name])
             rows.append(
                 {
                     "replicate": replicate,
@@ -260,26 +280,62 @@ def bootstrap_contrasts(
                     "median_non_swr": non,
                     "median_swr": swr,
                     "difference": swr - non,
-                    "matched_difference": g.matched(weights, eligible[name]),
+                    "matched_difference": matched,
+                    "matched_strata_skipped": skipped,
                 }
             )
     return pd.DataFrame(rows)
 
 
-def percentile_intervals(replicates: pd.DataFrame, level: float = 0.95) -> pd.DataFrame:
+def percentile_intervals(
+    replicates: pd.DataFrame,
+    level: float = 0.95,
+    *,
+    max_nan_share: float = MAX_NAN_REPLICATE_SHARE,
+) -> pd.DataFrame:
     """Each property's estimate (replicate -1) and percentile interval of each
-    column of :func:`bootstrap_contrasts`.
+    column of :func:`bootstrap_contrasts`, with the replicates behind it counted.
+
+    A replicate with no estimate (NaN) is left out of the percentiles, so the
+    count of such replicates is kept, and more than ``max_nan_share`` of them
+    raises.
 
     Returns
     -------
     pd.DataFrame
-        Indexed by property: for each column ``c``, ``c``, ``c_low`` and ``c_high``.
+        Indexed by property: for each column ``c``, ``c``, ``c_low``,
+        ``c_high`` and ``c_nan_replicates``; then ``n_replicates`` and
+        ``matched_replicates_skipping_strata`` (replicates whose matched
+        difference left out an eligible stratum).
+
+    Raises
+    ------
+    ValueError
+        If a property's share of NaN replicates in any column exceeds
+        ``max_nan_share``.
     """
     tail = (1.0 - level) / 2.0
     columns = ["median_non_swr", "median_swr", "difference", "matched_difference"]
     point = replicates[replicates.replicate < 0].set_index("property")[columns]
-    boot = replicates[replicates.replicate >= 0].groupby("property")[columns]
+    boot_rows = replicates[replicates.replicate >= 0]
+    boot = boot_rows.groupby("property")[columns]
     low = boot.quantile(tail).add_suffix("_low")
     high = boot.quantile(1.0 - tail).add_suffix("_high")
-    out = point.join(low).join(high)
-    return out[[f"{c}{s}" for c in columns for s in ("", "_low", "_high")]]
+    nan = boot_rows[columns].isna().groupby(boot_rows["property"]).sum()
+    n_replicates = boot.size()
+    share = nan.div(n_replicates, axis=0)
+    if (share > max_nan_share).any(axis=None):
+        bad = share[(share > max_nan_share).any(axis=1)]
+        raise ValueError(
+            f"more than {max_nan_share:.0%} of the replicates have no estimate:\n"
+            f"{bad.to_string()}"
+        )
+    out = point.join(low).join(high).join(nan.add_suffix("_nan_replicates"))
+    out = out[
+        [f"{c}{s}" for c in columns for s in ("", "_low", "_high", "_nan_replicates")]
+    ]
+    out["n_replicates"] = n_replicates
+    out["matched_replicates_skipping_strata"] = (
+        boot_rows["matched_strata_skipped"].gt(0).groupby(boot_rows["property"]).sum()
+    )
+    return out
