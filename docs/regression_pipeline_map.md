@@ -770,7 +770,7 @@ Add each compared event's Local, No-Spike, non-local and uncertain shares to an 
 
 Spike-evidence reality analysis for non-SWR non-local events.
 
-`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
+`animal_from_epoch_id`, `find_sessions`, `build_session_events`, `load_marks`, `stored_likelihood_columns`, `stored_event_likelihood`, `window_spike_counts`, `events_with_map_in_left_out_bins`, `event_metrics`, `analyze_session`, `render_session_figures`, `summarize`, `per_animal_medians`, `main`
 
 ### `scripts/detection/bootstrap_event_properties.py`
 
@@ -831,6 +831,12 @@ Compare the replay-detection inventories, one epoch at a time.
 Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
 `caveats`, `require_cpu`, `decode_files`, `decode_file_stats`, `reuse_reason`, `canonical_epochs`, `load_marks_and_training_mask`, `stored_log_likelihood`, `refit_encoding`, `spikes_in_bins`, `relative_error`, `output_paths`, `LabelSet`, `label_probabilities`, `checked_halves`, `time_held_out_record`, `epoch_table`, `label_set_table`, `running_only_masks`, `run_settings`, `run_epoch`, `run_epochs`, `figure_bouts`, `figure_calibration`, `figure_silence`, `write_csv`, `readme`, `summarize`, `build_parser`, `main`
+
+### `scripts/detection/split_state_evidence_by_swr.py`
+
+Held-out spike evidence of Non-Local bouts, split by SWR coupling.
+
+`ok_epochs`, `label_epoch`, `main`
 
 ### `scripts/detection/sweep_memoryless_controls.py`
 
@@ -1064,7 +1070,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py`
 

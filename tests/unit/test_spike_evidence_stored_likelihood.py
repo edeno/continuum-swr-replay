@@ -109,7 +109,7 @@ def stored_session(monkeypatch, tmp_path):
     ll[:, np.flatnonzero(INTERIOR)[-1]] = 1.0
     ds = results(ll)
     path = decode_paths(EPOCH_ID, tmp_path, threshold_percent=80).results
-    ds.to_netcdf(path)
+    ds.to_netcdf(path, engine="h5netcdf")  # as the decode writes it
     dot = pd.DataFrame(
         {
             "map_estimate": np.full(N_TIME, MAP_CM),

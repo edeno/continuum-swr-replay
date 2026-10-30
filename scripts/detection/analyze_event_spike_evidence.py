@@ -109,6 +109,7 @@ from continuum_swr_replay.decoding.files import (  # noqa: E402
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
+from continuum_swr_replay.decoding.results import open_results  # noqa: E402
 from continuum_swr_replay.intervals import (  # noqa: E402
     interval_mask,
 )
@@ -467,7 +468,7 @@ def analyze_session(
         n_events_left_out = n_events_map_in_flagged_bins
 
     if likelihood == "stored":
-        results = xr.open_dataset(paths.results)
+        results = open_results(paths.results, cache=False)
         if not np.array_equal(results["time"].values, t):
             raise ValueError(f"{epoch_id}: results.nc and data_over_time times differ")
         log_likelihood = results["log_likelihood"]
