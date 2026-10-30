@@ -39,7 +39,11 @@ Two estimators of the same mean model are provided:
 
 Both are fit by Newton's method with the per-unit intercepts ``alpha_u``
 eliminated through their block-diagonal Hessian (no unit dummies are built),
-and the uncertainty is a sandwich clustered by session.
+and the uncertainty is a sandwich clustered by recording day (NWB file): mPFC
+units are sorted once per day and recur in every epoch of that day, so the
+epochs of a day are not independent. With about ten days the sandwich takes the
+CR1 small-sample factor and the intervals a t quantile with ``G - 1`` degrees
+of freedom.
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
+from scipy import stats
 
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.intervals import (
@@ -219,6 +224,11 @@ def count_other_onsets(
     NDArray of int, shape (n_events,)
     """
     event_bins = np.asarray(event_bins, dtype=np.int64)
+    if not len(swr_bins) == len(swr_start) == len(swr_end):
+        raise ValueError(
+            f"{len(swr_bins)} SWR onset bins for {len(swr_start)} SWR intervals; "
+            "filter the intervals to the time axis before binning their onsets"
+        )
 
     def in_window(onsets: NDArray) -> NDArray:
         onsets = np.sort(np.asarray(onsets, dtype=np.int64))
@@ -321,13 +331,15 @@ def assemble_stop_context_table(
         two differ by a constant factor (about 5e-5) that cancels in every rate
         ratio.
     report : dict
-        Counts: units, events per class, stops, fitted bins, event-free bins,
-        events outside every cohort stop, events with no fitted post time.
+        Counts: units, stops, fitted bins, event-free bins, events with no
+        fitted post time and with only part of it, events per class, and the
+        onsets on the time axis that baseline time avoids (non-local, SWR,
+        dropped).
 
     Raises
     ------
     ValueError
-        If an analysed event lies outside every cohort stop.
+        If an analysed event, or a fitted bin, lies outside every cohort stop.
     """
     time = np.asarray(time, dtype=float)
     fit = np.asarray(fit_mask, dtype=bool)
@@ -345,14 +357,19 @@ def assemble_stop_context_table(
     if (stop_of_bin[fit] < 0).any():
         raise ValueError("a fitted bin lies outside every cohort stop")
 
-    def onsets(frame: pd.DataFrame) -> NDArray:
+    def on_axis(frame: pd.DataFrame) -> pd.DataFrame:
+        """The events whose onset lies on the time axis (the ones binned)."""
         start = frame["start_time"].to_numpy(dtype=float)
-        start = start[(start >= time[0]) & (start <= time[-1])]
-        return onset_bin_index(start, time)
+        return frame.loc[(start >= time[0]) & (start <= time[-1])]
 
-    non_local_bins = onsets(all_non_local)
-    swr_bins = onsets(swr_intervals)
-    dropped_bins = onsets(dropped_events)
+    def onsets(frame: pd.DataFrame) -> NDArray:
+        return onset_bin_index(frame["start_time"].to_numpy(dtype=float), time)
+
+    # Filtered once, so each onset bin and its interval stay paired.
+    swr_on_axis = on_axis(swr_intervals)
+    non_local_bins = onsets(on_axis(all_non_local))
+    swr_bins = onsets(swr_on_axis)
+    dropped_bins = onsets(on_axis(dropped_events))
     near_event = near_onset_mask(
         np.concatenate([non_local_bins, swr_bins, dropped_bins]), n_time, half
     )
@@ -384,8 +401,8 @@ def assemble_stop_context_table(
         non_local_start=all_non_local["start_time"].to_numpy(dtype=float),
         non_local_end=all_non_local["end_time"].to_numpy(dtype=float),
         swr_bins=swr_bins,
-        swr_start=swr_intervals["start_time"].to_numpy(dtype=float),
-        swr_end=swr_intervals["end_time"].to_numpy(dtype=float),
+        swr_start=swr_on_axis["start_time"].to_numpy(dtype=float),
+        swr_end=swr_on_axis["end_time"].to_numpy(dtype=float),
         dropped_bins=dropped_bins,
         n_post_bins=n_post,
     )
@@ -672,12 +689,14 @@ def model_frame(
     frame : pd.DataFrame
         Rows kept: known context, positive event-free time, fitted post time,
         and a (unit, stop) cell with at least one spike in the stop's fitted
-        time. Adds ``session`` (``"<nwb_file_name> <epoch>"``).
+        time. Adds ``session`` (``"<nwb_file_name> <epoch>"``) and ``day``
+        (``nwb_file_name``, the recording day the standard errors cluster on).
     drops : dict
-        ``n_stops_unknown_reward``, ``n_stops_unknown_switch`` (stops with an
-        event of the class), ``n_stops_no_event_free_time``,
-        ``n_events_no_post_fit_time``, ``n_unit_stop_cells_silent`` (the unit
-        had no spike in the stop's fitted time).
+        ``n_stops_with_events`` (stops with an event of the class, for the
+        selected units), of them ``n_stops_unknown_reward``,
+        ``n_stops_unknown_switch`` and ``n_stops_no_event_free_time``; then
+        ``n_events_no_post_fit_time`` and ``n_unit_stop_cells_silent`` (the
+        unit had no spike in the stop's fitted time).
     """
     rows = table.loc[table["event_class"].eq(event_class)].merge(
         units.loc[:, ["nwb_file_name", "epoch", "unit"]],
@@ -685,7 +704,9 @@ def model_frame(
         how="inner",
         validate="many_to_one",
     )
-    rows = rows.assign(session=rows["nwb_file_name"] + " " + rows["epoch"])
+    rows = rows.assign(
+        session=rows["nwb_file_name"] + " " + rows["epoch"], day=rows["nwb_file_name"]
+    )
     stop_key = ["session", "stop_idx"]
     stops = rows.drop_duplicates(stop_key)
     unknown_reward = ~np.isfinite(stops["rewarded"].to_numpy(dtype=float))
@@ -740,7 +761,7 @@ class StopContextDesign:
     baseline_count, baseline_time : NDArray, shape (n_cells,)
         Event-free spikes and seconds of each cell.
     cluster : NDArray of int, shape (n_rows,)
-        Session code of each row.
+        Cluster (recording day) code of each row; every unit lies in one.
     """
 
     y: NDArray
@@ -758,6 +779,8 @@ class StopContextDesign:
 def stop_context_design(
     frame: pd.DataFrame,
     terms: tuple[str, ...] = (*CONTEXT_TERMS, OVERLAP_TERM),
+    *,
+    cluster: str = "day",
 ) -> StopContextDesign:
     """Code a :func:`model_frame` for :func:`fit_stop_context_glm`.
 
@@ -765,15 +788,27 @@ def stop_context_design(
     ----------
     frame : pd.DataFrame
         Model rows: ``session``, ``unit``, ``stop_idx``, ``y``,
-        ``post_exposure_s``, ``baseline_count``, ``baseline_time_s`` and every
-        ``terms`` entry.
+        ``post_exposure_s``, ``baseline_count``, ``baseline_time_s``, the
+        ``cluster`` column and every ``terms`` entry.
     terms : tuple of str
         Columns used as terms.
+    cluster : str
+        The column the standard errors cluster on; each session must lie in
+        one cluster. ``"day"`` (the recording day) by default.
 
     Returns
     -------
     StopContextDesign
+        Units and (unit, stop) cells are coded within session, as before.
+
+    Raises
+    ------
+    ValueError
+        If a session lies in more than one cluster.
     """
+    pairs = frame[["session", cluster]].drop_duplicates()
+    if pairs["session"].duplicated().any():
+        raise ValueError(f"a session lies in more than one {cluster!r} cluster")
     session = pd.factorize(frame["session"])[0]
     unit = pd.factorize(pd.MultiIndex.from_arrays([session, frame["unit"]]))[0]
     cell, cell_keys = pd.factorize(
@@ -790,7 +825,7 @@ def stop_context_design(
         cell_unit=unit[first],
         baseline_count=frame["baseline_count"].to_numpy(dtype=float)[first],
         baseline_time=frame["baseline_time_s"].to_numpy(dtype=float)[first],
-        cluster=session,
+        cluster=pd.factorize(frame[cluster])[0],
     )
 
 
@@ -810,8 +845,9 @@ class StopContextFit:
     coef : NDArray, shape (n_terms,)
         Log-scale estimates; NaN for a term the data do not identify.
     se_cluster : NDArray, shape (n_terms,)
-        Sandwich standard errors clustered by session, with the ``G / (G - 1)``
-        small-sample factor.
+        Sandwich standard errors clustered by the design's clusters (recording
+        days), with the CR1 small-sample factor
+        ``G / (G - 1) * (N - 1) / (N - K)`` (:func:`fit_stop_context_glm`).
     se_model : NDArray, shape (n_terms,)
         Model-based (inverse information) standard errors.
     converged : bool
@@ -1025,11 +1061,11 @@ def fit_stop_context_glm(
         return StopContextFit(names, coef, se_cluster, se_model, False, n_iter, counts)
     schur = c_theta - (b_unit / a_unit[:, None]).T @ b_unit
     bread = np.linalg.inv(schur)
-    # Each unit lies in one session and its intercept's score is zero at the
-    # optimum, so the session scores of the terms are the whole meat.
+    # Each unit lies in one cluster and its intercept's score is zero at the
+    # optimum, so the cluster scores of the terms are the whole meat.
     scores = _cell_sums(residual[:, None] * d.X, d.cluster, counts["n_clusters"])
     n_clusters = counts["n_clusters"]
-    meat = scores.T @ scores * (n_clusters / max(n_clusters - 1, 1))
+    meat = scores.T @ scores * _cr1_factor(n_clusters, len(d.y), d.X.shape[1])
     cov = bread @ meat @ bread
     coef[identified] = theta
     # One cluster's score is zero at the optimum: no clustered SE.
@@ -1044,6 +1080,22 @@ def fit_stop_context_glm(
         n_iter=n_iter,
         counts=counts,
     )
+
+
+def _cr1_factor(n_clusters: int, n_rows: int, n_terms: int) -> float:
+    """The CR1 small-sample factor ``G / (G - 1) * (N - 1) / (N - K)``.
+
+    ``K`` counts the context and overlap terms only. The unit intercepts (and,
+    for the conditional estimator, the (unit, stop) baselines) are absorbed
+    and nested within clusters, since a unit is sorted once per recording day;
+    nested fixed effects are not counted in ``K`` (Cameron and Miller 2015,
+    *J. Human Resources* 50:317, section IV.B). With ``N`` in the hundreds of
+    thousands the second factor is 1 to many digits; ``G / (G - 1)`` is the
+    part that matters with about ten clusters.
+    """
+    if n_clusters < 2:
+        return 1.0
+    return n_clusters / (n_clusters - 1) * (n_rows - 1) / max(n_rows - n_terms, 1)
 
 
 def _varies_within_units(values: NDArray, unit: NDArray) -> bool:
@@ -1097,6 +1149,7 @@ def summarize_stop_context(
     *,
     estimator: str = "conditional",
     terms: tuple[str, ...] = (*CONTEXT_TERMS, OVERLAP_TERM),
+    cluster: str = "day",
 ) -> pd.DataFrame:
     """Pooled fit, per-animal fits and leave-one-animal-out fits of one frame.
 
@@ -1109,26 +1162,33 @@ def summarize_stop_context(
         Passed to :func:`fit_stop_context_glm`.
     terms : tuple of str
         Terms of the model.
+    cluster : str
+        The column the standard errors cluster on (:func:`stop_context_design`).
 
     Returns
     -------
     pd.DataFrame, one row per term
-        ``term``, ``coef``, ``exp_coef``, ``se_cluster``, ``ci_low``,
-        ``ci_high`` (``exp(coef -/+ 1.96 se_cluster)``), ``se_model``,
+        ``term``, ``coef``, ``exp_coef``, ``se_cluster`` (clustered by
+        recording day), ``ci_df`` (``G - 1``), ``ci_low``, ``ci_high``
+        (``exp(coef -/+ t_{0.975, G-1} se_cluster)``), ``se_model``,
         ``converged``, ``exp_coef_<animal>`` (per-animal fits),
-        ``n_animals_estimated``, ``n_animals_pooled_sign``,
-        ``loao_exp_coef_min`` / ``_max`` (leave-one-animal-out range),
+        ``n_animals``, ``n_animals_estimated``, ``n_animals_pooled_sign``,
+        ``n_loao_estimated`` (leave-one-animal-out fits with an estimate),
+        ``loao_exp_coef_min`` / ``_max`` (their range),
         ``loao_exp_coef_<animal>`` (fit without that animal), and the pooled
         fit's counts (``n_rows``, ``n_units``, ``n_cells``, ``n_clusters``, the
-        uninformative units) plus ``n_events``, ``n_stops``, ``n_sessions``.
+        uninformative units) plus ``n_events``, ``n_stops``, ``n_sessions``,
+        ``n_days``.
     """
     animals = sorted(frame["animal"].unique())
     pooled = fit_stop_context_glm(
-        stop_context_design(frame, terms), estimator=estimator
+        stop_context_design(frame, terms, cluster=cluster), estimator=estimator
     )
     per_animal = {
         animal: fit_stop_context_glm(
-            stop_context_design(frame.loc[frame["animal"].eq(animal)], terms),
+            stop_context_design(
+                frame.loc[frame["animal"].eq(animal)], terms, cluster=cluster
+            ),
             estimator=estimator,
         )
         for animal in animals
@@ -1136,7 +1196,9 @@ def summarize_stop_context(
     leave_out = (
         {
             animal: fit_stop_context_glm(
-                stop_context_design(frame.loc[~frame["animal"].eq(animal)], terms),
+                stop_context_design(
+                    frame.loc[~frame["animal"].eq(animal)], terms, cluster=cluster
+                ),
                 estimator=estimator,
             )
             for animal in animals
@@ -1144,6 +1206,8 @@ def summarize_stop_context(
         if len(animals) > 1
         else {}
     )
+    df = pooled.counts["n_clusters"] - 1
+    quantile = stats.t.ppf(0.975, df) if df > 0 else np.nan
     rows = []
     for index, term in enumerate(pooled.names):
         coef = pooled.coef[index]
@@ -1153,8 +1217,9 @@ def summarize_stop_context(
             "coef": coef,
             "exp_coef": np.exp(coef),
             "se_cluster": se,
-            "ci_low": np.exp(coef - 1.96 * se),
-            "ci_high": np.exp(coef + 1.96 * se),
+            "ci_df": df,
+            "ci_low": np.exp(coef - quantile * se),
+            "ci_high": np.exp(coef + quantile * se),
             "se_model": pooled.se_model[index],
             "converged": pooled.converged
             and all(
@@ -1165,11 +1230,14 @@ def summarize_stop_context(
         for animal, value in zip(animals, animal_coef, strict=True):
             row[f"exp_coef_{animal}"] = np.exp(value)
         finite = np.isfinite(animal_coef)
+        row["n_animals"] = len(animals)
         row["n_animals_estimated"] = int(finite.sum())
         row["n_animals_pooled_sign"] = int(
             (np.sign(animal_coef[finite]) == np.sign(coef)).sum()
         )
         loao = np.array([leave_out[a].coef[index] for a in leave_out])
+        # A failed leave-out would hide inside nanmin/nanmax: count them.
+        row["n_loao_estimated"] = int(np.isfinite(loao).sum())
         row["loao_exp_coef_min"] = (
             float(np.exp(np.nanmin(loao))) if np.isfinite(loao).any() else np.nan
         )
@@ -1182,5 +1250,6 @@ def summarize_stop_context(
         row["n_events"] = int(frame.drop_duplicates(["session", "event_id"]).shape[0])
         row["n_stops"] = int(frame.drop_duplicates(["session", "stop_idx"]).shape[0])
         row["n_sessions"] = int(frame["session"].nunique())
+        row["n_days"] = int(frame[cluster].nunique())
         rows.append(row)
     return pd.DataFrame(rows)

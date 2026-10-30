@@ -11,6 +11,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 from continuum_swr_replay.analysis.pfc.stop_context import (
     CONTEXT_TERMS,
@@ -92,6 +93,7 @@ def simulate_frame(
             pd.DataFrame(
                 {
                     "session": f"s{session}",
+                    "day": f"s{session}",  # one epoch per recording day
                     "animal": ANIMALS[session % len(ANIMALS)],
                     "unit": unit,
                     "event_id": event,
@@ -200,11 +202,119 @@ def test_summary_reports_animals_and_leave_one_out():
     row = summary.loc["rewarded"]
     assert row["exp_coef"] == pytest.approx(1.3, abs=0.07)
     assert row["ci_low"] < row["exp_coef"] < row["ci_high"]
+    assert row["n_animals"] == 5
     assert row["n_animals_estimated"] == 5
     assert row["n_animals_pooled_sign"] == 5
+    assert row["n_loao_estimated"] == 5
     assert row["loao_exp_coef_min"] <= row["exp_coef"] <= row["loao_exp_coef_max"]
     assert {f"exp_coef_{animal}" for animal in ANIMALS} <= set(summary.columns)
     assert row["n_sessions"] == 20
+    assert row["n_days"] == 20
+    # The interval is a t interval with G - 1 degrees of freedom.
+    assert row["ci_df"] == 19
+    half = stats.t.ppf(0.975, 19) * row["se_cluster"]
+    assert row["ci_high"] == pytest.approx(np.exp(row["coef"] + half))
+    assert row["ci_low"] == pytest.approx(np.exp(row["coef"] - half))
+
+
+def test_a_failed_leave_one_out_fit_is_counted():
+    # Without animal a1 nothing varies the switch term within a unit: that
+    # leave-out has no estimate, and nanmin/nanmax alone would hide it.
+    frame = simulate_frame(12, n_sessions=10)
+    frame.loc[~frame["animal"].eq("a1"), "next_trip_switches_patch"] = 0.0
+    row = (
+        summarize_stop_context(frame).set_index("term").loc["next_trip_switches_patch"]
+    )
+    assert row["n_animals"] == 5
+    assert row["n_loao_estimated"] == 4
+    assert np.isnan(row["loao_exp_coef_a1"])
+
+
+def test_a_session_in_two_days_is_refused():
+    frame = simulate_frame(13, n_sessions=2)
+    frame.loc[frame.index[:5], "day"] = "elsewhere"
+    with pytest.raises(ValueError, match="more than one 'day' cluster"):
+        stop_context_design(frame)
+
+
+def simulate_days(
+    seed: int,
+    *,
+    n_days: int = 10,
+    epochs_per_day: int = 6,
+    units_per_day: int = 20,
+    stops_per_epoch: int = 20,
+    unit_reward_sd: float = 0.3,
+) -> pd.DataFrame:
+    """Model rows where the same units recur in every epoch of a day.
+
+    Each day's units keep their rate and their own reward gain
+    (log-normal, SD ``unit_reward_sd``) in all its epochs, as mPFC units sorted
+    once per recording day do; the epochs of a day are therefore correlated.
+    """
+    rng = np.random.default_rng(seed)
+    frames = []
+    for day in range(n_days):
+        base_rate = np.exp(rng.normal(np.log(3.0), 0.8, units_per_day))
+        unit_reward = np.exp(rng.normal(0.0, unit_reward_sd, units_per_day))
+        for epoch in range(epochs_per_day):
+            rewarded = (rng.random(stops_per_epoch) < 0.6).astype(float)
+            switch = (rng.random(stops_per_epoch) < 0.3).astype(float)
+            free_s = rng.uniform(2.0, 8.0, stops_per_epoch)
+            stop_of_event = np.repeat(
+                np.arange(stops_per_epoch), rng.poisson(3.0, stops_per_epoch)
+            )
+            baseline = rng.poisson(base_rate[:, None] * free_s[None, :])
+            y = rng.poisson(
+                base_rate[:, None]
+                * 0.2
+                * unit_reward[:, None] ** rewarded[stop_of_event][None, :]
+            )
+            n_units, n_events = y.shape
+            unit = np.repeat(np.arange(n_units), n_events)
+            event = np.tile(np.arange(n_events), n_units)
+            stop = stop_of_event[event]
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "session": f"d{day}e{epoch}",
+                        "day": f"d{day}",
+                        "animal": ANIMALS[day % len(ANIMALS)],
+                        "unit": unit,
+                        "event_id": event,
+                        "stop_idx": stop,
+                        "y": y.ravel(),
+                        "post_exposure_s": 0.2,
+                        "baseline_count": baseline[unit, stop],
+                        "baseline_time_s": free_s[stop],
+                        "rewarded": rewarded[stop],
+                        "next_trip_switches_patch": switch[stop],
+                    }
+                )
+            )
+    return pd.concat(frames, ignore_index=True)
+
+
+def test_day_clustering_is_honest_where_epoch_clustering_is_too_narrow():
+    """Over 40 simulated datasets, the spread of the reward estimate against the
+    mean clustered SE: clustering by epoch ignores that a day's epochs share
+    their units and is far too narrow; clustering by day is about right (with
+    ten clusters the sandwich still runs a little narrow)."""
+    terms = CONTEXT_TERMS
+    coef, se_epoch, se_day = [], [], []
+    for seed in range(40):
+        frame = simulate_days(seed)
+        by_epoch = fit_stop_context_glm(
+            stop_context_design(frame, terms, cluster="session")
+        )
+        by_day = fit_stop_context_glm(stop_context_design(frame, terms))
+        np.testing.assert_allclose(by_epoch.coef, by_day.coef)
+        coef.append(by_day.coef[0])
+        se_epoch.append(by_epoch.se_cluster[0])
+        se_day.append(by_day.se_cluster[0])
+    spread = np.std(coef, ddof=1)
+    assert np.mean(se_epoch) / spread < 0.6
+    assert 0.7 < np.mean(se_day) / spread < 1.3
 
 
 # ---------------------------------------------------------------------------
@@ -244,6 +354,21 @@ def test_count_other_onsets_counts_each_event_once():
     # A [10, 20): B once (its SWR is part of it), SWR 18, dropped 19 -> 3.
     # B [15, 25): SWR 18, dropped 19 -> 2 (its own onset and SWR not counted).
     np.testing.assert_array_equal(count, [3, 2])
+
+
+def test_count_other_onsets_refuses_unpaired_swr_bins():
+    with pytest.raises(ValueError, match="filter the intervals"):
+        count_other_onsets(
+            np.array([10]),
+            non_local_bins=np.array([10]),
+            non_local_start=np.array([0.020]),
+            non_local_end=np.array([0.028]),
+            swr_bins=np.array([12]),
+            swr_start=np.array([0.024, 99.0]),
+            swr_end=np.array([0.026, 99.1]),
+            dropped_bins=np.array([], dtype=int),
+            n_post_bins=10,
+        )
 
 
 def _toy_session():
@@ -325,6 +450,33 @@ def test_assembled_toy_session_counts_are_exact():
     assert report["n_events_partial_post_fit_time"] == 1
 
 
+def test_events_off_the_time_axis_are_left_out_once():
+    """An SWR (and a non-local event) starting after the session's time axis
+    is not binned, and the overlap count still pairs each binned SWR with its
+    own interval (it raised an IndexError before)."""
+    time, fit, stops, events, all_nl, swr, dropped, spikes = _toy_session()
+    late = pd.DataFrame({"start_time": [20.0], "end_time": [20.1]})
+    swr_late = pd.concat([late, swr], ignore_index=True)
+    nl_late = pd.concat([all_nl, late.assign(event_id="late")], ignore_index=True)
+    kwargs = {
+        "time": time,
+        "fit_mask": fit,
+        "spike_times": spikes,
+        "events": events,
+        "dropped_events": dropped,
+        "stops": stops,
+        "sampling_frequency": 500.0,
+    }
+    table, report = assemble_stop_context_table(
+        all_non_local=nl_late, swr_intervals=swr_late, **kwargs
+    )
+    expected, expected_report = assemble_stop_context_table(
+        all_non_local=all_nl, swr_intervals=swr, **kwargs
+    )
+    pd.testing.assert_frame_equal(table, expected)
+    assert report["n_avoided_onsets"] == expected_report["n_avoided_onsets"]
+
+
 def test_model_frame_counts_every_drop():
     time, fit, stops, events, all_nl, swr, dropped, spikes = _toy_session()
     table, _ = assemble_stop_context_table(
@@ -342,8 +494,10 @@ def test_model_frame_counts_every_drop():
     units = pd.DataFrame({"nwb_file_name": "x_.nwb", "epoch": "02_r1", "unit": [0, 1]})
     frame, drops = model_frame(table, event_class="non_local_SWR", units=units)
     # Unit 1 never fires: its cell is silent.
+    assert drops["n_stops_with_events"] == 1
     assert drops["n_unit_stop_cells_silent"] == 1
     assert len(frame) == 1
+    assert frame["day"].tolist() == ["x_.nwb"]
     frame, drops = model_frame(table, event_class="non_local_no_SWR", units=units)
     assert drops["n_stops_unknown_switch"] == 1
     assert len(frame) == 0
