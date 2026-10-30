@@ -110,6 +110,7 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
+from continuum_swr_replay.reported.part4 import MIN_FIRING_RATE_HZ
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")
@@ -687,7 +688,9 @@ def generate_figure(
     )
     pop_df, modulations, pop_lag_time = load_population_data(
         data_dir,
-        min_firing_rate=1.0,
+        # No firing-rate cutoff, as Part 4's values (the lead, 2026-10-29):
+        # every unit with a usable fit.
+        min_firing_rate=MIN_FIRING_RATE_HZ,
         artifact_suffix=stop_cohort_suffix(stop_cohort),
     )
 
