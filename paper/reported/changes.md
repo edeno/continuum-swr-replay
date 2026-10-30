@@ -2340,3 +2340,67 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.marked_animals` | ? | 5 |
 | `paper/reported/overview.md` | `part4.marked_ripplepooled_ripple_power_pooled_peak` | ? | 0.012 |
 | `paper/reported/overview.md` | `part4.marked_ripplepooled_ripple_power_pooled_peak_lag_ms` | ? | −82 |
+
+## 2026-10-29
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_ci_low` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_ci_high` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_animals_pooled_sign` | ? | 3 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_animals_estimated` | ? | 5 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_loao_min` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_loao_max` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_ci_low` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_ci_high` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_animals_pooled_sign` | ? | 4 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_animals_estimated` | ? | 5 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_loao_min` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_loao_max` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_all_units` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_all_units_ci_low` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_all_units_ci_high` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units_ci_low` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units_ci_high` | ? | 1.1 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_decrease` | ? | 0.96 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_decrease_ci_low` | ? | 0.92 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_decrease_ci_high` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_low` | ? | 0.97 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_high` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_swr_replay_increase` | ? | 0.99 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_swr_replay_increase_ci_low` | ? | 0.96 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_swr_replay_increase_ci_high` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase` | ? | 1.0 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase_ci_low` | ? | 0.98 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase_ci_high` | ? | 1.0 |
+
+## 2026-10-29
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase` | 1.1 | 1.08 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_ci_low` | 1.0 | 1.02 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_ci_high` | 1.1 | 1.14 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_loao_min` | 1.0 | 1.02 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_loao_max` | 1.1 | 1.10 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase` | 1.1 | 1.06 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_ci_low` | 1.0 | 1.01 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_ci_high` | 1.1 | 1.11 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_loao_min` | 1.0 | 1.04 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_loao_max` | 1.1 | 1.08 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_all_units` | 1.1 | 1.08 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_all_units_ci_low` | 1.0 | 1.04 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_all_units_ci_high` | 1.1 | 1.12 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units` | 1.0 | 1.04 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units_ci_low` | 1.0 | 1.01 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units_ci_high` | 1.1 | 1.07 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_decrease_ci_high` | 1.0 | 1.00 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease` | 1.0 | 1.00 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_high` | 1.0 | 1.04 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_swr_replay_increase_ci_high` | 1.0 | 1.03 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase` | 1.0 | 1.01 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase_ci_high` | 1.0 | 1.05 |

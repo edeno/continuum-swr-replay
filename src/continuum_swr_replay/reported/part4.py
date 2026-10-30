@@ -127,6 +127,9 @@ TIMING_CALIBRATION = "pfc_response_followups/timing_calibration.json"
 
 SWR_WITHOUT_REPLAY_TREE = "pfc_response_followups/swr_without_replay"
 
+STOP_CONTEXT_RESULTS = "pfc_response_followups/stop_context/results.csv"
+"""The stop-level context fits (``scripts/pfc/run_pfc_stop_context.py fit``)."""
+
 MARKED_FAMILY_SUMMARY = (
     "pfc_response_followups/marked_family_baseline_prior/summary.parquet"
 )
@@ -193,6 +196,7 @@ class Part4Inputs:
     timing_calibration: Path
     swr_without_replay_dir: Path
     marked_family_summary: Path
+    stop_context_results: Path
 
 
 def default_inputs() -> Part4Inputs:
@@ -206,6 +210,7 @@ def default_inputs() -> Part4Inputs:
         timing_calibration=data / TIMING_CALIBRATION,
         swr_without_replay_dir=data / SWR_WITHOUT_REPLAY_TREE,
         marked_family_summary=data / MARKED_FAMILY_SUMMARY,
+        stop_context_results=data / STOP_CONTEXT_RESULTS,
     )
 
 
@@ -2136,6 +2141,112 @@ def marked_family_values(
     return values
 
 
+# --- stop context (Q8) ----------------------------------------------------------------
+
+
+def stop_context_values(
+    results: pd.DataFrame, make: Callable[..., Value]
+) -> list[Value]:
+    """Does the response to replay differ with the stop's reward outcome or a coming
+    patch switch?
+
+    Read from the stop-level context fits (``analysis/pfc/stop_context.py``): a
+    Poisson model, pooled over sessions, of each unit's spike count in the
+    ``[0, +200) ms`` window after each replay onset against its rate in the
+    same stop's event-free fitted time (the stop baseline estimated
+    conditionally), with free unit terms, the stop's known reward outcome, the
+    binary next-trip-switches-patch mark and the count of overlapping events;
+    fit for SWR-coupled and non-SWR replay, for units whose canonical peak is an
+    increase or a decrease. Main numbers: units called for the class
+    (conditional estimator); all units are a check (reward, increases only).
+    ``exp(beta)`` is the multiplicative change of the post-onset response
+    relative to the stop baseline at rewarded stops (or before a patch-leaving
+    trip); intervals are session-clustered 95 % intervals; animals counted with
+    the pooled sign out of those estimated; leave-one-animal-out range.
+    """
+    values: list[Value] = []
+
+    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
+        if np.isfinite(float(value)):
+            values.append(make(key, value, *args, **kwargs))
+
+    rows = results[results["estimator"] == "conditional"]
+    classes = {"non_local_SWR": "swr_replay", "non_local_no_SWR": "non_swr_replay"}
+    terms = {"rewarded": "reward", "next_trip_switches_patch": "switch"}
+    for (event_class, sign, unit_set, term), row in rows.set_index(
+        ["event_class", "sign", "unit_set", "term"]
+    ).iterrows():
+        if event_class not in classes or term not in terms:
+            continue
+        if unit_set == "all" and not (term == "rewarded" and sign == "increase"):
+            continue
+        stem = f"stop_context_{terms[term]}_gain_{classes[event_class]}_{sign}"
+        if unit_set == "all":
+            stem += "_all_units"
+        what = (
+            f"{'rewarded stops' if term == 'rewarded' else 'stops before a patch-leaving trip'}"
+            f", {event_class}, units whose peak is {'an increase' if sign == 'increase' else 'a decrease'}"
+            f", {'called' if unit_set == 'called' else 'all'} units"
+        )
+        add(
+            stem,
+            row["exp_coef"],
+            "quantity",
+            "dec2",
+            f"multiplicative change of the post-onset response relative to the stop "
+            f"baseline at {what}",
+            "x",
+        )
+        add(
+            f"{stem}_ci_low",
+            row["ci_low"],
+            "quantity",
+            "dec2",
+            f"lower end of the session-clustered 95 % interval of that, {what}",
+            "x",
+        )
+        add(
+            f"{stem}_ci_high",
+            row["ci_high"],
+            "quantity",
+            "dec2",
+            f"upper end of that interval, {what}",
+            "x",
+        )
+        if unit_set == "called" and sign == "increase":
+            add(
+                f"{stem}_animals_pooled_sign",
+                row["n_animals_pooled_sign"],
+                "count",
+                "count",
+                f"animals whose own estimate has the pooled sign, {what}",
+            )
+            add(
+                f"{stem}_animals_estimated",
+                row["n_animals_estimated"],
+                "count",
+                "count",
+                f"animals with an estimate, {what}",
+            )
+            add(
+                f"{stem}_loao_min",
+                row["loao_exp_coef_min"],
+                "quantity",
+                "dec2",
+                f"smallest leave-one-animal-out estimate, {what}",
+                "x",
+            )
+            add(
+                f"{stem}_loao_max",
+                row["loao_exp_coef_max"],
+                "quantity",
+                "dec2",
+                f"largest leave-one-animal-out estimate, {what}",
+                "x",
+            )
+    return values
+
+
 def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
     """Part 4's summary from ``inputs``."""
     summary = Summary(part=4, produced_by=produced_by, commit=commit)
@@ -2181,6 +2292,20 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
             )
         )
         summary.inputs.append(file_record(inputs.marked_family_summary, ROOT_DIR))
+    if inputs.stop_context_results.exists():
+        summary.add(
+            *stop_context_values(
+                pd.read_csv(inputs.stop_context_results),
+                _value_factory(
+                    f"{rel(inputs.stop_context_results)} "
+                    "(scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+                    claims,
+                    ("paper",),
+                    None,
+                ),
+            )
+        )
+        summary.inputs.append(file_record(inputs.stop_context_results, ROOT_DIR))
     extended_dir = inputs.swr_without_replay_dir
     extended_bundles = sorted(extended_dir.glob(f"*{STEM}.pkl"))
     if extended_bundles:

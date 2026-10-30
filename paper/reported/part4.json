@@ -3,11 +3,15 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "dd3bd1cd85ca-dirty",
+ "commit": "b402545d700f-dirty",
  "inputs": [
   {
    "path": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet",
    "sha256": "ecd836a226946eb3aa12c72fdb7837eb93e3c91c22e49770172a847559b9a20f"
+  },
+  {
+   "path": "Processed-Data/pfc_response_followups/stop_context/results.csv",
+   "sha256": "b949dcec67365c9a96b8d75e8649a5bdd83f35af08bf939918604e2924b72a8e"
   },
   {
    "path": "Processed-Data/pfc_response_followups/swr_without_replay/swr_without_replay/*_mPFC_modulation.pkl",
@@ -2335,6 +2339,696 @@
     "paper"
    ],
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_decrease": {
+   "value": 1.0034165840811171,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_decrease_ci_high": {
+   "value": 1.0387652167438963,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_decrease_ci_low": {
+   "value": 0.9692708467511691,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase": {
+   "value": 1.055646543693792,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_all_units": {
+   "value": 1.0400481352354911,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_all_units_ci_high": {
+   "value": 1.0676701280375485,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_all_units_ci_low": {
+   "value": 1.0131407587426489,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_animals_estimated": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with an estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_animals_pooled_sign": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose own estimate has the pooled sign, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_ci_high": {
+   "value": 1.1062685524564282,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_ci_low": {
+   "value": 1.0073409596053224,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_loao_max": {
+   "value": 1.0762166567927922,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "largest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_non_swr_replay_increase_loao_min": {
+   "value": 1.0364778001335666,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "smallest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_decrease": {
+   "value": 0.9601991174717264,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_decrease_ci_high": {
+   "value": 1.002253220032587,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_decrease_ci_low": {
+   "value": 0.9199095864850454,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase": {
+   "value": 1.0793371111332732,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_all_units": {
+   "value": 1.0793701455880675,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, all units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_all_units_ci_high": {
+   "value": 1.1241770683525265,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, all units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_all_units_ci_low": {
+   "value": 1.0363491161531733,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_SWR, units whose peak is an increase, all units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_animals_estimated": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with an estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_animals_pooled_sign": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose own estimate has the pooled sign, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_ci_high": {
+   "value": 1.142592900395848,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_ci_low": {
+   "value": 1.0195832645782412,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_loao_max": {
+   "value": 1.0983680889611875,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "largest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_reward_gain_swr_replay_increase_loao_min": {
+   "value": 1.02493460690233,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "smallest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_decrease": {
+   "value": 1.02098160805388,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_decrease_ci_high": {
+   "value": 1.055215582008149,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_decrease_ci_low": {
+   "value": 0.9878582744205882,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase": {
+   "value": 1.0119968020028458,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase_animals_estimated": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with an estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase_animals_pooled_sign": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase_ci_high": {
+   "value": 1.047699813185076,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase_ci_low": {
+   "value": 0.9775104608929364,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase_loao_max": {
+   "value": 1.023927172575158,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_non_swr_replay_increase_loao_min": {
+   "value": 0.9914967272722036,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_decrease": {
+   "value": 0.9950492139779098,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_decrease_ci_high": {
+   "value": 1.02979960602591,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_decrease_ci_low": {
+   "value": 0.9614714673071492,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase": {
+   "value": 0.993358955520978,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase_animals_estimated": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals with an estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase_animals_pooled_sign": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase_ci_high": {
+   "value": 1.0251271969557705,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase_ci_low": {
+   "value": 0.9625751979305868,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "lower end of the session-clustered 95 % interval of that, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase_loao_max": {
+   "value": 1.0066182450693757,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
+   "pending": null
+  },
+  "stop_context_switch_gain_swr_replay_increase_loao_min": {
+   "value": 0.9851702658615888,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "x",
+   "description": "smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
    "pending": null
   },
   "swr_called_fraction": {
