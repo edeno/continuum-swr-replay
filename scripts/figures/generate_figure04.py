@@ -18,7 +18,8 @@ Composite figure with 4 panels in 3 rows:
 
     Row 3 (panels c, d):
         c: Population average modulation curves (mean ± SEM) for SWR vs
-           non-SWR replay.
+           non-SWR replay, each unit's curve relative to its own value at
+           −200 ms (the reference of the Part 4 timing values).
         d: Consolidated statistics — fraction of neurons whose event
            regressor improves held-out deviance beyond the matched
            non-event control's null, and the distribution of the best
@@ -363,14 +364,20 @@ def plot_population_heatmaps(swr_mod, no_swr_mod, lag_time, axes):
 
 
 def plot_population_average(modulations, lag_time, ax):
-    """Plot population mean ± SEM modulation on provided ax."""
+    """Plot population mean ± SEM modulation on provided ax.
+
+    Each unit's curve is taken relative to its own value at the window's first
+    lag (−200 ms), the reference the Part 4 timing values use, so the panel shows
+    the event-locked change rather than the whole-window level that low-rate
+    units carry.
+    """
     lag_ms = lag_time * 1000
 
     for name, color, label in [
         ("swr", COLORS["SWR"], "SWR"),
         ("no_swr", COLORS["Non-Local"], "Non-SWR replay"),
     ]:
-        arr = modulations[name]
+        arr = modulations[name] - modulations[name][:1]
         mean = np.nanmean(arr, axis=1)
         sem = np.nanstd(arr, axis=1) / np.sqrt(arr.shape[1])
 
@@ -380,7 +387,7 @@ def plot_population_average(modulations, lag_time, ax):
     ax.axhline(0, color="k", linewidth=0.5, linestyle="--")
     ax.axvline(0, color="k", linewidth=0.5, linestyle="--")
     ax.set_xlabel("Time from event (ms)")
-    ax.set_ylabel("Log firing rate change")
+    ax.set_ylabel(f"Log firing rate change\nre {lag_ms[0]:.0f} ms")
     ax.set_xlim(lag_ms[0], lag_ms[-1])
     ax.legend(frameon=False)
     ax.set_title(f"Population (n={modulations['swr'].shape[1]:,})")

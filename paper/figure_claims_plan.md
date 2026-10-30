@@ -42,7 +42,8 @@ d: replay position by SWR status ("non-SWR represents reward zones").
 **Fig 4 — "PFC neurons respond to replay regardless of SWR detection."**
 a: single mPFC neuron, overlaid SWR + non-SWR GLM modulation + PSTHs.
 b: population heatmaps, SWR vs non-SWR modulation (shared sort order).
-c: population average modulation (mean ± SEM). d: % neurons significantly
+c: population average modulation (mean ± SEM), each unit's curve relative to its
+value at −200 ms (the Part 4 timing reference). d: % neurons significantly
 modulated + best-AIC model distribution.
 
 ---

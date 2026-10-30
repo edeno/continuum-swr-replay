@@ -424,3 +424,20 @@ def test_a_non_canonical_prior_is_refused_before_anything_is_loaded(monkeypatch)
     monkeypatch.setattr(figure04, "load_results", _must_not_load)
     with pytest.raises(ValueError, match="sensitivity bundle"):
         figure04.generate_figure(penalty_sigma=1.0)
+
+
+def test_panel_c_curves_are_relative_to_each_units_value_at_the_window_start():
+    # Two units with the same event-locked bump on different whole-window
+    # levels: relative to -200 ms, both start at zero and the mean is the bump.
+    lag_time = np.arange(-100, 101) / 500
+    bump = np.exp(-0.5 * (lag_time / 0.05) ** 2)
+    curves = np.stack([bump - 0.5, bump + 0.2], axis=1)
+    modulations = {"swr": curves, "no_swr": curves}
+    fig, ax = plt.subplots()
+
+    figure04.plot_population_average(modulations, lag_time, ax)
+
+    mean_line = ax.get_lines()[0]
+    np.testing.assert_allclose(mean_line.get_ydata(), bump - bump[0], atol=1e-12)
+    assert "-200 ms" in ax.get_ylabel()
+    plt.close(fig)
