@@ -178,7 +178,6 @@ def test_the_pending_notes_reach_the_followup_values(tmp_path, tables):
         pfc_cohort=tmp_path / "cohort.json",
         event_table=event,
         stop_table=stop,
-        ml_tree=tmp_path,
         timing_calibration=tmp_path / "none.json",
         swr_without_replay_dir=tmp_path,
         marked_family_summary=_marked(tmp_path, current),

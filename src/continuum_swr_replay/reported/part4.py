@@ -12,9 +12,6 @@ refitted here. The inputs (:class:`Part4Inputs`):
 - the PFC cohort record the runner writes (``pfc_cohort_mPFC.json``);
 - the canonical event and stop tables, only to check that the bundles and the
   follow-up fits below were made from the current ones;
-- the superseded maximum-likelihood tree (``_pre_ridge_backup_20260915``), for
-  the one comparison the prior is justified by (marked pending: it was fit on
-  earlier tables);
 - the timing calibration (``pfc_response_followups/timing_calibration.json``,
   from ``scripts/pfc/calibrate_pfc_kernel_timing.py``);
 - the extended-event-set bundles with SWRs without replay
@@ -105,13 +102,6 @@ CHECK_KEYS = (
     "overlap_odds_ratio",
     "overlap_rank_correlation",
     "swr_no_replay_called_fraction_all",
-)
-
-ML_TREE = "_pre_ridge_backup_20260915"
-ML_PENDING = (
-    "read from the superseded maximum-likelihood tree (Processed-Data/"
-    "_pre_ridge_backup_20260915), fit on the tables before the R11 re-decode; "
-    "it is a comparison of estimators, not refit on the current tables"
 )
 
 #: The unit tests Figure 4 reports, by the word their keys use.
@@ -235,7 +225,6 @@ class Part4Inputs:
     pfc_cohort: Path
     event_table: Path
     stop_table: Path
-    ml_tree: Path
     timing_calibration: Path
     swr_without_replay_dir: Path
     marked_family_summary: Path
@@ -249,7 +238,6 @@ def default_inputs() -> Part4Inputs:
         pfc_cohort=data / "pfc_cohort_mPFC.json",
         event_table=table_path("event_table", replay_content_dir()),
         stop_table=table_path("stop_table", replay_content_dir()),
-        ml_tree=data / ML_TREE,
         timing_calibration=data / TIMING_CALIBRATION,
         swr_without_replay_dir=data / SWR_WITHOUT_REPLAY_TREE,
         marked_family_summary=data / MARKED_FAMILY_SUMMARY,
@@ -739,33 +727,6 @@ def estimator_values(
             "sig2",
             "non-converged fits as a percent of model fits",
             "%",
-        ),
-    ]
-
-
-def ml_comparator_values(ml_tree: Path, make: Callable[..., Value]) -> list[Value]:
-    """Non-convergence in the maximum-likelihood tree the prior replaced."""
-    sidecars = read_sidecars(ml_tree)
-    if _uniform(sidecars, "estimator") != "poisson_glm":
-        raise ValueError(f"{ml_tree} is not the maximum-likelihood tree")
-    fits = sum(s["n_model_fits"] for s in sidecars)
-    nonconverged = sum(s["n_nonconverged_model_fits"] for s in sidecars)
-    return [
-        make(
-            "ml_nonconverged_percent",
-            100 * nonconverged / fits,
-            "quantity",
-            "sig2",
-            "non-converged fits as a percent of model fits in the maximum-likelihood "
-            f"tree ({nonconverged} of {fits}, {len(sidecars)} sessions)",
-            "%",
-        ),
-        make(
-            "ml_sessions",
-            len(sidecars),
-            "count",
-            "count",
-            "sessions in the maximum-likelihood tree",
         ),
     ]
 
@@ -2613,18 +2574,6 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
                 ROOT_DIR,
             ),
         ]
-    summary.add(
-        *ml_comparator_values(
-            inputs.ml_tree,
-            _value_factory(
-                f"{rel(inputs.ml_tree)}/*{STEM}.provenance.json",
-                claims,
-                ("paper",),
-                ML_PENDING,
-            ),
-        )
-    )
-
     summary.add(*rate_cutoff_check_values(population, extended_check, make))
 
     data = inputs.bundle_dir
@@ -2641,12 +2590,6 @@ def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
             [file_record(inputs.timing_calibration, ROOT_DIR)]
             if inputs.timing_calibration.exists()
             else []
-        ),
-        files_record(
-            f"*{STEM}.provenance.json",
-            inputs.ml_tree.glob(f"*{STEM}.provenance.json"),
-            ROOT_DIR,
-            note="superseded maximum-likelihood tree, for one comparison",
         ),
     ]
     return summary

@@ -15,3 +15,4 @@ Each row is an analysis or number taken out of a doc when Part 4's typed numbers
 | Doc | Claim / section | What | Now |
 |---|---|---|---|
 | `paper/claims_table.md` | 20, Numbers | "BH across the pooled units would give 12.1 %, quoted for reference only" | Restored as the computed value `engagement_bh_fraction`: BH applied once over the pooled plus-one empirical engagement p-values of every tested unit in Figure 4's population. Removed at first because no tracked script BH-corrects the held-out p-values (it was retired as inference); the review pointed out that the bundles hold those p-values. |
+| claims_table.md (20), docs/README.md | estimator note | `ml_nonconverged_percent` and `ml_sessions` (non-convergence in the superseded maximum-likelihood tree, `_pre_ridge_backup_20260915`) | pending: fit on the tables before the R11 re-decode, so not a before/after on the current sessions; the reason for the prior is kept in words |

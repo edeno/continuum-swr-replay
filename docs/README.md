@@ -439,7 +439,7 @@ Three tiers:
    the two inferences call comparable fractions of a comparable population, which are **not**
    comparable test by test. In the current bundles (`paper/reported/part4.json`),
    non-converged fits are **<!--v:part4.nonconverged_percent-->0.26<!--/v-->%** of model fits (<!--v:part4.nonconverged_model_fits-->432<!--/v--> of <!--v:part4.model_fits-->166,968<!--/v-->,
-   over <!--v:part4.nonconverged_neurons-->48<!--/v--> neurons). For reference only, and pending (a different tree, not a before/after on these sessions), the superseded maximum-likelihood tree (<!--v:part4.ml_sessions-->71<!--/v--> sessions, fit on the tables before the R11 re-decode) left <!--v:part4.ml_nonconverged_percent-->15<!--/v-->% unconverged. The prior binds on
+   over <!--v:part4.nonconverged_neurons-->48<!--/v--> neurons). The prior binds on
    <!--v:part4.prior_binds_percent_min-->2.6<!--/v-->–<!--v:part4.prior_binds_percent_max-->4.9<!--/v-->% of well-posed units per curve. The null's geometry, by the rules of
    `scripts/pfc/measure_pfc_null_geometry.py`: the engagement null's draws land on the
    shipped control they are entered beside on a median <!--v:part4.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:part4.class_called_flat_fraction_min@pctnum-->4<!--/v-->–<!--v:part4.class_called_flat_fraction_max-->8 %<!--/v--> of
