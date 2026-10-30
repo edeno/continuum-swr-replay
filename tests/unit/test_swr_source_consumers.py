@@ -812,6 +812,9 @@ DECODE_FRAME_READERS = {
     "scripts/detection/run_event_features.py": (
         "reads it through with_swr_source; its events are the comparison's tables"
     ),
+    "scripts/detection/measure_event_start_and_rest_theta.py": (
+        "reads it through with_swr_source; read_pickle reads the environment"
+    ),
 }
 
 
