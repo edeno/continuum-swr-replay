@@ -31,15 +31,21 @@ Run one process per GPU with disjoint session files. Six compact core models
 share one feature width; the three content horse-races and three interactions
 share the wider tier, so only two scorer shapes compile within a session.
 
-Fit the follow-up models (content, strength, stop context, ripple power) and
-their marginal tier on the extended event set, with a 30-draw shuffled-mark
-reference for every slope kernel; the follow-up set needs an explicit output
-directory::
+Fit the shipped follow-up run (contract 3): the ten models of
+``logs/pfc_response_followups/marked_family/models.txt`` (the follow-up joint
+models without ``stop_context``, and their marginal tier) on the extended event
+set, with no shuffled-mark reference and a prior SD of 3 on the baseline
+columns; one process per GPU (1-9) with disjoint session files. The
+follow-up set needs an explicit output directory::
 
-    python scripts/pfc/run_pfc_marked_model_family.py --gpu 1 \
-        --sessions worker1.sessions --model-set followup --tier all \
+    uv run python scripts/pfc/run_pfc_marked_model_family.py --gpu 1 \
+        --sessions logs/pfc_response_followups/marked_family_well_unknown/gpu1.sessions \
+        --model-set followup \
+        --models $(cat logs/pfc_response_followups/marked_family/models.txt) \
         --event-set with_swr_without_replay \
-        --output-dir Processed-Data/pfc_response_followups/marked_family
+        --slope-permutations 0 --baseline-penalty-sigma 3 \
+        --output-dir Processed-Data/pfc_response_followups/marked_family_well_unknown \
+        --log-directory logs/pfc_response_followups/marked_family_well_unknown
 """
 
 from __future__ import annotations

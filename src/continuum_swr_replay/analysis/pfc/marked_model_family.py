@@ -6,9 +6,10 @@ small family of question-specific, jointly adjusted designs.  A family shares
 one full fit across all of its target marks and compares each target with the
 otherwise identical model lacking only that target's temporal block.
 
-There are deliberately no p-values, label shuffles, or neuron-selection rules
-here.  The outputs are descriptive effect kernels and blocked held-out
-prediction changes.  The models use only event/content tables already shipped
+There are no p-values or neuron-selection rules here.  The outputs are
+descriptive effect kernels and blocked held-out prediction changes, plus an
+optional shuffled-mark reference for each slope kernel (``slope_permutations``
+draws; 0, i.e. none, in the shipped follow-up run).  The models use only event/content tables already shipped
 by the replay pipeline; they do not decode mPFC population activity.
 """
 
@@ -1565,8 +1566,9 @@ def build_marked_family_ladder(
     min_marked_events : int
         Fewest finite events a class may contribute to a marked kernel.
     baseline : NDArray, shape (n_fit_bins, n_baseline), optional
-        Unpenalized per-stop baseline columns placed after the intercept of
-        the full and every reduced design
+        Per-stop baseline columns placed after the intercept of the full and
+        every reduced design; free in marked_glm; in the family, free unless
+        ``baseline_penalty_sigma`` is given
         (:func:`~continuum_swr_replay.analysis.pfc.marked_glm.build_baseline_columns`).
 
     Returns

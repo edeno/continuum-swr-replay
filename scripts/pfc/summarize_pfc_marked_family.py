@@ -2,8 +2,10 @@
 
 Reads every complete bundle written by ``run_pfc_marked_model_family.py`` and
 aggregates unit -> session -> animal, never pooling units across sessions as
-if they were independent. Everything here is descriptive: the design doc
-attaches no p-value to a held-out delta, and none is computed.
+if they were independent. No p-value is attached to a held-out delta. The
+only p-value is the max-statistic call on a slope kernel against its
+shuffled-mark reference, computed only when the bundles carry null draws
+(``*.slope_null.npy``; none in the shipped run, ``--slope-permutations 0``).
 
 Per model, replay class and target mark the summary reports
 
@@ -13,9 +15,10 @@ Per model, replay class and target mark the summary reports
   the median over animals (animal-balanced) with the range across animals;
 - the median and 95th percentile of finite unit deltas, pooled only for
   scale;
-- the population mean one-SD slope kernel (mean over session means, SEM over
-  sessions), its peak value and lag, and how many sessions and animals share
-  the sign of that peak;
+- the population mean one-SD slope kernel (mean over animals of each
+  animal's mean over its sessions' unit-mean curves, SEM over animals), its
+  peak value and lag, and how many sessions and animals share the sign of
+  that peak;
 - when the bundles carry shuffled-mark nulls (``*.slope_null.npy``), the 95 %
   band of the same population curve over the shuffled refits, and whether
   the observed peak (and window mean) lies outside it, overall and per
@@ -39,12 +42,13 @@ Usage
     --out .claude/docs/reviews/<date>-pfc-marked-family-summary.md \
     --figure-dir paper/figures/pfc_marked_family``
 
-The follow-up corpus::
+The follow-up corpus (contract 3, ``well_unknown`` baseline; writes
+``summary.parquet`` into the bundle directory)::
 
     uv run python scripts/pfc/summarize_pfc_marked_family.py \
-        --bundle-dir Processed-Data/pfc_response_followups/marked_family \
-        --out .claude/docs/reviews/<date>-pfc-marked-followups-summary.md \
-        --figure-dir paper/figures/pfc_marked_family/followups
+        --bundle-dir Processed-Data/pfc_response_followups/marked_family_well_unknown \
+        --out .claude/research/pfc_response_followups_outputs/marked_family_well_unknown/report.md \
+        --figure-dir .claude/research/pfc_response_followups_outputs/marked_family_well_unknown
 """
 
 from __future__ import annotations
@@ -381,8 +385,10 @@ def population_curve_summary(
         # A kernel that is as large before onset as after it is a stationary
         # rate difference between the contexts the events occur in, not an
         # event-locked response; report both halves so they can be told apart.
-        pre = lag_time <= -0.1
-        post = (lag_time >= 0.0) & (lag_time <= 0.15)
+        pre = lag_time <= PRE_ONSET_MAX_S
+        post = (lag_time >= POST_ONSET_WINDOW_S[0]) & (
+            lag_time <= POST_ONSET_WINDOW_S[1]
+        )
         pre_mean = float(mean[pre].mean())
         post_mean = float(mean[post].mean())
         sign = np.sign(mean[peak])
