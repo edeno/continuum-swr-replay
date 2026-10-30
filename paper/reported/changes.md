@@ -2617,3 +2617,30 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_low` | 0.97 | 0.95 |
 | `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_high` | 1.04 | 1.06 |
 | `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase_ci_low` | 0.98 | 0.97 |
+
+## 2026-10-30
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.marked_content_recent_reward_swr_replay_post_onset_mean` | −0.0087 | −0.0088 |
+| `paper/reported/overview.md` | `part4.marked_content_uncertainty_swr_replay_peak` | −0.0097 | −0.0096 |
+| `paper/reported/overview.md` | `part4.marked_content_uncertainty_swr_replay_post_onset_mean` | −0.00069 | −0.00077 |
+| `paper/reported/overview.md` | `part4.marked_strength_duration_non_swr_replay_peak` | 0.0078 | 0.0076 |
+| `paper/reported/overview.md` | `part4.marked_strength_duration_non_swr_replay_post_onset_mean` | 0.0014 | 0.0013 |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_swr_replay_peak` | −0.0078 | −0.0077 |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_swr_replay_post_onset_mean` | 0.0014 | 0.0015 |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_non_swr_replay_peak` | 0.0087 | 0.0088 |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_non_swr_replay_post_onset_mean` | −0.00019 | −0.000039 |
+| `paper/reported/overview.md` | `part4.marked_strength_mua_rate_swr_replay_peak` | −0.0057 | −0.0055 |
+| `paper/reported/overview.md` | `part4.marked_strength_mua_rate_swr_replay_post_onset_mean` | −0.00098 | −0.00080 |
+| `paper/reported/overview.md` | `part4.marked_content_current_arm_non_swr_replay_heldout_gain_fraction` | 33 % | 34 % |
+| `paper/reported/overview.md` | `part4.marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction` | 28 % | 29 % |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction` | 27 % | 26 % |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_swr_replay_peak_lag_ms` | 6 | 8 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_swr_replay_post_onset_mean` | 0.0077 | 0.0079 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_non_swr_replay_peak` | 0.0088 | 0.0091 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_non_swr_replay_peak_lag_ms` | −96 | −98 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_non_swr_replay_post_onset_mean` | −0.0041 | −0.0039 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_swr_no_replay_peak` | −0.0099 | −0.0096 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_swr_no_replay_post_onset_mean` | −0.0059 | −0.0057 |
+| `paper/reported/overview.md` | `part4.marked_ripplepooled_ripple_power_pooled_peak_lag_ms` | −82 | −84 |
