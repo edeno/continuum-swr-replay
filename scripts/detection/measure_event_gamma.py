@@ -15,9 +15,11 @@ Is a non-local event at rest accompanied by a rise in slow or fast gamma
    samples / mean power over quiet rest)`` (``gamma_power.power_change_db``).
 
 Writes ``Processed-Data/<--out-name>/{epoch_id}_events.parquet`` per epoch,
-``reference.parquet`` (one row per epoch) and ``manifest.json``. A failing
-epoch is recorded and the rest run; a rerun skips the epochs already written
-unless ``--overwrite``.
+``reference.parquet`` (one row per epoch) and ``manifest.json``. Each epoch's
+``{epoch_id}_reference.json`` and the manifest record the SHA-256 of the
+canonical event table the events were read from. A failing epoch is recorded
+and the rest run; a rerun skips the epochs already written from the same event
+table unless ``--overwrite``.
 
 Usage::
 
@@ -62,6 +64,7 @@ from continuum_swr_replay.paths import (
     swr_inventory_root,
     table_path,
 )
+from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
@@ -134,13 +137,25 @@ def epoch_gamma(
     }
 
 
+def _written_from(ref_path: Path) -> str | None:
+    """The event-table SHA-256 an epoch's written reference records, if any."""
+    if not ref_path.exists():
+        return None
+    return json.loads(ref_path.read_text()).get("event_table_sha256")
+
+
 def _run(
-    job: tuple[str, dict[str, Any], pd.DataFrame, bool, str],
+    job: tuple[str, dict[str, Any], pd.DataFrame, bool, str, str],
 ) -> tuple[str, dict[str, Any]]:
-    identifier, record, events, overwrite, name = job
+    identifier, record, events, overwrite, name, event_table_sha256 = job
     path = out_dir(name) / f"{identifier}_events.parquet"
     ref_path = out_dir(name) / f"{identifier}_reference.json"
-    if path.exists() and ref_path.exists() and not overwrite:
+    # An epoch written from another event table describes other events.
+    if (
+        path.exists()
+        and _written_from(ref_path) == event_table_sha256
+        and not overwrite
+    ):
         return identifier, {"status": "ok", "reused": True}
     started = time.perf_counter()
     try:
@@ -151,6 +166,7 @@ def _run(
             "error": f"{type(error).__name__}: {error}",
         }
     table.to_parquet(path, index=False)
+    reference["event_table_sha256"] = event_table_sha256
     ref_path.write_text(json.dumps(reference, default=float) + "\n")
     return identifier, {"status": "ok", "wall_clock_s": time.perf_counter() - started}
 
@@ -168,8 +184,10 @@ def main(argv: Sequence[str] | None = None) -> None:
             swr_inventory_root() / swr_source.SWR_INVENTORY_RUN_ID / "manifest.json"
         ).read_text()
     )
+    event_table = table_path("event_table", replay_content_dir())
+    event_table_sha256 = sha256_file(event_table)
     events = pd.read_parquet(
-        table_path("event_table", replay_content_dir()),
+        event_table,
         columns=[*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"],
     )
     by_epoch = {
@@ -177,7 +195,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         for (animal, day, epoch), frame in events.groupby(KEYS)
     }
     jobs = [
-        (identifier, record, by_epoch[identifier], args.overwrite, args.out_name)
+        (
+            identifier,
+            record,
+            by_epoch[identifier],
+            args.overwrite,
+            args.out_name,
+            event_table_sha256,
+        )
         for identifier, record in sorted(swr_manifest["epochs"].items())
         if record.get("status") == "ok"
         and identifier in by_epoch
@@ -207,6 +232,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "produced_by": produced_by(__file__),
                 "commit": described_commit(),
                 "swr_run": swr_source.SWR_INVENTORY_RUN_ID,
+                "event_table": {"path": str(event_table), "sha256": event_table_sha256},
                 "bands_hz": GAMMA_BANDS,
                 "filter": f"Butterworth order {FILTER_ORDER}, zero phase (sosfiltfilt)",
                 "power": "squared Hilbert envelope, mean over the kept CA1 tetrodes",
