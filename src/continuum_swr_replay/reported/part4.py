@@ -21,7 +21,7 @@ refitted here. The inputs (:class:`Part4Inputs`):
   (``pfc_response_followups/swr_without_replay``, from
   ``scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay``);
 - the marked-family summary of the follow-up models and the bundle sidecars
-  beside it (``pfc_response_followups/marked_family_baseline_prior``, from
+  beside it (``pfc_response_followups/marked_family_well_unknown``, from
   ``scripts/pfc/run_pfc_marked_model_family.py`` and
   ``scripts/pfc/summarize_pfc_marked_family.py``), pending when a sidecar
   records other tables (:func:`marked_family_staleness`);
@@ -165,10 +165,11 @@ STOP_CONTEXT_RESULTS = "pfc_response_followups/stop_context/results.csv"
 """The stop-level context fits (``scripts/pfc/run_pfc_stop_context.py fit``)."""
 
 MARKED_FAMILY_SUMMARY = (
-    "pfc_response_followups/marked_family_baseline_prior/summary.parquet"
+    "pfc_response_followups/marked_family_well_unknown/summary.parquet"
 )
 """The marked-family summary (``scripts/pfc/summarize_pfc_marked_family.py``)
-of the follow-up models fit with the per-stop baseline prior."""
+of the follow-up models fit with the per-stop baseline prior and the
+``well_unknown`` baseline column (bundle contract 3)."""
 
 #: Joint follow-up models and targets quoted in Part 4, by key word.
 MARKED_MODELS = {
