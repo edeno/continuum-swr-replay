@@ -182,6 +182,13 @@ INTERACTION_FACTORS: dict[str, tuple[str, ...]] = {
         "is_swr",
         "is_candidate_arm_never_visited",
     ),
+    # SWR-specific arm baselines of the pooled contrast rungs (fit-time only):
+    # without them the arms share one baseline across SWR and non-SWR events,
+    # and SWR's shift of content onto the trunks loads on the swr_x terms.
+    **{
+        f"swr_x_is_candidate_arm_{k}": ("is_swr", f"is_candidate_arm_{k}")
+        for k in range(8)
+    },
     "swr_x_is_last_rewarded_noncurrent_arm": (
         "is_swr",
         "is_last_rewarded_noncurrent_arm",

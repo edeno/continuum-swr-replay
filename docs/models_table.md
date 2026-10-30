@@ -660,6 +660,9 @@ _LENC    := log_n_nonlocal_bins_z:is_current_arm              # event-length con
 _LENP    := log_n_nonlocal_bins_z:is_prev_arm
 BASEc_NT := ARMFE + is_current_arm + is_prev_arm + RECSPL
 BASEc    := BASEc_NT + _TSC + _LENC + _LENP
+SWR_ARMFE    := swr_x_ARMFE                                   # SWR-specific arm baselines
+BASEc_SWR    := BASEc + SWR_ARMFE                             # base of every pooled rung
+BASEc_NT_SWR := BASEc_NT + SWR_ARMFE
 ```
 
 **Why `BASEc` carries the two length products and `_TSC`.** SWR-coupled events
@@ -685,6 +688,17 @@ every `C*`/`CS*` `is_current_arm` non-comparable with `M1` / `C1_current`.
 non-SWR-only) and the dissociation is the comparison across those populations. A
 `pooled` rung fits both streams together, so its `swr_x_…` coefficient is the
 formal SWR-vs-non-SWR difference.
+
+**Every pooled rung carries SWR-specific arm baselines** (`SWR_ARMFE`, from
+2026-10-30): SWR and non-SWR events each get their own arm fixed effects, so a
+rung's `swr_x_…` compares the two kinds of event at the same arm. With one
+shared set, SWR's shift of content onto the trunk arms (about twice the trunk
+share, 5/5 animals) loaded on the only SWR-specific term: `CS1nt`'s
+`swr_x_is_current_arm` read −0.41 (0/5 animals positive), "SWR content is off
+the current arm" when it was "SWR content is on the trunks". On a leaf-only rung
+the baselines are the five leaf dummies' `swr_x_` twins. The pooled rungs below
+are on `BASEc_SWR` (`BASEc_NT_SWR` for `nt`); the "added to" column lists what
+is added on top of that.
 
 ```rungs
 C0_armfe

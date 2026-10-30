@@ -486,6 +486,25 @@ holds the TOTAL SWR effect. Both are shipped and are reported side by side;
 neither supersedes the other.
 ```
 
+## Content is_swr-contrast: SWR-specific arm baselines (2026-10-30)
+
+Every pooled arm rung (`CS1`–`CS6` and their `nt` twins, the leaf-only belief
+rungs included) now carries `swr_x_is_candidate_arm_0..7` (`SWR_ARMFE`; on a
+leaf-only rung the five leaf dummies' twins). Before, SWR and non-SWR events
+shared one set of arm fixed effects, and the rung's single `swr_x_` term was the
+only place an SWR difference could go. SWR events put about twice the share of
+their content on the trunk arms (all five animals), and the current, previous
+and last-rewarded arms are leaves, so the shared baselines read that shift as an
+effect of the leaf-arm feature: `CS1nt`'s `swr_x_is_current_arm` was −0.41
+(0/5 animals positive) and `CS1`'s −0.07 (1/5), against a paired within-session
+split difference (`C2_base` SWR − non-SWR `is_current_arm`) of about +0.09
+(3/5). With SWR-specific baselines the pooled terms read +0.03 (3/5) and +0.19
+(3/5) and match the split difference animal by animal (exploratory refit,
+`.claude/research/claim19a/swr_current_armfe.py`). The trunk shift itself is
+reported directly (Part 3 `trunk_share_*`). The patch ladder has no patch fixed
+effects (its base is current/previous patch, recency and never-visited), so it
+has no shared baselines to split and is unchanged.
+
 ## Content patch is_swr-contrast: the retired CP2/CPS3 rungs (moved 2026-09-06)
 
 Moved verbatim from `model_specs.py`:

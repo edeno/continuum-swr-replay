@@ -1442,6 +1442,14 @@ _TSC = "log1p_time_since_stop_start_s_z_x_is_current_arm"
 _LENC = "log_n_nonlocal_bins_z_x_is_current_arm"
 _LENP = "log_n_nonlocal_bins_z_x_is_prev_arm"
 BASEc = [*BASEc_NT, _TSC, _LENC, _LENP]
+# SWR-specific arm baselines, on every pooled rung: SWR and non-SWR events each
+# get their own arm fixed effects, so the swr_x term of a rung compares the two
+# kinds of event at the same arm rather than absorbing SWR's shift of content
+# onto the trunk arms. Why: ``docs/design/model_history.md`` § "Content
+# is_swr-contrast: SWR-specific arm baselines".
+SWR_ARMFE = [f"swr_x_{c}" for c in ARMFE]
+BASEc_SWR = [*BASEc, *SWR_ARMFE]
+BASEc_NT_SWR = [*BASEc_NT, *SWR_ARMFE]
 SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     "C0_armfe": (ARMFE, "split"),
     "C1_current": ([*ARMFE, "is_current_arm"], "split"),
@@ -1496,12 +1504,12 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # effect. Both are shipped and reported side by side; neither supersedes the
     # other. Estimand argument: ``docs/design/model_history.md``
     # § "Content is_swr-contrast: the direct/total estimand of every swr_x term".
-    "CS1_current": ([*BASEc, "swr_x_is_current_arm"], "pooled"),
-    "CS1nt_current": ([*BASEc_NT, "swr_x_is_current_arm"], "pooled"),
-    "CS2_prev": ([*BASEc, "swr_x_is_prev_arm"], "pooled"),
+    "CS1_current": ([*BASEc_SWR, "swr_x_is_current_arm"], "pooled"),
+    "CS1nt_current": ([*BASEc_NT_SWR, "swr_x_is_current_arm"], "pooled"),
+    "CS2_prev": ([*BASEc_SWR, "swr_x_is_prev_arm"], "pooled"),
     "CS3_lastrew": (
         [
-            *BASEc,
+            *BASEc_SWR,
             "is_last_rewarded_noncurrent_arm",
             "swr_x_is_last_rewarded_noncurrent_arm",
         ],
@@ -1509,7 +1517,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     ),
     "CS4_armreward": (
         [
-            *BASEc,
+            *BASEc_SWR,
             "reward_fraction_candidate_arm_last10_visits",
             "swr_x_reward_fraction_candidate_arm_last10_visits",
         ],
@@ -1517,7 +1525,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     ),
     "CS4nt_armreward": (
         [
-            *BASEc_NT,
+            *BASEc_NT_SWR,
             "reward_fraction_candidate_arm_last10_visits",
             "swr_x_reward_fraction_candidate_arm_last10_visits",
         ],
@@ -1525,7 +1533,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     ),
     "CS5_armvalue": (
         [
-            *BASEc,
+            *BASEc_SWR,
             "reward_belief_mean_candidate_arm_preoutcome",
             "swr_x_reward_belief_mean_candidate_arm_preoutcome",
         ],
@@ -1533,7 +1541,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     ),
     "CS5nt_armvalue": (
         [
-            *BASEc_NT,
+            *BASEc_NT_SWR,
             "reward_belief_mean_candidate_arm_preoutcome",
             "swr_x_reward_belief_mean_candidate_arm_preoutcome",
         ],
@@ -1550,7 +1558,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # reported in paper/claims_table.md (row 19f) — do not duplicate them here.
     "CS5b_valuevsprevgoal": (
         [
-            *BASEc,
+            *BASEc_SWR,
             "reward_belief_mean_candidate_arm_preoutcome",
             "swr_x_reward_belief_mean_candidate_arm_preoutcome",
             "is_last_rewarded_noncurrent_arm",
@@ -1569,7 +1577,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     ),
     "CS6_armuncert": (
         [
-            *BASEc,
+            *BASEc_SWR,
             "reward_belief_variance_candidate_arm_preoutcome_z",
             "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
         ],
@@ -1577,7 +1585,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     ),
     "CS6nt_armuncert": (
         [
-            *BASEc_NT,
+            *BASEc_NT_SWR,
             "reward_belief_variance_candidate_arm_preoutcome_z",
             "swr_x_reward_belief_variance_candidate_arm_preoutcome_z",
         ],
@@ -1713,8 +1721,10 @@ LEAF_ONLY_ARM_FE_PREDICTORS: tuple[str, ...] = tuple(
 
 
 def leaf_only_predictors(predictors) -> list[str]:
-    """Drop the arm fixed effects that are structurally zero on a leaf-only fit."""
+    """Drop the arm fixed effects (and their SWR-specific twins) that are
+    structurally zero on a leaf-only fit."""
     dropped = set(ARM_FE_PREDICTORS) - set(LEAF_ONLY_ARM_FE_PREDICTORS)
+    dropped |= {f"swr_x_{p}" for p in dropped}
     return [p for p in predictors if p not in dropped]
 
 
