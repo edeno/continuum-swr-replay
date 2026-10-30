@@ -23,9 +23,12 @@ here. The inputs (:class:`Part3Inputs`), with their runs in
 - the SWR-power model (``models_per_event_swr_power/swr_power_model.pkl``,
   ``coupling.ripple_power``);
 - the duration-aware history refit (``models_per_bin_rate/duration_aware_history_
-  {models,pooled}.pkl``, ``rate.duration_aware_history.{at_well,pooled_at_well}``),
+  pooled.pkl``, ``rate.duration_aware_history.pooled_at_well``),
   which supersedes the onset-only self-history values (``rate_burst_*``,
-  ``rate_refractory_*``, ``rate_raw_burst_*``; their pending note says so);
+  ``rate_refractory_*``, ``rate_raw_burst_*``; their pending note says so),
+  and its ridge cross-validated cross-history comparison
+  (``models_per_bin_rate/cross_history_ridge_cv/cross_history_ridge_cv.pkl``,
+  ``rate.cross_history_ridge_cv.at_well``), the source of the cross values;
 - the within-arm horse race (``uncertainty_content/horserace_summary.csv``,
   ``content.uncertainty``);
 - the canonical event and stop tables, for event lengths and cohort sizes.
@@ -289,8 +292,8 @@ class Part3Inputs:
     stop_table: Path
     onset_table: Path
     trunk_per_event: Path
-    duration_aware_sessions: Path
     duration_aware_pooled: Path
+    cross_ridge_cv: Path
     horserace_summary: Path
 
 
@@ -318,10 +321,11 @@ def default_inputs() -> Part3Inputs:
         stop_table=table_path("stop_table", rc),
         onset_table=table_path("event_onset_table", rc),
         trunk_per_event=rc / "_trunk_zscore_per_event.pkl",
-        duration_aware_sessions=model_dir("per_bin_rate")
-        / "duration_aware_history_models.pkl",
         duration_aware_pooled=model_dir("per_bin_rate")
         / "duration_aware_history_pooled.pkl",
+        cross_ridge_cv=model_dir("per_bin_rate")
+        / "cross_history_ridge_cv"
+        / "cross_history_ridge_cv.pkl",
         horserace_summary=rc / "uncertainty_content" / "horserace_summary.csv",
     )
 
@@ -2581,10 +2585,6 @@ SUPERSEDED_PREFIXES = ("rate_burst_", "rate_refractory_", "rate_raw_burst_")
 HISTORY_MIN_SUPPORT = 3.0
 #: ... and its Wald SE on the log scale is at most this.
 HISTORY_MAX_SE = 0.5
-#: The per-session cross AIC is pending when fewer than this share of the
-#: sessions have both rungs converged and not separated: the rest are not a
-#: random sample of sessions.
-HISTORY_MIN_USABLE_SESSION_SHARE = 0.5
 #: The caveat every pooled history value carries.
 UPPER_BOUND = (
     "pooled within animal with a session fixed effect; an upper bound, since rate "
@@ -2596,6 +2596,9 @@ CROSS_DIRECTIONS = {
     "swr_from_non_swr": ("non_local_swr", "SWR-coupled rate after non-SWR events"),
 }
 CROSS_LAG_MS = 45
+#: The ridge cross-validated rungs (``analysis/replay/ridge_history_cv.py``).
+RIDGE_SELF_RUNG = "Mself_long_dur"
+RIDGE_CROSS_RUNG = "Mselfcross_long_dur"
 
 
 def _lag_ms(j: int) -> int:
@@ -2640,7 +2643,7 @@ def _peak(kernel: dict) -> tuple[float, int, bool] | None:
 
 
 def duration_aware_history_values(
-    sessions: pd.DataFrame, pooled: dict, source: str
+    ridge: dict, pooled: dict, source: str
 ) -> list[Value]:
     """Claim 19c: refractoriness, burst and cross-coupling once duration is handled.
 
@@ -2650,10 +2653,12 @@ def duration_aware_history_values(
     at measurable lags only (expected onsets >= ``HISTORY_MIN_SUPPORT``, Wald
     SE <= ``HISTORY_MAX_SE``) of converged fits; an animal whose lag is not
     measurable is left out of that lag's values, and the description says how
-    many were kept. A cross direction with an unconverged pooled fit is
-    pending. ``sessions`` is ``duration_aware_history_models.pkl``, for the
-    per-session cross AIC, over sessions where both rungs converged and are
-    not separated.
+    many were kept. ``ridge`` is ``cross_history_ridge_cv.pkl``: per animal
+    and non-local stream, the self-only and self+cross rungs with the cross
+    block reaching 1 s, fit with a ridge prior on the history terms; the cross
+    values are its 45 ms end-locked rate ratio and its held-out gain (outer
+    five-fold cross-validation over whole stops). Every ridge fit must have
+    converged.
     """
     make = _value_factory(source, ("19c",), ("paper",))
     by_pop: dict[str, dict[str, dict]] = {}
@@ -2812,61 +2817,32 @@ def duration_aware_history_values(
         ),
     ]
     lag = _lag_index(CROSS_LAG_MS)
-    rungs = ["Mself_dur", "Mselfcross_dur"]
+    by_cross: dict[str, list[dict]] = {}
+    for rec in ridge["results"]:
+        by_cross.setdefault(rec["outcome"], []).append(rec)
     for word, (outcome, label) in CROSS_DIRECTIONS.items():
-        rr, above, unconverged = [], 0, []
-        for rec in by_pop[outcome].values():
-            k = _pooled_kernel(rec, "Mselfcross_dur", "cross_offset")
-            if k is None:
-                fit = rec["duration_aware"].get("Mselfcross_dur")
+        recs = by_cross.get(outcome, [])
+        _require(bool(recs), f"{outcome}: no ridge cross-history fit")
+        rr, above, gains = [], 0, []
+        for rec in recs:
+            for rung, fit in rec["models"].items():
                 _require(
-                    fit is not None and fit["ok"],
-                    f"{outcome}/{rec['animal']}: Mselfcross_dur failed",
+                    fit["full_converged"] and fit["cv"]["n_nonconverged"] == 0,
+                    f"{outcome}/{rec['animal']}: ridge {rung} did not converge",
                 )
-                unconverged.append(rec["animal"])
+            gains.append(rec["gain_per_event"])
+            k = rec["models"][RIDGE_CROSS_RUNG]["kernels"]["cross_offset"]
+            lr, sd = k["log_rr"][lag], k["sd"][lag]
+            if rec["support"]["cross_offset"][lag] < HISTORY_MIN_SUPPORT:
                 continue
-            if not k["ok"][lag]:
-                continue
-            rr.append(float(np.exp(k["log_rr"][lag])))
-            above += bool(k["log_rr"][lag] - 1.96 * k["se"][lag] > 0)
+            rr.append(float(np.exp(lr)))
+            above += bool(lr - 1.96 * sd > 0)
         _require(
             bool(rr), f"{outcome}: no animal's {CROSS_LAG_MS} ms lag is measurable"
         )
         kept = (
-            f"over the {len(rr)} of {len(by_pop[outcome])} animals with a converged "
-            f"fit and a measurable {CROSS_LAG_MS} ms lag"
-        )
-        pending = (
-            f"the pooled Mselfcross_dur fit of {', '.join(sorted(unconverged))} "
-            f"({outcome}) did not converge; refit before citing"
-            if unconverged
-            else None
-        )
-        rows = sessions[
-            (sessions["outcome"] == outcome) & sessions["model"].isin(rungs)
-        ].set_index([*SC, "model"])
-        usable = (
-            rows["fit_ok"].astype(bool)
-            & rows["converged"].eq(True)
-            & rows["separated"].eq(False)
-        )
-        both = usable.unstack("model").reindex(columns=rungs, fill_value=False)
-        aic = rows["aic"].unstack("model").loc[both.all(axis=1), rungs]
-        gain = aic["Mself_dur"] - aic["Mselfcross_dur"]
-        _require(len(gain) > 0, f"{outcome}: no session with both rungs usable")
-        animal_med = gain.groupby(level="animal").median()
-        sessions_kept = (
-            f"over the {len(gain)} of {len(both)} sessions where both rungs converged "
-            "and are not separated"
-        )
-        per_animal = gain.groupby(level="animal").size()
-        session_pending = (
-            f"only {len(gain)} of {len(both)} sessions have both rungs converged and "
-            "not separated (per animal: "
-            + ", ".join(f"{a} {n}" for a, n in per_animal.items())
-            + "); refit the per-session rungs before citing"
-            if len(gain) < HISTORY_MIN_USABLE_SESSION_SHARE * len(both)
-            else None
+            f"over the {len(rr)} of {len(recs)} animals whose {CROSS_LAG_MS} ms lag "
+            f"has at least {HISTORY_MIN_SUPPORT:g} expected onsets"
         )
         values += [
             make(
@@ -2875,38 +2851,39 @@ def duration_aware_history_values(
                 "quantity",
                 "dec2",
                 f"{label}: rate ratio {CROSS_LAG_MS} ms after the other stream's event "
-                "ended (end-locked cross block of Mselfcross_dur, at-risk design), "
-                f"median {kept}; {UPPER_BOUND}",
+                f"ended (end-locked cross block of {RIDGE_CROSS_RUNG}, 1 s cross "
+                "window, at-risk design, ridge prior on the history terms with its "
+                f"strength chosen by cross-validation), median {kept}; the prior "
+                f"shrinks it toward 1; {UPPER_BOUND}",
                 "rate ratio",
-                pending=pending,
             ),
             make(
                 f"history_cross_end_animals_{word}",
                 above,
                 "count",
                 "count",
-                f"{label}: animals whose rate ratio at {CROSS_LAG_MS} ms has its 95 % CI "
-                f"above 1, {kept}",
-                pending=pending,
+                f"{label}: animals whose rate ratio at {CROSS_LAG_MS} ms has its 95 % "
+                f"interval (posterior mode +- 1.96 posterior SD) above 1, {kept}",
             ),
             make(
-                f"history_cross_session_gain_{word}",
-                gain.median(),
+                f"history_cross_heldout_gain_{word}",
+                np.median(gains),
                 "quantity",
                 "sig2s",
-                f"{label}: median per-session AIC(Mself_dur) - AIC(Mselfcross_dur) "
-                f"{sessions_kept}, positive = the cross block pays for its parameters",
-                "AIC",
-                pending=session_pending,
+                f"{label}: median over the {len(gains)} animals of the held-out "
+                f"log-likelihood gain per held-out event of {RIDGE_CROSS_RUNG} over "
+                f"{RIDGE_SELF_RUNG} (five folds of whole stops, each rung's ridge "
+                "strength chosen by inner cross-validation); positive = the cross "
+                "block predicts new data",
+                "nats per event",
             ),
             make(
-                f"history_cross_session_animals_positive_{word}",
-                int((animal_med > 0).sum()),
+                f"history_cross_heldout_animals_positive_{word}",
+                int(sum(g > 0 for g in gains)),
                 "count",
                 "count",
-                f"{label}: animals whose median per-session cross gain is positive, "
-                f"{sessions_kept}",
-                pending=session_pending,
+                f"{label}: animals, of {len(gains)}, whose held-out cross gain is "
+                "positive",
             ),
         ]
     return values
@@ -3093,18 +3070,18 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     record(*rate_fits)
 
-    for artifact in (inputs.duration_aware_sessions, inputs.duration_aware_pooled):
+    for artifact in (inputs.duration_aware_pooled, inputs.cross_ridge_cv):
         _check_fresh(artifact)
     summary.add(
         *duration_aware_history_values(
-            pd.read_pickle(inputs.duration_aware_sessions),
+            pd.read_pickle(inputs.cross_ridge_cv),
             pd.read_pickle(inputs.duration_aware_pooled),
             f"{rel(inputs.duration_aware_pooled)} "
             "(rate.duration_aware_history.pooled_at_well) and "
-            f"{rel(inputs.duration_aware_sessions)} (rate.duration_aware_history.at_well)",
+            f"{rel(inputs.cross_ridge_cv)} (rate.cross_history_ridge_cv.at_well)",
         )
     )
-    record(inputs.duration_aware_sessions, inputs.duration_aware_pooled)
+    record(inputs.duration_aware_pooled, inputs.cross_ridge_cv)
 
     audited, sources = {}, {}
     for suffix in sorted({spec[0] for spec in CONTENT_SPECS.values()}):

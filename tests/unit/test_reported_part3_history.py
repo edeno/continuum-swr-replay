@@ -29,29 +29,22 @@ def _pooled(
     end_first_rr: float = 3.0,
     *,
     imprecise_first_lag: tuple[str, str] | None = None,
-    imprecise_cross_lag: tuple[str, str] | None = None,
-    unconverged_cross: tuple[str, str] | None = None,
 ) -> dict:
-    """Every animal: an end-locked kernel peaking at 30 ms, an onset-locked one
-    peaking at 105 ms (rate ratio ``onset_peak_rr``), and a cross end kernel of
-    rate ratio 2.5 at 45 ms. Onset lags 1-3 have no support (not measurable).
+    """Every animal: an end-locked kernel peaking at 30 ms and an onset-locked one
+    peaking at 105 ms (rate ratio ``onset_peak_rr``). Onset lags 1-3 have no
+    support (not measurable).
 
-    ``imprecise_first_lag`` / ``imprecise_cross_lag`` = (population, animal)
-    whose 15 ms end-locked / 45 ms cross lag has a Wald SE above
-    ``HISTORY_MAX_SE`` (and an extreme rate ratio that must not be read);
-    ``unconverged_cross`` = (population, animal) whose cross rung did not
-    converge (its kernel is extreme and must not be read)."""
+    ``imprecise_first_lag`` = (population, animal) whose 15 ms end-locked lag
+    has a Wald SE above ``HISTORY_MAX_SE`` (and an extreme rate ratio that must
+    not be read)."""
     end = np.full(10, 0.0)
     end[0], end[1] = np.log(end_first_rr), np.log(4.0)
     onset = np.full(10, 0.1)
     onset[6] = np.log(onset_peak_rr)
     onset[0] = 5.0  # unsupported: must not be read
-    cross = np.zeros(10)
-    cross[2] = np.log(2.5)
     support = {
         "self_onset": [0.0, 1.0, 2.0] + [10.0] * 7,
         "self_offset": [20.0] * 10,
-        "cross_offset": [20.0] * 10,
     }
     results = []
     for pop in POPS:
@@ -71,22 +64,6 @@ def _pooled(
                     },
                 }
             }
-            if pop in ("non_local_swr", "non_local_no_swr"):
-                cross_k = _kernel(cross)
-                if (pop, animal) == imprecise_cross_lag:
-                    lr = cross.copy()
-                    lr[2] = np.log(50.0)
-                    cross_k = _kernel(
-                        lr, [0.1] * 2 + [HISTORY_MAX_SE + 0.01] + [0.1] * 7
-                    )
-                converged = (pop, animal) != unconverged_cross
-                if not converged:
-                    cross_k = _kernel(np.full(10, np.log(50.0)))
-                fits["Mselfcross_dur"] = {
-                    "ok": True,
-                    "converged": converged,
-                    "kernels": {"cross_offset": cross_k},
-                }
             results.append(
                 {
                     "animal": animal,
@@ -98,47 +75,51 @@ def _pooled(
     return {"stop_cohort": "at_well", "results": results}
 
 
-def _sessions(gain: float, unusable_gain: float | None = None) -> pd.DataFrame:
-    """Three sessions per animal and stream whose cross gain is ``gain``; with
-    ``unusable_gain``, a fourth per animal whose cross rung did not converge and
-    a fifth whose Mself_dur is separated, both of gain ``unusable_gain``."""
-    rows = []
+def _ridge(
+    gains: tuple[float, ...] = (0.01, 0.02, 0.03, -0.01, 0.04),
+    *,
+    cross_rr: float = 2.5,
+    unsupported: tuple[str, str] | None = None,
+    unconverged: tuple[str, str] | None = None,
+) -> dict:
+    """Per animal and non-local stream: a held-out gain from ``gains`` and a 1 s
+    end-locked cross kernel of rate ratio ``cross_rr`` at 45 ms (posterior SD
+    0.1). ``unsupported`` = (stream, animal) whose 45 ms lag has fewer than 3
+    expected onsets (an extreme rate ratio that must not be read);
+    ``unconverged`` = (stream, animal) whose self+cross fit did not converge."""
+    results = []
     for pop in ("non_local_swr", "non_local_no_swr"):
-        for animal in ANIMALS:
-            for s in range(3 if unusable_gain is None else 5):
-                key = {
-                    "animal": animal,
-                    "session_date": s,
-                    "epoch": "02_r1",
-                    "outcome": pop,
-                    "fit_ok": True,
+        for animal, gain in zip(ANIMALS, gains, strict=True):
+            lr = np.zeros(67)
+            lr[2] = np.log(cross_rr)
+            support = np.full(67, 20.0)
+            if (pop, animal) == unsupported:
+                lr[2], support[2] = np.log(50.0), 1.0
+            kernel = {"log_rr": lr.tolist(), "sd": [0.1] * 67, "coef": [0.0] * 6}
+            models = {
+                rung: {
+                    "full_converged": True,
+                    "cv": {"n_nonconverged": 0},
+                    "kernels": {"cross_offset": kernel},
                 }
-                g = gain if s < 3 else unusable_gain
-                rows.append(
-                    {
-                        **key,
-                        "model": "Mself_dur",
-                        "aic": 100.0,
-                        "converged": True,
-                        "separated": s == 4,
-                    }
-                )
-                rows.append(
-                    {
-                        **key,
-                        "model": "Mselfcross_dur",
-                        "aic": 100.0 - g,
-                        "converged": s != 3,
-                        "separated": False,
-                    }
-                )
-    return pd.DataFrame(rows)
+                for rung in ("Mself_long_dur", "Mselfcross_long_dur")
+            }
+            if (pop, animal) == unconverged:
+                models["Mselfcross_long_dur"]["cv"]["n_nonconverged"] = 1
+            results.append(
+                {
+                    "animal": animal,
+                    "outcome": pop,
+                    "gain_per_event": gain,
+                    "support": {"cross_offset": support.tolist()},
+                    "models": models,
+                }
+            )
+    return {"stop_cohort": "at_well", "results": results}
 
 
 def test_history_values_read_measurable_lags_and_count_animals():
-    values = {
-        v.key: v for v in duration_aware_history_values(_sessions(-6.0), _pooled(), "x")
-    }
+    values = {v.key: v for v in duration_aware_history_values(_ridge(), _pooled(), "x")}
     # the onset peak is read at 105 ms, not at the unsupported first lag
     assert values["history_onset_peak_swr"].value == pytest.approx(2.0)
     assert values["history_onset_peak_lag_ms_swr"].value == 105
@@ -153,98 +134,58 @@ def test_history_values_read_measurable_lags_and_count_animals():
     assert values["history_fits"].value == 20
     assert values["history_cross_end_rr_non_swr_from_swr"].value == pytest.approx(2.5)
     assert values["history_cross_end_animals_swr_from_non_swr"].value == 5
-    # negative gain: the cross block does not pay for its parameters
-    assert values["history_cross_session_gain_non_swr_from_swr"].value == pytest.approx(
-        -6.0
+    assert values["history_cross_end_rr_non_swr_from_swr"].pending is None
+    assert values["history_cross_heldout_gain_non_swr_from_swr"].value == pytest.approx(
+        0.02
     )
-    assert values["history_cross_session_animals_positive_non_swr_from_swr"].value == 0
+    assert values["history_cross_heldout_animals_positive_swr_from_non_swr"].value == 4
 
 
 def test_history_values_count_a_suppression_after_the_end():
     values = {
         v.key: v
-        for v in duration_aware_history_values(
-            _sessions(1.0), _pooled(end_first_rr=0.2), "x"
-        )
+        for v in duration_aware_history_values(_ridge(), _pooled(end_first_rr=0.2), "x")
     }
     assert values["history_end_first_lag_suppressed_fits"].value == 20
     assert values["history_end_first_lag_raised_fits"].value == 0
-    assert values["history_cross_session_animals_positive_swr_from_non_swr"].value == 5
 
 
 def test_history_values_leave_out_an_imprecise_first_lag():
     # wilbur-like: one fit's 15 ms lag has SE above HISTORY_MAX_SE; its extreme
     # rate ratio must not be read, and the denominator drops to 19.
     pooled = _pooled(imprecise_first_lag=("non_local_no_swr", "e"))
-    values = {
-        v.key: v for v in duration_aware_history_values(_sessions(-6.0), pooled, "x")
-    }
+    values = {v.key: v for v in duration_aware_history_values(_ridge(), pooled, "x")}
     assert values["history_fits"].value == 19
     assert values["history_end_first_lag_raised_fits"].value == 19
     assert values["history_end_first_lag_rr_high"].value == pytest.approx(3.0)
     assert "19 of 20" in values["history_end_first_lag_rr_low"].description
 
 
-def test_history_values_leave_out_an_imprecise_cross_lag():
-    pooled = _pooled(imprecise_cross_lag=("non_local_swr", "a"))
-    values = {
-        v.key: v for v in duration_aware_history_values(_sessions(-6.0), pooled, "x")
-    }
+def test_cross_values_leave_out_an_unsupported_lag():
+    ridge = _ridge(unsupported=("non_local_swr", "a"))
+    values = {v.key: v for v in duration_aware_history_values(ridge, _pooled(), "x")}
     assert values["history_cross_end_rr_swr_from_non_swr"].value == pytest.approx(2.5)
     assert values["history_cross_end_animals_swr_from_non_swr"].value == 4
     assert (
         "4 of 5 animals" in values["history_cross_end_rr_swr_from_non_swr"].description
     )
-    assert values["history_cross_end_rr_swr_from_non_swr"].pending is None
+    # the held-out gain still counts every animal
+    assert (
+        "5 animals" in values["history_cross_heldout_gain_swr_from_non_swr"].description
+    )
 
 
-def test_history_values_pend_a_direction_with_an_unconverged_cross_fit():
-    pooled = _pooled(unconverged_cross=("non_local_no_swr", "b"))
-    values = {
-        v.key: v for v in duration_aware_history_values(_sessions(-6.0), pooled, "x")
-    }
-    rr = values["history_cross_end_rr_non_swr_from_swr"]
-    assert rr.value == pytest.approx(2.5)  # the unconverged kernel is not read
-    assert values["history_cross_end_animals_non_swr_from_swr"].value == 4
-    assert rr.pending is not None and "did not converge" in rr.pending
-    assert values["history_cross_end_animals_non_swr_from_swr"].pending == rr.pending
-    # the other direction and the per-session gain are unaffected
-    assert values["history_cross_end_rr_swr_from_non_swr"].pending is None
-    assert values["history_cross_session_gain_non_swr_from_swr"].pending is None
+def test_cross_values_refuse_an_unconverged_ridge_fit():
+    ridge = _ridge(unconverged=("non_local_no_swr", "b"))
+    with pytest.raises(ValueError, match="did not converge"):
+        duration_aware_history_values(ridge, _pooled(), "x")
 
 
 def test_history_values_drop_an_unconverged_end_locked_fit_loudly():
     pooled = _pooled()
     pooled["results"][0]["duration_aware"]["Mself_dur"]["converged"] = False
     with pytest.raises(ValueError, match="did not converge"):
-        duration_aware_history_values(_sessions(-6.0), pooled, "x")
-
-
-def test_cross_session_gain_reads_only_usable_sessions():
-    # Unconverged or separated sessions carry a gain of +50 that must not count.
-    values = {
-        v.key: v
-        for v in duration_aware_history_values(_sessions(-6.0, 50.0), _pooled(), "x")
-    }
-    gain = values["history_cross_session_gain_non_swr_from_swr"]
-    assert gain.value == pytest.approx(-6.0)
-    assert "15 of 25 sessions" in gain.description
-    assert values["history_cross_session_animals_positive_non_swr_from_swr"].value == 0
-    assert gain.pending is None  # 60 % of the sessions are usable
-
-
-def test_cross_session_gain_is_pending_when_most_sessions_are_unusable():
-    sessions = _sessions(-6.0, 50.0)
-    # make one more session per animal and stream unconverged: 10 of 25 usable
-    redo = sessions["session_date"].eq(2) & sessions["model"].eq("Mselfcross_dur")
-    sessions.loc[redo, "converged"] = False
-    values = {v.key: v for v in duration_aware_history_values(sessions, _pooled(), "x")}
-    gain = values["history_cross_session_gain_non_swr_from_swr"]
-    assert "10 of 25 sessions" in gain.description
-    assert gain.pending is not None and "per animal: a 2, b 2" in gain.pending
-    animals = values["history_cross_session_animals_positive_non_swr_from_swr"]
-    assert animals.pending == gain.pending
-    assert values["history_cross_end_rr_non_swr_from_swr"].pending is None
+        duration_aware_history_values(_ridge(), pooled, "x")
 
 
 def test_horserace_values_name_each_population_and_predictor():

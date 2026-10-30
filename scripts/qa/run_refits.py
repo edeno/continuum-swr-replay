@@ -51,9 +51,12 @@ command, its CPUs and environment, the commit, the data root, times and exit
 code) under ``--log-dir``; a run whose dependency failed gets a "blocked"
 record. Then ``check_fit_provenance.py`` checks every artifact the runs wrote.
 
-Not here: the prerequisites above, the Part 1 and Part 2 checks, and the PFC unit GLM (Part 4),
-which runs on GPUs for 14-17 h per card under its own launcher; Figure 4 reads
-it and is drawn after it.
+Not here: the prerequisites above, the Part 1 and Part 2 checks, the PFC unit GLM (Part 4),
+which runs on GPUs for 14-17 h per card under its own launcher (Figure 4 reads
+it and is drawn after it), and the ridge cross-validated cross-history fit
+(``rate.cross_history_ridge_cv.at_well``, Part 3), which needs one GPU for
+about 5 min: ``scripts/rate/fit_cross_history_ridge_cv.py --out-dir
+<models_per_bin_rate>/cross_history_ridge_cv --workers 5 --gpu N`` (never card 0).
 
 Usage
 -----
