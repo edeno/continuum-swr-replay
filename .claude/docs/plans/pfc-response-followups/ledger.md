@@ -78,6 +78,10 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-29 | Q8 | stop-context fit (worker): conditional Poisson (stop baseline estimated; plug-in offset kept as a check — it is biased upward when event-free time is short), unit terms absorbed, session-clustered sandwich SEs, per-animal and leave-one-animal-out fits; simulated recovery (×1.5 gain, null, stationary rate alone, switch, overlap) and two-session brute-force checks pass; assembly 55 min on 3 CPU workers (tmux `pfc_q8_stop_context`), fit 14 min | `dd3bd1cd` | `Processed-Data/pfc_response_followups/stop_context/results.csv`; logs `logs/pfc_response_followups/stop_context/` | — |
 | 2026-10-29 | Q8/4 | Part 4 values (`stop_context_*`) and overview bullet **Which stops?** | `f9e55a38` | `part4.json` (591 values) | reward gain for increasing units `stop_context_reward_gain_swr_replay_increase` / `..._non_swr_replay_increase` with intervals and animal counts; switch contrasts null |
 
+| 2026-10-29 | lead | main Part 4 numbers use no firing-rate cutoff; 1 Hz becomes a check; held-out gain shares stay out | — | — | — |
+| 2026-10-29 | 4 | branch rebased onto master `69e452d8` (generated files taken from master during the rebase, `changes.md` merged as a union, then everything re-emitted); Part 4 main values with no cutoff, `check_one_hz_*` keys reproduce the earlier 1 Hz values exactly; overview Part 4 opening and effect-size note updated | `819bbaeb`, `c461913a` | `part4.json` (598 values) | `units` 11,604 → 18,410; see the report for moved keys |
+| 2026-10-29 | 4 | `scripts/figures/generate_figure04.py:690` still loads the population with `min_firing_rate=1.0`; not changed (lead to decide) | — | — | open |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
