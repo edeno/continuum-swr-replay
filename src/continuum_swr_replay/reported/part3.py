@@ -59,6 +59,7 @@ from patsy import dmatrix
 from scipy.stats import wilcoxon
 from statsmodels.stats.multitest import multipletests
 
+from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
     pct_significant_sessions,
@@ -87,6 +88,10 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
     reward_kernel_rate_ratios,
     self_history_rate_ratios,
+)
+from continuum_swr_replay.data_loaders.constants import (
+    TRACK_SEGMENT_TO_PATCH,
+    WELL_PATCH_MAPPING,
 )
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
@@ -286,7 +291,7 @@ class Part3Inputs:
     event_table: Path
     stop_table: Path
     onset_table: Path
-    trunk_per_event: Path
+    event_arm_table: Path
     duration_aware_pooled: Path
     cross_ridge_cv: Path
     horserace_summary: Path
@@ -315,7 +320,7 @@ def default_inputs() -> Part3Inputs:
         event_table=table_path("event_table", rc),
         stop_table=table_path("stop_table", rc),
         onset_table=table_path("event_onset_table", rc),
-        trunk_per_event=rc / "_trunk_zscore_per_event.pkl",
+        event_arm_table=table_path("event_arm_table", rc),
         duration_aware_pooled=model_dir("per_bin_rate")
         / "duration_aware_history_pooled.pkl",
         cross_ridge_cv=model_dir("per_bin_rate")
@@ -1558,42 +1563,160 @@ def stop_table_values(
     return values
 
 
-TRUNK_PENDING = (
-    "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, "
-    "_trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, "
-    "and the rule behind the earlier 3.55x figure is not recoverable from it"
-)
+#: Trunk arm of each patch (``TRACK_SEGMENT_TO_PATCH``): patch -> trunk arm.
+PATCH_TRUNK = {
+    patch: arm
+    for arm, patch in TRACK_SEGMENT_TO_PATCH.items()
+    if arm not in WELL_PATCH_MAPPING
+}
+#: The event-arm columns the trunk values read.
+TRUNK_COLUMNS = ["animal", "event_id", "is_swr", "candidate_arm", "is_current_arm"]
+TRUNK_RESPONSE = "arm_fraction"
 
 
-def trunk_values(per_event: pd.DataFrame, source: str) -> list[Value]:
-    """The trunk-arm share of each event's posterior mass, SWR against non-SWR."""
-    make = _value_factory(source, ("14",), ("docs: replay_rate_content_swr_synthesis",))
-    mean = per_event.groupby("is_swr")["trunk_share"].mean()
+def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
+    """Each event's content share on the trunks, split by the current patch.
+
+    Parameters
+    ----------
+    arm : pd.DataFrame
+        The event-arm table on the content contrast's cohort (at-well events):
+        one row per event x candidate arm, with :data:`TRUNK_COLUMNS` and
+        ``arm_fraction``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per event with exactly one current arm: ``animal``, ``is_swr``,
+        ``trunk`` (share on arms 6-8), ``current_patch_trunk`` (the trunk of the
+        patch holding the current arm) and ``other_trunks`` (the other two).
+    """
+    arm = arm[arm["is_swr"].notna()]
+    current = arm.loc[arm["is_current_arm"] == 1, ["event_id", "candidate_arm"]]
+    current = current[~current["event_id"].duplicated(keep=False)]
+    trunk_of = current.set_index("event_id")["candidate_arm"].map(
+        lambda a: PATCH_TRUNK[TRACK_SEGMENT_TO_PATCH[int(a)]]
+    )
+    arm = arm[arm["event_id"].isin(trunk_of.index)]
+    on_trunk = arm["candidate_arm"].isin(PATCH_TRUNK.values())
+    on_current = (
+        arm["candidate_arm"].to_numpy() == arm["event_id"].map(trunk_of).to_numpy()
+    )
+    share = arm[TRUNK_RESPONSE].astype(float)
+    frame = pd.DataFrame(
+        {
+            "event_id": arm["event_id"],
+            "trunk": share.where(on_trunk, 0.0),
+            "current_patch_trunk": share.where(on_trunk & on_current, 0.0),
+        }
+    )
+    events = frame.groupby("event_id", sort=False).sum()
+    events["other_trunks"] = events["trunk"] - events["current_patch_trunk"]
+    meta = arm.drop_duplicates("event_id").set_index("event_id")[["animal", "is_swr"]]
+    events = events.join(meta)
+    events["is_swr"] = events["is_swr"].astype(bool)
+    return events.reset_index()
+
+
+def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
+    """Claim 19a: SWR content shifts onto the trunk arms, and which trunk.
+
+    Each animal's mean share over its events, SWR and non-SWR; the value is the
+    median over animals, with the animals where the SWR share is higher.
+    """
+    make = _value_factory(source, ("19a",), ("paper",))
+    events = trunk_shares(arm)
+    per_animal = events.groupby(["animal", "is_swr"])[
+        ["trunk", "current_patch_trunk", "other_trunks"]
+    ].mean()
+    values: list[Value] = []
+    labels = {
+        "trunk": "all three trunks",
+        "current_patch_trunk": "the trunk of the current arm's patch",
+        "other_trunks": "the other two trunks",
+    }
+    for column, label in labels.items():
+        word = {"trunk": "", "current_patch_trunk": "_current_patch"}.get(
+            column, "_other_patches"
+        )
+        table = per_animal[column].unstack("is_swr")
+        values += [
+            make(
+                f"trunk_share{word}_swr",
+                table[True].median(),
+                "fraction",
+                "pct",
+                f"SWR events: mean share of an event's content on {label}, median "
+                f"over the {len(table)} animals (at-well events)",
+            ),
+            make(
+                f"trunk_share{word}_non_swr",
+                table[False].median(),
+                "fraction",
+                "pct",
+                f"non-SWR events: mean share of an event's content on {label}, "
+                "median over animals",
+            ),
+            make(
+                f"trunk_share{word}_animals_swr_higher",
+                int((table[True] > table[False]).sum()),
+                "count",
+                "count",
+                f"animals whose SWR share on {label} is above their non-SWR share",
+            ),
+        ]
+    for flag, word in ((True, "swr"), (False, "non_swr")):
+        means = per_animal.xs(flag, level="is_swr")
+        values.append(
+            make(
+                f"trunk_current_patch_fraction_{word}",
+                (means["current_patch_trunk"] / means["trunk"]).median(),
+                "fraction",
+                "pct",
+                f"{'SWR' if flag else 'non-SWR'} events: the current patch's trunk "
+                "as a share of all trunk content (1/3 if the three trunks shared it "
+                "evenly), median over animals",
+            )
+        )
+    return values
+
+
+def current_arm_paired_values(fits: pd.DataFrame, source: str) -> list[Value]:
+    """Claim 19a: the within-session SWR - non-SWR difference of the separately
+    fitted current-arm preference (``C2_base`` ``is_current_arm``).
+
+    A session enters when both of its split fits keep the term
+    (:func:`gate_term_sessions`); each animal is the median of its sessions'
+    differences, and the value is the median over animals.
+    """
+    make = _value_factory(source, ("19a",), ("paper",))
+    term = "is_current_arm"
+    coef = {}
+    for population in ("SWR", "nonSWR"):
+        rows = fits[(fits["model"] == "C2_base") & (fits["population"] == population)]
+        gate = gate_term_sessions(rows, term)
+        coef[population] = rows.loc[gate.kept].set_index(SC)[f"coef_{term}"]
+    both = pd.concat(coef, axis=1).dropna()
+    _require(len(both) > 0, "no session keeps is_current_arm in both split fits")
+    per_animal = (both["SWR"] - both["nonSWR"]).groupby(level="animal").median()
     return [
         make(
-            "trunk_share_mean_swr",
-            mean[True],
-            "fraction",
-            "pct",
-            "mean share of an SWR event's posterior mass on trunk arms",
-            pending=TRUNK_PENDING,
-        ),
-        make(
-            "trunk_share_mean_non_swr",
-            mean[False],
-            "fraction",
-            "pct",
-            "mean share of a non-SWR event's posterior mass on trunk arms",
-            pending=TRUNK_PENDING,
-        ),
-        make(
-            "trunk_share_ratio",
-            mean[True] / mean[False],
+            "current_arm_paired_difference",
+            per_animal.median(),
             "quantity",
-            "sig2",
-            "ratio of those means",
-            "ratio",
-            pending=TRUNK_PENDING,
+            "sig2s",
+            "SWR minus non-SWR is_current_arm (C2_base, fitted separately), the "
+            "difference taken within each session, median over the session "
+            f"differences per animal, then over the {len(per_animal)} animals "
+            f"({len(both)} sessions with both fits kept)",
+            "log weight",
+        ),
+        make(
+            "current_arm_paired_difference_animals_positive",
+            int((per_animal > 0).sum()),
+            "count",
+            "count",
+            "animals whose median within-session difference is positive",
         ),
     ]
 
@@ -3157,13 +3280,23 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     record(inputs.onset_table)
+    arm, _ = select_event_cohort(
+        pd.read_parquet(
+            inputs.event_arm_table,
+            columns=[*TRUNK_COLUMNS, TRUNK_RESPONSE, "occupancy_state"],
+        ),
+        cohort="at_well",
+    )
+    summary.add(*trunk_values(arm, f"{rel(inputs.event_arm_table)} (at-well events)"))
+    record(inputs.event_arm_table)
+    split_fits = inputs.content_contrast_dir / "swr_contrast_content_arm.pkl"
+    _check_fresh(split_fits)
     summary.add(
-        *trunk_values(
-            pd.read_pickle(inputs.trunk_per_event),
-            f"{rel(inputs.trunk_per_event)} (exploratory)",
+        *current_arm_paired_values(
+            pd.read_pickle(split_fits), f"{rel(split_fits)} (per-session fits)"
         )
     )
-    record(inputs.trunk_per_event)
+    record(split_fits)
 
     _check_fresh(inputs.swr_power)
     summary.add(
