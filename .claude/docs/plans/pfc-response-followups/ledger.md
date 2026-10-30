@@ -75,6 +75,9 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 | 2026-10-29 | 3b/4 | summary over all units (no rate gate) → `summary.parquet`; full tables `.claude/research/pfc_response_followups_outputs/marked_family_baseline_prior/report.{md,csv}`; Part 4 quoted values (peak, lag, 0–150 ms mean, animals with the sign; ripple–MUA correlation) and overview bullet **What is replayed, and how strong?** | `3c6a3be5` | `part4.json` (545 values) | `marked_content_current_arm_*`, `marked_ripple_mua_correlation_*` |
 | 2026-10-29 | Q8 | stop-context code committed by the worker (`dd3bd1cd`); 75 session tables assembled; the worker stopped on an API limit before the fit; resumed | `dd3bd1cd` | `Processed-Data/pfc_response_followups/stop_context/sessions/` | pending |
 
+| 2026-10-29 | Q8 | stop-context fit (worker): conditional Poisson (stop baseline estimated; plug-in offset kept as a check — it is biased upward when event-free time is short), unit terms absorbed, session-clustered sandwich SEs, per-animal and leave-one-animal-out fits; simulated recovery (×1.5 gain, null, stationary rate alone, switch, overlap) and two-session brute-force checks pass; assembly 55 min on 3 CPU workers (tmux `pfc_q8_stop_context`), fit 14 min | `dd3bd1cd` | `Processed-Data/pfc_response_followups/stop_context/results.csv`; logs `logs/pfc_response_followups/stop_context/` | — |
+| 2026-10-29 | Q8/4 | Part 4 values (`stop_context_*`) and overview bullet **Which stops?** | `f9e55a38` | `part4.json` (591 values) | reward gain for increasing units `stop_context_reward_gain_swr_replay_increase` / `..._non_swr_replay_increase` with intervals and animal counts; switch contrasts null |
+
 ## Runs
 
 | run | tmux session | cards | log dir | output dir | started | finished | runtime / memory |
