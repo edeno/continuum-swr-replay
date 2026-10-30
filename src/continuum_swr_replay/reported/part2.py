@@ -12,8 +12,9 @@ refitted here. The inputs (:class:`Part2Inputs`):
   (``*_state_shares.parquet``, from ``scripts/detection/add_state_shares.py``);
 - the spike-evidence run that scores every event (``paper/figures/reality_all``, from
   ``scripts/detection/analyze_event_spike_evidence.py``);
-- the held-out tetrode test split by SWR, from an untracked research script
-  (every value from it is marked pending);
+- the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
+  the state-evidence run Part 1 reads, from
+  ``scripts/detection/split_state_evidence_by_swr.py``);
 - the content-occupancy table (``paper/figures/content_occupancy``, from
   ``scripts/content/analyze_content_occupancy.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
@@ -65,6 +66,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.part1 import STATE_EVIDENCE_RUN
 from continuum_swr_replay.reported.values import (
     Summary,
     Value,
@@ -74,12 +76,6 @@ from continuum_swr_replay.reported.values import (
 
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run Part 2 reads (242 epochs, all ``ok``)."""
-
-HELDOUT_PENDING = (
-    "computed by an untracked research script "
-    "(.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); "
-    "promote it to a tracked script before citing"
-)
 
 #: The other detectors of claim 23, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
@@ -118,8 +114,10 @@ def default_inputs() -> Part2Inputs:
         event_table=table_path("event_table", replay_content_dir()),
         event_features_run=event_features_root() / EVENT_FEATURES_RUN,
         reality_dir=ROOT_DIR / "paper/figures/reality_all/per_epoch",
-        heldout_by_swr=ROOT_DIR
-        / ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
+        heldout_by_swr=processed_data_dir()
+        / STATE_EVIDENCE_RUN
+        / "state_evidence"
+        / "nl_bouts_by_swr_stats.csv",
         content_occupancy=ROOT_DIR
         / "paper/figures/content_occupancy/content_occupancy_per_session.csv",
         brain_state_reference=processed_data_dir()
@@ -1041,7 +1039,6 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 f"held-out evidence per held-out spike for immobile Non-Local Continuous "
                 f"bouts {label}, against the animal's position: mean over animals",
                 "nats per spike",
-                pending=HELDOUT_PENDING,
             ),
             make(
                 f"heldout_{word}_per_spike_ci_low",
@@ -1050,7 +1047,6 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "dec2",
                 "lower bound of its 95 % t-interval over animals",
                 "nats per spike",
-                pending=HELDOUT_PENDING,
             ),
             make(
                 f"heldout_{word}_per_spike_ci_high",
@@ -1059,7 +1055,6 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "dec2",
                 "upper bound of its 95 % t-interval over animals",
                 "nats per spike",
-                pending=HELDOUT_PENDING,
             ),
             make(
                 f"heldout_{word}_animals_positive",
@@ -1067,7 +1062,6 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 "animals with a positive mean",
-                pending=HELDOUT_PENDING,
             ),
             make(
                 f"heldout_{word}_animals",
@@ -1075,7 +1069,6 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 "animals in that test",
-                pending=HELDOUT_PENDING,
             ),
         ]
     return values
@@ -1746,7 +1739,13 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
 
     stats = pd.read_csv(inputs.heldout_by_swr)
     summary.add(*heldout_by_swr_values(stats, rel(inputs.heldout_by_swr)))
-    summary.inputs.append(file_record(inputs.heldout_by_swr, ROOT_DIR))
+    summary.inputs += [
+        file_record(inputs.heldout_by_swr, ROOT_DIR),
+        file_record(
+            inputs.heldout_by_swr.with_name("nl_bouts_by_swr.provenance.json"),
+            ROOT_DIR,
+        ),
+    ]
 
     occupancy = pd.read_csv(inputs.content_occupancy)
     summary.add(*content_occupancy_values(occupancy, rel(inputs.content_occupancy)))

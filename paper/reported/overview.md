@@ -105,7 +105,7 @@ close on average.
   (SWR, remote); matched quiet windows score <!--v:part2.baseline_dll_per_spike_median-->0.00<!--/v-->.
 - Non-SWR events have fewer spikes (<!--v:part2.non_swr_remote_spikes_median-->34<!--/v--> against <!--v:part2.swr_remote_spikes_median-->116<!--/v-->)
   on fewer tetrodes (<!--v:part2.non_swr_remote_tetrodes_median-->10<!--/v--> against <!--v:part2.swr_remote_tetrodes_median-->15<!--/v-->).
-- The held-out version (pending: untracked script) gives <!--v:part2.heldout_non_swr_per_spike-->0.20<!--/v--> nats per held-out spike
+- The held-out version gives <!--v:part2.heldout_non_swr_per_spike-->0.20<!--/v--> nats per held-out spike
   without SWR and <!--v:part2.heldout_swr_per_spike-->0.60<!--/v--> with.
 - *Reading:* non-SWR events are real but carry less evidence per spike and involve fewer cells. Close events stay
   open until the wider-Local-kernel test (claim 8).
