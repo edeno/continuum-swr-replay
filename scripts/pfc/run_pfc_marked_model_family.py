@@ -1028,7 +1028,9 @@ def run_analysis(
                 null_seconds = time.perf_counter() - null_started
 
             statistics = fitted.statistics.copy()
-            statistics.insert(0, "neuron_index", np.arange(len(statistics)))
+            # The recorded index of each fitted unit: units with no spike may
+            # have been left out, so this is not the row number.
+            statistics.insert(0, "neuron_index", kept_units)
             statistics["nwb_file_name"] = nwb_file_name
             statistics["epoch_name"] = epoch_name
             statistics["brain_area"] = brain_area

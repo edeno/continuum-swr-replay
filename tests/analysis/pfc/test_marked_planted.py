@@ -332,7 +332,13 @@ def test_planted_context_kernel_is_separated_from_its_baseline():
 
 @pytest.mark.slow
 def test_planted_strength_kernel_is_recovered():
-    simulation = simulate(20261029, planted_mark="ripple_power_z")
+    # One event's onset lies between two samples (0.4 of a bin after its
+    # sample); it is binned with that sample, as the counts are.
+    simulation = simulate(
+        20261029,
+        planted_mark="ripple_power_z",
+        onset_offset_s=0.4 / SAMPLING_FREQUENCY,
+    )
     spec = MarkedFamilySpec(
         "strength_reference",
         ("ripple_power_z", CURRENT_ARM_FRACTION),
@@ -351,9 +357,9 @@ def test_planted_strength_kernel_is_recovered():
 
     peak = simulation.peak_lag_index
     curve = np.nanmean(result.mark_curves[DRIVEN_CLASS]["ripple_power_z"], axis=1)
-    # Sign and peak lag of the planted kernel (within 10 ms).
+    # Sign and peak lag of the planted kernel (within one 2 ms bin).
     assert curve[peak] == pytest.approx(PLANTED_PEAK, abs=0.35)
-    assert abs(int(np.argmax(curve)) - peak) <= 5
+    assert abs(int(np.argmax(curve)) - peak) <= 1
     null = np.nanmean(result.slope_null[DRIVEN_CLASS]["ripple_power_z"], axis=2)
     assert abs(null[:, peak].mean()) < 0.15
     assert curve[peak] > np.percentile(null[:, peak], 97.5)
@@ -481,3 +487,162 @@ def test_residualized_reference_is_as_wide_as_the_estimator_under_correlated_mar
     assert r_squared == pytest.approx(0.5625, abs=0.1)
     assert residualized_sd / estimator_sd == pytest.approx(1.0, abs=0.2)
     assert raw_sd / estimator_sd < 0.85
+
+
+def _load_runner():
+    """Import the marked-family runner script as a module."""
+    import importlib.util
+    from pathlib import Path
+
+    script = (
+        Path(__file__).resolve().parents[3]
+        / "scripts"
+        / "pfc"
+        / "run_pfc_marked_model_family.py"
+    )
+    spec = importlib.util.spec_from_file_location("run_pfc_marked_family_rt", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.slow
+def test_runner_round_trip_keeps_the_planted_peak_and_drops_silent_units(
+    tmp_path, monkeypatch
+):
+    """``run_analysis`` writes a bundle that reads back with the planted kernel.
+
+    Only the Spyglass-backed loaders are replaced (they hand over the simulated
+    session); eligibility, the design, the fit and the bundle writing are the
+    runner's own. Two units have no spike in the fitted bins: under the
+    baseline prior they are left out, and the table's ``neuron_index`` and the
+    sidecar's ``kept_unit_indices`` name the recorded units that were kept.
+    """
+    import json
+
+    from continuum_swr_replay.analysis.pfc.marked_glm import MarkedSessionContext
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        DECODE_ENTROPY,
+        LEAF_CONTENT_FRACTION,
+    )
+
+    runner = _load_runner()
+    model = f"marginal_{CURRENT_ARM_FRACTION}"
+    simulation = simulate(
+        20261031,
+        n_units=12,
+        stop_bins=1500,
+        gap_bins=300,
+        event_spacing_bins=300,
+        half_window_bins=125,
+        mixed_rate_factor=1.5,
+    )
+    silent = (3, 9)
+    n_recorded = simulation.counts.shape[1] + len(silent)
+    kept = np.setdiff1d(np.arange(n_recorded), silent)
+    counts = np.zeros((simulation.counts.shape[0], n_recorded))
+    counts[:, kept] = simulation.counts
+    rng = np.random.default_rng(1)
+    events = {
+        event_class: frame.assign(
+            **{
+                LEAF_CONTENT_FRACTION: rng.uniform(0.2, 1.0, len(frame)),
+                DECODE_ENTROPY: rng.uniform(1.0, 3.0, len(frame)),
+            }
+        )
+        for event_class, frame in simulation.events.items()
+    }
+    baseline, names, report = build_baseline_columns(
+        simulation.fit_mask, simulation.stops
+    )
+    hashes = {
+        "canonical_event_table_sha256": "event",
+        "data_over_time_sha256": "dot",
+        "swr_interval_source": "kay",
+        "swr_events_sha256": "swr",
+    }
+    context = MarkedSessionContext(
+        fit_mask=simulation.fit_mask,
+        counts=counts,
+        events=events,
+        spline_basis=simulation.spline_basis,
+        lag_time=simulation.lag_time,
+        lags=simulation.lags,
+        cohort_info={"n_bins_fit": int(simulation.fit_mask.sum())},
+        input_provenance=dict(hashes),
+        baseline=baseline,
+        baseline_names=names,
+        baseline_report=report,
+    )
+    monkeypatch.setattr(
+        runner,
+        "record_inputs",
+        lambda inputs: {key: {"sha256": key.split("_")[0]} for key in inputs},
+    )
+    monkeypatch.setattr(
+        runner, "canonical_event_input_hashes", lambda *a, **k: dict(hashes)
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_cohort",
+        lambda *a, **k: (simulation.stops, {"stop_table_sha256": "stop"}),
+    )
+    monkeypatch.setattr(
+        runner, "prepare_marked_session_context", lambda *a, **k: context
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_recommended_event_marks",
+        lambda *a, **k: (
+            events,
+            {"event_arm_table_sha256": "event", "event_table_sha256": "event"},
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_patch_switch_marks",
+        lambda *a, **k: (
+            pd.DataFrame(
+                {"trips_to_patch_switch": np.nan, "next_trip_switches_patch": np.nan},
+                index=pd.Index(simulation.stops["stop_idx"], name="stop_idx"),
+            ),
+            "stop",
+        ),
+    )
+
+    assert runner.run_analysis(
+        "rat20200101_.nwb",
+        "01_r1",
+        model_names=(model,),
+        output_dir=tmp_path,
+        log_directory=tmp_path / "logs",
+        event_arm_table_path=tmp_path / "event_arm_table.parquet",
+        event_table_path=tmp_path / "event_table.parquet",
+        baseline_penalty_sigma=3.0,
+        n_folds=5,
+        design_batch_size=4,
+    )
+
+    artifact = runner.family_artifact_path(tmp_path, "rat20200101_01_r1_mPFC", model)
+    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    extra = record.get("extra", record)
+    assert extra["bundle_status"] == "complete"
+    assert extra["bundle_contract_version"] == 3
+    assert extra["n_units_recorded"] == n_recorded
+    assert extra["n_units_without_spikes"] == len(silent)
+    assert extra["kept_unit_indices"] == kept.tolist()
+    assert "well_unknown" in extra["baseline_column_names"]
+    table = pd.read_pickle(artifact)
+    assert table["neuron_index"].tolist() == kept.tolist()
+    assert (table["fit_spike_count"] > 0).all()
+
+    lag_time = np.load(artifact.with_suffix(".lag_time.npy"))
+    slope = np.load(
+        artifact.with_suffix(f".{DRIVEN_CLASS}.{CURRENT_ARM_FRACTION}.slope.npy")
+    )
+    assert slope.shape == (len(lag_time), len(kept))
+    curve = np.nanmean(slope, axis=1)
+    true_peak = simulation.lag_time[simulation.peak_lag_index]
+    peak = int(np.argmin(np.abs(lag_time - true_peak)))
+    assert abs(int(np.argmax(curve)) - peak) <= 1
+    assert curve[peak] == pytest.approx(PLANTED_PEAK, abs=0.35)
