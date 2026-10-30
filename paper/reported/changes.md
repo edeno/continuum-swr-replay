@@ -1866,3 +1866,73 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part2.animals` | … | 5 |
 | `paper/reported/overview.md` | `part2.step_evidence_criterion_animals` | … | 3 |
 | `paper/reported/overview.md` | `part2.step_evidence_criterion_share_median` | … | +0.19 |
+
+## 2026-10-28
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part2.slow_gamma_db_median_non_swr` | … | +0.36 |
+| `paper/reported/overview.md` | `part2.slow_gamma_db_animals_above_rest_non_swr` | … | 3 |
+| `paper/reported/overview.md` | `part2.slow_gamma_db_median_swr` | … | +1.6 |
+| `paper/reported/overview.md` | `part2.slow_gamma_db_animals_above_rest_swr` | … | 5 |
+| `paper/reported/overview.md` | `part2.fast_gamma_db_median_non_swr` | … | +0.52 |
+| `paper/reported/overview.md` | `part2.fast_gamma_db_animals_above_rest_non_swr` | … | 5 |
+| `paper/reported/overview.md` | `part2.fast_gamma_db_median_swr` | … | +1.1 |
+| `paper/reported/overview.md` | `part2.fast_gamma_db_animals_above_rest_swr` | … | 5 |
+| `paper/reported/overview.md` | `part2.theta_like_fraction_rest_matched_non_swr` | … | 12 % |
+| `paper/reported/overview.md` | `part2.theta_like_fraction_rest_matched_swr` | … | 12 % |
+| `paper/reported/overview.md` | `part2.theta_like_animals_above_rest_matched_non_swr` | … | 2 |
+| `paper/reported/overview.md` | `part2.theta_like_animals_above_rest_matched_swr` | … | 1 |
+| `paper/reported/overview.md` | `part2.duration_difference_low` | … | +38 |
+| `paper/reported/overview.md` | `part2.duration_difference_high` | … | +54 |
+| `paper/reported/overview.md` | `part2.extent_difference_low` | … | +29 |
+| `paper/reported/overview.md` | `part2.extent_difference_high` | … | +58 |
+| `paper/reported/overview.md` | `part2.speed_difference_low` | … | +110 |
+| `paper/reported/overview.md` | `part2.speed_difference_high` | … | +230 |
+| `paper/reported/overview.md` | `part2.pause_difference_low` | … | −0.090 |
+| `paper/reported/overview.md` | `part2.pause_difference_high` | … | −0.059 |
+| `paper/reported/overview.md` | `part2.max_step_difference_low` | … | +7.8 |
+| `paper/reported/overview.md` | `part2.max_step_difference_high` | … | +22 |
+| `paper/reported/overview.md` | `part2.reversals_difference_low` | … | +2.0 |
+| `paper/reported/overview.md` | `part2.reversals_difference_high` | … | +3.0 |
+| `paper/reported/overview.md` | `part2.arms_median_non_swr` | … | 1 |
+| `paper/reported/overview.md` | `part2.arms_median_swr` | … | 3 |
+| `paper/reported/overview.md` | `part2.arms_difference_low` | … | +1.0 |
+| `paper/reported/overview.md` | `part2.arms_difference_high` | … | +2.0 |
+| `paper/reported/overview.md` | `part2.arms_animals_in_direction` | … | 5 |
+| `paper/reported/overview.md` | `part2.start_distance_median_non_swr` | … | 110 |
+| `paper/reported/overview.md` | `part2.start_distance_median_swr` | … | 120 |
+| `paper/reported/overview.md` | `part2.start_distance_difference_low` | … | −11 |
+| `paper/reported/overview.md` | `part2.start_distance_difference_high` | … | +16 |
+| `paper/reported/overview.md` | `part2.start_distance_animals_in_direction` | … | 3 |
+| `paper/reported/overview.md` | `part2.peak_difference_low` | … | −0.12 |
+| `paper/reported/overview.md` | `part2.peak_difference_high` | … | +0.0095 |
+| `paper/reported/overview.md` | `part2.hpd_difference_low` | … | −5.3 |
+| `paper/reported/overview.md` | `part2.hpd_difference_high` | … | +53 |
+| `paper/reported/overview.md` | `part2.extent_matched_difference` | … | +35 |
+| `paper/reported/overview.md` | `part2.extent_matched_difference_low` | … | +24 |
+| `paper/reported/overview.md` | `part2.extent_matched_difference_high` | … | +45 |
+| `paper/reported/overview.md` | `part2.speed_matched_difference` | … | +180 |
+| `paper/reported/overview.md` | `part2.speed_matched_difference_low` | … | +110 |
+| `paper/reported/overview.md` | `part2.speed_matched_difference_high` | … | +250 |
+| `paper/reported/overview.md` | `part2.pause_matched_difference` | … | −0.050 |
+| `paper/reported/overview.md` | `part2.pause_matched_difference_low` | … | −0.079 |
+| `paper/reported/overview.md` | `part2.pause_matched_difference_high` | … | −0.034 |
+| `paper/reported/overview.md` | `part2.max_step_matched_difference` | … | +24 |
+| `paper/reported/overview.md` | `part2.max_step_matched_difference_low` | … | +14 |
+| `paper/reported/overview.md` | `part2.max_step_matched_difference_high` | … | +34 |
+| `paper/reported/overview.md` | `part2.reversals_matched_difference` | … | +1.7 |
+| `paper/reported/overview.md` | `part2.reversals_matched_difference_low` | … | +0.92 |
+| `paper/reported/overview.md` | `part2.reversals_matched_difference_high` | … | +2.3 |
+| `paper/reported/overview.md` | `part2.arms_matched_difference` | … | +0.99 |
+| `paper/reported/overview.md` | `part2.arms_matched_difference_low` | … | +0.81 |
+| `paper/reported/overview.md` | `part2.arms_matched_difference_high` | … | +1.3 |
+| `paper/reported/overview.md` | `part2.peak_matched_difference` | … | −0.092 |
+| `paper/reported/overview.md` | `part2.peak_matched_difference_low` | … | −0.13 |
+| `paper/reported/overview.md` | `part2.peak_matched_difference_high` | … | −0.033 |
+| `paper/reported/overview.md` | `part2.hpd_matched_difference` | … | +38 |
+| `paper/reported/overview.md` | `part2.hpd_matched_difference_low` | … | −1.5 |
+| `paper/reported/overview.md` | `part2.hpd_matched_difference_high` | … | +57 |
+| `paper/reported/overview.md` | `part2.start_distance_matched_difference` | … | −13 |
+| `paper/reported/overview.md` | `part2.start_distance_matched_difference_low` | … | −29 |
+| `paper/reported/overview.md` | `part2.start_distance_matched_difference_high` | … | +3.8 |

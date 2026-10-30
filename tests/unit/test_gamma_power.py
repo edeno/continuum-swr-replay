@@ -7,6 +7,8 @@ from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     GAMMA_BANDS,
     band_power,
     event_means,
+    power_change_db,
+    samples_in_intervals,
     zscore_on,
 )
 
@@ -56,3 +58,41 @@ def test_event_means_include_both_bounds_and_mark_empty_events():
     means = event_means(grid, values, np.array([2.0, 4.5]), np.array([4.0, 4.6]))
     assert means[0] == pytest.approx(3.0)
     assert np.isnan(means[1])
+
+
+@pytest.mark.parametrize("band, freq_hz", [("slow_gamma", 40.0), ("fast_gamma", 80.0)])
+@pytest.mark.parametrize("gain", [2.0, 0.5, 1.0])
+def test_a_known_power_ratio_comes_back_in_db(band, freq_hz, gain):
+    # 20 s of a gamma sine in noise; in "event" seconds the sine's amplitude is
+    # multiplied by `gain`. Far from the edges of each stretch, the band power
+    # ratio is gain**2 (the noise adds the same small power to both), so the
+    # change is close to 20 log10(gain) dB.
+    rng = np.random.default_rng(0)
+    t = np.arange(int(20 * FS)) / FS
+    in_event = (t % 2.0) >= 1.0
+    amplitude = np.where(in_event, gain, 1.0)
+    lfp = (amplitude * np.sin(2 * np.pi * freq_hz * t))[:, None] + rng.normal(
+        0, 0.05, (t.size, 1)
+    )
+    power = band_power(lfp, FS, GAMMA_BANDS[band])
+    interior = ((t % 1.0) > 0.2) & ((t % 1.0) < 0.8) & (t > 1) & (t < 19)
+    db = power_change_db(power, in_event & interior, ~in_event & interior)
+    assert db == pytest.approx(20 * np.log10(gain), abs=0.15)
+
+
+def test_power_change_db_needs_both_sets():
+    power = np.array([1.0, 2.0, np.nan])
+    assert np.isnan(
+        power_change_db(power, np.array([False, False, True]), np.ones(3, bool))
+    )
+    assert power_change_db(
+        power, np.array([False, True, False]), np.array([True, False, False])
+    ) == pytest.approx(10 * np.log10(2))
+
+
+def test_samples_in_intervals_matches_event_means_rule():
+    grid = np.arange(10) * 0.002
+    mask = samples_in_intervals(
+        grid, np.array([0.002, 0.011]), np.array([0.006, 0.014])
+    )
+    np.testing.assert_array_equal(np.flatnonzero(mask), [1, 2, 3, 6, 7])

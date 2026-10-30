@@ -59,7 +59,7 @@ simulated replays:
   of their time bins, and <!--v:part2.kay_overlap_any_local_fraction-->32 %<!--/v--> of them hold at least one Local bin.
 - The other definitions (supplement) show the same two sides. Overlapping no non-local event: MUA
   <!--v:part2.mua_no_nonlocal_fraction-->15 %<!--/v-->, Carey <!--v:part2.carey_no_nonlocal_fraction-->20 %<!--/v-->, Zugaro <!--v:part2.zugaro_no_nonlocal_fraction-->35 %<!--/v-->,
-  Karlsson <!--v:part2.karlsson_no_nonlocal_fraction-->38 %<!--/v-->, Yu <!--v:part2.yu_no_nonlocal_fraction-->56 %<!--/v-->. Widloski (pending):
+  Karlsson <!--v:part2.karlsson_no_nonlocal_fraction-->38 %<!--/v-->, Yu <!--v:part2.yu_no_nonlocal_fraction-->56 %<!--/v-->. Widloski:
   <!--v:part2.widloski_no_nonlocal_fraction-->3 %<!--/v-->.
 - *Reading:* SWR detection and content detection measure different things. Many SWRs carry only local content,
   and even the overlapping ones are partly local. The Widloski detector, which requires a moving sequence, almost
@@ -73,7 +73,7 @@ simulated replays:
 - starting from any of the five SWR definitions: <!--v:part2.nonlocal_time_outside_swr_fraction-->31 %<!--/v--> of non-local time;
 - starting from any SWR definition or MUA: <!--v:part2.nonlocal_events_outside_trigger-->19,221<!--/v--> events (<!--v:part2.nonlocal_events_outside_trigger_fraction-->25 %<!--/v-->;
   about <!--v:part2.nonlocal_events_outside_trigger_per_hour-->480<!--/v--> per hour) and <!--v:part2.nonlocal_time_outside_trigger_fraction-->28 %<!--/v--> of the time;
-- starting from Widloski events (pending): <!--v:part2.nonlocal_events_outside_widloski_fraction-->94 %<!--/v--> of events and
+- starting from Widloski events: <!--v:part2.nonlocal_events_outside_widloski_fraction-->94 %<!--/v--> of events and
   <!--v:part2.nonlocal_time_outside_widloski_fraction-->93 %<!--/v--> of the time.
 
 **Are these immobility theta events?** No, in general. Non-SWR events sit at quiet-rest theta
@@ -83,10 +83,17 @@ running theta (SWR events <!--v:part2.theta_like_fraction_swr-->11 %<!--/v-->).
 - Ripple power: non-SWR events <!--v:part2.ripple_median_non_swr-->0.50<!--/v--> z, above quiet rest (<!--v:part2.ripple_rest_reference-->−0.60<!--/v--> z) in
   <!--v:part2.ripple_animals_above_rest_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; SWR events <!--v:part2.ripple_median_swr-->2.35<!--/v--> z.
 - Slow gamma (25–55 Hz): non-SWR <!--v:part2.slow_gamma_median_non_swr-->−0.10<!--/v--> z, SWR <!--v:part2.slow_gamma_median_swr-->0.36<!--/v--> z, quiet rest
-  <!--v:part2.slow_gamma_rest_reference-->−0.28<!--/v--> z. Fast gamma (65–100 Hz): <!--v:part2.fast_gamma_median_non_swr-->−0.21<!--/v-->, <!--v:part2.fast_gamma_median_swr-->0.11<!--/v-->
-  and <!--v:part2.fast_gamma_rest_reference-->−0.43<!--/v--> z. Spiking and the ripple leak broadband power into both bands, so part of
+  <!--v:part2.slow_gamma_rest_reference-->−0.28<!--/v--> z; as power against the same epoch's quiet rest, non-SWR
+  <!--v:part2.slow_gamma_db_median_non_swr-->+0.36<!--/v--> dB (above rest in <!--v:part2.slow_gamma_db_animals_above_rest_non_swr-->3<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals) and SWR
+  <!--v:part2.slow_gamma_db_median_swr-->+1.6<!--/v--> dB (<!--v:part2.slow_gamma_db_animals_above_rest_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->). Fast gamma (65–100 Hz): <!--v:part2.fast_gamma_median_non_swr-->−0.21<!--/v-->, <!--v:part2.fast_gamma_median_swr-->0.11<!--/v-->
+  and <!--v:part2.fast_gamma_rest_reference-->−0.43<!--/v--> z; non-SWR <!--v:part2.fast_gamma_db_median_non_swr-->+0.52<!--/v--> dB
+  (<!--v:part2.fast_gamma_db_animals_above_rest_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->) and SWR <!--v:part2.fast_gamma_db_median_swr-->+1.1<!--/v--> dB (<!--v:part2.fast_gamma_db_animals_above_rest_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->) against rest
+  (median over epochs). Spiking and the ripple leak broadband power into both bands, so part of
   these rises may be leakage rather than oscillation.
-- *Not yet:* how often quiet rest itself reaches running theta, the reference for the theta-like share.
+- Quiet rest matched in duration to the events reaches running theta in <!--v:part2.theta_like_fraction_rest_matched_non_swr-->12 %<!--/v--> (matched to non-SWR
+  events) and <!--v:part2.theta_like_fraction_rest_matched_swr-->12 %<!--/v--> (matched to SWR events) of windows; events exceed it in <!--v:part2.theta_like_animals_above_rest_matched_non_swr-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->
+  (non-SWR) and <!--v:part2.theta_like_animals_above_rest_matched_swr-->1<!--/v-->/<!--v:part2.animals-->5<!--/v--> (SWR) animals. *Reading:* the theta-like share of events is what quiet rest of the same
+  length shows; it does not mark theta events.
 
 **Do event boundaries agree?** For <!--v:part2.swr_overlapping_events-->32,701<!--/v--> overlapping events, the median start offset is
 <!--v:part2.start_offset_median_ms-->4<!--/v--> ms and the median end offset <!--v:part2.end_offset_median_ms-->−4<!--/v--> ms (event minus SWR):
@@ -103,20 +110,37 @@ close on average.
 - *Reading:* non-SWR events are real but carry less evidence per spike and involve fewer cells. Close events stay
   open until the wider-Local-kernel test (claim 8).
 
-**What are the events like?** Non-SWR against SWR, medians:
-- duration <!--v:part2.duration_median_non_swr-->48<!--/v--> against <!--v:part2.duration_median_swr-->94<!--/v--> ms;
-- spatial extent <!--v:part2.extent_median_non_swr-->8.0<!--/v--> against <!--v:part2.extent_median_swr-->50<!--/v--> cm;
-- replay speed <!--v:part2.speed_median_non_swr-->320<!--/v--> against <!--v:part2.speed_median_swr-->490<!--/v--> cm/s;
-- pause fraction <!--v:part2.pause_median_non_swr-->1.00<!--/v--> against <!--v:part2.pause_median_swr-->0.93<!--/v-->, largest step
-  <!--v:part2.max_step_median_non_swr-->2.0<!--/v--> against <!--v:part2.max_step_median_swr-->14<!--/v--> cm, reversals
-  <!--v:part2.reversals_median_non_swr-->0<!--/v--> against <!--v:part2.reversals_median_swr-->3<!--/v-->;
-- posterior peak <!--v:part2.peak_median_non_swr-->0.90<!--/v--> against <!--v:part2.peak_median_swr-->0.82<!--/v--> (<!--v:part2.peak_animals_in_direction-->4<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals),
-  HPD <!--v:part2.hpd_median_non_swr-->44<!--/v--> against <!--v:part2.hpd_median_swr-->80<!--/v--> cm (<!--v:part2.hpd_animals_in_direction-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
+**What are the events like?** Non-SWR against SWR, medians; in brackets the 95 % interval of the SWR minus non-SWR
+difference (nested bootstrap: animals, then epochs, then events):
+- duration <!--v:part2.duration_median_non_swr-->48<!--/v--> against <!--v:part2.duration_median_swr-->94<!--/v--> ms [<!--v:part2.duration_difference_low-->+38<!--/v--> to <!--v:part2.duration_difference_high-->+54<!--/v-->];
+- spatial extent <!--v:part2.extent_median_non_swr-->8.0<!--/v--> against <!--v:part2.extent_median_swr-->50<!--/v--> cm [<!--v:part2.extent_difference_low-->+29<!--/v--> to <!--v:part2.extent_difference_high-->+58<!--/v-->];
+- replay speed <!--v:part2.speed_median_non_swr-->320<!--/v--> against <!--v:part2.speed_median_swr-->490<!--/v--> cm/s [<!--v:part2.speed_difference_low-->+110<!--/v--> to <!--v:part2.speed_difference_high-->+230<!--/v-->];
+- pause fraction <!--v:part2.pause_median_non_swr-->1.00<!--/v--> against <!--v:part2.pause_median_swr-->0.93<!--/v--> [<!--v:part2.pause_difference_low-->−0.090<!--/v--> to <!--v:part2.pause_difference_high-->−0.059<!--/v-->], largest step
+  <!--v:part2.max_step_median_non_swr-->2.0<!--/v--> against <!--v:part2.max_step_median_swr-->14<!--/v--> cm [<!--v:part2.max_step_difference_low-->+7.8<!--/v--> to <!--v:part2.max_step_difference_high-->+22<!--/v-->], reversals
+  <!--v:part2.reversals_median_non_swr-->0<!--/v--> against <!--v:part2.reversals_median_swr-->3<!--/v--> [<!--v:part2.reversals_difference_low-->+2.0<!--/v--> to <!--v:part2.reversals_difference_high-->+3.0<!--/v-->];
+- arms visited <!--v:part2.arms_median_non_swr-->1<!--/v--> against <!--v:part2.arms_median_swr-->3<!--/v--> [<!--v:part2.arms_difference_low-->+1.0<!--/v--> to <!--v:part2.arms_difference_high-->+2.0<!--/v-->], fewer in
+  <!--v:part2.arms_animals_in_direction-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; start distance (track distance from the animal to the first decoded position)
+  <!--v:part2.start_distance_median_non_swr-->110<!--/v--> against <!--v:part2.start_distance_median_swr-->120<!--/v--> cm [<!--v:part2.start_distance_difference_low-->−11<!--/v--> to <!--v:part2.start_distance_difference_high-->+16<!--/v-->], shorter
+  for non-SWR events in <!--v:part2.start_distance_animals_in_direction-->3<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals;
+- posterior peak <!--v:part2.peak_median_non_swr-->0.90<!--/v--> against <!--v:part2.peak_median_swr-->0.82<!--/v--> [<!--v:part2.peak_difference_low-->−0.12<!--/v--> to <!--v:part2.peak_difference_high-->+0.0095<!--/v-->] (<!--v:part2.peak_animals_in_direction-->4<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals),
+  HPD <!--v:part2.hpd_median_non_swr-->44<!--/v--> against <!--v:part2.hpd_median_swr-->80<!--/v--> cm [<!--v:part2.hpd_difference_low-->−5.3<!--/v--> to <!--v:part2.hpd_difference_high-->+53<!--/v-->] (<!--v:part2.hpd_animals_in_direction-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
+- At matched duration (SWR minus non-SWR within ten duration-quantile strata, averaged; 95 % interval): extent
+  <!--v:part2.extent_matched_difference-->+35<!--/v--> cm [<!--v:part2.extent_matched_difference_low-->+24<!--/v--> to <!--v:part2.extent_matched_difference_high-->+45<!--/v-->], speed
+  <!--v:part2.speed_matched_difference-->+180<!--/v--> cm/s [<!--v:part2.speed_matched_difference_low-->+110<!--/v--> to <!--v:part2.speed_matched_difference_high-->+250<!--/v-->], pause fraction
+  <!--v:part2.pause_matched_difference-->−0.050<!--/v--> [<!--v:part2.pause_matched_difference_low-->−0.079<!--/v--> to <!--v:part2.pause_matched_difference_high-->−0.034<!--/v-->], largest step
+  <!--v:part2.max_step_matched_difference-->+24<!--/v--> cm [<!--v:part2.max_step_matched_difference_low-->+14<!--/v--> to <!--v:part2.max_step_matched_difference_high-->+34<!--/v-->], reversals
+  <!--v:part2.reversals_matched_difference-->+1.7<!--/v--> [<!--v:part2.reversals_matched_difference_low-->+0.92<!--/v--> to <!--v:part2.reversals_matched_difference_high-->+2.3<!--/v-->], arms visited
+  <!--v:part2.arms_matched_difference-->+0.99<!--/v--> [<!--v:part2.arms_matched_difference_low-->+0.81<!--/v--> to <!--v:part2.arms_matched_difference_high-->+1.3<!--/v-->], posterior peak
+  <!--v:part2.peak_matched_difference-->−0.092<!--/v--> [<!--v:part2.peak_matched_difference_low-->−0.13<!--/v--> to <!--v:part2.peak_matched_difference_high-->−0.033<!--/v-->], HPD
+  <!--v:part2.hpd_matched_difference-->+38<!--/v--> cm [<!--v:part2.hpd_matched_difference_low-->−1.5<!--/v--> to <!--v:part2.hpd_matched_difference_high-->+57<!--/v-->], start distance
+  <!--v:part2.start_distance_matched_difference-->−13<!--/v--> cm [<!--v:part2.start_distance_matched_difference_low-->−29<!--/v--> to <!--v:part2.start_distance_matched_difference_high-->+3.8<!--/v-->].
 - Where content sits: non-SWR <!--v:part2.non_swr_content_remote_well_fraction-->45 %<!--/v--> at a remote well,
   <!--v:part2.non_swr_content_own_well_fraction-->13 %<!--/v--> at the animal's own well and <!--v:part2.non_swr_content_remote_path_fraction-->41 %<!--/v--> on remote
   paths; SWR <!--v:part2.swr_content_remote_path_fraction-->73 %<!--/v--> on remote paths and <!--v:part2.swr_content_remote_well_fraction-->21 %<!--/v--> at a remote well.
 - *Reading:* non-SWR events are short, compact, nearly stationary and sharper, and sit at wells more often than
-  SWR events. Because none of these contrasts is duration-controlled, "shorter" may account for much of the rest.
+  SWR events. Duration does not explain the contrasts: at matched duration extent, speed, largest step, reversals,
+  arms visited, pause fraction and posterior peak still differ, with intervals that exclude zero. HPD and start
+  distance do not differ clearly, raw or matched.
 
 **One class or two?** (claim 24; `scripts/detection/measure_ripple_class_structure.py`) The events' peak ripple power
 has one mode in <!--v:part2.ripple_peak_animals_unimodal-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals, lying at

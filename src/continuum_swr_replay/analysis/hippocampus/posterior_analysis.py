@@ -367,6 +367,45 @@ def map_estimate_to_map_nodes(
     return node_ids, has_valid
 
 
+def track_distance_cm(
+    from_linear_position: np.ndarray,
+    to_linear_position: np.ndarray,
+    place_bin_centers_nodes_df: pd.DataFrame,
+    distance_between_nodes: dict,
+) -> np.ndarray:
+    """Track-graph distance between two linear positions, row by row (cm).
+
+    Each position goes to its nearest real place bin (never a junction
+    placeholder, :func:`map_estimate_to_map_nodes`), and the distance is the
+    environment's shortest path between the two bins' nodes
+    (``env.distance_between_nodes_``), as ``spatial_extent_cm`` and
+    ``net_displacement_cm`` use. With the animal's position and the first
+    decoded (MAP) position of an event, it is the event's start distance.
+
+    Parameters
+    ----------
+    from_linear_position, to_linear_position : np.ndarray, shape (n,)
+        Linear positions in cm; NaN where unknown.
+    place_bin_centers_nodes_df : pd.DataFrame
+        ``env.place_bin_centers_nodes_df_``.
+    distance_between_nodes : dict
+        ``env.distance_between_nodes_``: shortest-path cm, keyed by node then node.
+
+    Returns
+    -------
+    distance : np.ndarray, shape (n,)
+        NaN where either position is NaN.
+    """
+    a, a_ok = map_estimate_to_map_nodes(
+        from_linear_position, place_bin_centers_nodes_df
+    )
+    b, b_ok = map_estimate_to_map_nodes(to_linear_position, place_bin_centers_nodes_df)
+    out = np.full(a.shape, np.nan)
+    for k in np.flatnonzero(a_ok & b_ok):
+        out[k] = float(distance_between_nodes[a[k]][b[k]])
+    return out
+
+
 def get_map_speed(
     posterior: xr.DataArray | np.ndarray,
     track_graph_with_bin_centers_edges: nx.Graph,

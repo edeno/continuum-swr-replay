@@ -3,15 +3,40 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "bb1389c0d2e8",
+ "commit": "9329614f5e06",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/event_table.parquet",
    "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
   },
   {
+   "path": "Processed-Data/event_start_rest_theta/*.parquet",
+   "n_files": 242,
+   "sha256": "7703cce2df66ed957c7c160e0050f2dc8c0bc0eba2add4e9fc0af4047c3f7d10"
+  },
+  {
+   "path": "Processed-Data/event_start_rest_theta/manifest.json",
+   "sha256": "7af49df1193c02c031e972bb380c8e0696132de58043530a3ee22813dc611fb0"
+  },
+  {
+   "path": "Processed-Data/event_property_bootstrap/intervals.csv",
+   "sha256": "0385104f50530fa0a3b45cabd03a8dba585afb2ee0efef071d25ca06edf67791"
+  },
+  {
+   "path": "Processed-Data/event_property_bootstrap/manifest.json",
+   "sha256": "3e4dd5806443125484acfdca1f21d2f32079b8dabfc0b32e1391d11c74f7df5c"
+  },
+  {
    "path": "Processed-Data/brain_state_reference/reference.parquet",
    "sha256": "f7120f54f539fc6afe114f9c25b60487822c6f25b3347ee083566dc7bb2e4f54"
+  },
+  {
+   "path": "Processed-Data/event_gamma_power/reference.parquet",
+   "sha256": "bf5ac34c1bb458829a84069807345718b36501e22f74e2749f9f302d0ec16ca3"
+  },
+  {
+   "path": "Processed-Data/event_gamma_power/manifest.json",
+   "sha256": "2441b49db92604a193526c82a51e6321ba76b9e8544ccfb31b4aa39773260f04"
   },
   {
    "path": "Processed-Data/event_gamma/*_events.parquet",
@@ -138,6 +163,134 @@
     "figure: 2b"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "pending": null
+  },
+  "arms_animals_in_direction": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "arms_difference_high": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "arms_difference_low": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "arms_matched_difference": {
+   "value": 0.992414932276181,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "arms_matched_difference_high": {
+   "value": 1.2742055703810902,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "arms_matched_difference_low": {
+   "value": 0.8142339075335128,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "arms_median_non_swr": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "",
+   "description": "median number of arms the decoded position visits of immobile non-SWR non-local events",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "arms_median_swr": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "",
+   "description": "median number of arms the decoded position visits of immobile SWR-overlapping non-local events",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "baseline_dll_per_spike_median": {
@@ -426,7 +579,37 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "duration_difference_high": {
+   "value": 53.99990081787109,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "ms",
+   "description": "upper bound of that interval",
+   "claims": [
+    "18"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "duration_difference_low": {
+   "value": 38.00010681152344,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "ms",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration",
+   "claims": [
+    "18"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "duration_median_non_swr": {
@@ -441,7 +624,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "duration_median_swr": {
@@ -456,7 +639,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "end_offset_median_ms": {
@@ -541,7 +724,87 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "extent_difference_high": {
+   "value": 57.90744474644557,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of that interval",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "extent_difference_low": {
+   "value": 29.21378284532141,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "extent_matched_difference": {
+   "value": 34.65161704013706,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "extent_matched_difference_high": {
+   "value": 44.92981570327141,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "extent_matched_difference_low": {
+   "value": 23.84102849809838,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "extent_median_non_swr": {
@@ -557,7 +820,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "extent_median_swr": {
@@ -573,7 +836,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "fast_gamma_animals_above_rest_non_swr": {
@@ -634,6 +897,66 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "fast_gamma_db_animals_above_rest_non_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median over epochs of that change (non-SWR events) is above 0 dB",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
+  "fast_gamma_db_animals_above_rest_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
+  "fast_gamma_db_median_non_swr": {
+   "value": 0.5237300652177623,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "dB",
+   "description": "median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
+  "fast_gamma_db_median_swr": {
+   "value": 1.1488094096614931,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "dB",
+   "description": "median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "fast_gamma_median_non_swr": {
@@ -868,7 +1191,82 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "hpd_difference_high": {
+   "value": 52.72304263477471,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of that interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "hpd_difference_low": {
+   "value": -5.273391788759729,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "hpd_matched_difference": {
+   "value": 38.28887806024027,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "SWR minus non-SWR difference of median highest-density-region coverage at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "hpd_matched_difference_high": {
+   "value": 57.03339122563062,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "hpd_matched_difference_low": {
+   "value": -1.4803881456342702,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "hpd_median_non_swr": {
@@ -883,7 +1281,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "hpd_median_swr": {
@@ -898,7 +1296,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "karlsson_events": {
@@ -1361,7 +1759,87 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "max_step_difference_high": {
+   "value": 21.79726445920433,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of that interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "max_step_difference_low": {
+   "value": 7.833488993673558,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "max_step_matched_difference": {
+   "value": 23.69542706752765,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "SWR minus non-SWR difference of median largest step of the decoded position at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "max_step_matched_difference_high": {
+   "value": 34.25657735457281,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "max_step_matched_difference_low": {
+   "value": 13.783768700721495,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "max_step_median_non_swr": {
@@ -1377,7 +1855,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "max_step_median_swr": {
@@ -1393,7 +1871,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "mua_animals_above_rest_non_swr": {
@@ -1720,7 +2198,82 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "multimodal_difference_high": {
+   "value": 0.1315913604766633,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "multimodal_difference_low": {
+   "value": 0.0125233243767726,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "multimodal_matched_difference": {
+   "value": 0.0676164609925697,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "SWR minus non-SWR difference of median multimodal fraction of the posterior at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "multimodal_matched_difference_high": {
+   "value": 0.1191057738448384,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "multimodal_matched_difference_low": {
+   "value": 0.0058054922871853,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "multimodal_median_non_swr": {
@@ -1735,7 +2288,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "multimodal_median_swr": {
@@ -1750,7 +2303,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "non_swr_close_animals_above_baseline": {
@@ -2298,7 +2851,7 @@
     "figure: main, left out"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "nonlocal_events_outside_widloski_fraction": {
    "value": 0.9449407908648763,
@@ -2315,7 +2868,7 @@
     "figure: main, left out"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "nonlocal_events_outside_widloski_per_hour": {
    "value": 1777.6660405375621,
@@ -2332,7 +2885,7 @@
     "figure: main, left out"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "nonlocal_events_swr_contained": {
    "value": 16037,
@@ -2485,7 +3038,7 @@
     "figure: main, left out"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "nonlocal_time_outside_widloski_s": {
    "value": 6097.961916208267,
@@ -2502,7 +3055,7 @@
     "figure: main, left out"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "nonlocal_time_s": {
    "value": 6562.033644914627,
@@ -2551,7 +3104,87 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "pause_difference_high": {
+   "value": -0.0588235294117647,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "pause_difference_low": {
+   "value": -0.0898890449438202,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "pause_matched_difference": {
+   "value": -0.0498972790936483,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "SWR minus non-SWR difference of median pause fraction at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "pause_matched_difference_high": {
+   "value": -0.0343371623159765,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "pause_matched_difference_low": {
+   "value": -0.0790596960598705,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "pause_median_non_swr": {
@@ -2567,7 +3200,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "pause_median_swr": {
@@ -2583,7 +3216,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "peak_animals_in_direction": {
@@ -2598,7 +3231,82 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "peak_difference_high": {
+   "value": 0.0095100561516376,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "peak_difference_low": {
+   "value": -0.1170766410238823,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event)",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "peak_matched_difference": {
+   "value": -0.0916663979146148,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "SWR minus non-SWR difference of median posterior peak (mean over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "peak_matched_difference_high": {
+   "value": -0.0327098640724876,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "peak_matched_difference_low": {
+   "value": -0.1277020503939642,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "17"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "peak_median_non_swr": {
@@ -2613,7 +3321,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "peak_median_swr": {
@@ -2628,7 +3336,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "rest_hours": {
@@ -2661,7 +3369,87 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "reversals_difference_high": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of that interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "reversals_difference_low": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "reversals_matched_difference": {
+   "value": 1.6878361413941196,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "SWR minus non-SWR difference of median number of direction reversals at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "reversals_matched_difference_high": {
+   "value": 2.276424996376704,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "reversals_matched_difference_low": {
+   "value": 0.9238046781675344,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "16b"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "reversals_median_non_swr": {
@@ -2677,7 +3465,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "reversals_median_swr": {
@@ -2693,7 +3481,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "ripple_animals_above_rest_non_swr": {
@@ -2940,6 +3728,66 @@
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
+  "slow_gamma_db_animals_above_rest_non_swr": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median over epochs of that change (non-SWR events) is above 0 dB",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
+  "slow_gamma_db_animals_above_rest_swr": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
+  "slow_gamma_db_median_non_swr": {
+   "value": 0.3631893555661309,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "dB",
+   "description": "median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
+  "slow_gamma_db_median_swr": {
+   "value": 1.632122006811644,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "dB",
+   "description": "median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "supplement"
+   ],
+   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "pending": null
+  },
   "slow_gamma_median_non_swr": {
    "value": -0.10483297970275972,
    "kind": "quantity",
@@ -3013,7 +3861,87 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "speed_difference_high": {
+   "value": 230.5999917143936,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm/s",
+   "description": "upper bound of that interval",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "speed_difference_low": {
+   "value": 112.24525279329671,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm/s",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event)",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "speed_matched_difference": {
+   "value": 180.57343159609115,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm/s",
+   "description": "SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "speed_matched_difference_high": {
+   "value": 248.8611746826058,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm/s",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "speed_matched_difference_low": {
+   "value": 106.89945398782834,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm/s",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "15"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3c"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "speed_median_non_swr": {
@@ -3029,7 +3957,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "speed_median_swr": {
@@ -3045,7 +3973,135 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "start_distance_animals_in_direction": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "start_distance_difference_high": {
+   "value": 16.1224583883887,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of that interval",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "start_distance_difference_low": {
+   "value": -11.127290151233415,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position)",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "start_distance_matched_difference": {
+   "value": -13.390396140369962,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size)",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "start_distance_matched_difference_high": {
+   "value": 3.830936997357757,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "upper bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "start_distance_matched_difference_low": {
+   "value": -28.95142534094037,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "cm",
+   "description": "lower bound of its 95 % nested-bootstrap interval",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "pending": null
+  },
+  "start_distance_median_non_swr": {
+   "value": 113.48565074533889,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "start_distance_median_swr": {
+   "value": 119.94025919739316,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "cm",
+   "description": "median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events",
+   "claims": [
+    "14"
+   ],
+   "used_in": [
+    "paper",
+    "figure: 3"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "start_offset_median_ms": {
@@ -3421,6 +4477,36 @@
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
+  "theta_like_animals_above_rest_matched_non_swr": {
+   "value": 2,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "theta_like_animals_above_rest_matched_swr": {
+   "value": 1,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
   "theta_like_fraction_non_swr": {
    "value": 0.130078652208312,
    "kind": "fraction",
@@ -3434,6 +4520,36 @@
     "supplement"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "pending": null
+  },
+  "theta_like_fraction_rest_matched_non_swr": {
+   "value": 0.12406829969542309,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "pending": null
+  },
+  "theta_like_fraction_rest_matched_swr": {
+   "value": 0.12091292048250551,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta",
+   "claims": [
+    "5"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "theta_like_fraction_swr": {
@@ -3525,7 +4641,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_no_nonlocal_fraction": {
    "value": 0.03691886964448496,
@@ -3541,7 +4657,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_no_nonlocal_mixed_fraction": {
    "value": 0.48148148148148145,
@@ -3557,7 +4673,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_no_nonlocal_mostly_local_fraction": {
    "value": 0.5123456790123457,
@@ -3573,7 +4689,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_no_nonlocal_mostly_no_spike_fraction": {
    "value": 0.006172839506172839,
@@ -3589,7 +4705,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_all_nonlocal_fraction": {
    "value": 0.10837671557027923,
@@ -3605,7 +4721,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_any_local_fraction": {
    "value": 0.5832938949361098,
@@ -3621,7 +4737,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_any_no_spike_fraction": {
    "value": 0.27449124467581637,
@@ -3637,7 +4753,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_local_share_median": {
    "value": 0.05194805194805195,
@@ -3653,7 +4769,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_no_spike_share_median": {
    "value": 0.0,
@@ -3669,7 +4785,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_nonlocal_share_median": {
    "value": 0.7950262588816805,
@@ -3685,7 +4801,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_criteria_overlap_uncertain_share_median": {
    "value": 0.08433734939759036,
@@ -3701,7 +4817,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_events": {
    "value": 4092,
@@ -3717,7 +4833,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_no_nonlocal_fraction": {
    "value": 0.03372434017595308,
@@ -3733,7 +4849,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_no_nonlocal_mixed_fraction": {
    "value": 0.4927536231884058,
@@ -3749,7 +4865,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_no_nonlocal_mostly_local_fraction": {
    "value": 0.5072463768115942,
@@ -3765,7 +4881,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_no_nonlocal_mostly_no_spike_fraction": {
    "value": 0.0,
@@ -3781,7 +4897,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_all_nonlocal_fraction": {
    "value": 0.09661102680829539,
@@ -3797,7 +4913,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_any_local_fraction": {
    "value": 0.5940819423368741,
@@ -3813,7 +4929,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_any_no_spike_fraction": {
    "value": 0.2830045523520486,
@@ -3829,7 +4945,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_local_share_median": {
    "value": 0.056338028169014086,
@@ -3845,7 +4961,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_no_spike_share_median": {
    "value": 0.0,
@@ -3861,7 +4977,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_nonlocal_share_median": {
    "value": 0.7866666666666666,
@@ -3877,7 +4993,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "widloski_overlap_uncertain_share_median": {
    "value": 0.0847457627118644,
@@ -3893,7 +5009,7 @@
     "supplement"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
-   "pending": "Widloski detector: pending the Phase 2 pilot checks"
+   "pending": null
   },
   "yu_events": {
    "value": 125423,

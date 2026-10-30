@@ -52,8 +52,10 @@ dispersion alone). Its windows are those whose midpoint lies in the event,
 both bounds included, as for the ``ms_`` features; its candidates are those
 sharing time of positive duration with it, as the comparison's overlaps are.
 Every gate's failures are kept as their own count or flag, and one exclusive
-``stage`` gives the furthest gate reached, in the detector's order. All
-memoryless results are pending the Phase 2 pilot checks.
+``stage`` gives the furthest gate reached, in the detector's order. The
+memoryless detector is a documented adaptation whose clusterless null was
+not separately validated; the lead dropped the Phase 2 pilot checks
+(2026-10-28).
 """
 
 from collections.abc import Collection, Mapping

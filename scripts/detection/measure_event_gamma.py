@@ -9,16 +9,20 @@ Is a non-local event at rest accompanied by a rise in slow or fast gamma
 2. each band's power, averaged over those tetrodes, z-scored over the decode
    span outside excluded time, and read onto the decode grid;
 3. each immobile non-local event's mean (the canonical event table's events),
-   and the epoch's running and quiet-rest levels (``brain_state_reference``).
+   and the epoch's running and quiet-rest levels (``brain_state_reference``);
+4. the same on band power itself (not z), and each class's change against the
+   epoch's quiet rest in dB: ``10 log10(mean power over the class's event
+   samples / mean power over quiet rest)`` (``gamma_power.power_change_db``).
 
-Writes ``Processed-Data/event_gamma/{epoch_id}_events.parquet`` per epoch,
+Writes ``Processed-Data/<--out-name>/{epoch_id}_events.parquet`` per epoch,
 ``reference.parquet`` (one row per epoch) and ``manifest.json``. A failing
 epoch is recorded and the rest run; a rerun skips the epochs already written
 unless ``--overwrite``.
 
 Usage::
 
-    uv run python scripts/detection/measure_event_gamma.py --n-workers 8
+    uv run python scripts/detection/measure_event_gamma.py --n-workers 8 \\
+        [--out-name event_gamma]
 """
 
 from __future__ import annotations
@@ -37,12 +41,15 @@ import pandas as pd
 from continuum_swr_replay.analysis.events import analysed_time, swr_source
 from continuum_swr_replay.analysis.hippocampus.brain_state_reference import (
     brain_state_reference,
+    regime_masks,
 )
 from continuum_swr_replay.analysis.hippocampus.gamma_power import (
     FILTER_ORDER,
     GAMMA_BANDS,
     band_power,
     event_means,
+    power_change_db,
+    samples_in_intervals,
     zscore_on,
 )
 from continuum_swr_replay.analysis.inventory_comparison import inventory_run
@@ -61,8 +68,8 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 KEYS = list(SESSION_COLUMNS)
 
 
-def out_dir() -> Path:
-    return processed_data_dir() / "event_gamma"
+def out_dir(name: str = "event_gamma") -> Path:
+    return processed_data_dir() / name
 
 
 def epoch_gamma(
@@ -85,18 +92,33 @@ def epoch_gamma(
     in_span = (lfp_time >= grid_time[0]) & (lfp_time <= grid_time[-1])
     zscore_keep = in_span & ~interval_mask(lfp_time, excluded)
 
+    starts = events["event_start_s"].to_numpy(dtype=np.float64)
+    ends = events["event_end_s"].to_numpy(dtype=np.float64)
+    is_swr = events["is_swr"].to_numpy(dtype=bool)
+    rest = regime_masks(dot)["rest"]
+    in_class = {
+        "swr": samples_in_intervals(grid_time, starts[is_swr], ends[is_swr]),
+        "non_swr": samples_in_intervals(grid_time, starts[~is_swr], ends[~is_swr]),
+    }
     columns = {}
+    change_db = {}
     for word, band in GAMMA_BANDS.items():
-        power = zscore_on(band_power(lfp, sampling_frequency, band), zscore_keep)
-        on_grid = np.interp(grid_time, lfp_time, power)
+        power = band_power(lfp, sampling_frequency, band)
+        on_grid = np.interp(grid_time, lfp_time, zscore_on(power, zscore_keep))
         dot[f"{word}_z"] = on_grid
-        columns[f"{word}_z"] = event_means(
-            grid_time,
-            on_grid,
-            events["event_start_s"].to_numpy(dtype=np.float64),
-            events["event_end_s"].to_numpy(dtype=np.float64),
-        )
-    reference = brain_state_reference(dot, {word: f"{word}_z" for word in GAMMA_BANDS})
+        columns[f"{word}_z"] = event_means(grid_time, on_grid, starts, ends)
+        power_on_grid = np.interp(grid_time, lfp_time, power)
+        dot[f"{word}_power"] = power_on_grid
+        columns[f"{word}_power"] = event_means(grid_time, power_on_grid, starts, ends)
+        for group, mask in in_class.items():
+            change_db[f"{word}_db_{group}"] = power_change_db(power_on_grid, mask, rest)
+    reference = brain_state_reference(
+        dot,
+        {
+            **{word: f"{word}_z" for word in GAMMA_BANDS},
+            **{f"{word}_power": f"{word}_power" for word in GAMMA_BANDS},
+        },
+    )
     table = events[
         [*KEYS, "event_id", "event_start_s", "event_end_s", "is_swr"]
     ].assign(**columns)
@@ -108,15 +130,16 @@ def epoch_gamma(
         "n_kept_tetrodes": int(keep.sum()),
         "sampling_frequency": sampling_frequency,
         **reference,
+        **change_db,
     }
 
 
 def _run(
-    job: tuple[str, dict[str, Any], pd.DataFrame, bool],
+    job: tuple[str, dict[str, Any], pd.DataFrame, bool, str],
 ) -> tuple[str, dict[str, Any]]:
-    identifier, record, events, overwrite = job
-    path = out_dir() / f"{identifier}_events.parquet"
-    ref_path = out_dir() / f"{identifier}_reference.json"
+    identifier, record, events, overwrite, name = job
+    path = out_dir(name) / f"{identifier}_events.parquet"
+    ref_path = out_dir(name) / f"{identifier}_reference.json"
     if path.exists() and ref_path.exists() and not overwrite:
         return identifier, {"status": "ok", "reused": True}
     started = time.perf_counter()
@@ -137,6 +160,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--n-workers", type=int, default=1)
     parser.add_argument("--epoch-id", action="append", help="only these epochs")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--out-name", default="event_gamma")
     args = parser.parse_args(argv)
 
     swr_manifest = json.loads(
@@ -153,13 +177,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         for (animal, day, epoch), frame in events.groupby(KEYS)
     }
     jobs = [
-        (identifier, record, by_epoch[identifier], args.overwrite)
+        (identifier, record, by_epoch[identifier], args.overwrite, args.out_name)
         for identifier, record in sorted(swr_manifest["epochs"].items())
         if record.get("status") == "ok"
         and identifier in by_epoch
         and (not args.epoch_id or identifier in args.epoch_id)
     ]
-    out_dir().mkdir(parents=True, exist_ok=True)
+    out_dir(args.out_name).mkdir(parents=True, exist_ok=True)
     print(f"{len(jobs)} epochs")
     epochs: dict[str, Any] = {}
     with ProcessPoolExecutor(max_workers=args.n_workers) as pool:
@@ -170,12 +194,14 @@ def main(argv: Sequence[str] | None = None) -> None:
                 flush=True,
             )
     references = [
-        json.loads((out_dir() / f"{i}_reference.json").read_text())
+        json.loads((out_dir(args.out_name) / f"{i}_reference.json").read_text())
         for i, r in sorted(epochs.items())
         if r["status"] == "ok"
     ]
-    pd.DataFrame(references).to_parquet(out_dir() / "reference.parquet", index=False)
-    (out_dir() / "manifest.json").write_text(
+    pd.DataFrame(references).to_parquet(
+        out_dir(args.out_name) / "reference.parquet", index=False
+    )
+    (out_dir(args.out_name) / "manifest.json").write_text(
         json.dumps(
             {
                 "produced_by": produced_by(__file__),
@@ -185,6 +211,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "filter": f"Butterworth order {FILTER_ORDER}, zero phase (sosfiltfilt)",
                 "power": "squared Hilbert envelope, mean over the kept CA1 tetrodes",
                 "zscore": "over the decode span outside excluded time",
+                "change_db": "10 log10 of the mean band power over each class's event "
+                "samples over the mean over quiet rest (below 4 cm/s, in no non-local, "
+                "SWR or MUA event, outside excluded time), on the decode grid",
                 "epochs": epochs,
             },
             indent=1,

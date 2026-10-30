@@ -53,8 +53,8 @@ class Value:
     source : str
         The file, run or table it was computed from, and the selection.
     pending : str or None
-        Why the value may not be quoted yet (for example the Widloski pilot
-        checks), or None.
+        Why the value may not be quoted yet (for example a value from an
+        untracked script), or None.
     """
 
     key: str

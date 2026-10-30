@@ -18,7 +18,29 @@ from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
     get_map_step_distance,
     map_estimate_to_map_nodes,
     step_distance_from_nodes,
+    track_distance_cm,
 )
+
+
+def test_track_distance_cm_uses_real_bins_and_the_environment_distances():
+    # real bins at 0, 2, 4 cm (nodes 10-12) and 6 cm (node 13); a junction
+    # placeholder at 5 cm (node -1) must never be chosen
+    bins = pd.DataFrame(
+        {"linear_position": [0.0, 2.0, 4.0, 5.0, 6.0], "node_id": [10, 11, 12, -1, 13]}
+    )
+    nodes = [10, 11, 12, 13]
+    # 12 and 13 are on different arms, 30 cm apart along the track
+    where = {10: 0.0, 11: 2.0, 12: 4.0, 13: 34.0}
+    distance = {a: {b: abs(where[a] - where[b]) for b in nodes} for a in nodes}
+    out = track_distance_cm(
+        np.array([0.1, 5.1, np.nan, 2.0]),
+        np.array([4.2, 0.0, 1.0, np.nan]),
+        bins,
+        distance,
+    )
+    # 5.1 cm is nearest the placeholder; it goes to the real bin at 6 cm
+    np.testing.assert_allclose(out[:2], [4.0, 34.0])
+    assert np.isnan(out[2:]).all()
 
 
 def _linear_graph(n_nodes: int, edge_cm: float = 10.0) -> nx.Graph:
@@ -111,7 +133,8 @@ class TestConditionalNonLocalPosterior:
 
         # Result should be NaN or Inf when dividing by zero
         assert np.all(
-            np.isnan(conditional_posterior.values) | np.isinf(conditional_posterior.values)
+            np.isnan(conditional_posterior.values)
+            | np.isinf(conditional_posterior.values)
         ), "Division by zero should produce NaN or Inf"
 
     def test_single_timepoint(self):
@@ -140,7 +163,6 @@ class TestConditionalNonLocalPosterior:
         np.testing.assert_allclose(
             conditional_posterior.sum("position").values, 1.0, rtol=1e-10
         )
-
 
     def test_idempotent_does_not_mutate_results(self):
         """Calling twice on the same results should return identical output."""
@@ -280,10 +302,12 @@ class TestMapSpeed:
         # No edge connecting component {0,1} to component {2,3}
 
         # Try to move from node 0 to node 2 (impossible)
-        posterior = np.array([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],  # Jump from 0 to 2
-        ])
+        posterior = np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],  # Jump from 0 to 2
+            ]
+        )
         place_bin_center_ind_to_node = np.array([0, 1, 2, 3])
 
         with pytest.raises(nx.NetworkXNoPath):
@@ -322,8 +346,9 @@ class TestMapSpeed:
         )
 
         # Smoothed version should have lower variance
-        assert np.var(speed_smooth) < np.var(speed_no_smooth), \
+        assert np.var(speed_smooth) < np.var(speed_no_smooth), (
             "Smoothing should reduce variance"
+        )
 
     def test_absolute_speed_always_positive(self):
         """Speed should always be non-negative (uses np.abs)."""
@@ -355,7 +380,7 @@ class TestMapSpeed:
         graph = _linear_graph(n_nodes=11, edge_cm=10.0)
 
         # Forward 0→5, reverse 5→0: constant speed of 10cm per step
-        forward = list(range(6))        # [0, 1, 2, 3, 4, 5]
+        forward = list(range(6))  # [0, 1, 2, 3, 4, 5]
         backward = list(range(4, -1, -1))  # [4, 3, 2, 1, 0]
         node_sequence = forward + backward  # 11 timepoints
         posterior = np.eye(11)[node_sequence]
@@ -410,11 +435,13 @@ class TestMapSpeed:
         graph = _linear_graph(n_nodes=4, edge_cm=20.0)
 
         # Three nodes: 0 → 1 → 2
-        posterior = np.array([
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-        ])
+        posterior = np.array(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+            ]
+        )
         place_bin_center_ind_to_node = np.arange(4)
 
         sampling_frequency = 500.0
@@ -517,7 +544,9 @@ class TestMapSpeed:
         assert np.all(np.isfinite(speed))
         # Speed should be positive and within order of magnitude
         assert np.all(speed > 0)
-        assert np.all(speed < expected_speed * 1.5), "Speed shouldn't exceed theoretical max"
+        assert np.all(speed < expected_speed * 1.5), (
+            "Speed shouldn't exceed theoretical max"
+        )
 
 
 class TestEdgeCases:
@@ -529,11 +558,13 @@ class TestEdgeCases:
         graph.add_edge(0, 1, distance=10.0)
 
         # Posterior with NaN values
-        posterior = np.array([
-            [0.3, 0.7],
-            [np.nan, 1.0],
-            [0.5, 0.5],
-        ])
+        posterior = np.array(
+            [
+                [0.3, 0.7],
+                [np.nan, 1.0],
+                [0.5, 0.5],
+            ]
+        )
         place_bin_center_ind_to_node = np.array([0, 1])
 
         # Should not crash; nanargmax ignores NaN
@@ -554,11 +585,13 @@ class TestEdgeCases:
         graph.add_edge(0, 1, distance=10.0)
 
         # All positions equally likely
-        posterior = np.array([
-            [0.5, 0.5],
-            [0.5, 0.5],
-            [0.5, 0.5],
-        ])
+        posterior = np.array(
+            [
+                [0.5, 0.5],
+                [0.5, 0.5],
+                [0.5, 0.5],
+            ]
+        )
         place_bin_center_ind_to_node = np.array([0, 1])
 
         # Should not crash; argmax picks first occurrence
@@ -620,8 +653,9 @@ class TestEdgeCases:
         assert np.all(np.isfinite(speed))
         # Middle speeds should vary based on edge lengths
         # Note: smoothing reduces differences, so check if any variation exists
-        assert np.std(speed) > 0, \
+        assert np.std(speed) > 0, (
             "Different edge lengths should produce variation in speeds"
+        )
 
 
 class TestAllNaNRowHandlingFix:
@@ -633,13 +667,15 @@ class TestAllNaNRowHandlingFix:
         graph.add_edge(0, 1, distance=10.0)
 
         # Some rows have valid data, some are all NaN
-        posterior = np.array([
-            [0.3, 0.7],      # Valid
-            [np.nan, np.nan],  # All NaN
-            [0.5, 0.5],      # Valid
-            [np.nan, np.nan],  # All NaN
-            [0.2, 0.8],      # Valid
-        ])
+        posterior = np.array(
+            [
+                [0.3, 0.7],  # Valid
+                [np.nan, np.nan],  # All NaN
+                [0.5, 0.5],  # Valid
+                [np.nan, np.nan],  # All NaN
+                [0.2, 0.8],  # Valid
+            ]
+        )
         place_bin_center_ind_to_node = np.array([0, 1])
 
         speed = get_map_speed(
@@ -680,11 +716,13 @@ class TestAllNaNRowHandlingFix:
         graph.add_edge(0, 1, distance=20.0)
 
         # First and last row valid, middle is NaN
-        posterior = np.array([
-            [1.0, 0.0],       # At node 0
-            [np.nan, np.nan],  # NaN
-            [0.0, 1.0],       # At node 1
-        ])
+        posterior = np.array(
+            [
+                [1.0, 0.0],  # At node 0
+                [np.nan, np.nan],  # NaN
+                [0.0, 1.0],  # At node 1
+            ]
+        )
         place_bin_center_ind_to_node = np.array([0, 1])
 
         speed = get_map_speed(
@@ -708,11 +746,13 @@ class TestAllNaNRowHandlingFix:
         graph = nx.Graph()
         graph.add_edge(0, 1, distance=10.0)
 
-        posterior = np.array([
-            [0.3, 0.7],
-            [np.nan, np.nan],
-            [0.5, 0.5],
-        ])
+        posterior = np.array(
+            [
+                [0.3, 0.7],
+                [np.nan, np.nan],
+                [0.5, 0.5],
+            ]
+        )
         place_bin_center_ind_to_node = np.array([0, 1])
 
         # Catch any numpy warnings
@@ -728,13 +768,15 @@ class TestAllNaNRowHandlingFix:
 
             # Filter for RuntimeWarning about nanargmax
             nan_warnings = [
-                warning for warning in w
+                warning
+                for warning in w
                 if "All-NaN" in str(warning.message)
                 or "nanargmax" in str(warning.message).lower()
             ]
 
-            assert len(nan_warnings) == 0, \
+            assert len(nan_warnings) == 0, (
                 f"Should not emit NaN warnings, got: {[str(w.message) for w in nan_warnings]}"
+            )
 
 
 class TestMapStepDistance:
@@ -767,9 +809,7 @@ class TestMapStepDistance:
         """Backward-difference alignment: step[t] is the distance into bin t."""
         graph = _linear_graph(n_nodes=3, edge_cm=10.0)
         # MAP: node 0 -> node 2 -> node 0  (jump out 20cm, back 20cm)
-        posterior = np.array(
-            [[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]]
-        )
+        posterior = np.array([[1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0, 0.0]])
         place_bin_center_ind_to_node = np.arange(3)
 
         step = get_map_step_distance(posterior, graph, place_bin_center_ind_to_node)

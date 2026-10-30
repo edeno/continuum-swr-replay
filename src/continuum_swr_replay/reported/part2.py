@@ -17,7 +17,13 @@ refitted here. The inputs (:class:`Part2Inputs`):
 - the content-occupancy table (``paper/figures/content_occupancy``, from
   ``scripts/content/analyze_content_occupancy.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
-  ``scripts/detection/measure_ripple_class_structure.py``).
+  ``scripts/detection/measure_ripple_class_structure.py``);
+- each event's start distance and duration-matched quiet-rest theta
+  (``Processed-Data/event_start_rest_theta``, from
+  ``scripts/detection/measure_event_start_and_rest_theta.py``);
+- the nested bootstrap of the property contrasts
+  (``Processed-Data/event_property_bootstrap``, from
+  ``scripts/detection/bootstrap_event_properties.py``).
 
 Pooled values sum events over sessions and animals; "animals in direction"
 counts the animals whose own value points the way the claim states.
@@ -55,7 +61,6 @@ from continuum_swr_replay.reported.values import (
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run Part 2 reads (242 epochs, all ``ok``)."""
 
-WIDLOSKI_PENDING = "Widloski detector: pending the Phase 2 pilot checks"
 HELDOUT_PENDING = (
     "computed by an untracked research script "
     "(.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); "
@@ -89,6 +94,9 @@ class Part2Inputs:
     brain_state_reference: Path
     event_gamma: Path
     class_structure: Path
+    event_start_rest_theta: Path
+    property_bootstrap: Path
+    event_gamma_power: Path
 
 
 def default_inputs() -> Part2Inputs:
@@ -105,6 +113,9 @@ def default_inputs() -> Part2Inputs:
         / "reference.parquet",
         event_gamma=processed_data_dir() / "event_gamma",
         class_structure=processed_data_dir() / "ripple_class_structure",
+        event_start_rest_theta=processed_data_dir() / "event_start_rest_theta",
+        property_bootstrap=processed_data_dir() / "event_property_bootstrap",
+        event_gamma_power=processed_data_dir() / "event_gamma_power",
     )
 
 
@@ -325,7 +336,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             if main
             else ("supplement",),
         )
-        pending = WIDLOSKI_PENDING if detector.startswith("memoryless") else None
         mine = events[events["detector"] == detector]
         alone = mine[~mine["matched"]]
         overlapping = mine[mine["matched"]]
@@ -340,7 +350,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{detector} events compared with the non-local detector",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_fraction",
@@ -348,7 +357,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_mostly_local_fraction",
@@ -357,7 +365,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with Local "
                 "above 0.8 in more than half their rows",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_mostly_no_spike_fraction",
@@ -366,7 +373,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with No-Spike "
                 "above 0.8 in more than half their rows",
-                pending=pending,
             ),
             make(
                 f"{word}_no_nonlocal_mixed_fraction",
@@ -375,7 +381,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with "
                 "neither state in more than half their rows",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_local_share_median",
@@ -384,7 +389,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with Local above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_no_spike_share_median",
@@ -393,7 +397,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with No-Spike above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_nonlocal_share_median",
@@ -402,7 +405,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with non-local above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_uncertain_share_median",
@@ -411,7 +413,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
                 "of their rows with no state above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_any_local_fraction",
@@ -420,7 +421,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
                 "least one row with Local above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_any_no_spike_fraction",
@@ -429,7 +429,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
                 "least one row with No-Spike above 0.8",
-                pending=pending,
             ),
             make(
                 f"{word}_overlap_all_nonlocal_fraction",
@@ -438,7 +437,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "pct",
                 f"share of {detector} events overlapping a non-local event whose every row "
                 "is non-local above 0.8",
-                pending=pending,
             ),
         ]
         if main:
@@ -564,20 +562,18 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
             "s",
         ),
     ]
-    for word, key, label, pending in (
-        ("kay", "outside_kay", "Kay's SWRs", None),
-        ("swr", "outside_swr", "the five SWR definitions together", None),
+    for word, key, label in (
+        ("kay", "outside_kay", "Kay's SWRs"),
+        ("swr", "outside_swr", "the five SWR definitions together"),
         (
             "trigger",
             "outside_trigger",
             "the five SWR definitions and MUA together",
-            None,
         ),
         (
             "widloski",
             "outside_widloski",
             "the Widloski detector's events",
-            WIDLOSKI_PENDING,
         ),
     ):
         values += [
@@ -588,7 +584,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "int",
                 f"seconds of non-local event time that {label} do not cover",
                 "s",
-                pending=pending,
             ),
             make(
                 f"nonlocal_time_outside_{word}_fraction",
@@ -596,12 +591,11 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "fraction",
                 "pct",
                 f"share of non-local event time that {label} do not cover",
-                pending=pending,
             ),
         ]
-    for word, other, label, pending in (
-        ("kay", "kay", "no Kay SWR overlaps", None),
-        ("widloski", "memoryless", "no Widloski event overlaps", WIDLOSKI_PENDING),
+    for word, other, label in (
+        ("kay", "kay", "no Kay SWR overlaps"),
+        ("widloski", "memoryless", "no Widloski event overlaps"),
     ):
         n, total = int(unmatched.loc[other, "sum"]), int(unmatched.loc[other, "size"])
         values += [
@@ -611,7 +605,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "count",
                 "count",
                 f"non-local events {label} (detector comparison memberships)",
-                pending=pending,
             ),
             make(
                 f"nonlocal_events_outside_{word}_fraction",
@@ -619,7 +612,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "fraction",
                 "pct",
                 f"share of the non-local events with a known membership that {label}",
-                pending=pending,
             ),
             make(
                 f"nonlocal_events_outside_{word}_per_hour",
@@ -628,7 +620,6 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
                 "sig2",
                 f"non-local events {label}, per hour of analysed immobility",
                 "per h",
-                pending=pending,
             ),
         ]
     n_no_trigger = int(no_trigger["n_unmatched"])
@@ -769,6 +760,49 @@ def brain_state_values(
                         "reaches their epoch's median running level",
                     )
                 )
+    return values
+
+
+def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
+    """Claim 5: slow and fast gamma during events, as a change in band power
+    against the same epoch's quiet rest, in dB.
+
+    For each epoch and class: ``10 log10(mean band power over the class's event
+    samples / mean band power over quiet rest)`` (below 4 cm/s, in no non-local,
+    SWR or MUA event, outside excluded time), on the same band power the z
+    values are made from (``scripts/detection/measure_event_gamma.py``). The
+    median over epochs, and the animals whose median over their epochs is above
+    0 dB. The z values (``brain_state_values``) stay as they are.
+    """
+    make = _value_factory(source, ("5",), ("supplement",))
+    values: list[Value] = []
+    for word in ("slow_gamma", "fast_gamma"):
+        label = _SIGNAL_LABELS[word]
+        for group in ("non_swr", "swr"):
+            name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
+            column = f"{word}_db_{group}"
+            rows = reference.dropna(subset=[column])
+            per_animal = rows.groupby("animal")[column].median()
+            values += [
+                make(
+                    f"{word}_db_median_{group}",
+                    rows[column].median(),
+                    "quantity",
+                    "sig2s",
+                    f"median over epochs of the change in {label} during {name} events "
+                    "against the epoch's quiet rest: 10 log10 of the ratio of mean band "
+                    "powers",
+                    "dB",
+                ),
+                make(
+                    f"{word}_db_animals_above_rest_{group}",
+                    (per_animal > 0).sum(),
+                    "count",
+                    "count",
+                    f"animals whose median over epochs of that change ({name} events) "
+                    "is above 0 dB",
+                ),
+            ]
     return values
 
 
@@ -1201,6 +1235,17 @@ _PROPERTIES = (
         ("17",),
         ("supplement",),
     ),
+    (
+        "start_distance",
+        "start_distance_cm",
+        1.0,
+        "cm",
+        "sig2",
+        "lower",
+        ("14",),
+        ("paper", "figure: 3"),
+    ),
+    ("arms", "n_unique_arms", 1.0, "", "int", "lower", ("16",), ("paper", "figure: 3")),
 )
 
 
@@ -1214,6 +1259,9 @@ _PROPERTY_NAMES = {
     "max_step": "largest step of the decoded position",
     "reversals": "number of direction reversals",
     "multimodal": "multimodal fraction of the posterior",
+    "start_distance": "start distance (track-graph distance from the animal to the "
+    "event's first decoded position)",
+    "arms": "number of arms the decoded position visits",
 }
 """How each property's values describe it."""
 
@@ -1259,6 +1307,121 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"animals whose non-SWR median {name} is {direction} than their SWR median",
+            ),
+        ]
+    return values
+
+
+def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value]:
+    """Claims 15-18, 14 and 16b: the uncertainty of each property contrast, and
+    the contrast at matched duration.
+
+    A nested bootstrap (animals, then epochs within animal, then events within
+    epoch; 1000 replicates, fixed seed) of the SWR minus non-SWR difference of
+    class medians, and of the duration-matched difference: within ten quantile
+    strata of the pooled event durations, averaged by stratum size
+    (``analysis.hippocampus.property_contrast``). 95 % percentile intervals. The
+    class medians' own intervals stay in the bootstrap's ``intervals.csv``.
+    """
+    if set(intervals.index) != {p[0] for p in _PROPERTIES}:
+        raise ValueError(
+            f"the bootstrap holds {sorted(intervals.index)}, not Part 2's properties"
+        )
+    values: list[Value] = []
+    for word, _, _, unit, _, _, claims, used_in in _PROPERTIES:
+        make = _value_factory(source, claims, used_in)
+        row = intervals.loc[word]
+        name = _PROPERTY_NAMES[word]
+        values += [
+            make(
+                f"{word}_difference_low",
+                row.difference_low,
+                "quantity",
+                "sig2s",
+                f"lower bound of the 95 % nested-bootstrap interval of the SWR minus "
+                f"non-SWR difference of median {name}",
+                unit,
+            ),
+            make(
+                f"{word}_difference_high",
+                row.difference_high,
+                "quantity",
+                "sig2s",
+                "upper bound of that interval",
+                unit,
+            ),
+        ]
+        if word == "duration":
+            continue
+        values += [
+            make(
+                f"{word}_matched_difference",
+                row.matched_difference,
+                "quantity",
+                "sig2s",
+                f"SWR minus non-SWR difference of median {name} at matched duration "
+                "(within ten duration-quantile strata, averaged by stratum size)",
+                unit,
+            ),
+            make(
+                f"{word}_matched_difference_low",
+                row.matched_difference_low,
+                "quantity",
+                "sig2s",
+                "lower bound of its 95 % nested-bootstrap interval",
+                unit,
+            ),
+            make(
+                f"{word}_matched_difference_high",
+                row.matched_difference_high,
+                "quantity",
+                "sig2s",
+                "upper bound of its 95 % nested-bootstrap interval",
+                unit,
+            ),
+        ]
+    return values
+
+
+def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Claim 5: the theta-like share of events against duration-matched quiet rest.
+
+    For each event, ten windows of quiet rest (below 4 cm/s, in no non-local,
+    SWR or MUA event, outside excluded time) with as many bins as the event,
+    drawn uniformly in its epoch; a window is theta-like when its mean theta
+    reaches the epoch's median running theta, as an event is. The reference
+    share of a class is the mean over its events of their windows' theta-like
+    share, so it carries the class's durations. Events whose length no rest
+    stretch of their epoch holds have no windows and are left out of both.
+    """
+    make = _value_factory(source, ("5",), ("paper",))
+    usable = events[events.rest_windows > 0]
+    usable = usable.assign(
+        theta_like=usable.theta_z >= usable.theta_running_median,
+    )
+    values: list[Value] = []
+    for group, is_swr in (("non_swr", False), ("swr", True)):
+        rows = usable[usable.is_swr == is_swr]
+        per_animal = rows.groupby("animal").agg(
+            events=("theta_like", "mean"), rest=("rest_theta_like_share", "mean")
+        )
+        name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
+        values += [
+            make(
+                f"theta_like_fraction_rest_matched_{group}",
+                rows.rest_theta_like_share.mean(),
+                "fraction",
+                "pct",
+                f"share of quiet-rest windows, matched in duration to the {name} events, "
+                "whose theta reaches the epoch's median running theta",
+            ),
+            make(
+                f"theta_like_animals_above_rest_matched_{group}",
+                (per_animal.events > per_animal.rest).sum(),
+                "count",
+                "count",
+                f"animals whose share of theta-like {name} events is above that of "
+                "their duration-matched quiet-rest windows",
             ),
         ]
     return values
@@ -1334,8 +1497,43 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*event_cohort_values(events, source))
     summary.add(*boundary_offset_values(events, source))
-    summary.add(*property_values(events, source))
     summary.inputs.append(file_record(inputs.event_table, ROOT_DIR))
+    extra_paths = sorted(inputs.event_start_rest_theta.glob("*.parquet"))
+    if len(extra_paths) != REALITY_EPOCHS:
+        raise ValueError(
+            f"{inputs.event_start_rest_theta} holds {len(extra_paths)} epochs"
+        )
+    extras = pd.concat(map(pd.read_parquet, extra_paths), ignore_index=True)
+    events_with_extras = events.merge(
+        extras.drop(columns=["epoch_id", "decode_sha256"]),
+        on="event_id",
+        how="left",
+        validate="1:1",
+    )
+    if events_with_extras.n_bins.isna().any():
+        raise ValueError("an event has no start-distance and rest-theta row")
+    extras_source = (
+        f"{source} and {rel(inputs.event_start_rest_theta)} "
+        "(scripts/detection/measure_event_start_and_rest_theta.py)"
+    )
+    summary.add(*property_values(events_with_extras, extras_source))
+    summary.add(*rest_theta_values(events_with_extras, extras_source))
+    summary.inputs += [
+        files_record("*.parquet", extra_paths, ROOT_DIR),
+        file_record(inputs.event_start_rest_theta / "manifest.json", ROOT_DIR),
+    ]
+    intervals = pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0)
+    summary.add(
+        *property_interval_values(
+            intervals,
+            f"{rel(inputs.property_bootstrap)} "
+            "(scripts/detection/bootstrap_event_properties.py)",
+        )
+    )
+    summary.inputs += [
+        file_record(inputs.property_bootstrap / name, ROOT_DIR)
+        for name in ("intervals.csv", "manifest.json")
+    ]
     reference = pd.read_parquet(inputs.brain_state_reference)
     gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
     if len(reference) != REALITY_EPOCHS or len(gamma_reference) != REALITY_EPOCHS:
@@ -1367,6 +1565,20 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     summary.inputs.append(file_record(inputs.brain_state_reference, ROOT_DIR))
+    gamma_power = pd.read_parquet(inputs.event_gamma_power / "reference.parquet")
+    if len(gamma_power) != REALITY_EPOCHS:
+        raise ValueError(f"{inputs.event_gamma_power} does not hold every epoch")
+    summary.add(
+        *gamma_db_values(
+            gamma_power,
+            f"{rel(inputs.event_gamma_power)}/reference.parquet "
+            "(scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+        )
+    )
+    summary.inputs += [
+        file_record(inputs.event_gamma_power / name, ROOT_DIR)
+        for name in ("reference.parquet", "manifest.json")
+    ]
     summary.inputs.append(
         files_record(
             "*_events.parquet", inputs.event_gamma.glob("*_events.parquet"), ROOT_DIR

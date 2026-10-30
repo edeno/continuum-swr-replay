@@ -127,7 +127,9 @@ duration-controlled; no tracked analysis does that.
 | Sampled comparator-only and ours-only events, with their spike evidence and spikes per row | `figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` | — |
 | Single decoded events, for checking categories by eye | `figures/generate_event_gallery.py`, `figures/run_event_gallery.sh` | `event_gallery/` | — |
 
-Every Widloski column and every `ms_*` feature is pending the Phase 2 pilot checks
+The Widloski columns and the `ms_*` features are no longer pending: the lead dropped the
+Phase 2 pilot checks (null validation, two sensitivities) on 2026-10-28. The port stays a
+documented adaptation whose clusterless null was not separately validated
 ([.claude/docs/plans/replay_detection_comparison/PLAN.md](../.claude/docs/plans/replay_detection_comparison/PLAN.md)).
 
 ## Part 3. Behavior: how the events relate to the task, SWR against non-SWR
