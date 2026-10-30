@@ -80,7 +80,10 @@ Worktree `/cumulus/edeno/continuum-swr-replay-pfc-followups`, branch `pfc-respon
 
 | 2026-10-29 | lead | main Part 4 numbers use no firing-rate cutoff; 1 Hz becomes a check; held-out gain shares stay out | — | — | — |
 | 2026-10-29 | 4 | branch rebased onto master `69e452d8` (generated files taken from master during the rebase, `changes.md` merged as a union, then everything re-emitted); Part 4 main values with no cutoff, `check_one_hz_*` keys reproduce the earlier 1 Hz values exactly; overview Part 4 opening and effect-size note updated | `819bbaeb`, `c461913a` | `part4.json` (598 values) | `units` 11,604 → 18,410; see the report for moved keys |
-| 2026-10-29 | 4 | `scripts/figures/generate_figure04.py:690` still loads the population with `min_firing_rate=1.0`; not changed (lead to decide) | — | — | open |
+| 2026-10-29 | 4 | `scripts/figures/generate_figure04.py:690` still loads the population with `min_firing_rate=1.0`; not changed (lead to decide) | — | — | closed below |
+| 2026-10-29 | lead | Figure 4 uses no cutoff too; Phase C held-out-gain shares are kept, with the caveat that no chance reference was computed | — | — | — |
+| 2026-10-29 | 4 | Figure 4 reads `MIN_FIRING_RATE_HZ` from `reported.part4`; regenerated on GPU 1 (about 3 min); the 2026-10-12 PNG/PDF backed up; a 1 Hz render with current code isolates the cutoff's effect (panel a unchanged; its narrower band against the 2026-10-12 PNG comes from code changes since then) | `b2450de9` | `paper/figures/figure04/` (ignored; symlink), `.claude/research/pfc_response_followups_outputs/figure04_{no_cutoff,one_hz_current_code,2026_10_12_one_hz_backup}/` | every printed number matches `part4.json`: n = `units`, panel d = `swr/nonlocal/non_swr_replay/engagement_called_fraction`, best model = `best_model_*_fraction`; units below 1 Hz carry a whole-window negative offset (mean SWR curve −0.17 vs −0.05, non-SWR −0.27 vs −0.08 log rate) that lowers panel c and adds saturated heat-map rows |
+| 2026-10-29 | 4 | held-out-gain shares (`marked_{content,strength}_{current_arm,recent_reward,mua_rate,ripple_power}_{swr,non_swr}_replay_heldout_gain_fraction`) and the overview Phase C bullet | `cb73ed72`, overview commit, emit commit | `part4.json` (606 values) | shares 26–35 %; no chance reference |
 
 ## Runs
 

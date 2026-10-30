@@ -30,7 +30,7 @@ Line numbers verified on branch `pfc-response-followups` at `d6b8e0fd` (2026-10-
 
 ### Non-Goals
 
-- No change to the canonical Figure 4 model, its bundles, its 1 Hz gate, or claim 20.
+- No change to the canonical Figure 4 model, its bundles, its 1 Hz gate, or claim 20. (Superseded 2026-10-29 for the gate only: the lead dropped the 1 Hz gate from Part 4 and Figure 4; the model and bundles are unchanged.)
 - No OFC.
 - No per-event response estimates; strength is a graded mark (lead's decision).
 - From the marked-family v2 plan: no stop-rate link (its phase 4), no reactivation analysis (its phase 5), no interaction models; none answers the five questions.

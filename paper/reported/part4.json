@@ -3,7 +3,7 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "819bbaeb3af4",
+ "commit": "ac5433771200",
  "inputs": [
   {
    "path": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet",
@@ -805,6 +805,21 @@
    "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
    "pending": null
   },
+  "marked_content_current_arm_non_swr_replay_heldout_gain_fraction": {
+   "value": 0.33090909090909093,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
   "marked_content_current_arm_non_swr_replay_peak": {
    "value": -0.026752216709907545,
    "kind": "quantity",
@@ -856,6 +871,21 @@
    "style": "count",
    "unit": "",
    "description": "animals whose mean slope curve has the population peak's sign at that lag, current_arm_fraction in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_swr_replay_heldout_gain_fraction": {
+   "value": 0.35375494071146246,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
@@ -925,6 +955,21 @@
    "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
    "pending": null
   },
+  "marked_content_recent_reward_non_swr_replay_heldout_gain_fraction": {
+   "value": 0.30067567567567566,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
   "marked_content_recent_reward_non_swr_replay_peak": {
    "value": -0.013413939038993605,
    "kind": "quantity",
@@ -976,6 +1021,21 @@
    "style": "count",
    "unit": "",
    "description": "animals whose mean slope curve has the population peak's sign at that lag, content_weighted_recent_reward in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_swr_replay_heldout_gain_fraction": {
+   "value": 0.31125827814569534,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
@@ -1555,6 +1615,21 @@
    "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
    "pending": null
   },
+  "marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction": {
+   "value": 0.28205128205128205,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
   "marked_strength_mua_rate_non_swr_replay_peak": {
    "value": -0.020261524395236208,
    "kind": "quantity",
@@ -1606,6 +1681,21 @@
    "style": "count",
    "unit": "",
    "description": "animals whose mean slope curve has the population peak's sign at that lag, mua_rate_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_swr_replay_heldout_gain_fraction": {
+   "value": 0.2826086956521739,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],
@@ -1675,6 +1765,21 @@
    "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
    "pending": null
   },
+  "marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction": {
+   "value": 0.2690909090909091,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
   "marked_strength_ripple_power_non_swr_replay_peak": {
    "value": 0.008661324171143223,
    "kind": "quantity",
@@ -1726,6 +1831,21 @@
    "style": "count",
    "unit": "",
    "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_swr_replay_heldout_gain_fraction": {
+   "value": 0.2565835065835066,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "claims": [
     "20"
    ],

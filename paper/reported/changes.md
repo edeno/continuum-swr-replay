@@ -2576,3 +2576,16 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.swr_no_replay_rank_correlation_all` | 0.09 | 0.07 |
 | `paper/reported/overview.md` | `part4.swr_no_replay_adds_to_split_fraction_all` | 16 % | 25 % |
 | `paper/reported/overview.md` | `part4.swr_no_replay_effect_abs_peak_median_swr_no_replay_all` | 0.96 | 1.09 |
+
+## 2026-10-29
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/reported/overview.md` | `part4.marked_content_current_arm_swr_replay_heldout_gain_fraction` |  | 35 % |
+| `paper/reported/overview.md` | `part4.marked_content_current_arm_non_swr_replay_heldout_gain_fraction` |  | 33 % |
+| `paper/reported/overview.md` | `part4.marked_content_recent_reward_swr_replay_heldout_gain_fraction` |  | 31 % |
+| `paper/reported/overview.md` | `part4.marked_content_recent_reward_non_swr_replay_heldout_gain_fraction` |  | 30 % |
+| `paper/reported/overview.md` | `part4.marked_strength_mua_rate_swr_replay_heldout_gain_fraction` |  | 28 % |
+| `paper/reported/overview.md` | `part4.marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction` |  | 28 % |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_swr_replay_heldout_gain_fraction` |  | 26 % |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction` |  | 27 % |

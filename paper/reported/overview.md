@@ -349,12 +349,12 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
     <!--v:part4.marked_ripple_mua_correlation_non_swr_replay-->0.65<!--/v--> for non-SWR replay), so a small slope on either may carry part of the other's effect
     (ridge leakage: the same sign in every animal).
   - Held-out gain: the share of units whose held-out deviance improves when the mark's kernel is in the model
-    (animal-balanced). Current arm: SWR-coupled <!--v:part4.marked_content_current_arm_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR
-    <!--v:part4.marked_content_current_arm_non_swr_replay_heldout_gain_fraction--><!--/v-->. Recently rewarded arms: SWR-coupled
-    <!--v:part4.marked_content_recent_reward_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR <!--v:part4.marked_content_recent_reward_non_swr_replay_heldout_gain_fraction--><!--/v-->.
-    Multiunit rate: SWR-coupled <!--v:part4.marked_strength_mua_rate_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR
-    <!--v:part4.marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction--><!--/v-->. Ripple power: SWR-coupled
-    <!--v:part4.marked_strength_ripple_power_swr_replay_heldout_gain_fraction--><!--/v-->, non-SWR <!--v:part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction--><!--/v-->.
+    (animal-balanced). Current arm: SWR-coupled <!--v:part4.marked_content_current_arm_swr_replay_heldout_gain_fraction-->35 %<!--/v-->, non-SWR
+    <!--v:part4.marked_content_current_arm_non_swr_replay_heldout_gain_fraction-->33 %<!--/v-->. Recently rewarded arms: SWR-coupled
+    <!--v:part4.marked_content_recent_reward_swr_replay_heldout_gain_fraction-->31 %<!--/v-->, non-SWR <!--v:part4.marked_content_recent_reward_non_swr_replay_heldout_gain_fraction-->30 %<!--/v-->.
+    Multiunit rate: SWR-coupled <!--v:part4.marked_strength_mua_rate_swr_replay_heldout_gain_fraction-->28 %<!--/v-->, non-SWR
+    <!--v:part4.marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction-->28 %<!--/v-->. Ripple power: SWR-coupled
+    <!--v:part4.marked_strength_ripple_power_swr_replay_heldout_gain_fraction-->26 %<!--/v-->, non-SWR <!--v:part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction-->27 %<!--/v-->.
     No chance reference was computed, so the share expected by chance is not known: these shares are not a test,
     and a mark with no effect could still improve the held-out deviance of some units.
   - Ripple power alone, each class in one model: SWR-coupled <!--v:part4.marked_ripple_ripple_power_swr_replay_peak-->0.014<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_replay_peak_lag_ms-->6<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_replay_post_onset_mean-->0.0077<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
