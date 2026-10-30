@@ -47,7 +47,19 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
 
     assert values["marked_content_current_arm_swr_replay_peak"] == -0.03
     assert values["marked_content_current_arm_non_swr_replay_animals_same_sign"] == 5
-    assert not any(key.endswith("heldout_gain_fraction") for key in values)
+    # The held-out-gain share is quoted for the marks a sentence uses, per replay
+    # class, and says that no chance reference was computed.
+    share = {
+        v.key: v
+        for v in marked_family_values(summary, make)
+        if v.key.endswith("heldout_gain_fraction")
+    }
+    assert set(share) == {
+        "marked_content_current_arm_swr_replay_heldout_gain_fraction",
+        "marked_content_current_arm_non_swr_replay_heldout_gain_fraction",
+    }
+    assert values["marked_content_current_arm_swr_replay_heldout_gain_fraction"] == 0.35
+    assert all("no chance reference" in v.description.lower() for v in share.values())
     assert values["marked_ripple_mua_correlation_swr_replay"] == 0.79
     assert values["marked_ripplepooled_ripple_power_pooled_peak"] == 0.01
     assert not any(key.startswith("marked_marginal") for key in values)

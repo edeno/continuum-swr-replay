@@ -174,6 +174,16 @@ MARKED_CLASSES = {
     "SWR_no_non_local": "swr_no_replay",
     "pooled": "pooled",
 }
+#: The (model, target) pairs whose held-out-gain share is quoted, per replay class
+#: (the lead, 2026-10-29): replay content's current-arm fraction and recent
+#: reward, event strength's multiunit rate and ripple power.
+MARKED_HELDOUT_SHARES = {
+    ("replay_content", "current_arm_fraction"),
+    ("replay_content", "content_weighted_recent_reward"),
+    ("event_strength", "mua_rate_z"),
+    ("event_strength", "ripple_power_z"),
+}
+MARKED_HELDOUT_SHARE_CLASSES = ("non_local_SWR", "non_local_no_SWR")
 """The extended-event-set bundles (``run_pfc_analysis_bandit.py --event-set
 with_swr_without_replay``), relative to the processed-data root."""
 
@@ -2070,9 +2080,11 @@ def marked_family_values(
     population slope at its peak (log-rate change of the peri-event response
     per within-session SD of the mark; unit -> session -> animal), how many
     animals' mean curves share that sign there, and the curve's mean over 0 to
-    +150 ms. No shuffle reference was run, so the share of units whose held-out
-    deviance improves with a mark has nothing to be read against; it stays in
-    the summary's tables. Beside them, the within-session correlation of
+    +150 ms. For the marks a sentence quotes (``MARKED_HELDOUT_SHARES``), per
+    replay class, the share of units whose held-out deviance improves when the
+    mark's kernel is in the model (animal-balanced). No shuffle reference was
+    run, so the share expected by chance is unknown and the share is not a test.
+    Beside them, the within-session correlation of
     ripple power and multiunit rate in each replay class: under the shared
     ridge prior a small slope on either can carry part of the other's effect,
     with the same sign in every animal (possible leakage). Full tables are in
@@ -2132,6 +2144,20 @@ def marked_family_values(
                 f"animals whose mean slope curve has the population peak's "
                 f"sign at that lag, {what}",
             )
+            if (model, target) in MARKED_HELDOUT_SHARES and (
+                event_class in MARKED_HELDOUT_SHARE_CLASSES
+            ):
+                add(
+                    f"{stem}_heldout_gain_fraction",
+                    row["frac_pos"],
+                    "fraction",
+                    "pct",
+                    f"share of units whose held-out deviance improves when the mark's "
+                    f"kernel is in the model, {what} (per session, median over sessions "
+                    "within animal, median over animals). No chance reference was "
+                    "computed, so the share expected by chance is unknown: this is "
+                    "not a test",
+                )
     correlations = summary[
         (summary["statistic"] == "mark_correlation")
         & (summary["model"] == "event_strength")
