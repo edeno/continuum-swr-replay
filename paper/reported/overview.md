@@ -100,11 +100,11 @@ running theta (SWR events <!--v:part2.theta_like_fraction_swr-->11 %<!--/v-->).
 close on average.
 
 **Are the events backed by spikes?** (every event of every epoch)
-- Per spike, the decoded location beats the animal's by <!--v:part2.non_swr_close_dll_per_spike_median-->0.47<!--/v--> nats (non-SWR,
-  close), <!--v:part2.non_swr_remote_dll_per_spike_median-->0.69<!--/v--> (non-SWR, remote) and <!--v:part2.swr_remote_dll_per_spike_median-->1.17<!--/v-->
+- Per spike, the decoded location beats the animal's by <!--v:part2.non_swr_close_dll_per_spike_median-->0.49<!--/v--> nats (non-SWR,
+  close), <!--v:part2.non_swr_remote_dll_per_spike_median-->0.71<!--/v--> (non-SWR, remote) and <!--v:part2.swr_remote_dll_per_spike_median-->1.18<!--/v-->
   (SWR, remote); matched quiet windows score <!--v:part2.baseline_dll_per_spike_median-->0.00<!--/v-->.
-- Non-SWR events have fewer spikes (<!--v:part2.non_swr_remote_spikes_median-->34<!--/v--> against <!--v:part2.swr_remote_spikes_median-->116<!--/v-->)
-  on fewer tetrodes (<!--v:part2.non_swr_remote_tetrodes_median-->10<!--/v--> against <!--v:part2.swr_remote_tetrodes_median-->15<!--/v-->).
+- Non-SWR events have fewer spikes (<!--v:part2.non_swr_remote_spikes_median-->36<!--/v--> against <!--v:part2.swr_remote_spikes_median-->118<!--/v-->)
+  on fewer tetrodes (<!--v:part2.non_swr_remote_tetrodes_median-->11<!--/v--> against <!--v:part2.swr_remote_tetrodes_median-->15<!--/v-->).
 - The held-out version gives <!--v:part2.heldout_non_swr_per_spike-->0.20<!--/v--> nats per held-out spike
   without SWR and <!--v:part2.heldout_swr_per_spike-->0.60<!--/v--> with.
 - *Reading:* non-SWR events are real but carry less evidence per spike and involve fewer cells. Close events stay

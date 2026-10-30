@@ -136,7 +136,7 @@
 \newcommand{\PartOneSweepStateSpaceFraction}{91}  % part1.sweep_state_space_fraction: over the whole grid, share the state-space detector reports under its own criteria
 \newcommand{\PartOneSweepStateSpaceOnlyFraction}{73}  % part1.sweep_state_space_only_fraction: share of the swept replays reported by the state-space detector and not by the sliding-window detector
 
-% --- Part 2 (commit b13d7c9ad54f)
+% --- Part 2 (commit bfb20f359f8f)
 \newcommand{\PartTwoAnimals}{5}  % part2.animals: animals in the event table
 \newcommand{\PartTwoAnimalsNonSwrMajority}{4}  % part2.animals_non_swr_majority: animals in which more than half the events are non-SWR
 \newcommand{\PartTwoAnimalsNonSwrMoreAtWell}{5}  % part2.animals_non_swr_more_at_well: animals whose non-SWR content is at a well more often than their SWR content
@@ -151,7 +151,7 @@
 \newcommand{\PartTwoArmsMedianSwr}{3}  % part2.arms_median_swr: median number of arms the decoded position visits of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoBaselineDllPerSpikeMedian}{0.00}  % part2.baseline_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows
 \newcommand{\PartTwoBaselineGpiDistanceMedianCm}{100}  % part2.baseline_gpi_distance_median_cm: median track distance from the MAP of matched quiet windows to the ground-process intensity peak
-\newcommand{\PartTwoBaselineScored}{24{,}890}  % part2.baseline_scored: matched quiet windows scored
+\newcommand{\PartTwoBaselineScored}{25{,}167}  % part2.baseline_scored: matched quiet windows scored
 \newcommand{\PartTwoBaselineSpikesMedian}{11}  % part2.baseline_spikes_median: median spike count of matched quiet windows
 \newcommand{\PartTwoBaselineTetrodesMedian}{6}  % part2.baseline_tetrodes_median: median number of tetrodes with a spike in matched quiet windows
 \newcommand{\PartTwoCareyEvents}{24{,}084}  % part2.carey_events: carey events compared with the non-local detector
@@ -195,16 +195,16 @@
 \newcommand{\PartTwoFastGammaMedianSwr}{0.11}  % part2.fast_gamma_median_swr: median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean)
 \newcommand{\PartTwoFastGammaRestReference}{\ensuremath{-}0.43}  % part2.fast_gamma_rest_reference: median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest
 \newcommand{\PartTwoFastGammaRunningReference}{\ensuremath{-}0.14}  % part2.fast_gamma_running_reference: median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running
-\newcommand{\PartTwoHeldoutNonSwrAnimals}{5}  % part2.heldout_non_swr_animals: animals in that test [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutNonSwrAnimalsPositive}{5}  % part2.heldout_non_swr_animals_positive: animals with a positive mean [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutNonSwrPerSpike}{0.20}  % part2.heldout_non_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutNonSwrPerSpikeCiHigh}{0.25}  % part2.heldout_non_swr_per_spike_ci_high: upper bound of its 95 % t-interval over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutNonSwrPerSpikeCiLow}{0.16}  % part2.heldout_non_swr_per_spike_ci_low: lower bound of its 95 % t-interval over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutSwrAnimals}{5}  % part2.heldout_swr_animals: animals in that test [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutSwrAnimalsPositive}{5}  % part2.heldout_swr_animals_positive: animals with a positive mean [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutSwrPerSpike}{0.60}  % part2.heldout_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutSwrPerSpikeCiHigh}{0.74}  % part2.heldout_swr_per_spike_ci_high: upper bound of its 95 % t-interval over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
-\newcommand{\PartTwoHeldoutSwrPerSpikeCiLow}{0.45}  % part2.heldout_swr_per_spike_ci_low: lower bound of its 95 % t-interval over animals [PENDING: computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing]
+\newcommand{\PartTwoHeldoutNonSwrAnimals}{5}  % part2.heldout_non_swr_animals: animals in that test
+\newcommand{\PartTwoHeldoutNonSwrAnimalsPositive}{5}  % part2.heldout_non_swr_animals_positive: animals with a positive mean
+\newcommand{\PartTwoHeldoutNonSwrPerSpike}{0.20}  % part2.heldout_non_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals
+\newcommand{\PartTwoHeldoutNonSwrPerSpikeCiHigh}{0.24}  % part2.heldout_non_swr_per_spike_ci_high: upper bound of its 95 % t-interval over animals
+\newcommand{\PartTwoHeldoutNonSwrPerSpikeCiLow}{0.16}  % part2.heldout_non_swr_per_spike_ci_low: lower bound of its 95 % t-interval over animals
+\newcommand{\PartTwoHeldoutSwrAnimals}{5}  % part2.heldout_swr_animals: animals in that test
+\newcommand{\PartTwoHeldoutSwrAnimalsPositive}{5}  % part2.heldout_swr_animals_positive: animals with a positive mean
+\newcommand{\PartTwoHeldoutSwrPerSpike}{0.60}  % part2.heldout_swr_per_spike: held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals
+\newcommand{\PartTwoHeldoutSwrPerSpikeCiHigh}{0.74}  % part2.heldout_swr_per_spike_ci_high: upper bound of its 95 % t-interval over animals
+\newcommand{\PartTwoHeldoutSwrPerSpikeCiLow}{0.45}  % part2.heldout_swr_per_spike_ci_low: lower bound of its 95 % t-interval over animals
 \newcommand{\PartTwoHpdAnimalsInDirection}{4}  % part2.hpd_animals_in_direction: animals whose non-SWR median highest-density-region coverage is lower than their SWR median
 \newcommand{\PartTwoHpdDifferenceHigh}{+53}  % part2.hpd_difference_high: upper bound of that interval
 \newcommand{\PartTwoHpdDifferenceLow}{\ensuremath{-}5.3}  % part2.hpd_difference_low: lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage
@@ -277,12 +277,12 @@
 \newcommand{\PartTwoMultimodalMedianNonSwr}{0.03}  % part2.multimodal_median_non_swr: median multimodal fraction of the posterior of immobile non-SWR non-local events
 \newcommand{\PartTwoMultimodalMedianSwr}{0.11}  % part2.multimodal_median_swr: median multimodal fraction of the posterior of immobile SWR-overlapping non-local events
 \newcommand{\PartTwoNonSwrCloseAnimalsAboveBaseline}{5}  % part2.non_swr_close_animals_above_baseline: animals whose median nonSWR-close event scores above their median quiet window, per spike
-\newcommand{\PartTwoNonSwrCloseDllPerSpikeMedian}{0.47}  % part2.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
+\newcommand{\PartTwoNonSwrCloseDllPerSpikeMedian}{0.49}  % part2.non_swr_close_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events
 \newcommand{\PartTwoNonSwrCloseEpochsAboveBaseline}{242}  % part2.non_swr_close_epochs_above_baseline: epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike
 \newcommand{\PartTwoNonSwrCloseEpochsScored}{242}  % part2.non_swr_close_epochs_scored: epochs with a scored nonSWR-close event
 \newcommand{\PartTwoNonSwrCloseGpiDistanceMedianCm}{105}  % part2.non_swr_close_gpi_distance_median_cm: median track distance from the MAP of nonSWR-close events to the ground-process intensity peak
 \newcommand{\PartTwoNonSwrCloseScored}{10{,}488}  % part2.non_swr_close_scored: nonSWR-close events scored
-\newcommand{\PartTwoNonSwrCloseSpikesMedian}{42}  % part2.non_swr_close_spikes_median: median spike count of nonSWR-close events
+\newcommand{\PartTwoNonSwrCloseSpikesMedian}{44}  % part2.non_swr_close_spikes_median: median spike count of nonSWR-close events
 \newcommand{\PartTwoNonSwrCloseTetrodesMedian}{12}  % part2.non_swr_close_tetrodes_median: median number of tetrodes with a spike in nonSWR-close events
 \newcommand{\PartTwoNonSwrContentAtWellFraction}{58}  % part2.non_swr_content_at_well_fraction: share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions
 \newcommand{\PartTwoNonSwrContentNearOffFraction}{1}  % part2.non_swr_content_near_off_fraction: share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions
@@ -293,13 +293,13 @@
 \newcommand{\PartTwoNonSwrFractionAnimalMax}{65}  % part2.non_swr_fraction_animal_max: highest per-animal share of non-SWR events
 \newcommand{\PartTwoNonSwrFractionAnimalMin}{47}  % part2.non_swr_fraction_animal_min: lowest per-animal share of non-SWR events
 \newcommand{\PartTwoNonSwrRemoteAnimalsAboveBaseline}{5}  % part2.non_swr_remote_animals_above_baseline: animals whose median nonSWR-remote event scores above their median quiet window, per spike
-\newcommand{\PartTwoNonSwrRemoteDllPerSpikeMedian}{0.69}  % part2.non_swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events
+\newcommand{\PartTwoNonSwrRemoteDllPerSpikeMedian}{0.71}  % part2.non_swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events
 \newcommand{\PartTwoNonSwrRemoteEpochsAboveBaseline}{242}  % part2.non_swr_remote_epochs_above_baseline: epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike
 \newcommand{\PartTwoNonSwrRemoteEpochsScored}{242}  % part2.non_swr_remote_epochs_scored: epochs with a scored nonSWR-remote event
 \newcommand{\PartTwoNonSwrRemoteGpiDistanceMedianCm}{97}  % part2.non_swr_remote_gpi_distance_median_cm: median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak
-\newcommand{\PartTwoNonSwrRemoteScored}{24{,}076}  % part2.non_swr_remote_scored: nonSWR-remote events scored
-\newcommand{\PartTwoNonSwrRemoteSpikesMedian}{34}  % part2.non_swr_remote_spikes_median: median spike count of nonSWR-remote events
-\newcommand{\PartTwoNonSwrRemoteTetrodesMedian}{10}  % part2.non_swr_remote_tetrodes_median: median number of tetrodes with a spike in nonSWR-remote events
+\newcommand{\PartTwoNonSwrRemoteScored}{24{,}079}  % part2.non_swr_remote_scored: nonSWR-remote events scored
+\newcommand{\PartTwoNonSwrRemoteSpikesMedian}{36}  % part2.non_swr_remote_spikes_median: median spike count of nonSWR-remote events
+\newcommand{\PartTwoNonSwrRemoteTetrodesMedian}{11}  % part2.non_swr_remote_tetrodes_median: median number of tetrodes with a spike in nonSWR-remote events
 \newcommand{\PartTwoNonlocalEvents}{75{,}675}  % part2.nonlocal_events: immobile non-local events in the canonical event table (whole event below 4 cm/s)
 \newcommand{\PartTwoNonlocalEventsNonSwr}{42{,}974}  % part2.nonlocal_events_non_swr: of those, events overlapping no SWR (overlap_class non_swr)
 \newcommand{\PartTwoNonlocalEventsOutsideKay}{42{,}962}  % part2.nonlocal_events_outside_kay: non-local events no Kay SWR overlaps (detector comparison memberships)
@@ -399,12 +399,12 @@
 \newcommand{\PartTwoSwrContentRemoteWellFraction}{21}  % part2.swr_content_remote_well_fraction: share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions
 \newcommand{\PartTwoSwrOverlappingEvents}{32{,}701}  % part2.swr_overlapping_events: immobile non-local events overlapping an SWR
 \newcommand{\PartTwoSwrRemoteAnimalsAboveBaseline}{5}  % part2.swr_remote_animals_above_baseline: animals whose median SWR-remote event scores above their median quiet window, per spike
-\newcommand{\PartTwoSwrRemoteDllPerSpikeMedian}{1.17}  % part2.swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events
+\newcommand{\PartTwoSwrRemoteDllPerSpikeMedian}{1.18}  % part2.swr_remote_dll_per_spike_median: median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events
 \newcommand{\PartTwoSwrRemoteEpochsAboveBaseline}{242}  % part2.swr_remote_epochs_above_baseline: epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike
 \newcommand{\PartTwoSwrRemoteEpochsScored}{242}  % part2.swr_remote_epochs_scored: epochs with a scored SWR-remote event
-\newcommand{\PartTwoSwrRemoteGpiDistanceMedianCm}{81}  % part2.swr_remote_gpi_distance_median_cm: median track distance from the MAP of SWR-remote events to the ground-process intensity peak
-\newcommand{\PartTwoSwrRemoteScored}{20{,}862}  % part2.swr_remote_scored: SWR-remote events scored
-\newcommand{\PartTwoSwrRemoteSpikesMedian}{116}  % part2.swr_remote_spikes_median: median spike count of SWR-remote events
+\newcommand{\PartTwoSwrRemoteGpiDistanceMedianCm}{82}  % part2.swr_remote_gpi_distance_median_cm: median track distance from the MAP of SWR-remote events to the ground-process intensity peak
+\newcommand{\PartTwoSwrRemoteScored}{20{,}879}  % part2.swr_remote_scored: SWR-remote events scored
+\newcommand{\PartTwoSwrRemoteSpikesMedian}{118}  % part2.swr_remote_spikes_median: median spike count of SWR-remote events
 \newcommand{\PartTwoSwrRemoteTetrodesMedian}{15}  % part2.swr_remote_tetrodes_median: median number of tetrodes with a spike in SWR-remote events
 \newcommand{\PartTwoThetaAnimalsAboveRestNonSwr}{2}  % part2.theta_animals_above_rest_non_swr: animals whose median non-SWR event theta power is above their median quiet-rest level
 \newcommand{\PartTwoThetaAnimalsAboveRestSwr}{2}  % part2.theta_animals_above_rest_swr: animals whose median SWR-overlapping event theta power is above their median quiet-rest level

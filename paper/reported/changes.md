@@ -2653,3 +2653,23 @@ marker, and the computed value now there. Newest last.
 | `paper/claims_table.md` | `part3.history_cross_heldout_gain_non_swr_from_swr` | 0.014 | +0.014 |
 | `paper/reported/overview.md` | `part3.history_cross_heldout_gain_swr_from_non_swr` | 0.015 | +0.015 |
 | `paper/reported/overview.md` | `part3.history_cross_heldout_gain_non_swr_from_swr` | 0.014 | +0.014 |
+
+## 2026-10-30
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/claims_table.md` | `part2.non_swr_remote_spikes_median` | 34 | 36 |
+| `paper/claims_table.md` | `part2.non_swr_remote_tetrodes_median` | 10 | 11 |
+| `paper/claims_table.md` | `part2.non_swr_close_spikes_median` | 42 | 44 |
+| `paper/claims_table.md` | `part2.swr_remote_spikes_median` | 116 | 118 |
+| `paper/claims_table.md` | `part2.non_swr_close_dll_per_spike_median` | 0.47 | 0.49 |
+| `paper/claims_table.md` | `part2.non_swr_remote_dll_per_spike_median` | 0.69 | 0.71 |
+| `paper/claims_table.md` | `part2.swr_remote_dll_per_spike_median` | 1.17 | 1.18 |
+| `paper/claims_table.md` | `part2.heldout_non_swr_per_spike_ci_high` | 0.25 | 0.24 |
+| `paper/claims_table.md` | `part2.non_swr_close_dll_per_spike_median` | 0.47 | 0.49 |
+| `paper/reported/overview.md` | `part2.non_swr_close_dll_per_spike_median` | 0.47 | 0.49 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_dll_per_spike_median` | 0.69 | 0.71 |
+| `paper/reported/overview.md` | `part2.swr_remote_dll_per_spike_median` | 1.17 | 1.18 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_spikes_median` | 34 | 36 |
+| `paper/reported/overview.md` | `part2.swr_remote_spikes_median` | 116 | 118 |
+| `paper/reported/overview.md` | `part2.non_swr_remote_tetrodes_median` | 10 | 11 |
