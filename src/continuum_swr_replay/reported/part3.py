@@ -100,11 +100,6 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 SC = list(SESSION_COLUMNS)
 
-NO_SIDECAR_PENDING = (
-    "{name} has no provenance sidecar, so it cannot be checked against the "
-    "current tables; give its runner one before citing"
-)
-
 #: Rate populations: the word their keys use, the fits' ``outcome``, the label.
 RATE_POPULATIONS = {
     "swr": ("swr", "detected SWR"),
@@ -2520,7 +2515,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
     """The SWR-coupling mark: per-session OLS of event ripple power on
     standardized covariates, summarized as the fitting script prints it (median,
     share positive, animals whose median is positive, signed-rank p)."""
-    pending = NO_SIDECAR_PENDING.format(name="the SWR-power model")
     make = _value_factory(
         source, ("synthesis Layer 2",), ("docs: replay_rate_content_swr_synthesis",)
     )
@@ -2531,7 +2525,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
             "count",
             "count",
             "sessions in the SWR-power model",
-            pending=pending,
         )
     ]
     for word, column in POWER_COVARIATES.items():
@@ -2545,7 +2538,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
                 "sig2s",
                 f"{column}: median per-session coefficient on ripple_power_z",
                 "SD of power per SD",
-                pending=pending,
             ),
             make(
                 f"power_{word}_animals_positive",
@@ -2553,7 +2545,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{column}: animals with a positive median",
-                pending=pending,
             ),
             make(
                 f"power_{word}_p",
@@ -2561,7 +2552,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
                 "quantity",
                 "pval",
                 f"{column}: signed-rank p",
-                pending=pending,
             ),
         ]
     return values
@@ -3175,6 +3165,7 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     record(inputs.trunk_per_event)
 
+    _check_fresh(inputs.swr_power)
     summary.add(
         *power_values(
             pd.read_pickle(inputs.swr_power),

@@ -29,7 +29,8 @@ treatment. ``ripple_power_z`` here is the event-mean; a peri-onset peak (the
 detector's actual criterion) is the better summary and is left as a follow-up.
 
 Output: ``models_per_event_swr_power/swr_power_model.pkl`` (per-session
-coefficients), its z reference and two audits beside it.
+coefficients), its z reference, two audits and its ``.provenance.json``
+sidecar (the hashes of the three tables it read) beside it.
 
 Usage::
 
@@ -40,6 +41,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -49,6 +51,7 @@ from scipy.stats import skew, wilcoxon
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
@@ -57,6 +60,10 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.replay.covariates import add_uncertainty_covariates
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
+)
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
@@ -469,6 +476,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     smoke = args.max_per_animal is not None
 
     df = _assemble()
+    fit_inputs = record_inputs(
+        {
+            name: table_path(name)
+            for name in ("event_table", "stop_table", "qvals_table")
+        }
+    )
     if smoke:
         df = subset_max_per_animal(df, args.max_per_animal, sort_sessions=True)
     m = df[POWER_COL].to_numpy()
@@ -502,6 +515,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         gate_audit=gate_audit,
         cohort_records=_cohort_records(df, coefs),
         smoke=smoke,
+    )
+    write_fit_provenance(
+        out,
+        fit_inputs,
+        "ols",
+        [sys.argv[0], *(sys.argv[1:] if argv is None else argv)],
+        extra={"swr_source": swr_source_name()},
     )
     if coefs.empty:
         raise RuntimeError(
