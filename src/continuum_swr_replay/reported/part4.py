@@ -2047,9 +2047,10 @@ def marked_family_values(
     kept, no rate gate). For each model, target mark and event class: the
     population slope at its peak (log-rate change of the peri-event response
     per within-session SD of the mark; unit -> session -> animal), how many
-    animals' mean curves share that sign there, and the share of units whose
-    held-out deviance improves when the mark's block is added (K = 5). No
-    shuffle reference was run. Beside them, the within-session correlation of
+    animals' mean curves share that sign there, and the curve's mean over 0 to
+    +150 ms. No shuffle reference was run, so the share of units whose held-out
+    deviance improves with a mark has nothing to be read against; it stays in
+    the summary's tables. Beside them, the within-session correlation of
     ripple power and multiunit rate in each replay class: under the shared
     ridge prior a small slope on either can carry part of the other's effect,
     with the same sign in every animal (possible leakage). Full tables are in
@@ -2094,20 +2095,20 @@ def marked_family_values(
                 "ms",
             )
             add(
+                f"{stem}_post_onset_mean",
+                row.get("post_onset_mean", np.nan),
+                "quantity",
+                "sig2",
+                f"mean of the population slope curve from 0 to +150 ms after onset, {what}",
+                "log rate",
+            )
+            add(
                 f"{stem}_animals_same_sign",
                 row["animals_same_sign"],
                 "count",
                 "count",
                 f"animals whose mean slope curve has the population peak's "
                 f"sign at that lag, {what}",
-            )
-            add(
-                f"{stem}_heldout_gain_fraction",
-                row["frac_pos"],
-                "fraction",
-                "pct",
-                f"share of units whose held-out deviance improves when the {target} "
-                f"block is added (animal-balanced), {what}",
             )
     correlations = summary[
         (summary["statistic"] == "mark_correlation")

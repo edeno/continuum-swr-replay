@@ -3,8 +3,12 @@
  "part": 4,
  "title": "other brain areas",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "2d07ae2f759c-dirty",
+ "commit": "dd3bd1cd85ca-dirty",
  "inputs": [
+  {
+   "path": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet",
+   "sha256": "ecd836a226946eb3aa12c72fdb7837eb93e3c91c22e49770172a847559b9a20f"
+  },
   {
    "path": "Processed-Data/pfc_response_followups/swr_without_replay/swr_without_replay/*_mPFC_modulation.pkl",
    "n_files": 75,
@@ -660,6 +664,1011 @@
     "paper"
    ],
    "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, 1 Hz gate)",
+   "pending": null
+  },
+  "marked_animals": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals in the marked-family summary",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_non_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, current_arm_fraction in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_non_swr_replay_peak": {
+   "value": -0.026752216709907545,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_non_swr_replay_peak_lag_ms": {
+   "value": 74.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, current_arm_fraction in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_non_swr_replay_post_onset_mean": {
+   "value": -0.02267809143328084,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, current_arm_fraction in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_swr_replay_peak": {
+   "value": -0.030508828011439004,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_swr_replay_peak_lag_ms": {
+   "value": 60.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, current_arm_fraction in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_current_arm_swr_replay_post_onset_mean": {
+   "value": -0.0258603994597874,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_non_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, content_weighted_recent_reward in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_non_swr_replay_peak": {
+   "value": -0.013413939038993605,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_non_swr_replay_peak_lag_ms": {
+   "value": 84.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, content_weighted_recent_reward in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_non_swr_replay_post_onset_mean": {
+   "value": -0.012496619081545597,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, content_weighted_recent_reward in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_swr_replay_peak": {
+   "value": -0.010654083217380152,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_swr_replay_peak_lag_ms": {
+   "value": 96.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, content_weighted_recent_reward in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_recent_reward_swr_replay_post_onset_mean": {
+   "value": -0.008738233898518827,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_non_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_non_swr_replay_peak": {
+   "value": 0.012600852467755297,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_non_swr_replay_peak_lag_ms": {
+   "value": 108.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_non_swr_replay_post_onset_mean": {
+   "value": 0.01058897724596494,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, content_weighted_belief_uncertainty in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_swr_replay_peak": {
+   "value": -0.009660398155468316,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_swr_replay_peak_lag_ms": {
+   "value": -72.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_content_uncertainty_swr_replay_post_onset_mean": {
+   "value": -0.0006885356911982904,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_mua_correlation_non_swr_replay": {
+   "value": 0.6464457127080354,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "within-session correlation of ripple power and hippocampal multiunit rate over non_local_no_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_mua_correlation_swr_replay": {
+   "value": 0.7940062782845481,
+   "kind": "quantity",
+   "style": "dec2",
+   "unit": "",
+   "description": "within-session correlation of ripple power and hippocampal multiunit rate over non_local_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_non_swr_replay_animals_same_sign": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model ripple_power, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_non_swr_replay_peak": {
+   "value": 0.008834348921879365,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_non_swr_replay_peak_lag_ms": {
+   "value": -96.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, ripple_power_z in model ripple_power, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_non_swr_replay_post_onset_mean": {
+   "value": -0.004089803662032363,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_no_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model ripple_power, SWR_no_non_local",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_no_replay_peak": {
+   "value": -0.009899326783386942,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, SWR_no_non_local (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_no_replay_peak_lag_ms": {
+   "value": -98.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, ripple_power_z in model ripple_power, SWR_no_non_local",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_no_replay_post_onset_mean": {
+   "value": -0.0058741767068324485,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, SWR_no_non_local",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_replay_animals_same_sign": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model ripple_power, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_replay_peak": {
+   "value": 0.014221148735196198,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_replay_peak_lag_ms": {
+   "value": 6.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, ripple_power_z in model ripple_power, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripple_ripple_power_swr_replay_post_onset_mean": {
+   "value": 0.007713186391459637,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripplepooled_ripple_power_pooled_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model ripple_power_pooled, all classes pooled",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripplepooled_ripple_power_pooled_peak": {
+   "value": 0.011854605942152544,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power_pooled, all classes pooled (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripplepooled_ripple_power_pooled_peak_lag_ms": {
+   "value": -82.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, ripple_power_z in model ripple_power_pooled, all classes pooled",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_ripplepooled_ripple_power_pooled_post_onset_mean": {
+   "value": 0.0043344435123731425,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power_pooled, all classes pooled",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_non_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, log_event_duration_s in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_non_swr_replay_peak": {
+   "value": 0.007770178527143663,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_non_swr_replay_peak_lag_ms": {
+   "value": 190.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, log_event_duration_s in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_non_swr_replay_post_onset_mean": {
+   "value": 0.0014009908006841528,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_swr_replay_animals_same_sign": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, log_event_duration_s in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_swr_replay_peak": {
+   "value": 0.010095680580585529,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_swr_replay_peak_lag_ms": {
+   "value": 200.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, log_event_duration_s in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_duration_swr_replay_post_onset_mean": {
+   "value": -0.0011285404783298292,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_non_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, mua_rate_z in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_non_swr_replay_peak": {
+   "value": -0.020261524395236208,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_non_swr_replay_peak_lag_ms": {
+   "value": 58.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, mua_rate_z in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_non_swr_replay_post_onset_mean": {
+   "value": -0.015466488691061372,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, mua_rate_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_swr_replay_peak": {
+   "value": -0.005651901241011921,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_swr_replay_peak_lag_ms": {
+   "value": -200.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, mua_rate_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_mua_rate_swr_replay_post_onset_mean": {
+   "value": -0.0009770963001852328,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_non_swr_replay_animals_same_sign": {
+   "value": 4,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_non_swr_replay_peak": {
+   "value": 0.008661324171143223,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_no_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_non_swr_replay_peak_lag_ms": {
+   "value": -106.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, ripple_power_z in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_non_swr_replay_post_onset_mean": {
+   "value": -0.00018866770684478816,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_no_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_swr_replay_animals_same_sign": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose mean slope curve has the population peak's sign at that lag, ripple_power_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_swr_replay_peak": {
+   "value": -0.007842241794486804,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_SWR (unit -> session -> animal)",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_swr_replay_peak_lag_ms": {
+   "value": 168.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "lag of that peak, ripple_power_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
+   "pending": null
+  },
+  "marked_strength_ripple_power_swr_replay_post_onset_mean": {
+   "value": 0.001364452607019838,
+   "kind": "quantity",
+   "style": "sig2",
+   "unit": "log rate",
+   "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_SWR",
+   "claims": [
+    "20"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "Processed-Data/pfc_response_followups/marked_family_baseline_prior/summary.parquet (scripts/pfc/summarize_pfc_marked_family.py over scripts/pfc/run_pfc_marked_model_family.py --model-set followup --baseline-penalty-sigma 3 bundles)",
    "pending": null
   },
   "min_pvalue": {
