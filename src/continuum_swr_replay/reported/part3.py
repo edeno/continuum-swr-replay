@@ -2581,6 +2581,10 @@ SUPERSEDED_PREFIXES = ("rate_burst_", "rate_refractory_", "rate_raw_burst_")
 HISTORY_MIN_SUPPORT = 3.0
 #: ... and its Wald SE on the log scale is at most this.
 HISTORY_MAX_SE = 0.5
+#: The per-session cross AIC is pending when fewer than this share of the
+#: sessions have both rungs converged and not separated: the rest are not a
+#: random sample of sessions.
+HISTORY_MIN_USABLE_SESSION_SHARE = 0.5
 #: The caveat every pooled history value carries.
 UPPER_BOUND = (
     "pooled within animal with a session fixed effect; an upper bound, since rate "
@@ -2855,6 +2859,15 @@ def duration_aware_history_values(
             f"over the {len(gain)} of {len(both)} sessions where both rungs converged "
             "and are not separated"
         )
+        per_animal = gain.groupby(level="animal").size()
+        session_pending = (
+            f"only {len(gain)} of {len(both)} sessions have both rungs converged and "
+            "not separated (per animal: "
+            + ", ".join(f"{a} {n}" for a, n in per_animal.items())
+            + "); refit the per-session rungs before citing"
+            if len(gain) < HISTORY_MIN_USABLE_SESSION_SHARE * len(both)
+            else None
+        )
         values += [
             make(
                 f"history_cross_end_rr_{word}",
@@ -2884,6 +2897,7 @@ def duration_aware_history_values(
                 f"{label}: median per-session AIC(Mself_dur) - AIC(Mselfcross_dur) "
                 f"{sessions_kept}, positive = the cross block pays for its parameters",
                 "AIC",
+                pending=session_pending,
             ),
             make(
                 f"history_cross_session_animals_positive_{word}",
@@ -2892,6 +2906,7 @@ def duration_aware_history_values(
                 "count",
                 f"{label}: animals whose median per-session cross gain is positive, "
                 f"{sessions_kept}",
+                pending=session_pending,
             ),
         ]
     return values

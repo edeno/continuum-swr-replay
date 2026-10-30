@@ -138,7 +138,7 @@ Analysis functions for manipulating and characterizing detected events.
 
 ### `src/continuum_swr_replay/analysis/hippocampus/gamma_power.py`
 
-Slow- and fast-gamma power of CA1, z-scored per epoch, on the decode grid.
+Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
 
 `band_power`, `zscore_on`, `event_means`, `samples_in_intervals`, `power_change_db`
 
@@ -908,7 +908,7 @@ Fit the recommended descriptive mPFC marked-kernel model family.
 
 Stop-level context of the mPFC replay response, pooled across sessions (Q8).
 
-`default_output_dir`, `bundle_path`, `selected_sessions`, `assemble`, `unit_table`, `fit`, `get_command_line_arguments`, `main`
+`default_output_dir`, `bundle_path`, `pfc_left_out`, `selected_sessions`, `current_table_hashes`, `cached_is_current`, `assemble`, `unit_table`, `select_units`, `fit`, `get_command_line_arguments`, `main`
 
 ### `scripts/pfc/summarize_pfc_marked_family.py`
 

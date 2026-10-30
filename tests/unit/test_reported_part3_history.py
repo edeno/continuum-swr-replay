@@ -230,6 +230,21 @@ def test_cross_session_gain_reads_only_usable_sessions():
     assert gain.value == pytest.approx(-6.0)
     assert "15 of 25 sessions" in gain.description
     assert values["history_cross_session_animals_positive_non_swr_from_swr"].value == 0
+    assert gain.pending is None  # 60 % of the sessions are usable
+
+
+def test_cross_session_gain_is_pending_when_most_sessions_are_unusable():
+    sessions = _sessions(-6.0, 50.0)
+    # make one more session per animal and stream unconverged: 10 of 25 usable
+    redo = sessions["session_date"].eq(2) & sessions["model"].eq("Mselfcross_dur")
+    sessions.loc[redo, "converged"] = False
+    values = {v.key: v for v in duration_aware_history_values(sessions, _pooled(), "x")}
+    gain = values["history_cross_session_gain_non_swr_from_swr"]
+    assert "10 of 25 sessions" in gain.description
+    assert gain.pending is not None and "per animal: a 2, b 2" in gain.pending
+    animals = values["history_cross_session_animals_positive_non_swr_from_swr"]
+    assert animals.pending == gain.pending
+    assert values["history_cross_end_rr_non_swr_from_swr"].pending is None
 
 
 def test_horserace_values_name_each_population_and_predictor():
