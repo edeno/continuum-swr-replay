@@ -22,6 +22,12 @@ here. The inputs (:class:`Part3Inputs`), with their runs in
 - the stay/leave fits (``stage6_is_stay_*.pkl``, ``behavior.stay_leave.*``);
 - the SWR-power model (``models_per_event_swr_power/swr_power_model.pkl``,
   ``coupling.ripple_power``);
+- the duration-aware history refit (``models_per_bin_rate/duration_aware_history_
+  {models,pooled}.pkl``, ``rate.duration_aware_history.{at_well,pooled_at_well}``),
+  which supersedes the onset-only self-history values (``rate_burst_*``,
+  ``rate_refractory_*``, ``rate_raw_burst_*``; their pending note says so);
+- the within-arm horse race (``uncertainty_content/horserace_summary.csv``,
+  ``content.uncertainty``);
 - the canonical event and stop tables, for event lengths and cohort sizes.
 
 Each aggregate is computed with the rule the producing script or its audit
@@ -41,7 +47,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -94,11 +100,6 @@ SC = list(SESSION_COLUMNS)
 NO_SIDECAR_PENDING = (
     "{name} has no provenance sidecar, so it cannot be checked against the "
     "current tables; give its runner one before citing"
-)
-CHOICE_RULE_PENDING = (
-    NO_SIDECAR_PENDING.format(name="the event-source suite's choice fit")
-    + "; the summary rule (session median, signed-rank test) is the project's "
-    "per-session convention, which the fitting script does not state itself"
 )
 
 #: Rate populations: the word their keys use, the fits' ``outcome``, the label.
@@ -288,6 +289,9 @@ class Part3Inputs:
     stop_table: Path
     onset_table: Path
     trunk_per_event: Path
+    duration_aware_sessions: Path
+    duration_aware_pooled: Path
+    horserace_summary: Path
 
 
 def default_inputs() -> Part3Inputs:
@@ -314,6 +318,11 @@ def default_inputs() -> Part3Inputs:
         stop_table=table_path("stop_table", rc),
         onset_table=table_path("event_onset_table", rc),
         trunk_per_event=rc / "_trunk_zscore_per_event.pkl",
+        duration_aware_sessions=model_dir("per_bin_rate")
+        / "duration_aware_history_models.pkl",
+        duration_aware_pooled=model_dir("per_bin_rate")
+        / "duration_aware_history_pooled.pkl",
+        horserace_summary=rc / "uncertainty_content" / "horserace_summary.csv",
     )
 
 
@@ -2335,7 +2344,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "sig2s",
                 f"{what}: session median coefficient (gated)",
                 "log odds",
-                pending=CHOICE_RULE_PENDING,
             ),
             make(
                 f"{word}_p",
@@ -2343,7 +2351,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "quantity",
                 "pval",
                 f"{what}: signed-rank p across sessions",
-                pending=CHOICE_RULE_PENDING,
             ),
             make(
                 f"{word}_sessions",
@@ -2351,7 +2358,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{what}: sessions kept",
-                pending=CHOICE_RULE_PENDING,
             ),
             make(
                 f"{word}_positive_sessions",
@@ -2359,7 +2365,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{what}: sessions with a positive coefficient",
-                pending=CHOICE_RULE_PENDING,
             ),
             make(
                 f"{word}_negative_sessions",
@@ -2367,7 +2372,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{what}: sessions with a negative coefficient",
-                pending=CHOICE_RULE_PENDING,
             ),
             make(
                 f"{word}_animals_positive",
@@ -2375,7 +2379,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{what}: animals with a positive median",
-                pending=CHOICE_RULE_PENDING,
             ),
             make(
                 f"{word}_significant_fraction",
@@ -2383,7 +2386,6 @@ def choice_values(fits: dict, source: str) -> list[Value]:
                 "fraction",
                 "pct",
                 f"{what}: share of sessions individually significant",
-                pending=CHOICE_RULE_PENDING,
             ),
         ]
     return values
@@ -2564,6 +2566,339 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
 # --- the summary -------------------------------------------------------------------
 
 
+# --- 3a: event history on the duration-aware design ---------------------------
+
+#: Why the onset-only history values are no longer the ones to quote.
+HISTORY_SUPERSEDED = (
+    "superseded by the duration-aware refit (history_* values): this fit counts the "
+    "bins inside an ongoing event as at risk and reads history from onsets only, "
+    "which on simulated data alone makes a short-lag dip and a burst at these lags "
+    "(.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md)"
+)
+#: Prefixes of the onset-only self-history values the refit supersedes.
+SUPERSEDED_PREFIXES = ("rate_burst_", "rate_refractory_", "rate_raw_burst_")
+#: A pooled kernel's lag is read when it has this many expected onsets ...
+HISTORY_MIN_SUPPORT = 3.0
+#: ... and its Wald SE on the log scale is at most this.
+HISTORY_MAX_SE = 0.5
+#: The caveat every pooled history value carries.
+UPPER_BOUND = (
+    "pooled within animal with a session fixed effect; an upper bound, since rate "
+    "variation between stops that the model does not capture inflates history terms"
+)
+#: Cross directions: key word -> (response population, label).
+CROSS_DIRECTIONS = {
+    "non_swr_from_swr": ("non_local_no_swr", "non-SWR rate after SWR-coupled events"),
+    "swr_from_non_swr": ("non_local_swr", "SWR-coupled rate after non-SWR events"),
+}
+CROSS_LAG_MS = 45
+
+
+def _pooled_kernel(rec: dict, rung: str, block: str) -> dict | None:
+    """One (animal, population) fit's kernel with its measurable lags."""
+    fit = rec["duration_aware"].get(rung)
+    if fit is None or not fit["ok"] or block not in fit["kernels"]:
+        return None
+    k = fit["kernels"][block]
+    log_rr, se = np.asarray(k["log_rr"]), np.asarray(k["se"])
+    ok = (np.asarray(rec["support"][block]) >= HISTORY_MIN_SUPPORT) & (
+        se <= HISTORY_MAX_SE
+    )
+    return {"log_rr": log_rr, "se": se, "ok": ok}
+
+
+def _peak(kernel: dict) -> tuple[float, int, bool] | None:
+    """(rate ratio, lag in ms, CI above 1) at the largest measurable lag."""
+    if not kernel["ok"].any():
+        return None
+    j = int(np.nanargmax(np.where(kernel["ok"], kernel["log_rr"], np.nan)))
+    lr, se = kernel["log_rr"][j], kernel["se"][j]
+    return float(np.exp(lr)), (j + 1) * 15, bool(lr - 1.96 * se > 0)
+
+
+def duration_aware_history_values(
+    sessions: pd.DataFrame, pooled: dict, source: str
+) -> list[Value]:
+    """Claim 19c: refractoriness, burst and cross-coupling once duration is handled.
+
+    ``pooled`` is ``duration_aware_history_pooled.pkl``: per animal and
+    population, the rungs fit to the animal's stacked sessions. The kernels are
+    the both-anchor rung's (``Mself_dur``; ``Mselfcross_dur`` for cross), read
+    at measurable lags only (expected onsets >= ``HISTORY_MIN_SUPPORT``, Wald
+    SE <= ``HISTORY_MAX_SE``). ``sessions`` is ``duration_aware_history_models.pkl``,
+    for the per-session cross AIC.
+    """
+    make = _value_factory(source, ("19c",), ("paper",))
+    by_pop: dict[str, dict[str, dict]] = {}
+    for rec in pooled["results"]:
+        by_pop.setdefault(rec["outcome"], {})[rec["animal"]] = rec
+    _require(
+        set(by_pop) == set(RATE_POPULATIONS),
+        f"pooled populations {sorted(by_pop)} != {sorted(RATE_POPULATIONS)}",
+    )
+    values: list[Value] = []
+    first_lag, end_peaks, end_lags, end_animals = [], [], [], []
+    n_fits = n_suppressed = n_raised = 0
+    for word, (outcome, label) in RATE_POPULATIONS.items():
+        ends, onsets, first = [], [], []
+        for rec in by_pop[outcome].values():
+            end = _pooled_kernel(rec, "Mself_dur", "self_offset")
+            onset = _pooled_kernel(rec, "Mself_dur", "self_onset")
+            _require(end is not None, f"{outcome}/{rec['animal']}: Mself_dur failed")
+            n_fits += 1
+            lr, se = end["log_rr"][0], end["se"][0]
+            first.append(float(np.exp(lr)))
+            n_suppressed += bool(lr + 1.96 * se < 0)
+            n_raised += bool(lr - 1.96 * se > 0)
+            if (peak := _peak(end)) is not None:
+                ends.append(peak)
+            if onset is not None and (peak := _peak(onset)) is not None:
+                onsets.append(peak)
+        first_lag.append(float(np.median(first)))
+        end_peaks.append(np.median([p[0] for p in ends]))
+        end_lags.append(np.median([p[1] for p in ends]))
+        end_animals.append(sum(p[2] for p in ends))
+        values += [
+            make(
+                f"history_onset_peak_{word}",
+                np.median([p[0] for p in onsets]),
+                "quantity",
+                "dec2",
+                f"{label}: onset-locked part of the self-history (both-anchor rung "
+                "Mself_dur, at-risk design): median over animals of each animal's "
+                f"peak rate ratio over its measurable lags; {UPPER_BOUND}",
+                "rate ratio",
+            ),
+            make(
+                f"history_onset_peak_lag_ms_{word}",
+                np.median([p[1] for p in onsets]),
+                "quantity",
+                "int",
+                f"{label}: median over animals of that onset-locked peak's lag",
+                "ms",
+            ),
+            make(
+                f"history_onset_animals_{word}",
+                sum(p[2] for p in onsets),
+                "count",
+                "count",
+                f"{label}: animals whose onset-locked peak has its 95 % CI above 1",
+            ),
+        ]
+    values += [
+        make(
+            "history_end_first_lag_rr_low",
+            min(first_lag),
+            "quantity",
+            "dec2",
+            "lowest over the four populations of the median (over animals) rate ratio "
+            "15 ms after the previous event's end (end-locked part of Mself_dur, "
+            f"at-risk design); {UPPER_BOUND}",
+            "rate ratio",
+        ),
+        make(
+            "history_end_first_lag_rr_high",
+            max(first_lag),
+            "quantity",
+            "dec2",
+            "highest over the four populations of that median rate ratio 15 ms after "
+            "the previous event's end",
+            "rate ratio",
+        ),
+        make(
+            "history_end_first_lag_suppressed_fits",
+            n_suppressed,
+            "count",
+            "count",
+            "animal x population fits whose rate 15 ms after the previous event's end "
+            "is below 1 with its 95 % CI (suppression after the end)",
+        ),
+        make(
+            "history_end_first_lag_raised_fits",
+            n_raised,
+            "count",
+            "count",
+            "animal x population fits whose rate 15 ms after the previous event's end "
+            "is above 1 with its 95 % CI",
+        ),
+        make(
+            "history_fits",
+            n_fits,
+            "count",
+            "count",
+            "animal x population pooled fits (5 animals x 4 populations)",
+        ),
+        make(
+            "history_end_peak_low",
+            min(end_peaks),
+            "quantity",
+            "dec2",
+            "lowest over the four populations of the median (over animals) peak rate "
+            "ratio of the end-locked self-history (Mself_dur, at-risk design, "
+            f"measurable lags); {UPPER_BOUND}",
+            "rate ratio",
+        ),
+        make(
+            "history_end_peak_high",
+            max(end_peaks),
+            "quantity",
+            "dec2",
+            "highest over the four populations of that end-locked peak",
+            "rate ratio",
+        ),
+        make(
+            "history_end_peak_lag_ms_low",
+            min(end_lags),
+            "quantity",
+            "int",
+            "shortest over the populations of the median end-locked peak lag",
+            "ms",
+        ),
+        make(
+            "history_end_peak_lag_ms_high",
+            max(end_lags),
+            "quantity",
+            "int",
+            "longest over the populations of the median end-locked peak lag",
+            "ms",
+        ),
+        make(
+            "history_end_peak_animals_min",
+            min(end_animals),
+            "count",
+            "count",
+            "fewest, over the populations, animals whose end-locked peak has its 95 % "
+            "CI above 1",
+        ),
+    ]
+    lag = CROSS_LAG_MS // 15 - 1
+    for word, (outcome, label) in CROSS_DIRECTIONS.items():
+        rr, above = [], 0
+        for rec in by_pop[outcome].values():
+            k = _pooled_kernel(rec, "Mselfcross_dur", "cross_offset")
+            _require(k is not None, f"{outcome}/{rec['animal']}: Mselfcross_dur failed")
+            rr.append(float(np.exp(k["log_rr"][lag])))
+            above += bool(k["log_rr"][lag] - 1.96 * k["se"][lag] > 0)
+        rows = sessions[
+            (sessions["outcome"] == outcome)
+            & sessions["model"].isin(["Mself_dur", "Mselfcross_dur"])
+            & sessions["fit_ok"]
+        ]
+        aic = rows.pivot_table(index=SC, columns="model", values="aic").dropna()
+        gain = aic["Mself_dur"] - aic["Mselfcross_dur"]
+        animal_med = gain.groupby(level="animal").median()
+        values += [
+            make(
+                f"history_cross_end_rr_{word}",
+                np.median(rr),
+                "quantity",
+                "dec2",
+                f"{label}: rate ratio {CROSS_LAG_MS} ms after the other stream's event "
+                "ended (end-locked cross block of Mselfcross_dur, at-risk design), "
+                f"median over animals; {UPPER_BOUND}",
+                "rate ratio",
+            ),
+            make(
+                f"history_cross_end_animals_{word}",
+                above,
+                "count",
+                "count",
+                f"{label}: animals whose rate ratio at {CROSS_LAG_MS} ms has its 95 % CI "
+                "above 1",
+            ),
+            make(
+                f"history_cross_session_gain_{word}",
+                gain.median(),
+                "quantity",
+                "sig2s",
+                f"{label}: median per-session AIC(Mself_dur) - AIC(Mselfcross_dur), "
+                "positive = the cross block pays for its parameters",
+                "AIC",
+            ),
+            make(
+                f"history_cross_session_animals_positive_{word}",
+                int((animal_med > 0).sum()),
+                "count",
+                "count",
+                f"{label}: animals whose median per-session cross gain is positive",
+            ),
+        ]
+    return values
+
+
+# --- 3b: the within-arm horse race --------------------------------------------
+
+#: Horse-race predictors: key word -> (summary column, label).
+HORSERACE_PREDICTORS = {
+    "uncertainty": (
+        "reward_belief_variance_candidate_arm_preoutcome_z",
+        "reward-belief variance (uncertainty)",
+    ),
+    "value": (
+        "reward_belief_mean_candidate_arm_preoutcome_z",
+        "reward-belief mean (value)",
+    ),
+    "distance": ("distance_to_candidate_arm_cm_z", "distance to the arm"),
+    "recency": ("visit_recency_trials_z", "visit recency"),
+}
+HORSERACE_POPULATIONS = {"all": "all", "swr": "SWR", "non_swr": "non_SWR"}
+
+
+def horserace_values(summary: pd.DataFrame, source: str) -> list[Value]:
+    """Claim 19g: are uncertainty, value and visit history separated?
+
+    ``summary`` is ``horserace_summary.csv`` (``uncertainty_content.
+    summarize_horserace``): per population and predictor, the median over
+    sessions of the within-arm OLS coefficient (all four predictors entered
+    together, arm-demeaned within session; non-current leaf arms), the animals
+    whose own median has that sign, and the median design condition number.
+    """
+    make = _value_factory(source, ("19g",), ("paper",))
+    values: list[Value] = []
+    for pop_word, pop in HORSERACE_POPULATIONS.items():
+        rows = summary[summary["population"] == pop].set_index("predictor")
+        _require(len(rows) == len(HORSERACE_PREDICTORS), f"horse race: {pop} rows")
+        for word, (column, label) in HORSERACE_PREDICTORS.items():
+            row = rows.loc[column]
+            values += [
+                make(
+                    f"horserace_{word}_{pop_word}",
+                    row["median"],
+                    "quantity",
+                    "sig2s",
+                    f"{pop} events: within-arm coefficient of {label}, the four "
+                    "predictors entered together; median over sessions",
+                    "arm fraction per SD",
+                ),
+                make(
+                    f"horserace_{word}_{pop_word}_animals",
+                    int(row["n_animals_consistent"]),
+                    "count",
+                    "count",
+                    f"{pop} events: animals whose own median {label} coefficient has "
+                    "the sign of the overall median",
+                ),
+            ]
+        values.append(
+            make(
+                f"horserace_condition_number_{pop_word}",
+                float(rows["median_cond_number"].iloc[0]),
+                "quantity",
+                "dec2",
+                f"{pop} events: median per-session condition number of the "
+                "four-predictor design (collinearity check; below 10 = separable)",
+            )
+        )
+    return values
+
+
+def mark_superseded(summary: Summary) -> None:
+    """Point the onset-only self-history values to the duration-aware ones."""
+    for key, value in list(summary.values.items()):
+        if key.startswith(SUPERSEDED_PREFIXES):
+            summary.values[key] = replace(value, pending=HISTORY_SUPERSEDED)
+
+
 def _check_fresh(artifact: Path) -> None:
     """Refuse a fit whose provenance sidecar says a table it read has changed."""
     recorded = json.loads(fit_provenance_path(artifact).read_text())["inputs"]
@@ -2672,6 +3007,19 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     record(*rate_fits)
 
+    for artifact in (inputs.duration_aware_sessions, inputs.duration_aware_pooled):
+        _check_fresh(artifact)
+    summary.add(
+        *duration_aware_history_values(
+            pd.read_pickle(inputs.duration_aware_sessions),
+            pd.read_pickle(inputs.duration_aware_pooled),
+            f"{rel(inputs.duration_aware_pooled)} "
+            "(rate.duration_aware_history.pooled_at_well) and "
+            f"{rel(inputs.duration_aware_sessions)} (rate.duration_aware_history.at_well)",
+        )
+    )
+    record(inputs.duration_aware_sessions, inputs.duration_aware_pooled)
+
     audited, sources = {}, {}
     for suffix in sorted({spec[0] for spec in CONTENT_SPECS.values()}):
         path = inputs.content_contrast_dir / f"swr_contrast_content_audited{suffix}.pkl"
@@ -2712,6 +3060,16 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     record(*(inputs.leaf_dir / f"{n}.pkl" for n in ("Mu", "Mv", "model_comparison")))
 
+    _check_fresh(inputs.horserace_summary)
+    summary.add(
+        *horserace_values(
+            pd.read_csv(inputs.horserace_summary),
+            f"{rel(inputs.horserace_summary)} (content.uncertainty)",
+        )
+    )
+    record(inputs.horserace_summary)
+
+    _check_fresh(inputs.choice_fits)
     summary.add(
         *choice_values(
             pd.read_pickle(inputs.choice_fits),
@@ -2761,4 +3119,5 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     record(inputs.swr_power)
+    mark_superseded(summary)
     return summary

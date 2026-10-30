@@ -71,6 +71,10 @@ One frame shared by every caller: do not mutate it (add rows, columns or
 _REWARD_LAG_COLUMNS = tuple(
     f"known_reward_outcome_lag_{j}" for j in range(1, REWARD_HISTORY_N_LAGS + 1)
 )
+#: An event's end, seconds since its stop's onset (the duration-aware options).
+_END_COLUMN = "t_end_since_stop_onset"
+#: At-risk seconds below which a bin counts as wholly inside an event (rounding).
+_AT_RISK_FLOOR_S = 1e-9
 #: Stop columns needed to place a bin on the arrival / outcome-availability clocks.
 _ARRIVAL_CLOCK_STOP_COLUMNS = (
     "stop_start",
@@ -524,6 +528,8 @@ def aggregate_to_timebins(
     history_window_s: float = 0.0,
     arrival_clocks: bool = True,
     outcome_shift: bool = True,
+    at_risk_events: pd.DataFrame | None = None,
+    offset_history: bool = False,
 ) -> pd.DataFrame:
     """One row per (stop, bin) up to ``tmax``, at ``bin_s`` resolution.
 
@@ -597,6 +603,27 @@ def aggregate_to_timebins(
         ``stop_table``. False keeps every bin on its bout-start history.
         Without ``reward_basis`` there is no reward history to shift, and it
         does nothing.
+    at_risk_events : pd.DataFrame, optional
+        Duration-aware option (default None: every bin of the stop is at risk,
+        the shipped design). Every event of the decoder whose onsets are
+        modelled -- all streams, since one decoder's events never overlap --
+        with ``stop_id``, ``t_since_stop_onset`` (start) and
+        ``t_end_since_stop_onset`` (end), seconds since stop onset. While an
+        event is ongoing no new onset can occur, so a bin's ``exposure`` becomes
+        its at-risk time: the part of the bin no event covers. Bins with no
+        at-risk time (inside an ongoing event) are dropped, after the history
+        columns are built, so the lags still count every past event. Raises if
+        two events of one stop overlap.
+    offset_history : bool
+        Duration-aware option (default False). Also build history from event
+        OFFSETS: ``offset_lag{j}`` (the response stream's event ends ``j`` bins
+        back, read from ``onset_times["t_end_since_stop_onset"]``) and, with
+        ``self_history_basis``, ``offhist_rcos_k``; with cross history,
+        ``cross_offset_lag{j}`` / ``cross_offhist_rcos_k`` from
+        ``cross_onset_times["t_end_since_stop_onset"]``. Same lags and basis as
+        the onset blocks. An offset in the current bin is not used (lag >= 1),
+        so a dependence on time since offset shorter than one bin is not
+        resolved.
 
     Returns
     -------
@@ -615,7 +642,11 @@ def aggregate_to_timebins(
         When excluded time has rows, ``attrs`` counts the bins dropped for
         touching it (``n_bins_excluded``), those dropped for their
         history window alone (``n_bins_excluded_history``) and the onsets
-        those bins held (``n_onsets_in_excluded_bins``).
+        those bins held (``n_onsets_in_excluded_bins``). With
+        ``at_risk_events``, ``attrs`` also counts the bins dropped for having
+        no at-risk time (``n_bins_not_at_risk``) and the response onsets they
+        held (``n_onsets_not_at_risk``; nonzero only if an onset coincides
+        with another event's span).
 
     Notes on the outcome boundary
     -----------------------------
@@ -671,6 +702,15 @@ def aggregate_to_timebins(
         raise ValueError("cross_history_basis requires cross_history_lags > 0")
     if cross_history_lags and cross_onset_times is None:
         raise ValueError("cross_history_lags requires cross_onset_times")
+    if offset_history:
+        if not self_history_lags:
+            raise ValueError("offset_history requires self_history_lags > 0")
+        streams = {"onset_times": onset_times}
+        if cross_history_lags:
+            streams["cross_onset_times"] = cross_onset_times
+        for name, frame in streams.items():
+            if _END_COLUMN not in frame.columns:
+                raise KeyError(f"offset_history needs {_END_COLUMN!r} in {name}")
     reward_cols = (
         [*REWARD_HISTORY_COLUMNS, REWARD_HISTORY_INCOMPLETE] if reward_basis else []
     )
@@ -839,6 +879,45 @@ def aggregate_to_timebins(
                 out[f"cross_hist_rcos_{k}"] = xproj[:, k]
         out = out.drop(columns=["cross_count"])
 
+    # Duration-aware history: the same lag/basis blocks, counted from event ENDS.
+    if offset_history:
+        out = _add_offset_history(
+            out,
+            onset_times,
+            lag_prefix="offset_lag",
+            basis_prefix="offhist_rcos_",
+            n_lags=self_history_lags,
+            n_basis=self_history_basis,
+            bin_s=bin_s,
+            tmax=tmax,
+        )
+        if cross_history_lags:
+            out = _add_offset_history(
+                out,
+                cross_onset_times,
+                lag_prefix="cross_offset_lag",
+                basis_prefix="cross_offhist_rcos_",
+                n_lags=cross_history_lags,
+                n_basis=cross_history_basis,
+                bin_s=bin_s,
+                tmax=tmax,
+            )
+
+    # Duration-aware at-risk time: the part of each bin no event covers. Kept
+    # aside until the excluded-time drop has used the bin's full exposure.
+    if at_risk_events is not None:
+        horizon = (
+            s.set_index("stop_id")["_span_s"].clip(upper=tmax)
+            if len(s)
+            else pd.Series(dtype=float)
+        )
+        covered = _event_coverage_by_bin(at_risk_events, horizon, bin_s=bin_s)
+        out = out.merge(covered, on=["stop_id", "binj"], how="left")
+        out["_at_risk_s"] = out["exposure"].to_numpy() - out["_covered_s"].fillna(
+            0.0
+        ).to_numpy(dtype=float)
+        out = out.drop(columns=["_covered_s"])
+
     n_stops_arrival_spanning: int | None = None
     if shift_at_outcome:
         # The reward history a stop carries is evaluated at BOUT START, so bins
@@ -888,12 +967,141 @@ def aggregate_to_timebins(
         out, excluded_counts = _drop_excluded_bins(
             out, excluded_intervals, bin_s=bin_s, history_window_s=history_window_s
         )
+    at_risk_counts: dict[str, int] = {}
+    if at_risk_events is not None:
+        # A rounding-level floor, not the 1e-4 s sliver rule above: an onset just
+        # after a bin's left edge whose event covers the rest of the bin leaves
+        # the bin a few microseconds at risk, and that bin is its onset's bin.
+        at_risk = out["_at_risk_s"].to_numpy() > _AT_RISK_FLOOR_S
+        at_risk_counts = {
+            "n_bins_not_at_risk": int((~at_risk).sum()),
+            "n_onsets_not_at_risk": int(out.loc[~at_risk, "count"].sum()),
+        }
+        out = out.loc[at_risk].copy()
+        out["exposure"] = out["_at_risk_s"]
+        out = out.drop(columns=["_at_risk_s"])
     out = out.drop(columns=["_span_s", *drop_internal]).reset_index(drop=True)
     out.attrs["n_onsets_in_dropped_bins"] = n_onsets_in_dropped_bins
     out.attrs.update(excluded_counts)
+    out.attrs.update(at_risk_counts)
     if n_stops_arrival_spanning is not None:
         out.attrs["n_stops_arrival_spanning"] = n_stops_arrival_spanning
     return out
+
+
+def _add_offset_history(
+    out: pd.DataFrame,
+    events: pd.DataFrame,
+    *,
+    lag_prefix: str,
+    basis_prefix: str,
+    n_lags: int,
+    n_basis: int,
+    bin_s: float,
+    tmax: float,
+) -> pd.DataFrame:
+    """Lagged counts of event ENDS on the design's grid, and their basis.
+
+    ``{lag_prefix}{j}`` counts the ``events``' ends ``j`` bins before the
+    current one (within stop, reset at the stop boundary), binned like the
+    onsets; with ``n_basis`` the lags are projected onto
+    :func:`raised_cosine_history_basis` as ``{basis_prefix}{k}``. ``out`` must
+    be sorted by ``(stop_id, binj)``; the returned frame keeps that order.
+    """
+    nmax = int(np.ceil(tmax / bin_s))
+    ends = events[events[_END_COLUMN] < tmax]
+    end_binj = np.clip(
+        np.floor(ends[_END_COLUMN].to_numpy(dtype=float) / bin_s + 1e-9).astype(int),
+        0,
+        nmax - 1,
+    )
+    counts = (
+        pd.DataFrame({"stop_id": ends["stop_id"].to_numpy(), "binj": end_binj})
+        .groupby(["stop_id", "binj"])
+        .size()
+        .rename("_offset_count")
+    )
+    out = out.merge(counts, on=["stop_id", "binj"], how="left")
+    out["_offset_count"] = out["_offset_count"].fillna(0)
+    grouped = out.groupby("stop_id")["_offset_count"]
+    lag_cols = [f"{lag_prefix}{j}" for j in range(1, n_lags + 1)]
+    for j, col in enumerate(lag_cols, start=1):
+        out[col] = grouped.shift(j).fillna(0)
+    if n_basis:
+        proj = out[lag_cols].to_numpy() @ raised_cosine_history_basis(n_lags, n_basis).T
+        for k in range(n_basis):
+            out[f"{basis_prefix}{k}"] = proj[:, k]
+    return out.drop(columns=["_offset_count"])
+
+
+def _event_coverage_by_bin(
+    events: pd.DataFrame, horizon: pd.Series, *, bin_s: float
+) -> pd.DataFrame:
+    """Seconds of each (stop, bin) that an event covers.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        ``stop_id``, ``t_since_stop_onset`` and ``t_end_since_stop_onset``
+        (seconds since stop onset) of every event of one decoder.
+    horizon : pd.Series
+        Per ``stop_id``: the end of the stop's binned window,
+        ``min(span, tmax)``. Coverage past it is not counted (no bin is
+        exposed there). Stops not in it are skipped.
+    bin_s : float
+        Bin width in seconds.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``stop_id``, ``binj``, ``_covered_s``: one row per touched bin.
+
+    Raises
+    ------
+    ValueError
+        If an event ends before it starts, or two events of a stop overlap
+        (the at-risk time assumes one decoder's non-overlapping events).
+    """
+    ev = events[["stop_id", "t_since_stop_onset", _END_COLUMN]]
+    ev = ev[ev["stop_id"].isin(horizon.index)].sort_values(
+        ["stop_id", "t_since_stop_onset"], kind="stable"
+    )
+    start = ev["t_since_stop_onset"].to_numpy(dtype=float)
+    end = ev[_END_COLUMN].to_numpy(dtype=float)
+    if np.any(end < start):
+        raise ValueError("at_risk_events has an event that ends before it starts")
+    stop_ids = ev["stop_id"].to_numpy()
+    same_stop = stop_ids[1:] == stop_ids[:-1]
+    if np.any(same_stop & (start[1:] < end[:-1])):
+        raise ValueError(
+            "at_risk_events overlap within a stop; the at-risk time needs one "
+            "decoder's non-overlapping events"
+        )
+    start = np.maximum(start, 0.0)
+    end = np.minimum(end, horizon.reindex(stop_ids).to_numpy(dtype=float))
+    keep = end > start
+    start, end, stop_ids = start[keep], end[keep], stop_ids[keep]
+    first = np.floor(start / bin_s + 1e-9).astype(int)
+    last = np.maximum(np.ceil(end / bin_s - 1e-9).astype(int) - 1, first)
+    n_bins = last - first + 1
+    rep = np.repeat(np.arange(len(start)), n_bins)
+    binj = first[rep] + (
+        np.arange(len(rep)) - np.repeat(np.cumsum(n_bins) - n_bins, n_bins)
+    )
+    piece = np.minimum(end[rep], (binj + 1) * bin_s) - np.maximum(
+        start[rep], binj * bin_s
+    )
+    return (
+        pd.DataFrame(
+            {
+                "stop_id": stop_ids[rep],
+                "binj": binj,
+                "_covered_s": np.clip(piece, 0.0, None),
+            }
+        )
+        .groupby(["stop_id", "binj"], as_index=False)["_covered_s"]
+        .sum()
+    )
 
 
 def _drop_excluded_bins(

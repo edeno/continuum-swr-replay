@@ -10,8 +10,9 @@ Single source of truth for every model family, each a dict of
 - ``MODEL_PER_STOP_RATE`` — ordinary Poisson on per-stop event counts
   (different estimator; see its section below).
 - ``MODEL_PER_BIN_RATE`` — the per-bin conditional-intensity ladder, with
-  the auxiliary per-bin models ``MODEL_UNCERTAINTY_RATE`` and
-  ``MODEL_CROSS_HISTORY_RATE`` fit by their own runners.
+  the auxiliary per-bin models ``MODEL_UNCERTAINTY_RATE``,
+  ``MODEL_CROSS_HISTORY_RATE`` and its duration-aware twin
+  ``MODEL_CROSS_HISTORY_DURATION_RATE`` fit by their own runners.
 - ``MODEL_CHOICE`` — conditional logit on the animal's next-arm
   choice (different estimator again).
 
@@ -35,7 +36,7 @@ sits next to a specific ``ModelSpec`` stays inline below.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import NamedTuple
 
 import pandas as pd
@@ -74,6 +75,7 @@ __all__ = [
     "BIN_S",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
     "MODEL_CHOICE",
+    "MODEL_CROSS_HISTORY_DURATION_RATE",
     "MODEL_CROSS_HISTORY_RATE",
     "MODEL_HIERARCHY",
     "MODEL_HIERARCHY_MUA",
@@ -585,14 +587,28 @@ def _history_terms(prefix: str, n_lags: int, n_basis: int) -> list[PerBinTerm]:
     """An event-history block over ``n_lags`` bins.
 
     ``{prefix}hist_rcos_{k}`` raised-cosine features when ``n_basis > 0``, else
-    the per-lag ``onset_lag{j}`` (self) / ``cross_lag{j}`` (cross) dummies.
+    the per-lag ``onset_lag{j}`` (self) / ``cross_lag{j}`` (cross) dummies, or
+    their event-end twins ``offset_lag{j}`` / ``cross_offset_lag{j}``.
     """
     if n_basis:
         columns = [f"{prefix}hist_rcos_{k}" for k in range(n_basis)]
     else:
-        lag = f"{prefix}lag" if prefix else "onset_lag"
+        lag = _HISTORY_LAG_PREFIX[prefix]
         columns = [f"{lag}{j}" for j in range(1, n_lags + 1)]
     return _column_terms(columns, n_lags)
+
+
+# Per-lag dummy names of each history block, keyed by its basis prefix: onsets
+# of the stop's own stream (""), of the cross stream ("cross_"), and the
+# duration-aware blocks on event ENDS ("off", "cross_off").
+_HISTORY_LAG_PREFIX = {
+    "": "onset_lag",
+    "cross_": "cross_lag",
+    "off": "offset_lag",
+    "cross_off": "cross_offset_lag",
+}
+# History-block prefix of each anchor (``PerBinRateModelSpec.*_history_anchors``).
+_ANCHOR_PREFIX = {"onset": "", "offset": "off"}
 
 
 # Per-stop covariates the shipped ladder needs beyond the reward-history basis
@@ -674,6 +690,17 @@ class PerBinRateModelSpec:
     # leaves the shipped ladder unchanged.
     cross_history_lags: int = 0
     cross_history_basis: int = 0
+    # Duration-aware history: which past-event times each history block is
+    # measured from. ``"onset"`` is the shipped block (``hist_rcos_k`` /
+    # ``cross_hist_rcos_k``); ``"offset"`` adds the same lags/basis counted
+    # from event ENDS (``offhist_rcos_k`` / ``cross_offhist_rcos_k``, or the
+    # ``offset_lag{j}`` / ``cross_offset_lag{j}`` dummies), so a dependence
+    # locked to the previous event's end is not read as one locked to its
+    # onset. An offset block's design is built with
+    # ``aggregate_to_timebins(offset_history=True, at_risk_events=...)``. The
+    # default ``("onset",)`` leaves every shipped rung unchanged.
+    self_history_anchors: tuple[str, ...] = ("onset",)
+    cross_history_anchors: tuple[str, ...] = ("onset",)
     # Extra per-stop covariates appended to the formula as plain linear terms
     # (e.g. the ``MU_uncertainty`` uncertainty/value block). Default
     # ``()`` so the shipped ``MODEL_PER_BIN_RATE`` ladder is byte-identical and
@@ -698,6 +725,17 @@ class PerBinRateModelSpec:
                 "PerBinRateModelSpec.time_clock must be 'stop' or 'arrival'; "
                 f"got {self.time_clock!r}."
             )
+        for field_name in ("self_history_anchors", "cross_history_anchors"):
+            anchors = getattr(self, field_name)
+            if (
+                not anchors
+                or set(anchors) - set(_ANCHOR_PREFIX)
+                or len(set(anchors)) != len(anchors)
+            ):
+                raise ValueError(
+                    f"PerBinRateModelSpec.{field_name} must be distinct values "
+                    f"of {tuple(_ANCHOR_PREFIX)}; got {anchors!r}."
+                )
         if self.reward_basis not in (0, REWARD_HISTORY_N_BASIS):
             raise ValueError(
                 "PerBinRateModelSpec.reward_basis must be 0 or "
@@ -727,10 +765,18 @@ class PerBinRateModelSpec:
             terms += _reward_basis_terms(self.reward_basis)
         if self.reward_rate:
             terms += _column_terms(("reward_fraction_last10_known_trials",))
-        terms += _history_terms("", self.self_history_lags, self.self_history_basis)
-        terms += _history_terms(
-            "cross_", self.cross_history_lags, self.cross_history_basis
-        )
+        for anchor in self.self_history_anchors:
+            terms += _history_terms(
+                _ANCHOR_PREFIX[anchor],
+                self.self_history_lags,
+                self.self_history_basis,
+            )
+        for anchor in self.cross_history_anchors:
+            terms += _history_terms(
+                "cross_" + _ANCHOR_PREFIX[anchor],
+                self.cross_history_lags,
+                self.cross_history_basis,
+            )
         # ``switch`` is retired (see the field docstring); the completed-trip
         # switch flag is never added to a per-bin model.
         if self.reward_time_interaction:
@@ -997,7 +1043,10 @@ MODEL_UNCERTAINTY_RATE: dict[str, PerBinRateModelSpec] = {
 # reward_rate stop covariate), so the design needs no regenerated stop
 # covariate and builds on the current tables. The pair is compared by its
 # runner on two designs (self vs self+cross), not by ``parent``.
-def _cross_history_spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
+def _cross_history_spec(
+    name: str, *, cross: bool, duration_aware: bool = False
+) -> PerBinRateModelSpec:
+    anchors = ("onset", "offset") if duration_aware else ("onset",)
     return PerBinRateModelSpec(
         name=name,
         time_spline=True,
@@ -1006,17 +1055,72 @@ def _cross_history_spec(name: str, *, cross: bool) -> PerBinRateModelSpec:
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
         reward_time_interaction=False,
-        description="non-local cross-history coupling",
+        description=(
+            "non-local cross-history coupling, duration-aware"
+            if duration_aware
+            else "non-local cross-history coupling"
+        ),
         parent=None,
         self_history_basis=N_HISTORY_BASIS,
         cross_history_lags=N_HISTORY_LAGS if cross else 0,
         cross_history_basis=N_HISTORY_BASIS if cross else 0,
+        self_history_anchors=anchors,
+        cross_history_anchors=anchors,
     )
 
 
 MODEL_CROSS_HISTORY_RATE: dict[str, PerBinRateModelSpec] = {
     "Mself": _cross_history_spec("Mself", cross=False),
     "Mselfcross": _cross_history_spec("Mselfcross", cross=True),
+}
+
+
+# The duration-aware twin. Events have duration and one detector's events never
+# overlap, so the onset-only design above counts the bins inside an ongoing
+# event as at risk and can read a dependence on the previous event's END as one
+# on its onset. These rungs measure history from onsets, ends or both; their
+# design is built with the at-risk time (``aggregate_to_timebins(at_risk_events=
+# <every event of the detector>, offset_history=True)``), which drops the bins
+# inside an ongoing event. The fixed blocks are ``Mnohist_dur`` -> ``Mself_dur``
+# (self history, both anchors) -> ``Mselfcross_dur`` (+ cross, both anchors);
+# the one-anchor rungs give the onset-vs-offset contrasts. Runner:
+# ``scripts/rate/fit_duration_aware_history_rate.py``; the simulation behind
+# them is ``analysis/replay/duration_history_simulation.py``.
+def _duration_aware_spec(
+    name: str,
+    *,
+    self_anchors: tuple[str, ...] | None,
+    cross_anchors: tuple[str, ...] | None = None,
+) -> PerBinRateModelSpec:
+    spec = _cross_history_spec(
+        name, cross=cross_anchors is not None, duration_aware=True
+    )
+    return replace(
+        spec,
+        self_history_lags=N_HISTORY_LAGS if self_anchors else 0,
+        self_history_basis=N_HISTORY_BASIS if self_anchors else 0,
+        self_history_anchors=self_anchors or ("onset",),
+        cross_history_anchors=cross_anchors or ("onset",),
+    )
+
+
+_BOTH = ("onset", "offset")
+MODEL_CROSS_HISTORY_DURATION_RATE: dict[str, PerBinRateModelSpec] = {
+    "Mnohist_dur": _duration_aware_spec("Mnohist_dur", self_anchors=None),
+    "Mself_onset_dur": _duration_aware_spec("Mself_onset_dur", self_anchors=("onset",)),
+    "Mself_offset_dur": _duration_aware_spec(
+        "Mself_offset_dur", self_anchors=("offset",)
+    ),
+    "Mself_dur": _duration_aware_spec("Mself_dur", self_anchors=_BOTH),
+    "Mselfcross_onset_dur": _duration_aware_spec(
+        "Mselfcross_onset_dur", self_anchors=_BOTH, cross_anchors=("onset",)
+    ),
+    "Mselfcross_offset_dur": _duration_aware_spec(
+        "Mselfcross_offset_dur", self_anchors=_BOTH, cross_anchors=("offset",)
+    ),
+    "Mselfcross_dur": _duration_aware_spec(
+        "Mselfcross_dur", self_anchors=_BOTH, cross_anchors=_BOTH
+    ),
 }
 
 

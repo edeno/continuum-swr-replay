@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -29,7 +30,9 @@ from continuum_swr_replay.analysis.replay.fit_outputs import (
     belief_chain_output_subdir,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
     require_fresh_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import LEAF_ONLY_N_CATEGORIES
 from continuum_swr_replay.analysis.replay.uncertainty_content import (
@@ -341,6 +344,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     require_fresh_inputs(
         mu_path, mu_inputs(args.data_dir), allow_stale=args.allow_stale
     )
+    # Hash the inputs now, while they are being read. The tables are the
+    # sidecar's inputs; the Mu fit (it only picks the session cohort) is
+    # recorded beside them, since it lives in another directory.
+    fit_inputs = record_inputs(
+        {
+            "event_arm_table": event_arm_path,
+            "stop_table": stop_path,
+            "qvals_table": qvals_path,
+        }
+    )
+    mu_record = record_inputs({"Mu": mu_path})["Mu"]
     mu = pd.read_pickle(mu_path)
     try:
         assert_standardized_matches_reference(
@@ -521,6 +535,17 @@ def main(argv: Sequence[str] | None = None) -> None:
         args.output_dir / "horserace_session_coefficients.csv", index=False
     )
     horserace_summary.to_csv(args.output_dir / "horserace_summary.csv", index=False)
+    for artifact in ("horserace_summary.csv", "horserace_session_coefficients.csv"):
+        write_fit_provenance(
+            args.output_dir / artifact,
+            fit_inputs,
+            "ols_within_arm",
+            [__file__, *(argv if argv is not None else sys.argv[1:])],
+            extra={
+                "cohort": args.cohort,
+                "mu_fit": {"path": str(mu_path), **mu_record},
+            },
+        )
     (args.output_dir / "cohort_audit.json").write_text(
         json.dumps(audit, indent=2, sort_keys=True)
     )

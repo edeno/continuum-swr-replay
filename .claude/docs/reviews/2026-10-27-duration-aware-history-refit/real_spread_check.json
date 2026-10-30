@@ -1,0 +1,583 @@
+{
+ "n_stops": 4000,
+ "medians_s": {
+  "swr": 0.094,
+  "no_swr": 0.048
+ },
+ "log_sd": {
+  "swr": 0.67,
+  "no_swr": 0.7
+ },
+ "scenarios": {
+  "a_independent": {
+   "n_events": {
+    "no_swr": 7173,
+    "swr": 4807
+   },
+   "duration_log_sd": {
+    "no_swr": 0.681338088249707,
+    "swr": 0.6676592591599395
+   },
+   "swr/current": {
+    "delta_aic_self": 158.32,
+    "delta_aic_cross": 120.59,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 0.6497024803457936,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_onset": {
+      "peak_lag_ms": 120,
+      "peak_rr": 0.9396140310416773,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.006,
+      0.021,
+      0.131,
+      0.341,
+      0.464,
+      0.54,
+      0.597,
+      0.633,
+      0.649,
+      0.65
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.102,
+      0.134,
+      0.343,
+      0.609,
+      0.783,
+      0.886,
+      0.935,
+      0.94,
+      0.913,
+      0.869
+     ]
+    }
+   },
+   "swr/duration_aware": {
+    "delta_aic_self": -7.83,
+    "delta_aic_cross": -5.45,
+    "self_offset_vs_onset": 1.75,
+    "cross_offset_vs_onset": 0.59,
+    "best_self": "none",
+    "best": "none",
+    "collinearity": {
+     "canonical_corr_self": 0.6465934238257777,
+     "canonical_corr_cross": 0.7311243172678673
+    },
+    "best_kernels": {}
+   },
+   "no_swr/current": {
+    "delta_aic_self": 168.71,
+    "delta_aic_cross": 237.63,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 1.2927520393809917,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 0.6377837623294192,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.039,
+      0.172,
+      0.489,
+      0.757,
+      0.81,
+      0.86,
+      0.944,
+      1.05,
+      1.169,
+      1.293
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.027,
+      0.061,
+      0.188,
+      0.335,
+      0.404,
+      0.456,
+      0.51,
+      0.56,
+      0.603,
+      0.638
+     ]
+    }
+   },
+   "no_swr/duration_aware": {
+    "delta_aic_self": 7.04,
+    "delta_aic_cross": -10.12,
+    "self_offset_vs_onset": -5.12,
+    "cross_offset_vs_onset": -3.1,
+    "best_self": "self_both",
+    "best": "self_both",
+    "collinearity": {
+     "canonical_corr_self": 0.7311243172678673,
+     "canonical_corr_cross": 0.6465934238257777
+    },
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 1.5026562238119612,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "self_offset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 1.1971970157710454,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     }
+    }
+   }
+  },
+  "b_fragmentation": {
+   "n_events": {
+    "no_swr": 7574,
+    "swr": 5157
+   },
+   "duration_log_sd": {
+    "no_swr": 0.6879972655548718,
+    "swr": 0.667696944386663
+   },
+   "swr/current": {
+    "delta_aic_self": 138.36,
+    "delta_aic_cross": 178.14,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 120,
+      "peak_rr": 1.380809147965259,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_onset": {
+      "peak_lag_ms": 90,
+      "peak_rr": 1.8401206359152809,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.044,
+      0.035,
+      0.143,
+      0.421,
+      0.787,
+      1.121,
+      1.329,
+      1.381,
+      1.308,
+      1.166
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.078,
+      0.183,
+      0.71,
+      1.43,
+      1.779,
+      1.84,
+      1.749,
+      1.583,
+      1.398,
+      1.222
+     ]
+    }
+   },
+   "swr/duration_aware": {
+    "delta_aic_self": 159.37,
+    "delta_aic_cross": 294.39,
+    "self_offset_vs_onset": 90.3,
+    "cross_offset_vs_onset": 137.17,
+    "best_self": "self_offset",
+    "best": "self_offset+cross_offset",
+    "collinearity": {
+     "canonical_corr_self": 0.6238116167070097,
+     "canonical_corr_cross": 0.6796485060374037
+    },
+    "best_kernels": {
+     "self_offset": {
+      "peak_lag_ms": 30,
+      "peak_rr": 3.581409620619156,
+      "truth_peak_rr": 4.013766832135222,
+      "truth_peak_lag_ms": 45
+     },
+     "cross_offset": {
+      "peak_lag_ms": 30,
+      "peak_rr": 3.72844753816006,
+      "truth_peak_rr": 4.013766832135222,
+      "truth_peak_lag_ms": 45
+     }
+    }
+   },
+   "no_swr/current": {
+    "delta_aic_self": 252.42,
+    "delta_aic_cross": 224.55,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 75,
+      "peak_rr": 1.8640685314266245,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_onset": {
+      "peak_lag_ms": 120,
+      "peak_rr": 1.333732381513686,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.08,
+      0.245,
+      0.902,
+      1.641,
+      1.864,
+      1.83,
+      1.704,
+      1.547,
+      1.391,
+      1.25
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.012,
+      0.022,
+      0.138,
+      0.45,
+      0.791,
+      1.078,
+      1.266,
+      1.334,
+      1.3,
+      1.203
+     ]
+    }
+   },
+   "no_swr/duration_aware": {
+    "delta_aic_self": 463.34,
+    "delta_aic_cross": 337.23,
+    "self_offset_vs_onset": 208.79,
+    "cross_offset_vs_onset": 229.97,
+    "best_self": "self_offset",
+    "best": "self_offset+cross_offset",
+    "collinearity": {
+     "canonical_corr_self": 0.6796485060374037,
+     "canonical_corr_cross": 0.6238116167070097
+    },
+    "best_kernels": {
+     "self_offset": {
+      "peak_lag_ms": 30,
+      "peak_rr": 3.765834819817808,
+      "truth_peak_rr": 4.013766832135222,
+      "truth_peak_lag_ms": 45
+     },
+     "cross_offset": {
+      "peak_lag_ms": 30,
+      "peak_rr": 3.9357788209383533,
+      "truth_peak_rr": 4.013766832135222,
+      "truth_peak_lag_ms": 45
+     }
+    }
+   }
+  },
+  "c_onset_rhythm": {
+   "n_events": {
+    "no_swr": 7430,
+    "swr": 4950
+   },
+   "duration_log_sd": {
+    "no_swr": 0.6876408507615897,
+    "swr": 0.670270722284817
+   },
+   "swr/current": {
+    "delta_aic_self": 165.92,
+    "delta_aic_cross": 103.71,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 105,
+      "peak_rr": 1.2730655011855654,
+      "truth_peak_rr": 3.3945287053140345,
+      "truth_peak_lag_ms": 105
+     },
+     "cross_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 1.1129209969978713,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.019,
+      0.005,
+      0.037,
+      0.198,
+      0.566,
+      1.006,
+      1.273,
+      1.271,
+      1.081,
+      0.831
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.094,
+      0.227,
+      0.472,
+      0.667,
+      0.731,
+      0.79,
+      0.866,
+      0.949,
+      1.033,
+      1.113
+     ]
+    }
+   },
+   "swr/duration_aware": {
+    "delta_aic_self": 36.82,
+    "delta_aic_cross": -10.82,
+    "self_offset_vs_onset": -31.53,
+    "cross_offset_vs_onset": 3.53,
+    "best_self": "self_onset",
+    "best": "self_onset",
+    "collinearity": {
+     "canonical_corr_self": 0.6337599744626546,
+     "canonical_corr_cross": 0.6906557771137164
+    },
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 105,
+      "peak_rr": 2.2871545037099694,
+      "truth_peak_rr": 3.3945287053140345,
+      "truth_peak_lag_ms": 105
+     }
+    }
+   },
+   "no_swr/current": {
+    "delta_aic_self": 321.86,
+    "delta_aic_cross": 264.09,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 105,
+      "peak_rr": 2.002244836226993,
+      "truth_peak_rr": 3.3945287053140345,
+      "truth_peak_lag_ms": 105
+     },
+     "cross_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 0.7520066300183816,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.136,
+      0.108,
+      0.341,
+      0.837,
+      1.407,
+      1.831,
+      2.002,
+      1.944,
+      1.746,
+      1.495
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.003,
+      0.016,
+      0.118,
+      0.311,
+      0.405,
+      0.473,
+      0.549,
+      0.624,
+      0.693,
+      0.752
+     ]
+    }
+   },
+   "no_swr/duration_aware": {
+    "delta_aic_self": 227.58,
+    "delta_aic_cross": -9.42,
+    "self_offset_vs_onset": -67.25,
+    "cross_offset_vs_onset": 1.39,
+    "best_self": "self_onset",
+    "best": "self_onset",
+    "collinearity": {
+     "canonical_corr_self": 0.6906557771137164,
+     "canonical_corr_cross": 0.6337599744626546
+    },
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 105,
+      "peak_rr": 2.388754767743592,
+      "truth_peak_rr": 3.3945287053140345,
+      "truth_peak_lag_ms": 105
+     }
+    }
+   }
+  },
+  "d_cross_swr_to_nonswr": {
+   "n_events": {
+    "no_swr": 7322,
+    "swr": 4788
+   },
+   "duration_log_sd": {
+    "no_swr": 0.6913533819528477,
+    "swr": 0.6804018759794999
+   },
+   "swr/current": {
+    "delta_aic_self": 196.17,
+    "delta_aic_cross": 109.2,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 0.6880753285201991,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_onset": {
+      "peak_lag_ms": 105,
+      "peak_rr": 0.9906919003653339,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.005,
+      0.023,
+      0.103,
+      0.213,
+      0.262,
+      0.315,
+      0.39,
+      0.481,
+      0.582,
+      0.688
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.118,
+      0.145,
+      0.37,
+      0.657,
+      0.847,
+      0.952,
+      0.991,
+      0.978,
+      0.934,
+      0.873
+     ]
+    }
+   },
+   "swr/duration_aware": {
+    "delta_aic_self": -4.62,
+    "delta_aic_cross": -8.45,
+    "self_offset_vs_onset": -2.73,
+    "cross_offset_vs_onset": -5.53,
+    "best_self": "none",
+    "best": "none",
+    "collinearity": {
+     "canonical_corr_self": 0.642829972584411,
+     "canonical_corr_cross": 0.7306388916218658
+    },
+    "best_kernels": {}
+   },
+   "no_swr/current": {
+    "delta_aic_self": 172.01,
+    "delta_aic_cross": 188.14,
+    "best_self": "self",
+    "best": "self+cross",
+    "collinearity": {},
+    "best_kernels": {
+     "self_onset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 0.976258370030111,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_onset": {
+      "peak_lag_ms": 120,
+      "peak_rr": 1.2967773308482935,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "current_self_onset_rr_by_lag": [
+      0.103,
+      0.207,
+      0.406,
+      0.57,
+      0.634,
+      0.693,
+      0.763,
+      0.838,
+      0.91,
+      0.976
+     ],
+     "current_cross_onset_rr_by_lag": [
+      0.048,
+      0.038,
+      0.143,
+      0.398,
+      0.724,
+      1.026,
+      1.228,
+      1.297,
+      1.254,
+      1.142
+     ]
+    }
+   },
+   "no_swr/duration_aware": {
+    "delta_aic_self": -0.3,
+    "delta_aic_cross": 229.98,
+    "self_offset_vs_onset": 8.82,
+    "cross_offset_vs_onset": 149.17,
+    "best_self": "self_offset",
+    "best": "self_offset+cross_offset",
+    "collinearity": {
+     "canonical_corr_self": 0.7306388916218658,
+     "canonical_corr_cross": 0.642829972584411
+    },
+    "best_kernels": {
+     "self_offset": {
+      "peak_lag_ms": 150,
+      "peak_rr": 1.1220695852482927,
+      "truth_peak_rr": 1.0,
+      "truth_peak_lag_ms": 15
+     },
+     "cross_offset": {
+      "peak_lag_ms": 45,
+      "peak_rr": 3.2298513884468987,
+      "truth_peak_rr": 3.7991783046368104,
+      "truth_peak_lag_ms": 45
+     }
+    }
+   }
+  }
+ }
+}

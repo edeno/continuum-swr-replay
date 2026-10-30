@@ -30,6 +30,7 @@ import argparse
 import hashlib
 import logging
 import pickle
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -40,6 +41,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     _sorted_unit_ids,
     freeze_common_cohort,
 )
+from continuum_swr_replay.analysis.events.swr_source import swr_source_name
 from continuum_swr_replay.analysis.replay import (
     MODEL_CHOICE,
     MODEL_PATCH,
@@ -60,6 +62,10 @@ from continuum_swr_replay.analysis.replay.cohort_audit import (
 )
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
+)
+from continuum_swr_replay.analysis.replay.fit_provenance import (
+    record_inputs,
+    write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
@@ -169,8 +175,8 @@ def _comparison_output_path(out_dir: Path, event_source: str, brain_area: str) -
     return out_dir / f"{event_source}_{effective_area}_comparison_fits.pkl"
 
 
-def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
-    """Load event / event_arm / stop tables for an event source."""
+def _table_paths(event_source: str, brain_area: str) -> dict[str, Path]:
+    """The event / event_arm / stop table files of an event source."""
     input_dir, stem = _SOURCES[event_source]
     d = input_dir()
     effective_area = _effective_brain_area(event_source, brain_area)
@@ -183,13 +189,16 @@ def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
             )
     else:
         suffix = f"_{stem}_{effective_area}"
+    return {
+        short: d / f"{short}{suffix}.parquet"
+        for short in ("event_table", "event_arm_table", "stop_table")
+    }
+
+
+def _load_tables(event_source: str, brain_area: str) -> dict[str, pd.DataFrame]:
+    """Load event / event_arm / stop tables for an event source."""
     tables = {}
-    for short, base in [
-        ("event_table", "event_table"),
-        ("event_arm_table", "event_arm_table"),
-        ("stop_table", "stop_table"),
-    ]:
-        path = d / f"{base}{suffix}.parquet"
+    for short, path in _table_paths(event_source, brain_area).items():
         tables[short] = read_table(path)
         require_covariate_schema(
             tables[short],
@@ -576,10 +585,30 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="Brain area for ContFrag sources (SWR/MUA); ignored for "
         "non_local (HPC-only). Default: HPC.",
     )
+    parser.add_argument(
+        "--max-sessions",
+        type=int,
+        default=None,
+        help="Smoke: fit only the first N sessions; writes *_smoke outputs.",
+    )
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
     src = args.event_source
 
     tables = _load_tables(src, args.brain_area)
+    # Hash the inputs now, while the fit reads them; the sidecar is written
+    # beside the output so Part 3 can check it against the current tables.
+    fit_inputs = record_inputs(_table_paths(src, args.brain_area))
+    if args.max_sessions is not None:
+        keep = (
+            tables["stop_table"][list(SESSION_COLUMNS)]
+            .drop_duplicates()
+            .head(args.max_sessions)
+        )
+        tables = {
+            name: frame.merge(keep, on=list(SESSION_COLUMNS))
+            for name, frame in tables.items()
+        }
     out_dir = replay_content_dir() / "event_source_comparison"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -626,8 +655,21 @@ def main(argv: Sequence[str] | None = None) -> None:
     # SWR/HPC and SWR/mPFC must not overwrite each other. (non_local is
     # HPC-only; its name is then non_local_HPC.)
     out_path = _comparison_output_path(out_dir, src, args.brain_area)
+    if args.max_sessions is not None:
+        out_path = out_path.with_name(out_path.stem + "_smoke.pkl")
     with open(out_path, "wb") as f:
         pickle.dump(results, f)
+    write_fit_provenance(
+        out_path,
+        fit_inputs,
+        "conditional_logit_and_poisson",
+        [__file__, *argv],
+        extra={
+            "event_source": src,
+            "brain_area": _effective_brain_area(src, args.brain_area),
+            "swr_source": swr_source_name(),
+        },
+    )
     logger.info("saved %s", out_path)
 
     # Standardized cohort audit for every common-cohort block (patch / rate / choice),

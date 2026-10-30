@@ -430,14 +430,23 @@ Built into `event_arm_table` (leaf arm *j* to `betadist_var{j+1}`, trunk arms
   vanishes once event length is held fixed. The earlier reading — that the
   pooled `CS6` interaction was a nine-arm fixed-effect artifact — is superseded:
   on the leaf-only fraction fit the direct interaction is simply a null.
+- **The within-arm horse-race is re-derived on the fraction response**
+  (`uncertainty_content/horserace_summary.csv`, `content.uncertainty`, 242 sessions; per-session OLS with the four
+  predictors entered together, arm-demeaned): uncertainty
+  <!--v:part3.horserace_uncertainty_all-->+0.037<!--/v--> arm fraction per SD
+  (<!--v:part3.horserace_uncertainty_all_animals-->5<!--/v-->/5 animals), value
+  <!--v:part3.horserace_value_all-->−0.0012<!--/v--> (<!--v:part3.horserace_value_all_animals-->4<!--/v-->/5),
+  distance <!--v:part3.horserace_distance_all-->−0.014<!--/v--> (<!--v:part3.horserace_distance_all_animals-->5<!--/v-->/5),
+  recency <!--v:part3.horserace_recency_all-->+0.0026<!--/v--> (<!--v:part3.horserace_recency_all_animals-->3<!--/v-->/5);
+  median condition number <!--v:part3.horserace_condition_number_all-->3.09<!--/v-->, so the four separate.
+  The SWR and non-SWR splits are in `paper/reported/overview.md`.
 - **PENDING (not re-derived on the fraction response):** the
   recency-orthogonalized uncertainty effect, the recency VIF
-  decomposition, the within-arm value-by-uncertainty horse-race, the `Mvu` VIF diagnostics, and the
+  decomposition, the `Mvu` VIF diagnostics, and the
   per-arm realized-gain test. All were count-response fits; their numbers are
-  withdrawn until refit. The *design* conclusions they supported — that the
-  within-arm frame identifies value and uncertainty separately, and that the
+  withdrawn until refit. The *design* conclusion they supported — that the
   gain axis of content is epistemic uncertainty rather than realized
-  value-update — are retained as hypotheses, not as measurements.
+  value-update — is retained as a hypothesis, not as a measurement.
 
 ### SWR by arm value — near zero as a direct effect, negative as a total effect
 
@@ -561,8 +570,9 @@ discriminating fit does not.
 
 **Uncertainty-to-content vs their visit-recency bias (their Fig 7)** remains a
 distinction of *estimand* — theirs is between-arm binned recency, ours is
-within-arm — but the numeric within-arm horse-race backing it was a
-count-response fit and is **PENDING** re-derivation.
+within-arm. The within-arm horse-race backing it is re-derived on the fraction
+response: uncertainty <!--v:part3.horserace_uncertainty_all-->+0.037<!--/v--> against recency
+<!--v:part3.horserace_recency_all-->+0.0026<!--/v--> arm fraction per SD, entered together.
 
 The remaining structurally-novel axes (no Gillespie analog): the **SWR/non-SWR
 dissociation** and the **rate/intensity models** (they modeled content only).
@@ -667,14 +677,14 @@ with their estimand named.
 
 ## Unknown / pending — including the models we DON'T have
 
-- **Clean exploit-vs-explore content model — the within-arm frame, not yet refit.**
-  The design conclusion stands: within-arm (arm-demeaned, non-current-leaf) beta
-  value `reward_belief_mean_candidate_arm_preoutcome` and beta uncertainty
-  `reward_belief_variance_candidate_arm_preoutcome` are separately identifiable,
-  and no HMM value is needed (HMM retired). The **numbers** — the within-arm
-  horse-race coefficients and the `Mvu` conditioning diagnostics — were
-  count-response fits and are **PENDING** re-derivation on the per-event fraction
-  response before any of them can be quoted.
+- **Clean exploit-vs-explore content model — the within-arm frame.**
+  Within-arm (arm-demeaned, non-current-leaf) beta value
+  `reward_belief_mean_candidate_arm_preoutcome` and beta uncertainty
+  `reward_belief_variance_candidate_arm_preoutcome` are separately identifiable
+  (median condition number <!--v:part3.horserace_condition_number_all-->3.09<!--/v-->), and no HMM
+  value is needed (HMM retired). The horse-race coefficients are re-derived on the
+  per-event fraction response (`horserace_*` in Part 3). The `Mvu` conditioning
+  diagnostics were count-response fits and are still **PENDING** re-derivation.
 - **Full marked point process** (joint intensity + coupling + content; shared
   latent; power↔history independence). **Not built.** The three layers are treated as
   separable factors but never jointly fit.

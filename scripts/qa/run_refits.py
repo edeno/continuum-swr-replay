@@ -123,6 +123,7 @@ def _fig(name, cmd, deps=()):
 _PB = "scripts/rate/fit_per_bin_rate_models.py"
 _PS = "scripts/rate/fit_per_stop_rate_models.py"
 _RC = "scripts/rate/fit_swr_contrast_rate.py"
+_DA = "scripts/rate/fit_duration_aware_history_rate.py"
 _CL = "scripts/content/fit_replay_content_models.py"
 _KC = "scripts/content/fit_swr_contrast_content.py"
 _ES = "scripts/content/compare_event_source_models.py"
@@ -168,6 +169,10 @@ RUNS: tuple[Run, ...] = (
     _run("coupling.ripple_power", "scripts/coupling/fit_swr_power_model.py", 1, _RT),
     # No worker flag: its parallelism is BLAS threads.
     _run("rate.cross_history", "scripts/rate/fit_cross_history_rate.py --write", 8, _RTB, threads=8),
+    # The self- and cross-history on the at-risk design (bins inside an event dropped,
+    # history from event onsets and ends): per session, then pooled within animal.
+    _run("rate.duration_aware_history.at_well", f"{_DA} --mode session --workers 16", 16, _RTB),
+    _run("rate.duration_aware_history.pooled_at_well", f"{_DA} --mode pooled --workers 20", 20, _RTB),
     _fig("rate.fig.per_bin_ladder", "scripts/rate/plot_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
     _fig("rate.fig.per_bin_summary", "scripts/rate/plot_per_bin_rate_summary.py", ["rate.per_bin.at_well"]),
     _fig("rate.fig.model_checking", "scripts/rate/plot_model_checking.py", ["rate.per_bin.at_well"]),

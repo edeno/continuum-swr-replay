@@ -36,8 +36,6 @@ the lead's OK). Design: `docs/design/2026-10-26-reported-values-design.md`. Ever
 
 - Claim 19a: separately fitted SWR content leans more to the current arm (+0.88 vs +0.53) but the pooled
   SWR x current-arm contrast is negative (-0.41). The models disagree in sign; check before citing 19a.
-- `uncertainty_content/horserace_summary.csv` exists (242 sessions) but the docs still call the horse-race
-  pending; not migrated.
 - Retraction notes still quote the numbers they retract; the Part 3 agent treated them as dated records.
 - Claim 10's per-session quality output (`quality_summary.csv`, April, 218 epochs) predates the re-decode.
 - The three part worktrees (`continuum-swr-replay-reported-part{1,3,4}`) are merged and can be removed.
@@ -56,6 +54,18 @@ On simulation the current design reads non-overlap and end-locked fragmentation 
 burst and two-way cross coupling; the duration-aware design (opt-in `at_risk_events=`, `offset_history=`,
 `MODEL_CROSS_HISTORY_DURATION_RATE`) recovers each truth. Waiting on the lead: (1) pull the burst/refractory
 statements (claim 19c text) now; (2) run the real refit (measure duration log-SD first).
+Real refit done 2026-10-27/28 on the same branch (at-well only; review
+`.claude/docs/reviews/2026-10-27-duration-aware-history-refit/README.md`). Part 3 now carries the `history_*` values
+(runs `rate.duration_aware_history.at_well` and `.pooled_at_well`); the onset-only `rate_burst_*`,
+`rate_refractory_*` and `rate_raw_burst_*` values are kept but marked superseded. The proposed claim 19c text is in
+the agent's report; the claims table is not rewritten.
+
+## Part 3 additions (2026-10-28, branch `worktree-agent-ace075bd61a8ee966`, not merged)
+
+- Within-arm horse race migrated (`horserace_*`, claim 19g): `analyze_uncertainty_content.py` now writes a
+  provenance sidecar; its rerun reproduced `horserace_summary.csv` exactly. Docs no longer call it pending.
+- Next-choice fit (`choice_*`, claim 19d): `compare_event_source_models.py` now writes a provenance sidecar; its
+  rerun reproduced every `choice_*` value exactly, so their pending note is cleared.
 
 ## Trends across sessions (2026-10-26, exploratory)
 

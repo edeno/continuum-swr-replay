@@ -47,6 +47,10 @@ HISTCOS := hist_rcos_0 + hist_rcos_1 + hist_rcos_2 + hist_rcos_3  # raised-cosin
                                                                   # a 10-bin (150 ms) window
 CROSSCOS:= cross_hist_rcos_0 + ... + cross_hist_rcos_3            # HISTCOS over the OTHER stream's
                                                                   # onsets (cross-history coupling)
+OFFCOS  := offhist_rcos_0 + ... + offhist_rcos_3                  # HISTCOS over the stream's own
+                                                                  # event ENDS (duration-aware)
+XOFFCOS := cross_offhist_rcos_0 + ... + cross_offhist_rcos_3      # CROSSCOS over the other stream's
+                                                                  # event ENDS (duration-aware)
 ARMFE   := is_candidate_arm_0 + ... + is_candidate_arm_7          # arm 8 is reference
 RECSPL  := visit_recency_trials_event_leaf_centered_spline_{1,2,3}
            + is_candidate_arm_never_visited
@@ -278,6 +282,36 @@ drop and held-out bits per event).
 ```rungs
 Mself       count ~ BS_TC + REWBASIS + HISTCOS
 Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
+```
+
+## Cross-history coupling, duration-aware — per-bin Poisson (auxiliary)
+`scripts/rate/fit_duration_aware_history_rate.py` →
+`models_per_bin_rate/duration_aware_history_models.pkl` (per session, `--mode session`) and
+`duration_aware_history_pooled.pkl` (each animal's sessions stacked with a session fixed effect,
+`--mode pooled`), each with its `.provenance.json`.
+Simulation behind it: `analysis/replay/duration_history_simulation.py`, review
+`.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`.
+
+`MODEL_CROSS_HISTORY_DURATION_RATE` in `model_specs.py`. Events have duration
+and one detector's events never overlap, so these rungs are fit on the at-risk
+design: `aggregate_to_timebins(at_risk_events=<every event of the detector>,
+offset_history=True)` drops the bins inside an ongoing event and sets each bin's
+exposure to the time no event covers. History is measured from past events'
+onsets, their ends, or both (`*_history_anchors`), so an end-locked dependence
+(fragmentation) is not read as an onset-locked one. The fixed blocks are
+`Mnohist_dur` → `Mself_dur` → `Mselfcross_dur`; the one-anchor rungs give the
+onset-vs-offset contrasts. Self-history rungs are fit on all four populations
+(detected SWR, at risk outside Kay SWRs; the non-local ones, at risk outside
+non-local events); the cross rungs on the two non-local streams.
+
+```rungs
+Mnohist_dur            count ~ BS_TC + REWBASIS
+Mself_onset_dur        count ~ BS_TC + REWBASIS + HISTCOS
+Mself_offset_dur       count ~ BS_TC + REWBASIS + OFFCOS
+Mself_dur              count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS
+Mselfcross_onset_dur   count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS
+Mselfcross_offset_dur  count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + XOFFCOS
+Mselfcross_dur         count ~ BS_TC + REWBASIS + HISTCOS + OFFCOS + CROSSCOS + XOFFCOS
 ```
 
 ## Per-stop rate — Family A
