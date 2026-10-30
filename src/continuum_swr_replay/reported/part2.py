@@ -23,7 +23,17 @@ refitted here. The inputs (:class:`Part2Inputs`):
   ``scripts/detection/measure_event_start_and_rest_theta.py``);
 - the nested bootstrap of the property contrasts
   (``Processed-Data/event_property_bootstrap``, from
-  ``scripts/detection/bootstrap_event_properties.py``).
+  ``scripts/detection/bootstrap_event_properties.py``);
+- the brain-state reference (``Processed-Data/brain_state_reference``, from
+  ``scripts/detection/measure_brain_state_reference.py``) and the two gamma
+  passes of ``scripts/detection/measure_event_gamma.py``: the z-scored gamma per
+  event and epoch (``Processed-Data/event_gamma``) and the band power's change
+  against quiet rest in dB (``Processed-Data/event_gamma_power``).
+
+Each derived output above that reads the canonical event table records the
+table's SHA-256 in its manifest; an output made from another table than the
+current one, or recording none, makes the values read from it pending
+(:func:`event_table_staleness`).
 
 Pooled values sum events over sessions and animals; "animals in direction"
 counts the animals whose own value points the way the claim states.
@@ -31,15 +41,19 @@ counts the animals whose own value points the way the claim states.
 
 from __future__ import annotations
 
+import hashlib
 import json
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from continuum_swr_replay import intervals
+from continuum_swr_replay.analysis.hippocampus.property_contrast import (
+    MAX_NAN_REPLICATE_SHARE,
+)
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
@@ -152,6 +166,49 @@ def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...
         )
 
     return make
+
+
+def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str | None:
+    """Why an output made from the canonical event table is stale, or None.
+
+    ``manifest`` records the table's SHA-256 under ``event_table`` or
+    ``inputs.event_table``; an output recording none cannot be tied to the
+    current table and is treated as stale.
+    """
+    recorded = (
+        manifest.get("event_table")
+        or manifest.get("inputs", {}).get("event_table")
+        or {}
+    ).get("sha256")
+    if recorded is None:
+        return f"{what} records no event-table SHA-256; rerun it before citing"
+    if recorded != current_sha256:
+        return (
+            f"{what} was made from another event table than the current one "
+            f"(sha256 {recorded[:12]}, current {current_sha256[:12]}); rerun it "
+            "before citing"
+        )
+    return None
+
+
+def pend(
+    values: Iterable[Value],
+    note: str | None,
+    selected: Callable[[Value], bool] = lambda value: True,
+) -> list[Value]:
+    """``values`` with ``note`` added to the pending note of the selected ones."""
+    if note is None:
+        return list(values)
+    return [
+        replace(v, pending=note if v.pending is None else f"{v.pending}; {note}")
+        if selected(v)
+        else v
+        for v in values
+    ]
+
+
+def _manifest(folder: Path) -> dict:
+    return json.loads((folder / "manifest.json").read_text())
 
 
 # --- 2a: how common the events are, and how they sit against SWRs ------------
@@ -781,7 +838,11 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
         for group in ("non_swr", "swr"):
             name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
             column = f"{word}_db_{group}"
-            rows = reference.dropna(subset=[column])
+            if reference[column].isna().any():
+                raise ValueError(
+                    f"{int(reference[column].isna().sum())} epochs have no {column}"
+                )
+            rows = reference
             per_animal = rows.groupby("animal")[column].median()
             values += [
                 make(
@@ -1327,11 +1388,23 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
         raise ValueError(
             f"the bootstrap holds {sorted(intervals.index)}, not Part 2's properties"
         )
+    nan_columns = [c for c in intervals.columns if c.endswith("_nan_replicates")]
+    if not nan_columns:
+        raise ValueError("the bootstrap does not count its replicates without estimate")
+    share = intervals[nan_columns].div(intervals["n_replicates"], axis=0)
+    if (share > MAX_NAN_REPLICATE_SHARE).any(axis=None):
+        raise ValueError(f"too many bootstrap replicates without estimate:\n{share}")
     values: list[Value] = []
     for word, _, _, unit, _, _, claims, used_in in _PROPERTIES:
         make = _value_factory(source, claims, used_in)
         row = intervals.loc[word]
         name = _PROPERTY_NAMES[word]
+        skipped = (
+            f"; {row.matched_replicates_skipping_strata:.0f} of "
+            f"{row.n_replicates:.0f} replicates left out a stratum that drew no "
+            f"event of a class, {row.matched_difference_nan_replicates:.0f} had no "
+            "estimate"
+        )
         values += [
             make(
                 f"{word}_difference_low",
@@ -1368,7 +1441,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 row.matched_difference_low,
                 "quantity",
                 "sig2s",
-                "lower bound of its 95 % nested-bootstrap interval",
+                f"lower bound of its 95 % nested-bootstrap interval{skipped}",
                 unit,
             ),
             make(
@@ -1391,13 +1464,18 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
     drawn uniformly in its epoch; a window is theta-like when its mean theta
     reaches the epoch's median running theta, as an event is. The reference
     share of a class is the mean over its events of their windows' theta-like
-    share, so it carries the class's durations. Events whose length no rest
-    stretch of their epoch holds have no windows and are left out of both.
+    share, so it carries the class's durations. Every event must have its
+    windows: an event whose length no rest stretch of its epoch holds would
+    have none, and raises rather than leaving the comparison silently.
     """
     make = _value_factory(source, ("5",), ("paper",))
-    usable = events[events.rest_windows > 0]
-    usable = usable.assign(
-        theta_like=usable.theta_z >= usable.theta_running_median,
+    if (events.rest_windows <= 0).any():
+        raise ValueError(
+            f"{int((events.rest_windows <= 0).sum())} events have no duration-matched "
+            "quiet-rest window"
+        )
+    usable = events.assign(
+        theta_like=events.theta_z >= events.theta_running_median,
     )
     values: list[Value] = []
     for group, is_swr in (("non_swr", False), ("swr", True)):
@@ -1494,6 +1572,11 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
     summary = Summary(part=2, produced_by=produced_by, commit=commit)
 
     events = pd.read_parquet(inputs.event_table)
+    current_sha256 = hashlib.sha256(inputs.event_table.read_bytes()).hexdigest()
+
+    def stale(folder: Path) -> str | None:
+        return event_table_staleness(_manifest(folder), current_sha256, rel(folder))
+
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*event_cohort_values(events, source))
     summary.add(*boundary_offset_values(events, source))
@@ -1516,18 +1599,30 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
         f"{source} and {rel(inputs.event_start_rest_theta)} "
         "(scripts/detection/measure_event_start_and_rest_theta.py)"
     )
-    summary.add(*property_values(events_with_extras, extras_source))
-    summary.add(*rest_theta_values(events_with_extras, extras_source))
+    extras_stale = stale(inputs.event_start_rest_theta)
+    summary.add(
+        *pend(
+            property_values(events_with_extras, extras_source),
+            extras_stale,
+            lambda v: v.key.startswith("start_distance_"),
+        )
+    )
+    summary.add(
+        *pend(rest_theta_values(events_with_extras, extras_source), extras_stale)
+    )
     summary.inputs += [
         files_record("*.parquet", extra_paths, ROOT_DIR),
         file_record(inputs.event_start_rest_theta / "manifest.json", ROOT_DIR),
     ]
     intervals = pd.read_csv(inputs.property_bootstrap / "intervals.csv", index_col=0)
     summary.add(
-        *property_interval_values(
-            intervals,
-            f"{rel(inputs.property_bootstrap)} "
-            "(scripts/detection/bootstrap_event_properties.py)",
+        *pend(
+            property_interval_values(
+                intervals,
+                f"{rel(inputs.property_bootstrap)} "
+                "(scripts/detection/bootstrap_event_properties.py)",
+            ),
+            stale(inputs.property_bootstrap),
         )
     )
     summary.inputs += [
@@ -1555,24 +1650,34 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
     if events_with_gamma[["slow_gamma_z", "fast_gamma_z"]].isna().all(axis=1).any():
         raise ValueError("an event has no gamma value")
     summary.add(
-        *brain_state_values(
-            events_with_gamma,
-            reference,
-            f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) and "
-            f"{rel(inputs.brain_state_reference)} (scripts/detection/"
-            "measure_brain_state_reference.py) and the gamma pass "
-            f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)",
+        *pend(
+            brain_state_values(
+                events_with_gamma,
+                reference,
+                f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) "
+                f"and {rel(inputs.brain_state_reference)} (scripts/detection/"
+                "measure_brain_state_reference.py) and the gamma pass "
+                f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)",
+            ),
+            stale(inputs.event_gamma),
+            lambda v: v.key.startswith(("slow_gamma_", "fast_gamma_")),
         )
     )
-    summary.inputs.append(file_record(inputs.brain_state_reference, ROOT_DIR))
+    summary.inputs += [
+        file_record(inputs.brain_state_reference, ROOT_DIR),
+        file_record(inputs.event_gamma / "manifest.json", ROOT_DIR),
+    ]
     gamma_power = pd.read_parquet(inputs.event_gamma_power / "reference.parquet")
     if len(gamma_power) != REALITY_EPOCHS:
         raise ValueError(f"{inputs.event_gamma_power} does not hold every epoch")
     summary.add(
-        *gamma_db_values(
-            gamma_power,
-            f"{rel(inputs.event_gamma_power)}/reference.parquet "
-            "(scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+        *pend(
+            gamma_db_values(
+                gamma_power,
+                f"{rel(inputs.event_gamma_power)}/reference.parquet "
+                "(scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+            ),
+            stale(inputs.event_gamma_power),
         )
     )
     summary.inputs += [
@@ -1654,10 +1759,19 @@ def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
         f"event table, event features run {EVENT_FEATURES_RUN}, the decode frames and "
         "the spike-evidence run)"
     )
+    class_stale = stale(folder)
     summary.add(
-        *class_distribution_values(pd.read_csv(folder / "distribution.csv"), source)
+        *pend(
+            class_distribution_values(pd.read_csv(folder / "distribution.csv"), source),
+            class_stale,
+        )
     )
-    summary.add(*class_step_values(pd.read_csv(folder / "step_fits.csv"), source))
+    summary.add(
+        *pend(
+            class_step_values(pd.read_csv(folder / "step_fits.csv"), source),
+            class_stale,
+        )
+    )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
     return summary
 

@@ -1,4 +1,4 @@
-"""Slow- and fast-gamma power of CA1, z-scored per epoch, on the decode grid.
+"""Slow- and fast-gamma power of CA1 on the decode grid: z-scored per epoch, and its change against quiet rest in dB (``power_change_db``).
 
 Is a non-local event accompanied by a rise in slow gamma (CA3 input) or fast
 gamma (entorhinal input; Colgin et al., 2009, *Nature* 462:353)? This gives
@@ -12,6 +12,9 @@ z-scored signals (``theta_power_zscore``, ``SWR_zscore``):
    over the kept tetrodes.
 3. It is z-scored over the decode span outside excluded time, and read onto the
    decode grid by linear interpolation.
+4. On the band power itself (not z), :func:`power_change_db` gives a class of
+   events' change against the epoch's quiet rest:
+   ``10 log10(mean power over the events' samples / mean power over rest)``.
 
 The fast band stops at 100 Hz, below Colgin's upper bound (about 140 Hz), to
 keep clear of the ripple band (150-250 Hz) and of the broadband rise spikes
