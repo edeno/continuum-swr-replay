@@ -2589,3 +2589,31 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction` |  | 28 % |
 | `paper/reported/overview.md` | `part4.marked_strength_ripple_power_swr_replay_heldout_gain_fraction` |  | 26 % |
 | `paper/reported/overview.md` | `part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction` |  | 27 % |
+
+## 2026-10-30
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/claims_table.md` | `part3.history_fits` | 20 | 19 |
+| `paper/claims_table.md` | `part3.history_cross_end_rr_non_swr_from_swr` | 2.28 | 2.42 |
+| `paper/claims_table.md` | `part3.history_cross_session_gain_non_swr_from_swr` | −6.1 | −3.4 |
+| `paper/claims_table.md` | `part3.history_cross_session_gain_swr_from_non_swr` | −5.5 | −4.7 |
+| `paper/reported/overview.md` | `part2.reversals_matched_difference_low` | +0.92 | +0.94 |
+| `paper/reported/overview.md` | `part2.arms_matched_difference` | +0.99 | +0.98 |
+| `paper/reported/overview.md` | `part2.arms_matched_difference_low` | +0.81 | +0.82 |
+| `paper/reported/overview.md` | `part2.peak_matched_difference` | −0.092 | −0.091 |
+| `paper/reported/overview.md` | `part2.peak_matched_difference_high` | −0.033 | −0.032 |
+| `paper/reported/overview.md` | `part2.hpd_matched_difference_low` | −1.5 | −1.3 |
+| `paper/reported/overview.md` | `part2.start_distance_matched_difference_high` | +3.8 | +4.1 |
+| `paper/reported/overview.md` | `part3.history_fits` | 20 | 19 |
+| `paper/reported/overview.md` | `part3.history_cross_end_rr_non_swr_from_swr` | 2.28 | 2.42 |
+| `paper/reported/overview.md` | `part3.history_cross_end_animals_non_swr_from_swr` | 5 | 4 |
+| `paper/reported/overview.md` | `part3.history_cross_session_gain_non_swr_from_swr` | −6.1 | −3.4 |
+| `paper/reported/overview.md` | `part3.history_cross_session_gain_swr_from_non_swr` | −5.5 | −4.7 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_swr_replay_increase_ci_high` | 1.14 | 1.15 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_ci_low` | 1.01 | 1.00 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_ci_high` | 1.11 | 1.12 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_increase_all_units_ci_high` | 1.07 | 1.08 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_low` | 0.97 | 0.95 |
+| `paper/reported/overview.md` | `part4.stop_context_reward_gain_non_swr_replay_decrease_ci_high` | 1.04 | 1.06 |
+| `paper/reported/overview.md` | `part4.stop_context_switch_gain_non_swr_replay_increase_ci_low` | 0.98 | 0.97 |
