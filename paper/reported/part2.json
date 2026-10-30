@@ -3,100 +3,104 @@
  "part": 2,
  "title": "the events",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "b13d7c9ad54f",
+ "commit": "bfb20f359f8f",
  "inputs": [
   {
-   "path": "Processed-Data/replay_content/event_table.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet",
    "sha256": "19d407a6bdd381b86d71a5cff2e904665431d35dec2d490cbadb4dee19452f48"
   },
   {
-   "path": "Processed-Data/event_start_rest_theta/*.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta/*.parquet",
    "n_files": 242,
    "sha256": "7703cce2df66ed957c7c160e0050f2dc8c0bc0eba2add4e9fc0af4047c3f7d10"
   },
   {
-   "path": "Processed-Data/event_start_rest_theta/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta/manifest.json",
    "sha256": "7af49df1193c02c031e972bb380c8e0696132de58043530a3ee22813dc611fb0"
   },
   {
-   "path": "Processed-Data/event_property_bootstrap/intervals.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap/intervals.csv",
    "sha256": "d7b8c27a1cca74868b71ba2b87ac4baf302aaeb5c1b45cc7e790354cf492d6fd"
   },
   {
-   "path": "Processed-Data/event_property_bootstrap/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap/manifest.json",
    "sha256": "ef0ddfadea03733f048567516e4fc5a2d59a75d6e416d10c528c9c4394fc634f"
   },
   {
-   "path": "Processed-Data/brain_state_reference/reference.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet",
    "sha256": "f7120f54f539fc6afe114f9c25b60487822c6f25b3347ee083566dc7bb2e4f54"
   },
   {
-   "path": "Processed-Data/event_gamma/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/manifest.json",
    "sha256": "1b3bc6f40e5c4a53969d83fd8113ac4cd3969a21909f40967fd6ff44f865c7d8"
   },
   {
-   "path": "Processed-Data/event_gamma_power/reference.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet",
    "sha256": "253abe749df602af0f91aad47c93778765cd0188ec5c0c7a77810e883eb6fd29"
   },
   {
-   "path": "Processed-Data/event_gamma_power/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/manifest.json",
    "sha256": "3656684da13e79c0c513ee2ff9fa2eca0f588912710d4b6bbb4f60d207fb7ba2"
   },
   {
-   "path": "Processed-Data/event_gamma/*_events.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma/*_events.parquet",
    "n_files": 242,
    "sha256": "4c7fabece8e648c85f0da19f623c16b798414bf38073098deb925fddb0332d50"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_features.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_features.parquet",
    "n_files": 242,
    "sha256": "7045d747c109d3af1485cc0455f981c717e3c6e365b41bb5a14242e19cab5561"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/counts_by_animal.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/counts_by_animal.csv",
    "sha256": "88d2e4bc011cc2ad5831084e646dac50e82b110f3a795999ac1837d22dc1f612"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/cells_by_animal.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/cells_by_animal.csv",
    "sha256": "343e537122112e3578b58ade3ca0f3df121dccfe6749ec06085a8b4649d0b0d3"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_state_shares.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_state_shares.parquet",
    "n_files": 242,
    "sha256": "715bc3b57216c0aa77016de5de5727bb9143d3c0f6fbea21c7c3f20bd86d9810"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_pair_membership.parquet",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/event_features/30cf1cc432e9/*_pair_membership.parquet",
    "n_files": 242,
    "sha256": "2040d219e96588591df50444ad8d8bfaee94190a750db062037f5bee7a2948de"
   },
   {
-   "path": "Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/directional_by_animal.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report/directional_by_animal.csv",
    "sha256": "19a36645f549d0fba071e773ba57f874df53e339b643d99dfd311d14f3094d6d"
   },
   {
    "path": "paper/figures/reality_all/per_epoch/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
    "n_files": 242,
-   "sha256": "dc5c47d2c37fab035c68754a38c0ddccfbb075b35c92df73d0f1d5e75c7b23e5"
+   "sha256": "c985e57fe55be40732bb1b3bc31515d04777bfbc1d5efce334ce149280e2b861"
   },
   {
-   "path": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "sha256": "4e59295db93cd9b4f01e2e7a29a242e0ca8fcadbe775c73854c22017fd50f11c"
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "sha256": "5f2ac0961a93ef25c5fdb89f503729ed3ac16098760d13e36b682dc50b73bc71"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr.provenance.json",
+   "sha256": "c271a902f07b5eab5ea3cbb1691ae726741f58028f21aac8b9417ccd5d116dcf"
   },
   {
    "path": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/distribution.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure/distribution.csv",
    "sha256": "57f6c311acca5da0023d27ec607d14799fff07d5449fee947ffda70ed74d4903"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/step_fits.csv",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure/step_fits.csv",
    "sha256": "4c1f5cce6cb492bec3ab3d60aa893c3a7cb29a8d2bfec181a2a394571146401d"
   },
   {
-   "path": "Processed-Data/ripple_class_structure/manifest.json",
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure/manifest.json",
    "sha256": "d8840cf38caa08dfe99d784d58715c00800f234bde28ba14251f122b627153ef"
   }
  ],
@@ -115,7 +119,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "animals_non_swr_majority": {
@@ -132,7 +136,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "animals_non_swr_more_at_well": {
@@ -166,7 +170,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "arms_animals_in_direction": {
@@ -182,7 +186,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "arms_difference_high": {
@@ -198,7 +202,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "arms_difference_low": {
@@ -214,7 +218,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "arms_matched_difference": {
@@ -230,7 +234,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "arms_matched_difference_high": {
@@ -246,7 +250,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "arms_matched_difference_low": {
@@ -262,7 +266,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "arms_median_non_swr": {
@@ -278,7 +282,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "arms_median_swr": {
@@ -294,11 +298,11 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "baseline_dll_per_spike_median": {
-   "value": -0.004568513948470354,
+   "value": -0.0021713078022003174,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -315,7 +319,7 @@
    "pending": null
   },
   "baseline_gpi_distance_median_cm": {
-   "value": 100.43956984531246,
+   "value": 100.40865229520087,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -330,7 +334,7 @@
    "pending": null
   },
   "baseline_scored": {
-   "value": 24890,
+   "value": 25167,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -583,7 +587,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "duration_difference_high": {
@@ -598,7 +602,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "duration_difference_low": {
@@ -613,7 +617,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "duration_median_non_swr": {
@@ -628,7 +632,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "duration_median_swr": {
@@ -643,7 +647,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "end_offset_median_ms": {
@@ -659,7 +663,7 @@
     "paper",
     "figure: 2d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "epochs": {
@@ -676,7 +680,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "evidence_animals": {
@@ -728,7 +732,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "extent_difference_high": {
@@ -744,7 +748,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "extent_difference_low": {
@@ -760,7 +764,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "extent_matched_difference": {
@@ -776,7 +780,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "extent_matched_difference_high": {
@@ -792,7 +796,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "extent_matched_difference_low": {
@@ -808,7 +812,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "extent_median_non_swr": {
@@ -824,7 +828,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "extent_median_swr": {
@@ -840,7 +844,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "fast_gamma_animals_above_rest_non_swr": {
@@ -855,7 +859,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_animals_above_rest_swr": {
@@ -870,7 +874,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_animals_below_running_non_swr": {
@@ -885,7 +889,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_animals_below_running_swr": {
@@ -900,7 +904,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_db_animals_above_rest_non_swr": {
@@ -915,7 +919,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "fast_gamma_db_animals_above_rest_swr": {
@@ -930,7 +934,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "fast_gamma_db_median_non_swr": {
@@ -945,7 +949,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "fast_gamma_db_median_swr": {
@@ -960,7 +964,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "fast_gamma_median_non_swr": {
@@ -975,7 +979,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_median_swr": {
@@ -990,7 +994,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_rest_reference": {
@@ -1005,7 +1009,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "fast_gamma_running_reference": {
@@ -1020,7 +1024,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "heldout_non_swr_animals": {
@@ -1036,8 +1040,8 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_non_swr_animals_positive": {
    "value": 5,
@@ -1052,11 +1056,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_non_swr_per_spike": {
-   "value": 0.2010162119243848,
+   "value": 0.2018734824246966,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1068,11 +1072,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_non_swr_per_spike_ci_high": {
-   "value": 0.2456243894670809,
+   "value": 0.2429086221203311,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1084,11 +1088,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_non_swr_per_spike_ci_low": {
-   "value": 0.1564080343816887,
+   "value": 0.1608383427290622,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1100,8 +1104,8 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_swr_animals": {
    "value": 5,
@@ -1116,8 +1120,8 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_swr_animals_positive": {
    "value": 5,
@@ -1132,11 +1136,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_swr_per_spike": {
-   "value": 0.5976333351694096,
+   "value": 0.5956347689353638,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1148,11 +1152,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_swr_per_spike_ci_high": {
-   "value": 0.7431123493144657,
+   "value": 0.7412883605773628,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1164,11 +1168,11 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "heldout_swr_per_spike_ci_low": {
-   "value": 0.4521543210243536,
+   "value": 0.4499811772933648,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -1180,8 +1184,8 @@
     "paper",
     "figure: spike support"
    ],
-   "source": ".claude/research/refresh_followup/f1_outputs/full240_nl_bouts_by_swr_stats.csv",
-   "pending": "computed by an untracked research script (.claude/research/refresh_followup/f1_scripts/state_evidence_by_swr.py); promote it to a tracked script before citing"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
+   "pending": null
   },
   "hpd_animals_in_direction": {
    "value": 4,
@@ -1195,7 +1199,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "hpd_difference_high": {
@@ -1210,7 +1214,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "hpd_difference_low": {
@@ -1225,7 +1229,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "hpd_matched_difference": {
@@ -1240,7 +1244,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "hpd_matched_difference_high": {
@@ -1255,7 +1259,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "hpd_matched_difference_low": {
@@ -1270,7 +1274,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "hpd_median_non_swr": {
@@ -1285,7 +1289,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "hpd_median_swr": {
@@ -1300,7 +1304,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "karlsson_events": {
@@ -1747,7 +1751,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "max_step_animals_in_direction": {
@@ -1763,7 +1767,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "max_step_difference_high": {
@@ -1779,7 +1783,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "max_step_difference_low": {
@@ -1795,7 +1799,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "max_step_matched_difference": {
@@ -1811,7 +1815,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "max_step_matched_difference_high": {
@@ -1827,7 +1831,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "max_step_matched_difference_low": {
@@ -1843,7 +1847,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "max_step_median_non_swr": {
@@ -1859,7 +1863,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "max_step_median_swr": {
@@ -1875,7 +1879,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "mua_animals_above_rest_non_swr": {
@@ -1890,7 +1894,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_animals_above_rest_swr": {
@@ -1905,7 +1909,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_animals_below_running_non_swr": {
@@ -1920,7 +1924,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_animals_below_running_swr": {
@@ -1935,7 +1939,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_events": {
@@ -1966,7 +1970,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_median_swr": {
@@ -1981,7 +1985,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_no_nonlocal_fraction": {
@@ -2172,7 +2176,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "mua_running_reference": {
@@ -2187,7 +2191,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "multimodal_animals_in_direction": {
@@ -2202,7 +2206,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "multimodal_difference_high": {
@@ -2217,7 +2221,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "multimodal_difference_low": {
@@ -2232,7 +2236,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "multimodal_matched_difference": {
@@ -2247,7 +2251,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "multimodal_matched_difference_high": {
@@ -2262,7 +2266,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "multimodal_matched_difference_low": {
@@ -2277,7 +2281,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "multimodal_median_non_swr": {
@@ -2292,7 +2296,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "multimodal_median_swr": {
@@ -2307,7 +2311,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "non_swr_close_animals_above_baseline": {
@@ -2327,7 +2331,7 @@
    "pending": null
   },
   "non_swr_close_dll_per_spike_median": {
-   "value": 0.466031014919281,
+   "value": 0.48689698531032766,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -2408,7 +2412,7 @@
    "pending": null
   },
   "non_swr_close_spikes_median": {
-   "value": 42.0,
+   "value": 44.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -2538,7 +2542,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "non_swr_fraction_animal_max": {
@@ -2555,7 +2559,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "non_swr_fraction_animal_min": {
@@ -2572,7 +2576,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "non_swr_remote_animals_above_baseline": {
@@ -2592,7 +2596,7 @@
    "pending": null
   },
   "non_swr_remote_dll_per_spike_median": {
-   "value": 0.6851800680160522,
+   "value": 0.7071316480636597,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -2640,7 +2644,7 @@
    "pending": null
   },
   "non_swr_remote_gpi_distance_median_cm": {
-   "value": 96.72020822347216,
+   "value": 96.72413442794357,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -2655,7 +2659,7 @@
    "pending": null
   },
   "non_swr_remote_scored": {
-   "value": 24076,
+   "value": 24079,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2673,7 +2677,7 @@
    "pending": null
   },
   "non_swr_remote_spikes_median": {
-   "value": 34.0,
+   "value": 36.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -2689,7 +2693,7 @@
    "pending": null
   },
   "non_swr_remote_tetrodes_median": {
-   "value": 10.0,
+   "value": 11.0,
    "kind": "quantity",
    "style": "int",
    "unit": "tetrodes",
@@ -2718,7 +2722,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "nonlocal_events_non_swr": {
@@ -2735,7 +2739,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "nonlocal_events_outside_kay": {
@@ -2752,7 +2756,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_kay_fraction": {
@@ -2769,7 +2773,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_kay_per_hour": {
@@ -2786,7 +2790,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_trigger": {
@@ -2803,7 +2807,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_trigger_fraction": {
@@ -2820,7 +2824,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_trigger_per_hour": {
@@ -2837,7 +2841,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_widloski": {
@@ -2854,7 +2858,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_widloski_fraction": {
@@ -2871,7 +2875,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_outside_widloski_per_hour": {
@@ -2888,7 +2892,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_events_swr_contained": {
@@ -2905,7 +2909,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "nonlocal_events_swr_partial": {
@@ -2922,7 +2926,7 @@
     "paper",
     "figure: 2b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "nonlocal_time_outside_kay_fraction": {
@@ -2939,7 +2943,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_kay_s": {
@@ -2956,7 +2960,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_swr_fraction": {
@@ -2973,7 +2977,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_swr_s": {
@@ -2990,7 +2994,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_trigger_fraction": {
@@ -3007,7 +3011,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_trigger_s": {
@@ -3024,7 +3028,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_widloski_fraction": {
@@ -3041,7 +3045,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_outside_widloski_s": {
@@ -3058,7 +3062,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "nonlocal_time_s": {
@@ -3075,7 +3079,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "occupancy_epochs": {
@@ -3108,7 +3112,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "pause_difference_high": {
@@ -3124,7 +3128,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "pause_difference_low": {
@@ -3140,7 +3144,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "pause_matched_difference": {
@@ -3156,7 +3160,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "pause_matched_difference_high": {
@@ -3172,7 +3176,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "pause_matched_difference_low": {
@@ -3188,7 +3192,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "pause_median_non_swr": {
@@ -3204,7 +3208,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "pause_median_swr": {
@@ -3220,7 +3224,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "peak_animals_in_direction": {
@@ -3235,7 +3239,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "peak_difference_high": {
@@ -3250,7 +3254,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "peak_difference_low": {
@@ -3265,7 +3269,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "peak_matched_difference": {
@@ -3280,7 +3284,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "peak_matched_difference_high": {
@@ -3295,7 +3299,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "peak_matched_difference_low": {
@@ -3310,7 +3314,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "peak_median_non_swr": {
@@ -3325,7 +3329,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "peak_median_swr": {
@@ -3340,7 +3344,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "rest_hours": {
@@ -3357,7 +3361,7 @@
     "paper",
     "figure: main, left out"
    ],
-   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
+   "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
   },
   "reversals_animals_in_direction": {
@@ -3373,7 +3377,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "reversals_difference_high": {
@@ -3389,7 +3393,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "reversals_difference_low": {
@@ -3405,7 +3409,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "reversals_matched_difference": {
@@ -3421,7 +3425,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "reversals_matched_difference_high": {
@@ -3437,7 +3441,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "reversals_matched_difference_low": {
@@ -3453,7 +3457,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "reversals_median_non_swr": {
@@ -3469,7 +3473,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "reversals_median_swr": {
@@ -3485,7 +3489,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "ripple_animals_above_rest_non_swr": {
@@ -3502,7 +3506,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_animals_above_rest_swr": {
@@ -3519,7 +3523,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_animals_below_running_non_swr": {
@@ -3536,7 +3540,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_animals_below_running_swr": {
@@ -3553,7 +3557,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_median_non_swr": {
@@ -3570,7 +3574,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_median_swr": {
@@ -3587,7 +3591,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_peak_animals_unimodal": {
@@ -3603,7 +3607,7 @@
     "supplement",
     "figure: one class or two"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "ripple_peak_mode_animal_max": {
@@ -3619,7 +3623,7 @@
     "supplement",
     "figure: one class or two"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "ripple_peak_mode_animal_min": {
@@ -3635,7 +3639,7 @@
     "supplement",
     "figure: one class or two"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "ripple_rest_reference": {
@@ -3652,7 +3656,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "ripple_running_reference": {
@@ -3669,7 +3673,7 @@
     "paper",
     "figure: 3b"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_animals_above_rest_non_swr": {
@@ -3684,7 +3688,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_animals_above_rest_swr": {
@@ -3699,7 +3703,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_animals_below_running_non_swr": {
@@ -3714,7 +3718,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_animals_below_running_swr": {
@@ -3729,7 +3733,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_db_animals_above_rest_non_swr": {
@@ -3744,7 +3748,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "slow_gamma_db_animals_above_rest_swr": {
@@ -3759,7 +3763,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "slow_gamma_db_median_non_swr": {
@@ -3774,7 +3778,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "slow_gamma_db_median_swr": {
@@ -3789,7 +3793,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)",
    "pending": null
   },
   "slow_gamma_median_non_swr": {
@@ -3804,7 +3808,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_median_swr": {
@@ -3819,7 +3823,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_rest_reference": {
@@ -3834,7 +3838,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "slow_gamma_running_reference": {
@@ -3849,7 +3853,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "speed_animals_in_direction": {
@@ -3865,7 +3869,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "speed_difference_high": {
@@ -3881,7 +3885,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "speed_difference_low": {
@@ -3897,7 +3901,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "speed_matched_difference": {
@@ -3913,7 +3917,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "speed_matched_difference_high": {
@@ -3929,7 +3933,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "speed_matched_difference_low": {
@@ -3945,7 +3949,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "speed_median_non_swr": {
@@ -3961,7 +3965,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "speed_median_swr": {
@@ -3977,7 +3981,7 @@
     "paper",
     "figure: 3c"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "start_distance_animals_in_direction": {
@@ -3993,7 +3997,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "start_distance_difference_high": {
@@ -4009,7 +4013,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "start_distance_difference_low": {
@@ -4025,7 +4029,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "start_distance_matched_difference": {
@@ -4041,7 +4045,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "start_distance_matched_difference_high": {
@@ -4057,7 +4061,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "start_distance_matched_difference_low": {
@@ -4073,7 +4077,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)",
    "pending": null
   },
   "start_distance_median_non_swr": {
@@ -4089,7 +4093,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "start_distance_median_swr": {
@@ -4105,7 +4109,7 @@
     "paper",
     "figure: 3"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "start_offset_median_ms": {
@@ -4121,7 +4125,7 @@
     "paper",
     "figure: 2d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "step_evidence_criterion_animals": {
@@ -4137,7 +4141,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "step_evidence_criterion_animals_same_sign": {
@@ -4153,7 +4157,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "step_evidence_criterion_share_median": {
@@ -4169,7 +4173,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "step_other_properties_criterion_animals_max": {
@@ -4188,7 +4192,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
   },
   "swr_content_at_well_fraction": {
@@ -4289,7 +4293,7 @@
     "paper",
     "figure: 2d"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)",
    "pending": null
   },
   "swr_remote_animals_above_baseline": {
@@ -4309,7 +4313,7 @@
    "pending": null
   },
   "swr_remote_dll_per_spike_median": {
-   "value": 1.1743625402450562,
+   "value": 1.1822706526191673,
    "kind": "quantity",
    "style": "dec2",
    "unit": "nats per spike",
@@ -4357,7 +4361,7 @@
    "pending": null
   },
   "swr_remote_gpi_distance_median_cm": {
-   "value": 81.46319856201036,
+   "value": 81.5350159411854,
    "kind": "quantity",
    "style": "int",
    "unit": "cm",
@@ -4372,7 +4376,7 @@
    "pending": null
   },
   "swr_remote_scored": {
-   "value": 20862,
+   "value": 20879,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -4390,7 +4394,7 @@
    "pending": null
   },
   "swr_remote_spikes_median": {
-   "value": 116.0,
+   "value": 118.0,
    "kind": "quantity",
    "style": "int",
    "unit": "spikes",
@@ -4433,7 +4437,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_animals_above_rest_swr": {
@@ -4448,7 +4452,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_animals_below_running_non_swr": {
@@ -4463,7 +4467,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_animals_below_running_swr": {
@@ -4478,7 +4482,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_like_animals_above_rest_matched_non_swr": {
@@ -4493,7 +4497,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "theta_like_animals_above_rest_matched_swr": {
@@ -4508,7 +4512,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "theta_like_fraction_non_swr": {
@@ -4523,7 +4527,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_like_fraction_rest_matched_non_swr": {
@@ -4538,7 +4542,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "theta_like_fraction_rest_matched_swr": {
@@ -4553,7 +4557,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
    "pending": null
   },
   "theta_like_fraction_swr": {
@@ -4568,7 +4572,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_median_non_swr": {
@@ -4583,7 +4587,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_median_swr": {
@@ -4598,7 +4602,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_rest_reference": {
@@ -4613,7 +4617,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "theta_running_reference": {
@@ -4628,7 +4632,7 @@
    "used_in": [
     "supplement"
    ],
-   "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
    "pending": null
   },
   "widloski_criteria_events": {
