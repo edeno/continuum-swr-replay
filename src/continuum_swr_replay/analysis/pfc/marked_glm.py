@@ -344,10 +344,14 @@ def build_baseline_columns(
     reference_well: int = BASELINE_REFERENCE_WELL,
     context_columns: tuple[str, ...] = (),
 ) -> tuple[NDArray, tuple[str, ...], dict[str, Any]]:
-    """Per-stop, unpenalized baseline columns on the fitted bins.
+    """Per-stop baseline columns on the fitted bins.
 
-    Every fitted bin is mapped to the cohort stop that contains it. The columns
-    are an indicator per kept well other than the reference, then
+    The columns are free in this module's fits; in the marked family they are
+    free unless ``baseline_penalty_sigma`` is given. Every fitted bin is mapped
+    to the cohort stop that contains it. The columns are an indicator per kept
+    well other than the reference, then ``well_unknown`` (1 in a stop with no
+    ``occupancy_well_id``, i.e. a mixed stop; added only when such a bin
+    exists), so the intercept is the reference well's level, then
     ``rewarded_outcome`` (1 when the stop's outcome is known and rewarded) and
     ``outcome_unknown`` (1 when ``is_rewarded_outcome`` is NaN), then, per
     ``context_columns`` entry, the stop's value z-scored over the fitted bins
@@ -431,6 +435,12 @@ def build_baseline_columns(
             continue
         columns.append((well_of_bin == well).astype(float))
         names.append(f"well_{well}")
+    # A bin in a stop with no well (a mixed stop) would otherwise be coded
+    # like the reference well; it gets its own level, only when there is one.
+    well_unknown = ~np.isfinite(well_of_bin)
+    if well_unknown.any():
+        columns.append(well_unknown.astype(float))
+        names.append("well_unknown")
     columns.append(np.where(np.isfinite(reward_of_bin), reward_of_bin, 0.0))
     names.append("rewarded_outcome")
     columns.append((~np.isfinite(reward_of_bin)).astype(float))

@@ -777,9 +777,10 @@ def build_report(
         "`pre / post` are the population curve's means over lags <= -100 ms and 0 to "
         "+150 ms: a kernel that is as large before onset as after is a stationary rate "
         "difference between the contexts the events occur in, not an event-locked "
-        "response (contract-2 designs carry per-stop well and reward-outcome baseline "
-        "columns, so their typical kernel is the response at the reference well after "
-        "an unrewarded, known outcome). "
+        "response (contract-3 designs carry per-stop well, `well_unknown` (mixed "
+        "stop) and reward-outcome baseline columns, so their typical kernel is the "
+        "response at the reference well after an unrewarded, known outcome; contract-2 "
+        "designs lacked `well_unknown` and coded mixed stops like the reference well). "
         "No per-unit p-values: the only p is the shuffled-mark reference's for the "
         "population curve, a descriptive check.\n\n"
     )

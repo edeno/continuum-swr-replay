@@ -29,21 +29,30 @@ property. Both replay classes and every mark in a named family are fit jointly.
 The ordinary kernel is the response to an event whose marks are at their
 within-class means.
 
-**Per-stop baseline (bundle contract 2).** Every design also carries
-unpenalised per-stop columns right after the intercept
+**Per-stop baseline (bundle contract 3).** Every design also carries
+per-stop columns right after the intercept
 (`marked_glm.build_baseline_columns`): one indicator per kept well other than
 the reference well (well 0, or the session's lowest kept well when well 0 has
-no fitted bin), `rewarded_outcome` (the stop's known outcome was rewarded) and
+no fitted bin), `well_unknown` (the stop has no `occupancy_well_id`: a mixed
+stop of the well-anchored cohort; added only when the session has such a
+fitted bin), `rewarded_outcome` (the stop's known outcome was rewarded) and
 `outcome_unknown`. A column constant over the fitted bins is dropped and named
-in the sidecar. These columns take up stationary rate differences between
-stops, which a design with one intercept per session would otherwise read as
-event-locked effects of a context mark (the contract-1 corpus showed reward,
-switch and previous-arm "effects" as large 200 ms before onset as after). The
-typical-event kernel is now the response at the reference well after an
-unrewarded, known outcome. A model whose target is a stop-level context mark
-other than the reward outcome (`trips_to_patch_switch`,
-`next_trip_switches_patch`) adds that mark as a baseline column too, z-scored
-over the fitted bins with an `_unknown` indicator. `--no-baseline` fits the
+in the sidecar (`baseline_column_names` lists the kept ones). The columns are
+free unless `--baseline-penalty-sigma` is given; the shipped follow-up run
+gives them a prior SD of 3 log-rate units. These columns take up stationary
+rate differences between stops, which a design with one intercept per session
+would otherwise read as event-locked effects of a context mark (the
+contract-1 corpus showed reward, switch and previous-arm "effects" as large
+200 ms before onset as after). Because mixed stops have their own level, the
+intercept is the reference well's level and the typical-event kernel is the
+response at the reference well after an unrewarded, known outcome. Contract 2
+lacked `well_unknown`: mixed-stop bins (a median 43 % of fitted bins over the
+75 sessions of `marked_family_baseline_prior/`) were coded exactly like the
+reference well, so contract-2 typical kernels mix the two levels. A model
+whose target is a stop-level context mark other than the reward outcome
+(`trips_to_patch_switch`, `next_trip_switches_patch`) adds that mark as a
+baseline column too, z-scored over the fitted bins with an `_unknown`
+indicator. `--no-baseline` fits the
 contract-1 single-intercept designs.
 
 For each class × target, the descriptive comparison removes only that target's
@@ -344,8 +353,10 @@ without excluded time and without the artifact-dropped events, on the
 the canonical PFC assembly (`analysis/pfc/session.py`), so a refit's fit mask
 and event onsets are the Figure 4 ones. Contract-2 bundles (per-stop baseline,
 `tier`, `event_set`, the slope-reference keys) never match a contract-1
-sidecar; the follow-up corpus is written to its own directory
-(`pfc_response_followups/marked_family/`, an explicit `--output-dir`), and
+sidecar, and contract-3 bundles (`well_unknown` added) never match a
+contract-2 one; the follow-up corpus is written to its own directory
+(`pfc_response_followups/marked_family_well_unknown/` for contract 3, an
+explicit `--output-dir`), and
 `summarize_pfc_marked_family.py` refuses a directory that mixes contracts or
 event sets. It writes `summary.parquet` there, one row per model, tier,
 class, target and statistic.

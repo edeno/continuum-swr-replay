@@ -104,16 +104,28 @@ def test_baseline_drops_constant_columns_and_reports_them():
     ]
 
 
-def test_baseline_counts_bins_in_a_stop_without_a_well():
+def test_baseline_gives_bins_in_a_stop_without_a_well_their_own_column():
     fit_mask, stops = _stops(wells=[0, np.nan, 2], outcomes=[1, 0, 1])
 
     baseline, names, report = build_baseline_columns(fit_mask, stops)
 
     assert report["n_bins_without_well"] == STOP_BINS
-    # The well-less stop has no well indicator: it sits with the reference.
-    np.testing.assert_array_equal(
-        baseline[:, names.index("well_2")], _stop_of_fitted_bin(fit_mask) == 2
-    )
+    # ``well_unknown`` sits right after the well indicators, so the well-less
+    # (mixed) stop is not coded like the reference well.
+    assert names == ("well_2", "well_unknown", "rewarded_outcome")
+    stop = _stop_of_fitted_bin(fit_mask)
+    np.testing.assert_array_equal(baseline[:, names.index("well_2")], stop == 2)
+    np.testing.assert_array_equal(baseline[:, names.index("well_unknown")], stop == 1)
+    assert report["baseline_dropped_constant"] == ["outcome_unknown"]
+
+
+def test_baseline_adds_no_well_unknown_column_when_every_well_is_known():
+    fit_mask, stops = _stops(wells=[0, 1, 2], outcomes=[1, 0, 1])
+
+    _, names, report = build_baseline_columns(fit_mask, stops)
+
+    assert "well_unknown" not in names
+    assert "well_unknown" not in report["baseline_dropped_constant"]
 
 
 def test_baseline_refuses_a_fitted_bin_outside_every_stop():

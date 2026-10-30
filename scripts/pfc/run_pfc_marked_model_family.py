@@ -124,7 +124,8 @@ from continuum_swr_replay.runs.batch import setup_logger
 OUTPUT_SUBDIR = "pfc_marked_model_family"
 ESTIMATOR = "joint_multimark_ridge_poisson_temporal_glm"
 INFERENCE = "descriptive_blocked_heldout_leave_one_mark_block_out"
-BUNDLE_CONTRACT_VERSION = 2
+# 3: the per-stop baseline gains ``well_unknown`` (mixed stops).
+BUNDLE_CONTRACT_VERSION = 3
 # ``prepare_marked_session_context`` fits over lags -125..125 samples with an
 # 11-function clamped cubic B-spline basis per kernel. Both are pinned into the
 # contract here because the contract is built before the session is prepared;

@@ -104,7 +104,8 @@ INFERENCE = "descriptive_blocked_heldout_association_with_label_shuffle_referenc
 MARK_SCALING = "within_session_within_replay_class_population_sd_ddof0"
 SHUFFLE_POLICY = "permute_scientific_mark_among_events_within_session_and_class"
 LABEL_SHUFFLE_TAIL_METHOD = EMPIRICAL_PVALUE_METHOD
-BUNDLE_CONTRACT_VERSION = 2
+# 3: the per-stop baseline gains ``well_unknown`` (mixed stops).
+BUNDLE_CONTRACT_VERSION = 3
 FIT_HALF_WINDOW_S = 0.25
 
 MARK_DESCRIPTIONS = {
