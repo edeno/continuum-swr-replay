@@ -182,11 +182,15 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   (<!--v:part3.history_onset_animals_non_local_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
   <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms
   (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
-- Cross: an SWR-coupled event is <!--v:part3.history_cross_end_rr_swr_from_non_swr-->2.57<!--/v-->× as likely 45 ms after a non-SWR event ends
-  (<!--v:part3.history_cross_end_animals_swr_from_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals). Pending: the other direction
-  (one animal's pooled cross fit did not converge) and whether the cross block pays for its parameters (most
-  per-session cross fits did not converge or were separated).
-- *Reading:* There is no refractory period beyond the event itself. Events cluster mostly right after the previous event ends, with a weaker onset-locked rhythm; an SWR-coupled event follows the end of a non-SWR one the same way it follows its own kind. If the other direction holds once its fit converges, the succession is the same in both directions, which fits one continuum of events rather than two classes
+- Cross (ridge fit per animal, cross window 1 s, rate ratios shrunk toward 1): 45 ms after the other stream's event ends,
+  an SWR-coupled event is <!--v:part3.history_cross_end_rr_swr_from_non_swr-->3.07<!--/v-->× as likely
+  (<!--v:part3.history_cross_end_animals_swr_from_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals) and a non-SWR event
+  <!--v:part3.history_cross_end_rr_non_swr_from_swr-->1.92<!--/v-->× (<!--v:part3.history_cross_end_animals_non_swr_from_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
+  The cross block predicts held-out stops: median gain <!--v:part3.history_cross_heldout_gain_swr_from_non_swr-->+0.015<!--/v--> and
+  <!--v:part3.history_cross_heldout_gain_non_swr_from_swr-->+0.014<!--/v--> nats per event, positive in
+  <!--v:part3.history_cross_heldout_animals_positive_swr_from_non_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> and
+  <!--v:part3.history_cross_heldout_animals_positive_non_swr_from_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals.
+- *Reading:* There is no refractory period beyond the event itself. Events cluster mostly right after the previous event ends, with a weaker onset-locked rhythm, and each kind of event follows the end of the other kind the same way it follows its own. The succession runs in both directions, which fits one continuum of events rather than two classes
   (Part 2, "One class or two?").
 
 **What do events represent?** (content, log weights per arm; fraction estimator unless named; q is the false-discovery-adjusted p)

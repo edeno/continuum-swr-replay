@@ -2644,3 +2644,12 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_swr_no_replay_peak` | −0.0099 | −0.0096 |
 | `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_swr_no_replay_post_onset_mean` | −0.0059 | −0.0057 |
 | `paper/reported/overview.md` | `part4.marked_ripplepooled_ripple_power_pooled_peak_lag_ms` | −82 | −84 |
+
+## 2026-10-30
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `paper/claims_table.md` | `part3.history_cross_heldout_gain_swr_from_non_swr` | 0.015 | +0.015 |
+| `paper/claims_table.md` | `part3.history_cross_heldout_gain_non_swr_from_swr` | 0.014 | +0.014 |
+| `paper/reported/overview.md` | `part3.history_cross_heldout_gain_swr_from_non_swr` | 0.015 | +0.015 |
+| `paper/reported/overview.md` | `part3.history_cross_heldout_gain_non_swr_from_swr` | 0.014 | +0.014 |
