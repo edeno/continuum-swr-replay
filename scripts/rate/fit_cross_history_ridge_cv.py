@@ -14,6 +14,9 @@ the same question on held-out data:
 - their outer held-out log-likelihoods are compared over five folds of whole
   stops (``analysis/replay/ridge_history_cv.py``).
 
+Designs are built in ``--workers`` CPU processes; every fit of a rung's
+cross-validation runs as one batch on one GPU (``--gpu``, never card 0).
+
 A session with fewer than ``MIN_SESSION_EVENTS`` response onsets is left out
 (its unpenalised session effect has no estimate in a training set without
 events); the count is recorded. Writes one pickle per run with the
@@ -23,14 +26,14 @@ Usage::
 
     python scripts/rate/fit_cross_history_ridge_cv.py --out-dir DIR
         [--animals wilbur j16] [--outcomes non_local_swr non_local_no_swr]
-        [--workers N] [--stop-cohort at_well]
+        [--workers N] [--gpu K] [--stop-cohort at_well]
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-import resource
+import multiprocessing as mp
 import sys
 import time
 from collections.abc import Sequence
@@ -45,6 +48,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.replay import attach_is_swr_to_onsets
 from continuum_swr_replay.analysis.replay.covariate_timing import (
     assert_predictor_timing,
@@ -81,8 +85,16 @@ OUTCOMES = ("non_local_swr", "non_local_no_swr")
 _LAG_PREFIXES = ("onset_lag", "offset_lag", "cross_lag", "cross_offset_lag")
 
 
-def _fit_one(animal: str, outcome: str, sessions: list) -> tuple[tuple, dict, float]:
-    """Stack one animal's sessions for one stream and compare. For workers."""
+def _gpu_peak_bytes() -> int | None:
+    """Peak device memory JAX has used in this process, where it reports it."""
+    import jax
+
+    stats = jax.devices()[0].memory_stats() or {}
+    return stats.get("peak_bytes_in_use")
+
+
+def _stack_one(animal: str, outcome: str, sessions: list) -> dict:
+    """One animal's stacked design for one stream. CPU; for workers."""
     t0 = time.perf_counter()
     frames, dropped = [], []
     for keys, stops_g, onsets_g in sessions:
@@ -97,16 +109,15 @@ def _fit_one(animal: str, outcome: str, sessions: list) -> tuple[tuple, dict, fl
     design = design.drop(
         columns=[c for c in design.columns if c.startswith(_LAG_PREFIXES)]
     )
-    rec = {
+    return {
         "animal": animal,
         "outcome": outcome,
+        "design": design,
         "n_sessions_dropped": len(dropped),
         "sessions_dropped": dropped,
         "support": support,
-        **compare_cross_history(design, LADDER),
-        "max_rss_gb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1e6,
+        "build_seconds": round(time.perf_counter() - t0, 1),
     }
-    return (animal, outcome), rec, time.perf_counter() - t0
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -114,7 +125,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     p.add_argument("--out-dir", type=Path, required=True)
     p.add_argument("--animals", nargs="*", default=None)
     p.add_argument("--outcomes", nargs="*", choices=OUTCOMES, default=list(OUTCOMES))
-    p.add_argument("--workers", type=int, default=1)
+    p.add_argument("--workers", type=int, default=4, help="design-building processes")
+    p.add_argument("--gpu", type=int, default=None, help="card to fit on (never 0)")
+    p.add_argument("--allow-cpu", action="store_true")
     p.add_argument("--stop-cohort", choices=STOP_COHORTS, default="at_well")
     argv = sys.argv[1:] if argv is None else list(argv)
     args = p.parse_args(argv)
@@ -163,19 +176,35 @@ def main(argv: Sequence[str] | None = None) -> None:
     logger.info("%d (animal, stream) jobs, %d worker(s)", len(jobs), args.workers)
 
     t0 = time.perf_counter()
+    with ProcessPoolExecutor(
+        max_workers=args.workers, mp_context=mp.get_context("spawn")
+    ) as ex:
+        futures = [ex.submit(_stack_one, *job) for job in jobs]
+        stacked = [fut.result() for fut in as_completed(futures)]
+    logger.info("built %d designs in %.0fs", len(stacked), time.perf_counter() - t0)
+
+    device = configure_jax_gpu(gpu=args.gpu, allow_cpu=args.allow_cpu)
+    logger.info("JAX device: %s", device)
     results = []
-    if args.workers > 1:
-        with ProcessPoolExecutor(max_workers=args.workers) as ex:
-            futures = [ex.submit(_fit_one, *job) for job in jobs]
-            for fut in as_completed(futures):
-                keys, rec, elapsed = fut.result()
-                results.append(rec)
-                logger.info("  %s in %.0fs", keys, elapsed)
-    else:
-        for job in jobs:
-            keys, rec, elapsed = _fit_one(*job)
-            results.append(rec)
-            logger.info("  %s in %.0fs", keys, elapsed)
+    for rec in sorted(stacked, key=lambda r: (r["animal"], r["outcome"])):
+        t1 = time.perf_counter()
+        design = rec.pop("design")
+        rec |= compare_cross_history(design, LADDER)
+        rec["fit_seconds"] = round(time.perf_counter() - t1, 1)
+        rec["gpu_peak_bytes"] = _gpu_peak_bytes()
+        results.append(rec)
+        logger.info(
+            "  %s %s: %d bins, %d events, gain/event %+.5f, %d/%d folds > 0, fit %.0fs",
+            rec["animal"],
+            rec["outcome"],
+            rec["n_bins"],
+            rec["n_events"],
+            rec["gain_per_event"],
+            rec["n_folds_positive"],
+            N_FOLDS,
+            rec["fit_seconds"],
+        )
+        del design
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     out = args.out_dir / "cross_history_ridge_cv.pkl"
@@ -193,6 +222,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "n_folds": N_FOLDS,
             "fold_seed": FOLD_SEED,
             "min_session_events": MIN_SESSION_EVENTS,
+            **device,
         },
     )
     logger.info("Saved %s in %.1fs", out, time.perf_counter() - t0)

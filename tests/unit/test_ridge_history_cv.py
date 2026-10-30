@@ -19,6 +19,8 @@ from continuum_swr_replay.analysis.replay.ridge_history_cv import (
     assign_stop_folds,
     compare_cross_history,
     fit_ridge_poisson,
+    fit_ridge_poisson_batch,
+    heldout_loglik,
     ridge_design,
 )
 
@@ -87,6 +89,33 @@ def test_the_penalised_fit_is_a_stationary_point(cross_design):
     assert np.max(np.abs(grad)) < 1e-5
     # Only the history columns are penalised.
     assert penalized.sum() == 4 + 4 + 6 + 6
+
+
+def test_the_batched_fitter_matches_the_reference_fit_by_fit(cross_design):
+    spec = LADDER["Mselfcross_long_dur"]
+    X, _, penalized = ridge_design(cross_design, spec)
+    y = cross_design["count"].to_numpy(dtype=float)
+    offset = np.log(cross_design["exposure"].to_numpy(dtype=float))
+    folds = assign_stop_folds(cross_design)
+    cases = [(s, ex) for s in (0.03125, 4.0) for ex in ((0,), (0, 1), ())]
+    excluded = np.zeros((len(cases), 5), dtype=bool)
+    penalties = np.zeros((len(cases), X.shape[1]))
+    score = np.zeros(len(cases), dtype=np.int32)
+    for b, (sigma, ex) in enumerate(cases):
+        excluded[b, list(ex)] = True
+        penalties[b] = np.where(penalized, 1.0 / sigma**2, 0.0)
+        score[b] = ex[-1] if ex else 0
+    batch = fit_ridge_poisson_batch(
+        X, y, offset, folds, excluded, penalties, score_fold=score
+    )
+    for b in range(len(cases)):
+        ref = fit_ridge_poisson(
+            X, y, offset, penalties[b], weights=(~excluded[b][folds]).astype(float)
+        )
+        assert batch["converged"][b] and ref.converged
+        np.testing.assert_allclose(batch["params"][b], ref.params, rtol=0, atol=1e-6)
+        ll = heldout_loglik(X, y, offset, ref.params, folds == score[b])
+        assert abs(batch["heldout_ll"][b] - ll) < 1e-6
 
 
 def test_folds_are_whole_stops_and_every_session_is_in_every_fold(cross_design):

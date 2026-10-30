@@ -20,7 +20,10 @@ pooled fit: a lag with no events has its maximum-likelihood coefficient at
   the self-only and the self+cross rung is compared fold by fold.
 
 The fitter is Newton's method on the penalised log-likelihood with step
-halving (the objective is strictly concave), in ``float64`` on the CPU.
+halving (the objective is strictly concave), in ``float64``. The
+cross-validation runs every (training set, sigma) fit of a rung as one batch in
+JAX (:func:`fit_ridge_poisson_batch`), on whichever device the caller chose;
+:func:`fit_ridge_poisson` is the one-fit NumPy reference it is tested against.
 """
 
 from __future__ import annotations
@@ -29,7 +32,10 @@ import re
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 import patsy
@@ -49,6 +55,7 @@ __all__ = [
     "assign_stop_folds",
     "compare_cross_history",
     "fit_ridge_poisson",
+    "fit_ridge_poisson_batch",
     "heldout_loglik",
     "nested_cv",
     "ridge_design",
@@ -57,7 +64,7 @@ __all__ = [
 
 #: Prior SDs of a history coefficient (log rate ratio per bump) tried by the
 #: inner cross-validation, strongest penalty first.
-SIGMA_GRID: tuple[float, ...] = (0.25, 0.5, 1.0, 2.0, 4.0)
+SIGMA_GRID: tuple[float, ...] = (0.03125, 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0)
 #: Outer folds of whole stops; the inner folds are the other outer folds.
 N_FOLDS = 5
 #: Seed of the stop-to-fold assignment.
@@ -65,6 +72,9 @@ FOLD_SEED = 20261030
 #: A session with fewer response onsets than this is left out: an unpenalised
 #: session effect with no events in a training set has its estimate at -inf.
 MIN_SESSION_EVENTS = 10
+#: Elements of the largest ``(rows, n_fits, n_features)`` block a batched pass
+#: holds (1 GB in float64).
+_CHUNK_ELEMENTS = 125_000_000
 #: Design columns of the history blocks (the penalised ones).
 _HISTORY_COLUMN = re.compile(r"^(cross_)?(off)?hist_rcos_\d+$")
 
@@ -236,6 +246,206 @@ def assign_stop_folds(
     )
 
 
+def _batch_shape(n_rows: int, n_fits: int, n_features: int) -> int:
+    """Rows per chunk so a ``(rows, n_fits, n_features)`` block is ~1 GB."""
+    return int(max(1024, min(n_rows, _CHUNK_ELEMENTS // (n_fits * n_features))))
+
+
+def _chunks(array: np.ndarray, rows: int, fill: float) -> jnp.ndarray:
+    """``array`` padded along axis 0 to a multiple of ``rows`` and split."""
+    n = array.shape[0]
+    pad = (-n) % rows
+    padded = np.concatenate(
+        [array, np.full((pad, *array.shape[1:]), fill, dtype=array.dtype)]
+    )
+    return jnp.asarray(padded.reshape(-1, rows, *array.shape[1:]))
+
+
+def _weights(fold: jnp.ndarray, keep: jnp.ndarray) -> jnp.ndarray:
+    """``(rows, n_fits)`` training weights of a chunk's rows (padding is -1)."""
+    return (keep.T[jnp.clip(fold, 0)] & (fold >= 0)[:, None]).astype(jnp.float64)
+
+
+def _batch_objective(data, keep, lam, beta):
+    """Penalised training log-likelihood of each fit, shape ``(n_fits,)``."""
+
+    def body(acc, chunk):
+        X, y, o, f = chunk
+        eta = X @ beta.T + o[:, None]
+        w = _weights(f, keep)
+        return acc + jnp.sum(w * (y[:, None] * eta - jnp.exp(eta)), axis=0), None
+
+    ll, _ = jax.lax.scan(body, jnp.zeros(beta.shape[0]), data)
+    return ll - 0.5 * jnp.sum(lam * beta**2, axis=1)
+
+
+def _score_and_information(data, keep, lam, beta):
+    """Penalised score ``(n_fits, p)`` and information ``(n_fits, p, p)``."""
+    n_fits, p = beta.shape
+
+    def body(acc, chunk):
+        g, h = acc
+        X, y, o, f = chunk
+        mu = jnp.exp(X @ beta.T + o[:, None])
+        w = _weights(f, keep)
+        g = g + X.T @ (w * (y[:, None] - mu))
+        h = h + jnp.einsum("np,nb,nq->bpq", X, w * mu, X)
+        return (g, h), None
+
+    init = (jnp.zeros((p, n_fits)), jnp.zeros((n_fits, p, p)))
+    (g, h), _ = jax.lax.scan(body, init, data)
+    eye = jnp.eye(p)
+    return g.T - lam * beta, h + lam[:, :, None] * eye[None]
+
+
+@partial(jax.jit, static_argnames=("maxiter", "max_halvings"))
+def _newton_batch(data, keep, lam, tol, maxiter, max_halvings):
+    """Batched Newton with per-fit step halving; see :func:`fit_ridge_poisson`."""
+    X, y, o, f = data
+    n_fits, p = lam.shape
+
+    def totals(acc, chunk):
+        Xc, yc, oc, fc = chunk
+        w = _weights(fc, keep)
+        return (acc[0] + w.T @ yc, acc[1] + w.T @ jnp.exp(oc)), None
+
+    (sy, se), _ = jax.lax.scan(totals, (jnp.zeros(n_fits), jnp.zeros(n_fits)), data)
+    beta0 = jnp.zeros((n_fits, p)).at[:, 0].set(jnp.log(sy / se))
+    obj0 = _batch_objective(data, keep, lam, beta0)
+    done0 = jnp.zeros(n_fits, dtype=bool)
+
+    def cond(state):
+        it, _, _, done, _ = state
+        return (it < maxiter) & ~jnp.all(done)
+
+    def body(state):
+        it, beta, obj, done, n_iter = state
+        grad, info = _score_and_information(data, keep, lam, beta)
+        step = jnp.linalg.solve(info, grad[..., None])[..., 0]
+        step = jnp.where(done[:, None], 0.0, step)
+
+        def h_cond(h):
+            k, _, _, ok = h
+            return (k < max_halvings) & ~jnp.all(ok)
+
+        def h_body(h):
+            k, t, _, ok = h
+            t = jnp.where(ok, t, t / 2)
+            trial = _batch_objective(data, keep, lam, beta + t[:, None] * step)
+            ok = ok | (jnp.isfinite(trial) & (trial >= obj))
+            return k + 1, t, trial, ok
+
+        t0 = jnp.ones(n_fits)
+        trial0 = _batch_objective(data, keep, lam, beta + step)
+        ok0 = done | (jnp.isfinite(trial0) & (trial0 >= obj))
+        _, t, trial, ok = jax.lax.while_loop(h_cond, h_body, (0, t0, trial0, ok0))
+        move = ok & ~done
+        new_beta = jnp.where(move[:, None], beta + t[:, None] * step, beta)
+        new_obj = jnp.where(move, trial, obj)
+        conv = jnp.abs(new_obj - obj) <= tol * (jnp.abs(new_obj) + 1.0)
+        n_iter = n_iter + (~done).astype(jnp.int32)
+        return it + 1, new_beta, new_obj, done | conv, n_iter
+
+    state = (0, beta0, obj0, done0, jnp.zeros(n_fits, dtype=jnp.int32))
+    _, beta, obj, done, n_iter = jax.lax.while_loop(cond, body, state)
+    return beta, obj, done, n_iter
+
+
+@jax.jit
+def _heldout_batch(data, beta, score_fold):
+    """Each fit's Poisson log-likelihood on its own scoring fold."""
+
+    def body(acc, chunk):
+        X, y, o, f = chunk
+        eta = X @ beta.T + o[:, None]
+        ll = (
+            y[:, None] * eta
+            - jnp.exp(eta)
+            - jax.scipy.special.gammaln(y + 1.0)[:, None]
+        )
+        return acc + jnp.sum(
+            jnp.where(f[:, None] == score_fold[None, :], ll, 0.0), 0
+        ), None
+
+    out, _ = jax.lax.scan(body, jnp.zeros(beta.shape[0]), data)
+    return out
+
+
+@jax.jit
+def _information_at(data, keep, lam, beta):
+    return _score_and_information(data, keep, lam, beta)[1]
+
+
+def fit_ridge_poisson_batch(
+    X: np.ndarray,
+    y: np.ndarray,
+    offset: np.ndarray,
+    folds: np.ndarray,
+    excluded: np.ndarray,
+    penalties: np.ndarray,
+    *,
+    score_fold: np.ndarray | None = None,
+    maxiter: int = 100,
+    tol: float = 1e-10,
+    max_halvings: int = 40,
+    covariance: bool = False,
+) -> dict:
+    """Many ridge Poisson fits of one design at once, in JAX ``float64``.
+
+    The batched twin of :func:`fit_ridge_poisson` (same objective, start,
+    halving and stopping rule, applied fit by fit): fit ``b`` trains on the
+    rows whose fold ``excluded[b]`` does not mark, under ``penalties[b]``.
+    Every fit reads the same design in one pass per Newton step, so a sigma
+    grid times a set of training folds costs about one fit's passes.
+
+    Parameters
+    ----------
+    X : np.ndarray, shape (n_bins, n_features)
+    y, offset : np.ndarray, shape (n_bins,)
+    folds : np.ndarray of int, shape (n_bins,)
+    excluded : np.ndarray of bool, shape (n_fits, n_folds)
+    penalties : np.ndarray, shape (n_fits, n_features)
+    score_fold : np.ndarray of int, shape (n_fits,), optional
+        Fold each fit is scored on (held-out log-likelihood, with ``log y!``).
+    covariance : bool
+        Also return the inverse penalised information at each mode.
+
+    Returns
+    -------
+    dict
+        ``params`` (n_fits, n_features), ``objective``, ``converged``,
+        ``n_iter``, and ``heldout_ll`` / ``covariance`` when asked.
+    """
+    with jax.enable_x64(True):
+        n_fits, n_features = penalties.shape
+        rows = _batch_shape(len(y), n_fits, n_features)
+        data = (
+            _chunks(np.asarray(X, dtype=float), rows, 0.0),
+            _chunks(np.asarray(y, dtype=float), rows, 0.0),
+            _chunks(np.asarray(offset, dtype=float), rows, 0.0),
+            _chunks(np.asarray(folds, dtype=np.int32), rows, -1),
+        )
+        keep = jnp.asarray(~np.asarray(excluded, dtype=bool))
+        lam = jnp.asarray(penalties, dtype=jnp.float64)
+        beta, obj, done, n_iter = _newton_batch(
+            data, keep, lam, tol, maxiter, max_halvings
+        )
+        out = {
+            "params": np.asarray(beta),
+            "objective": np.asarray(obj),
+            "converged": np.asarray(done),
+            "n_iter": np.asarray(n_iter),
+        }
+        if score_fold is not None:
+            out["heldout_ll"] = np.asarray(
+                _heldout_batch(data, beta, jnp.asarray(score_fold, dtype=jnp.int32))
+            )
+        if covariance:
+            info = np.asarray(_information_at(data, keep, lam, beta))
+            out["covariance"] = np.linalg.inv(info)
+        return out
+
+
 def nested_cv(
     X: np.ndarray,
     y: np.ndarray,
@@ -253,54 +463,51 @@ def nested_cv(
     ``j``; the ``sigma`` with the largest summed inner log-likelihood is the
     one fold ``k`` is scored at. Every ``sigma`` is also fit on all folds but
     ``k`` and scored on ``k`` (``outer_curve``), which picks the ``sigma`` of
-    the full-data fit.
+    the full-data fit. All ``n_folds**2 * len(sigma_grid)`` fits run as one
+    batch (:func:`fit_ridge_poisson_batch`).
 
     Returns
     -------
     dict
         ``sigma`` (grid, strongest first), ``outer_ll`` (per fold, at the inner
-        choice), ``chosen_sigma`` (per fold), ``outer_curve`` (folds x grid),
-        ``n_fits``, ``n_nonconverged``.
+        choice), ``chosen_sigma`` (per fold), ``inner_curve`` and
+        ``outer_curve`` (folds x grid), ``n_fits``, ``n_nonconverged``,
+        ``max_n_iter``.
     """
     grid = sorted(sigma_grid)
-    lam = {s: np.where(penalized, 1.0 / s**2, 0.0) for s in grid}
-    outer_ll = np.zeros(n_folds)
-    chosen = np.zeros(n_folds)
+    fits = [
+        (k, j, i)
+        for k in range(n_folds)
+        for j in range(n_folds)
+        for i in range(len(grid))
+    ]
+    excluded = np.zeros((len(fits), n_folds), dtype=bool)
+    penalties = np.zeros((len(fits), X.shape[1]))
+    score = np.zeros(len(fits), dtype=np.int32)
+    for b, (k, j, i) in enumerate(fits):
+        excluded[b, [k, j]] = True  # j == k: the outer training set
+        penalties[b] = np.where(penalized, 1.0 / grid[i] ** 2, 0.0)
+        score[b] = j
+    res = fit_ridge_poisson_batch(
+        X, y, offset, folds, excluded, penalties, score_fold=score
+    )
+    inner = np.zeros((n_folds, len(grid)))
     curve = np.zeros((n_folds, len(grid)))
-    n_fits = n_bad = 0
-    for k in range(n_folds):
-        inner = np.zeros(len(grid))
-        for j in range(n_folds):
-            if j == k:
-                continue
-            train = ((folds != k) & (folds != j)).astype(float)
-            start = None
-            for i, s in enumerate(grid):
-                fit = fit_ridge_poisson(
-                    X, y, offset, lam[s], weights=train, start=start
-                )
-                n_fits += 1
-                n_bad += not fit.converged
-                start = fit.params
-                inner[i] += heldout_loglik(X, y, offset, fit.params, folds == j)
-        best = int(np.argmax(inner))
-        train = (folds != k).astype(float)
-        start = None
-        for i, s in enumerate(grid):
-            fit = fit_ridge_poisson(X, y, offset, lam[s], weights=train, start=start)
-            n_fits += 1
-            n_bad += not fit.converged
-            start = fit.params
-            curve[k, i] = heldout_loglik(X, y, offset, fit.params, folds == k)
-        outer_ll[k] = curve[k, best]
-        chosen[k] = grid[best]
+    for b, (k, j, i) in enumerate(fits):
+        if j == k:
+            curve[k, i] = res["heldout_ll"][b]
+        else:
+            inner[k, i] += res["heldout_ll"][b]
+    best = inner.argmax(axis=1)
     return {
         "sigma": grid,
-        "outer_ll": outer_ll,
-        "chosen_sigma": chosen,
+        "outer_ll": curve[np.arange(n_folds), best],
+        "chosen_sigma": np.asarray(grid)[best],
+        "inner_curve": inner,
         "outer_curve": curve,
-        "n_fits": n_fits,
-        "n_nonconverged": n_bad,
+        "n_fits": len(fits),
+        "n_nonconverged": int((~res["converged"]).sum()),
+        "max_n_iter": int(res["n_iter"].max()),
     }
 
 
@@ -378,12 +585,22 @@ def compare_cross_history(
         )
         full_sigma = cv["sigma"][int(np.argmax(cv["outer_curve"].sum(axis=0)))]
         lam = np.where(penalized, 1.0 / full_sigma**2, 0.0)
-        full = fit_ridge_poisson(X, y, offset, lam)
-        mu = np.exp(X @ full.params + offset)
-        root = X * np.sqrt(mu)[:, None]
-        info = root.T @ root
-        info[np.diag_indices_from(info)] += lam
-        covariance = linalg.inv(info, check_finite=True)
+        res = fit_ridge_poisson_batch(
+            X,
+            y,
+            offset,
+            folds,
+            np.zeros((1, n_folds), dtype=bool),
+            lam[None],
+            covariance=True,
+        )
+        full = RidgeFit(
+            res["params"][0],
+            bool(res["converged"][0]),
+            int(res["n_iter"][0]),
+            float(res["objective"][0]),
+        )
+        covariance = res["covariance"][0]
         models[name] = {
             "cv": {k: np.asarray(v).tolist() for k, v in cv.items()},
             "full_sigma": full_sigma,
@@ -394,7 +611,7 @@ def compare_cross_history(
             "kernels": ridge_kernels(full, names, covariance, spec),
             "seconds": round(time.perf_counter() - t0, 1),
         }
-        del X, root
+        del X
     events = np.array([y[folds == k].sum() for k in range(n_folds)])
     ll_self = np.asarray(models[self_name]["cv"]["outer_ll"])
     ll_cross = np.asarray(models[cross_name]["cv"]["outer_ll"])
