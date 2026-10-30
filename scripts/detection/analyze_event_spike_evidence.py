@@ -7,11 +7,23 @@ are sparse or non-spatial.
 
 The key idea: the decoder reports ``posterior = likelihood x prior``. Artifacts
 produce a confident *posterior* via the *prior* while the *likelihood* (the
-spike evidence) stays uninformative. So we recompute the **prior-excluded
-clusterless spike likelihood** over track positions for each event, directly
-from the saved encoding model and the event's marks (no re-decode), and ask
+spike evidence) stays uninformative. So we read the **prior-excluded
+clusterless spike likelihood** over track positions for each event and ask
 whether it supports the decoded position over the animal's own position,
 above a matched non-event immobility baseline.
+
+The likelihood is the decode's own: the ``log_likelihood`` the HPC decode
+stores in ``results.nc`` beside the posterior (``--likelihood stored``, the
+default). Its Non-Local Continuous columns at the interior bins are the
+non-local likelihood (the Fragmented columns are the same). Row ``k`` holds the
+spikes in ``[t_k, t_{k+1})``, so an event of bins ``s..e`` spans
+``[t_s, t_{e+1})`` and its spikes are counted over that span.
+``--likelihood rebuild`` instead recomputes it on the CPU from the saved
+encoding model and the event's marks (``state_evidence.event_likelihood``);
+that rebuild bins spikes on the window's own axis, so its last row holds no
+spike, and it is kept as the reference the stored path was checked against
+(rows ``s..e`` of the stored likelihood equal the rebuild over ``s..e+1`` to
+float32 rounding).
 
 Per-event metrics (all bin lookups use native track-graph distance):
 
@@ -27,16 +39,15 @@ Per-event metrics (all bin lookups use native track-graph distance):
 The matched non-event immobility baseline is the null (its dll_animal and
 dll_per_spike sit at ~0).
 
-Events decoded where the CPU rebuild is not the decode are left out. A real
-place bin whose stored occupancy is above 0 and below
+A real place bin whose stored occupancy is above 0 and below
 ``UNDERFLOW_OCCUPANCY_FLOOR`` (float32 subnormals where the animal never went; a
 GPU decode keeps them, the CPU flushes them to zero;
 ``subnormal_occupancy_bin_mask``) has a CPU likelihood that is not the decode's,
-up to 20 nats per spike off (D1). A bin with an occupancy of exactly 0 does not:
-both devices read ``occupancy > 0`` as False and agree there. An event (or
-baseline window) with a scored bin whose MAP is in a flagged bin is not scored;
-``event_spike_evidence_left_out.csv`` counts them per epoch. With no flagged bin
-(every analysed epoch but chimi20200221_08_r4) the outputs are unchanged.
+up to 20 nats per spike off (D1). The stored likelihood is the decode's, so it
+scores every event; ``event_spike_evidence_left_out.csv`` counts per epoch the
+events (and baseline windows) with a scored bin whose MAP is in a flagged bin
+(``n_events_map_in_flagged_bins``). Only the rebuild leaves them out
+(``n_events_left_out``).
 
 Usage
 -----
@@ -58,6 +69,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 for _cat in (UserWarning, FutureWarning, DeprecationWarning):
     warnings.filterwarnings("ignore", category=_cat)
@@ -272,6 +284,59 @@ def load_marks(epoch_id: str, cache_dir: Path) -> tuple[list, list]:
 
 
 # --- Likelihood + metrics -----------------------------------------------------
+def stored_likelihood_columns(results: xr.Dataset, env) -> np.ndarray:
+    """Columns of the stored ``log_likelihood`` holding the non-local likelihood.
+
+    Parameters
+    ----------
+    results : xr.Dataset
+        The decode's ``results.nc``, with ``state`` and ``position`` per state bin.
+    env : Environment
+        Fitted; its place bins are the Non-Local Continuous state's bins.
+
+    Returns
+    -------
+    ndarray of int, shape (n_interior_bins,)
+        The Non-Local Continuous columns at the interior bins, in
+        ``is_track_interior_`` order (the order ``nearest_interior_bins`` indexes).
+
+    Raises
+    ------
+    ValueError
+        The state's bins are not the environment's place bins.
+    """
+    cols = np.flatnonzero(results["state"].values == "Non-Local Continuous")
+    centers = np.asarray(env.place_bin_centers_).ravel()
+    if len(cols) != len(centers) or not np.allclose(
+        results["position"].values[cols], centers
+    ):
+        raise ValueError(
+            "the stored Non-Local Continuous bins are not the environment's place bins"
+        )
+    return cols[np.asarray(env.is_track_interior_).ravel()]
+
+
+def stored_event_likelihood(
+    log_likelihood: xr.DataArray, cols: np.ndarray, s: int, e: int
+) -> np.ndarray:
+    """The stored non-local log-likelihood of bins ``s..e``.
+
+    Returns
+    -------
+    ndarray, shape (e - s + 1, n_interior_bins)
+    """
+    rows = log_likelihood.isel(time=slice(s, e + 1)).values
+    return np.asarray(rows[:, cols], dtype=float)
+
+
+def window_spike_counts(
+    spike_times: Sequence[np.ndarray], start: float, stop: float
+) -> tuple[int, int]:
+    """Spikes in ``[start, stop)`` over all tetrodes, and the tetrodes with any."""
+    counts = [int(np.count_nonzero((x >= start) & (x < stop))) for x in spike_times]
+    return sum(counts), sum(c > 0 for c in counts)
+
+
 def events_with_map_in_left_out_bins(
     events: pd.DataFrame,
     mape: np.ndarray,
@@ -346,20 +411,31 @@ def event_metrics(
 
 
 def analyze_session(
-    epoch_id: str, cache_dir: Path, n_sample: int, seed: int = 0
+    epoch_id: str,
+    cache_dir: Path,
+    n_sample: int,
+    seed: int = 0,
+    likelihood: str = "stored",
 ) -> tuple[pd.DataFrame, dict]:
     """Compute per-event reality metrics for one session.
+
+    ``likelihood`` is ``"stored"`` (the decode's ``log_likelihood``) or
+    ``"rebuild"`` (recomputed on the CPU; see the module docstring).
 
     Returns ``(metrics_df, context)`` where context holds arrays needed for
     figures (``pos``, ``gpi``, ``t``, ``mape``, ``lin``, etc.).
     """
+    if likelihood not in ("stored", "rebuild"):
+        raise ValueError(
+            f"likelihood must be 'stored' or 'rebuild', not {likelihood!r}"
+        )
     # The read refuses labels that break the speed rule or the probability
     # contract.
+    paths = decode_paths(
+        epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
+    )
     dot = read_dot_with_swr_source(
-        decode_paths(
-            epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
-        ).data_over_time,
-        non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD,
+        paths.data_over_time, non_local_threshold=DEFAULT_NON_LOCAL_THRESHOLD
     )
     # Validate before loading encoding data so a missing/corrupt auxiliary
     # artifact cannot mask malformed event labels as an ordinary session skip.
@@ -375,16 +451,28 @@ def analyze_session(
     mape = dot["map_estimate"].to_numpy()
     lin = dot["linear_position"].to_numpy()
 
-    # events decoded where the CPU rebuild is not the decode are not scored
+    # where the CPU rebuild is not the decode: the rebuild leaves those events
+    # out; the stored likelihood is the decode's and scores them
     left_out = subnormal_occupancy_bin_mask(
         enc["encargs"]["occupancy"], env, floor=UNDERFLOW_OCCUPANCY_FLOOR
     )
     n_events = len(events)
-    n_events_left_out = 0
+    hit = np.zeros(n_events, dtype=bool)
     if left_out.any():
         hit = events_with_map_in_left_out_bins(events, mape, lin, env, left_out)
+    n_events_map_in_flagged_bins = int(hit.sum())
+    n_events_left_out = 0
+    if likelihood == "rebuild":
         events = events[~hit]
-        n_events_left_out = int(hit.sum())
+        n_events_left_out = n_events_map_in_flagged_bins
+
+    if likelihood == "stored":
+        results = xr.open_dataset(paths.results)
+        if not np.array_equal(results["time"].values, t):
+            raise ValueError(f"{epoch_id}: results.nc and data_over_time times differ")
+        log_likelihood = results["log_likelihood"]
+        cols = stored_likelihood_columns(results, env)
+        bin_s = float(np.median(np.diff(t)))
 
     records = []
     animal = animal_from_epoch_id(epoch_id)
@@ -394,9 +482,14 @@ def analyze_session(
         sample = g.sample(min(n_sample, len(g)), random_state=seed)
         for _, r in sample.iterrows():
             s, ev = int(r.s), int(r.e)
-            L, n_spk, n_tet = event_likelihood(
-                s, ev, t, lin, spike_times, waveform_features, encargs
-            )
+            if likelihood == "stored":
+                L = stored_event_likelihood(log_likelihood, cols, s, ev)
+                stop = t[ev + 1] if ev + 1 < len(t) else t[ev] + bin_s
+                n_spk, n_tet = window_spike_counts(spike_times, t[s], stop)
+            else:
+                L, n_spk, n_tet = event_likelihood(
+                    s, ev, t, lin, spike_times, waveform_features, encargs
+                )
             m = event_metrics(s, ev, L, n_spk, mape, lin, env, pos, gpi_peak_pos)
             if m is not None:
                 m.update(
@@ -409,6 +502,8 @@ def analyze_session(
                     animal=animal,
                 )
                 records.append(m)
+    if likelihood == "stored":
+        results.close()
 
     metrics_df = pd.DataFrame(records)
     context = {
@@ -429,6 +524,7 @@ def analyze_session(
             "bins": np.flatnonzero(left_out).tolist(),
             "n_events": n_events,
             "n_events_left_out": n_events_left_out,
+            "n_events_map_in_flagged_bins": n_events_map_in_flagged_bins,
         },
     }
     return metrics_df, context
@@ -592,6 +688,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--n-sample", type=int, default=N_SAMPLE_PER_GROUP)
     parser.add_argument(
+        "--likelihood",
+        choices=("stored", "rebuild"),
+        default="stored",
+        help="the decode's stored log_likelihood (default) or a CPU rebuild",
+    )
+    parser.add_argument(
         "--make-figures", action="store_true", help="render per-session figures"
     )
     args = parser.parse_args(argv)
@@ -611,7 +713,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     for epoch_id in sessions:
         try:
             metrics_df, context = analyze_session(
-                epoch_id, args.cache_dir, args.n_sample
+                epoch_id, args.cache_dir, args.n_sample, likelihood=args.likelihood
             )
         except EventDefinitionError:
             # A malformed saved event cohort invalidates the multi-session
@@ -630,6 +732,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "n_underflowed_bins": len(left_out["bins"]),
                 "n_events": left_out["n_events"],
                 "n_events_left_out": left_out["n_events_left_out"],
+                "n_events_map_in_flagged_bins": left_out[
+                    "n_events_map_in_flagged_bins"
+                ],
             }
         )
         if left_out["n_events_left_out"]:

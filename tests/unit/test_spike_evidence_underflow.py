@@ -1,13 +1,14 @@
-"""The spike-evidence ("reality") engine leaves out events decoded where the CPU
-rebuild is not the decode.
+"""The spike-evidence ("reality") engine's CPU rebuild leaves out events decoded
+where the rebuild is not the decode.
 
 In chimi20200221_08_r4 (D1) the animal never entered patch 1, so the stored
 occupancy at the far end of arm 1 is a float32 subnormal. The GPU decode kept
 it; a CPU rebuild of the likelihood flushes it to zero, so an event whose MAP is
 there is scored with numbers that differ from the decode's by up to 20 nats per
 spike. Such events are left out and counted. Bins whose occupancy is exactly 0
-are not: both devices read ``occupancy > 0`` as False there and agree. Every
-input here is synthetic: a straight track of 2 cm bins and a stand-in encoding.
+are not: both devices read ``occupancy > 0`` as False there and agree. (The
+default stored likelihood is the decode's and scores them:
+``test_spike_evidence_stored_likelihood.py``.) Every input here is synthetic: a straight track of 2 cm bins and a stand-in encoding.
 """
 
 from __future__ import annotations
@@ -127,7 +128,9 @@ def session(monkeypatch, tmp_path):
         monkeypatch.setattr(spike_evidence, name, value)
 
     def analyze():
-        return spike_evidence.analyze_session(EPOCH_ID, tmp_path, n_sample=10)
+        return spike_evidence.analyze_session(
+            EPOCH_ID, tmp_path, n_sample=10, likelihood="rebuild"
+        )
 
     return analyze, state, calls
 
@@ -150,6 +153,7 @@ def test_an_event_decoded_in_underflowed_bins_is_left_out_and_counted(session):
         "bins": ZONE.tolist(),
         "n_events": 4,
         "n_events_left_out": 1,
+        "n_events_map_in_flagged_bins": 1,
     }
     # the figures draw from the events that were scored
     assert context["events"].s.tolist() == [10, 80, 100]
@@ -167,6 +171,7 @@ def test_the_other_events_are_scored_as_when_nothing_underflows(session):
         "bins": [],
         "n_events": 4,
         "n_events_left_out": 0,
+        "n_events_map_in_flagged_bins": 0,
     }
     state["underflowing"] = True
     some_events, _ = analyze()
@@ -200,5 +205,6 @@ def test_the_run_records_how_many_events_each_epoch_left_out(
             "n_underflowed_bins": ZONE.size,
             "n_events": 4,
             "n_events_left_out": 1,
+            "n_events_map_in_flagged_bins": 1,
         }
     ]
