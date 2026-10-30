@@ -3,7 +3,8 @@
 One generator serves every test: stops of fitted bins at alternating rewarded
 and unrewarded outcomes, replay events of both classes inside them, and a
 log-rate that is a constant baseline, optionally raised by a stationary factor
-on rewarded stops, plus a planted per-SD kernel on one class's mark.
+on rewarded stops or on mixed stops (no well), plus a planted per-SD kernel on
+one class's mark.
 """
 
 from __future__ import annotations
@@ -59,27 +60,47 @@ def simulate(
     stop_bins: int = 600,
     gap_bins: int = 100,
     rate_hz: float = 25.0,
+    mixed_rate_factor: float | None = None,
+    onset_offset_s: float = 0.0,
+    half_window_bins: int = 30,
+    event_spacing_bins: int = 120,
 ) -> Simulation:
     """Simulate stops, events of both replay classes and Poisson counts.
 
-    Events sit every 120 bins inside each stop, alternating class. Every unit
+    Events sit every ``event_spacing_bins`` bins inside each stop, alternating
+    class; kernels span lags of ``half_window_bins`` either side. Every unit
     shares the log-rate: ``log(rate_hz)`` plus ``log(rewarded_rate_factor)``
     on every bin of a rewarded stop, plus ``z_e * planted(t - onset_e)`` at
     each driven-class event, where ``z_e`` is the event's within-class
     standardized ``planted_mark``. Nothing else is event-locked.
+
+    With ``mixed_rate_factor``, every stop whose index is 2 or 3 modulo 4 is a
+    mixed stop: no ``occupancy_well_id`` (NaN), ``log(mixed_rate_factor)``
+    added on its bins, and every event slot used, while the other stops
+    (well 0) keep only their first slot, so events are denser in mixed stops.
+    ``onset_offset_s`` moves the first event's recorded ``start_time`` off
+    the sample grid (inside its bin); the counts still use its bin.
     """
     rng = np.random.default_rng(seed)
     n_time = n_stops * (stop_bins + gap_bins)
     time = np.arange(n_time) / SAMPLING_FREQUENCY
     fitted = np.zeros(n_time, dtype=bool)
     rewarded = np.resize([1.0, 0.0], n_stops)
+    mixed = (
+        np.isin(np.arange(n_stops) % 4, (2, 3))
+        if mixed_rate_factor is not None
+        else np.zeros(n_stops, dtype=bool)
+    )
     starts, ends, onsets, stop_of_event = [], [], [], []
     for stop in range(n_stops):
         first = stop * (stop_bins + gap_bins)
         fitted[first : first + stop_bins] = True
         starts.append(time[first])
         ends.append(time[first + stop_bins - 1])
-        for onset in first + 60 + np.arange(0, stop_bins - 120, 120):
+        slots = first + 60 + np.arange(0, stop_bins - 120, event_spacing_bins)
+        if mixed_rate_factor is not None and not mixed[stop]:
+            slots = slots[:1]
+        for onset in slots:
             onsets.append(onset)
             stop_of_event.append(stop)
     onsets = np.asarray(onsets)
@@ -89,12 +110,12 @@ def simulate(
             "stop_idx": np.arange(n_stops),
             "stop_start": starts,
             "stop_end": ends,
-            "occupancy_well_id": 0.0,
+            "occupancy_well_id": np.where(mixed, np.nan, 0.0),
             "is_rewarded_outcome": rewarded,
         }
     )
     fit_mask = pd.Series(fitted, index=time)
-    lags = np.arange(-30, 31)
+    lags = np.arange(-half_window_bins, half_window_bins + 1)
     basis, lag_time, _ = event_basis_functions(lags, SAMPLING_FREQUENCY)
 
     classes = np.resize(np.array(MARKED_EVENT_CLASSES), len(onsets))
@@ -104,11 +125,13 @@ def simulate(
         EVENT_DURATION_MARK: np.log(rng.uniform(0.02, 0.2, len(onsets))),
         REWARDED_CONTEXT: rewarded[stop_of_event],
     }
+    start_time = time[onsets].copy()
+    start_time[0] += onset_offset_s
     events = {
         event_class: pd.DataFrame(
             {
                 "event_id": np.flatnonzero(classes == event_class),
-                "start_time": time[onsets[classes == event_class]],
+                "start_time": start_time[classes == event_class],
                 "stop_idx": stop_of_event[classes == event_class],
                 **{
                     name: values[classes == event_class]
@@ -129,6 +152,9 @@ def simulate(
     for stop in np.flatnonzero(rewarded):
         first = stop * (stop_bins + gap_bins)
         log_rate[first : first + stop_bins] += np.log(rewarded_rate_factor)
+    for stop in np.flatnonzero(mixed):
+        first = stop * (stop_bins + gap_bins)
+        log_rate[first : first + stop_bins] += np.log(mixed_rate_factor)
     for onset, mark_z in zip(onsets[driven], standardized, strict=True):
         np.add.at(log_rate, np.clip(onset + lags, 0, n_time - 1), mark_z * planted)
     counts = rng.poisson(np.exp(log_rate)[:, None], size=(n_time, n_units))[fitted]
@@ -148,13 +174,24 @@ def simulate(
     )
 
 
-def fit(simulation: Simulation, spec: MarkedFamilySpec, *, baseline: bool, **kwargs):
-    """Build and fit one spec on a simulation, with or without the baseline."""
-    columns = (
-        build_baseline_columns(simulation.fit_mask, simulation.stops)[0]
-        if baseline
-        else None
-    )
+def fit(
+    simulation: Simulation,
+    spec: MarkedFamilySpec,
+    *,
+    baseline: bool,
+    without_columns: tuple[str, ...] = (),
+    **kwargs,
+):
+    """Build and fit one spec on a simulation, with or without the baseline.
+
+    ``without_columns`` names baseline columns to leave out of the design.
+    """
+    columns = None
+    if baseline:
+        columns, names, _ = build_baseline_columns(
+            simulation.fit_mask, simulation.stops
+        )
+        columns = columns[:, [name not in without_columns for name in names]]
     ladder = build_marked_family_ladder(
         simulation.events,
         simulation.fit_mask,
@@ -198,6 +235,42 @@ def test_planted_kernel_is_recovered_with_a_context_offset_present():
         assert abs(reward[pre_onset].mean()) < 0.05
         confounded = without_baseline.mark_curves[event_class][REWARDED_CONTEXT]
         assert confounded[pre_onset].mean() > 0.1
+
+
+@pytest.mark.slow
+def test_mixed_stop_offset_moves_neither_kernel_nor_reference_level():
+    """Mixed stops (no well) at twice the rate, with events denser in them.
+
+    With ``well_unknown`` the offset goes to that column: the intercept is the
+    reference well's level and the ordinary kernels stay at their true zero.
+    Without it the mixed stops are coded as the reference well, so the
+    intercept is raised and the kernels read the offset as event-locked.
+    """
+    simulation = simulate(20261030, mixed_rate_factor=2.0)
+    spec = MarkedFamilySpec(
+        "mixed_offset",
+        (CURRENT_ARM_FRACTION,),
+        (EVENT_DURATION_MARK,),
+        "is a stationary mixed-stop offset kept out of the kernels?",
+    )
+    names = build_baseline_columns(simulation.fit_mask, simulation.stops)[1]
+    assert names == ("well_unknown", "rewarded_outcome")
+    true_level = np.log(25.0 / SAMPLING_FREQUENCY)
+    options = {"baseline": True, "baseline_penalty_sigma": 3.0}
+
+    with_column = fit(simulation, spec, **options)
+    without_column = fit(simulation, spec, without_columns=("well_unknown",), **options)
+
+    assert with_column.full_params[:, 0].mean() == pytest.approx(true_level, abs=0.03)
+    assert with_column.full_params[:, 1].mean() == pytest.approx(np.log(2.0), abs=0.03)
+    assert without_column.full_params[:, 0].mean() - true_level > 0.15
+    for event_class in MARKED_EVENT_CLASSES:
+        assert abs(np.nanmean(with_column.typical_curves[event_class])) < 0.03
+        assert np.nanmean(without_column.typical_curves[event_class]) > 0.08
+    recovered = with_column.mark_curves[DRIVEN_CLASS][CURRENT_ARM_FRACTION]
+    curve = np.nanmean(recovered, axis=1)
+    assert curve[simulation.peak_lag_index] == pytest.approx(PLANTED_PEAK, abs=0.35)
+    assert abs(int(np.argmax(curve)) - simulation.peak_lag_index) <= 1
 
 
 def _window_mean_and_band(result, event_class: str, mark: str):
@@ -259,7 +332,13 @@ def test_planted_context_kernel_is_separated_from_its_baseline():
 
 @pytest.mark.slow
 def test_planted_strength_kernel_is_recovered():
-    simulation = simulate(20261029, planted_mark="ripple_power_z")
+    # One event's onset lies between two samples (0.4 of a bin after its
+    # sample); it is binned with that sample, as the counts are.
+    simulation = simulate(
+        20261029,
+        planted_mark="ripple_power_z",
+        onset_offset_s=0.4 / SAMPLING_FREQUENCY,
+    )
     spec = MarkedFamilySpec(
         "strength_reference",
         ("ripple_power_z", CURRENT_ARM_FRACTION),
@@ -278,9 +357,9 @@ def test_planted_strength_kernel_is_recovered():
 
     peak = simulation.peak_lag_index
     curve = np.nanmean(result.mark_curves[DRIVEN_CLASS]["ripple_power_z"], axis=1)
-    # Sign and peak lag of the planted kernel (within 10 ms).
+    # Sign and peak lag of the planted kernel (within one 2 ms bin).
     assert curve[peak] == pytest.approx(PLANTED_PEAK, abs=0.35)
-    assert abs(int(np.argmax(curve)) - peak) <= 5
+    assert abs(int(np.argmax(curve)) - peak) <= 1
     null = np.nanmean(result.slope_null[DRIVEN_CLASS]["ripple_power_z"], axis=2)
     assert abs(null[:, peak].mean()) < 0.15
     assert curve[peak] > np.percentile(null[:, peak], 97.5)
@@ -408,3 +487,162 @@ def test_residualized_reference_is_as_wide_as_the_estimator_under_correlated_mar
     assert r_squared == pytest.approx(0.5625, abs=0.1)
     assert residualized_sd / estimator_sd == pytest.approx(1.0, abs=0.2)
     assert raw_sd / estimator_sd < 0.85
+
+
+def _load_runner():
+    """Import the marked-family runner script as a module."""
+    import importlib.util
+    from pathlib import Path
+
+    script = (
+        Path(__file__).resolve().parents[3]
+        / "scripts"
+        / "pfc"
+        / "run_pfc_marked_model_family.py"
+    )
+    spec = importlib.util.spec_from_file_location("run_pfc_marked_family_rt", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.slow
+def test_runner_round_trip_keeps_the_planted_peak_and_drops_silent_units(
+    tmp_path, monkeypatch
+):
+    """``run_analysis`` writes a bundle that reads back with the planted kernel.
+
+    Only the Spyglass-backed loaders are replaced (they hand over the simulated
+    session); eligibility, the design, the fit and the bundle writing are the
+    runner's own. Two units have no spike in the fitted bins: under the
+    baseline prior they are left out, and the table's ``neuron_index`` and the
+    sidecar's ``kept_unit_indices`` name the recorded units that were kept.
+    """
+    import json
+
+    from continuum_swr_replay.analysis.pfc.marked_glm import MarkedSessionContext
+    from continuum_swr_replay.analysis.pfc.marked_model_family import (
+        DECODE_ENTROPY,
+        LEAF_CONTENT_FRACTION,
+    )
+
+    runner = _load_runner()
+    model = f"marginal_{CURRENT_ARM_FRACTION}"
+    simulation = simulate(
+        20261031,
+        n_units=12,
+        stop_bins=1500,
+        gap_bins=300,
+        event_spacing_bins=300,
+        half_window_bins=125,
+        mixed_rate_factor=1.5,
+    )
+    silent = (3, 9)
+    n_recorded = simulation.counts.shape[1] + len(silent)
+    kept = np.setdiff1d(np.arange(n_recorded), silent)
+    counts = np.zeros((simulation.counts.shape[0], n_recorded))
+    counts[:, kept] = simulation.counts
+    rng = np.random.default_rng(1)
+    events = {
+        event_class: frame.assign(
+            **{
+                LEAF_CONTENT_FRACTION: rng.uniform(0.2, 1.0, len(frame)),
+                DECODE_ENTROPY: rng.uniform(1.0, 3.0, len(frame)),
+            }
+        )
+        for event_class, frame in simulation.events.items()
+    }
+    baseline, names, report = build_baseline_columns(
+        simulation.fit_mask, simulation.stops
+    )
+    hashes = {
+        "canonical_event_table_sha256": "event",
+        "data_over_time_sha256": "dot",
+        "swr_interval_source": "kay",
+        "swr_events_sha256": "swr",
+    }
+    context = MarkedSessionContext(
+        fit_mask=simulation.fit_mask,
+        counts=counts,
+        events=events,
+        spline_basis=simulation.spline_basis,
+        lag_time=simulation.lag_time,
+        lags=simulation.lags,
+        cohort_info={"n_bins_fit": int(simulation.fit_mask.sum())},
+        input_provenance=dict(hashes),
+        baseline=baseline,
+        baseline_names=names,
+        baseline_report=report,
+    )
+    monkeypatch.setattr(
+        runner,
+        "record_inputs",
+        lambda inputs: {key: {"sha256": key.split("_")[0]} for key in inputs},
+    )
+    monkeypatch.setattr(
+        runner, "canonical_event_input_hashes", lambda *a, **k: dict(hashes)
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_cohort",
+        lambda *a, **k: (simulation.stops, {"stop_table_sha256": "stop"}),
+    )
+    monkeypatch.setattr(
+        runner, "prepare_marked_session_context", lambda *a, **k: context
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_recommended_event_marks",
+        lambda *a, **k: (
+            events,
+            {"event_arm_table_sha256": "event", "event_table_sha256": "event"},
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_session_stop_patch_switch_marks",
+        lambda *a, **k: (
+            pd.DataFrame(
+                {"trips_to_patch_switch": np.nan, "next_trip_switches_patch": np.nan},
+                index=pd.Index(simulation.stops["stop_idx"], name="stop_idx"),
+            ),
+            "stop",
+        ),
+    )
+
+    assert runner.run_analysis(
+        "rat20200101_.nwb",
+        "01_r1",
+        model_names=(model,),
+        output_dir=tmp_path,
+        log_directory=tmp_path / "logs",
+        event_arm_table_path=tmp_path / "event_arm_table.parquet",
+        event_table_path=tmp_path / "event_table.parquet",
+        baseline_penalty_sigma=3.0,
+        n_folds=5,
+        design_batch_size=4,
+    )
+
+    artifact = runner.family_artifact_path(tmp_path, "rat20200101_01_r1_mPFC", model)
+    record = json.loads(runner.fit_provenance_path(artifact).read_text())
+    extra = record.get("extra", record)
+    assert extra["bundle_status"] == "complete"
+    assert extra["bundle_contract_version"] == 3
+    assert extra["n_units_recorded"] == n_recorded
+    assert extra["n_units_without_spikes"] == len(silent)
+    assert extra["kept_unit_indices"] == kept.tolist()
+    assert "well_unknown" in extra["baseline_column_names"]
+    table = pd.read_pickle(artifact)
+    assert table["neuron_index"].tolist() == kept.tolist()
+    assert (table["fit_spike_count"] > 0).all()
+
+    lag_time = np.load(artifact.with_suffix(".lag_time.npy"))
+    slope = np.load(
+        artifact.with_suffix(f".{DRIVEN_CLASS}.{CURRENT_ARM_FRACTION}.slope.npy")
+    )
+    assert slope.shape == (len(lag_time), len(kept))
+    curve = np.nanmean(slope, axis=1)
+    true_peak = simulation.lag_time[simulation.peak_lag_index]
+    peak = int(np.argmin(np.abs(lag_time - true_peak)))
+    assert abs(int(np.argmax(curve)) - peak) <= 1
+    assert curve[peak] == pytest.approx(PLANTED_PEAK, abs=0.35)

@@ -622,7 +622,9 @@ def test_a_prepared_window_off_the_pinned_contract_is_refused(spline_basis, lags
         runner._check_prepared_window(spline_basis, lags)
 
 
-def test_runner_contract_records_baseline_names_and_version_two(tmp_path, monkeypatch):
+def test_runner_contract_records_baseline_names_and_version_three(
+    tmp_path, monkeypatch
+):
     context = _context()
     _install_mocks(monkeypatch, context)
 
@@ -630,7 +632,7 @@ def test_runner_contract_records_baseline_names_and_version_two(tmp_path, monkey
 
     artifact = _artifact(tmp_path)
     record = json.loads(runner.fit_provenance_path(artifact).read_text())
-    assert record["bundle_contract_version"] == 2
+    assert record["bundle_contract_version"] == 3
     assert record["baseline_terms"] == "well_and_reward_outcome"
     assert record["baseline_column_names"] == ["well_2", "rewarded_outcome"]
     assert record["baseline_reference_well"] == 0
@@ -638,13 +640,15 @@ def test_runner_contract_records_baseline_names_and_version_two(tmp_path, monkey
     assert runner._bundle_is_current(
         artifact, SPEC, overwrite=False, fit_contract=_contract()
     )
-    # A contract-1 sidecar never matches, so the old corpus is refit, not skipped.
-    runner.fit_provenance_path(artifact).write_text(
-        json.dumps({**record, "bundle_contract_version": 1})
-    )
-    assert not runner._bundle_is_current(
-        artifact, SPEC, overwrite=False, fit_contract=_contract()
-    )
+    # An older sidecar (contract 1: no baseline; contract 2: no well_unknown)
+    # never matches, so an old corpus is refit, not skipped.
+    for old_version in (1, 2):
+        runner.fit_provenance_path(artifact).write_text(
+            json.dumps({**record, "bundle_contract_version": old_version})
+        )
+        assert not runner._bundle_is_current(
+            artifact, SPEC, overwrite=False, fit_contract=_contract()
+        )
     # Without the baseline the contract differs, so neither bundle stands in
     # for the other.
     assert _contract(baseline_terms="none") != _contract()
