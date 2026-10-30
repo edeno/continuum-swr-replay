@@ -4,8 +4,7 @@
 The shipped per-bin design treats each event as an instant onset: every 15 ms
 bin of a stop is at risk, including the bins inside an ongoing event, and
 self-/cross-history count past onsets. On simulated data that alone produces a
-short-lag "refractory" dip, a self-history burst near 90-120 ms and two-way
-cross coupling (``.claude/docs/reviews/2026-10-26-duration-aware-history-
+short-lag "refractory" dip, a self-history burst and two-way cross coupling (``.claude/docs/reviews/2026-10-26-duration-aware-history-
 simulation.md``). This runner refits the history on the at-risk design
 (``analysis/replay/duration_aware_history.py:build_design``):
 
@@ -50,7 +49,6 @@ import argparse
 import logging
 import sys
 import time
-import warnings
 from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
@@ -105,7 +103,6 @@ def _fit_one_session(
     keys: tuple, stops_g: pd.DataFrame, onsets_g: pd.DataFrame
 ) -> tuple[tuple, list[dict], float]:
     """Fit every population's rungs for one session. Top-level for workers."""
-    warnings.filterwarnings("ignore")
     t0 = time.perf_counter()
     rows: list[dict] = []
     for outcome, (event_type, cross_pop) in POPULATION_PLAN.items():
@@ -148,7 +145,6 @@ def _fit_one_animal(
     animal: str, outcome: str, sessions: list
 ) -> tuple[tuple, dict, float]:
     """Fit one animal's stacked sessions for one population. For workers."""
-    warnings.filterwarnings("ignore")
     t0 = time.perf_counter()
     rec: dict = {"animal": animal, "outcome": outcome, "n_sessions": len(sessions)}
     design, rungs = _stacked(sessions, outcome, duration_aware=True)

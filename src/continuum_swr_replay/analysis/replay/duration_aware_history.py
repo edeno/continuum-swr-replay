@@ -35,7 +35,11 @@ from continuum_swr_replay.analysis.events.swr_source import (
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
-from ._fit_diagnostics import EXPECTED_FIT_ERRORS
+from ._fit_diagnostics import (
+    EXPECTED_FIT_ERRORS,
+    capture_fit_warnings,
+    count_fit_quality_warnings,
+)
 from .design_constants import BIN_S, N_HISTORY_BASIS, N_HISTORY_LAGS, TMAX
 from .model_specs import (
     MODEL_CROSS_HISTORY_DURATION_RATE,
@@ -364,19 +368,22 @@ def fit_pooled_history(
     -------
     dict
         ``ok``; when the fit ran: ``aic``, ``llf``, ``n_params``,
-        ``converged``, ``seconds`` and ``kernels`` (block -> ``log_rr`` and its
-        Wald ``se`` per lag, and the basis ``coef``); otherwise ``error``.
+        ``converged``, ``n_convergence_warnings`` (convergence and separation
+        warnings statsmodels raised), ``warnings`` (their distinct messages),
+        ``seconds`` and ``kernels`` (block -> ``log_rr`` and its Wald ``se``
+        per lag, and the basis ``coef``); otherwise ``error``.
     """
     cols = [c for c in spec.design_columns() if c != "count"]
     df = design[["count", "exposure", group, *cols]]
     t0 = time.perf_counter()
     try:
-        res = smf.glm(
-            spec.formula() + f" + C({group})",
-            data=df,
-            family=sm.families.Poisson(),
-            offset=np.log(df["exposure"].to_numpy(dtype=float)),
-        ).fit()
+        with capture_fit_warnings() as caught:
+            res = smf.glm(
+                spec.formula() + f" + C({group})",
+                data=df,
+                family=sm.families.Poisson(),
+                offset=np.log(df["exposure"].to_numpy(dtype=float)),
+            ).fit()
     except EXPECTED_FIT_ERRORS as exc:
         return {"ok": False, "error": repr(exc)}
     basis = raised_cosine_history_basis(N_HISTORY_LAGS, N_HISTORY_BASIS)
@@ -398,6 +405,8 @@ def fit_pooled_history(
         "llf": float(res.llf),
         "n_params": int(len(res.params)),
         "converged": bool(res.converged),
+        "n_convergence_warnings": count_fit_quality_warnings(caught),
+        "warnings": sorted({str(w.message) for w in caught}),
         "seconds": round(time.perf_counter() - t0, 1),
         "kernels": kernels,
     }

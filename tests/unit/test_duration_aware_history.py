@@ -358,3 +358,178 @@ def test_pooled_fit_recovers_the_end_locked_kernel_with_a_session_effect():
     assert fit["ok"] and fit["converged"]
     assert int(np.argmax(kernel)) + 1 in (2, 3)
     assert np.all(np.isfinite(se)) and np.all(se > 0)
+
+
+# ── Readouts of a design or a fit, on hand-built inputs ──
+
+
+def test_history_kernels_weight_the_bumps_by_each_block_coefficients():
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        history_kernels,
+    )
+
+    n_lags, n_basis = model_specs.N_HISTORY_LAGS, model_specs.N_HISTORY_BASIS
+    basis = raised_cosine_history_basis(n_lags, n_basis)  # (n_basis, n_lags)
+    fit = {f"coef_hist_rcos_{k}": float(k == 1) for k in range(n_basis)}
+    fit |= {f"coef_offhist_rcos_{k}": 2.0 for k in range(n_basis)}
+    fit["coef_cross_hist_rcos_0"] = 1.0  # an incomplete block is not read
+    kernels = history_kernels(fit)
+    assert set(kernels) == {"self_onset", "self_offset"}
+    np.testing.assert_allclose(kernels["self_onset"], basis[1])
+    np.testing.assert_allclose(kernels["self_offset"], 2.0 * basis.sum(axis=0))
+    assert kernels["self_onset"].shape == (n_lags,)
+
+
+def _lag_design() -> pd.DataFrame:
+    """Four bins, two onsets in 0.06 s; onset-lag columns marked by hand."""
+    n_lags = model_specs.N_HISTORY_LAGS
+    design = pd.DataFrame(
+        {"count": [1, 0, 1, 0], "exposure": [0.015, 0.015, 0.01, 0.02]}
+    )
+    for j in range(1, n_lags + 1):
+        design[f"onset_lag{j}"] = 0
+        design[f"offset_lag{j}"] = 0
+    design.loc[[1, 3], "onset_lag1"] = 1  # exposure 0.035 has a past onset at lag 1
+    design.loc[2, "onset_lag2"] = 2  # a count, not a flag: still one bin's exposure
+    design.loc[[0, 1, 2, 3], "offset_lag3"] = 1
+    return design
+
+
+def test_lag_support_is_the_mean_rate_times_the_exposure_at_each_lag():
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        lag_support,
+    )
+
+    support = lag_support(_lag_design())
+    assert set(support) == {"self_onset", "self_offset"}
+    rate = 2 / 0.06
+    expected = np.zeros(model_specs.N_HISTORY_LAGS)
+    expected[0], expected[1] = rate * 0.035, rate * 0.01
+    np.testing.assert_allclose(support["self_onset"], expected)
+    assert support["self_offset"][2] == pytest.approx(2.0)  # rate x all exposure
+    assert support["self_offset"][[0, 1, 3]].sum() == 0
+
+
+def test_onset_offset_collinearity_is_one_for_shifted_copies_and_lower_otherwise():
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        onset_offset_collinearity,
+    )
+
+    rng = np.random.default_rng(0)
+    n_basis = model_specs.N_HISTORY_BASIS
+    onset = rng.normal(size=(200, n_basis))
+    onset[:20] = 0.0  # bins with no history in either block are left out
+    same = pd.DataFrame(
+        {
+            **{f"hist_rcos_{k}": onset[:, k] for k in range(n_basis)},
+            # the offset block spans the same space (a mixing of the onset bumps)
+            **{
+                f"offhist_rcos_{k}": onset @ rng.normal(size=n_basis)
+                for k in range(n_basis)
+            },
+        }
+    )
+    assert onset_offset_collinearity(same) == {
+        "canonical_corr_self": pytest.approx(1.0)
+    }
+    other = rng.normal(size=(200, n_basis))
+    independent = same.assign(
+        **{f"offhist_rcos_{k}": other[:, k] for k in range(n_basis)},
+        **{f"cross_hist_rcos_{k}": other[:, k] for k in range(n_basis)},
+        **{f"cross_offhist_rcos_{k}": other[:, k] for k in range(n_basis)},
+    )
+    result = onset_offset_collinearity(independent)
+    assert 0 < result["canonical_corr_self"] < 0.5
+    assert result["canonical_corr_cross"] == pytest.approx(1.0)
+    assert onset_offset_collinearity(same.drop(columns="offhist_rcos_0")) == {}
+
+
+def _swr_onsets(times, t_since) -> pd.DataFrame:
+    keys = {"animal": "x", "session_date": 1, "epoch": "02_r1", "stop_id": 1}
+    return pd.DataFrame(
+        [
+            {**keys, "event_type": "SWR", "onset_time": t, "t_since_stop_onset": s}
+            for t, s in zip(times, t_since, strict=True)
+        ]
+    )
+
+
+@pytest.fixture
+def kay_inventory(monkeypatch):
+    """A Kay inventory of three events, 1 ms apart at the middle pair."""
+    from continuum_swr_replay.analysis.replay import duration_aware_history as dah
+
+    inventory = pd.DataFrame(
+        {"start_time": [19.9, 20.0, 20.003], "end_time": [19.95, 20.05, 20.103]}
+    )
+    monkeypatch.setattr(dah, "swr_epoch_id_of_session", lambda *keys: "epoch")
+    monkeypatch.setattr(dah, "read_swr_inventory", lambda epoch_id: inventory)
+    return dah
+
+
+def _no_non_local_events() -> pd.DataFrame:
+    """An event table with no rows, typed as the real one."""
+    return pd.DataFrame(
+        {
+            "animal": pd.Series(dtype=object),
+            "session_date": pd.Series(dtype=int),
+            "epoch": pd.Series(dtype=object),
+            "stop_id": pd.Series(dtype=int),
+            "event_start_s": pd.Series(dtype=float),
+            "event_end_s": pd.Series(dtype=float),
+        }
+    )
+
+
+def test_attach_event_ends_gives_an_swr_onset_its_nearest_kay_event(kay_inventory):
+    dah = kay_inventory
+    # 20.001 is 1 ms from 20.0 and 2 ms from 20.003: the nearer one's end;
+    # 20.0024 is nearer 20.003; 19.8995 matches the first event within 0.5 ms.
+    out = dah.attach_event_ends(
+        _swr_onsets([20.001, 20.0024, 19.8995], [1.0, 2.0, 3.0]),
+        _no_non_local_events(),
+    )
+    np.testing.assert_allclose(out[dah.END_COLUMN], [1.05, 2.1, 3.05])
+
+
+def test_attach_event_ends_raises_when_no_kay_event_is_within_tolerance(
+    kay_inventory,
+):
+    dah = kay_inventory
+    # 2.6 ms after the last start: beyond SWR_START_TOLERANCE_S (2.5 ms)
+    with pytest.raises(ValueError, match="1 SWR onsets have no Kay event"):
+        dah.attach_event_ends(
+            _swr_onsets([20.0056, 20.0], [1.0, 2.0]), _no_non_local_events()
+        )
+
+
+def test_pooled_fit_records_its_convergence_warnings(monkeypatch):
+    import warnings
+
+    from statsmodels.genmod.generalized_linear_model import GLM
+    from statsmodels.tools.sm_exceptions import ConvergenceWarning
+
+    from continuum_swr_replay.analysis.replay.duration_aware_history import (
+        fit_pooled_history,
+    )
+    from continuum_swr_replay.analysis.replay.per_bin_rate_model import (
+        freeze_per_bin_cohort,
+    )
+
+    spec = model_specs.MODEL_CROSS_HISTORY_DURATION_RATE["Mself_offset_dur"]
+    design, _ = freeze_per_bin_cohort(_simulated_design(n_stops=100), [spec])
+    design["session"] = "only"
+    fit = fit_pooled_history(design, spec)
+    assert fit["n_convergence_warnings"] == 0 and fit["warnings"] == []
+
+    original = GLM.fit
+
+    def warning_fit(self, *args, **kwargs):
+        warnings.warn("IRLS hit the iteration limit", ConvergenceWarning, stacklevel=2)
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(GLM, "fit", warning_fit)
+    fit = fit_pooled_history(design, spec)
+    assert fit["ok"]
+    assert fit["n_convergence_warnings"] == 1
+    assert fit["warnings"] == ["IRLS hit the iteration limit"]

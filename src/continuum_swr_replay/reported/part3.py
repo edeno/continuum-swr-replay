@@ -2594,10 +2594,28 @@ CROSS_DIRECTIONS = {
 CROSS_LAG_MS = 45
 
 
+def _lag_ms(j: int) -> int:
+    """Lag index ``j`` of a history kernel in ms: lag ``j + 1`` bins of ``BIN_S``."""
+    return round((j + 1) * BIN_S * 1e3)
+
+
+def _lag_index(ms: float) -> int:
+    """The history-kernel index of a lag of ``ms`` milliseconds."""
+    return round(ms / (BIN_S * 1e3)) - 1
+
+
 def _pooled_kernel(rec: dict, rung: str, block: str) -> dict | None:
-    """One (animal, population) fit's kernel with its measurable lags."""
+    """One (animal, population) fit's kernel with its measurable lags.
+
+    None when the rung did not fit, did not converge, or lacks the block.
+    """
     fit = rec["duration_aware"].get(rung)
-    if fit is None or not fit["ok"] or block not in fit["kernels"]:
+    if (
+        fit is None
+        or not fit["ok"]
+        or not fit["converged"]
+        or block not in fit["kernels"]
+    ):
         return None
     k = fit["kernels"][block]
     log_rr, se = np.asarray(k["log_rr"]), np.asarray(k["se"])
@@ -2608,12 +2626,13 @@ def _pooled_kernel(rec: dict, rung: str, block: str) -> dict | None:
 
 
 def _peak(kernel: dict) -> tuple[float, int, bool] | None:
-    """(rate ratio, lag in ms, CI above 1) at the largest measurable lag."""
+    """(rate ratio, lag in ms, CI above 1) at the measurable lag whose rate ratio
+    is largest; None when no lag is measurable."""
     if not kernel["ok"].any():
         return None
     j = int(np.nanargmax(np.where(kernel["ok"], kernel["log_rr"], np.nan)))
     lr, se = kernel["log_rr"][j], kernel["se"][j]
-    return float(np.exp(lr)), (j + 1) * 15, bool(lr - 1.96 * se > 0)
+    return float(np.exp(lr)), _lag_ms(j), bool(lr - 1.96 * se > 0)
 
 
 def duration_aware_history_values(
@@ -2625,8 +2644,12 @@ def duration_aware_history_values(
     population, the rungs fit to the animal's stacked sessions. The kernels are
     the both-anchor rung's (``Mself_dur``; ``Mselfcross_dur`` for cross), read
     at measurable lags only (expected onsets >= ``HISTORY_MIN_SUPPORT``, Wald
-    SE <= ``HISTORY_MAX_SE``). ``sessions`` is ``duration_aware_history_models.pkl``,
-    for the per-session cross AIC.
+    SE <= ``HISTORY_MAX_SE``) of converged fits; an animal whose lag is not
+    measurable is left out of that lag's values, and the description says how
+    many were kept. A cross direction with an unconverged pooled fit is
+    pending. ``sessions`` is ``duration_aware_history_models.pkl``, for the
+    per-session cross AIC, over sessions where both rungs converged and are
+    not separated.
     """
     make = _value_factory(source, ("19c",), ("paper",))
     by_pop: dict[str, dict[str, dict]] = {}
@@ -2638,22 +2661,29 @@ def duration_aware_history_values(
     )
     values: list[Value] = []
     first_lag, end_peaks, end_lags, end_animals = [], [], [], []
-    n_fits = n_suppressed = n_raised = 0
+    n_fits = n_measured = n_suppressed = n_raised = 0
+    first_ms = _lag_ms(0)
     for word, (outcome, label) in RATE_POPULATIONS.items():
         ends, onsets, first = [], [], []
         for rec in by_pop[outcome].values():
             end = _pooled_kernel(rec, "Mself_dur", "self_offset")
             onset = _pooled_kernel(rec, "Mself_dur", "self_onset")
-            _require(end is not None, f"{outcome}/{rec['animal']}: Mself_dur failed")
+            _require(
+                end is not None,
+                f"{outcome}/{rec['animal']}: Mself_dur failed or did not converge",
+            )
             n_fits += 1
-            lr, se = end["log_rr"][0], end["se"][0]
-            first.append(float(np.exp(lr)))
-            n_suppressed += bool(lr + 1.96 * se < 0)
-            n_raised += bool(lr - 1.96 * se > 0)
+            if end["ok"][0]:
+                n_measured += 1
+                lr, se = end["log_rr"][0], end["se"][0]
+                first.append(float(np.exp(lr)))
+                n_suppressed += bool(lr + 1.96 * se < 0)
+                n_raised += bool(lr - 1.96 * se > 0)
             if (peak := _peak(end)) is not None:
                 ends.append(peak)
             if onset is not None and (peak := _peak(onset)) is not None:
                 onsets.append(peak)
+        _require(bool(first), f"{outcome}: no animal's {first_ms} ms lag is measurable")
         first_lag.append(float(np.median(first)))
         end_peaks.append(np.median([p[0] for p in ends]))
         end_lags.append(np.median([p[1] for p in ends]))
@@ -2692,8 +2722,9 @@ def duration_aware_history_values(
             "quantity",
             "dec2",
             "lowest over the four populations of the median (over animals) rate ratio "
-            "15 ms after the previous event's end (end-locked part of Mself_dur, "
-            f"at-risk design); {UPPER_BOUND}",
+            f"{first_ms} ms after the previous event's end (end-locked part of "
+            f"Mself_dur, at-risk design), over the {n_measured} of {n_fits} animal x "
+            f"population fits whose {first_ms} ms lag is measurable; {UPPER_BOUND}",
             "rate ratio",
         ),
         make(
@@ -2701,8 +2732,9 @@ def duration_aware_history_values(
             max(first_lag),
             "quantity",
             "dec2",
-            "highest over the four populations of that median rate ratio 15 ms after "
-            "the previous event's end",
+            "highest over the four populations of that median rate ratio "
+            f"{first_ms} ms after the previous event's end ({n_measured} of {n_fits} "
+            "fits measurable)",
             "rate ratio",
         ),
         make(
@@ -2710,23 +2742,27 @@ def duration_aware_history_values(
             n_suppressed,
             "count",
             "count",
-            "animal x population fits whose rate 15 ms after the previous event's end "
-            "is below 1 with its 95 % CI (suppression after the end)",
+            f"animal x population fits whose rate {first_ms} ms after the previous "
+            "event's end is below 1 with its 95 % CI (suppression after the end), of "
+            "the history_fits fits where that lag is measurable",
         ),
         make(
             "history_end_first_lag_raised_fits",
             n_raised,
             "count",
             "count",
-            "animal x population fits whose rate 15 ms after the previous event's end "
-            "is above 1 with its 95 % CI",
+            f"animal x population fits whose rate {first_ms} ms after the previous "
+            "event's end is above 1 with its 95 % CI, of the history_fits fits where "
+            "that lag is measurable",
         ),
         make(
             "history_fits",
-            n_fits,
+            n_measured,
             "count",
             "count",
-            "animal x population pooled fits (5 animals x 4 populations)",
+            f"animal x population pooled fits ({n_fits} converged) whose {first_ms} ms "
+            "end-locked lag is measurable: the denominator of the raised and "
+            "suppressed counts",
         ),
         make(
             "history_end_peak_low",
@@ -2771,22 +2807,54 @@ def duration_aware_history_values(
             "CI above 1",
         ),
     ]
-    lag = CROSS_LAG_MS // 15 - 1
+    lag = _lag_index(CROSS_LAG_MS)
+    rungs = ["Mself_dur", "Mselfcross_dur"]
     for word, (outcome, label) in CROSS_DIRECTIONS.items():
-        rr, above = [], 0
+        rr, above, unconverged = [], 0, []
         for rec in by_pop[outcome].values():
             k = _pooled_kernel(rec, "Mselfcross_dur", "cross_offset")
-            _require(k is not None, f"{outcome}/{rec['animal']}: Mselfcross_dur failed")
+            if k is None:
+                fit = rec["duration_aware"].get("Mselfcross_dur")
+                _require(
+                    fit is not None and fit["ok"],
+                    f"{outcome}/{rec['animal']}: Mselfcross_dur failed",
+                )
+                unconverged.append(rec["animal"])
+                continue
+            if not k["ok"][lag]:
+                continue
             rr.append(float(np.exp(k["log_rr"][lag])))
             above += bool(k["log_rr"][lag] - 1.96 * k["se"][lag] > 0)
+        _require(
+            bool(rr), f"{outcome}: no animal's {CROSS_LAG_MS} ms lag is measurable"
+        )
+        kept = (
+            f"over the {len(rr)} of {len(by_pop[outcome])} animals with a converged "
+            f"fit and a measurable {CROSS_LAG_MS} ms lag"
+        )
+        pending = (
+            f"the pooled Mselfcross_dur fit of {', '.join(sorted(unconverged))} "
+            f"({outcome}) did not converge; refit before citing"
+            if unconverged
+            else None
+        )
         rows = sessions[
-            (sessions["outcome"] == outcome)
-            & sessions["model"].isin(["Mself_dur", "Mselfcross_dur"])
-            & sessions["fit_ok"]
-        ]
-        aic = rows.pivot_table(index=SC, columns="model", values="aic").dropna()
+            (sessions["outcome"] == outcome) & sessions["model"].isin(rungs)
+        ].set_index([*SC, "model"])
+        usable = (
+            rows["fit_ok"].astype(bool)
+            & rows["converged"].eq(True)
+            & rows["separated"].eq(False)
+        )
+        both = usable.unstack("model").reindex(columns=rungs, fill_value=False)
+        aic = rows["aic"].unstack("model").loc[both.all(axis=1), rungs]
         gain = aic["Mself_dur"] - aic["Mselfcross_dur"]
+        _require(len(gain) > 0, f"{outcome}: no session with both rungs usable")
         animal_med = gain.groupby(level="animal").median()
+        sessions_kept = (
+            f"over the {len(gain)} of {len(both)} sessions where both rungs converged "
+            "and are not separated"
+        )
         values += [
             make(
                 f"history_cross_end_rr_{word}",
@@ -2795,8 +2863,9 @@ def duration_aware_history_values(
                 "dec2",
                 f"{label}: rate ratio {CROSS_LAG_MS} ms after the other stream's event "
                 "ended (end-locked cross block of Mselfcross_dur, at-risk design), "
-                f"median over animals; {UPPER_BOUND}",
+                f"median {kept}; {UPPER_BOUND}",
                 "rate ratio",
+                pending=pending,
             ),
             make(
                 f"history_cross_end_animals_{word}",
@@ -2804,15 +2873,16 @@ def duration_aware_history_values(
                 "count",
                 "count",
                 f"{label}: animals whose rate ratio at {CROSS_LAG_MS} ms has its 95 % CI "
-                "above 1",
+                f"above 1, {kept}",
+                pending=pending,
             ),
             make(
                 f"history_cross_session_gain_{word}",
                 gain.median(),
                 "quantity",
                 "sig2s",
-                f"{label}: median per-session AIC(Mself_dur) - AIC(Mselfcross_dur), "
-                "positive = the cross block pays for its parameters",
+                f"{label}: median per-session AIC(Mself_dur) - AIC(Mselfcross_dur) "
+                f"{sessions_kept}, positive = the cross block pays for its parameters",
                 "AIC",
             ),
             make(
@@ -2820,7 +2890,8 @@ def duration_aware_history_values(
                 int((animal_med > 0).sum()),
                 "count",
                 "count",
-                f"{label}: animals whose median per-session cross gain is positive",
+                f"{label}: animals whose median per-session cross gain is positive, "
+                f"{sessions_kept}",
             ),
         ]
     return values
