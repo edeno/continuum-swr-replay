@@ -106,6 +106,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     LEAF_ONLY_CONTRAST_RUNGS,
     LEAF_ONLY_N_CATEGORIES,
     MODEL_HIERARCHY,
+    BASEc_SWR,
     leaf_only_predictors,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
@@ -252,20 +253,26 @@ def _contrast_rung(
     )
 
 
-# M2 and the two C2_base fits are parents only: they carry no ``delta_aic``
-# row of their own. ``C2_base_leaf`` is the six-leaf refit of the same base --
-# a leaf-only rung's AIC lives on a six-category likelihood and cannot be
-# differenced against a nine-arm one, so ``CS5_armvalue`` is given a parent on
-# its own candidate set instead of a nominally-nested but incomparable number.
+# M2 and the three C2_base fits carry no ``delta_aic`` row of their own.
+# ``C2_base_leaf`` is the six-leaf refit of the same base -- a leaf-only rung's
+# AIC lives on a six-category likelihood and cannot be differenced against a
+# nine-arm one. ``CS5_armvalue``'s parent, ``C2_base_swr_leaf``, is that refit
+# plus the SWR-specific arm baselines the rung carries, so its ``delta_aic``
+# prices only the two value terms.
 COMPARISON_RUNGS: tuple[RungSpec, ...] = (
     _hierarchy_rung("M2", None),
     _hierarchy_rung("M3", "M2"),
     _hierarchy_rung("M4", "M3"),
     _contrast_rung("C2_base", None),
     _contrast_rung("C2_base_leaf", None, spec_name="C2_base"),
+    RungSpec(
+        name="C2_base_swr_leaf",
+        predictors=tuple(leaf_only_predictors(BASEc_SWR)),
+        leaf_only=True,
+    ),
     _contrast_rung("CS1_current", "C2_base"),
     _contrast_rung("CS4_armreward", "C2_base"),
-    _contrast_rung("CS5_armvalue", "C2_base_leaf"),
+    _contrast_rung("CS5_armvalue", "C2_base_swr_leaf"),
 )
 
 #: Rung whose Dirichlet-multinomial concentration the log-phi figure shows.

@@ -353,7 +353,15 @@ def test_figures_and_caption_are_written(two_rungs, tmp_path):
 def test_resolve_rungs_pulls_in_the_parent_a_rung_is_differenced_against():
     selected = mod.resolve_rungs(["CS5_armvalue"])
     names = [rung.name for rung in selected]
-    assert names == ["C2_base_leaf", "CS5_armvalue"]
+    assert names == ["C2_base_swr_leaf", "CS5_armvalue"]
+    # The parent carries everything but the two value terms, so the rung's
+    # delta_aic prices only those.
+    parent, rung = selected
+    assert set(rung.predictors) - set(parent.predictors) == {
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    }
+    assert set(parent.predictors) <= set(rung.predictors)
     # A leaf-only rung must be differenced against a leaf-only parent: a
     # six-category likelihood and a nine-arm one are not comparable.
     assert all(rung.leaf_only for rung in selected)

@@ -2302,7 +2302,7 @@ def estimator_values(
                         getattr(row, f"median_delta_aic_{est_word}"),
                         "quantity",
                         "sig2s",
-                        f"CS5_armvalue against C2_base_leaf, {ESTIMATORS[est_word]}: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
+                        f"CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), {ESTIMATORS[est_word]}: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
                         "AIC",
                     )
                 )
