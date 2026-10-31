@@ -182,13 +182,7 @@ from a rung built at the trial *start*, which could encode the not-yet-delivered
 outcome on approach stops; it is no longer fit and neither its magnitude nor its
 session share survives.
 
-**Events are strongly non-Poisson.** The controlled self-history kernel (read
-without the per-term separation gate, as its summarizer reads it, so pending: many
-sessions separate on it) is
-refractory at short lags then bursty: peak RR **<!--v:part3.rate_burst_peak_swr-->2.67<!--/v-->** (detected SWR, <!--v:part3.rate_burst_peak_lag_ms_swr-->105<!--/v--> ms),
-**<!--v:part3.rate_burst_peak_non_local-->1.95<!--/v-->** (non-local, <!--v:part3.rate_burst_peak_lag_ms_non_local-->120<!--/v--> ms), **<!--v:part3.rate_burst_peak_non_local_swr-->1.98<!--/v-->** (w/ SWR, <!--v:part3.rate_burst_peak_lag_ms_non_local_swr-->120<!--/v--> ms, dead time ≤<!--v:part3.rate_refractory_ms_non_local_swr-->60<!--/v--> ms),
-**<!--v:part3.rate_burst_peak_non_local_no_swr-->1.56<!--/v-->** (no SWR, <!--v:part3.rate_burst_peak_lag_ms_non_local_no_swr-->105<!--/v--> ms). Detected SWRs are the most tightly
-bursty stream and non-SWR events the flattest.
+**Events are strongly non-Poisson.** On the duration-aware design (claim 19c) there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->…<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->…<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->…<!--/v-->–<!--v:part3.history_end_peak_high-->…<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->…<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->…<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains: detected SWR <!--v:part3.history_onset_peak_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->…<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->…<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->…<!--/v-->/5). Non-SWR events have the weakest onset-locked rhythm.
 
 **Reward shifts the rate LEVEL, not the within-stop profile SHAPE.**
 `M9r_rew_x_time` costs held-out bits and buys no AIC against its parent
@@ -634,10 +628,10 @@ with their estimand named.
    percentage as a property of the kernel values or vice versa. The slower
    recent-reward component (lags 3–10, lowest RR <!--v:part3.rate_kernel_late_min_low-->0.89<!--/v-->–<!--v:part3.rate_kernel_late_min_high-->0.93<!--/v-->) is **shared** across all
    four populations.
-3. **Events are strongly non-Poisson** — refractory then bursty, peak RR
-   **<!--v:part3.rate_burst_peak_low-->1.56<!--/v-->–<!--v:part3.rate_burst_peak_high-->2.67<!--/v-->** by population, detected SWRs the most tightly
-   bursty and non-SWR the flattest (pending: the self-history kernel is read
-   without the separation gate).
+3. **Events are strongly non-Poisson** — no refractory period beyond the event
+   itself; events cluster right after the previous event ends (<!--v:part3.history_end_peak_low-->…<!--/v-->–<!--v:part3.history_end_peak_high-->…<!--/v-->×),
+   with a weaker onset-locked rhythm that is weakest in non-SWR events (duration-aware
+   design, claim 19c).
 4. **Content current-arm bias.** `C2_base` `is_current_arm` **<!--v:part3.base_current_all-->+0.73<!--/v-->** (<!--v:part3.base_current_all_sessions-->242<!--/v-->
    sessions, <!--v:part3.base_current_all_animals_positive-->5<!--/v-->/5, q <!--v:part3.base_current_all_q-->3.8e-34<!--/v-->), present in both populations (non-SWR <!--v:part3.base_current_non_swr-->+0.53<!--/v--> /
    SWR <!--v:part3.base_current_swr-->+0.88<!--/v-->) and sign-consistent across all three estimators (count <!--v:part3.est_current_count-->+0.67<!--/v--> /

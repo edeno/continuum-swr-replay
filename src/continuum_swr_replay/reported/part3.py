@@ -24,9 +24,8 @@ here. The inputs (:class:`Part3Inputs`), with their runs in
   ``coupling.ripple_power``);
 - the duration-aware history refit (``models_per_bin_rate/duration_aware_history_
   pooled.pkl``, ``rate.duration_aware_history.pooled_at_well``),
-  which supersedes the onset-only self-history values (``rate_burst_*``,
-  ``rate_refractory_*``, ``rate_raw_burst_*``; their pending note says so),
-  and its ridge cross-validated cross-history comparison
+  the source of the self-history values, and its ridge cross-validated
+  cross-history comparison
   (``models_per_bin_rate/cross_history_ridge_cv/cross_history_ridge_cv.pkl``,
   ``rate.cross_history_ridge_cv.at_well``), the source of the cross values;
 - the within-arm horse race (``uncertainty_content/horserace_summary.csv``,
@@ -50,7 +49,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -87,7 +86,6 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     aggregate_to_timebins,
     reconstruct_reward_kernels,
     reward_kernel_rate_ratios,
-    self_history_rate_ratios,
 )
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
@@ -113,12 +111,6 @@ RATE_POPULATIONS = {
     "non_local_no_swr": ("non_local_no_swr", "non-local without SWR"),
 }
 FULL_RATE_RUNG = "M7r_time_histcos_rew"
-HISTORY_PENDING = (
-    "read over every session, as the producing summarizer "
-    "(summarize_per_bin_rate_models.py) reads it, without the per-term separation "
-    "gate; many sessions flag a hist_rcos term separated, and leaving them out moves "
-    "the kernel (rate_hist_separated_fraction_*, rate_burst_peak_gated_*)"
-)
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
 STOP_TIME_RUNG = "M5_time"
 ARRIVAL_TIME_RUNG = "M5a_time_arrival"
@@ -574,11 +566,6 @@ def per_bin_values(
         _require(len(per_animal) == 5, f"{outcome}: {len(per_animal)} animals")
         immediate = _immediate_session(full)
         rr_animal, animals_pos = _immediate_animal(full)
-        history = self_history_rate_ratios(full)
-        refractory = 0
-        while refractory < len(history) and history[refractory] < 1.0:
-            refractory += 1
-        peak_lag = int(np.nanargmax(history)) + 1
         values += [
             make(
                 f"rate_baseline_{word}",
@@ -713,34 +700,6 @@ def per_bin_values(
                 f"{label}: median per-session AIC({FULL_RATE_RUNG}) - AIC(M6r_time_histcos); "
                 "negative = child better",
                 "AIC",
-            ),
-            make(
-                f"rate_burst_peak_{word}",
-                history[peak_lag - 1],
-                "quantity",
-                "dec2",
-                f"{label}: peak of the median reconstructed self-history kernel of {FULL_RATE_RUNG}",
-                "rate ratio",
-                pending=HISTORY_PENDING,
-            ),
-            make(
-                f"rate_burst_peak_lag_ms_{word}",
-                peak_lag * 15,
-                "quantity",
-                "int",
-                f"{label}: lag of that peak (15 ms lags)",
-                "ms",
-                pending=HISTORY_PENDING,
-            ),
-            make(
-                f"rate_refractory_ms_{word}",
-                refractory * 15,
-                "quantity",
-                "int",
-                f"{label}: end of the first run of lags, from lag 1, at which the median "
-                "self-history kernel is below 1",
-                "ms",
-                pending=HISTORY_PENDING,
             ),
         ]
         cohort = fits.attrs["arrival_clock_cohort"][outcome]
@@ -1033,8 +992,6 @@ def per_bin_detail_values(
             lambda v: isinstance(v, str)
             and any(t.startswith("hist_rcos") for t in v.split("|"))
         )
-        gated = self_history_rate_ratios(hist_fits[~flagged])
-        raw_history = self_history_rate_ratios(_rung(fits, "M3r_histcos", outcome))
         marginal = _delta_aic(fits, "M1_rew", "M0_const", outcome)
         values += [
             make(
@@ -1089,31 +1046,6 @@ def per_bin_detail_values(
                 "fraction",
                 "pct",
                 f"{label}: share of those fits flagging a hist_rcos term separated",
-            ),
-            make(
-                f"rate_burst_peak_gated_{word}",
-                gated.max(),
-                "quantity",
-                "dec2",
-                f"{label}: peak of the median self-history kernel over the fits that flag no hist_rcos term",
-                "rate ratio",
-            ),
-            make(
-                f"rate_burst_peak_gated_lag_ms_{word}",
-                (int(np.argmax(gated)) + 1) * 15,
-                "quantity",
-                "int",
-                f"{label}: lag of that gated peak",
-                "ms",
-            ),
-            make(
-                f"rate_raw_burst_peak_{word}",
-                raw_history.max(),
-                "quantity",
-                "dec2",
-                f"{label}: peak of the median self-history kernel of M3r_histcos (uncontrolled)",
-                "rate ratio",
-                pending=HISTORY_PENDING,
             ),
         ]
         for k, bump in ((1, "one"), (2, "two")):
@@ -1731,8 +1663,6 @@ _RANGED = (
     "rate_allstops_arrival_peak_s",
     "rate_allstops_clock_ks",
     "rate_arrival_separated_fraction",
-    "rate_burst_peak",
-    "rate_burst_peak_lag_ms",
 )
 
 
@@ -2685,15 +2615,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
 
 # --- 3a: event history on the duration-aware design ---------------------------
 
-#: Why the onset-only history values are no longer the ones to quote.
-HISTORY_SUPERSEDED = (
-    "superseded by the duration-aware refit (history_* values): this fit counts the "
-    "bins inside an ongoing event as at risk and reads history from onsets only, "
-    "which on simulated data alone makes a short-lag dip and a burst at these lags "
-    "(.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md)"
-)
-#: Prefixes of the onset-only self-history values the refit supersedes.
-SUPERSEDED_PREFIXES = ("rate_burst_", "rate_refractory_", "rate_raw_burst_")
 #: A pooled kernel's lag is read when it has this many expected onsets ...
 HISTORY_MIN_SUPPORT = 3.0
 #: ... and its Wald SE on the log scale is at most this.
@@ -3068,13 +2989,6 @@ def horserace_values(summary: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-def mark_superseded(summary: Summary) -> None:
-    """Point the onset-only self-history values to the duration-aware ones."""
-    for key, value in list(summary.values.items()):
-        if key.startswith(SUPERSEDED_PREFIXES):
-            summary.values[key] = replace(value, pending=HISTORY_SUPERSEDED)
-
-
 def _check_fresh(artifact: Path) -> None:
     """Refuse a fit whose provenance sidecar says a table it read has changed."""
     recorded = json.loads(fit_provenance_path(artifact).read_text())["inputs"]
@@ -3306,5 +3220,4 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
         )
     )
     record(inputs.swr_power)
-    mark_superseded(summary)
     return summary

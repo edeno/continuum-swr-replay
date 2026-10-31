@@ -200,30 +200,9 @@ here — this GLM uses past binary outcomes, not a prediction error.
 
 ## 4. Self-history (within-stop autocorrelation)
 
-Reconstructed from the four `hist_rcos_k` coefficients of
-`M7r_time_histcos_rew` the same way §3 reconstructs the reward kernel, over ten
-15 ms lags, and read over every fitted session as the summarizer reads it — with
-no per-term separation gate, though <!--v:part3.rate_hist_separated_fraction_non_local-->28 %<!--/v-->–<!--v:part3.rate_hist_separated_fraction_non_local_swr-->42 %<!--/v--> of each population's fits
-flag a `hist_rcos` term separated, so these values are **pending**. The shape is
-qualitatively the same for every population — **refractory** (RR < 1) at short
-lags, **bursty** (RR > 1) after — but the microstructure dissociates:
+`M7r_time_histcos_rew` carries a self-history block (four `hist_rcos_k` raised-cosine coefficients over ten 15 ms lags) as a control for the reward kernel; <!--v:part3.rate_hist_separated_fraction_non_local-->…<!--/v-->–<!--v:part3.rate_hist_separated_fraction_non_local_swr-->…<!--/v--> of each population's fits flag a `hist_rcos` term separated. The onset-only self-history kernel of `M7r_time_histcos_rew` is **not** the one to read for refractoriness or bursting: it counts the bins inside an ongoing event as at risk and reads history from onsets only, which on simulated data alone makes a short-lag dip and a burst at these lags ([review](../.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md)). Its values are no longer reported.
 
-| population | refractory window (first lags with RR<1) | burst peak RR | @ lag | gated peak RR | n |
-| --- | --- | --- | --- | --- | --- |
-| detected SWR | ≤<!--v:part3.rate_refractory_ms_swr-->60<!--/v--> ms | <!--v:part3.rate_burst_peak_swr-->2.67<!--/v--> | <!--v:part3.rate_burst_peak_lag_ms_swr-->105<!--/v--> ms | <!--v:part3.rate_burst_peak_gated_swr-->2.81<!--/v--> | <!--v:part3.rate_hist_sessions_swr-->242<!--/v--> |
-| non-local (all) | ≤<!--v:part3.rate_refractory_ms_non_local-->60<!--/v--> ms | <!--v:part3.rate_burst_peak_non_local-->1.95<!--/v--> | <!--v:part3.rate_burst_peak_lag_ms_non_local-->120<!--/v--> ms | <!--v:part3.rate_burst_peak_gated_non_local-->1.92<!--/v--> | <!--v:part3.rate_hist_sessions_non_local-->242<!--/v--> |
-| non-local, w/ SWR | ≤<!--v:part3.rate_refractory_ms_non_local_swr-->60<!--/v--> ms | <!--v:part3.rate_burst_peak_non_local_swr-->1.98<!--/v--> | <!--v:part3.rate_burst_peak_lag_ms_non_local_swr-->120<!--/v--> ms | <!--v:part3.rate_burst_peak_gated_non_local_swr-->2.18<!--/v--> | <!--v:part3.rate_hist_sessions_non_local_swr-->242<!--/v--> |
-| non-local, no SWR | ≤<!--v:part3.rate_refractory_ms_non_local_no_swr-->60<!--/v--> ms | <!--v:part3.rate_burst_peak_non_local_no_swr-->1.56<!--/v--> | <!--v:part3.rate_burst_peak_lag_ms_non_local_no_swr-->105<!--/v--> ms | <!--v:part3.rate_burst_peak_gated_non_local_no_swr-->1.86<!--/v--> | <!--v:part3.rate_hist_sessions_non_local_no_swr-->240<!--/v--> |
-
-"Gated" leaves out the fits that flag a `hist_rcos` term separated. Detected
-SWRs are the most tightly bursty stream and **non-SWR non-local events are the
-flattest**; events are strongly non-Poisson in every population. Two cautions:
-the raised-cosine basis is smooth, so a single-lag notch cannot appear in it and
-the tabulated refractory window is a resolution-limited "≤", not a measured dead
-time; and these are the *controlled* kernels (`M7r`), read after the time spline
-and the reward block. The uncontrolled `M3r_histcos` kernels are larger
-throughout (peaks <!--v:part3.rate_raw_burst_peak_swr-->4.18<!--/v--> / <!--v:part3.rate_raw_burst_peak_non_local-->2.83<!--/v--> / <!--v:part3.rate_raw_burst_peak_non_local_swr-->3.49<!--/v--> / <!--v:part3.rate_raw_burst_peak_non_local_no_swr-->2.15<!--/v-->× in the same row order), so do not mix
-the two.
+Read on the duration-aware design instead (claim 19c: a bin is at risk only while no event is ongoing, and history is anchored on both the onset and the end of each event), there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->…<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->…<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->…<!--/v-->–<!--v:part3.history_end_peak_high-->…<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->…<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->…<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains: detected SWR <!--v:part3.history_onset_peak_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->…<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->…<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->…<!--/v-->/5).
 
 ## 5. Behavioral-state covariates
 

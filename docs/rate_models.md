@@ -217,17 +217,11 @@ offset. Its limitation is exactly that offset — see below.
   *consistent with* an RPE / relative-reward account (Kleinman & Foster 2024;
   Ambrose adaptive coding) but this GLM does not measure a prediction error, so
   the mechanism (RPE vs satiety vs reward-rate adaptation) is not established
-  here. The self-history kernel is **refractory** (RR < 1) at short lags and
-  **bursty** (RR > 1) with its peak at <!--v:part3.rate_burst_peak_lag_ms_low-->105<!--/v-->–<!--v:part3.rate_burst_peak_lag_ms_high-->120<!--/v--> ms, so events are strongly non-Poisson in every
-  population. It is reconstructed from the four `hist_rcos_k` coefficients,
-  which is smooth and cannot represent a single-lag notch, so the tabulated
-  refractory window is a resolution-limited bound rather than a measured dead
-  time: it is ≤<!--v:part3.rate_refractory_ms_swr-->60<!--/v--> / <!--v:part3.rate_refractory_ms_non_local-->60<!--/v--> / <!--v:part3.rate_refractory_ms_non_local_swr-->60<!--/v--> / <!--v:part3.rate_refractory_ms_non_local_no_swr-->60<!--/v--> ms (detected SWR / non-local / non-local with
-  SWR / without SWR), and the burst peak is <!--v:part3.rate_burst_peak_swr-->2.67<!--/v-->× (detected SWR), <!--v:part3.rate_burst_peak_non_local_swr-->1.98<!--/v-->× (non-local
-  with SWR), <!--v:part3.rate_burst_peak_non_local-->1.95<!--/v-->× (non-local, all) and <!--v:part3.rate_burst_peak_non_local_no_swr-->1.56<!--/v-->× (non-local without SWR). Detected SWRs
-  are the tightly bursty stream (pending: the kernel is read without the per-term
-  separation gate, and many sessions separate on it); non-SWR non-local events are the
-  flattest.
+  here. The self-history block is a control for the
+  reward kernel. Its onset-only kernel is not read for refractoriness or bursting:
+  it counts the bins inside an ongoing event as at risk, which alone makes a
+  short-lag dip and a burst at these lags; its values are no longer reported. On
+  the duration-aware design (claim 19c) there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->…<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->…<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->…<!--/v-->–<!--v:part3.history_end_peak_high-->…<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->…<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->…<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains: detected SWR <!--v:part3.history_onset_peak_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->…<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->…<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->…<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->…<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->…<!--/v-->/5).
 
   **Two reward functionals, never interchangeable.** `rr_lag1` is the
   reconstructed kernel evaluated **at lag 1** — the blend of the three bumps that

@@ -8,12 +8,9 @@ import pytest
 
 from continuum_swr_replay.reported.part3 import (
     HISTORY_MAX_SE,
-    HISTORY_SUPERSEDED,
     duration_aware_history_values,
     horserace_values,
-    mark_superseded,
 )
-from continuum_swr_replay.reported.values import Summary, Value
 
 ANIMALS = ("a", "b", "c", "d", "e")
 POPS = ("swr", "non_local", "non_local_swr", "non_local_no_swr")
@@ -214,24 +211,3 @@ def test_horserace_values_name_each_population_and_predictor():
     assert values["horserace_condition_number_non_swr"].value == pytest.approx(5.0)
     assert len(values) == 3 * (4 * 2 + 1)
 
-
-def test_mark_superseded_points_old_history_values_to_the_refit():
-    summary = Summary(part=3, produced_by="x", commit="x")
-    common = {
-        "kind": "quantity",
-        "style": "dec2",
-        "unit": "",
-        "description": "d",
-        "claims": ("19c",),
-        "used_in": ("paper",),
-        "source": "s",
-    }
-    summary.add(
-        Value(key="rate_burst_peak_swr", value=2.0, **common),
-        Value(key="rate_refractory_ms_swr", value=60, **common),
-        Value(key="rate_kernel_lag_one_swr", value=1.4, **common),
-    )
-    mark_superseded(summary)
-    assert summary.values["rate_burst_peak_swr"].pending == HISTORY_SUPERSEDED
-    assert summary.values["rate_refractory_ms_swr"].pending == HISTORY_SUPERSEDED
-    assert summary.values["rate_kernel_lag_one_swr"].pending is None
