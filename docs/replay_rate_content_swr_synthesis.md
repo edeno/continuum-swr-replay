@@ -477,7 +477,7 @@ The rung is also not worth its parameters on either honest scale. The
 animal-balanced median per-session ΔAIC against `C2_base_swr_leaf` (the same
 leaf-only base and SWR arm baselines, without the two value terms) — AIC(rung) −
 AIC(parent), **negative = rung better**, the same convention as the rate ΔAIC in
-Layer 1 — is **<!--v:part3.est_armvalue_rung_delta_aic_fraction-->+4.0<!--/v-->** (fraction) and **<!--v:part3.est_armvalue_rung_delta_aic_dm-->+0.22<!--/v-->** (DM), against **<!--v:part3.est_armvalue_rung_delta_aic_count-->−490<!--/v-->** on the retired
+Layer 1 — is **<!--v:part3.est_armvalue_rung_delta_aic_fraction-->+2.4<!--/v-->** (fraction) and **<!--v:part3.est_armvalue_rung_delta_aic_dm-->+2.1<!--/v-->** (DM), against **<!--v:part3.est_armvalue_rung_delta_aic_count-->−64<!--/v-->** on the retired
 count scale. The count figure is the timebin-pseudoreplication artefact, not an
 effect.
 
