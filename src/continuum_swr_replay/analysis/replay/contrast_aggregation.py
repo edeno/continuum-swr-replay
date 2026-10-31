@@ -795,6 +795,13 @@ _ARM_INTERACTIONS = (
 # The SWR-specific arm baselines of the pooled rungs, built with the arm fixed
 # effects they multiply (``model_specs.SWR_ARMFE``).
 _SWR_ARM_FE_PRODUCTS = tuple(f"swr_x_is_candidate_arm_{k}" for k in range(8))
+
+
+def _add_swr_arm_fixed_effects(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach the SWR-specific arm baselines (:data:`_SWR_ARM_FE_PRODUCTS`) in place."""
+    return attach_interactions(frame, _SWR_ARM_FE_PRODUCTS)
+
+
 _PATCH_INTERACTIONS = (
     "periswitch_index_trials_z_x_is_current_patch",
     "log1p_time_since_stop_start_s_z_x_is_current_patch",
@@ -1052,7 +1059,7 @@ def assemble_arm(
             f"reference before fitting: {exc}"
         ) from exc
     add_arm_fixed_effects(ev)
-    attach_interactions(ev, _SWR_ARM_FE_PRODUCTS)
+    _add_swr_arm_fixed_effects(ev)
     stop = read_table(fit_inputs["stop_table"])
     require_covariate_schema(stop, table="stop")
     require_swr_source(stop, what=str(fit_inputs["stop_table"]))

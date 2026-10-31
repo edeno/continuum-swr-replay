@@ -300,7 +300,7 @@ def test_uncontrolled_twins_keep_the_base_without_the_controls() -> None:
     arm_nt = ms.SWR_CONTRAST_CONTENT_ARM_LADDER["CS1nt_current"][0]
     patch_nt = ms.SWR_CONTRAST_CONTENT_PATCH_LADDER["CPS1nt_current"][0]
 
-    assert arm_nt == [*ms.BASEc_NT, "swr_x_is_current_arm"]
+    assert arm_nt == [*ms.BASEc_NT_SWR, "swr_x_is_current_arm"]
     assert patch_nt == [*ms.BASEc_PATCH_NT, "swr_x_is_current_patch"]
     for control in _ARM_CONTROLS:
         assert control not in arm_nt

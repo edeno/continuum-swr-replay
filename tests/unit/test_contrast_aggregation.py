@@ -797,6 +797,7 @@ def test_arm_assembly_refuses_a_duplicated_stop_id(
         "assert_standardized_matches_reference",
         "load_reference",
         "add_arm_fixed_effects",
+        "_add_swr_arm_fixed_effects",
         "validate_uncertainty_inputs",
         "_cohort_log",
     ):
@@ -833,6 +834,7 @@ def test_arm_assembly_flags_the_stops_with_a_qvals_row(
         "assert_standardized_matches_reference",
         "load_reference",
         "add_arm_fixed_effects",
+        "_add_swr_arm_fixed_effects",
         "validate_uncertainty_inputs",
         "_cohort_log",
     ):
