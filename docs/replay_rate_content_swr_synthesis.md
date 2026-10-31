@@ -279,12 +279,12 @@ effect (`BASEc`) or the **total** effect (`nt` twin on `BASEc_NT`).
 | current-arm bias, pooled | `C2_base` `is_current_arm` | **<!--v:part3.base_current_all-->+0.73<!--/v-->** (<!--v:part3.base_current_all_sessions-->242<!--/v--> sessions, <!--v:part3.base_current_all_animals_positive-->5<!--/v-->/5, q <!--v:part3.base_current_all_q-->1.9e-34<!--/v-->) |
 | current-arm bias, non-SWR | same, nonSWR population | **<!--v:part3.base_current_non_swr-->+0.53<!--/v-->** (<!--v:part3.base_current_non_swr_sessions-->239<!--/v--> sessions, <!--v:part3.base_current_non_swr_animals_positive-->5<!--/v-->/5) |
 | current-arm bias, SWR | same, SWR population | **<!--v:part3.base_current_swr-->+0.88<!--/v-->** (<!--v:part3.base_current_swr_sessions-->241<!--/v--> sessions, <!--v:part3.base_current_swr_animals_positive-->4<!--/v-->/5) |
-| SWR less current-locked (direct) | `CS1_current` `swr_x_is_current_arm` | **<!--v:part3.swr_current_direct-->−0.071<!--/v-->** (<!--v:part3.swr_current_direct_sessions-->242<!--/v--> sessions, <!--v:part3.swr_current_direct_animals_positive-->1<!--/v-->/5, q <!--v:part3.swr_current_direct_q-->4.3e-7<!--/v-->) |
-| SWR less current-locked (total) | `CS1nt_current` | **<!--v:part3.swr_current_total-->−0.41<!--/v-->** (<!--v:part3.swr_current_total_sessions-->242<!--/v--> sessions, <!--v:part3.swr_current_total_animals_positive-->0<!--/v-->/5, q <!--v:part3.swr_current_total_q-->7.0e-28<!--/v-->) |
-| SWR less prev-locked (direct) | `CS2_prev` `swr_x_is_prev_arm` | **<!--v:part3.swr_prev_direct-->−0.42<!--/v-->** (<!--v:part3.swr_prev_direct_sessions-->240<!--/v--> sessions, <!--v:part3.swr_prev_direct_animals_positive-->1<!--/v-->/5, q <!--v:part3.swr_prev_direct_q-->3.7e-15<!--/v-->) |
+| SWR × current arm (direct; SWR-specific arm baselines) | `CS1_current` `swr_x_is_current_arm` | **<!--v:part3.swr_current_direct-->−0.071<!--/v-->** (<!--v:part3.swr_current_direct_sessions-->242<!--/v--> sessions, <!--v:part3.swr_current_direct_animals_positive-->1<!--/v-->/5, q <!--v:part3.swr_current_direct_q-->4.3e-7<!--/v-->) |
+| SWR × current arm (total) | `CS1nt_current` | **<!--v:part3.swr_current_total-->−0.41<!--/v-->** (<!--v:part3.swr_current_total_sessions-->242<!--/v--> sessions, <!--v:part3.swr_current_total_animals_positive-->0<!--/v-->/5, q <!--v:part3.swr_current_total_q-->7.0e-28<!--/v-->) |
+| SWR × previous arm (direct) | `CS2_prev` `swr_x_is_prev_arm` | **<!--v:part3.swr_prev_direct-->−0.42<!--/v-->** (<!--v:part3.swr_prev_direct_sessions-->240<!--/v--> sessions, <!--v:part3.swr_prev_direct_animals_positive-->1<!--/v-->/5, q <!--v:part3.swr_prev_direct_q-->3.7e-15<!--/v-->) |
 | arm reward fraction, non-SWR | `C3_armreward` `reward_fraction_candidate_arm_last10_visits` | **<!--v:part3.armreward_non_swr-->+0.027<!--/v-->** (<!--v:part3.armreward_non_swr_sessions-->239<!--/v--> sessions, <!--v:part3.armreward_non_swr_animals_positive-->3<!--/v-->/5, q <!--v:part3.armreward_non_swr_q-->0.35<!--/v-->) |
 | arm reward fraction, SWR | same, SWR population | **<!--v:part3.armreward_swr-->−0.26<!--/v-->** (<!--v:part3.armreward_swr_sessions-->241<!--/v--> sessions, <!--v:part3.armreward_swr_animals_positive-->0<!--/v-->/5, q <!--v:part3.armreward_swr_q-->3.3e-4<!--/v-->) |
-| SWR avoids recently-rewarded arms (direct) | `CS4_armreward` `swr_x_reward_fraction_candidate_arm_last10_visits` | **<!--v:part3.swr_armreward_direct-->−1.0<!--/v-->** (<!--v:part3.swr_armreward_direct_sessions-->242<!--/v--> sessions, <!--v:part3.swr_armreward_direct_animals_positive-->0<!--/v-->/5, q <!--v:part3.swr_armreward_direct_q-->1.7e-35<!--/v-->) |
+| SWR × arm reward fraction (direct) | `CS4_armreward` `swr_x_reward_fraction_candidate_arm_last10_visits` | **<!--v:part3.swr_armreward_direct-->−1.0<!--/v-->** (<!--v:part3.swr_armreward_direct_sessions-->242<!--/v--> sessions, <!--v:part3.swr_armreward_direct_animals_positive-->0<!--/v-->/5, q <!--v:part3.swr_armreward_direct_q-->1.7e-35<!--/v-->) |
 | ... (total) | `CS4nt_armreward` | **<!--v:part3.swr_armreward_total-->−1.2<!--/v-->** (<!--v:part3.swr_armreward_total_sessions-->242<!--/v--> sessions, <!--v:part3.swr_armreward_total_animals_positive-->0<!--/v-->/5, q <!--v:part3.swr_armreward_total_q-->1.3e-38<!--/v-->) |
 | current-patch bias | `CP0_base` `is_current_patch` | **<!--v:part3.patch_current-->+1.1<!--/v-->** (<!--v:part3.patch_current_sessions-->230<!--/v--> sessions, <!--v:part3.patch_current_animals_positive-->5<!--/v-->/5, q <!--v:part3.patch_current_q-->4.4e-38<!--/v-->) |
 | SWR patch-locking (direct / total) | `CPS1_current` / `CPS1nt_current` `swr_x_is_current_patch` | **<!--v:part3.swr_patch_current_direct-->+0.015<!--/v-->** (<!--v:part3.swr_patch_current_direct_sessions-->236<!--/v--> sessions, <!--v:part3.swr_patch_current_direct_animals_positive-->3<!--/v-->/5, q <!--v:part3.swr_patch_current_direct_q-->0.0016<!--/v-->) / **<!--v:part3.swr_patch_current_total-->−0.21<!--/v-->** (<!--v:part3.swr_patch_current_total_sessions-->239<!--/v--> sessions, <!--v:part3.swr_patch_current_total_animals_positive-->1<!--/v-->/5, q <!--v:part3.swr_patch_current_total_q-->1.2e-6<!--/v-->) |
@@ -521,10 +521,11 @@ remote*) more often than SWR content does, and SWR content represents **paths**.
   `≥ 20 cm` = "path"** (crossed with `d_animal`, 20 cm, for remote vs own). So **"path" means
   ">20 cm from any reward port" — it includes mid-leaf-arm, NOT only trunk/inter-patch arms**,
   and it is MAP-based (not posterior mass). The clean, artifact-immune part is `remote_path`
-  (far from animal *and* wells). The strict trunk-vs-leaf version: SWR events put a
-  mean <!--v:part3.trunk_share_mean_swr-->36 %<!--/v--> of their posterior mass on trunk arms against <!--v:part3.trunk_share_mean_non_swr-->17 %<!--/v--> for non-SWR
-  events (<!--v:part3.trunk_share_ratio-->2.2<!--/v-->×; pending — a stale exploratory output, and the rule behind the
-  earlier figure is not recoverable from it).
+  (far from animal *and* wells). The strict trunk-vs-leaf version: SWR events put
+  <!--v:part3.trunk_share_swr-->38 %<!--/v--> of their content on the trunk arms against <!--v:part3.trunk_share_non_swr-->19 %<!--/v--> for non-SWR
+  events (median over animals of each animal's mean, at-well events; higher for SWR in
+  <!--v:part3.trunk_share_animals_swr_higher-->5<!--/v-->/5 animals), and the shift reaches the current patch's trunk and the
+  other two alike (claim 19a).
 - **Retraction:** `reward_belief_variance_candidate_arm_preoutcome` is **0 on all
   trunk arms** (a per-*leaf* quantity), so the
   `C13`/`Mu` uncertainty effects are estimated **only on well/leaf arms** — we have **no
@@ -604,9 +605,11 @@ with their estimand named.
   events are a **less consummatory/reward-coupled mode** that obeys the same
   slower recent-reward baseline. The non-SWR stream's immediate response is weak
   (its lag-1 kernel is close to 1) but its immediate coefficient is still positive.
-- **Content (restated).** SWR content is less current-locked (**<!--v:part3.swr_current_direct-->−0.071<!--/v-->** direct /
-  **<!--v:part3.swr_current_total-->−0.41<!--/v-->** total) and less prev-locked (**<!--v:part3.swr_prev_direct-->−0.42<!--/v-->**), avoids recently rewarded
-  arms (**<!--v:part3.swr_armreward_direct-->−1.0<!--/v-->** / **<!--v:part3.swr_armreward_total-->−1.2<!--/v-->**), and is **broader within the event**
+- **Content (restated).** SWR content shifts onto the trunk arms (**<!--v:part3.trunk_share_swr-->38 %<!--/v-->** against
+  **<!--v:part3.trunk_share_non_swr-->19 %<!--/v-->**, <!--v:part3.trunk_share_animals_swr_higher-->5<!--/v-->/5 animals). Compared at the same arm (SWR-specific arm
+  baselines) it is not consistently more or less current-locked (**<!--v:part3.swr_current_direct-->+0.19<!--/v-->** direct /
+  **<!--v:part3.swr_current_total-->+0.026<!--/v-->** total) or prev-locked (**<!--v:part3.swr_prev_direct-->−0.13<!--/v-->**), and its
+  avoidance of recently rewarded arms is small (**<!--v:part3.swr_armreward_direct-->−0.18<!--/v-->** / **<!--v:part3.swr_armreward_total-->−0.39<!--/v-->**). It is **broader within the event**
   (`log_phi_is_swr` **<!--v:part3.dm_breadth-->+1.7<!--/v-->** total, **<!--v:part3.dm_breadth_length_adjusted-->+1.4<!--/v-->** length-adjusted, <!--v:part3.dm_breadth_animals_positive-->5<!--/v-->/5 animals,
   <!--v:part3.dm_breadth_positive_fraction-->100 %<!--/v--> of sessions). It shows no direct avoidance of high-**value** arms under any estimator;
   the total contrast is negative.
@@ -638,19 +641,21 @@ with their estimand named.
    sessions, <!--v:part3.base_current_all_animals_positive-->5<!--/v-->/5, q <!--v:part3.base_current_all_q-->1.9e-34<!--/v-->), present in both populations (non-SWR <!--v:part3.base_current_non_swr-->+0.53<!--/v--> /
    SWR <!--v:part3.base_current_swr-->+0.88<!--/v-->) and sign-consistent across all three estimators (count <!--v:part3.est_current_count-->+0.67<!--/v--> /
    fraction <!--v:part3.est_current_fraction-->+0.73<!--/v--> / DM <!--v:part3.est_current_dm-->+0.73<!--/v-->).
-5. **SWR content is less current- and prev-locked, and broader within the
-   event.** `swr_x_is_current_arm` **<!--v:part3.swr_current_direct-->−0.071<!--/v-->** direct / **<!--v:part3.swr_current_total-->−0.41<!--/v-->** total;
-   `swr_x_is_prev_arm` **<!--v:part3.swr_prev_direct-->−0.42<!--/v-->**; `log_phi_is_swr` **<!--v:part3.dm_breadth-->+1.7<!--/v-->** (<!--v:part3.dm_breadth_animals_positive-->5<!--/v-->/5 animals,
+5. **SWR content shifts onto the trunks and is broader within the event; at the
+   same arm it is not consistently more or less current- or prev-locked.**
+   With SWR-specific arm baselines `swr_x_is_current_arm` **<!--v:part3.swr_current_direct-->+0.19<!--/v-->** direct / **<!--v:part3.swr_current_total-->+0.026<!--/v-->** total;
+   `swr_x_is_prev_arm` **<!--v:part3.swr_prev_direct-->−0.13<!--/v-->**; `log_phi_is_swr` **<!--v:part3.dm_breadth-->+1.7<!--/v-->** (<!--v:part3.dm_breadth_animals_positive-->5<!--/v-->/5 animals,
    <!--v:part3.dm_breadth_positive_fraction-->100 %<!--/v--> of sessions), **<!--v:part3.dm_breadth_length_adjusted-->+1.4<!--/v-->** length-adjusted.
-6. **Non-SWR content is neutral to *recently rewarded* arms; with-SWR content
-   avoids them.** Measured on `reward_fraction_candidate_arm_last10_visits` —
+6. **Non-SWR content is neutral to *recently rewarded* arms; with-SWR content,
+   fitted on its own, avoids them — but compared at the same arm the difference is small.** Measured on `reward_fraction_candidate_arm_last10_visits` —
    the realized reward fraction over the last ten visits to that arm — **not**
    on the belief mean `reward_belief_mean_candidate_arm_preoutcome`, whose main
    effect is positive in the median but not across animals (item 7). `C3_armreward` non-SWR **<!--v:part3.armreward_non_swr-->+0.027<!--/v-->** (<!--v:part3.armreward_non_swr_sessions-->239<!--/v-->
    sessions, <!--v:part3.armreward_non_swr_animals_positive-->3<!--/v-->/5, q <!--v:part3.armreward_non_swr_q-->0.35<!--/v-->) against SWR **<!--v:part3.armreward_swr-->−0.26<!--/v-->** (<!--v:part3.armreward_swr_sessions-->241<!--/v--> sessions, **<!--v:part3.armreward_swr_animals_positive-->0<!--/v-->/5 animals
    positive**, q <!--v:part3.armreward_swr_q-->3.3e-4<!--/v-->); the pooled SWR interaction is
    **<!--v:part3.swr_armreward_direct-->−1.0<!--/v-->** direct (<!--v:part3.swr_armreward_direct_sessions-->242<!--/v--> sessions, **<!--v:part3.swr_armreward_direct_animals_positive-->0<!--/v-->/5** animals positive) / **<!--v:part3.swr_armreward_total-->−1.2<!--/v-->**
-   total and negative under all three estimators.
+   total, with SWR-specific arm baselines (with one shared baseline set the trunk shift made it far larger and
+   negative in every animal).
 7. **Content over-represents high-uncertainty arms.** `Mu`
    `reward_belief_variance_candidate_arm_preoutcome_z` **<!--v:part3.leaf_uncertainty-->+0.31<!--/v-->** (**session
    median** over <!--v:part3.leaf_uncertainty_sessions-->242<!--/v--> sessions, <!--v:part3.leaf_uncertainty_animals_positive-->5<!--/v-->/5 animals positive); split `C13_armuncert` SWR **<!--v:part3.armuncert_swr-->+0.37<!--/v-->** vs non-SWR **<!--v:part3.armuncert_non_swr-->+0.18<!--/v-->**
