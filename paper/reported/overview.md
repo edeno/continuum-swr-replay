@@ -202,7 +202,7 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   (<!--v:part3.swr_current_direct_animals_positive-->3<!--/v--> and <!--v:part3.swr_current_total_animals_positive-->3<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive).
 - Trunks: SWR events put <!--v:part3.trunk_share_swr-->38 %<!--/v--> of their content on the trunk arms against
   <!--v:part3.trunk_share_non_swr-->19 %<!--/v--> for non-SWR events (<!--v:part3.trunk_share_animals_swr_higher-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals). Every trunk gains: the current
-  patch's trunk <!--v:part3.trunk_share_current_patch_swr-->14 %<!--/v--> against <!--v:part3.trunk_share_current_patch_non_swr-->8.2 %<!--/v-->, the other two together
+  patch's trunk <!--v:part3.trunk_share_current_patch_swr-->14 %<!--/v--> against <!--v:part3.trunk_share_current_patch_non_swr-->8 %<!--/v-->, the other two together
   <!--v:part3.trunk_share_other_patches_swr-->21 %<!--/v--> against <!--v:part3.trunk_share_other_patches_non_swr-->10 %<!--/v--> (<!--v:part3.trunk_share_current_patch_animals_swr_higher-->5<!--/v--> and <!--v:part3.trunk_share_other_patches_animals_swr_higher-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals).
   With one set of arm baselines shared by both kinds of event, this trunk shift used to read as "SWR content is less
   current-locked"; that reading is withdrawn.
@@ -213,11 +213,11 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   SWR-specific arm baselines, the SWR contrast is <!--v:part3.swr_armreward_total-->−0.39<!--/v--> as a total effect
   (<!--v:part3.swr_armreward_total_animals_positive-->1<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive) and <!--v:part3.swr_armreward_direct-->−0.18<!--/v--> once event length is held fixed
   (<!--v:part3.swr_armreward_direct_animals_positive-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.swr_armreward_direct_q-->0.72<!--/v-->).
-- Uncertain arms: content favours them, <!--v:part3.armuncert_all-->+0.31<!--/v--> (<!--v:part3.armuncert_all_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armuncert_all_q-->2.7e-27<!--/v-->),
+- Uncertain arms: content favours them, <!--v:part3.armuncert_all-->+0.31<!--/v--> (<!--v:part3.armuncert_all_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armuncert_all_q-->5.4e-27<!--/v-->),
   for both non-SWR (<!--v:part3.armuncert_non_swr-->+0.18<!--/v-->) and SWR (<!--v:part3.armuncert_swr-->+0.37<!--/v-->). Adding uncertainty helps the leaf model
   (median AIC improvement, positive = better: <!--v:part3.leaf_step_uncertainty-->+1.3<!--/v-->, <!--v:part3.leaf_step_uncertainty_animals-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals); adding value does not
   (<!--v:part3.leaf_step_value-->−2.4<!--/v-->, <!--v:part3.leaf_step_value_animals-->0<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
-- Arm value: <!--v:part3.armvalue_all-->+0.078<!--/v--> (<!--v:part3.armvalue_all_animals_positive-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armvalue_all_q-->0.11<!--/v-->). The SWR × value contrast is
+- Arm value: <!--v:part3.armvalue_all-->+0.078<!--/v--> (<!--v:part3.armvalue_all_animals_positive-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armvalue_all_q-->0.13<!--/v-->). The SWR × value contrast is
   near zero once event length is in (direct <!--v:part3.swr_armvalue_direct-->+0.082<!--/v-->, <!--v:part3.swr_armvalue_direct_animals_positive-->3<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive) and
   weakly negative without it (total <!--v:part3.swr_armvalue_total-->−0.13<!--/v-->, <!--v:part3.swr_armvalue_total_animals_positive-->1<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
 - Are uncertainty, value and visit history separated? Within each arm (the four entered together; arm fraction per SD;
