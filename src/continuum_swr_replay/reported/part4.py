@@ -995,6 +995,21 @@ def null_geometry_values(
 # --- the summary -------------------------------------------------------------------
 
 
+def odds_ratio(a: int, b: int, c: int, d: int, what: str = "") -> float:
+    """Odds ratio ``(a * d) / (b * c)`` of a 2 x 2 table of unit counts.
+
+    ``a`` both called, ``b`` and ``c`` called for one class only, ``d`` neither.
+    An empty off-diagonal cell makes the ratio infinite, so the summary refuses it
+    rather than raise a bare ZeroDivisionError or report a meaningless number.
+    """
+    if b * c == 0:
+        raise ValueError(
+            f"odds ratio undefined for {what or 'this table'}: a one-class-only "
+            f"cell is empty (both {a}, one-only {b} and {c}, neither {d})"
+        )
+    return (a * d) / (b * c)
+
+
 def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
     """Do the same mPFC units respond to SWR-coupled and non-SWR replay, how much,
     and do they respond alike?
@@ -1028,10 +1043,6 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         int((~swr_called & ~non_called).sum()),
     )
     n = int(tested.sum())
-
-    def odds_ratio(a: int, b: int, c: int, d: int) -> float:
-        return (a * d) / (b * c)
-
     animals = (
         frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]).to_numpy()
     )
@@ -1044,6 +1055,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
                 int((sc & ~nc).sum()),
                 int((~sc & nc).sum()),
                 int((~sc & ~nc).sum()),
+                what=f"animal {animal}",
             )
         )
     swr_peak = frame["non_local_SWR: peak_log_modulation"]
@@ -1100,7 +1112,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "overlap_odds_ratio",
-            odds_ratio(both, swr_only, non_only, neither),
+            odds_ratio(both, swr_only, non_only, neither, what="pooled units"),
             "quantity",
             "sig2",
             "odds ratio of being called for non-SWR replay given called for SWR-coupled "
@@ -2162,9 +2174,9 @@ def marked_family_values(
     a weak prior on the per-stop baseline columns, every unit with a spike
     kept, no rate gate). For each model, target mark and event class: the
     population slope at its peak (log-rate change of the peri-event response
-    per within-session SD of the mark; unit -> session -> animal), how many
-    animals' mean curves share that sign there, and the curve's mean over 0 to
-    +150 ms. For the marks a sentence quotes (``MARKED_HELDOUT_SHARES``), per
+    per within-session SD of the mark; unit -> session -> animal), the curve's
+    mean over 0 to +150 ms, and how many animals' own 0 to +150 ms means share
+    its sign. For the marks a sentence quotes (``MARKED_HELDOUT_SHARES``), per
     replay class, the share of units whose held-out deviance improves when the
     mark's kernel is in the model (animal-balanced). No shuffle reference was
     run, so the share expected by chance is unknown and the share is not a test.
@@ -2221,12 +2233,15 @@ def marked_family_values(
                 "log rate",
             )
             add(
-                f"{stem}_animals_same_sign",
-                row["animals_same_sign"],
+                f"{stem}_post_onset_animals_same_sign",
+                row["post_onset_animals_same_sign"],
                 "count",
                 "count",
-                f"animals whose mean slope curve has the population peak's "
-                f"sign at that lag, {what}",
+                f"animals whose own mean slope from 0 to +150 ms after onset has the "
+                f"sign of the population's, {what} (a window fixed in advance; the "
+                "count at the peak lag is not reported, since the lag is chosen where "
+                "the population curve is largest and the animals agree there by "
+                "selection)",
             )
             if (model, target) in MARKED_HELDOUT_SHARES and (
                 event_class in MARKED_HELDOUT_SHARE_CLASSES

@@ -373,9 +373,16 @@ def population_curve_summary(
         session-mean curves sharing the peak's sign at that lag) and
         ``animals_same_sign`` (count of animals whose mean curve does, of
         ``curve_n_animals``), ``pre_onset_mean`` (mean of the population
-        curve over lags <= -100 ms), ``post_onset_mean`` (0 to +150 ms) and
+        curve over lags <= -100 ms), ``post_onset_mean`` (0 to +150 ms),
+        ``post_onset_animals_same_sign`` (count of animals whose own 0 to
+        +150 ms mean has the sign of ``post_onset_mean``) and
         ``post_minus_pre``; a curve with |post - pre| small relative to
         |pre| is a context offset, not an event-locked modulation.
+
+        ``animals_same_sign`` is read at the lag the population curve picked,
+        so the animals agree there more often than chance alone would make
+        them; ``post_onset_animals_same_sign`` is read on a window fixed in
+        advance and does not carry that selection.
     """
     out = []
     for (model, event_class, target), by_session in curves.items():
@@ -394,6 +401,7 @@ def population_curve_summary(
         sign = np.sign(mean[peak])
         animal_means = {a: float(curve[peak]) for a, curve in per_animal.items()}
         animal_values = np.array(list(animal_means.values()))
+        animal_post = [float(curve[post].mean()) for curve in per_animal.values()]
         out.append(
             {
                 "model": model,
@@ -414,6 +422,9 @@ def population_curve_summary(
                     sum(np.sign(v) == sign for v in animal_means.values())
                 ),
                 "curve_n_animals": int(len(animal_means)),
+                "post_onset_animals_same_sign": int(
+                    sum(np.sign(v) == np.sign(post_mean) for v in animal_post)
+                ),
             }
         )
     return pd.DataFrame(out)

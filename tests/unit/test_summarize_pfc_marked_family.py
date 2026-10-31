@@ -77,6 +77,30 @@ def test_population_curve_peak_and_sign_consistency():
     assert row.sem_at_peak == pytest.approx(np.std([1.25, -0.5], ddof=1) / np.sqrt(2))
     assert row.sessions_same_sign == 2 / 3
     assert row.animals_same_sign == 1 and row.curve_n_animals == 2
+    # Lags 0.0 and 0.1 s fall in the 0 to +150 ms window: animal a's mean there
+    # is +0.625, b's -0.25, the population's +0.1875.
+    assert row.post_onset_animals_same_sign == 1
+
+
+def test_post_onset_sign_count_reads_the_fixed_window_not_the_peak():
+    """Animals agree at the peak lag but not over 0 to +150 ms: the post-onset
+    count must not inherit the peak's agreement."""
+    lag = np.array([-0.2, -0.1, 0.0, 0.1, 0.2])
+    curves = {
+        ("m", "non_local_no_SWR", "t"): {
+            # Both animals peak at +0.2 s (outside the window) with one sign...
+            "a1": np.array([0.0, 0.0, 0.3, 0.3, 2.0]),
+            # ...but b is negative inside the window.
+            "b1": np.array([0.0, 0.0, -0.2, -0.2, 1.0]),
+        }
+    }
+    row = summarize.population_curve_summary(curves, lag, {"a1": "a", "b1": "b"}).iloc[
+        0
+    ]
+    assert row.peak_lag_ms == pytest.approx(200.0)
+    assert row.animals_same_sign == 2
+    assert row.post_onset_mean > 0
+    assert row.post_onset_animals_same_sign == 1
 
 
 def test_summary_band_and_peak_call():

@@ -136,6 +136,7 @@ def _marked(root: Path, current: dict[str, str]) -> Path:
                 ("peak_value", -0.03),
                 ("peak_lag_ms", 60.0),
                 ("animals_same_sign", 5.0),
+                ("post_onset_animals_same_sign", 5.0),
                 ("n_animals", 5.0),
                 ("frac_pos", 0.4),
                 ("n_units", 10.0),
