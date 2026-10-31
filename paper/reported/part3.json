@@ -3,7 +3,7 @@
  "part": 3,
  "title": "behavior",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "ca2150e0814e",
+ "commit": "5b462c9c5f6a",
  "inputs": [
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl",
@@ -47,23 +47,23 @@
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited.pkl",
-   "sha256": "3bfeb81fffb3448e7adbbeac82eb125fea544cdf63062320a620f710b9a339eb"
+   "sha256": "c6ca2073c97bb8425f0fa97b9e99a9949e783a9a5544d5f768b9d9d41731475c"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl",
-   "sha256": "ac20e3410968942b431f2805f77bbcee47be2d875da3a555455a5866db512162"
+   "sha256": "8758cd0419529d2a250cf56cd1a25fd24427c40ddad6a0e4e15e27f845115664"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm_len.pkl",
-   "sha256": "987cbdef9460928bf9d06281617f274e90691c03148431e4b7d8f8d86b90ed6d"
+   "sha256": "733141f63c870094ac4c4e6f4735d0ccf39d807819d8f712b989e1b84055e9cc"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_omitted.pkl",
-   "sha256": "8745352b10a6b55583441768b7f4e6762032a9f3efa068e922f9d1e593cdc11e"
+   "sha256": "3d680e131fb5609795f549e5cda8e57cce90b479a3e0753fff04ae5fa94bb0a3"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_rewarded.pkl",
-   "sha256": "1fa4f07bcb229c6257c844bb73bf89450bfe6f3883d1a7ef40aacf0e7ec1cfa2"
+   "sha256": "14845447ff665bd133e46ee57c10987f27fd1ab91ef7e12510cd9206a8571354"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet",
@@ -71,11 +71,11 @@
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/content_estimator_comparison/content_estimator_comparison_summary.csv",
-   "sha256": "93e782f0243ff3d17495fae19587d8fdbc3e378c3880428f3b4fd4da275db17b"
+   "sha256": "fb035c3db5c6ae1519a50715c0cf1f1659ad1c3f3ac2c9dde81c414a61f42e4b"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/content_estimator_comparison/content_estimator_bootstrap.csv",
-   "sha256": "bd69b196d93599c90e05852bae9d7ea6655b18113270587da426e6ce9d4d33b7"
+   "sha256": "2ec20c3e835daab320f87942352de1e95c58b7b30524a6e5b71638bc2a127372"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu/Mu.pkl",
@@ -138,8 +138,12 @@
    "sha256": "3c894ead1df7122c861022631c14158c1a1fb778cd0d0507a25973246d762433"
   },
   {
-   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/_trunk_zscore_per_event.pkl",
-   "sha256": "d6c9b5a4e50836b2a3176b7c3cc9f677a5c569a7e8bfb3358ed97f1d871670e3"
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet",
+   "sha256": "254a5fdcdbc5aa089e2cd96d0b9210f92449407656a69d9691ae6498b0e3700f"
+  },
+  {
+   "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_arm.pkl",
+   "sha256": "7ec7e95bc1399f5fe6f4196c259cadde3819916643f993ae997d006b3e032977"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_event_swr_power/swr_power_model.pkl",
@@ -178,7 +182,7 @@
    "pending": null
   },
   "armreward_all_q": {
-   "value": 0.28745686304368434,
+   "value": 0.33818454475727566,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -358,7 +362,7 @@
    "pending": null
   },
   "armuncert_all_q": {
-   "value": 2.6786275409617602e-27,
+   "value": 5.3572550819235204e-27,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -540,7 +544,7 @@
    "pending": null
   },
   "armvalue_all_q": {
-   "value": 0.11088672562406826,
+   "value": 0.12567162237394403,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -730,7 +734,7 @@
    "pending": null
   },
   "base_current_all_q": {
-   "value": 1.8922186768082653e-34,
+   "value": 3.7844373536165306e-34,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -790,7 +794,7 @@
    "pending": null
   },
   "base_current_no_controls_all_q": {
-   "value": 4.615481761368487e-37,
+   "value": 9.230963522736974e-37,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -820,7 +824,7 @@
    "pending": null
   },
   "base_current_no_controls_non_swr": {
-   "value": 0.6392154511614967,
+   "value": 0.6392154511614968,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -1090,7 +1094,7 @@
    "pending": null
   },
   "block_current_all_q": {
-   "value": 1.5297545044986427e-09,
+   "value": 2.8045499249141785e-09,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1659,6 +1663,36 @@
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "pending": null
   },
+  "current_arm_paired_difference": {
+   "value": 0.08789016885188206,
+   "kind": "quantity",
+   "style": "sig2s",
+   "unit": "log weight",
+   "description": "SWR minus non-SWR is_current_arm (C2_base, fitted separately), the difference taken within each session, median over the session differences per animal, then over the 5 animals (238 sessions with both fits kept)",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_arm.pkl (per-session fits)",
+   "pending": null
+  },
+  "current_arm_paired_difference_animals_positive": {
+   "value": 3,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose median within-session difference is positive",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_arm.pkl (per-session fits)",
+   "pending": null
+  },
   "dm_breadth": {
    "value": 1.7251933019887435,
    "kind": "quantity",
@@ -1735,7 +1769,7 @@
    "pending": null
   },
   "dm_breadth_length_adjusted_q": {
-   "value": 2.707206425532296e-41,
+   "value": 2.61053687725353e-41,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1840,7 +1874,7 @@
    "pending": null
   },
   "dm_breadth_length_term_q": {
-   "value": 2.707206425532296e-41,
+   "value": 2.61053687725353e-41,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1930,7 +1964,7 @@
    "pending": null
   },
   "dm_swr_armreward_direct": {
-   "value": -0.7822792015936053,
+   "value": -0.01037667957693936,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -1946,7 +1980,7 @@
    "pending": null
   },
   "dm_swr_armreward_direct_animals_positive": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -1962,7 +1996,7 @@
    "pending": null
   },
   "dm_swr_armreward_direct_q": {
-   "value": 4.8738045460222196e-32,
+   "value": 0.9667072777319932,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -1994,7 +2028,7 @@
    "pending": null
   },
   "dm_swr_armuncert_direct": {
-   "value": -0.07045564336403122,
+   "value": -0.06700780234427063,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2024,7 +2058,7 @@
    "pending": null
   },
   "dm_swr_armuncert_direct_q": {
-   "value": 0.16092301575936,
+   "value": 0.015442052165957697,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -2054,7 +2088,7 @@
    "pending": null
   },
   "dm_swr_armuncert_total": {
-   "value": 0.12245328843227112,
+   "value": 0.11044079821721278,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2069,7 +2103,7 @@
    "pending": null
   },
   "dm_swr_armuncert_total_animals_positive": {
-   "value": 4,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2084,7 +2118,7 @@
    "pending": null
   },
   "dm_swr_armuncert_total_q": {
-   "value": 1.4832700722696366e-10,
+   "value": 0.00012236380637479255,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -2114,7 +2148,7 @@
    "pending": null
   },
   "dm_swr_armvalue_direct": {
-   "value": 0.04606104871628933,
+   "value": -0.03999965580270887,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2129,7 +2163,7 @@
    "pending": null
   },
   "dm_swr_armvalue_direct_animals_positive": {
-   "value": 3,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2144,7 +2178,7 @@
    "pending": null
   },
   "dm_swr_armvalue_direct_q": {
-   "value": 0.03075030590795177,
+   "value": 0.8733748483732336,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -2174,7 +2208,7 @@
    "pending": null
   },
   "dm_swr_armvalue_total": {
-   "value": -0.4628040288378762,
+   "value": -0.4288876566611942,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2204,7 +2238,7 @@
    "pending": null
   },
   "dm_swr_armvalue_total_q": {
-   "value": 3.1408828175939985e-11,
+   "value": 0.00012236380637479255,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -2219,7 +2253,7 @@
    "pending": null
   },
   "dm_swr_armvalue_total_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2234,7 +2268,7 @@
    "pending": null
   },
   "dm_swr_prevgoal": {
-   "value": -0.11881228969423609,
+   "value": -0.10723535626463701,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2249,7 +2283,7 @@
    "pending": null
   },
   "dm_swr_prevgoal_animals_positive": {
-   "value": 1,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2264,7 +2298,7 @@
    "pending": null
   },
   "dm_swr_prevgoal_q": {
-   "value": 0.08272154841261059,
+   "value": 0.767661985762303,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -2279,7 +2313,7 @@
    "pending": null
   },
   "dm_swr_prevgoal_separated": {
-   "value": 104,
+   "value": 105,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2294,7 +2328,7 @@
    "pending": null
   },
   "dm_swr_prevgoal_sessions": {
-   "value": 152,
+   "value": 157,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2309,7 +2343,7 @@
    "pending": null
   },
   "entropy_current_all": {
-   "value": -0.03972995642223013,
+   "value": -0.03972995642223014,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2339,7 +2373,7 @@
    "pending": null
   },
   "entropy_current_all_q": {
-   "value": 0.541541514350849,
+   "value": 0.5985458842825172,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -2489,7 +2523,7 @@
    "pending": null
   },
   "est_armvalue_count": {
-   "value": 0.7011229243427699,
+   "value": -0.0379336911268929,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2507,7 +2541,7 @@
    "pending": null
   },
   "est_armvalue_count_animals_positive": {
-   "value": 4,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2525,7 +2559,7 @@
    "pending": null
   },
   "est_armvalue_count_high": {
-   "value": 1.5257225049621883,
+   "value": 0.712640608850388,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2543,7 +2577,7 @@
    "pending": null
   },
   "est_armvalue_count_low": {
-   "value": -0.0018697622651821,
+   "value": -0.2064824462643905,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2579,7 +2613,7 @@
    "pending": null
   },
   "est_armvalue_dm": {
-   "value": 0.3003595139853988,
+   "value": 0.0282143224814102,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2597,7 +2631,7 @@
    "pending": null
   },
   "est_armvalue_dm_animals_positive": {
-   "value": 4,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -2615,7 +2649,7 @@
    "pending": null
   },
   "est_armvalue_dm_high": {
-   "value": 0.7826364312829527,
+   "value": 0.9868677546003708,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2633,7 +2667,7 @@
    "pending": null
   },
   "est_armvalue_dm_low": {
-   "value": -0.3068115591527042,
+   "value": -0.2872986280562832,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2669,7 +2703,7 @@
    "pending": null
   },
   "est_armvalue_fraction": {
-   "value": 0.2560418677489613,
+   "value": 0.06681840167566,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2705,7 +2739,7 @@
    "pending": null
   },
   "est_armvalue_fraction_high": {
-   "value": 0.6139330817918409,
+   "value": 0.9393373964848356,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2723,7 +2757,7 @@
    "pending": null
   },
   "est_armvalue_fraction_low": {
-   "value": -0.2637053420883244,
+   "value": -0.2621702680421509,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -2759,7 +2793,7 @@
    "pending": null
   },
   "est_armvalue_rung_delta_aic_count": {
-   "value": -65.53968856178835,
+   "value": -485.2903183026156,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -2777,7 +2811,7 @@
    "pending": null
   },
   "est_armvalue_rung_delta_aic_dm": {
-   "value": 1.9726096344645607,
+   "value": 0.21612519140524,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -2795,7 +2829,7 @@
    "pending": null
   },
   "est_armvalue_rung_delta_aic_fraction": {
-   "value": 2.220352883674422,
+   "value": 3.9838680188368016,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -3115,7 +3149,7 @@
    "pending": null
   },
   "est_swr_armreward_count": {
-   "value": -1.3467456403701588,
+   "value": -0.0096719148946533,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3133,7 +3167,7 @@
    "pending": null
   },
   "est_swr_armreward_count_animals_positive": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3151,7 +3185,7 @@
    "pending": null
   },
   "est_swr_armreward_count_high": {
-   "value": -0.9109486049290358,
+   "value": 0.3251560744156932,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3169,7 +3203,7 @@
    "pending": null
   },
   "est_swr_armreward_count_low": {
-   "value": -1.4814078358086158,
+   "value": -0.56077782662893,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3187,7 +3221,7 @@
    "pending": null
   },
   "est_swr_armreward_count_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3205,7 +3239,7 @@
    "pending": null
   },
   "est_swr_armreward_dm": {
-   "value": -0.7822792015936053,
+   "value": -0.0103766795769393,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3223,7 +3257,7 @@
    "pending": null
   },
   "est_swr_armreward_dm_animals_positive": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3241,7 +3275,7 @@
    "pending": null
   },
   "est_swr_armreward_dm_high": {
-   "value": -0.4428349076549512,
+   "value": 0.2548007078555007,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3259,7 +3293,7 @@
    "pending": null
   },
   "est_swr_armreward_dm_low": {
-   "value": -0.9066442528533348,
+   "value": -0.2405398583764463,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3277,7 +3311,7 @@
    "pending": null
   },
   "est_swr_armreward_dm_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3295,7 +3329,7 @@
    "pending": null
   },
   "est_swr_armreward_fraction": {
-   "value": -1.0085994815611876,
+   "value": -0.1777077455977742,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3313,7 +3347,7 @@
    "pending": null
   },
   "est_swr_armreward_fraction_animals_positive": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3331,7 +3365,7 @@
    "pending": null
   },
   "est_swr_armreward_fraction_high": {
-   "value": -0.7984445481695341,
+   "value": 0.6089165827667873,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3349,7 +3383,7 @@
    "pending": null
   },
   "est_swr_armreward_fraction_low": {
-   "value": -1.3068809374879948,
+   "value": -0.4134122840080218,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3367,7 +3401,7 @@
    "pending": null
   },
   "est_swr_armreward_fraction_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3385,7 +3419,7 @@
    "pending": null
   },
   "est_swr_armvalue_count": {
-   "value": -0.1732332771975581,
+   "value": 0.1299092720691418,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3403,7 +3437,7 @@
    "pending": null
   },
   "est_swr_armvalue_count_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3421,7 +3455,7 @@
    "pending": null
   },
   "est_swr_armvalue_count_high": {
-   "value": 0.175952493742844,
+   "value": 0.3920902169836864,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3439,7 +3473,7 @@
    "pending": null
   },
   "est_swr_armvalue_count_low": {
-   "value": -1.1247147006169689,
+   "value": -0.6931087633552171,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3457,7 +3491,7 @@
    "pending": null
   },
   "est_swr_armvalue_count_sessions": {
-   "value": 238,
+   "value": 236,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3475,7 +3509,7 @@
    "pending": null
   },
   "est_swr_armvalue_dm": {
-   "value": 0.0460610487162893,
+   "value": -0.0399996558027088,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3493,7 +3527,7 @@
    "pending": null
   },
   "est_swr_armvalue_dm_animals_positive": {
-   "value": 3,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3511,7 +3545,7 @@
    "pending": null
   },
   "est_swr_armvalue_dm_high": {
-   "value": 0.1026571094271958,
+   "value": 0.2977816471318438,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3529,7 +3563,7 @@
    "pending": null
   },
   "est_swr_armvalue_dm_low": {
-   "value": -0.7301351251975983,
+   "value": -1.2384790382644593,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3547,7 +3581,7 @@
    "pending": null
   },
   "est_swr_armvalue_dm_sessions": {
-   "value": 238,
+   "value": 236,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3565,7 +3599,7 @@
    "pending": null
   },
   "est_swr_armvalue_fraction": {
-   "value": -0.0141983663037473,
+   "value": 0.0818294528153921,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3583,7 +3617,7 @@
    "pending": null
   },
   "est_swr_armvalue_fraction_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3601,7 +3635,7 @@
    "pending": null
   },
   "est_swr_armvalue_fraction_high": {
-   "value": 0.2040450008494228,
+   "value": 0.3039540258306691,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3619,7 +3653,7 @@
    "pending": null
   },
   "est_swr_armvalue_fraction_low": {
-   "value": -0.8110670403820069,
+   "value": -1.2452708545218374,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3637,7 +3671,7 @@
    "pending": null
   },
   "est_swr_armvalue_fraction_sessions": {
-   "value": 238,
+   "value": 236,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3655,7 +3689,7 @@
    "pending": null
   },
   "est_swr_current_count": {
-   "value": -0.0934464414088441,
+   "value": 0.1910380614887987,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3673,7 +3707,7 @@
    "pending": null
   },
   "est_swr_current_count_animals_positive": {
-   "value": 1,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3691,7 +3725,7 @@
    "pending": null
   },
   "est_swr_current_count_high": {
-   "value": 0.0074499497081018,
+   "value": 0.7082416172434167,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3709,7 +3743,7 @@
    "pending": null
   },
   "est_swr_current_count_low": {
-   "value": -0.8466185147389975,
+   "value": -0.191110473349316,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3727,7 +3761,7 @@
    "pending": null
   },
   "est_swr_current_count_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3745,7 +3779,7 @@
    "pending": null
   },
   "est_swr_current_dm": {
-   "value": -0.0363779628267961,
+   "value": 0.1950678675475976,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3763,7 +3797,7 @@
    "pending": null
   },
   "est_swr_current_dm_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3781,7 +3815,7 @@
    "pending": null
   },
   "est_swr_current_dm_high": {
-   "value": 0.1328899632534177,
+   "value": 0.562281994240031,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3799,7 +3833,7 @@
    "pending": null
   },
   "est_swr_current_dm_low": {
-   "value": -0.5229732747724818,
+   "value": -0.2612950727631818,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3817,7 +3851,7 @@
    "pending": null
   },
   "est_swr_current_dm_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3835,7 +3869,7 @@
    "pending": null
   },
   "est_swr_current_fraction": {
-   "value": -0.0709091517678272,
+   "value": 0.1858161736062235,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3853,7 +3887,7 @@
    "pending": null
   },
   "est_swr_current_fraction_animals_positive": {
-   "value": 1,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -3871,7 +3905,7 @@
    "pending": null
   },
   "est_swr_current_fraction_high": {
-   "value": 0.1464376567693684,
+   "value": 0.7786531051597061,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3889,7 +3923,7 @@
    "pending": null
   },
   "est_swr_current_fraction_low": {
-   "value": -0.6326370938317514,
+   "value": -0.265629227895561,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -3907,7 +3941,7 @@
    "pending": null
   },
   "est_swr_current_fraction_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -5745,7 +5779,7 @@
    "pending": null
   },
   "periswitch_current_all_q": {
-   "value": 0.0006302401771960367,
+   "value": 0.0008403202362613824,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -12166,7 +12200,7 @@
    "pending": null
   },
   "relative_value_current_all_q": {
-   "value": 2.5188483921961995e-07,
+   "value": 4.093128637318824e-07,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -12346,7 +12380,7 @@
    "pending": null
   },
   "rpe_current_all_q": {
-   "value": 6.615937311209164e-08,
+   "value": 1.1341606819215708e-07,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13023,7 +13057,7 @@
    "pending": null
   },
   "switchrate_current_all_q": {
-   "value": 5.857227106389417e-23,
+   "value": 1.0250147436181479e-22,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13173,7 +13207,7 @@
    "pending": null
   },
   "swr_armreward_direct": {
-   "value": -1.0085994815611876,
+   "value": -0.17770774559777422,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13189,7 +13223,7 @@
    "pending": null
   },
   "swr_armreward_direct_animals_positive": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13205,7 +13239,7 @@
    "pending": null
   },
   "swr_armreward_direct_q": {
-   "value": 1.661583137830299e-35,
+   "value": 0.7232953520632448,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13221,7 +13255,7 @@
    "pending": null
   },
   "swr_armreward_direct_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13237,7 +13271,7 @@
    "pending": null
   },
   "swr_armreward_total": {
-   "value": -1.1662134812557188,
+   "value": -0.39131027025142173,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13253,7 +13287,7 @@
    "pending": null
   },
   "swr_armreward_total_animals_positive": {
-   "value": 0,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13269,7 +13303,7 @@
    "pending": null
   },
   "swr_armreward_total_q": {
-   "value": 1.3089687959771556e-38,
+   "value": 0.0003312046405844726,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13285,7 +13319,7 @@
    "pending": null
   },
   "swr_armreward_total_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13301,7 +13335,7 @@
    "pending": null
   },
   "swr_armuncert_direct": {
-   "value": -0.05849675784157195,
+   "value": -0.06185163857172885,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13331,7 +13365,7 @@
    "pending": null
   },
   "swr_armuncert_direct_q": {
-   "value": 0.8793308531209231,
+   "value": 0.3296881379061651,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13361,7 +13395,7 @@
    "pending": null
   },
   "swr_armuncert_total": {
-   "value": 0.17649409040133457,
+   "value": 0.10070062700799716,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13376,7 +13410,7 @@
    "pending": null
   },
   "swr_armuncert_total_animals_positive": {
-   "value": 5,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13391,7 +13425,7 @@
    "pending": null
   },
   "swr_armuncert_total_q": {
-   "value": 1.9077058502973486e-12,
+   "value": 5.21707045928463e-07,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13421,7 +13455,7 @@
    "pending": null
   },
   "swr_armvalue_direct": {
-   "value": -0.014198366303747344,
+   "value": 0.08182945281539213,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13436,7 +13470,7 @@
    "pending": null
   },
   "swr_armvalue_direct_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13451,7 +13485,7 @@
    "pending": null
   },
   "swr_armvalue_direct_q": {
-   "value": 0.18123683342581462,
+   "value": 0.9301739821762929,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13466,7 +13500,7 @@
    "pending": null
   },
   "swr_armvalue_direct_rewarded": {
-   "value": -0.05255901136164297,
+   "value": 0.1460621831544546,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13481,7 +13515,7 @@
    "pending": null
   },
   "swr_armvalue_direct_rewarded_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13496,7 +13530,7 @@
    "pending": null
   },
   "swr_armvalue_direct_rewarded_q": {
-   "value": 0.20004969291398736,
+   "value": 0.9487939062045906,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13511,7 +13545,7 @@
    "pending": null
   },
   "swr_armvalue_direct_rewarded_sessions": {
-   "value": 237,
+   "value": 235,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13526,7 +13560,7 @@
    "pending": null
   },
   "swr_armvalue_direct_sessions": {
-   "value": 238,
+   "value": 236,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13541,7 +13575,7 @@
    "pending": null
   },
   "swr_armvalue_total": {
-   "value": -0.25279618103600515,
+   "value": -0.1269961652316754,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13556,7 +13590,7 @@
    "pending": null
   },
   "swr_armvalue_total_animals_positive": {
-   "value": 0,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13571,7 +13605,7 @@
    "pending": null
   },
   "swr_armvalue_total_q": {
-   "value": 5.658834901248186e-06,
+   "value": 0.026185901843853304,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13586,7 +13620,7 @@
    "pending": null
   },
   "swr_armvalue_total_rewarded": {
-   "value": -0.3267130198490717,
+   "value": -0.17861891735806049,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13616,7 +13650,7 @@
    "pending": null
   },
   "swr_armvalue_total_rewarded_q": {
-   "value": 1.0295418081427882e-05,
+   "value": 0.028191108545186624,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13631,7 +13665,7 @@
    "pending": null
   },
   "swr_armvalue_total_rewarded_sessions": {
-   "value": 239,
+   "value": 237,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13646,7 +13680,7 @@
    "pending": null
   },
   "swr_armvalue_total_sessions": {
-   "value": 239,
+   "value": 238,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13661,7 +13695,7 @@
    "pending": null
   },
   "swr_current_direct": {
-   "value": -0.07090915176782726,
+   "value": 0.18581617360622352,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13676,7 +13710,7 @@
    "pending": null
   },
   "swr_current_direct_animals_positive": {
-   "value": 1,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13691,7 +13725,7 @@
    "pending": null
   },
   "swr_current_direct_omitted": {
-   "value": -0.08194716614691785,
+   "value": 0.04409195896897139,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13721,7 +13755,7 @@
    "pending": null
   },
   "swr_current_direct_omitted_animals_positive": {
-   "value": 1,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13736,7 +13770,7 @@
    "pending": null
   },
   "swr_current_direct_omitted_q": {
-   "value": 0.4708251953125,
+   "value": 0.9326210618019104,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13751,7 +13785,7 @@
    "pending": null
   },
   "swr_current_direct_omitted_sessions": {
-   "value": 23,
+   "value": 14,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13766,7 +13800,7 @@
    "pending": null
   },
   "swr_current_direct_q": {
-   "value": 4.2699268960882817e-07,
+   "value": 5.21707045928463e-07,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13781,7 +13815,7 @@
    "pending": null
   },
   "swr_current_direct_rewarded": {
-   "value": -0.028486425846665674,
+   "value": 0.2699464316592283,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13796,7 +13830,7 @@
    "pending": null
   },
   "swr_current_direct_rewarded_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13811,7 +13845,7 @@
    "pending": null
   },
   "swr_current_direct_rewarded_q": {
-   "value": 2.595180245079997e-05,
+   "value": 1.2637417907508585e-08,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13826,7 +13860,7 @@
    "pending": null
   },
   "swr_current_direct_rewarded_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13841,7 +13875,7 @@
    "pending": null
   },
   "swr_current_direct_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13856,7 +13890,7 @@
    "pending": null
   },
   "swr_current_total": {
-   "value": -0.4112874776375039,
+   "value": 0.02636713272903193,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -13871,7 +13905,7 @@
    "pending": null
   },
   "swr_current_total_animals_positive": {
-   "value": 0,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -13886,7 +13920,7 @@
    "pending": null
   },
   "swr_current_total_q": {
-   "value": 6.979086847181066e-28,
+   "value": 0.3866721895821502,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -13901,7 +13935,7 @@
    "pending": null
   },
   "swr_current_total_sessions": {
-   "value": 242,
+   "value": 241,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -14036,7 +14070,7 @@
    "pending": null
   },
   "swr_prev_direct": {
-   "value": -0.41858586082558746,
+   "value": -0.13185825703811893,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -14066,7 +14100,7 @@
    "pending": null
   },
   "swr_prev_direct_q": {
-   "value": 3.708444857583067e-15,
+   "value": 0.008205088868745774,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -14081,7 +14115,7 @@
    "pending": null
   },
   "swr_prev_direct_sessions": {
-   "value": 240,
+   "value": 239,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -14096,7 +14130,7 @@
    "pending": null
   },
   "swr_prevgoal": {
-   "value": -0.06084304497345916,
+   "value": 0.01531407026050478,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "log weight",
@@ -14111,7 +14145,7 @@
    "pending": null
   },
   "swr_prevgoal_animals_positive": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -14126,7 +14160,7 @@
    "pending": null
   },
   "swr_prevgoal_q": {
-   "value": 0.16467897776896737,
+   "value": 0.7232953520632448,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -14141,7 +14175,7 @@
    "pending": null
   },
   "swr_prevgoal_separated": {
-   "value": 4,
+   "value": 5,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -14156,7 +14190,7 @@
    "pending": null
   },
   "swr_prevgoal_sessions": {
-   "value": 198,
+   "value": 197,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -14170,50 +14204,170 @@
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited.pkl (audited aggregate)",
    "pending": null
   },
-  "trunk_share_mean_non_swr": {
-   "value": 0.16652963134275575,
+  "trunk_current_patch_fraction_non_swr": {
+   "value": 0.4499778034863563,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "mean share of a non-SWR event's posterior mass on trunk arms",
+   "description": "non-SWR events: the current patch's trunk as a share of all trunk content (1/3 if the three trunks shared it evenly), median over animals",
    "claims": [
-    "14"
+    "19a"
    ],
    "used_in": [
-    "docs: replay_rate_content_swr_synthesis"
+    "paper"
    ],
-   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/_trunk_zscore_per_event.pkl (exploratory)",
-   "pending": "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
   },
-  "trunk_share_mean_swr": {
-   "value": 0.36313854414268687,
+  "trunk_current_patch_fraction_swr": {
+   "value": 0.40816593892063463,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "mean share of an SWR event's posterior mass on trunk arms",
+   "description": "SWR events: the current patch's trunk as a share of all trunk content (1/3 if the three trunks shared it evenly), median over animals",
    "claims": [
-    "14"
+    "19a"
    ],
    "used_in": [
-    "docs: replay_rate_content_swr_synthesis"
+    "paper"
    ],
-   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/_trunk_zscore_per_event.pkl (exploratory)",
-   "pending": "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
   },
-  "trunk_share_ratio": {
-   "value": 2.1806242001176677,
-   "kind": "quantity",
-   "style": "sig2",
-   "unit": "ratio",
-   "description": "ratio of those means",
+  "trunk_share_animals_swr_higher": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose SWR share on all three trunks is above their non-SWR share",
    "claims": [
-    "14"
+    "19a"
    ],
    "used_in": [
-    "docs: replay_rate_content_swr_synthesis"
+    "paper"
    ],
-   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/_trunk_zscore_per_event.pkl (exploratory)",
-   "pending": "read from an exploratory script's output (scripts/exploratory/_trunk_zscore_extract.py, _trunk_zscore_per_event.pkl, written 2026-06-08 on the pre-refresh tables): stale, and the rule behind the earlier 3.55x figure is not recoverable from it"
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_current_patch_animals_swr_higher": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose SWR share on the trunk of the current arm's patch is above their non-SWR share",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_current_patch_non_swr": {
+   "value": 0.08185853908147446,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-SWR events: mean share of an event's content on the trunk of the current arm's patch, median over animals",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_current_patch_swr": {
+   "value": 0.14049198353433812,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "SWR events: mean share of an event's content on the trunk of the current arm's patch, median over the 5 animals (at-well events)",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_non_swr": {
+   "value": 0.18649250750840093,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-SWR events: mean share of an event's content on all three trunks, median over animals",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_other_patches_animals_swr_higher": {
+   "value": 5,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "animals whose SWR share on the other two trunks is above their non-SWR share",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_other_patches_non_swr": {
+   "value": 0.10226086930488544,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "non-SWR events: mean share of an event's content on the other two trunks, median over animals",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_other_patches_swr": {
+   "value": 0.21269897095641158,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "SWR events: mean share of an event's content on the other two trunks, median over the 5 animals (at-well events)",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
+  },
+  "trunk_share_swr": {
+   "value": 0.3753775580961202,
+   "kind": "fraction",
+   "style": "pct",
+   "unit": "",
+   "description": "SWR events: mean share of an event's content on all three trunks, median over the 5 animals (at-well events)",
+   "claims": [
+    "19a"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_arm_table.parquet (at-well events)",
+   "pending": null
   },
   "update_current_all": {
    "value": 0.24314095285533346,
@@ -14246,7 +14400,7 @@
    "pending": null
   },
   "update_current_all_q": {
-   "value": 2.0433007046364113e-18,
+   "value": 3.2692811274182583e-18,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
