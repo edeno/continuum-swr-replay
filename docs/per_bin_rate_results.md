@@ -46,9 +46,12 @@ the well-anchored one. All three are described in [rate_models.md](rate_models.m
 
 Effects are reported **per event-type population**: detected SWR (LFP ripples),
 all non-local decoding events, and the non-local split by SWR overlap
-(`non_local_swr` / `non_local_no_swr`). "RR" = rate ratio = `exp(coef)`;
-summaries are across-session medians with per-animal sign consistency (n/5) and
-a signed-rank p. Every effect is *conditional on the first 4 s of each stop*,
+(`non_local_swr` / `non_local_no_swr`). "RR" = rate ratio; the reward effect is
+the reconstructed kernel (§2–3), not `exp` of any one basis coefficient.
+Summaries are across-session medians, over the sessions whose terms pass the
+per-term separation gate, with per-animal sign consistency (n/5) and a
+signed-rank p that treats the sessions (run epochs, several per recording day)
+as independent, so it overstates the evidence. Every effect is *conditional on the first 4 s of each stop*,
 measured from a speed-threshold crossing.
 
 ## 1. Baseline rate (M0_const)
@@ -129,47 +132,50 @@ pooled, on their fitted curve, never per session; see
 arrival window keeps <!--v:part3.rate_arrival_event_share_non_local_no_swr@pctnum-->88<!--/v-->–<!--v:part3.rate_arrival_event_share_swr@pct-->95 %<!--/v--> of each population's event bins, against
 <!--v:part3.rate_allstops_arrival_event_share_non_local_no_swr@pctnum-->81<!--/v-->–<!--v:part3.rate_allstops_arrival_event_share_swr@pct-->91 %<!--/v--> on all stops.
 
-## 2. Immediate reward component (basis bump 0)
+## 2. Reward at lag 1 (the reconstructed kernel)
 
-`reward_history_rcos_0` is the bump-weighted reward *fraction* over roughly the
-last seven known outcomes (weights 1.00, 0.79, 0.54, … at lags 1–7), so its
-coefficient is **per unit of that fraction** — a 0→1 contrast, not a
-single-trial indicator. The three basis coefficients are strongly collinear, so
-read the *kernel reconstruction* in §3 for the per-lag effect and treat the
-single-coefficient RRs below as a within-population contrast only.
+The effect of a reward on the rate is the reward kernel reconstructed from the
+three basis coefficients (§3). At lag 1, per population, over the sessions whose
+three reward terms pass the per-term separation gate (the rule the content and
+rate contrasts use); "animals" counts those whose median is above 1, and p is a
+signed-rank test across sessions that treats them as independent:
 
-| population | RR raw (M1_rew) | RR controlled (M7r) | %pos (M7r) | animals (M7r) | p (M7r) | n |
-| --- | --- | --- | --- | --- | --- | --- |
-| detected SWR | <!--v:part3.rate_raw_immediate_session_swr-->58<!--/v--> | <!--v:part3.rate_immediate_session_swr-->6.4<!--/v--> | <!--v:part3.rate_immediate_session_positive_fraction_swr-->83 %<!--/v--> | <!--v:part3.rate_immediate_session_animals_swr-->5<!--/v-->/5 | <!--v:part3.rate_immediate_session_p_swr-->7.9e-28<!--/v--> | <!--v:part3.rate_full_sessions_swr-->242<!--/v--> |
-| non-local (all) | <!--v:part3.rate_raw_immediate_session_non_local-->30<!--/v--> | <!--v:part3.rate_immediate_session_non_local-->3.3<!--/v--> | <!--v:part3.rate_immediate_session_positive_fraction_non_local-->79 %<!--/v--> | <!--v:part3.rate_immediate_session_animals_non_local-->5<!--/v-->/5 | <!--v:part3.rate_immediate_session_p_non_local-->1.3e-22<!--/v--> | <!--v:part3.rate_full_sessions_non_local-->242<!--/v--> |
-| non-local, w/ SWR | **<!--v:part3.rate_raw_immediate_session_non_local_swr-->130<!--/v-->** | **<!--v:part3.rate_immediate_session_non_local_swr-->9.9<!--/v-->** | <!--v:part3.rate_immediate_session_positive_fraction_non_local_swr-->87 %<!--/v--> | <!--v:part3.rate_immediate_session_animals_non_local_swr-->5<!--/v-->/5 | <!--v:part3.rate_immediate_session_p_non_local_swr-->8.0e-33<!--/v--> | <!--v:part3.rate_full_sessions_non_local_swr-->242<!--/v--> |
-| non-local, no SWR | **<!--v:part3.rate_raw_immediate_session_non_local_no_swr-->12<!--/v-->** | **<!--v:part3.rate_immediate_session_non_local_no_swr-->1.4<!--/v-->** | <!--v:part3.rate_immediate_session_positive_fraction_non_local_no_swr-->58 %<!--/v--> | <!--v:part3.rate_immediate_session_animals_non_local_no_swr-->5<!--/v-->/5 | <!--v:part3.rate_immediate_session_p_non_local_no_swr-->0.0026<!--/v--> | <!--v:part3.rate_full_sessions_non_local_no_swr-->240<!--/v--> |
+| population | lag-1 RR | %>1 | animals | p | sessions | left out | not converged |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| detected SWR | <!--v:part3.rate_kernel_lag_one_swr-->1.38<!--/v--> | <!--v:part3.rate_kernel_lag_one_positive_fraction_swr-->81 %<!--/v--> | <!--v:part3.rate_kernel_lag_one_animals_positive_swr-->5<!--/v-->/5 | <!--v:part3.rate_kernel_lag_one_p_swr-->1.9e-24<!--/v--> | <!--v:part3.rate_kernel_sessions_swr-->240<!--/v--> | <!--v:part3.rate_kernel_dropped_swr-->2<!--/v--> | <!--v:part3.rate_kernel_nonconverged_swr-->59<!--/v--> |
+| non-local (all) | <!--v:part3.rate_kernel_lag_one_non_local-->1.18<!--/v--> | <!--v:part3.rate_kernel_lag_one_positive_fraction_non_local-->72 %<!--/v--> | <!--v:part3.rate_kernel_lag_one_animals_positive_non_local-->5<!--/v-->/5 | <!--v:part3.rate_kernel_lag_one_p_non_local-->3.8e-17<!--/v--> | <!--v:part3.rate_kernel_sessions_non_local-->241<!--/v--> | <!--v:part3.rate_kernel_dropped_non_local-->1<!--/v--> | <!--v:part3.rate_kernel_nonconverged_non_local-->39<!--/v--> |
+| non-local, w/ SWR | **<!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v-->** | <!--v:part3.rate_kernel_lag_one_positive_fraction_non_local_swr-->85 %<!--/v--> | <!--v:part3.rate_kernel_lag_one_animals_positive_non_local_swr-->5<!--/v-->/5 | <!--v:part3.rate_kernel_lag_one_p_non_local_swr-->3.2e-28<!--/v--> | <!--v:part3.rate_kernel_sessions_non_local_swr-->225<!--/v--> | <!--v:part3.rate_kernel_dropped_non_local_swr-->17<!--/v--> | <!--v:part3.rate_kernel_nonconverged_non_local_swr-->78<!--/v--> |
+| non-local, no SWR | **<!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v-->** | <!--v:part3.rate_kernel_lag_one_positive_fraction_non_local_no_swr-->50 %<!--/v--> | <!--v:part3.rate_kernel_lag_one_animals_positive_non_local_no_swr-->4<!--/v-->/5 | <!--v:part3.rate_kernel_lag_one_p_non_local_no_swr-->0.55<!--/v--> | <!--v:part3.rate_kernel_sessions_non_local_no_swr-->218<!--/v--> | <!--v:part3.rate_kernel_dropped_non_local_no_swr-->22<!--/v--> | <!--v:part3.rate_kernel_nonconverged_non_local_no_swr-->62<!--/v--> |
 
-Controlled = `M7r_time_histcos_rew` (within-stop time spline + raised-cosine
-self-history + reward basis); "animals" counts those whose median has the sign
-of the across-session median. The paired NL-w/SWR > NL-no-SWR dissociation is
-**<!--v:part3.rate_paired_positive_fraction-->77 %<!--/v--> of sessions, <!--v:part3.rate_paired_animals_positive-->5<!--/v-->/5 animals, signed-rank p = <!--v:part3.rate_paired_p-->1.1e-19<!--/v-->** over **<!--v:part3.rate_paired_sessions-->240<!--/v--> paired
-sessions**. The non-SWR immediate component is a response of its own
-(RR <!--v:part3.rate_immediate_session_non_local_no_swr-->1.4<!--/v-->, p = <!--v:part3.rate_immediate_session_p_non_local_no_swr-->0.0026<!--/v-->, <!--v:part3.rate_immediate_session_animals_non_local_no_swr-->5<!--/v-->/5 animals) rather than the null it read as on all
-stops (RR <!--v:part3.rate_allstops_immediate_session_no_swr-->0.83<!--/v-->, p = <!--v:part3.rate_allstops_immediate_session_p_no_swr-->0.74<!--/v-->, <!--v:part3.rate_allstops_immediate_session_animals_no_swr-->3<!--/v-->/5) — the SWR-coupled one is about <!--v:part3.rate_immediate_ratio_swr_to_no_swr-->7.0<!--/v-->× it.
+Within session, the SWR-coupled lag-1 kernel is larger than the non-SWR one in
+**<!--v:part3.rate_paired_positive_fraction-->79 %<!--/v--> of <!--v:part3.rate_paired_sessions-->207<!--/v--> paired sessions, <!--v:part3.rate_paired_animals_positive-->5<!--/v-->/5 animals, signed-rank p = <!--v:part3.rate_paired_p-->3.1e-19<!--/v-->**
+(the sessions in which both streams pass the gate). The non-SWR lag-1 kernel
+cannot be told from 1 here; on all stops it is
+<!--v:part3.rate_allstops_kernel_lag_one_no_swr-->0.92<!--/v--> (p = <!--v:part3.rate_allstops_kernel_lag_one_p_no_swr-->0.029<!--/v-->, above 1 in <!--v:part3.rate_allstops_kernel_lag_one_animals_positive_no_swr-->0<!--/v-->/5 animals).
+Kept fits that the optimizer flagged as not converged are counted, not left out:
+why they do not converge is still open, and the values may move once it is
+settled.
 
-These are across-session medians. The audited aggregate summarizes the same
-coefficient animal-balanced, where it reads **<!--v:part3.rate_immediate_animal_swr-->5.4<!--/v--> / <!--v:part3.rate_immediate_animal_non_local-->2.9<!--/v--> / <!--v:part3.rate_immediate_animal_non_local_swr-->8.8<!--/v--> / <!--v:part3.rate_immediate_animal_non_local_no_swr-->1.2<!--/v-->** in the
-same row order (`rr_immediate`, with <!--v:part3.rate_immediate_animals_positive_swr-->5<!--/v--> / <!--v:part3.rate_immediate_animals_positive_non_local-->5<!--/v--> / <!--v:part3.rate_immediate_animals_positive_non_local_swr-->5<!--/v--> / <!--v:part3.rate_immediate_animals_positive_non_local_no_swr-->5<!--/v--> of 5 animals positive). Say which summary a quoted
-number is.
+### Basis coefficients (not effect sizes)
 
-The other two bumps (`M7r`, same fits) run the other way and are also
-consistent — the middle bump is far below 1 and the slowest bump above it,
-which is what produces the dip-then-recovery shape of §3:
+Each reward feature is a bump-weighted reward *fraction* (`reward_history_rcos_0`
+weights lags 1–7 at 1.00, 0.79, 0.54, …; `_1` spans all ten lags with its peak
+at lag 3; `_2` rises to lag 10). The three coefficients are strongly collinear,
+and a 0→1 change in one feature with the other two held fixed is no reward
+history that occurs, so `exp(coef)` of one basis function is **not** the effect
+of a reward at any lag. The coefficients are listed for completeness only; do
+not quote them as rate ratios:
 
-| population | bump 1 RR | %pos | animals | bump 2 RR | %pos | animals |
-| --- | --- | --- | --- | --- | --- | --- |
-| detected SWR | <!--v:part3.rate_bump_one_session_swr-->0.021<!--/v--> | <!--v:part3.rate_bump_one_positive_fraction_swr-->14 %<!--/v--> | <!--v:part3.rate_bump_one_animals_swr-->5<!--/v-->/5 | <!--v:part3.rate_bump_two_session_swr-->7.7<!--/v--> | <!--v:part3.rate_bump_two_positive_fraction_swr-->80 %<!--/v--> | <!--v:part3.rate_bump_two_animals_swr-->5<!--/v-->/5 |
-| non-local (all) | <!--v:part3.rate_bump_one_session_non_local-->0.050<!--/v--> | <!--v:part3.rate_bump_one_positive_fraction_non_local-->18 %<!--/v--> | <!--v:part3.rate_bump_one_animals_non_local-->5<!--/v-->/5 | <!--v:part3.rate_bump_two_session_non_local-->5.2<!--/v--> | <!--v:part3.rate_bump_two_positive_fraction_non_local-->80 %<!--/v--> | <!--v:part3.rate_bump_two_animals_non_local-->5<!--/v-->/5 |
-| non-local, w/ SWR | <!--v:part3.rate_bump_one_session_non_local_swr-->0.0065<!--/v--> | <!--v:part3.rate_bump_one_positive_fraction_non_local_swr-->13 %<!--/v--> | <!--v:part3.rate_bump_one_animals_non_local_swr-->5<!--/v-->/5 | <!--v:part3.rate_bump_two_session_non_local_swr-->15<!--/v--> | <!--v:part3.rate_bump_two_positive_fraction_non_local_swr-->83 %<!--/v--> | <!--v:part3.rate_bump_two_animals_non_local_swr-->5<!--/v-->/5 |
-| non-local, no SWR | <!--v:part3.rate_bump_one_session_non_local_no_swr-->0.17<!--/v--> | <!--v:part3.rate_bump_one_positive_fraction_non_local_no_swr-->35 %<!--/v--> | <!--v:part3.rate_bump_one_animals_non_local_no_swr-->5<!--/v-->/5 | <!--v:part3.rate_bump_two_session_non_local_no_swr-->2.4<!--/v--> | <!--v:part3.rate_bump_two_positive_fraction_non_local_no_swr-->61 %<!--/v--> | <!--v:part3.rate_bump_two_animals_non_local_no_swr-->5<!--/v-->/5 |
+| population | bump 0 (M1_rew) | bump 0 (M7r) | bump 1 (M7r) | bump 2 (M7r) |
+| --- | --- | --- | --- | --- |
+| detected SWR | <!--v:part3.rate_raw_immediate_session_swr-->58<!--/v--> | <!--v:part3.rate_immediate_session_swr-->6.4<!--/v--> | <!--v:part3.rate_bump_one_session_swr-->0.021<!--/v--> | <!--v:part3.rate_bump_two_session_swr-->7.7<!--/v--> |
+| non-local (all) | <!--v:part3.rate_raw_immediate_session_non_local-->30<!--/v--> | <!--v:part3.rate_immediate_session_non_local-->3.3<!--/v--> | <!--v:part3.rate_bump_one_session_non_local-->0.051<!--/v--> | <!--v:part3.rate_bump_two_session_non_local-->5.2<!--/v--> |
+| non-local, w/ SWR | <!--v:part3.rate_raw_immediate_session_non_local_swr-->130<!--/v--> | <!--v:part3.rate_immediate_session_non_local_swr-->9.9<!--/v--> | <!--v:part3.rate_bump_one_session_non_local_swr-->0.0088<!--/v--> | <!--v:part3.rate_bump_two_session_non_local_swr-->15<!--/v--> |
+| non-local, no SWR | <!--v:part3.rate_raw_immediate_session_non_local_no_swr-->12<!--/v--> | <!--v:part3.rate_immediate_session_non_local_no_swr-->1.4<!--/v--> | <!--v:part3.rate_bump_one_session_non_local_no_swr-->0.17<!--/v--> | <!--v:part3.rate_bump_two_session_non_local_no_swr-->2.4<!--/v--> |
 
-None of these three is a per-lag effect on its own; they are one kernel.
+(`exp` of the across-session median coefficient, each over the sessions where
+that term passes the gate.) None of these three is a per-lag effect on its own;
+they are one kernel.
 
 ## 3. Reward kernel, lags 1–10 (M7r, reconstructed from the basis)
 
@@ -185,14 +191,14 @@ coefficients are collinear.
 | population | lag1 | lag2 | lag3 | lag4 | lag5 | lag6 | lag7 | lag8 | lag9 | lag10 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | detected SWR | <!--v:part3.rate_kernel_lag_one_swr-->1.38<!--/v--> | <!--v:part3.rate_kernel_lag_two_swr-->1.04<!--/v--> | <!--v:part3.rate_kernel_lag_three_swr-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_four_swr-->0.90<!--/v--> | <!--v:part3.rate_kernel_lag_five_swr-->0.90<!--/v--> | <!--v:part3.rate_kernel_lag_six_swr-->0.92<!--/v--> | <!--v:part3.rate_kernel_lag_seven_swr-->0.94<!--/v--> | <!--v:part3.rate_kernel_lag_eight_swr-->0.97<!--/v--> | <!--v:part3.rate_kernel_lag_nine_swr-->1.00<!--/v--> | <!--v:part3.rate_kernel_lag_ten_swr-->1.04<!--/v--> |
-| non-local (all) | <!--v:part3.rate_kernel_lag_one_non_local-->1.19<!--/v--> | <!--v:part3.rate_kernel_lag_two_non_local-->0.99<!--/v--> | <!--v:part3.rate_kernel_lag_three_non_local-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_four_non_local-->0.91<!--/v--> | <!--v:part3.rate_kernel_lag_five_non_local-->0.91<!--/v--> | <!--v:part3.rate_kernel_lag_six_non_local-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_seven_non_local-->0.95<!--/v--> | <!--v:part3.rate_kernel_lag_eight_non_local-->0.98<!--/v--> | <!--v:part3.rate_kernel_lag_nine_non_local-->1.01<!--/v--> | <!--v:part3.rate_kernel_lag_ten_non_local-->1.04<!--/v--> |
-| non-local, w/ SWR | <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.51<!--/v--> | <!--v:part3.rate_kernel_lag_two_non_local_swr-->1.07<!--/v--> | <!--v:part3.rate_kernel_lag_three_non_local_swr-->0.94<!--/v--> | <!--v:part3.rate_kernel_lag_four_non_local_swr-->0.89<!--/v--> | <!--v:part3.rate_kernel_lag_five_non_local_swr-->0.89<!--/v--> | <!--v:part3.rate_kernel_lag_six_non_local_swr-->0.91<!--/v--> | <!--v:part3.rate_kernel_lag_seven_non_local_swr-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_eight_non_local_swr-->0.98<!--/v--> | <!--v:part3.rate_kernel_lag_nine_non_local_swr-->1.02<!--/v--> | <!--v:part3.rate_kernel_lag_ten_non_local_swr-->1.07<!--/v--> |
-| non-local, no SWR | <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v--> | <!--v:part3.rate_kernel_lag_two_non_local_no_swr-->0.95<!--/v--> | <!--v:part3.rate_kernel_lag_three_non_local_no_swr-->0.94<!--/v--> | <!--v:part3.rate_kernel_lag_four_non_local_no_swr-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_five_non_local_no_swr-->0.94<!--/v--> | <!--v:part3.rate_kernel_lag_six_non_local_no_swr-->0.96<!--/v--> | <!--v:part3.rate_kernel_lag_seven_non_local_no_swr-->0.97<!--/v--> | <!--v:part3.rate_kernel_lag_eight_non_local_no_swr-->0.98<!--/v--> | <!--v:part3.rate_kernel_lag_nine_non_local_no_swr-->1.00<!--/v--> | <!--v:part3.rate_kernel_lag_ten_non_local_no_swr-->1.01<!--/v--> |
+| non-local (all) | <!--v:part3.rate_kernel_lag_one_non_local-->1.18<!--/v--> | <!--v:part3.rate_kernel_lag_two_non_local-->0.99<!--/v--> | <!--v:part3.rate_kernel_lag_three_non_local-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_four_non_local-->0.91<!--/v--> | <!--v:part3.rate_kernel_lag_five_non_local-->0.91<!--/v--> | <!--v:part3.rate_kernel_lag_six_non_local-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_seven_non_local-->0.95<!--/v--> | <!--v:part3.rate_kernel_lag_eight_non_local-->0.98<!--/v--> | <!--v:part3.rate_kernel_lag_nine_non_local-->1.01<!--/v--> | <!--v:part3.rate_kernel_lag_ten_non_local-->1.04<!--/v--> |
+| non-local, w/ SWR | <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v--> | <!--v:part3.rate_kernel_lag_two_non_local_swr-->1.07<!--/v--> | <!--v:part3.rate_kernel_lag_three_non_local_swr-->0.95<!--/v--> | <!--v:part3.rate_kernel_lag_four_non_local_swr-->0.90<!--/v--> | <!--v:part3.rate_kernel_lag_five_non_local_swr-->0.89<!--/v--> | <!--v:part3.rate_kernel_lag_six_non_local_swr-->0.91<!--/v--> | <!--v:part3.rate_kernel_lag_seven_non_local_swr-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_eight_non_local_swr-->0.98<!--/v--> | <!--v:part3.rate_kernel_lag_nine_non_local_swr-->1.02<!--/v--> | <!--v:part3.rate_kernel_lag_ten_non_local_swr-->1.07<!--/v--> |
+| non-local, no SWR | <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v--> | <!--v:part3.rate_kernel_lag_two_non_local_no_swr-->0.95<!--/v--> | <!--v:part3.rate_kernel_lag_three_non_local_no_swr-->0.93<!--/v--> | <!--v:part3.rate_kernel_lag_four_non_local_no_swr-->0.92<!--/v--> | <!--v:part3.rate_kernel_lag_five_non_local_no_swr-->0.94<!--/v--> | <!--v:part3.rate_kernel_lag_six_non_local_no_swr-->0.95<!--/v--> | <!--v:part3.rate_kernel_lag_seven_non_local_no_swr-->0.97<!--/v--> | <!--v:part3.rate_kernel_lag_eight_non_local_no_swr-->0.98<!--/v--> | <!--v:part3.rate_kernel_lag_nine_non_local_no_swr-->0.99<!--/v--> | <!--v:part3.rate_kernel_lag_ten_non_local_no_swr-->1.01<!--/v--> |
 
 So the reward kernel is **a boost at lag 1 that dissociates by SWR coupling
-(<!--v:part3.rate_kernel_lag_one_non_local_swr-->1.51<!--/v--> SWR-coupled vs <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v--> non-SWR), then a mild suppression from lag 3 on
-(the lowest per-population value over lags 3–10 is <!--v:part3.rate_kernel_late_min_low-->0.89<!--/v-->–<!--v:part3.rate_kernel_late_min_high-->0.93<!--/v-->, shared across all four populations) that returns to ~1 by lag
-10**. On all stops the non-SWR lag-1 value is <!--v:part3.rate_allstops_kernel_lag_one_no_swr-->0.95<!--/v-->. The smooth basis has no per-lag parameter and cannot represent a
+(<!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v--> SWR-coupled vs <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v--> non-SWR), then a mild suppression from lag 3 on
+(the lowest per-population value over lags 3–10 is <!--v:part3.rate_kernel_late_min_low-->0.89<!--/v-->–<!--v:part3.rate_kernel_late_min_high-->0.92<!--/v-->, shared across all four populations) that returns to ~1 by lag
+10**. The smooth basis has no per-lag parameter and cannot represent a
 lag-specific spike, so read the shape off the reconstruction rather than off any
 one coefficient. The lag≥2 suppression is a recent-reward effect; whether it is
 an RPE / relative-reward signal or satiety / adaptation is **not** established
@@ -202,7 +208,7 @@ here — this GLM uses past binary outcomes, not a prediction error.
 
 `M7r_time_histcos_rew` carries a self-history block (four `hist_rcos_k` raised-cosine coefficients over ten 15 ms lags) as a control for the reward kernel; <!--v:part3.rate_hist_separated_fraction_non_local-->28 %<!--/v-->–<!--v:part3.rate_hist_separated_fraction_non_local_swr-->42 %<!--/v--> of each population's fits flag a `hist_rcos` term separated. The onset-only self-history kernel of `M7r_time_histcos_rew` is **not** the one to read for refractoriness or bursting: it counts the bins inside an ongoing event as at risk and reads history from onsets only, which on simulated data alone makes a short-lag dip and a burst at these lags ([review](../.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md)). Its values are no longer reported.
 
-On the duration-aware design instead (claim 19c: a bin is at risk only while no event is ongoing, and history is anchored on both the onset and the end of each event), there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->4.53<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains: detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->5<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/5).
+On the duration-aware design instead (claim 19c: a bin is at risk only while no event is ongoing, and history is anchored on both the onset and the end of each event), there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->4.53<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains (an animal counts when its peak's interval, widened for the lags searched, stays above 1): detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->4<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/5).
 
 ## 5. Behavioral-state covariates
 
@@ -275,7 +281,8 @@ bits/event is not comparable with a rung scored on the full corpus.
   self-history, is positive everywhere:
   **<!--v:part3.rate_conditional_reward_delta_aic_swr-->+0.94<!--/v-->**, **<!--v:part3.rate_conditional_reward_delta_aic_non_local-->+1.0<!--/v-->**, **<!--v:part3.rate_conditional_reward_delta_aic_non_local_swr-->+1.6<!--/v-->**, **<!--v:part3.rate_conditional_reward_delta_aic_non_local_no_swr-->+2.4<!--/v-->** on the same four populations. The four-parameter smooth block does
   not pay for itself once the time course and self-history are in the model,
-  even though its immediate component is a large and consistent effect (§2).
+  even though the lag-1 kernel it builds is above 1 in most SWR-coupled
+  sessions (§2): AIC weighs four parameters against a gain concentrated at lag 1.
 - **`M9r_rew_x_time` (reward × time) costs CV and does not buy AIC** relative to
   its parent `M7r_time_histcos_rew` (<!--v:part3.rate_ladder_aic_reward_by_time-->2133<!--/v--> vs <!--v:part3.rate_ladder_aic_full-->2128<!--/v-->; <!--v:part3.rate_ladder_cv_bits_reward_by_time-->0.18<!--/v--> vs <!--v:part3.rate_ladder_cv_bits_full-->0.22<!--/v--> bits/event on
   a smaller CV cohort still), so there is no evidence here that recent reward

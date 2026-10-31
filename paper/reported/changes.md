@@ -3085,3 +3085,121 @@ marker, and the computed value now there. Newest last.
 | `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_animals_non_local_no_swr` | … | 2 |
 | `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_low` | … | 2.63 |
 | `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_high` | … | 4.53 |
+
+## 2026-10-31
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_p_swr` | 0 | 1.9e-24 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local` | 1.19 | 1.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_p_non_local` | 0 | 3.8e-17 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_p_non_local_swr` | 0 | 3.2e-28 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/per_bin_rate_results.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_kernel_lag_one_no_swr` | 0.95 | 0.92 |
+| `docs/per_bin_rate_results.md` | `part3.rate_allstops_kernel_lag_one_p_no_swr` | 0.03 | 0.029 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_session_non_local` | 0.050 | 0.051 |
+| `docs/per_bin_rate_results.md` | `part3.rate_bump_one_session_non_local_swr` | 0.0065 | 0.0088 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local` | 1.19 | 1.18 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_three_non_local_swr` | 0.94 | 0.95 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_four_non_local_swr` | 0.89 | 0.90 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_three_non_local_no_swr` | 0.94 | 0.93 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_four_non_local_no_swr` | 0.93 | 0.92 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_six_non_local_no_swr` | 0.96 | 0.95 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_nine_non_local_no_swr` | 1.00 | 0.99 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/per_bin_rate_results.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_animals_non_local_swr` | 5 | 4 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local` | 1.19 | 1.18 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/rate_models.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `docs/rate_models.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/rate_models.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/rate_models.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/rate_models.md` | `part3.history_onset_animals_non_local_swr` | 5 | 4 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local` | 1.19 | 1.18 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/rate_models.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/rate_models.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/rate_models.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/rate_models.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/rate_models.md` | `part3.rate_allstops_paired_p` | 4.6e-26 | 7.0e-25 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local` | 1.19 | 1.18 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_late_min_non_local_no_swr` | 0.93 | 0.92 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_allstops_kernel_lag_one_no_swr` | 0.95 | 0.92 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_allstops_paired_p` | 4.6e-26 | 7.0e-25 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_animals_non_local_swr` | 5 | 4 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `paper/claims_table.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `paper/claims_table.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `paper/claims_table.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `paper/claims_table.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local` | 1.19 | 1.18 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `paper/claims_table.md` | `part3.rate_kernel_late_min_high` | 0.93 | 0.92 |
+| `paper/claims_table.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `paper/claims_table.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `paper/claims_table.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `paper/claims_table.md` | `part3.rate_allstops_paired_sessions` | 241 | 218 |
+| `paper/claims_table.md` | `part3.rate_allstops_paired_p` | 4.6e-26 | 7.0e-25 |
+| `paper/claims_table.md` | `part3.history_onset_animals_non_local` | 5 | 4 |
+| `paper/claims_table.md` | `part3.history_onset_animals_non_local_swr` | 5 | 4 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `paper/claims_table.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `paper/claims_table.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `paper/claims_table.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `paper/claims_table.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `paper/claims_table.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `paper/reported/overview.md` | `part3.rate_kernel_lag_one_non_local_swr` | 1.51 | 1.50 |
+| `paper/reported/overview.md` | `part3.rate_kernel_lag_one_non_local_no_swr` | 1.01 | 1.00 |
+| `paper/reported/overview.md` | `part3.rate_paired_positive_fraction` | 77 % | 79 % |
+| `paper/reported/overview.md` | `part3.rate_paired_sessions` | 240 | 207 |
+| `paper/reported/overview.md` | `part3.rate_paired_p` | 1.1e-19 | 3.1e-19 |
+| `paper/reported/overview.md` | `part3.history_onset_animals_non_local` | 5 | 4 |
+| `paper/reported/overview.md` | `part3.history_onset_animals_non_local_swr` | 5 | 4 |
+| `paper/reported/overview.md` | `part4.marked_content_uncertainty_swr_replay_post_onset_animals_same_sign` | 5 | 2 |
+| `paper/reported/overview.md` | `part4.marked_strength_duration_swr_replay_post_onset_animals_same_sign` | 4 | 2 |
+| `paper/reported/overview.md` | `part4.marked_strength_duration_non_swr_replay_post_onset_animals_same_sign` | 5 | 3 |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_swr_replay_post_onset_animals_same_sign` | 5 | 3 |
+| `paper/reported/overview.md` | `part4.marked_strength_ripple_power_non_swr_replay_post_onset_animals_same_sign` | 4 | 2 |
+| `paper/reported/overview.md` | `part4.marked_strength_mua_rate_swr_replay_post_onset_animals_same_sign` | 5 | 3 |
+| `paper/reported/overview.md` | `part4.marked_ripple_ripple_power_non_swr_replay_post_onset_animals_same_sign` | 4 | 3 |

@@ -5,14 +5,19 @@ Every number on this page is filled by `scripts/reported/emit_reported_values.py
 [values_index.md](values_index.md). The interpretations are the assistant's reading of those values
 (2026-10-26), for the lead to check; "pending" marks values that may not be quoted as findings yet.
 
-**A caution that applies throughout.**
+**Cautions that apply throughout.**
 - Unless a line says otherwise, a property contrast is a plain median, not controlled for event duration, and
   non-SWR events are about half as long as SWR events.
+- A "session" is one run epoch, and several epochs come from each recording day. A p or q value
+  over sessions treats the epochs as independent, which they are not, so it overstates the evidence. The
+  animal counts beside it are the level to read the claim at. Tests at the recording-day level are still to
+  be added.
 
 ## Part 1. The model: how it works and what it captures
 
 **Do the decoder's states mean what they claim?** The held-out tetrode test asks whether spikes that did not
-choose a location still support it.
+choose a location still support it. Only the location is held out: the state labels that pick the windows
+come from the decode on all tetrodes, so the scoring tetrodes helped choose which windows are tested.
 - At rest, all three states pass: Local <!--v:part1.heldout_local_immobile_estimate-->2.8<!--/v--> nats per window
   (<!--v:part1.heldout_local_immobile_animals_positive-->5<!--/v-->/<!--v:part1.state_evidence_animals-->5<!--/v--> animals,
   <!--v:part1.heldout_local_immobile_epochs_positive-->242<!--/v-->/<!--v:part1.heldout_local_immobile_epochs-->242<!--/v--> epochs), No-Spike
@@ -154,17 +159,26 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 ## Part 3. Behavior: how the events relate to the task, SWR against non-SWR
 
 **How often do events occur, and does reward drive the rate?**
-- Baseline rates are similar: <!--v:part3.rate_baseline_non_local_no_swr-->0.22<!--/v--> non-SWR against <!--v:part3.rate_baseline_non_local_swr-->0.21<!--/v-->
+- Baseline rates show no detectable difference: <!--v:part3.rate_baseline_non_local_no_swr-->0.22<!--/v--> non-SWR against <!--v:part3.rate_baseline_non_local_swr-->0.21<!--/v-->
   SWR-coupled events per second of rest (within-session ratio <!--v:part3.rate_baseline_ratio_swr_coupled_to_no_swr-->0.98<!--/v-->,
-  p <!--v:part3.rate_baseline_ratio_swr_coupled_to_no_swr_p-->0.30<!--/v-->).
-- One reward later, the rate rises <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.51<!--/v-->× for SWR-coupled events and
-  <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v-->× for non-SWR events. The immediate reward coefficient is larger for
-  SWR-coupled events in <!--v:part3.rate_paired_positive_fraction-->77 %<!--/v--> of <!--v:part3.rate_paired_sessions-->240<!--/v--> sessions
-  (p <!--v:part3.rate_paired_p-->1.1e-19<!--/v-->).
+  p <!--v:part3.rate_baseline_ratio_swr_coupled_to_no_swr_p-->0.30<!--/v-->). This is no test of equivalence, so it does not show the rates are the same.
+- One reward later, the rate rises <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v-->× for SWR-coupled events
+  (above 1 in <!--v:part3.rate_kernel_lag_one_animals_positive_non_local_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals) and
+  <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v-->× for non-SWR events (p <!--v:part3.rate_kernel_lag_one_p_non_local_no_swr-->0.55<!--/v-->). This is the reward kernel reconstructed
+  at lag 1, read over the sessions whose reward terms pass the separation gate
+  (<!--v:part3.rate_kernel_sessions_non_local_swr-->225<!--/v--> and <!--v:part3.rate_kernel_sessions_non_local_no_swr-->218<!--/v--> sessions). Within session the SWR-coupled kernel is the
+  larger in <!--v:part3.rate_paired_positive_fraction-->79 %<!--/v--> of <!--v:part3.rate_paired_sessions-->207<!--/v--> sessions
+  (<!--v:part3.rate_paired_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; p <!--v:part3.rate_paired_p-->3.1e-19<!--/v-->).
+  Of the kept fits, <!--v:part3.rate_kernel_nonconverged_non_local_swr-->78<!--/v--> (SWR-coupled) and <!--v:part3.rate_kernel_nonconverged_non_local_no_swr-->62<!--/v--> (non-SWR) did
+  not converge. Why is still open, and the values may move once it is settled.
 - In the per-stop model, adding reward history improves the fit for SWR-coupled events
   (median AIC(with) − AIC(without), negative = better: <!--v:part3.per_stop_delta_aic_session_non_local_swr-->−3.1<!--/v-->) but not for non-SWR events
   (<!--v:part3.per_stop_delta_aic_session_non_local_no_swr-->+0.88<!--/v-->).
-- *Reading:* reward gates SWR-coupled events; non-SWR events occur at a similar rate but barely respond to reward.
+- *Reading:* reward raises the rate of SWR-coupled events more than that of non-SWR events. In this model
+  the non-SWR lag-1 kernel cannot be told from 1, but how far that depends on the model's other terms has not
+  been computed, so "non-SWR events do not respond to reward" is not yet a finding. The SWR-coupled class is
+  defined by overlap with a detected SWR, and detected SWRs respond too (lag-1 kernel
+  <!--v:part3.rate_kernel_lag_one_swr-->1.38<!--/v-->×), so the gating may be of SWRs rather than of replay.
 
 **Do events come in clusters, and do the two types follow each other?** Event history, once event duration is handled (a bin inside an event is not at risk; history is read from the previous event's end and its onset; each animal's sessions pooled, so the sizes are upper bounds):
 - No suppression after an event ends: 15 ms after the end the rate ratio is
@@ -173,13 +187,15 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   <!--v:part3.history_end_first_lag_suppressed_fits-->0<!--/v--> of <!--v:part3.history_fits-->19<!--/v--> animal × population fits (95 % CI).
 - The next event is <!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× likelier
   <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the previous one
-  ends (at least <!--v:part3.history_end_peak_animals_min-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals in every population).
-- A smaller onset-locked part remains: detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at
+  ends (at least <!--v:part3.history_end_peak_animals_min-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals in every population, each peak's interval
+  widened for the lags searched).
+- A smaller onset-locked part remains. Each peak is the largest rate ratio over the measurable lags, so an
+  animal counts only when its interval, widened for the lags searched, stays above 1: detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at
   <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals),
   non-local <!--v:part3.history_onset_peak_non_local-->1.59<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local-->120<!--/v--> ms
-  (<!--v:part3.history_onset_animals_non_local-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), SWR-coupled
+  (<!--v:part3.history_onset_animals_non_local-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->), SWR-coupled
   <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms
-  (<!--v:part3.history_onset_animals_non_local_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
+  (<!--v:part3.history_onset_animals_non_local_swr-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->), non-SWR
   <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms
   (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
 - Cross (ridge fit per animal, cross window 1 s, rate ratios shrunk toward 1): 45 ms after the other stream's event ends,
@@ -193,7 +209,10 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 - *Reading:* There is no refractory period beyond the event itself. Events cluster mostly right after the previous event ends, with a weaker onset-locked rhythm, and each kind of event follows the end of the other kind the same way it follows its own. The succession runs in both directions, which fits one continuum of events rather than two classes
   (Part 2, "One class or two?").
 
-**What do events represent?** (content, log weights per arm; fraction estimator unless named; q is the false-discovery-adjusted p)
+**What do events represent?** (content, log weights per arm; fraction estimator unless named; q is the false-discovery-adjusted p
+over sessions. "Direct" is the SWR contrast adjusted for event length, where length enters only crossed with the
+current and previous arm; the SWR × reward, value and uncertainty terms have no length interaction. "Total" has no
+length term. Length may itself be a result of being an SWR event, so neither is the one right answer.)
 - Current arm: <!--v:part3.base_current_all-->+0.73<!--/v--> (<!--v:part3.base_current_all_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals); fitted separately,
   SWR <!--v:part3.base_current_swr-->+0.88<!--/v--> and non-SWR <!--v:part3.base_current_non_swr-->+0.53<!--/v-->. The two kinds of event do not differ
   consistently: within each session the SWR minus non-SWR difference is <!--v:part3.current_arm_paired_difference-->+0.088<!--/v-->
@@ -211,14 +230,14 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 - Recently rewarded arms: non-SWR content is not selective (<!--v:part3.armreward_non_swr-->+0.027<!--/v-->, q <!--v:part3.armreward_non_swr_q-->0.35<!--/v-->);
   SWR content avoids them (<!--v:part3.armreward_swr-->−0.26<!--/v-->, <!--v:part3.armreward_swr_animals_positive-->0<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive). Compared directly, with
   SWR-specific arm baselines, the SWR contrast is <!--v:part3.swr_armreward_total-->−0.39<!--/v--> as a total effect
-  (<!--v:part3.swr_armreward_total_animals_positive-->1<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive) and <!--v:part3.swr_armreward_direct-->−0.18<!--/v--> once event length is held fixed
+  (<!--v:part3.swr_armreward_total_animals_positive-->1<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive) and <!--v:part3.swr_armreward_direct-->−0.18<!--/v--> direct (adjusted for length × current and previous arm)
   (<!--v:part3.swr_armreward_direct_animals_positive-->2<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.swr_armreward_direct_q-->0.72<!--/v-->).
 - Uncertain arms: content favours them, <!--v:part3.armuncert_all-->+0.31<!--/v--> (<!--v:part3.armuncert_all_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armuncert_all_q-->5.4e-27<!--/v-->),
   for both non-SWR (<!--v:part3.armuncert_non_swr-->+0.18<!--/v-->) and SWR (<!--v:part3.armuncert_swr-->+0.37<!--/v-->). Adding uncertainty helps the leaf model
   (median AIC improvement, positive = better: <!--v:part3.leaf_step_uncertainty-->+1.3<!--/v-->, <!--v:part3.leaf_step_uncertainty_animals-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals); adding value does not
   (<!--v:part3.leaf_step_value-->−2.4<!--/v-->, <!--v:part3.leaf_step_value_animals-->0<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
 - Arm value: <!--v:part3.armvalue_all-->+0.078<!--/v--> (<!--v:part3.armvalue_all_animals_positive-->4<!--/v-->/<!--v:part2.animals-->5<!--/v-->, q <!--v:part3.armvalue_all_q-->0.13<!--/v-->). The SWR × value contrast is
-  near zero once event length is in (direct <!--v:part3.swr_armvalue_direct-->+0.082<!--/v-->, <!--v:part3.swr_armvalue_direct_animals_positive-->3<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive) and
+  near zero with the length adjustment (direct <!--v:part3.swr_armvalue_direct-->+0.082<!--/v-->, <!--v:part3.swr_armvalue_direct_animals_positive-->3<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals positive) and
   weakly negative without it (total <!--v:part3.swr_armvalue_total-->−0.13<!--/v-->, <!--v:part3.swr_armvalue_total_animals_positive-->1<!--/v-->/<!--v:part2.animals-->5<!--/v-->).
 - Are uncertainty, value and visit history separated? Within each arm (the four entered together; arm fraction per SD;
   non-current reward arms; design condition number <!--v:part3.horserace_condition_number_all-->3.09<!--/v-->, so they separate):
@@ -238,8 +257,10 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   - Yes: uncertainty is the only term whose sign agrees in every animal in all three populations, and it is much
     larger than value or recency. Value is near zero once uncertainty, distance and recency are in; content leans
     away from distant arms; recency is small, and near zero for non-SWR events.
-- *Reading:* the robust content facts are current-arm bias, preference for uncertain arms, broader SWR content, and SWR
-  avoidance of recently rewarded arms. Value effects are weak or run through event length.
+- *Reading:* the robust content facts are current-arm bias, preference for uncertain arms and broader SWR content.
+  SWR content avoids recently rewarded arms within SWR events, and against non-SWR events as a total effect, but not
+  once the length adjustment is in, so that contrast may run through event length. Value effects are weak or run
+  through event length.
 
 **Does content relate to what the animal does next?**
 - Next choice: over the behavioural baseline, non-SWR content <!--v:part3.choice_non_swr-->+0.040<!--/v--> (p <!--v:part3.choice_non_swr_p-->0.84<!--/v-->),
@@ -352,13 +373,13 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   within-session SD of the property, fit jointly with the other properties of its group, every unit with a spike kept
   (a weak prior on the per-stop baselines lets near-silent units converge), averaged unit → session → animal. Values are
   in log-rate units per SD (0.01 ≈ a 1 % rate change). No shuffle reference was run.
-  - Content. Replay of the current arm: SWR-coupled <!--v:part4.marked_content_current_arm_swr_replay_peak-->−0.031<!--/v--> at <!--v:part4.marked_content_current_arm_swr_replay_peak_lag_ms-->60<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_current_arm_swr_replay_post_onset_mean-->−0.026<!--/v-->; <!--v:part4.marked_content_current_arm_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
-    non-SWR <!--v:part4.marked_content_current_arm_non_swr_replay_peak-->−0.027<!--/v--> at <!--v:part4.marked_content_current_arm_non_swr_replay_peak_lag_ms-->74<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_current_arm_non_swr_replay_post_onset_mean-->−0.023<!--/v-->; <!--v:part4.marked_content_current_arm_non_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign). Recently rewarded arms:
-    SWR-coupled <!--v:part4.marked_content_recent_reward_swr_replay_peak-->−0.011<!--/v--> at <!--v:part4.marked_content_recent_reward_swr_replay_peak_lag_ms-->96<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_recent_reward_swr_replay_post_onset_mean-->−0.0088<!--/v-->; <!--v:part4.marked_content_recent_reward_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_content_recent_reward_non_swr_replay_peak-->−0.013<!--/v--> at <!--v:part4.marked_content_recent_reward_non_swr_replay_peak_lag_ms-->84<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_recent_reward_non_swr_replay_post_onset_mean-->−0.012<!--/v-->; <!--v:part4.marked_content_recent_reward_non_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
-    Uncertain arms: SWR-coupled <!--v:part4.marked_content_uncertainty_swr_replay_peak-->−0.0096<!--/v--> at <!--v:part4.marked_content_uncertainty_swr_replay_peak_lag_ms-->−72<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_uncertainty_swr_replay_post_onset_mean-->−0.00077<!--/v-->; <!--v:part4.marked_content_uncertainty_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_content_uncertainty_non_swr_replay_peak-->0.013<!--/v--> at <!--v:part4.marked_content_uncertainty_non_swr_replay_peak_lag_ms-->108<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_uncertainty_non_swr_replay_post_onset_mean-->0.011<!--/v-->; <!--v:part4.marked_content_uncertainty_non_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
-  - Strength. Duration: SWR-coupled <!--v:part4.marked_strength_duration_swr_replay_peak-->0.010<!--/v--> at <!--v:part4.marked_strength_duration_swr_replay_peak_lag_ms-->200<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_duration_swr_replay_post_onset_mean-->−0.0011<!--/v-->; <!--v:part4.marked_strength_duration_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_strength_duration_non_swr_replay_peak-->0.0076<!--/v--> at <!--v:part4.marked_strength_duration_non_swr_replay_peak_lag_ms-->190<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_duration_non_swr_replay_post_onset_mean-->0.0013<!--/v-->; <!--v:part4.marked_strength_duration_non_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
-    Ripple power: SWR-coupled <!--v:part4.marked_strength_ripple_power_swr_replay_peak-->−0.0077<!--/v--> at <!--v:part4.marked_strength_ripple_power_swr_replay_peak_lag_ms-->168<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_ripple_power_swr_replay_post_onset_mean-->0.0015<!--/v-->; <!--v:part4.marked_strength_ripple_power_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_strength_ripple_power_non_swr_replay_peak-->0.0088<!--/v--> at <!--v:part4.marked_strength_ripple_power_non_swr_replay_peak_lag_ms-->−106<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_ripple_power_non_swr_replay_post_onset_mean-->−0.000039<!--/v-->; <!--v:part4.marked_strength_ripple_power_non_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
-    Multiunit rate: SWR-coupled <!--v:part4.marked_strength_mua_rate_swr_replay_peak-->−0.0055<!--/v--> at <!--v:part4.marked_strength_mua_rate_swr_replay_peak_lag_ms-->−200<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_mua_rate_swr_replay_post_onset_mean-->−0.00080<!--/v-->; <!--v:part4.marked_strength_mua_rate_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_strength_mua_rate_non_swr_replay_peak-->−0.020<!--/v--> at <!--v:part4.marked_strength_mua_rate_non_swr_replay_peak_lag_ms-->58<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_mua_rate_non_swr_replay_post_onset_mean-->−0.015<!--/v-->; <!--v:part4.marked_strength_mua_rate_non_swr_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
+  - Content. Replay of the current arm: SWR-coupled <!--v:part4.marked_content_current_arm_swr_replay_peak-->−0.031<!--/v--> at <!--v:part4.marked_content_current_arm_swr_replay_peak_lag_ms-->60<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_current_arm_swr_replay_post_onset_mean-->−0.026<!--/v-->; <!--v:part4.marked_content_current_arm_swr_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
+    non-SWR <!--v:part4.marked_content_current_arm_non_swr_replay_peak-->−0.027<!--/v--> at <!--v:part4.marked_content_current_arm_non_swr_replay_peak_lag_ms-->74<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_current_arm_non_swr_replay_post_onset_mean-->−0.023<!--/v-->; <!--v:part4.marked_content_current_arm_non_swr_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign). Recently rewarded arms:
+    SWR-coupled <!--v:part4.marked_content_recent_reward_swr_replay_peak-->−0.011<!--/v--> at <!--v:part4.marked_content_recent_reward_swr_replay_peak_lag_ms-->96<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_recent_reward_swr_replay_post_onset_mean-->−0.0088<!--/v-->; <!--v:part4.marked_content_recent_reward_swr_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_content_recent_reward_non_swr_replay_peak-->−0.013<!--/v--> at <!--v:part4.marked_content_recent_reward_non_swr_replay_peak_lag_ms-->84<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_recent_reward_non_swr_replay_post_onset_mean-->−0.012<!--/v-->; <!--v:part4.marked_content_recent_reward_non_swr_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
+    Uncertain arms: SWR-coupled <!--v:part4.marked_content_uncertainty_swr_replay_peak-->−0.0096<!--/v--> at <!--v:part4.marked_content_uncertainty_swr_replay_peak_lag_ms-->−72<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_uncertainty_swr_replay_post_onset_mean-->−0.00077<!--/v-->; <!--v:part4.marked_content_uncertainty_swr_replay_post_onset_animals_same_sign-->2<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_content_uncertainty_non_swr_replay_peak-->0.013<!--/v--> at <!--v:part4.marked_content_uncertainty_non_swr_replay_peak_lag_ms-->108<!--/v--> ms (0–150 ms mean <!--v:part4.marked_content_uncertainty_non_swr_replay_post_onset_mean-->0.011<!--/v-->; <!--v:part4.marked_content_uncertainty_non_swr_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
+  - Strength. Duration: SWR-coupled <!--v:part4.marked_strength_duration_swr_replay_peak-->0.010<!--/v--> at <!--v:part4.marked_strength_duration_swr_replay_peak_lag_ms-->200<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_duration_swr_replay_post_onset_mean-->−0.0011<!--/v-->; <!--v:part4.marked_strength_duration_swr_replay_post_onset_animals_same_sign-->2<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_strength_duration_non_swr_replay_peak-->0.0076<!--/v--> at <!--v:part4.marked_strength_duration_non_swr_replay_peak_lag_ms-->190<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_duration_non_swr_replay_post_onset_mean-->0.0013<!--/v-->; <!--v:part4.marked_strength_duration_non_swr_replay_post_onset_animals_same_sign-->3<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
+    Ripple power: SWR-coupled <!--v:part4.marked_strength_ripple_power_swr_replay_peak-->−0.0077<!--/v--> at <!--v:part4.marked_strength_ripple_power_swr_replay_peak_lag_ms-->168<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_ripple_power_swr_replay_post_onset_mean-->0.0015<!--/v-->; <!--v:part4.marked_strength_ripple_power_swr_replay_post_onset_animals_same_sign-->3<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_strength_ripple_power_non_swr_replay_peak-->0.0088<!--/v--> at <!--v:part4.marked_strength_ripple_power_non_swr_replay_peak_lag_ms-->−106<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_ripple_power_non_swr_replay_post_onset_mean-->−0.000039<!--/v-->; <!--v:part4.marked_strength_ripple_power_non_swr_replay_post_onset_animals_same_sign-->2<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
+    Multiunit rate: SWR-coupled <!--v:part4.marked_strength_mua_rate_swr_replay_peak-->−0.0055<!--/v--> at <!--v:part4.marked_strength_mua_rate_swr_replay_peak_lag_ms-->−200<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_mua_rate_swr_replay_post_onset_mean-->−0.00080<!--/v-->; <!--v:part4.marked_strength_mua_rate_swr_replay_post_onset_animals_same_sign-->3<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); non-SWR <!--v:part4.marked_strength_mua_rate_non_swr_replay_peak-->−0.020<!--/v--> at <!--v:part4.marked_strength_mua_rate_non_swr_replay_peak_lag_ms-->58<!--/v--> ms (0–150 ms mean <!--v:part4.marked_strength_mua_rate_non_swr_replay_post_onset_mean-->−0.015<!--/v-->; <!--v:part4.marked_strength_mua_rate_non_swr_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign).
     Ripple power and multiunit rate correlate within a session (<!--v:part4.marked_ripple_mua_correlation_swr_replay-->0.79<!--/v--> for SWR-coupled,
     <!--v:part4.marked_ripple_mua_correlation_non_swr_replay-->0.65<!--/v--> for non-SWR replay), so a small slope on either may carry part of the other's effect
     (ridge leakage: the same sign in every animal).
@@ -371,14 +392,16 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
     <!--v:part4.marked_strength_ripple_power_swr_replay_heldout_gain_fraction-->26 %<!--/v-->, non-SWR <!--v:part4.marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction-->26 %<!--/v-->.
     No chance reference was computed, so the share expected by chance is not known: these shares are not a test,
     and a mark with no effect could still improve the held-out deviance of some units.
-  - Ripple power alone, each class in one model: SWR-coupled <!--v:part4.marked_ripple_ripple_power_swr_replay_peak-->0.014<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_replay_peak_lag_ms-->8<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_replay_post_onset_mean-->0.0079<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
-    non-SWR <!--v:part4.marked_ripple_ripple_power_non_swr_replay_peak-->0.0091<!--/v--> at <!--v:part4.marked_ripple_ripple_power_non_swr_replay_peak_lag_ms-->−98<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_non_swr_replay_post_onset_mean-->−0.0039<!--/v-->; <!--v:part4.marked_ripple_ripple_power_non_swr_replay_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); SWRs without replay <!--v:part4.marked_ripple_ripple_power_swr_no_replay_peak-->−0.0096<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_no_replay_peak_lag_ms-->−98<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_no_replay_post_onset_mean-->−0.0057<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_no_replay_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
+  - Ripple power alone, each class in one model: SWR-coupled <!--v:part4.marked_ripple_ripple_power_swr_replay_peak-->0.014<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_replay_peak_lag_ms-->8<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_replay_post_onset_mean-->0.0079<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_replay_post_onset_animals_same_sign-->4<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
+    non-SWR <!--v:part4.marked_ripple_ripple_power_non_swr_replay_peak-->0.0091<!--/v--> at <!--v:part4.marked_ripple_ripple_power_non_swr_replay_peak_lag_ms-->−98<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_non_swr_replay_post_onset_mean-->−0.0039<!--/v-->; <!--v:part4.marked_ripple_ripple_power_non_swr_replay_post_onset_animals_same_sign-->3<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign); SWRs without replay <!--v:part4.marked_ripple_ripple_power_swr_no_replay_peak-->−0.0096<!--/v--> at <!--v:part4.marked_ripple_ripple_power_swr_no_replay_peak_lag_ms-->−98<!--/v--> ms (0–150 ms mean <!--v:part4.marked_ripple_ripple_power_swr_no_replay_post_onset_mean-->−0.0057<!--/v-->; <!--v:part4.marked_ripple_ripple_power_swr_no_replay_post_onset_animals_same_sign-->5<!--/v-->/<!--v:part4.marked_animals-->5<!--/v--> animals with that sign);
     all classes pooled <!--v:part4.marked_ripplepooled_ripple_power_pooled_peak-->0.012<!--/v--> at <!--v:part4.marked_ripplepooled_ripple_power_pooled_peak_lag_ms-->−84<!--/v--> ms.
-  - Reading: every slope is a change of a few percent per SD. The largest post-onset slopes are for replay of the current
-    arm (smaller responses, both replay classes, the peak's sign in every animal); recently rewarded content and, for
-    non-SWR replay, multiunit rate give smaller slopes of consistent sign. Duration and ripple-power slopes peak at the
-    window's edges or before onset, so they show no event-locked scaling. The animal counts are taken at each peak's lag;
-    a slope linear in the mark is assumed.
+  - Reading: every slope is a change of a few percent per SD. The animal counts are read on the 0–150 ms window fixed
+    in advance, not at the peak lag: at the lag picked for being the population's largest, the animals agree by
+    selection (there every mark looked consistent across animals, null ones included). On the fixed window, replay of
+    the current arm (smaller responses) and of recently rewarded arms has its sign in every animal in both replay
+    classes, as do the non-SWR uncertainty and non-SWR multiunit-rate slopes; the other slopes have their sign in only
+    some animals. Duration and ripple-power slopes peak at the window's edges or before onset, so they show no
+    event-locked scaling. A slope linear in the mark is assumed.
 - **Which stops?** (Stop-level context, pooled over sessions: each unit's spikes in the 200 ms after each replay onset
   against its rate in the same stop's event-free time, with free unit terms and the count of overlapping events;
   units called for the class; 95 % intervals clustered by recording day (t intervals).) Units whose response is an increase respond more at
