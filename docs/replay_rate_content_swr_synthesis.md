@@ -92,7 +92,7 @@ content claims registry [../paper/claims_table.md](../paper/claims_table.md).
   carries a parameter the conditional estimators do not — `log_phi_is_swr`, the
   within-event concentration contrast — which is the direct measurement of "SWR
   broadens content" (Layer 3). The fraction's event-clustered SE runs above the
-  DM's model SE on every term (the comparison summary's `median_se_ratio_*`
+  DM's model SE on most terms (the comparison summary's `median_se_ratio_*`
   columns), so the shipped estimator is if
   anything the more conservative of the two honest options, and the fraction
   stays the shipped response.
@@ -474,7 +474,8 @@ Report it as a three-way comparison; do not write that any estimator shows a
 direct value avoidance.
 
 The rung is also not worth its parameters on either honest scale. The
-animal-balanced median per-session ΔAIC against `C2_base_leaf` — AIC(rung) −
+animal-balanced median per-session ΔAIC against `C2_base_swr_leaf` (the same
+leaf-only base and SWR arm baselines, without the two value terms) — AIC(rung) −
 AIC(parent), **negative = rung better**, the same convention as the rate ΔAIC in
 Layer 1 — is **<!--v:part3.est_armvalue_rung_delta_aic_fraction-->+4.0<!--/v-->** (fraction) and **<!--v:part3.est_armvalue_rung_delta_aic_dm-->+0.22<!--/v-->** (DM), against **<!--v:part3.est_armvalue_rung_delta_aic_count-->−490<!--/v-->** on the retired
 count scale. The count figure is the timebin-pseudoreplication artefact, not an

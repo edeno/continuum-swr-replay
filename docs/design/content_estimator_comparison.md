@@ -1,12 +1,19 @@
 # Content estimators compared — count multinomial, event fractions, Dirichlet-multinomial
 
-*2026-09-05.* Which of the nine candidate arms an immobility non-local event
-represents has been asked with three different likelihoods on **one** cohort:
-**218 sessions, 5 animals**, the at-well candidate-arm cohort assembled by
-`scripts/content/fit_swr_contrast_content.py` (its cohort rules are applied once
-per session for *both* response columns and intersected, so a per-(session,
-rung) event set is identical across the three estimators — a difference between
-them is a difference of likelihood and never of cohort).
+*2026-09-05; numbers converted to reported values 2026-10-31.* Which of the
+nine candidate arms an immobility non-local event represents has been asked
+with three different likelihoods on **one** cohort: the at-well candidate-arm
+cohort assembled by `scripts/content/fit_swr_contrast_content.py` (its cohort
+rules are applied once per session for *both* response columns and
+intersected, so a per-(session, rung) event set is identical across the three
+estimators — a difference between them is a difference of likelihood and never
+of cohort).
+
+Every number below is read from `paper/reported/part3.json` (or `part2.json`)
+through a value marker. A number this document used to type that no summary
+holds was taken out; each removal is listed in
+[`paper/reported/removed_part3.md`](../../paper/reported/removed_part3.md). The
+full tables (every rung, every term) are in the artifacts below.
 
 Runner: [`scripts/content/compare_content_estimators.py`](../../scripts/content/compare_content_estimators.py).
 
@@ -14,17 +21,17 @@ Artifacts (gitignored, under `Processed-Data/replay_content/content_estimator_co
 
 | file | holds |
 |---|---|
-| `content_estimator_comparison.parquet` | one row per (session, rung, term, estimator); 81,868 × 25 |
+| `content_estimator_comparison.parquet` | one row per (session, rung, term, estimator) |
 | `content_estimator_comparison_summary.csv` | per (rung, term): animal-balanced median coefficient, animals-positive count, median ΔAIC, median SE ratio, per estimator |
 | `content_estimator_bootstrap.csv` | animal-bootstrap 2.5 / 50 / 97.5 percentiles (2000 draws, seed 0) |
 | `content_estimator_comparison_skips.csv` | the (session, rung) keys no estimator set could be formed for |
-| `content_estimator_comparison.provenance.json` | inputs, git hash, `n_unidentified_triples_dropped`, `min_events_session_phi` |
+| `content_estimator_comparison.provenance.json` | inputs, git hash, `n_unidentified_triples_dropped`, `n_fits_delta_aic_row_mismatch`, `min_events_session_phi` |
 
-The length-adjusted concentration twin (§7.1) lives beside the DM contrast
-bundle instead, as `Processed-Data/replay_content/models/`
-`swr_contrast_content_{arm,patch,audited}_dm_len.pkl` with its
-`_cohort_audit_dm_len.csv`, `_term_diagnostics_dm_len.csv` and
-`_provenance_dm_len.json`. Each artifact's provenance sidecar records the
+The shipped Dirichlet-multinomial contrast bundles, and their length-adjusted
+concentration twin (§7.1), live beside the other contrast fits in
+`Processed-Data/replay_content/models_swr_contrast/` as
+`swr_contrast_content_{arm,patch,audited}_dm{,_len}.pkl` with their cohort
+audits, term diagnostics and provenance. Each provenance sidecar records the
 `concentration_cols` it was fit with, so a `_dm` table and a `_dm_len` table
 are told apart from the record and not from the filename.
 
@@ -38,31 +45,9 @@ axis (identity dashed, colour = animal). `log_phi_by_session.png` plots the DM
 concentration intercept and its `is_swr` shift per session for `C2_base`, with
 the animal-bootstrap band.
 
-> **These numbers live only in this document.** The claims table
-> (`paper/claims_table.md`) has not been revised against them and does not cite
-> them. Nothing here supersedes a shipped claim until that revision happens.
-
-> **Cohort note (2026-09-12).** This comparison was fit on 2026-09-05, before
-> the `is_swr`-contrast content runner was given the explicit well-anchored
-> (at-well) event cohort it now shares with the rate family. All three columns
-> come from that one run, so the table remains an honest like-for-like
-> comparison of likelihoods — but its **fraction** column is the pre-refit value
-> of a coefficient that has since moved. Measured against the refit
-> ([2026-09-12-content-cohort-comparison.md](../../.claude/docs/reviews/2026-09-12-content-cohort-comparison.md)):
-> `C2_base` `is_current_arm` **+0.681 → +0.708**, `CS5_armvalue`
-> `swr_x_reward_belief_mean_candidate_arm_preoutcome` **+0.237 → +0.236**, and
-> `CS1_current` (−0.373), `CS4_armreward` (−1.198) and `CS4nt_armreward`
-> (−1.335) are unchanged at the precision printed here. Per-SD units are now
-> defined on the at-well fit cohort (2026-09-12); pre-refit values differ at the
-> third decimal (the arm-belief SD moves 0.1190 → 0.1193). **This table's count
-> and DM columns come from the same 2026-09-05 harness run and were not refit
-> either**, so do not replace a single fraction cell below with a refit value:
-> that would make the row a comparison across two cohorts. Quote the refit
-> fraction value from the audited contrast bundle instead. (The separately
-> shipped DM contrast bundles, `swr_contrast_content_audited_dm{,_len}.pkl`,
-> *were* refit on the well-anchored cohort; their key terms — `log_phi_is_swr`
-> +1.799 / +1.502, `CS4` −0.841, `CS5` −0.316, `CS5nt` −0.638, `CS6` −0.027,
-> `CS6nt` +0.146 — are unchanged at the precision quoted anywhere.)
+Claim 19f in [`paper/claims_table.md`](../../paper/claims_table.md) cites the
+arm-value comparison (§3, §4); the rest of this document is the method record
+behind it.
 
 ## 1. What each estimator assumes
 
@@ -81,32 +66,20 @@ deliberately not tabulated.
 
 ## 2. Simulation recovery
 
-Data simulated at a known concentration by
-`simulate_dirichlet_multinomial_counts` (`β = {is_current_arm: +1.0,
-is_prev_arm: −0.5}`, 300 events × 32 timebins × 9 arms). Coverage and the
-concentration error are the 40-replicate fixtures of
-`tests/unit/test_dirichlet_multinomial.py::test_recovers_beta_and_phi` /
-`::test_recovers_beta_and_phi_many_replicates` (seeds `1000·rep + int(φ)`,
-3-SE coverage of the true β). The SE columns use the fixture and seed scheme of
-`::test_count_model_se_too_small_on_dm_data` (100 replicates, seeds
-`90000 + rep`, `is_current_arm`), evaluated at each φ rather than only at the
-test's φ = 2: they are the mean model SE over replicates divided by the
-empirical SD of that estimator's own coefficient, so **1.0 is calibrated and
-below 1.0 is an understated SE**.
+`simulate_dirichlet_multinomial_counts` simulates events at a known
+concentration (`β = {is_current_arm: +1.0, is_prev_arm: −0.5}`, 9 arms), and
+`tests/unit/test_dirichlet_multinomial.py` checks the estimators on it:
 
-| φ | 3-SE coverage, `is_current_arm` | 3-SE coverage, `is_prev_arm` | median &#124;Δ log φ&#124; | count-model SE / empirical SD | DM SE / empirical SD |
-|---|---|---|---|---|---|
-| 1 | 1.000 | 1.000 | 0.017 | 0.23 | 0.93 |
-| 3 | 0.975 | 1.000 | 0.005 | 0.35 | 0.95 |
-| 10 | 1.000 | 1.000 | 0.003 | 0.62 | 1.23 |
-| 100 | 1.000 | 0.975 | 0.090 | 0.87 | 0.98 |
+- `::test_recovers_beta_and_phi` and `::test_recovers_beta_and_phi_many_replicates`:
+  the DM recovers both coefficients within 3 SE and recovers the
+  concentration.
+- `::test_count_model_se_too_small_on_dm_data`: on overdispersed data the
+  count model's SE is smaller than the spread of its own estimates — the defect
+  this comparison exists to measure, and why a count-scale AIC or p-value on
+  real events cannot be read at face value.
 
-The DM recovers both coefficients and the concentration at every φ, and its
-model SE tracks its own sampling spread. The count model's SE is a **quarter**
-of the true spread at φ = 1 and is still short at φ = 100; it approaches
-calibration only as φ → ∞, i.e. as the data stop being overdispersed. That is
-the defect this comparison exists to measure, and it is why a count-scale AIC
-or p-value on real events cannot be read at face value.
+The count model approaches calibration only as φ → ∞, i.e. as the data stop
+being overdispersed.
 
 ## 3. Real data — the key terms
 
@@ -117,167 +90,112 @@ by all three estimators on that (rung, term).
 
 | rung | term | n | count (retired) | fraction (shipped) | Dirichlet-multinomial |
 |---|---|---|---|---|---|
-| `C2_base` | `is_current_arm` | 218 | +0.626 (5/5) [+0.416, +1.461] | +0.681 (5/5) [+0.405, +1.496] | +0.737 (5/5) [+0.409, +1.360] |
-| `C2_base_leaf` | `is_current_arm` | 217 | +0.688 (5/5) [+0.420, +1.422] | +0.734 (5/5) [+0.337, +1.402] | +0.789 (5/5) [+0.419, +1.280] |
-| `CS1_current` | `swr_x_is_current_arm` | 217 | −0.461 (0/5) [−0.916, −0.121] | −0.373 (0/5) [−0.614, −0.095] | −0.297 (0/5) [−0.605, −0.174] |
-| `M3` | `reward_fraction_candidate_arm_last10_visits` | 218 | −0.077 (0/5) [−0.330, −0.006] | −0.034 (2/5) [−0.199, +0.052] | −0.046 (1/5) [−0.193, +0.089] |
-| `CS4_armreward` | `reward_fraction_candidate_arm_last10_visits` | 218 | +0.513 (5/5) [+0.399, +0.732] | +0.311 (5/5) [+0.177, +0.386] | +0.359 (5/5) [+0.283, +0.500] |
-| `CS4_armreward` | `swr_x_reward_fraction_candidate_arm_last10_visits` | 218 | −1.449 (0/5) [−1.609, −1.041] | −1.198 (0/5) [−1.523, −0.894] | −0.840 (0/5) [−1.002, −0.682] |
-| `CS5_armvalue` | `reward_belief_mean_candidate_arm_preoutcome` | 217 | +0.228 (5/5) [+0.014, +1.209] | +0.264 (5/5) [+0.031, +0.818] | +0.168 (4/5) [−0.149, +0.850] |
-| **`CS5_armvalue`** | **`swr_x_reward_belief_mean_candidate_arm_preoutcome`** | 216 | **−0.398 (1/5) [−0.904, +0.199]** | **+0.237 (3/5) [−1.322, +0.539]** | **−0.316 (0/5) [−1.136, −0.057]** |
-| `M2` | `is_prev_arm` | 218 | −1.140 (0/5) [−1.205, −0.449] | −0.657 (0/5) [−0.943, −0.277] | −0.273 (0/5) [−0.593, −0.018] |
-| `M4` | `is_candidate_arm_never_visited` | 217 | +0.283 (5/5) [+0.153, +0.468] | +0.167 (5/5) [+0.044, +0.330] | +0.119 (5/5) [+0.097, +0.262] |
+| `C2_base` | `is_current_arm` | <!--v:part3.est_current_fraction_sessions-->…<!--/v--> | <!--v:part3.est_current_count-->…<!--/v--> (<!--v:part3.est_current_count_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_current_count_low-->…<!--/v-->, <!--v:part3.est_current_count_high-->…<!--/v-->] | <!--v:part3.est_current_fraction-->…<!--/v--> (<!--v:part3.est_current_fraction_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_current_fraction_low-->…<!--/v-->, <!--v:part3.est_current_fraction_high-->…<!--/v-->] | <!--v:part3.est_current_dm-->…<!--/v--> (<!--v:part3.est_current_dm_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_current_dm_low-->…<!--/v-->, <!--v:part3.est_current_dm_high-->…<!--/v-->] |
+| `CS1_current` | `swr_x_is_current_arm` | <!--v:part3.est_swr_current_fraction_sessions-->…<!--/v--> | <!--v:part3.est_swr_current_count-->…<!--/v--> (<!--v:part3.est_swr_current_count_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_current_count_low-->…<!--/v-->, <!--v:part3.est_swr_current_count_high-->…<!--/v-->] | <!--v:part3.est_swr_current_fraction-->…<!--/v--> (<!--v:part3.est_swr_current_fraction_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_current_fraction_low-->…<!--/v-->, <!--v:part3.est_swr_current_fraction_high-->…<!--/v-->] | <!--v:part3.est_swr_current_dm-->…<!--/v--> (<!--v:part3.est_swr_current_dm_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_current_dm_low-->…<!--/v-->, <!--v:part3.est_swr_current_dm_high-->…<!--/v-->] |
+| `CS4_armreward` | `swr_x_reward_fraction_candidate_arm_last10_visits` | <!--v:part3.est_swr_armreward_fraction_sessions-->…<!--/v--> | <!--v:part3.est_swr_armreward_count-->…<!--/v--> (<!--v:part3.est_swr_armreward_count_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_armreward_count_low-->…<!--/v-->, <!--v:part3.est_swr_armreward_count_high-->…<!--/v-->] | <!--v:part3.est_swr_armreward_fraction-->…<!--/v--> (<!--v:part3.est_swr_armreward_fraction_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_armreward_fraction_low-->…<!--/v-->, <!--v:part3.est_swr_armreward_fraction_high-->…<!--/v-->] | <!--v:part3.est_swr_armreward_dm-->…<!--/v--> (<!--v:part3.est_swr_armreward_dm_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_armreward_dm_low-->…<!--/v-->, <!--v:part3.est_swr_armreward_dm_high-->…<!--/v-->] |
+| `CS5_armvalue` | `reward_belief_mean_candidate_arm_preoutcome` | <!--v:part3.est_armvalue_fraction_sessions-->…<!--/v--> | <!--v:part3.est_armvalue_count-->…<!--/v--> (<!--v:part3.est_armvalue_count_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_armvalue_count_low-->…<!--/v-->, <!--v:part3.est_armvalue_count_high-->…<!--/v-->] | <!--v:part3.est_armvalue_fraction-->…<!--/v--> (<!--v:part3.est_armvalue_fraction_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_armvalue_fraction_low-->…<!--/v-->, <!--v:part3.est_armvalue_fraction_high-->…<!--/v-->] | <!--v:part3.est_armvalue_dm-->…<!--/v--> (<!--v:part3.est_armvalue_dm_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_armvalue_dm_low-->…<!--/v-->, <!--v:part3.est_armvalue_dm_high-->…<!--/v-->] |
+| **`CS5_armvalue`** | **`swr_x_reward_belief_mean_candidate_arm_preoutcome`** | <!--v:part3.est_swr_armvalue_fraction_sessions-->…<!--/v--> | **<!--v:part3.est_swr_armvalue_count-->…<!--/v-->** (<!--v:part3.est_swr_armvalue_count_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_armvalue_count_low-->…<!--/v-->, <!--v:part3.est_swr_armvalue_count_high-->…<!--/v-->] | **<!--v:part3.est_swr_armvalue_fraction-->…<!--/v-->** (<!--v:part3.est_swr_armvalue_fraction_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_armvalue_fraction_low-->…<!--/v-->, <!--v:part3.est_swr_armvalue_fraction_high-->…<!--/v-->] | **<!--v:part3.est_swr_armvalue_dm-->…<!--/v-->** (<!--v:part3.est_swr_armvalue_dm_animals_positive-->…<!--/v-->/5) [<!--v:part3.est_swr_armvalue_dm_low-->…<!--/v-->, <!--v:part3.est_swr_armvalue_dm_high-->…<!--/v-->] |
+
+The `swr_x_` terms are read with SWR-specific arm baselines (2026-10-30): SWR
+and non-SWR events each get their own arm fixed effects, so a `swr_x_` term
+compares the two kinds of event at the same arm instead of absorbing SWR's
+shift of content onto the trunks.
 
 `log_phi_is_swr` exists only under the DM (the conditional estimators have no
-such parameter), so it gets its own table:
+such parameter). On `C2_base` its animal-bootstrap interval in this comparison
+is [<!--v:part3.est_breadth_dm_low-->…<!--/v-->,
+<!--v:part3.est_breadth_dm_high-->…<!--/v-->]; §7 reads it from the shipped DM
+contrast bundle.
 
-| rung | DM `log_phi_is_swr` | animals positive | bootstrap 2.5–97.5 |
-|---|---|---|---|
-| `M2` | +1.817 | 5/5 | +1.475 … +2.195 |
-| `M3` | +1.816 | 5/5 | +1.472 … +2.194 |
-| `M4` | +1.819 | 5/5 | +1.471 … +2.195 |
-| `C2_base` | +1.799 | 5/5 | +1.447 … +2.205 |
-| `C2_base_leaf` | +1.984 | 5/5 | +1.640 … +2.237 |
-| `CS1_current` | +1.793 | 5/5 | +1.423 … +2.176 |
-| `CS4_armreward` | +1.805 | 5/5 | +1.432 … +2.193 |
-| `CS5_armvalue` | +1.997 | 5/5 | +1.628 … +2.213 |
-
-## 4. Model comparison (ΔAIC, child better = positive)
+## 4. Model comparison (ΔAIC)
 
 Animal-balanced median per-session ΔAIC against the rung's parent, on the
-constant-equalized scale.
+constant-equalized scale: **ΔAIC = AIC(rung) − AIC(parent), negative = rung
+better.** The parent of `CS5_armvalue` is `C2_base_swr_leaf`, the leaf-only
+base plus the SWR-specific arm baselines the rung carries, so the difference
+prices only the two value terms (a leaf-only rung's six-category likelihood
+cannot be differenced against a nine-arm one).
 
 | rung (vs parent) | count | fraction | DM |
 |---|---|---|---|
-| `CS5_armvalue` vs `C2_base_leaf` (both leaf-only) | **−85.415** | **+2.524** | **+2.252** |
-| `CS1_current` vs `C2_base` | −51.979 | +0.803 | +0.372 |
-| `CS4_armreward` vs `C2_base` | −373.706 | −1.486 | −3.091 |
-| `M3` vs `M2` | −23.138 | +1.298 | +1.176 |
-| `M4` vs `M3` | −377.816 | +1.846 | +0.472 |
+| `CS5_armvalue` vs `C2_base_swr_leaf` (both leaf-only) | <!--v:part3.est_armvalue_rung_delta_aic_count-->…<!--/v--> | <!--v:part3.est_armvalue_rung_delta_aic_fraction-->…<!--/v--> | <!--v:part3.est_armvalue_rung_delta_aic_dm-->…<!--/v--> |
 
-The count model's ΔAIC of −85 per session on CS5 (and −374 to −378 elsewhere)
-is the timebin-pseudoreplication artefact: on a per-bin likelihood a session
-contributes thousands of "observations", so a parameter's likelihood cost is
-swamped. On either honest, event-scale likelihood the same rung is worth about
-+2 AIC. 75 of the 5,226 fits (1.4 %) have a parent/child row mismatch — parent
-and child dropped different events — and their ΔAIC cell is NaN;
-`n_unidentified_triples_dropped = 34` triples were removed by the same
-separation rule the shipped aggregation uses.
-
-The DM arm ladder (`Processed-Data/replay_content/models_dm/`) fit on its own,
-animal-median ΔAIC with the count of animals where the child is better:
-
-| step | ΔAIC | animals child-better |
-|---|---|---|
-| `M0` → `M0a` | +27.07 | 5/5 |
-| `M0a` → `M1` | +22.06 | 5/5 |
-| `M1` → `M2` | +0.56 | 4/5 |
-| `M2` → `M3` | −1.18 | 0/5 |
-| `M3` → `M4` | −0.47 | 2/5 |
-| `M4` → `M5` | +8.11 | 5/5 |
-| `M5` → `M6` | +1.37 | 4/5 |
-
-The arm fixed effects and the current-arm term earn their parameters
-decisively; the reward/recency block does not, and the SWR interaction block
-(`M5`) does.
+A large negative count-scale ΔAIC is the timebin-pseudoreplication artefact: on
+a per-bin likelihood a session contributes thousands of "observations", so a
+parameter's likelihood cost is swamped. Only the two event-scale columns can be
+read. Fits whose parent and child dropped different events have a NaN ΔAIC
+(`n_fits_delta_aic_row_mismatch` in the provenance), and
+`n_unidentified_triples_dropped` triples are removed by the same separation
+rule the shipped aggregation uses. The other rungs' ΔAIC (`CS1_current`,
+`CS4_armreward` against `C2_base`; `M3`, `M4` against their hierarchy parents)
+are in the summary CSV.
 
 ## 5. Standard errors
 
-Animal-balanced median SE ratio against the count model's SE, across the eight
-per-rung key terms:
+The summary CSV gives, per (rung, term), the animal-balanced median SE ratio of
+each estimator against the count model's SE
+(`median_se_ratio_fraction_cluster_over_count_model`,
+`median_se_ratio_dm_model_over_count_model`). Both honest estimators widen the
+count model's SE several-fold.
 
-- **fraction: 4.647 – 5.931×**
-- **DM: 3.613 – 4.629×**
-
-**Type caveat — these two ranges are not the same comparison.** The fraction
+**Type caveat — these two ratios are not the same comparison.** The fraction
 ratio puts an event-**clustered sandwich** SE over the count model's **model**
-SE (`se_source` is `event_clustered` for the fraction rows — or `model_fallback` for the
-few (session, term) rows whose sandwich is not finite, which keep their model SE exactly as
-the shipped aggregation's per-session rule does; the count is in the provenance sidecar — and `model` for the
-other two); the DM ratio is model SE over model SE. Do not read the gap between
-4.6× and 5.9× as "the fraction model is more conservative than the DM" — one
-number is robust, the other is parametric.
+SE (`se_source` is `event_clustered` for the fraction rows — or `model_fallback`
+for the few (session, term) rows whose sandwich is not finite, which keep their
+model SE exactly as the shipped aggregation's per-session rule does; the count
+is in the provenance sidecar — and `model` for the other two); the DM ratio is
+model SE over model SE. One number is robust, the other is parametric, so a gap
+between them is not "one model is more conservative".
 
-**The two do not coincide, and the direct ratio says by how much.** Taking
-`se_fraction / se_dm` per session on the key term and animal-balancing it the
-same way (computed from `content_estimator_comparison.parquet`: pivot the `se`
-column by estimator on (animal, session_date, epoch), take the ratio, then the
-median over animals of each animal's per-session median):
-
-| rung | key term | fraction SE / DM SE |
-|---|---|---|
-| `C2_base_leaf` | `is_current_arm` | 1.161 |
-| `CS5_armvalue` | `swr_x_reward_belief_mean_candidate_arm_preoutcome` | 1.174 |
-| `CS1_current` | `swr_x_is_current_arm` | 1.219 |
-| `C2_base` | `is_current_arm` | 1.288 |
-| `M4` | `is_candidate_arm_never_visited` | 1.296 |
-| `M3` | `reward_fraction_candidate_arm_last10_visits` | 1.315 |
-| `CS4_armreward` | `swr_x_reward_fraction_candidate_arm_last10_visits` | 1.316 |
-| `M2` | `is_prev_arm` | 1.467 |
-
-**The shipped cluster SE runs ~15–50 % above the DM's, median ≈ 30 %**
-(1.161–1.467, median 1.292 over the eight key terms). Both estimators reach a
-similar order of correction over the count model — one from a sandwich, one
-from a likelihood — but the sandwich is systematically the wider of the two on
-every key term.
+The fraction's clustered SE is wider than the DM's on most terms. The direct
+per-session ratio `se_fraction / se_dm` can be formed from
+`content_estimator_comparison.parquet` (pivot the `se` column by estimator on
+(animal, session_date, epoch), take the ratio, then the median over animals of
+each animal's per-session median); no summary holds it, so no value is quoted
+here.
 
 ## 6. What is estimator-dependent, and what is not
 
-**Estimator-dependent: exactly one conclusion.** `CS5_armvalue`'s
-`swr_x_reward_belief_mean_candidate_arm_preoutcome` — whether SWR content
-avoids high-value arms. On the fully paired 216-session cohort, two of three
-estimators put it **negative** (count −0.398, 1/5 animals; DM −0.316, 0/5) and
-the **shipped fraction estimator puts it positive** (+0.237, 3/5). The three
-bootstrap intervals overlap heavily, so this is not a significant disagreement
-between estimators; but only the DM's interval excludes zero ([−1.136,
-−0.057]), and only the DM has 0/5 animals positive. The term is weakly
-identified per session, and the animal-balanced median flips because two
-animals sit near zero. The rung is also barely worth its parameters on either
-honest scale (ΔAIC ≈ +2.3 … +2.5, against −85 on the count scale). Report it as
-a three-way comparison whose sign depends on the estimator; do not write "the
-DM confirms value avoidance" without saying that the shipped estimator does
-not.
+**The SWR × arm-value term (`CS5_armvalue`) is near zero under every
+estimator, and its sign differs between them:** count
+<!--v:part3.est_swr_armvalue_count-->…<!--/v--> (<!--v:part3.est_swr_armvalue_count_animals_positive-->…<!--/v-->/5),
+fraction <!--v:part3.est_swr_armvalue_fraction-->…<!--/v--> (<!--v:part3.est_swr_armvalue_fraction_animals_positive-->…<!--/v-->/5),
+DM <!--v:part3.est_swr_armvalue_dm-->…<!--/v--> (<!--v:part3.est_swr_armvalue_dm_animals_positive-->…<!--/v-->/5).
+Every bootstrap interval spans zero and no estimator has 0/5 animals positive.
+Report it as a three-way comparison; do not write that any estimator shows a
+direct value avoidance. The arm-value main term is also near zero, with a sign
+that differs between estimators (§3).
 
-**Everything else agrees in sign across all three estimators.** Every other
-key term in §3 has the same sign under count, fraction and DM. The one term
-whose animals-positive count moves is `M3`'s
-`reward_fraction_candidate_arm_last10_visits` (0 / 2 / 1 of 5), and it is not a
-disagreement: the coefficient is −0.034 to −0.077 under all three, a term
-sitting on zero, so which animals fall on which side of it is noise. Magnitudes are not uniformly ordered: the SWR interactions and
-the recency/novelty terms shrink monotonically from count → fraction → DM
-(`CS1` −0.461 → −0.373 → −0.297; `CS4` −1.449 → −1.198 → −0.840; `M2` −1.140 →
-−0.657 → −0.273; `M4` +0.283 → +0.167 → +0.119), which is what down-weighting
-long events does, while `is_current_arm` moves the other way (+0.626 → +0.681 →
-+0.737 on `C2_base`), which implies the long events the count model
-over-weights are the ones less locked to the current arm.
+**The current-arm preference agrees across all three:** `is_current_arm` on
+`C2_base` is positive in every animal under every estimator (§3). The SWR
+interactions `swr_x_is_current_arm` and
+`swr_x_reward_fraction_candidate_arm_last10_visits` have the same sign under all
+three estimators but are not consistent across animals.
 
-The comparison harness's **fraction** column reproduced the shipped runner's
-audited table exactly as both stood on 2026-09-05 (CS5 +0.2366, CS4 −1.1976,
-CS1 −0.3731 all matched `swr_contrast_content_audited.pkl` to every printed
-digit), so the comparison measures an estimator difference and not a cohort or
-code difference. The audited bundle has since been refit on the well-anchored
-cohort and now reads +0.2363 / −1.1975 / −0.3730; this harness has not, which is
-the cohort note at the top of this file and not a second estimator.
+**The comparison measures an estimator difference, not a cohort or code
+difference.** The harness's fraction column and the shipped audited fit are the
+same quantity — `CS5_armvalue`'s SWR × value term is
+<!--v:part3.est_swr_armvalue_fraction-->…<!--/v--> in the harness and
+<!--v:part3.swr_armvalue_direct-->…<!--/v--> in
+`swr_contrast_content_audited.pkl` — so any gap is rounding.
 
 ## 7. The one uniform finding: an SWR event's timebins are far less redundant
 
-`log_phi_is_swr` is **positive on every rung and in every session of the `all`
-stratum**, and its median is positive on every rung of every stratum. On the
-pooled DM contrast table (32 rung × population rows: arm +1.789 … +2.001, patch
-+1.781 … +1.841) it is positive for **5/5 animals and 100 % of sessions** —
-per-session minimum +0.657 — with BH-FDR q from 2.4e-37 to 8.3e-18. The
-`models_dm` ladder gives the same over M0–M4 (+1.775 … +1.819, 5/5 animals,
-100 % of sessions). (§9 gives the weaker `omitted`-stratum version.)
+`log_phi_is_swr` on `C2_base`, from the shipped DM contrast bundle, is
+<!--v:part3.dm_breadth-->…<!--/v--> (<!--v:part3.dm_breadth_animals_positive-->…<!--/v-->/5
+animals, positive in <!--v:part3.dm_breadth_positive_fraction@pct-->…<!--/v-->
+of <!--v:part3.dm_breadth_sessions-->…<!--/v--> sessions, q =
+<!--v:part3.dm_breadth_q-->…<!--/v-->).
 
 Read it on the log scale, and read φ as the Dirichlet **concentration**: it
 concentrates the event's own probability vector around the model's mean
 allocation, so **large φ is *less* overdispersion** (φ → ∞ is exactly the count
 multinomial, with the bins independent) and **small φ means the event's mass
 clumps onto whichever few arms that event happened to favour, with its bins
-near-copies of one another**. `log_phi_is_swr ≈ +1.8` therefore says an SWR
-event's φ is ≈ e^1.8 ≈ **6× that of a non-SWR event**: its bins sit far closer
-to independent draws from its arm distribution, and its mass is spread over
-more arms rather than piled on a few.
+near-copies of one another**. An SWR event's φ is therefore
+<!--v:part3.dm_breadth_ratio-->…<!--/v-->× that of a non-SWR event: its bins
+sit far closer to independent draws from its arm distribution, and its mass is
+spread over more arms rather than piled on a few.
 
 **This is a statement about within-event timebin redundancy, not about which
 arms are represented.** It is not "SWR events prefer other arms" — the arm
@@ -288,67 +206,36 @@ direct, uniform result of this comparison.
 
 ### 7.1 φ is assumed length-invariant, so the shipped number is the TOTAL contrast
 
-> The `_dm_len` artifacts are a separate fit of the whole rung, not a φ-only refit: their
-> β terms differ from the `_dm` fit by up to 0.09 (e.g. `CS4_armreward` `swr_x_reward_fraction…`
-> −0.841 → −0.933; `CS6_armuncert`'s near-zero term flips sign). Read β from `_dm`; read
-> `_dm_len` only for the two concentration terms. The table below lists 14 of the 32 pooled
-> rungs; the full set is in `swr_contrast_content_audited_dm_len.pkl`.
-
 The likelihood uses an event's length `L_e` **only as the multinomial index**:
 `log φ_e = log_phi_intercept + log_phi_is_swr · is_swr_e` carries no length
-term, so the fitter assumes one concentration for a 25-bin event and a 90-bin
-one. Event length is **post-treatment** with respect to `is_swr` — over the
-65,913 events of this cohort an SWR event runs **1.73×** longer (median 45 vs
-26 bins) and a longer trajectory covers more arms (corr(log L, #arms with
-non-zero mass) = **0.362**). The shipped `log_phi_is_swr` is
-therefore the **TOTAL** concentration contrast, length included: exactly the
-total/direct distinction §8 already draws for β, but on the concentration
-scale.
+term, so the fitter assumes one concentration for a short event and a long one.
+Event length is **post-treatment** with respect to `is_swr` — SWR events last
+longer (median <!--v:part2.duration_median_swr-->…<!--/v--> ms against
+<!--v:part2.duration_median_non_swr-->…<!--/v--> ms) and a longer trajectory
+covers more arms. The shipped `log_phi_is_swr` is therefore the **TOTAL**
+concentration contrast, length included: the total/direct distinction §8 draws
+for β, on the concentration scale.
 
 The **length-adjusted twin** puts `log_n_nonlocal_bins_z` into the
 concentration design as well
 (`fit_swr_contrast_content.py --estimator dirichlet_multinomial
---concentration-length`, artifacts `…_dm_len`; 218 sessions, all 25 arm and 7
-patch rungs, `all` stratum, run at `e1f264b`). Both estimands, per rung:
+--concentration-length`, artifacts `…_dm_len`). It is a separate fit of the
+whole rung, not a φ-only refit, so read β from `_dm` and `_dm_len` only for its
+two concentration terms. On `C2_base`:
 
-| rung | total `log_phi_is_swr` | length-adjusted `log_phi_is_swr` | `log_phi_log_n_nonlocal_bins_z` (per SD) |
-|---|---|---|---|
-| `C0_armfe` | +1.806 (5/5) | +1.567 (5/5, q = 2.7e-37) | +0.433 (5/5, q = 2.7e-37) |
-| `C1_current` | +1.817 (5/5) | +1.489 (5/5, q = 2.7e-37) | +0.519 (5/5, q = 2.7e-37) |
-| **`C2_base`** | **+1.799 (5/5, q = 2.4e-37)** | **+1.502 (5/5, q = 2.7e-37)** | **+0.522 (5/5, q = 2.7e-37)** |
-| `C4_armvalue` | +1.990 (5/5) | +1.725 (5/5, q = 3.4e-37) | +0.433 (5/5, q = 8.1e-37) |
-| `C5_lastrew` | +1.798 (5/5) | +1.502 (5/5, q = 3.4e-34) | +0.508 (5/5, q = 3.4e-34) |
-| `CS1_current` | +1.793 (5/5) | +1.489 (5/5, q = 2.7e-37) | +0.527 (5/5, q = 2.7e-37) |
-| `CS1nt_current` | +1.808 (5/5) | +1.478 (5/5, q = 2.7e-37) | +0.532 (5/5, q = 2.7e-37) |
-| `CS3_lastrew` | +1.823 (5/5) | +1.505 (5/5, q = 7.1e-24) | +0.493 (5/5, q = 7.2e-24) |
-| `CS4_armreward` | +1.805 (5/5) | +1.503 (5/5, q = 2.7e-37) | +0.525 (5/5, q = 2.7e-37) |
-| **`CS5_armvalue`** | **+1.997 (5/5, q = 2.8e-37)** | **+1.725 (5/5, q = 3.4e-37)** | **+0.435 (5/5, q = 8.1e-37)** |
-| `CS5nt_armvalue` | +2.001 (5/5) | +1.725 (5/5, q = 5.4e-37) | +0.456 (5/5, q = 5.4e-37) |
-| `CS6_armuncert` | +1.980 (5/5) | +1.723 (5/5, q = 3.4e-37) | +0.442 (5/5, q = 8.1e-37) |
-| `CP0_base` (patch) | +1.839 (5/5) | +1.505 (5/5, q = 8.6e-37) | +0.482 (5/5, q = 1.2e-36) |
-| `CPS1_current` (patch) | +1.795 (5/5) | +1.499 (5/5, q = 8.6e-37) | +0.480 (5/5, q = 1.2e-36) |
+| term | value | animals positive | sessions positive | q |
+|---|---|---|---|---|
+| total `log_phi_is_swr` (`_dm`) | <!--v:part3.dm_breadth-->…<!--/v--> | <!--v:part3.dm_breadth_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_breadth_positive_fraction@pct-->…<!--/v--> | <!--v:part3.dm_breadth_q-->…<!--/v--> |
+| length-adjusted `log_phi_is_swr` (`_dm_len`) | <!--v:part3.dm_breadth_length_adjusted-->…<!--/v--> | <!--v:part3.dm_breadth_length_adjusted_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_breadth_length_adjusted_positive_fraction@pct-->…<!--/v--> | <!--v:part3.dm_breadth_length_adjusted_q-->…<!--/v--> |
+| `log_phi_log_n_nonlocal_bins_z` (per SD, `_dm_len`) | <!--v:part3.dm_breadth_length_term-->…<!--/v--> | <!--v:part3.dm_breadth_length_term_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_breadth_length_term_positive_fraction@pct-->…<!--/v--> | <!--v:part3.dm_breadth_length_term_q-->…<!--/v--> |
 
-Over the whole ladder the length-adjusted `log_phi_is_swr` spans **+1.478 …
-+1.730** on the arm rungs and **+1.471 … +1.531** on the patch rungs, **5/5
-animals positive on every one of the 32 pooled rungs**, q from 2.7e-37 to
-9.0e-18; the length coefficient spans **+0.425 … +0.532** (arm) and **+0.440 …
-+0.496** (patch), also 5/5 on every rung, q from 2.7e-37 to 1.0e-17.
-
-Two readings follow. **The finding survives the adjustment**: roughly
-**0.30 of the ≈1.80 total** (about a sixth) runs through event length, and
-+1.50 still means an SWR event's φ is ≈ e^1.50 ≈ **4.5×** a non-SWR event's at
-the same length, rather than ≈6× unadjusted. **And length has its own
-concentration effect in the same direction**: +0.52 per SD of log event length
-says a longer event's bins are *also* closer to independent draws, which is why
-leaving it out inflates the SWR contrast.
-
-Per-session, the adjusted contrast is positive in **6,653 of 6,659** pooled
-rows (99.9 %) rather than 100 %; the six exceptions are all one session
-(`wilbur/20210331/16_r8`) on the patch ladder, at −0.35 with an SE of 0.42.
-Pinning is as rare as in the unadjusted run: 70 of 11,075 arm rows and 20 of
-2,815 patch rows are `animal_pooled` (one more patch row than the `_dm` run —
-the extra free parameter pushes one short session past the
-`n_events < 2 × n_free` gate on the free pass).
+Two readings follow. **The finding survives the adjustment**: a share of
+<!--v:part3.dm_breadth_length_share@pct-->…<!--/v--> of the total runs through
+event length, and an SWR event's φ is still
+<!--v:part3.dm_breadth_length_adjusted_ratio-->…<!--/v-->× a non-SWR event's at
+the same length. **And length has its own concentration effect in the same
+direction**: a longer event's bins are *also* closer to independent draws,
+which is why leaving it out inflates the SWR contrast.
 
 Which estimand a claim uses must be said. The recommendation in §10 cites the
 **total** contrast: "direct" there means measured on the concentration scale
@@ -363,29 +250,27 @@ length is therefore **post-treatment** with respect to `is_swr`: a `BASEc`
 rung's `swr_x_…` is the length-adjusted **direct** effect, and length may be a
 mediator (SWR → longer replay → the trajectory leaves the current arm). The
 `nt` twins on `BASEc_NT` omit those products and report the **total** effect.
-Under the DM they separate sharply:
+Under the shipped DM contrast bundle:
 
 | rung | estimand | DM coefficient | animals positive | q |
 |---|---|---|---|---|
-| `CS5nt_armvalue` | total | −0.638 | 0/5 | 7.9e-10 |
-| `CS5_armvalue` | direct (length-adjusted) | −0.316 | 0/5 | 0.025 |
+| `CS5nt_armvalue` | total | <!--v:part3.dm_swr_armvalue_total-->…<!--/v--> | <!--v:part3.dm_swr_armvalue_total_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_swr_armvalue_total_q-->…<!--/v--> |
+| `CS5_armvalue` | direct (length-adjusted) | <!--v:part3.dm_swr_armvalue_direct-->…<!--/v--> | <!--v:part3.dm_swr_armvalue_direct_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_swr_armvalue_direct_q-->…<!--/v--> |
+| `CS6nt_armuncert` | total | <!--v:part3.dm_swr_armuncert_total-->…<!--/v--> | <!--v:part3.dm_swr_armuncert_total_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_swr_armuncert_total_q-->…<!--/v--> |
+| `CS6_armuncert` | direct (length-adjusted) | <!--v:part3.dm_swr_armuncert_direct-->…<!--/v--> | <!--v:part3.dm_swr_armuncert_direct_animals_positive-->…<!--/v-->/5 | <!--v:part3.dm_swr_armuncert_direct_q-->…<!--/v--> |
 
-Roughly half the total SWR × value effect runs through event length —
-**but note this decomposition is DM-only, on the very term §6 flags as
-estimator-dependent**: under the shipped fraction estimator the direct effect
-(`CS5`) is positive, so the total/direct split cannot be quoted as an
-estimator-independent mediation result. Both rungs are shipped; report the
-pair and say which estimand a number is. The estimand
-distinction is specified in
+The SWR × value effect is negative as a total effect and near zero once length
+is adjusted. Because the direct effect's sign differs between estimators (§6),
+the total/direct split cannot be quoted as an estimator-independent mediation
+result. Both rungs are shipped; report the pair and say which estimand a number
+is. The estimand distinction is specified in
 [`content_model_design.md`](content_model_design.md) and in
 [`../models_table.md`](../models_table.md) (section C of the `is_swr`-contrast
-ladder).
-For reference, the other audited DM contrast key terms on the `all` stratum:
-`CS5b_valuevsprevgoal` −0.315 (2/5, q = 0.297, only 133 sessions with 95
-flagged separated), `CS6_armuncert` −0.027 (2/5, q = 0.564), `CS6nt_armuncert`
-+0.146 (4/5, q = 7.5e-12).
+ladder). `CS5b_valuevsprevgoal` is refused as unidentified: under the DM only
+<!--v:part3.dm_swr_prevgoal_sessions-->…<!--/v--> sessions are fit, of which
+<!--v:part3.dm_swr_prevgoal_separated-->…<!--/v--> are flagged separated.
 
-## 9. Stratum caveats
+## 9. Stratum and cohort caveats
 
 The DM ladder was also refit within the two current-outcome strata
 (`_dm_rewarded`, `_dm_omitted`). Neither is on the same footing as `all`.
@@ -393,68 +278,52 @@ The DM ladder was also refit within the two current-outcome strata
 - **`rewarded` has no last-rewarded rungs.** The whole last-rewarded family
   (`C5_lastrew`, `CS3_lastrew`, `CS5b_valuevsprevgoal`, `CP1`, `CPS2`) has
   `n_sessions_modeled = 0` there — those predictors are omission-only by
-  construction — so the rewarded bundle carries 22 arm and 5 patch rungs rather
-  than the full ladder.
-- **`omitted` is thin and heavily pinned.** 102 arm sessions, 11–86 sessions
-  per rung, 3–5 animals, and **30 %** of its arm rows (222 of 735, 27 of them on
-  the all-animal pool) sit on a **pooled φ** rather than the session's own. Its
-  `log_phi_is_swr` medians span +1.656 … +2.562 with 3–5 animals positive;
-  quote them separately, and do not read a 3/5 there as a sign count on the
-  same footing as the `all` stratum's 5/5.
+  construction — so the rewarded bundle carries fewer rungs than the full
+  ladder.
+- **`omitted` is thin and often pinned.** It has far fewer sessions per rung,
+  not every animal on every rung, and a large share of its rows sit on a
+  **pooled φ** rather than the session's own. Quote its `log_phi_is_swr`
+  separately, and do not read a 3/5 there as a sign count on the same footing
+  as the `all` stratum.
 
 **A session with one or two SWR events would carry an `is_swr` modifier no
 identifiability rule can catch.** The effect-scale backstop reads
 `|coef| × sd`, and with an `is_swr` SD of at most 0.5 a finite coefficient from
 two events passes it; the fitter's separation flag would not fire either. The
 DM rows therefore carry `n_events_swr` / `n_events_nonswr` so the question can
-be asked of the artifact. On the `all` stratum it does not arise: **no session
-has fewer than 5 SWR events on any rung** — over the 6,659 pooled arm+patch
-fits the minimum is **25** SWR events (and 29 non-SWR), in two of `wilbur`'s
-`20210331` epochs. Re-check this whenever the cohort or the stratum
-changes; the `omitted` stratum in particular has not been audited this way.
+be asked of the artifact. The check was last made on the 2026-09-05 cohort
+and has not been repeated on the current one; repeat it whenever the cohort or
+the stratum changes. The `omitted` stratum has not been audited
+this way.
 
-Pooled-φ pinning is otherwise rare: no fit in the comparison (1,742 fits) or in
-the `models_dm` ladder (1,744 fits) needed one — the smallest per-fit cohort
-there is 54 events against the 40-event threshold. In the `all` contrast run,
-70 of 11,075 arm rows and 19 of 2,815 patch rows are `animal_pooled`; none are
-`pooled_all_animals`.
-
-Two further cohort notes. The comparison's per-rung `n` is bounded by the
-**worst** estimator: `senor/20201027/02_r1` is skipped on `C2_base_leaf` and
-`CS1_current` because the *count* model's covariance failed, which removes that
-session from all three by the paired-triple rule (hence n = 217 there). And 11
-sessions in the `all` DM run (10 rewarded, 6 omitted) are refused by the DM
-design gate — a within-event design with fewer events than 2 × free parameters,
-or a rank-deficient one — so the per-rung DM cohort is not always 218 (e.g.
-`CS3_lastrew` 135, `CS5b` 132, `C5_lastrew` 197). Every refusal is named in the
-run's cohort audit under `dm_design`, not silently dropped.
+The comparison's per-rung `n` is bounded by the **worst** estimator: a session
+skipped by one estimator (for example because the count model's covariance
+failed) leaves all three by the paired-triple rule. Sessions the DM design gate
+refuses — a within-event design with fewer events than 2 × free parameters, or
+a rank-deficient one — are named in the run's cohort audit under `dm_design`,
+not silently dropped, so the per-rung DM cohort is not always the full one.
 
 ## 10. Recommendation
 
 **The per-event fraction stays the shipped content response.** It is the
 estimand the ladder was designed around (one event, one unit of mass), its
-event-clustered SE is if anything the more conservative of the two honest
-options (~15–50 % above the DM's likelihood-based SE, median ≈ 30 %; §5), and
-the DM changes no conclusion except CS5's sign — where it does not settle the
-question either.
+event-clustered SE is usually the wider of the two honest options (§5), and the
+DM changes no conclusion: where the estimators disagree in sign (§6), the term
+is near zero under all of them.
 
 **The DM's `log_phi_is_swr` is the direct test of "SWR broadens replay
-content."** It is positive (+1.799 on `C2_base`, bootstrap [+1.447, +2.205]),
-5/5 animals, 100 % of sessions, and it measures the broadening on the
-within-event concentration scale rather than inferring it from arm
-coefficients. **"Direct" here means measured on the concentration scale rather
-than read off the arm coefficients — it does NOT mean length-adjusted.** This
-is the **total** contrast; the length-adjusted twin is +1.502 on `C2_base`
-(§7.1), so about a sixth of it runs through the fact that SWR events are
-longer, and the finding survives. Cite whichever estimand the claim needs, say
-which, and do not promote the DM to the primary content estimator on the
-strength of either.
+content."** It is positive (<!--v:part3.dm_breadth-->…<!--/v--> on `C2_base`,
+<!--v:part3.dm_breadth_animals_positive-->…<!--/v-->/5 animals, positive in
+<!--v:part3.dm_breadth_positive_fraction@pct-->…<!--/v--> of sessions), and it
+measures the broadening on the within-event concentration scale rather than
+inferring it from arm coefficients. **"Direct" here means measured on the
+concentration scale rather than read off the arm coefficients — it does NOT
+mean length-adjusted.** This is the **total** contrast; the length-adjusted
+twin is <!--v:part3.dm_breadth_length_adjusted-->…<!--/v--> on `C2_base`
+(§7.1), so part of it runs through the fact that SWR events are longer, and the
+finding survives. Cite whichever estimand the claim needs, say which, and do
+not promote the DM to the primary content estimator on the strength of either.
 
 **The count response remains retired.** Its ΔAIC and its standard errors are
 not interpretable at the event scale, as §2 and §4 show; it is retained only
 for this comparison and for the before/after audit.
-
-**None of this is in the claims table yet.** `paper/claims_table.md` has not
-been revised against these numbers and does not cite them; until it is, the two
-documents will disagree about CS5, and the claims table is the one people read
-first. Nothing here supersedes a shipped claim.
