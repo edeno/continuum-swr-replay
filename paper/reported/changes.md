@@ -3031,3 +3031,57 @@ marker, and the computed value now there. Newest last.
 | `paper/claims_table.md` | `part3.est_armvalue_rung_delta_aic_fraction` | +4.0 | +2.4 |
 | `paper/claims_table.md` | `part3.est_armvalue_rung_delta_aic_dm` | +0.22 | +2.1 |
 | `paper/claims_table.md` | `part3.est_armvalue_rung_delta_aic_count` | −490 | −64 |
+
+## 2026-10-31
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_separated_fraction_non_local` | … | 28 % |
+| `docs/per_bin_rate_results.md` | `part3.rate_hist_separated_fraction_non_local_swr` | … | 42 % |
+| `docs/per_bin_rate_results.md` | `part3.history_end_first_lag_rr_low` | … | 1.68 |
+| `docs/per_bin_rate_results.md` | `part3.history_end_first_lag_rr_high` | … | 4.53 |
+| `docs/per_bin_rate_results.md` | `part3.history_end_peak_low` | … | 2.63 |
+| `docs/per_bin_rate_results.md` | `part3.history_end_peak_high` | … | 4.53 |
+| `docs/per_bin_rate_results.md` | `part3.history_end_peak_lag_ms_low` | … | 15 |
+| `docs/per_bin_rate_results.md` | `part3.history_end_peak_lag_ms_high` | … | 45 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_peak_swr` | … | 2.28 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_peak_lag_ms_swr` | … | 90 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_animals_swr` | … | 5 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_peak_non_local_swr` | … | 1.83 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_peak_lag_ms_non_local_swr` | … | 105 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_animals_non_local_swr` | … | 5 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_peak_non_local_no_swr` | … | 1.34 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_peak_lag_ms_non_local_no_swr` | … | 150 |
+| `docs/per_bin_rate_results.md` | `part3.history_onset_animals_non_local_no_swr` | … | 2 |
+| `docs/rate_models.md` | `part3.history_end_first_lag_rr_low` | … | 1.68 |
+| `docs/rate_models.md` | `part3.history_end_first_lag_rr_high` | … | 4.53 |
+| `docs/rate_models.md` | `part3.history_end_peak_low` | … | 2.63 |
+| `docs/rate_models.md` | `part3.history_end_peak_high` | … | 4.53 |
+| `docs/rate_models.md` | `part3.history_end_peak_lag_ms_low` | … | 15 |
+| `docs/rate_models.md` | `part3.history_end_peak_lag_ms_high` | … | 45 |
+| `docs/rate_models.md` | `part3.history_onset_peak_swr` | … | 2.28 |
+| `docs/rate_models.md` | `part3.history_onset_peak_lag_ms_swr` | … | 90 |
+| `docs/rate_models.md` | `part3.history_onset_animals_swr` | … | 5 |
+| `docs/rate_models.md` | `part3.history_onset_peak_non_local_swr` | … | 1.83 |
+| `docs/rate_models.md` | `part3.history_onset_peak_lag_ms_non_local_swr` | … | 105 |
+| `docs/rate_models.md` | `part3.history_onset_animals_non_local_swr` | … | 5 |
+| `docs/rate_models.md` | `part3.history_onset_peak_non_local_no_swr` | … | 1.34 |
+| `docs/rate_models.md` | `part3.history_onset_peak_lag_ms_non_local_no_swr` | … | 150 |
+| `docs/rate_models.md` | `part3.history_onset_animals_non_local_no_swr` | … | 2 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_first_lag_rr_low` | … | 1.68 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_first_lag_rr_high` | … | 4.53 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_low` | … | 2.63 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_high` | … | 4.53 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_lag_ms_low` | … | 15 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_lag_ms_high` | … | 45 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_peak_swr` | … | 2.28 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_peak_lag_ms_swr` | … | 90 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_animals_swr` | … | 5 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_peak_non_local_swr` | … | 1.83 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_peak_lag_ms_non_local_swr` | … | 105 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_animals_non_local_swr` | … | 5 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_peak_non_local_no_swr` | … | 1.34 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_peak_lag_ms_non_local_no_swr` | … | 150 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_onset_animals_non_local_no_swr` | … | 2 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_low` | … | 2.63 |
+| `docs/replay_rate_content_swr_synthesis.md` | `part3.history_end_peak_high` | … | 4.53 |
