@@ -3,7 +3,7 @@
  "part": 3,
  "title": "behavior",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "5b462c9c5f6a",
+ "commit": "326a46160c99",
  "inputs": [
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl",
@@ -71,11 +71,11 @@
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/content_estimator_comparison/content_estimator_comparison_summary.csv",
-   "sha256": "fb035c3db5c6ae1519a50715c0cf1f1659ad1c3f3ac2c9dde81c414a61f42e4b"
+   "sha256": "6f8648bb22d5c7fd695782e28260454899cd393c9c6e7ba579a937ae5e7acf2e"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/content_estimator_comparison/content_estimator_bootstrap.csv",
-   "sha256": "2ec20c3e835daab320f87942352de1e95c58b7b30524a6e5b71638bc2a127372"
+   "sha256": "b15c8edc86ab24ec6921d9af76d1ea1b85c6ef9fd4dc7b14afe600d7969402cd"
   },
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu/Mu.pkl",
@@ -2793,11 +2793,11 @@
    "pending": null
   },
   "est_armvalue_rung_delta_aic_count": {
-   "value": -485.2903183026156,
+   "value": -64.14751925793826,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
-   "description": "CS5_armvalue against C2_base_leaf, conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
+   "description": "CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
    "claims": [
     "19a",
     "19f",
@@ -2811,11 +2811,11 @@
    "pending": null
   },
   "est_armvalue_rung_delta_aic_dm": {
-   "value": 0.21612519140524,
+   "value": 2.137506637237493,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
-   "description": "CS5_armvalue against C2_base_leaf, dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
+   "description": "CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
    "claims": [
     "19a",
     "19f",
@@ -2829,11 +2829,11 @@
    "pending": null
   },
   "est_armvalue_rung_delta_aic_fraction": {
-   "value": 3.9838680188368016,
+   "value": 2.3627165934467484,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
-   "description": "CS5_armvalue against C2_base_leaf, conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
+   "description": "CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better",
    "claims": [
     "19a",
     "19f",
