@@ -247,8 +247,8 @@ therefore `OFFCOS`, counted from event ends (`PER_BIN_HISTORY_ANCHORS`).
 Counted from onsets on the at-risk bins it is not estimable (the bins a few lags
 after an onset are mostly inside that event). On the earlier all-bins design
 (fits without the `per_bin_design` column, which the summaries refuse) the onset
-block ran to −∞ because the bin after an onset never holds one, and about a
-quarter of those fits were flagged not converged. Each rung's rate is the rate at
+block ran to −∞ because the bin after an onset never holds one, and many of
+those fits were flagged not converged. Each rung's rate is the rate at
 which events start while none is ongoing, not events per second of stop; the
 per-stop family below keeps the latter. The rung names keep `histcos`.
 

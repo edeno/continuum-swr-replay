@@ -128,7 +128,7 @@ offset. Its limitation is exactly that offset — see below.
   the previous event's **end** (`offhist_rcos_0..3`); counted from onsets it has
   almost no at-risk bins at short lags and cannot be estimated. On the earlier
   all-bins design the onset block's short-lag coefficient ran to −∞ (the bin
-  after an onset never holds one), which is why about a quarter of those fits
+  after an onset never holds one), which is why many of those fits
   were flagged not converged; their reward kernels agree with the at-risk fits
   session by session.
 - **The ladder** toggles three blocks independently, all at one bin width
@@ -172,8 +172,9 @@ offset. Its limitation is exactly that offset — see below.
   and `n_stops`, and `compare_nested_models` NaNs any comparison whose two rungs
   disagree on `n_events` / `n_bins` / `n_stops`. On the shipped fit the union
   costs <!--v:part3.rate_audit_stops_common_drop-->575<!--/v--> of the <!--v:part3.rate_audit_stops_in-->93,560<!--/v--> well-anchored stops (plus <!--v:part3.rate_audit_stops_own_drop-->5<!--/v--> with a missing own
-  predictor and <!--v:part3.rate_audit_stops_modeled_session_excluded-->38<!--/v--> in gated-out sessions), leaving **<!--v:part3.rate_stops-->92,942<!--/v--> stops and <!--v:part3.rate_bins-->7,535,050<!--/v--> bins** in every rung of every
-  population (`models_per_bin_rate/per_bin_rate_cohort_audit.csv`;
+  predictor and <!--v:part3.rate_audit_stops_modeled_session_excluded-->38<!--/v--> in gated-out sessions), leaving **<!--v:part3.rate_stops-->92,942<!--/v--> stops** in every rung of every population, over
+  <!--v:part3.rate_bins-->7,280,203<!--/v--> at-risk bins for the non-local populations and <!--v:part3.rate_bins_swr-->7,359,637<!--/v--> for detected SWR
+  (each detector's own events set its at-risk bins) (`models_per_bin_rate/per_bin_rate_cohort_audit.csv`;
   [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
   "Cohort size"). Those are the well-anchored stops carrying no
   arrival clock, which the arrival rungs put into the union. The freeze bites harder where
@@ -184,7 +185,7 @@ offset. Its limitation is exactly that offset — see below.
 
   The corpus is **<!--v:part3.rate_sessions-->242<!--/v--> sessions**, and a session may still carry no fit for a
   population that has too few events in it. On the well-anchored fit the full
-  additive rung `M7r_time_histcos_rew` is fit on **<!--v:part3.rate_full_sessions_swr-->242<!--/v--> / <!--v:part3.rate_full_sessions_non_local-->242<!--/v--> / <!--v:part3.rate_full_sessions_non_local_swr-->242<!--/v--> / <!--v:part3.rate_full_sessions_non_local_no_swr-->240<!--/v-->**
+  additive rung `M7r_time_histcos_rew` is fit on **<!--v:part3.rate_full_sessions_swr-->242<!--/v--> / <!--v:part3.rate_full_sessions_non_local-->242<!--/v--> / <!--v:part3.rate_full_sessions_non_local_swr-->242<!--/v--> / <!--v:part3.rate_full_sessions_non_local_no_swr-->242<!--/v-->**
   sessions (detected SWR / non-local, all / non-local w/ SWR / non-local, no
   SWR) and `M5_time` on <!--v:part3.rate_time_sessions_swr-->242<!--/v--> / <!--v:part3.rate_time_sessions_non_local-->242<!--/v--> / <!--v:part3.rate_time_sessions_non_local_swr-->242<!--/v--> / <!--v:part3.rate_time_sessions_non_local_no_swr-->242<!--/v--> (fitted rows of
   `models_per_bin_rate/all_models.pkl`; the reward-quantity `n` per population is
@@ -213,13 +214,13 @@ offset. Its limitation is exactly that offset — see below.
   audited table and its term diagnostics from the persisted per-session fits.
 - **Cite it for:** the **dwell-, time-, reward-history- and clustering-controlled
   dissociation**. In `M7r_time_histcos_rew`, the reconstructed reward kernel at
-  lag 1 dissociates — `non_local_swr` ≈ <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v-->, `swr` ≈ <!--v:part3.rate_kernel_lag_one_swr-->1.38<!--/v-->, `non_local` ≈ <!--v:part3.rate_kernel_lag_one_non_local-->1.18<!--/v-->,
-  `non_local_no_swr` ≈ <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v--> — while the
-  slower **recent-reward suppression** from lag 3 on (lowest per-population RR over lags 3–10: <!--v:part3.rate_kernel_late_min_low-->0.89<!--/v-->–<!--v:part3.rate_kernel_late_min_high-->0.92<!--/v-->) is
+  lag 1 dissociates — `non_local_swr` ≈ <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.44<!--/v-->, `swr` ≈ <!--v:part3.rate_kernel_lag_one_swr-->1.39<!--/v-->, `non_local` ≈ <!--v:part3.rate_kernel_lag_one_non_local-->1.18<!--/v-->,
+  `non_local_no_swr` ≈ <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v--> — while the
+  slower **recent-reward suppression** from lag 3 on (lowest per-population RR over lags 3–10: <!--v:part3.rate_kernel_late_min_low-->0.89<!--/v-->–<!--v:part3.rate_kernel_late_min_high-->0.93<!--/v-->) is
   **shared** across populations and returns to ~1 by lag 10. Separately, the
   lag-1 kernel is higher for `non_local_swr` than for `non_local_no_swr`
-  **within session in <!--v:part3.rate_paired_positive_fraction-->79 %<!--/v--> of <!--v:part3.rate_paired_sessions-->207<!--/v--> paired sessions, <!--v:part3.rate_paired_animals_positive-->5<!--/v-->/5
-  animals, signed-rank p = <!--v:part3.rate_paired_p-->3.1e-19<!--/v-->** (sessions treated as independent). Every
+  **within session in <!--v:part3.rate_paired_positive_fraction-->78 %<!--/v--> of <!--v:part3.rate_paired_sessions-->197<!--/v--> paired sessions, <!--v:part3.rate_paired_animals_positive-->5<!--/v-->/5
+  animals, signed-rank p = <!--v:part3.rate_paired_p-->3.2e-18<!--/v-->** (sessions treated as independent). Every
   kernel value is read over the sessions whose three reward terms pass the
   per-term separation gate. Those two are different measurements:
   the first is the size of the kernel at a lag, the second is the consistency of
@@ -248,8 +249,8 @@ offset. Its limitation is exactly that offset — see below.
   any lag and is not quoted as one ([per_bin_rate_results.md](per_bin_rate_results.md) §2 lists the
   coefficients for completeness). Say whether a quoted `rr_lag1` is the
   animal-balanced or the session-pooled summary — it is published
-  both ways (session-pooled **<!--v:part3.rate_kernel_lag_one_swr-->1.38<!--/v--> / <!--v:part3.rate_kernel_lag_one_non_local-->1.18<!--/v--> / <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v--> / <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v-->**, animal-balanced
-  **<!--v:part3.rate_kernel_lag_one_animal_swr-->1.41<!--/v--> / <!--v:part3.rate_kernel_lag_one_animal_non_local-->1.22<!--/v--> / <!--v:part3.rate_kernel_lag_one_animal_non_local_swr-->1.49<!--/v--> / <!--v:part3.rate_kernel_lag_one_animal_non_local_no_swr-->1.01<!--/v-->**, in the same row order).
+  both ways (session-pooled **<!--v:part3.rate_kernel_lag_one_swr-->1.39<!--/v--> / <!--v:part3.rate_kernel_lag_one_non_local-->1.18<!--/v--> / <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.44<!--/v--> / <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v-->**, animal-balanced
+  **<!--v:part3.rate_kernel_lag_one_animal_swr-->1.41<!--/v--> / <!--v:part3.rate_kernel_lag_one_animal_non_local-->1.22<!--/v--> / <!--v:part3.rate_kernel_lag_one_animal_non_local_swr-->1.47<!--/v--> / <!--v:part3.rate_kernel_lag_one_animal_non_local_no_swr-->1.00<!--/v-->**, in the same row order).
 
   (Everything in this bullet is the well-anchored fit over <!--v:part3.rate_sessions-->242<!--/v--> sessions — see
   [per_bin_rate_results.md](per_bin_rate_results.md) §3 for the full kernel and
@@ -289,8 +290,8 @@ direct test of that alternative.
 
 ### The arrival-clock variant of the time course
 
-> Coverage: `M0a_const_arrival` fits <!--v:part3.rate_arrival_const_sessions_swr-->242<!--/v--> / <!--v:part3.rate_arrival_const_sessions_non_local-->242<!--/v--> / <!--v:part3.rate_arrival_const_sessions_non_local_swr-->242<!--/v--> / <!--v:part3.rate_arrival_const_sessions_non_local_no_swr-->242<!--/v--> sessions, `M5a_time_arrival` <!--v:part3.rate_arrival_time_sessions_swr-->233<!--/v--> / <!--v:part3.rate_arrival_time_sessions_non_local-->237<!--/v--> / <!--v:part3.rate_arrival_time_sessions_non_local_swr-->222<!--/v--> / <!--v:part3.rate_arrival_time_sessions_non_local_no_swr-->236<!--/v--> and
-> `M7ra_time_arrival_histcos_rew` <!--v:part3.rate_arrival_full_sessions_swr-->231<!--/v--> / <!--v:part3.rate_arrival_full_sessions_non_local-->234<!--/v--> / <!--v:part3.rate_arrival_full_sessions_non_local_swr-->219<!--/v--> / <!--v:part3.rate_arrival_full_sessions_non_local_no_swr-->233<!--/v--> (detected SWR /
+> Coverage: `M0a_const_arrival` fits <!--v:part3.rate_arrival_const_sessions_swr-->242<!--/v--> / <!--v:part3.rate_arrival_const_sessions_non_local-->242<!--/v--> / <!--v:part3.rate_arrival_const_sessions_non_local_swr-->242<!--/v--> / <!--v:part3.rate_arrival_const_sessions_non_local_no_swr-->242<!--/v--> sessions, `M5a_time_arrival` <!--v:part3.rate_arrival_time_sessions_swr-->235<!--/v--> / <!--v:part3.rate_arrival_time_sessions_non_local-->239<!--/v--> / <!--v:part3.rate_arrival_time_sessions_non_local_swr-->222<!--/v--> / <!--v:part3.rate_arrival_time_sessions_non_local_no_swr-->234<!--/v--> and
+> `M7ra_time_arrival_histcos_rew` <!--v:part3.rate_arrival_full_sessions_swr-->237<!--/v--> / <!--v:part3.rate_arrival_full_sessions_non_local-->236<!--/v--> / <!--v:part3.rate_arrival_full_sessions_non_local_swr-->221<!--/v--> / <!--v:part3.rate_arrival_full_sessions_non_local_no_swr-->233<!--/v--> (detected SWR /
 > non-local, all / non-local w/ SWR / non-local, no SWR; fits with a finite AIC
 > in `models_per_bin_rate/all_models.pkl`), so the arrival
 > sub-ladder's pooled comparisons are over the smaller of each pair, per
@@ -328,12 +329,12 @@ read on [1, 3] s (knots 1/2/3) and the arrival clock on [1, 6] s (knots
 1/2/4/6) — because a cubic B-spline extrapolating past its outermost interior
 knot sits over almost no exposure and can run away there. On the **well-anchored**
 cohort, counting only argmaxes that are not on an interval edge
-(<!--v:part3.rate_time_peak_edge_count-->1<!--/v--> stop-clock and <!--v:part3.rate_arrival_peak_edge_count-->0<!--/v--> arrival-clock argmaxes are), the two clocks put
-the across-session median peak within about a second of each other: <!--v:part3.rate_time_peak_s_low-->2.48<!--/v-->–<!--v:part3.rate_time_peak_s_high-->2.96<!--/v--> s on `tc` against <!--v:part3.rate_arrival_peak_s_low-->2.94<!--/v-->–<!--v:part3.rate_arrival_peak_s_high-->4.00<!--/v--> s after arrival, with KS
+(<!--v:part3.rate_time_peak_edge_count-->0<!--/v--> stop-clock and <!--v:part3.rate_arrival_peak_edge_count-->0<!--/v--> arrival-clock argmaxes are), the two clocks put
+the across-session median peak within about a second of each other: <!--v:part3.rate_time_peak_s_low-->2.48<!--/v-->–<!--v:part3.rate_time_peak_s_high-->2.95<!--/v--> s on `tc` against <!--v:part3.rate_arrival_peak_s_low-->2.94<!--/v-->–<!--v:part3.rate_arrival_peak_s_high-->5.21<!--/v--> s after arrival, with KS
 distances between the normalized curves of <!--v:part3.rate_clock_ks_non_local-->0.08<!--/v--> (non-local, all), <!--v:part3.rate_clock_ks_non_local_no_swr-->0.08<!--/v-->
 (non-local no-SWR), <!--v:part3.rate_clock_ks_swr-->0.09<!--/v--> (detected SWR) and <!--v:part3.rate_clock_ks_non_local_swr-->0.09<!--/v--> (non-local with SWR). Detected
-SWR is no exception — its supported arrival-clock maximum is at <!--v:part3.rate_arrival_peak_s_swr-->3.08<!--/v--> s. The all-stops sensitivity reads <!--v:part3.rate_allstops_time_peak_s_low-->2.57<!--/v-->–<!--v:part3.rate_allstops_time_peak_s_high-->2.98<!--/v--> s against
-<!--v:part3.rate_allstops_arrival_peak_s_low-->2.91<!--/v-->–<!--v:part3.rate_allstops_arrival_peak_s_high-->5.73<!--/v--> s with KS distances <!--v:part3.rate_allstops_clock_ks_low-->0.08<!--/v-->–<!--v:part3.rate_allstops_clock_ks_high-->0.09<!--/v-->; the arrival-clock band is much wider there, so the cross-clock
+SWR is no exception — its supported arrival-clock maximum is at <!--v:part3.rate_arrival_peak_s_swr-->3.11<!--/v--> s. The all-stops sensitivity reads <!--v:part3.rate_allstops_time_peak_s_low-->2.53<!--/v-->–<!--v:part3.rate_allstops_time_peak_s_high-->3.00<!--/v--> s against
+<!--v:part3.rate_allstops_arrival_peak_s_low-->3.04<!--/v-->–<!--v:part3.rate_allstops_arrival_peak_s_high-->5.79<!--/v--> s with KS distances <!--v:part3.rate_allstops_clock_ks_low-->0.08<!--/v-->–<!--v:part3.rate_allstops_clock_ks_high-->0.09<!--/v-->; the arrival-clock band is much wider there, so the cross-clock
 agreement turns partly on the cohort
 ([2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md),
 "Arrival clock vs stop clock, by cohort").
@@ -342,19 +343,19 @@ Read over the **full** [0, 8] s window, a median arrival-clock curve's argmax
 can land on the 0 s grid point, where the window holds almost no exposure; that
 is a boundary artefact, not an arrival-locked rate. **A 0.00 s peak must never be
 read as arrival-locked.** The same caution applied to the non-local-no-SWR stop-clock
-peak, which sits at <!--v:part3.rate_time_peak_s_non_local_no_swr-->3.00<!--/v--> s on the well-anchored fit and <!--v:part3.rate_allstops_time_peak_s_non_local_no_swr-->3.00<!--/v--> s on the all-stops fit;
+peak, which sits at <!--v:part3.rate_time_peak_s_non_local_no_swr-->2.48<!--/v--> s on the well-anchored fit and <!--v:part3.rate_allstops_time_peak_s_non_local_no_swr-->3.00<!--/v--> s on the all-stops fit;
 an argmax at 3.00 s is the right edge of the supported interval: it bounds the peak rather than locating it.
 
 Read the whole comparison as two descriptions of the same rate, not as one
 clock beating the other — neither ladder is fit to the other's rows. The
-arrival rungs are also heavily flagged: on the well-anchored fit <!--v:part3.rate_arrival_separated_fraction_low-->58 %<!--/v--> to
-<!--v:part3.rate_arrival_separated_fraction_high-->63 %<!--/v--> of `M5a_time_arrival` fits (by population) carry a
+arrival rungs are also heavily flagged: on the well-anchored fit <!--v:part3.rate_arrival_separated_fraction_low-->56 %<!--/v--> to
+<!--v:part3.rate_arrival_separated_fraction_high-->64 %<!--/v--> of `M5a_time_arrival` fits (by population) carry a
 separated non-nuisance term and are excluded from the shape summary, so a shape
-summary rests on a minority of the corpus, not on <!--v:part3.rate_sessions-->242<!--/v--> sessions. (The shape numbers rest on <!--v:part3.rate_arrival_peak_sessions_swr-->86<!--/v--> / <!--v:part3.rate_arrival_peak_sessions_non_local-->99<!--/v--> / <!--v:part3.rate_arrival_peak_sessions_non_local_swr-->83<!--/v--> / <!--v:part3.rate_arrival_peak_sessions_non_local_no_swr-->96<!--/v--> unflagged arrival-clock curves by population.)
+summary rests on a minority of the corpus, not on <!--v:part3.rate_sessions-->242<!--/v--> sessions. (The shape numbers rest on <!--v:part3.rate_arrival_peak_sessions_swr-->89<!--/v--> / <!--v:part3.rate_arrival_peak_sessions_non_local-->105<!--/v--> / <!--v:part3.rate_arrival_peak_sessions_non_local_swr-->80<!--/v--> / <!--v:part3.rate_arrival_peak_sessions_non_local_no_swr-->97<!--/v--> unflagged arrival-clock curves by population.)
 
 On the all-stops fit, requiring the arrival clock costs the common
-cohort **<!--v:part3.rate_allstops_arrival_bins_dropped-->92,849<!--/v--> of <!--v:part3.rate_allstops_arrival_bins_before-->8,230,251<!--/v--> bins (<!--v:part3.rate_allstops_arrival_bins_dropped_fraction-->1 %<!--/v-->) and <!--v:part3.rate_allstops_arrival_stops_dropped-->1,509<!--/v--> stops**; the window then
-keeps **<!--v:part3.rate_allstops_arrival_window_bins-->7,374,525<!--/v--> of <!--v:part3.rate_allstops_frozen_bins-->8,137,402<!--/v--> bins (<!--v:part3.rate_allstops_arrival_window_fraction-->91 %<!--/v-->)**. On the well-anchored cohort the
+cohort **<!--v:part3.rate_allstops_arrival_bins_dropped-->89,838<!--/v--> of <!--v:part3.rate_allstops_arrival_bins_before-->7,943,566<!--/v--> bins (<!--v:part3.rate_allstops_arrival_bins_dropped_fraction-->1 %<!--/v-->) and <!--v:part3.rate_allstops_arrival_stops_dropped-->1,509<!--/v--> stops**; the window then
+keeps **<!--v:part3.rate_allstops_arrival_window_bins-->7,136,257<!--/v--> of <!--v:part3.rate_allstops_frozen_bins-->7,853,728<!--/v--> bins (<!--v:part3.rate_allstops_arrival_window_fraction-->91 %<!--/v-->)**. On the well-anchored cohort the
 clock costs **<!--v:part3.rate_audit_stops_common_drop-->575<!--/v--> of <!--v:part3.rate_audit_stops_in-->93,560<!--/v--> stops** (above) and the window keeps a larger share
 of every population's events (retention table above).
 
@@ -380,12 +381,12 @@ population (`result.attrs["arrival_clock_cohort"]`;
 
 **The arrival rungs are themselves rarely cross-validated.** On the
 well-anchored fit `cv_bits_per_event` is NaN in <!--v:part3.rate_arrival_time_cv_nan_fraction_non_local-->92 %<!--/v--> (`M5a_time_arrival`) and
-<!--v:part3.rate_arrival_full_cv_nan_fraction_non_local-->95 %<!--/v--> (`M7ra_time_arrival_histcos_rew`) of non-local fits — <!--v:part3.rate_arrival_time_cv_nan_fraction_non_local_swr-->100 %<!--/v--> and <!--v:part3.rate_arrival_full_cv_nan_fraction_non_local_swr-->100 %<!--/v--> on
+<!--v:part3.rate_arrival_full_cv_nan_fraction_non_local-->93 %<!--/v--> (`M7ra_time_arrival_histcos_rew`) of non-local fits — <!--v:part3.rate_arrival_time_cv_nan_fraction_non_local_swr-->100 %<!--/v--> and <!--v:part3.rate_arrival_full_cv_nan_fraction_non_local_swr-->100 %<!--/v--> on
 the `non_local_swr` population — so their held-out numbers describe a small,
 self-selected subset of sessions and must not be quoted as corpus quantities.
 Read the arrival ladder on its fitted time course, not on its CV — and read it
 **pooled**: `M5a_time_arrival` is flagged separated in
-<!--v:part3.rate_arrival_separated_fraction_low-->58 %<!--/v--> to <!--v:part3.rate_arrival_separated_fraction_high-->63 %<!--/v--> of sessions (by population), so a
+<!--v:part3.rate_arrival_separated_fraction_low-->56 %<!--/v--> to <!--v:part3.rate_arrival_separated_fraction_high-->64 %<!--/v--> of sessions (by population), so a
 per-session arrival coefficient is usually not identified. The ladder-level AIC and the
 across-session median curve are the readable quantities; individual
 coefficients are not.
@@ -464,15 +465,15 @@ non-SWR one:
   the causal-hygiene note above). Neither its magnitude nor its session share
   survives into this ladder.
 - **Family B (per-bin):** on the well-anchored cohort, the reconstructed
-  kernel's lag-1 dissociation (**<!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v-->** SWR-coupled vs **<!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v-->** non-SWR) and the
+  kernel's lag-1 dissociation (**<!--v:part3.rate_kernel_lag_one_non_local_swr-->1.44<!--/v-->** SWR-coupled vs **<!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v-->** non-SWR) and the
   paired within-session comparison
-  (**<!--v:part3.rate_paired_positive_fraction-->79 %<!--/v--> of <!--v:part3.rate_paired_sessions-->207<!--/v--> sessions, <!--v:part3.rate_paired_animals_positive-->5<!--/v-->/5 animals, signed-rank p = <!--v:part3.rate_paired_p-->3.1e-19<!--/v-->**),
+  (**<!--v:part3.rate_paired_positive_fraction-->78 %<!--/v--> of <!--v:part3.rate_paired_sessions-->197<!--/v--> sessions, <!--v:part3.rate_paired_animals_positive-->5<!--/v-->/5 animals, signed-rank p = <!--v:part3.rate_paired_p-->3.2e-18<!--/v-->**),
   controlling for dwell, the within-stop time course, reward history, and event
   clustering. The paired test is weaker than on the all-stops sensitivity
-  (<!--v:part3.rate_allstops_paired_positive_fraction-->83 %<!--/v-->, p = <!--v:part3.rate_allstops_paired_p-->7.0e-25<!--/v-->). The non-SWR lag-1 kernel cannot be told
-  from 1 (p = <!--v:part3.rate_kernel_lag_one_p_non_local_no_swr-->0.55<!--/v-->); how far that depends on the model's other terms is not
-  yet computed, so "the non-SWR stream does not respond" is not a finding. Many
-  kept fits did not converge (<!--v:part3.rate_kernel_nonconverged_non_local_swr-->78<!--/v--> SWR-coupled, <!--v:part3.rate_kernel_nonconverged_non_local_no_swr-->62<!--/v--> non-SWR); why is open.
+  (<!--v:part3.rate_allstops_paired_positive_fraction-->84 %<!--/v-->, p = <!--v:part3.rate_allstops_paired_p-->2.3e-24<!--/v-->). The non-SWR lag-1 kernel cannot be told
+  from 1 (p = <!--v:part3.rate_kernel_lag_one_p_non_local_no_swr-->0.29<!--/v-->); how far that depends on the model's other terms is not
+  yet computed, so "the non-SWR stream does not respond" is not a finding.
+  A few kept fits did not converge (<!--v:part3.rate_kernel_nonconverged_non_local_swr-->14<!--/v--> SWR-coupled, <!--v:part3.rate_kernel_nonconverged_non_local_no_swr-->24<!--/v--> non-SWR), on the at-risk design described above.
 
 Family A agrees in *direction* on a four-parameter block test; Family B is where
 the effect is measured. Read the agreement as directional only: Family A's step
@@ -524,15 +525,15 @@ per-unit slope on a narrow covariate is kept and only legacy artifacts carrying
 no `sd_<term>` fall back to the raw `|coef| >= 10`.
 
 The fit-level `separated` share of the S rungs stays high — on the well-anchored
-contrast fit, <!--v:part3.rate_contrast_expanded_separated_low-->193<!--/v-->–<!--v:part3.rate_contrast_expanded_separated_high-->206<!--/v--> of the
-<!--v:part3.rate_contrast_expanded_fits_low-->235<!--/v-->–<!--v:part3.rate_contrast_expanded_fits_high-->240<!--/v--> fits of every rung that carries an `is_swr` expansion (`S2`–`S10`) —
+contrast fit, <!--v:part3.rate_contrast_expanded_separated_low-->231<!--/v-->–<!--v:part3.rate_contrast_expanded_separated_high-->239<!--/v--> of the
+<!--v:part3.rate_contrast_expanded_fits_low-->242<!--/v-->–<!--v:part3.rate_contrast_expanded_fits_high-->242<!--/v--> fits of every rung that carries an `is_swr` expansion (`S2`–`S10`) —
 because one term dominates it: `is_swr:reward_history_rcos_1` alone is flagged in
-<!--v:part3.rate_contrast_expanded_flagged_low-->173<!--/v-->–<!--v:part3.rate_contrast_expanded_flagged_high-->196<!--/v--> fits per rung. The middle bump of the three-bump reward basis is nearly
+<!--v:part3.rate_contrast_expanded_flagged_low-->223<!--/v-->–<!--v:part3.rate_contrast_expanded_flagged_high-->239<!--/v--> fits per rung. The middle bump of the three-bump reward basis is nearly
 collinear with its neighbours *inside* the expansion, where it is estimated on
 the SWR-coupled bins alone; the same bump outside an expansion is ordinary
-(`S1_rew`, which has no `is_swr` reward expansion, flags <!--v:part3.rate_contrast_plain_flagged-->0<!--/v--> of <!--v:part3.rate_contrast_plain_fits-->242<!--/v--> fits). The key
-`is_swr:<covariate>` terms are barely affected: <!--v:part3.rate_contrast_terms_losing_sessions-->2<!--/v--> of them lose any session to
-the aggregation, at most <!--v:part3.rate_contrast_most_dropped-->23<!--/v--> of <!--v:part3.rate_contrast_most_dropped_of-->236<!--/v--> (`S3_periswitch`).
+(`S1_rew`, which has no `is_swr` reward expansion, flags <!--v:part3.rate_contrast_plain_flagged-->2<!--/v--> of <!--v:part3.rate_contrast_plain_fits-->242<!--/v--> fits). The key
+`is_swr:<covariate>` terms are barely affected: <!--v:part3.rate_contrast_terms_losing_sessions-->1<!--/v--> of them lose any session to
+the aggregation, at most <!--v:part3.rate_contrast_most_dropped-->31<!--/v--> of <!--v:part3.rate_contrast_most_dropped_of-->242<!--/v--> (`S3_periswitch`).
 Read the fit-level share as "some coefficient in this fit is unidentified", never
 as a verdict on the term being aggregated.
 
@@ -546,31 +547,31 @@ What the ladder actually shows (<!--v:part3.rate_sessions-->242<!--/v--> session
 [per_bin_rate_results.md](per_bin_rate_results.md) §6):
 
 - **The within-stop time course is what calibrates the process.** `M0_const`
-  fails the KS band on more than half of sessions (`ks_within_band` <!--v:part3.rate_ladder_ks_band_const-->0.45<!--/v-->,
+  fails the KS band on more than half of sessions (`ks_within_band` <!--v:part3.rate_ladder_ks_band_const-->0.31<!--/v-->,
   non-Poisson: refractory + bursty), and the reward / self-history blocks
-  *without* time do **not** fix it (`M1_rew` <!--v:part3.rate_ladder_ks_band_rew-->0.37<!--/v-->, `M3r_histcos` <!--v:part3.rate_ladder_ks_band_histcos-->0.37<!--/v-->). Adding
-  the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to <!--v:part3.rate_ladder_ks_band_time-->0.93<!--/v-->, `M6r` (+
-  self-history) reaches <!--v:part3.rate_ladder_ks_band_time_histcos-->0.96<!--/v--> and the full model `M7r_time_histcos_rew`
-  <!--v:part3.rate_ladder_ks_band_full-->0.96<!--/v-->. The dominant misfit of the constant model is
+  *without* time do **not** fix it (`M1_rew` <!--v:part3.rate_ladder_ks_band_rew-->0.26<!--/v-->, `M3r_histcos` <!--v:part3.rate_ladder_ks_band_histcos-->0.30<!--/v-->). Adding
+  the `bs(tc)` spline (`M5_time`) jumps `ks_within_band` to <!--v:part3.rate_ladder_ks_band_time-->0.72<!--/v-->, `M6r` (+
+  self-history) reaches <!--v:part3.rate_ladder_ks_band_time_histcos-->0.94<!--/v--> and the full model `M7r_time_histcos_rew`
+  <!--v:part3.rate_ladder_ks_band_full-->0.95<!--/v-->. The dominant misfit of the constant model is
   the strong post-stop rate transient, not the fine-timescale clustering.
 - **Dispersion stays far below 1 (underdispersed), not → 1.** At these sparse 15 ms
   bins the Poisson deviance is not a calibrated dispersion estimate, so the
   textbook "history block drives dispersion → 1" does not apply; read KS and the
   rescaled-ISI autocorrelation (neither discretization-sensitive) instead. The
-  mean per-bin count is the §1 baseline rate times the 15 ms bin — ≈ <!--v:part3.rate_bin_count_non_local_swr-->0.0032<!--/v-->
-  (non-local w/ SWR) to ≈ <!--v:part3.rate_bin_count_non_local-->0.0065<!--/v--> (non-local, all) — so the trapezoid rescaling is
+  mean per-bin count is the §1 baseline rate times the 15 ms bin — ≈ <!--v:part3.rate_bin_count_non_local_swr-->0.0033<!--/v-->
+  (non-local w/ SWR) to ≈ <!--v:part3.rate_bin_count_non_local-->0.0067<!--/v--> (non-local, all) — so the trapezoid rescaling is
   well-behaved on average; `mean_predicted` / `max_predicted` are reported so the
   high-rate-bin KS bias can be ruled out.
 - **The time block is the only rung with both a large CV gain and a near-full CV
-  cohort.** `M5_time` scores **<!--v:part3.rate_ladder_cv_bits_time-->0.24<!--/v-->** held-out bits/event on **<!--v:part3.rate_ladder_cv_sessions_time-->226<!--/v--> of <!--v:part3.rate_ladder_sessions_time-->242<!--/v-->**
-  non-local sessions. Its median AIC (<!--v:part3.rate_ladder_aic_time-->2138<!--/v-->) is above
-  `M7r_time_histcos_rew` (<!--v:part3.rate_ladder_aic_full-->2128<!--/v-->) and `M6r_time_histcos` (<!--v:part3.rate_ladder_aic_time_histcos-->2128<!--/v-->) — the AIC ordering
+  cohort.** `M5_time` scores **<!--v:part3.rate_ladder_cv_bits_time-->0.25<!--/v-->** held-out bits/event on **<!--v:part3.rate_ladder_cv_sessions_time-->226<!--/v--> of <!--v:part3.rate_ladder_sessions_time-->242<!--/v-->**
+  non-local sessions. Its median AIC (<!--v:part3.rate_ladder_aic_time-->2320<!--/v-->) is above
+  `M7r_time_histcos_rew` (<!--v:part3.rate_ladder_aic_full-->2303<!--/v-->) and `M6r_time_histcos` (<!--v:part3.rate_ladder_aic_time_histcos-->2307<!--/v-->) — the AIC ordering
   and the held-out ordering are not the same ordering. The three rungs that carry
-  time **and** the raised-cosine self-history block score <!--v:part3.rate_ladder_cv_bits_time_histcos-->0.22<!--/v--> (`M6r_time_histcos`),
-  <!--v:part3.rate_ladder_cv_bits_full-->0.22<!--/v--> (`M7r_time_histcos_rew`) and <!--v:part3.rate_ladder_cv_bits_reward_by_time-->0.18<!--/v--> (`M9r_rew_x_time`) bits/event but only
-  on <!--v:part3.rate_ladder_cv_sessions_time_histcos-->62<!--/v-->, <!--v:part3.rate_ladder_cv_sessions_full-->61<!--/v--> and <!--v:part3.rate_ladder_cv_sessions_reward_by_time-->40<!--/v--> sessions, so a median there is a selected-minority number and
+  time **and** the raised-cosine self-history block score <!--v:part3.rate_ladder_cv_bits_time_histcos-->0.30<!--/v--> (`M6r_time_histcos`),
+  <!--v:part3.rate_ladder_cv_bits_full-->0.30<!--/v--> (`M7r_time_histcos_rew`) and <!--v:part3.rate_ladder_cv_bits_reward_by_time-->0.24<!--/v--> (`M9r_rew_x_time`) bits/event but only
+  on <!--v:part3.rate_ladder_cv_sessions_time_histcos-->216<!--/v-->, <!--v:part3.rate_ladder_cv_sessions_full-->213<!--/v--> and <!--v:part3.rate_ladder_cv_sessions_reward_by_time-->128<!--/v--> sessions, so a median there is a selected-minority number and
   not a like-for-like win over `M5_time`. The fourth rung carrying that block,
-  `M3r_histcos`, has no time spline and scores **<!--v:part3.rate_ladder_cv_bits_histcos-->0.05<!--/v-->** over <!--v:part3.rate_ladder_cv_sessions_histcos-->67<!--/v--> sessions — far
+  `M3r_histcos`, has no time spline and scores **<!--v:part3.rate_ladder_cv_bits_histcos-->0.09<!--/v-->** over <!--v:part3.rate_ladder_cv_sessions_histcos-->230<!--/v--> sessions — far
   below `M5_time` on a comparably selected cohort. The
   `onset_lag` dummy rungs could not be cross-validated — that
   is what retired them — and no longer exist. Use `M5_time`
@@ -581,13 +582,13 @@ What the ladder actually shows (<!--v:part3.rate_sessions-->242<!--/v--> session
 - **The reward block is a small AIC gain once the rungs share rows (except on
   the non-SWR stream), and a loss once time and self-history are already in.**
   Read the block twice. *Marginally* (`M1_rew − M0_const`) the median per-session ΔAIC is
-  **<!--v:part3.rate_marginal_reward_delta_aic_non_local-->−7.8<!--/v-->** (non-local), **<!--v:part3.rate_marginal_reward_delta_aic_non_local_swr-->−5.4<!--/v-->** (non-local w/ SWR), **<!--v:part3.rate_marginal_reward_delta_aic_swr-->−6.8<!--/v-->** (detected SWR)
-  and **<!--v:part3.rate_marginal_reward_delta_aic_non_local_no_swr-->+0.089<!--/v-->** (non-local, no SWR): the block pays for itself against a
+  **<!--v:part3.rate_marginal_reward_delta_aic_non_local-->−8.9<!--/v-->** (non-local), **<!--v:part3.rate_marginal_reward_delta_aic_non_local_swr-->−6.0<!--/v-->** (non-local w/ SWR), **<!--v:part3.rate_marginal_reward_delta_aic_swr-->−7.6<!--/v-->** (detected SWR)
+  and **<!--v:part3.rate_marginal_reward_delta_aic_non_local_no_swr-->−0.53<!--/v-->** (non-local, no SWR): the block pays for itself against a
   constant rate on three populations, and on the non-SWR one it does not (the child
-  wins in <!--v:part3.rate_marginal_reward_child_better_fraction_non_local_no_swr-->49 %<!--/v--> of its sessions). *Conditionally* — the reward
+  wins in <!--v:part3.rate_marginal_reward_child_better_fraction_non_local_no_swr-->52 %<!--/v--> of its sessions). *Conditionally* — the reward
   block given time **and** self-history, `M7r_time_histcos_rew − M6r_time_histcos`
-  — every population moves the wrong way: **<!--v:part3.rate_conditional_reward_delta_aic_swr-->+0.94<!--/v-->** (detected SWR), **<!--v:part3.rate_conditional_reward_delta_aic_non_local-->+1.0<!--/v-->**
-  (non-local), **<!--v:part3.rate_conditional_reward_delta_aic_non_local_swr-->+1.6<!--/v-->** (non-local w/ SWR), **<!--v:part3.rate_conditional_reward_delta_aic_non_local_no_swr-->+2.4<!--/v-->** (non-local, no SWR).
+  — every population moves the wrong way: **<!--v:part3.rate_conditional_reward_delta_aic_swr-->+1.2<!--/v-->** (detected SWR), **<!--v:part3.rate_conditional_reward_delta_aic_non_local-->+1.0<!--/v-->**
+  (non-local), **<!--v:part3.rate_conditional_reward_delta_aic_non_local_swr-->+1.8<!--/v-->** (non-local w/ SWR), **<!--v:part3.rate_conditional_reward_delta_aic_non_local_no_swr-->+2.2<!--/v-->** (non-local, no SWR).
   The four-parameter smooth block does not pay for itself once the time
   course and self-history are in the model, even though the lag-1 kernel it
   builds is above 1 in most SWR-coupled sessions. The much larger reward step the retired

@@ -159,18 +159,21 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
 ## Part 3. Behavior: how the events relate to the task, SWR against non-SWR
 
 **How often do events occur, and does reward drive the rate?**
-- Baseline rates show no detectable difference: <!--v:part3.rate_baseline_non_local_no_swr-->0.22<!--/v--> non-SWR against <!--v:part3.rate_baseline_non_local_swr-->0.21<!--/v-->
-  SWR-coupled events per second of rest (within-session ratio <!--v:part3.rate_baseline_ratio_swr_coupled_to_no_swr-->0.98<!--/v-->,
+- Baseline rates show no detectable difference: <!--v:part3.rate_baseline_non_local_no_swr-->0.23<!--/v--> non-SWR against <!--v:part3.rate_baseline_non_local_swr-->0.22<!--/v-->
+  SWR-coupled events per second in which an event can start (within-session ratio <!--v:part3.rate_baseline_ratio_swr_coupled_to_no_swr-->0.98<!--/v-->,
   p <!--v:part3.rate_baseline_ratio_swr_coupled_to_no_swr_p-->0.30<!--/v-->). This is no test of equivalence, so it does not show the rates are the same.
-- One reward later, the rate rises <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.50<!--/v-->× for SWR-coupled events
+- One reward later, the rate rises <!--v:part3.rate_kernel_lag_one_non_local_swr-->1.44<!--/v-->× for SWR-coupled events
   (above 1 in <!--v:part3.rate_kernel_lag_one_animals_positive_non_local_swr-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals) and
-  <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.00<!--/v-->× for non-SWR events (p <!--v:part3.rate_kernel_lag_one_p_non_local_no_swr-->0.55<!--/v-->). This is the reward kernel reconstructed
+  <!--v:part3.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v-->× for non-SWR events (p <!--v:part3.rate_kernel_lag_one_p_non_local_no_swr-->0.29<!--/v-->). This is the reward kernel reconstructed
   at lag 1, read over the sessions whose reward terms pass the separation gate
-  (<!--v:part3.rate_kernel_sessions_non_local_swr-->225<!--/v--> and <!--v:part3.rate_kernel_sessions_non_local_no_swr-->218<!--/v--> sessions). Within session the SWR-coupled kernel is the
-  larger in <!--v:part3.rate_paired_positive_fraction-->79 %<!--/v--> of <!--v:part3.rate_paired_sessions-->207<!--/v--> sessions
-  (<!--v:part3.rate_paired_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; p <!--v:part3.rate_paired_p-->3.1e-19<!--/v-->).
-  Of the kept fits, <!--v:part3.rate_kernel_nonconverged_non_local_swr-->78<!--/v--> (SWR-coupled) and <!--v:part3.rate_kernel_nonconverged_non_local_no_swr-->62<!--/v--> (non-SWR) did
-  not converge. Why is still open, and the values may move once it is settled.
+  (<!--v:part3.rate_kernel_sessions_non_local_swr-->213<!--/v--> and <!--v:part3.rate_kernel_sessions_non_local_no_swr-->215<!--/v--> sessions). Within session the SWR-coupled kernel is the
+  larger in <!--v:part3.rate_paired_positive_fraction-->78 %<!--/v--> of <!--v:part3.rate_paired_sessions-->197<!--/v--> sessions
+  (<!--v:part3.rate_paired_animals_positive-->5<!--/v-->/<!--v:part2.animals-->5<!--/v--> animals; p <!--v:part3.rate_paired_p-->3.2e-18<!--/v-->).
+  Of the kept fits, <!--v:part3.rate_kernel_nonconverged_non_local_swr-->14<!--/v--> (SWR-coupled) and <!--v:part3.rate_kernel_nonconverged_non_local_no_swr-->24<!--/v--> (non-SWR) did
+  not converge. The rates are fit on the bins in which an event can start (a bin
+  inside an ongoing event is left out), so they are rates of events starting,
+  not events per second of rest. Counting those bins had made many
+  of the fits fail to converge, without changing the reward kernel.
 - In the per-stop model, adding reward history improves the fit for SWR-coupled events
   (median AIC(with) − AIC(without), negative = better: <!--v:part3.per_stop_delta_aic_session_non_local_swr-->−3.1<!--/v-->) but not for non-SWR events
   (<!--v:part3.per_stop_delta_aic_session_non_local_no_swr-->+0.88<!--/v-->).
@@ -178,7 +181,7 @@ the detector's threshold, with spike evidence per spike the one hint of a bounda
   the non-SWR lag-1 kernel cannot be told from 1, but how far that depends on the model's other terms has not
   been computed, so "non-SWR events do not respond to reward" is not yet a finding. The SWR-coupled class is
   defined by overlap with a detected SWR, and detected SWRs respond too (lag-1 kernel
-  <!--v:part3.rate_kernel_lag_one_swr-->1.38<!--/v-->×), so the gating may be of SWRs rather than of replay.
+  <!--v:part3.rate_kernel_lag_one_swr-->1.39<!--/v-->×), so the gating may be of SWRs rather than of replay.
 
 **Do events come in clusters, and do the two types follow each other?** Event history, once event duration is handled (a bin inside an event is not at risk; history is read from the previous event's end and its onset; each animal's sessions pooled, so the sizes are upper bounds):
 - No suppression after an event ends: 15 ms after the end the rate ratio is
