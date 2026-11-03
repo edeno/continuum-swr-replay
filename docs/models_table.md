@@ -71,7 +71,7 @@ directly comparable.
 |---|---|
 | `nt` | **n**o **t**ime/length controls — the twin fitted on `BASEc_NT`, i.e. without the within-stop-time and event-length current/previous-arm products. Reports the **total** SWR effect where the `BASEc` rung reports the length-adjusted (direct) one. |
 | `b` | carries the **previous-goal** control (`is_last_rewarded_noncurrent_arm` and its SWR interaction) on top of its parent rung. |
-| `r` | self-history block is the **r**aised-cosine basis (`HISTCOS`) rather than per-lag dummies. |
+| `r` | self-history block is the **r**aised-cosine basis (`OFFCOS` in the per-bin rate ladders, `HISTCOS` in the cross-history ones) rather than per-lag dummies. |
 | `a` | time-course block is anchored on the **a**rrival clock (`BS_ARR`) instead of the bout clock. |
 
 ### Bundle names and suffixes
@@ -223,10 +223,10 @@ correction. `tmax = 4 s` on the bout clock.
 M0_const              count ~ 1
 M1_rew                count ~ REWBASIS
 M5_time               count ~ BS_TC
-M3r_histcos           count ~ HISTCOS
-M6r_time_histcos      count ~ BS_TC + HISTCOS
-M7r_time_histcos_rew  count ~ BS_TC + REWBASIS + HISTCOS
-M9r_rew_x_time        count ~ BS_TC + REWBASIS + HISTCOS + reward_history_rcos_0:BS_TC
+M3r_histcos           count ~ OFFCOS
+M6r_time_histcos      count ~ BS_TC + OFFCOS
+M7r_time_histcos_rew  count ~ BS_TC + REWBASIS + OFFCOS
+M9r_rew_x_time        count ~ BS_TC + REWBASIS + OFFCOS + reward_history_rcos_0:BS_TC
 
 # Arrival-anchored sub-ladder (time_clock = "arrival"), fit on the [0, 8] s
 # arrival window -- a strict subset of the frozen cohort's rows. AIC, deviance
@@ -234,15 +234,30 @@ M9r_rew_x_time        count ~ BS_TC + REWBASIS + HISTCOS + reward_history_rcos_0
 # compared ONLY with each other; M0a_const_arrival is the window's own null.
 M0a_const_arrival              count ~ 1
 M5a_time_arrival               count ~ BS_ARR
-M7ra_time_arrival_histcos_rew  count ~ BS_ARR + REWBASIS + HISTCOS
+M7ra_time_arrival_histcos_rew  count ~ BS_ARR + REWBASIS + OFFCOS
 ```
+
+**At-risk design.** Every rung is fit on the at-risk bins
+(`PER_BIN_DESIGN = "at_risk_end_history"` in `model_specs.py`): a bin inside an
+ongoing event of the outcome's detector cannot hold an onset, so it is dropped
+(`aggregate_to_timebins(at_risk_events=...)`, the events from
+`duration_aware_history.at_risk_events`: all Kay SWRs for detected SWR, all
+non-local events for every non-local population). The self-history block is
+therefore `OFFCOS`, counted from event ends (`PER_BIN_HISTORY_ANCHORS`).
+Counted from onsets on the at-risk bins it is not estimable (the bins a few lags
+after an onset are mostly inside that event). On the earlier all-bins design
+(fits without the `per_bin_design` column, which the summaries refuse) the onset
+block ran to −∞ because the bin after an onset never holds one, and about a
+quarter of those fits were flagged not converged. Each rung's rate is the rate at
+which events start while none is ongoing, not events per second of stop; the
+per-stop family below keeps the latter. The rung names keep `histcos`.
 
 `M6r_time_histcos` is `M7r_time_histcos_rew` without the reward block, so the
 reward step *given* time and self-history is the nested pair
 `M7r_time_histcos_rew − M6r_time_histcos`; `M1_rew − M0_const` is the same
 block's marginal step. The per-lag `onset_lag1..10` self-history rungs are
 retired — the dummy block separates on the refractory bins, which voids the
-rung's held-out metric; `HISTCOS` spans the same window and is scored. The
+rung's held-out metric; the raised-cosine block spans the same window and is scored. The
 per-bin switch main-effect rung is retired too, because
 `did_last_completed_trip_switch_patch` is often constant within a session's
 complete-case cohort and makes the design rank-deficient. See
@@ -257,7 +272,7 @@ One model, `MODEL_UNCERTAINTY_RATE` in `model_specs.py`, kept out of the shipped
 `MU_UNCERTAINTY_COVARIATES`:
 
 ```rungs
-MU_uncertainty  count ~ BS_TC + REWBASIS + HISTCOS
+MU_uncertainty  count ~ BS_TC + REWBASIS + OFFCOS
                         + task_reward_probability_chosen_arm
                         + task_reward_probability_patch_mean_gap_best_vs_second
                         + patch_switch_fraction_last5_completed_trips
@@ -532,7 +547,8 @@ variables (Comrie et al.), all from the **beta-Bernoulli** behavioural model:
 
 ```
 BASE      := BS_TC + reward_history_rcos_0 + reward_history_rcos_1
-             + reward_history_rcos_2 + HISTCOS
+             + reward_history_rcos_2 + OFFCOS
+             # on the per-bin at-risk design (see the per-bin ladder above)
              # reward_history_incomplete is appended to every G/S formula as a
              # plain main effect, OUTSIDE any is_swr expansion
 PERISWITCH:= periswitch_index_trials + is_periswitch_post

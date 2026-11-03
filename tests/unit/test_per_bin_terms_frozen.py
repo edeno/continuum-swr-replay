@@ -26,6 +26,7 @@ at 2d0ef3f9:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -52,6 +53,24 @@ HISTORY = {
     "lags": (ms.N_HISTORY_LAGS, 0),
     "basis": (ms.N_HISTORY_LAGS, ms.N_HISTORY_BASIS),
 }
+
+
+# Ladders whose self-history moved to event ends on the at-risk design
+# (``PER_BIN_HISTORY_ANCHORS``) after the snapshot: their answer is the
+# snapshot's with each onset self-history column renamed to its end twin.
+END_ANCHORED = {"MODEL_PER_BIN_RATE", "MODEL_UNCERTAINTY_RATE", *CONTRAST_LADDERS}
+
+
+def _end_anchored(answer):
+    """``answer`` with the onset self-history columns renamed to their end twins."""
+    rename = lambda text: re.sub(r"(?<![a-z_])hist_rcos_", "offhist_rcos_", text)  # noqa: E731
+    if isinstance(answer, str):
+        return rename(answer)
+    if isinstance(answer, list):
+        return [_end_anchored(a) for a in answer]
+    if isinstance(answer, dict):
+        return {k: _end_anchored(v) for k, v in answer.items()}
+    return answer
 
 
 def _answer(spec: ms.PerBinRateModelSpec) -> dict:
@@ -84,10 +103,15 @@ def _grid_spec(key: str) -> ms.PerBinRateModelSpec:
 
 
 def test_every_shipped_per_bin_rung_is_reproduced() -> None:
-    shipped = {n: s for ladder in PER_BIN_LADDERS.values() for n, s in ladder.items()}
+    shipped = {
+        n: (s, ladder_name in END_ANCHORED)
+        for ladder_name, ladder in PER_BIN_LADDERS.items()
+        for n, s in ladder.items()
+    }
     assert set(shipped) == set(ANSWERS_2D0EF3F9["specs"])
-    for name, spec in shipped.items():
-        assert _answer(spec) == ANSWERS_2D0EF3F9["specs"][name], name
+    for name, (spec, end_anchored) in shipped.items():
+        old = ANSWERS_2D0EF3F9["specs"][name]
+        assert _answer(spec) == (_end_anchored(old) if end_anchored else old), name
 
 
 def test_every_contrast_rung_is_reproduced() -> None:
@@ -98,7 +122,7 @@ def test_every_contrast_rung_is_reproduced() -> None:
             "formula": formula,
             "columns": list(columns),
             "history_window_s": ms.longest_history_window_s([(formula, columns)]),
-        } == ANSWERS_2D0EF3F9["contrast"][name], name
+        } == _end_anchored(ANSWERS_2D0EF3F9["contrast"][name]), name
     assert (
         list(ms.SWR_CONTRAST_RATE_STOP_COVARS)
         == ANSWERS_2D0EF3F9["SWR_CONTRAST_RATE_STOP_COVARS"]

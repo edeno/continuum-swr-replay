@@ -116,6 +116,21 @@ offset. Its limitation is exactly that offset — see below.
   within-stop time course is modelled explicitly by a `bs(tc, df=4)` spline
   rather than averaged into a per-stop dwell offset
   ([`per_bin_rate_model.py`](../src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py)).
+- **At-risk bins (2026-11-03).** Only bins in which an event can start enter
+  the fit: a bin inside an ongoing event of the outcome's detector is dropped
+  (all Kay SWRs for detected SWR; all non-local events, with or without an
+  SWR, for every non-local population), because one detector's events never
+  overlap. This is the at-risk rule of counting-process models for recurrent
+  episodes (Andersen and Gill 1982; Cook and Lawless 2007, §1.4.2 and §6.5).
+  **Estimand:** every Family B rate and rate ratio is the rate at which events
+  *start* while none is ongoing. Family A's is events per second of stop, which
+  also moves when events get longer. The self-history control is counted from
+  the previous event's **end** (`offhist_rcos_0..3`); counted from onsets it has
+  almost no at-risk bins at short lags and cannot be estimated. On the earlier
+  all-bins design the onset block's short-lag coefficient ran to −∞ (the bin
+  after an onset never holds one), which is why about a quarter of those fits
+  were flagged not converged; their reward kernels agree with the at-risk fits
+  session by session.
 - **The ladder** toggles three blocks independently, all at one bin width
   (`BIN_S = 0.015`) so the models are nested and AIC / CV / GOF are comparable:
 
@@ -124,7 +139,7 @@ offset. Its limitation is exactly that offset — see below.
   | `M0_const` | homogeneous Poisson baseline (`count ~ 1`) |
   | `M1_rew` | reward-history basis (`reward_history_rcos_0..2` + `reward_history_incomplete`) |
   | `M5_time` | within-stop time course (spline) |
-  | `M3r_histcos` | self-history / autoregression (raised-cosine `hist_rcos_0..3` over a 150 ms window) |
+  | `M3r_histcos` | self-history (raised-cosine `offhist_rcos_0..3` over the 150 ms after the previous event's end) |
   | `M6r_time_histcos` | time + self-history (the reward block's nested null) |
   | `M7r_time_histcos_rew` | time + self-history + reward history (**the full additive model**) |
   | `M9r_rew_x_time` | + `reward_history_rcos_0 × bs(tc)` interaction (does reward modulate the time course?) |
@@ -220,10 +235,9 @@ offset. Its limitation is exactly that offset — see below.
   Ambrose adaptive coding) but this GLM does not measure a prediction error, so
   the mechanism (RPE vs satiety vs reward-rate adaptation) is not established
   here. The self-history block is a control for the
-  reward kernel. Its onset-only kernel is not read for refractoriness or bursting:
-  it counts the bins inside an ongoing event as at risk, which alone makes a
-  short-lag dip and a burst at these lags; its values are no longer reported. On
-  the duration-aware design (claim 19c) there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->4.53<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains (an animal counts when its peak's interval, widened for the lags searched, stays above 1): detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->4<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/5).
+  reward kernel, counted from event ends; its 150 ms window is too short and a
+  single session too sparse to read history from it. On the pooled
+  duration-aware fits (claim 19c) there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:part3.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:part3.history_end_first_lag_rr_high-->4.53<!--/v-->×), events **cluster right after the previous event ends** (<!--v:part3.history_end_peak_low-->2.63<!--/v-->–<!--v:part3.history_end_peak_high-->4.53<!--/v-->× at <!--v:part3.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:part3.history_end_peak_lag_ms_high-->45<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains (an animal counts when its peak's interval, widened for the lags searched, stays above 1): detected SWR <!--v:part3.history_onset_peak_swr-->2.28<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:part3.history_onset_animals_swr-->5<!--/v-->/5 animals), non-local with SWR <!--v:part3.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_swr-->4<!--/v-->/5), non-local without SWR <!--v:part3.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:part3.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms (<!--v:part3.history_onset_animals_non_local_no_swr-->2<!--/v-->/5).
 
   **The reward effect is `rr_lag1`, not `rr_immediate`.** `rr_lag1` is the
   reconstructed kernel evaluated **at lag 1** — the blend of the three bumps that

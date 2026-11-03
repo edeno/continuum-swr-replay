@@ -98,6 +98,9 @@ __all__ = [
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
+    "PER_BIN_DESIGN",
+    "PER_BIN_HISTORY_ANCHORS",
+    "PER_BIN_HISTORY_COLUMNS",
     "POST_OUTCOME_COHORT",
     "POST_OUTCOME_COVARIATES",
     "POST_OUTCOME_RATE_RUNGS",
@@ -622,6 +625,29 @@ _ANCHOR_PREFIX = {"onset": "", "offset": "off"}
 # and the immediate-switch term was retired with the M8 rung (see R1).
 STOP_COVARIATES: tuple[str, ...] = ()
 
+# The per-bin rate ladders (``MODEL_PER_BIN_RATE``, ``MODEL_UNCERTAINTY_RATE``
+# and the is_swr-contrast ``BASE`` block) are fit on the at-risk design: a bin
+# inside an ongoing event of the outcome's detector is not at risk of an onset
+# and is dropped (``aggregate_to_timebins(at_risk_events=...)``, built by
+# ``duration_aware_history.at_risk_events``). Their self-history control is
+# counted from event ENDS. Counted from onsets it is not estimable there: the
+# bins a few lags after an onset are mostly inside that event, so the
+# short-lag terms have almost no at-risk bins (28 % of the per-session
+# duration-aware fits with onset history did not converge, against 5 % with
+# end history). On the old all-bins design the onset block ran to -inf
+# instead, because the bin after an onset never holds one. The onset-locked
+# rhythm is read from the pooled duration-aware history fits, not here.
+PER_BIN_HISTORY_ANCHORS: tuple[str, ...] = ("offset",)
+#: Written on every per-bin rate fit row; readers refuse rows without it (fits
+#: from the old all-bins, onset-history design).
+PER_BIN_DESIGN = "at_risk_end_history"
+#: The self-history basis columns those ladders fit.
+PER_BIN_HISTORY_COLUMNS: tuple[str, ...] = tuple(
+    f"{_ANCHOR_PREFIX[anchor]}hist_rcos_{k}"
+    for anchor in PER_BIN_HISTORY_ANCHORS
+    for k in range(N_HISTORY_BASIS)
+)
+
 
 @dataclass(frozen=True)
 class PerBinRateModelSpec:
@@ -861,9 +887,10 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
     # M8_full_switch (the per-bin switch main-effect extension) was retired;
     # nothing parents off it. Why: ``docs/design/model_history.md``
     # § "Per-bin rate ladder: the retired M8 switch rung (moved 2026-09-06)".
-    # Raised-cosine self-history variants: smooth basis over the same window so
-    # the history block cannot separate on the refractory bins (lifts held-out
-    # cv_bits_per_event from negative to positive vs the onset_lag dummies).
+    # Raised-cosine self-history variants: a smooth basis over the same window
+    # (it lifted held-out cv_bits_per_event from negative to positive vs the
+    # onset_lag dummies), counted from event ends on the at-risk design
+    # (``PER_BIN_HISTORY_ANCHORS``).
     "M3r_histcos": PerBinRateModelSpec(
         name="M3r_histcos",
         time_spline=False,
@@ -872,9 +899,10 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
         reward_time_interaction=False,
-        description="+ self-history (raised-cosine basis)",
+        description="+ self-history from event ends (raised-cosine basis)",
         parent="M0_const",
         self_history_basis=N_HISTORY_BASIS,
+        self_history_anchors=PER_BIN_HISTORY_ANCHORS,
     ),
     # Time + self-history without the reward block, so the reward block has a
     # nested null that already holds time AND self-history: the "reward given
@@ -888,9 +916,10 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
         reward_time_interaction=False,
-        description="+ time + raised-cosine self-history",
+        description="+ time + raised-cosine self-history from event ends",
         parent="M5_time",
         self_history_basis=N_HISTORY_BASIS,
+        self_history_anchors=PER_BIN_HISTORY_ANCHORS,
     ),
     "M7r_time_histcos_rew": PerBinRateModelSpec(
         name="M7r_time_histcos_rew",
@@ -900,9 +929,10 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         self_history_lags=N_HISTORY_LAGS,
         switch=False,
         reward_time_interaction=False,
-        description="+ time + raised-cosine self-history + reward history",
+        description="+ time + raised-cosine self-history from event ends + reward history",
         parent="M6r_time_histcos",
         self_history_basis=N_HISTORY_BASIS,
+        self_history_anchors=PER_BIN_HISTORY_ANCHORS,
     ),
     "M9r_rew_x_time": PerBinRateModelSpec(
         name="M9r_rew_x_time",
@@ -915,6 +945,7 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         description="M7r + reward x time interaction",
         parent="M7r_time_histcos_rew",
         self_history_basis=N_HISTORY_BASIS,
+        self_history_anchors=PER_BIN_HISTORY_ANCHORS,
     ),
     # Arrival-anchored sub-ladder. These rungs re-anchor the time-course block
     # on ``ARRIVAL_CLOCK_COLUMN`` and are fit on the arrival window
@@ -961,10 +992,12 @@ MODEL_PER_BIN_RATE: dict[str, PerBinRateModelSpec] = {
         switch=False,
         reward_time_interaction=False,
         description=(
-            "+ time-since-arrival + raised-cosine self-history + reward history"
+            "+ time-since-arrival + raised-cosine self-history from event ends"
+            " + reward history"
         ),
         parent="M5a_time_arrival",
         self_history_basis=N_HISTORY_BASIS,
+        self_history_anchors=PER_BIN_HISTORY_ANCHORS,
         time_clock="arrival",
     ),
 }
@@ -1034,6 +1067,7 @@ MODEL_UNCERTAINTY_RATE: dict[str, PerBinRateModelSpec] = {
         description="curated uncertainty/value beyond time/reward/history",
         parent="M7r_time_histcos_rew",
         self_history_basis=N_HISTORY_BASIS,
+        self_history_anchors=PER_BIN_HISTORY_ANCHORS,
         extra_covariates=MU_UNCERTAINTY_COVARIATES,
     ),
 }
@@ -1225,12 +1259,19 @@ MODEL_CHOICE: dict[str, ModelSpec] = {
 
 # --- Rate is_swr-contrast ladder (per-bin Poisson: G0-G8 stratified, S0-S10 contrast) ---
 # Each block is a tuple of formula terms with their columns. BASE is the time
-# spline + the full reward-history basis + the raised-cosine self-history.
+# spline + the full reward-history basis + the raised-cosine self-history,
+# counted from event ends on the at-risk design (``PER_BIN_HISTORY_ANCHORS``).
 _BLOCKS: dict[str, tuple[PerBinTerm, ...]] = {
     "BASE": (
         _spline_term("stop"),
         *_reward_basis_terms(REWARD_HISTORY_N_BASIS),
-        *_history_terms("", N_HISTORY_LAGS, N_HISTORY_BASIS),
+        *(
+            term
+            for anchor in PER_BIN_HISTORY_ANCHORS
+            for term in _history_terms(
+                _ANCHOR_PREFIX[anchor], N_HISTORY_LAGS, N_HISTORY_BASIS
+            )
+        ),
     ),
     "PERISWITCH": (
         *_column_terms(("periswitch_index_trials", "is_periswitch_post")),

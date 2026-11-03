@@ -292,7 +292,11 @@ Two parallel families estimate replay event *rate* (how often events occur):
 **Family A** (`MODEL_PER_STOP_RATE`, per-stop Poisson with a `log(immobility)`
 offset — the literature-comparable layer) and **Family B**
 (`MODEL_PER_BIN_RATE`, the per-bin conditional-intensity ladder with a spline
-time course + reward kernel + self-history — the confound-free layer). See
+time course + reward kernel + self-history — the confound-free layer). Family B
+is fit on at-risk bins only (a bin inside an ongoing event of the outcome's
+detector is dropped, self-history counted from event ends), so its rates are
+the rate at which events start while none is ongoing; Family A's are events per
+second of stop. See
 [docs/rate_models.md](docs/rate_models.md) for which family to cite for what,
 the M0–M9 ladder, and the point-process model-checking. Runners:
 `scripts/rate/fit_per_stop_rate_models.py`, `scripts/rate/fit_per_bin_rate_models.py`;

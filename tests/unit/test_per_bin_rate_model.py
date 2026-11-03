@@ -189,6 +189,7 @@ def test_extra_covariates_formula():
         base.description,
         base.parent,
         self_history_basis=base.self_history_basis,
+        self_history_anchors=base.self_history_anchors,
     )
     assert same.formula() == base.formula()
 

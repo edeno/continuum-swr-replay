@@ -207,7 +207,7 @@ def test_swr_contrast_base_block_is_spline_basis_and_self_history() -> None:
         f"{ms._SPLINE} + "
         + " + ".join(ms.REWARD_HISTORY_COLUMNS)
         + " + "
-        + " + ".join(f"hist_rcos_{k}" for k in range(ms.N_HISTORY_BASIS))
+        + " + ".join(ms.PER_BIN_HISTORY_COLUMNS)
         + f" + {ms.REWARD_HISTORY_INCOMPLETE}"
     )
     assert base == expected

@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.model_specs import (
+    PER_BIN_DESIGN,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -136,3 +137,16 @@ def test_the_history_peak_interval_is_widened_for_the_lags_searched():
     assert part3._peak(_kernel(np.r_[0.5, np.zeros(9)], se, [True] * 8 + [False] * 2))[
         2
     ]
+
+
+def test_fits_from_the_old_all_bins_design_are_refused(tmp_path):
+    """A per-bin fit table without the at-risk design label is not summarized."""
+    path = tmp_path / "all_models.pkl"
+    _fits("non_local_swr", [[0.3, 0.1, 0.0]]).to_pickle(path)
+    with pytest.raises(ValueError, match="refit"):
+        part3._read_per_bin_fits(path)
+
+    _fits("non_local_swr", [[0.3, 0.1, 0.0]]).assign(
+        per_bin_design=PER_BIN_DESIGN
+    ).to_pickle(path)
+    assert len(part3._read_per_bin_fits(path)) == 1

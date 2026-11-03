@@ -2,7 +2,10 @@
 """Fit the per-bin non-local rate models, `is_swr` version (see docs/models_table.md).
 
 Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
-(15 ms bins, `log(exposure)` offset, Poisson), fit per session:
+(15 ms bins, `log(exposure)` offset, Poisson), fit per session. The design is the
+at-risk one shared with `fit_per_bin_rate_models.py`: a bin inside an ongoing
+non-local event is dropped, and self-history is counted from event ends
+(`PER_BIN_HISTORY_ANCHORS`).
 
   * STRATIFIED (G0-G8): each spec fit to `non_local`, `non_local_swr`,
     `non_local_no_swr` separately. Comparing a coefficient across the three
@@ -10,9 +13,10 @@ Two ladders on the canonical (stop x bin) design from `aggregate_to_timebins`
   * is_swr CONTRAST (S0-S10, design B): the `non_local_swr` and `non_local_no_swr`
     per-bin designs are STACKED (identical (stop,bin) rows + covariates, differing
     only in `count`), tagged by `is_swr`, and `is_swr:X` interactions test whether a
-    task effect differs by SWR status. Self-history (`hist_rcos_*`) is stream-specific
-    only in its raw per-stream values; it is still wrapped inside `is_swr * BASE`
-    (S2-S10), so `is_swr:hist_rcos_k` refractoriness-by-SWR interactions ARE fit.
+    task effect differs by SWR status. Self-history (`offhist_rcos_*`) is
+    stream-specific only in its raw per-stream values; it is still wrapped inside
+    `is_swr * BASE` (S2-S10), so `is_swr:offhist_rcos_k` history-by-SWR
+    interactions ARE fit.
     Time/reward/task covariates are shared across the two rows of a bin. The within-bin
     pairing is carried by the per-session fit + across-session aggregation (no GLMM),
     matching the rest of Family B.
@@ -113,12 +117,17 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
 from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
     assert_qvals_aligned,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import (  # noqa: E402
+    at_risk_events,
+    attach_event_ends,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     DESCRIPTIVE_RATE_RUNGS,
+    PER_BIN_DESIGN,
     POST_OUTCOME_COHORT,
     POST_OUTCOME_COVARIATES,
     POST_OUTCOME_RATE_RUNGS,
@@ -356,7 +365,7 @@ def _fit_post_outcome_cohort(
     population : str
         Fit population recorded on each row (a stratum, or ``"contrast"``).
     base : dict
-        Session key columns copied onto each row.
+        Session key columns and the design label copied onto each row.
     tag_cols : tuple of str
         Extra required columns of the design (``("is_swr",)`` for the stacked
         contrast design).
@@ -435,6 +444,10 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARS,
             history_window_s=HISTORY_WINDOW_S,
+            # Every stratum is at risk outside every non-local event, so the
+            # two streams' designs keep the same bins.
+            at_risk_events=at_risk_events(onsets_g, pop),
+            offset_history=True,
         )
         for pop in STRATA
     }
@@ -450,7 +463,12 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
         frozen, freeze = freeze_per_bin_cohort(designs[pop], (), extra_columns=g_union)
         cohort_drops[pop] = freeze["n_stops_before"] - freeze["n_stops_after"]
         designs[pop] = frozen
-    base = dict(zip(SESSION_COLUMNS, keys, strict=True))
+    base = {
+        **dict(zip(SESSION_COLUMNS, keys, strict=True)),
+        # The design every row was fit on, so a reader can refuse a fit from
+        # the old all-bins design.
+        "per_bin_design": PER_BIN_DESIGN,
+    }
     # A. stratified, primary cohort
     for pop in STRATA:
         for name, (formula, need) in G_SPECS.items():
@@ -652,7 +670,9 @@ def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
         },
     )
     require_swr_source(event_table, what=str(inputs["event_table"]))
-    onsets = attach_is_swr_to_onsets(onset_table, event_table)
+    onsets = attach_event_ends(
+        attach_is_swr_to_onsets(onset_table, event_table), event_table
+    )
     # Stops dropped by the inner qvals join are the mechanism-B "qvals gap" (no fitted
     # beta/value state) -- reported per-model as n_drop_qvals_gap in the cohort audit.
     n_qvals_dropped = int(n0 - len(stop))

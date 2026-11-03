@@ -33,7 +33,9 @@ from continuum_swr_replay.analysis.replay import (
     TMAX,
     aggregate_to_timebins,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import at_risk_events
 from scripts.rate import fit_swr_contrast_rate as mod
+from tests.unit._event_end_fixtures import with_event_ends
 from tests.unit._executor_fixtures import InlineExecutor, completion_order
 
 
@@ -163,7 +165,7 @@ def _gated_session(session_date: int, n_stops: int = 24, seed: int = 0):
             )
     stops = pd.DataFrame(stop_rows)
     gated = [r["stop_id"] for i, r in enumerate(stop_rows) if i % 3 == 0]
-    return stops, pd.DataFrame(onset_rows), gated
+    return stops, with_event_ends(pd.DataFrame(onset_rows)), gated
 
 
 _without_clocks_or_shift = functools.partial(
@@ -217,9 +219,10 @@ def test_primary_rungs_share_one_cohort_unaffected_by_the_gate(two_session_fits)
 def test_post_outcome_rung_and_its_null_share_the_gated_cohort(two_session_fits):
     """G5_rpe and the G0_base refit beside it lose exactly the gated stops' bins."""
     fits, stops, _drops, gated = two_session_fits
+    onsets = _gated_session(1, seed=1)[1].assign(is_swr=False)
     design = aggregate_to_timebins(
         stops[stops.session_date == 1],
-        POPULATIONS["non_local"](_gated_session(1, seed=1)[1].assign(is_swr=False)),
+        POPULATIONS["non_local"](onsets),
         bin_s=BIN_S,
         tmax=TMAX,
         reward_basis=True,
@@ -228,6 +231,8 @@ def test_post_outcome_rung_and_its_null_share_the_gated_cohort(two_session_fits)
         stop_covariates=mod.STOP_COVARS,
         arrival_clocks=False,
         outcome_shift=False,
+        at_risk_events=at_risk_events(onsets, "non_local"),
+        offset_history=True,
     )
     gated_bins = int(design["stop_id"].isin(gated).sum())
     assert gated_bins > 0
@@ -695,6 +700,7 @@ def stubbed_load(monkeypatch):
     monkeypatch.setattr(
         mod, "attach_is_swr_to_onsets", lambda onsets, events: pd.DataFrame()
     )
+    monkeypatch.setattr(mod, "attach_event_ends", lambda onsets, events: onsets)
     return stops
 
 

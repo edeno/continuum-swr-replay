@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.replay.cohort_audit import DROP_FIELDS
+from tests.unit._event_end_fixtures import with_event_ends
 
 SC = ["animal", "session_date", "epoch"]
 
@@ -561,7 +562,7 @@ def test_contrast_ladder_rungs_share_one_cohort():
     with threadpool_limits(limits=1), pytest.MonkeyPatch.context() as patch:
         patch.setattr(mod, "aggregate_to_timebins", design)
         _, rows, skips, drops = mod._fit_one_session(
-            ("a", 1, "02_r1"), stop, pd.DataFrame(onset_rows)
+            ("a", 1, "02_r1"), stop, with_event_ends(pd.DataFrame(onset_rows))
         )
     fits = pd.DataFrame(rows)
 

@@ -95,6 +95,7 @@ def stubbed_run(monkeypatch, replay_content_root):
     monkeypatch.setattr(
         mod, "attach_is_swr_to_onsets", lambda onsets, events: pd.DataFrame()
     )
+    monkeypatch.setattr(mod, "attach_event_ends", lambda onsets, events: onsets)
     monkeypatch.setattr(mod, "fit_uncertainty_rate", _fit)
     monkeypatch.setattr(mod, "_cohort_records", lambda *a, **k: [])
     return seen, replay_content_root

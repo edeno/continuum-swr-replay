@@ -19,8 +19,9 @@ controlled for the within-stop time course and the same-event clustering:
   (``reward_history_rcos_0``, a recent-reward fraction weighted toward the
   newest outcomes: about 0.33 / 0.26 / 0.17 / 0.11 on lags 1-4).
 * ``selfhistory_autocorr.png`` -- the within-stop self-history rate ratio
-  over lags 1..10, reconstructed from the four raised-cosine basis
-  coefficients: refractory (<1) at short lags, bursty (>1) at ~100 ms.
+  over lags 1..10 after the previous event's END (the at-risk design counts
+  history from event ends), reconstructed from the four raised-cosine basis
+  coefficients.
 
 Usage:
     uv run python scripts/rate/plot_per_bin_rate_models.py
@@ -48,6 +49,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     BIN_S,
     N_HISTORY_BASIS,
     N_HISTORY_LAGS,
+    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -108,7 +110,7 @@ def _self_history_kernel(
     medians are not any fitted kernel.
     """
     out = {}
-    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+    columns = [f"coef_{c}" for c in PER_BIN_HISTORY_COLUMNS]
     for oc in POP_STYLE:
         fitted = df.loc[df.outcome == oc, columns].to_numpy(dtype=float)
         kernels = np.exp(
@@ -286,9 +288,9 @@ def plot_selfhistory(m7: pd.DataFrame) -> None:
             capsize=3,
         )
     ax.axhline(1, color="0.5", ls=":")
-    ax.set_xlabel("time lag (ms)")
+    ax.set_xlabel("time since the previous event ended (ms)")
     ax.set_ylabel("self-history rate ratio (per-session median, IQR)")
-    ax.set_title("Within-stop event autocorrelation\n(<1 = refractory, >1 = bursty)")
+    ax.set_title("Within-stop event history, from event ends\n(<1 = fewer, >1 = more)")
     ax.legend(frameon=False)
     fig.tight_layout()
     out = figure_dir("rate") / "selfhistory_autocorr.png"

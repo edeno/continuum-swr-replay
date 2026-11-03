@@ -7,6 +7,13 @@ with a ``log(immobility_duration_s)`` dwell offset, here every model is fit on t
 canonical (stop x bin) design from ``aggregate_to_timebins`` with a
 ``log(exposure)`` offset, modelling the within-stop time course explicitly.
 
+The design is the at-risk one (``PER_BIN_DESIGN``): a bin inside an ongoing
+event of the outcome's detector cannot hold an onset, so it is dropped
+(``duration_aware_history.at_risk_events``), and the self-history control is
+counted from event ends (``PER_BIN_HISTORY_ANCHORS``). Each rung's rate is
+therefore the rate at which events start while none is ongoing, not events per
+second of stop (Family A's quantity).
+
 The WHOLE ladder runs at one bin width (``BIN_S = 0.015``): for each
 (session, outcome) the design is built ONCE — carrying the reward-history
 basis and the self-history lags — then frozen to one cohort with
@@ -119,11 +126,16 @@ from continuum_swr_replay.analysis.replay.covariate_timing import (  # noqa: E40
     DERIVED_COVARIATE_SOURCES,
     assert_predictor_timing,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import (  # noqa: E402
+    at_risk_events,
+    attach_event_ends,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
+    PER_BIN_DESIGN,
     longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.per_bin_rate_model import (  # noqa: E402
@@ -218,7 +230,18 @@ def _fit_one_session(
             self_history_basis=N_HISTORY_BASIS,
             stop_covariates=STOP_COVARIATES,
             history_window_s=HISTORY_WINDOW_S,
+            at_risk_events=at_risk_events(onsets_g, outcome),
+            offset_history=True,
         )
+        # An onset of the response is at risk in its own bin by construction;
+        # one in a dropped bin means two of the detector's events overlap.
+        if design.attrs["n_onsets_not_at_risk"]:
+            raise ValueError(
+                f"{'_'.join(map(str, keys))}/{outcome}: "
+                f"{design.attrs['n_onsets_not_at_risk']} onsets fell in bins "
+                "with no at-risk time"
+            )
+        n_bins_not_at_risk = int(design.attrs["n_bins_not_at_risk"])
         if design.attrs.get("n_bins_excluded") or design.attrs.get(
             "n_bins_excluded_history"
         ):
@@ -295,6 +318,10 @@ def _fit_one_session(
                 # are fit to different rows, so this travels with every fit and
                 # invalidates a cross-clock comparison downstream.
                 "time_clock": spec.time_clock,
+                # The design the row was fit on, so a reader can refuse a fit
+                # from the old all-bins design.
+                "per_bin_design": PER_BIN_DESIGN,
+                "n_bins_not_at_risk": n_bins_not_at_risk,
                 # 'predicted' is a per-bin Series (GOF input), not tidy data.
                 **{k: v for k, v in fit.items() if k != "predicted"},
             }
@@ -337,8 +364,9 @@ def fit_per_bin_rate_models(
 ) -> pd.DataFrame:
     """One row per (outcome, model, session): coefficients + CV + GOF.
 
-    ``onsets`` must already carry the canonical ``is_swr`` column (run
-    :func:`attach_is_swr_to_onsets` once before calling). ``workers > 1``
+    ``onsets`` must already carry the canonical ``is_swr`` column and each
+    event's end (run :func:`attach_is_swr_to_onsets` and
+    :func:`attach_event_ends` once before calling). ``workers > 1``
     fans the per-session work out over processes (sessions are independent).
 
     Every rung of one (session, outcome) cell is fit to the frozen cohort, so
@@ -610,7 +638,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     # table could be regenerated mid-fit and be certified as this fit's input.
     fit_inputs = record_inputs(inputs)
     require_swr_source(event_table, what=str(inputs["event_table"]))
-    onsets = attach_is_swr_to_onsets(onset_table, event_table)
+    onsets = attach_event_ends(
+        attach_is_swr_to_onsets(onset_table, event_table), event_table
+    )
     # The cohort is applied to the whole stop table BEFORE the smoke subset (so a
     # smoke session is a cohort session) and before the per-session common-cohort
     # freeze (so the freeze reports what the fitted population is missing, not

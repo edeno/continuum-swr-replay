@@ -50,6 +50,10 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import (  # noqa: E402
+    at_risk_events,
+    attach_event_ends,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
@@ -261,7 +265,8 @@ def _refit_session(
         om &= onsets[c] == v
     pop = POPULATIONS[outcome](onsets[om])
     # the bins the published fits used: excluded time and the bins whose
-    # history window (the ladder's longest) reaches it are not analysed
+    # history window (the ladder's longest) reaches it are not analysed, nor
+    # the bins inside an ongoing event (the at-risk design)
     design = aggregate_to_timebins(
         stops_g,
         pop,
@@ -272,6 +277,8 @@ def _refit_session(
         self_history_basis=N_HISTORY_BASIS,
         stop_covariates=(*STOP_COVARIATES, "stop_start"),
         history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
+        at_risk_events=at_risk_events(onsets[om], outcome),
+        offset_history=True,
     )
     # Freeze the cohort before fitting (the fitter refuses an incomplete
     # design). This design is built for one rung, not the whole ladder, so the
@@ -465,7 +472,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     require_swr_source(stop, what=str(inputs["stop_table"]))
     require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
     require_swr_source(event_table, what=str(inputs["event_table"]))
-    onsets = attach_is_swr_to_onsets(onset_table, event_table)
+    onsets = attach_event_ends(
+        attach_is_swr_to_onsets(onset_table, event_table), event_table
+    )
     full_nl = df[(df.outcome == "non_local") & (df.model == FULL)].dropna(
         subset=["n_events"]
     )

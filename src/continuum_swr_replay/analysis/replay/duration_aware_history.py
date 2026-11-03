@@ -63,6 +63,7 @@ __all__ = [
     "HISTORY_BLOCKS",
     "POPULATION_PLAN",
     "SELF_RUNGS",
+    "at_risk_events",
     "attach_event_ends",
     "build_design",
     "fit_pooled_history",
@@ -167,6 +168,38 @@ def attach_event_ends(onsets: pd.DataFrame, event_table: pd.DataFrame) -> pd.Dat
     return out
 
 
+def at_risk_events(onsets_g: pd.DataFrame, outcome: str) -> pd.DataFrame:
+    """The events whose spans are not at risk for ``outcome``'s onsets.
+
+    Every event of the outcome's detector (:data:`POPULATION_PLAN`), whatever
+    its stream: one decoder's events never overlap, so no onset of any of its
+    streams can occur while one is ongoing. Each event covers ``[start + one
+    sample, end + one sample)`` (``end`` is its last sample), so the sample in
+    which it starts is the sample it was at risk in.
+
+    Parameters
+    ----------
+    onsets_g : pd.DataFrame
+        One session's onsets, carrying :data:`END_COLUMN`
+        (:func:`attach_event_ends`).
+    outcome : str
+        A key of :data:`POPULATION_PLAN`.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``stop_id``, ``t_since_stop_onset`` and :data:`END_COLUMN`, the
+        ``at_risk_events`` argument of ``aggregate_to_timebins``.
+    """
+    event_type, _ = POPULATION_PLAN[outcome]
+    events = onsets_g.loc[
+        onsets_g["event_type"] == event_type,
+        ["stop_id", "t_since_stop_onset", END_COLUMN],
+    ].copy()
+    events[["t_since_stop_onset", END_COLUMN]] += DECODE_SAMPLE_S
+    return events
+
+
 def build_design(
     keys: tuple,
     stops_g: pd.DataFrame,
@@ -217,13 +250,9 @@ def build_design(
         If the freeze drops a stop (every required column is complete by
         construction).
     """
-    event_type, cross_pop = POPULATION_PLAN[outcome]
+    _, cross_pop = POPULATION_PLAN[outcome]
     response = POPULATIONS[outcome](onsets_g)
-    at_risk = onsets_g.loc[
-        onsets_g["event_type"] == event_type,
-        ["stop_id", "t_since_stop_onset", END_COLUMN],
-    ].copy()
-    at_risk[["t_since_stop_onset", END_COLUMN]] += DECODE_SAMPLE_S
+    at_risk = at_risk_events(onsets_g, outcome)
     cross_kwargs: dict = {}
     rungs = SELF_RUNGS
     cross_lags, cross_basis, window_s = (

@@ -19,11 +19,12 @@ physical response bins whose left edge is at or after ``outcome_known_time``
 (reward onset for rewarded trials; latest possible pump latency, capped at
 the collapsed task visit's final departure, for omissions).
 Per population in ``{swr, non_local_swr, non_local_no_swr}`` build the per-bin
-design (carrying the uncertainty + value covariates as ``stop_covariates``) and
-fit a single spec -- ``MU_uncertainty``, defined in
+design (carrying the uncertainty + value covariates as ``stop_covariates``) on
+the at-risk bins shared with ``fit_per_bin_rate_models.py`` (a bin inside an
+ongoing event of the population's detector is dropped) and fit a single spec -- ``MU_uncertainty``, defined in
 ``model_specs.MODEL_UNCERTAINTY_RATE`` (not in ``MODEL_PER_BIN_RATE`` /
 ``all_models.pkl``). The spec is M7r (time spline +
-raised-cosine self-history + reward kernel + reward rate) plus the
+raised-cosine self-history from event ends + reward kernel) plus the
 uncertainty/value block, so the block is tested *beyond* those confounds.
 
 Collect one tidy row per (session, population) with every covariate's
@@ -91,6 +92,10 @@ from continuum_swr_replay.analysis.replay.covariates import (  # noqa: E402
     CANONICAL_SWITCH_WINDOW,
     assert_qvals_aligned,
 )
+from continuum_swr_replay.analysis.replay.duration_aware_history import (  # noqa: E402
+    at_risk_events,
+    attach_event_ends,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     record_inputs,
     write_fit_provenance,
@@ -99,6 +104,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_UNCERTAINTY_RATE,
     MU_UNCERTAINTY_COVARIATES,
     MU_UNCERTAINTY_RL_COVARIATES,
+    PER_BIN_DESIGN,
     longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
@@ -397,6 +403,8 @@ def fit_uncertainty_rate(
                 self_history_basis=N_HISTORY_BASIS,
                 stop_covariates=stop_covariates,
                 history_window_s=longest_history_window_s([MU_UNCERTAINTY]),
+                at_risk_events=at_risk_events(onsets_g, outcome),
+                offset_history=True,
             )
             design, gate_audit = _gate_bins_after_outcome(design)
             gate_audit_rows.append(
@@ -440,6 +448,7 @@ def fit_uncertainty_rate(
                 {
                     "outcome": outcome,
                     "model": MU_UNCERTAINTY.name,
+                    "per_bin_design": PER_BIN_DESIGN,
                     "post_outcome_gate": True,
                     "post_outcome_gate_rule": POST_OUTCOME_GATE_RULE,
                     "outcome_time_semantics": OUTCOME_TIME_SEMANTICS,
@@ -619,7 +628,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     require_swr_source(stop, what=str(inputs["stop_table"]))
     require_swr_source(onset_table, what=str(inputs["event_onset_table"]))
     require_swr_source(event_table, what=str(inputs["event_table"]))
-    onsets = attach_is_swr_to_onsets(onset_table, event_table)
+    onsets = attach_event_ends(
+        attach_is_swr_to_onsets(onset_table, event_table), event_table
+    )
 
     # add_uncertainty_covariates validates the upstream recent_switch_rate (the
     # only model-free covariate still fit) and derives stop-local summaries. Its

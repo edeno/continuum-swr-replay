@@ -24,6 +24,8 @@ from continuum_swr_replay.analysis.replay import (
     POPULATIONS,
     TMAX_ARRIVAL,
 )
+from continuum_swr_replay.analysis.replay.model_specs import PER_BIN_DESIGN
+from tests.unit._event_end_fixtures import with_event_ends
 from tests.unit._executor_fixtures import InlineExecutor, completion_order
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -123,7 +125,7 @@ def _toy_tables(
                         }
                     )
             sid += 1
-    return pd.DataFrame(stop_rows), pd.DataFrame(onset_rows)
+    return pd.DataFrame(stop_rows), with_event_ends(pd.DataFrame(onset_rows))
 
 
 @pytest.fixture
@@ -381,6 +383,7 @@ def stubbed_run(monkeypatch, replay_content_root):
     monkeypatch.setattr(fprm, "require_covariate_schema", lambda *a, **k: None)
     monkeypatch.setattr(fprm, "record_inputs", lambda inputs: {})
     monkeypatch.setattr(fprm, "attach_is_swr_to_onsets", lambda o, e: pd.DataFrame())
+    monkeypatch.setattr(fprm, "attach_event_ends", lambda o, e: o)
     monkeypatch.setattr(fprm, "fit_per_bin_rate_models", _fit)
     monkeypatch.setattr(fprm, "_cohort_records", lambda *a, **k: [])
     monkeypatch.setattr(
@@ -534,3 +537,32 @@ def test_stop_sessions_without_onsets_are_named_not_dropped_silently(
     fitted = set(map(tuple, out[list(fprm.SESSION_COLUMNS)].drop_duplicates().values))
     assert silent not in fitted
     assert len(fitted) == stop.groupby(list(fprm.SESSION_COLUMNS)).ngroups - 1
+
+
+def test_bins_inside_an_event_are_not_at_risk(without_outcome_shift):
+    """Events lasting several bins leave the design: the fits are on fewer bins
+    than the stops hold, every row says so, and no onset was in a dropped bin
+    (the runner raises if one were)."""
+    stop, onsets = _toy_tables()
+    long_events = with_event_ends(onsets, max_duration_s=0.06)
+    with threadpool_limits(limits=1):
+        out = fprm.fit_per_bin_rate_models(
+            stop, long_events, run_cv=False, run_gof=False
+        )
+        short = fprm.fit_per_bin_rate_models(
+            stop,
+            with_event_ends(onsets, max_duration_s=1e-4),
+            run_cv=False,
+            run_gof=False,
+        )
+
+    assert (out["per_bin_design"] == PER_BIN_DESIGN).all()
+    assert (out["n_bins_not_at_risk"] > 0).all()
+    keys = ["animal", "session_date", "epoch", "outcome", "model"]
+    merged = out.merge(short, on=keys, suffixes=("_long", "_short"))
+    assert len(merged) == len(out)
+    # Longer events cover more bins, so fewer remain at risk.
+    assert (merged["n_bins_long"] < merged["n_bins_short"]).all()
+    history = MODEL_PER_BIN_RATE["M7r_time_histcos_rew"]
+    assert "offhist_rcos_0" in history.formula()
+    assert "+ hist_rcos_0" not in history.formula()

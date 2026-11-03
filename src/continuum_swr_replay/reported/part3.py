@@ -78,6 +78,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     ARRIVAL_SPLINE_KNOTS,
     BIN_S,
     MODEL_PER_BIN_RATE,
+    PER_BIN_DESIGN,
+    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
@@ -583,8 +585,13 @@ def per_bin_values(
     null = fits[fits["model"] == "M0_const"]
     stops = null.groupby("outcome")["n_stops"].sum()
     bins = null.groupby("outcome")["n_bins"].sum()
+    # Every population is fit on the same stops. The at-risk bins are the
+    # detector's: the non-local populations share theirs (no bin inside any
+    # non-local event), detected SWR has its own (no bin inside a Kay SWR).
+    non_local_bins = bins.drop("swr")
     _require(
-        stops.nunique() == 1 and bins.nunique() == 1, "populations differ in cohort"
+        stops.nunique() == 1 and non_local_bins.nunique() == 1,
+        "populations differ in cohort",
     )
     values += [
         make(
@@ -603,10 +610,19 @@ def per_bin_values(
         ),
         make(
             "rate_bins",
-            bins.iloc[0],
+            non_local_bins.iloc[0],
             "count",
             "count",
-            "15 ms bins in the frozen common cohort",
+            "15 ms bins at risk in the frozen common cohort, non-local populations "
+            "(the bins inside a non-local event are not at risk)",
+        ),
+        make(
+            "rate_bins_swr",
+            bins["swr"],
+            "count",
+            "count",
+            "15 ms bins at risk in the frozen common cohort, detected SWR (the bins "
+            "inside a Kay SWR are not at risk)",
         ),
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
@@ -1089,7 +1105,7 @@ def per_bin_detail_values(
     make = _value_factory(source, ("19c",), ("supplement",))
     values: list[Value] = []
     null = fits[fits["model"] == "M0_const"]
-    hist_columns = [f"coef_hist_rcos_{k}" for k in range(4)]
+    hist_columns = [f"coef_{c}" for c in PER_BIN_HISTORY_COLUMNS]
     for word, (outcome, label) in RATE_POPULATIONS.items():
         rate = np.exp(_rung(fits, "M0_const", outcome)["coef_Intercept"].dropna())
         raw = _immediate_session(_rung(fits, "M1_rew", outcome))
@@ -1098,7 +1114,7 @@ def per_bin_detail_values(
         hist_fits = full.dropna(subset=hist_columns)
         flagged = hist_fits["separated_terms"].map(
             lambda v: isinstance(v, str)
-            and any(t.startswith("hist_rcos") for t in v.split("|"))
+            and any(t in PER_BIN_HISTORY_COLUMNS for t in v.split("|"))
         )
         marginal = _delta_aic(fits, "M1_rew", "M0_const", outcome)
         values += [
@@ -1154,7 +1170,8 @@ def per_bin_detail_values(
                 flagged.mean(),
                 "fraction",
                 "pct",
-                f"{label}: share of those fits flagging a hist_rcos term separated",
+                f"{label}: share of those fits flagging a self-history term "
+                "(counted from event ends) separated",
             ),
         ]
         for k, bump in ((1, "one"), (2, "two")):
@@ -3124,6 +3141,21 @@ def _check_fresh(artifact: Path) -> None:
         raise ValueError(f"{artifact}: stale against {stale}; refit before summarizing")
 
 
+def _read_per_bin_fits(path: Path) -> pd.DataFrame:
+    """A per-bin rate fit table, refused unless every row is on the at-risk design.
+
+    Fits from the old all-bins, onset-history design carry no
+    ``per_bin_design`` column; their ``hist_rcos`` terms are not the
+    ``PER_BIN_HISTORY_COLUMNS`` this module reads.
+    """
+    fits = pd.read_pickle(path)
+    if "per_bin_design" not in fits or (fits["per_bin_design"] != PER_BIN_DESIGN).any():
+        raise ValueError(
+            f"{path}: not fit on the {PER_BIN_DESIGN!r} per-bin design; refit it"
+        )
+    return fits
+
+
 def rel(path: Path) -> str:
     """``path`` relative to the repository when it is under it."""
     return (
@@ -3158,11 +3190,11 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     record(contrast_audited)
     summary.add(
         *rate_contrast_separation_values(
-            pd.read_pickle(inputs.rate_contrast),
+            _read_per_bin_fits(inputs.rate_contrast),
             f"{rel(inputs.rate_contrast)} (rate.swr_contrast.at_well)",
         )
     )
-    in_transit = pd.read_pickle(inputs.per_bin_in_transit)
+    in_transit = _read_per_bin_fits(inputs.per_bin_in_transit)
     make_transit = _value_factory(
         f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.in_transit)",
         ("19c",),
@@ -3190,8 +3222,8 @@ def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
     )
     summary.add(*cohort_audit_values(inputs))
     record(inputs.per_bin_audit, inputs.per_stop_audit)
-    per_bin = pd.read_pickle(inputs.per_bin)
-    per_bin_all = pd.read_pickle(inputs.per_bin_all_stops)
+    per_bin = _read_per_bin_fits(inputs.per_bin)
+    per_bin_all = _read_per_bin_fits(inputs.per_bin_all_stops)
     summary.add(
         *per_bin_values(
             per_bin,
