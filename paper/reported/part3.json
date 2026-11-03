@@ -3,15 +3,15 @@
  "part": 3,
  "title": "behavior",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "5609943e9472",
+ "commit": "c96c9133ef6c-dirty",
  "inputs": [
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl",
-   "sha256": "dc00fd6ed342a6ffde4e9714129ac44cfa69c52703cb4be80ec35c062e461110"
+   "sha256": "1cd559898757cf88d7eeeb79ecc922a5187adaa7391898d1e97e4204f9f9c649"
   },
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/per_bin_rate_cohort_audit.csv",
-   "sha256": "96f71710dc10bf9cc91f07b9f92cac78ce3455979c8154329322b170da7ffa61"
+   "sha256": "1eee49dd78c5d60a002a70e7e02edaea81ff99896d7ad4d53e846743a13bed88"
   },
   {
    "path": "Processed-Data/replay_content/models_per_stop_rate/all_models_cohort_audit.csv",
@@ -19,19 +19,19 @@
   },
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl",
-   "sha256": "46f5b3d5a8e223aa3f0447ee5242cb4b805ab0c223e20464ee9825f5f1216750"
+   "sha256": "19c22d64f3679a14921371f2fe64b0fa641196817e61bb55a7db4dec3f3856bc"
   },
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl",
-   "sha256": "43f4ac0c74ffd996881ab0bc7f520c944b1337381dc9f1a114012c801a719c9a"
+   "sha256": "50b6b04802e990eddbda2cfefbe26223e4f6388ffb975e609ad6cdfd88adbc76"
   },
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/all_models_intransit.pkl",
-   "sha256": "f77188ed8ae20fd64dda960a07adeb4da18f9cfc0f9be383ec0e092029d681ce"
+   "sha256": "ed18152a208754468bc8ad5ecc490e298fb19c135f3a234b56ecc20c12fa5bb0"
   },
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate.pkl",
-   "sha256": "1f2aea985014e999bcfe4277cb627bcc2e1b01c790402d44bd0f32ba3614726b"
+   "sha256": "2aa79c4a7feb2ba6ba63b27c23c78ddad6b06fa51e086b32968b9b61ba579f09"
   },
   {
    "path": "Processed-Data/replay_content/models_per_stop_rate/all_models.pkl",
@@ -6079,7 +6079,7 @@
    "pending": null
   },
   "rate_allstops_arrival_bins_before": {
-   "value": 8230251,
+   "value": 7943566,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6094,7 +6094,7 @@
    "pending": null
   },
   "rate_allstops_arrival_bins_dropped": {
-   "value": 92849,
+   "value": 89838,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6109,7 +6109,7 @@
    "pending": null
   },
   "rate_allstops_arrival_bins_dropped_fraction": {
-   "value": 0.011281429934518401,
+   "value": 0.011309530253792818,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -6268,7 +6268,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_s_high": {
-   "value": 5.7250000000000005,
+   "value": 5.7875000000000005,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6284,7 +6284,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_s_low": {
-   "value": 2.9125,
+   "value": 3.0375,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6300,7 +6300,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_s_non_local": {
-   "value": 2.9125,
+   "value": 3.0375,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6316,7 +6316,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_s_non_local_no_swr": {
-   "value": 5.7250000000000005,
+   "value": 5.7875000000000005,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6332,7 +6332,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_s_non_local_swr": {
-   "value": 3.0875,
+   "value": 3.4875000000000003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6348,7 +6348,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_s_swr": {
-   "value": 2.975,
+   "value": 3.1125000000000003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6380,7 +6380,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_sessions_non_local_no_swr": {
-   "value": 112,
+   "value": 107,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6396,7 +6396,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_sessions_non_local_swr": {
-   "value": 80,
+   "value": 81,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6412,7 +6412,7 @@
    "pending": null
   },
   "rate_allstops_arrival_peak_sessions_swr": {
-   "value": 94,
+   "value": 89,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6443,7 +6443,7 @@
    "pending": null
   },
   "rate_allstops_arrival_window_bins": {
-   "value": 7374525,
+   "value": 7136257,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6458,7 +6458,7 @@
    "pending": null
   },
   "rate_allstops_arrival_window_fraction": {
-   "value": 0.9062505453214674,
+   "value": 0.9086458048967319,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -6473,7 +6473,7 @@
    "pending": null
   },
   "rate_allstops_clock_ks_high": {
-   "value": 0.0922612536897832,
+   "value": 0.0899607384783912,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -6489,7 +6489,7 @@
    "pending": null
   },
   "rate_allstops_clock_ks_low": {
-   "value": 0.07970131927866533,
+   "value": 0.07550480522318836,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -6505,7 +6505,7 @@
    "pending": null
   },
   "rate_allstops_clock_ks_non_local": {
-   "value": 0.08107019078140913,
+   "value": 0.08029705525978019,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -6521,7 +6521,7 @@
    "pending": null
   },
   "rate_allstops_clock_ks_non_local_no_swr": {
-   "value": 0.07970131927866533,
+   "value": 0.07550480522318836,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -6537,7 +6537,7 @@
    "pending": null
   },
   "rate_allstops_clock_ks_non_local_swr": {
-   "value": 0.0922612536897832,
+   "value": 0.0899607384783912,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -6553,7 +6553,7 @@
    "pending": null
   },
   "rate_allstops_clock_ks_swr": {
-   "value": 0.08334760074838882,
+   "value": 0.08324741052531921,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -6569,7 +6569,7 @@
    "pending": null
   },
   "rate_allstops_frozen_bins": {
-   "value": 8137402,
+   "value": 7853728,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6584,7 +6584,7 @@
    "pending": null
   },
   "rate_allstops_immediate_animal_non_local": {
-   "value": 1.921560046681572,
+   "value": 2.020633743471912,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -6600,7 +6600,7 @@
    "pending": null
   },
   "rate_allstops_immediate_animal_non_local_no_swr": {
-   "value": 0.8356164597762447,
+   "value": 0.9021313919528305,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -6616,7 +6616,7 @@
    "pending": null
   },
   "rate_allstops_immediate_animal_non_local_swr": {
-   "value": 8.557609162861961,
+   "value": 8.510651823270422,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -6632,7 +6632,7 @@
    "pending": null
   },
   "rate_allstops_immediate_animal_swr": {
-   "value": 5.748859870462007,
+   "value": 5.392310645756021,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -6728,7 +6728,7 @@
    "pending": null
   },
   "rate_allstops_immediate_session_no_swr": {
-   "value": 0.830182977492963,
+   "value": 0.8805643968971796,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -6744,7 +6744,7 @@
    "pending": null
   },
   "rate_allstops_immediate_session_p_no_swr": {
-   "value": 0.7449024949521185,
+   "value": 0.5193019166215158,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -6776,7 +6776,7 @@
    "pending": null
   },
   "rate_allstops_kernel_lag_one_no_swr": {
-   "value": 0.9238245410902554,
+   "value": 0.9317246881419474,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -6792,7 +6792,7 @@
    "pending": null
   },
   "rate_allstops_kernel_lag_one_p_no_swr": {
-   "value": 0.029084880955327228,
+   "value": 0.06751050008008437,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -6808,7 +6808,7 @@
    "pending": null
   },
   "rate_allstops_marginal_reward_child_better_fraction_non_local_no_swr": {
-   "value": 0.44214876033057854,
+   "value": 0.47107438016528924,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -6823,7 +6823,7 @@
    "pending": null
   },
   "rate_allstops_marginal_reward_delta_aic_non_local_no_swr": {
-   "value": 0.6494514490491383,
+   "value": 0.34215742047217645,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -6838,7 +6838,7 @@
    "pending": null
   },
   "rate_allstops_paired_p": {
-   "value": 7.034129139407194e-25,
+   "value": 2.3050168769726666e-24,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -6854,7 +6854,7 @@
    "pending": null
   },
   "rate_allstops_paired_positive_fraction": {
-   "value": 0.8302752293577982,
+   "value": 0.839622641509434,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -6870,7 +6870,7 @@
    "pending": null
   },
   "rate_allstops_paired_sessions": {
-   "value": 218,
+   "value": 212,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -6966,7 +6966,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_s_high": {
-   "value": 2.98,
+   "value": 2.995,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6982,7 +6982,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_s_low": {
-   "value": 2.565,
+   "value": 2.5300000000000002,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -6998,7 +6998,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_s_non_local": {
-   "value": 2.98,
+   "value": 2.995,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7030,7 +7030,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_s_non_local_swr": {
-   "value": 2.565,
+   "value": 2.5300000000000002,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7046,7 +7046,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_s_swr": {
-   "value": 2.795,
+   "value": 2.6500000000000004,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7094,7 +7094,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_sessions_non_local_swr": {
-   "value": 204,
+   "value": 203,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7110,7 +7110,7 @@
    "pending": null
   },
   "rate_allstops_time_peak_sessions_swr": {
-   "value": 236,
+   "value": 235,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7250,7 +7250,7 @@
    "pending": null
   },
   "rate_arrival_full_cv_nan_fraction_non_local": {
-   "value": 0.9529914529914529,
+   "value": 0.9279661016949152,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7280,7 +7280,7 @@
    "pending": null
   },
   "rate_arrival_full_sessions_non_local": {
-   "value": 234,
+   "value": 236,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7310,7 +7310,7 @@
    "pending": null
   },
   "rate_arrival_full_sessions_non_local_swr": {
-   "value": 219,
+   "value": 221,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7325,7 +7325,7 @@
    "pending": null
   },
   "rate_arrival_full_sessions_swr": {
-   "value": 231,
+   "value": 237,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7420,7 +7420,7 @@
    "pending": null
   },
   "rate_arrival_peak_s_high": {
-   "value": 4.0,
+   "value": 5.2125,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7452,7 +7452,7 @@
    "pending": null
   },
   "rate_arrival_peak_s_non_local": {
-   "value": 3.2125,
+   "value": 3.0125,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7468,7 +7468,7 @@
    "pending": null
   },
   "rate_arrival_peak_s_non_local_no_swr": {
-   "value": 4.0,
+   "value": 5.2125,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7500,7 +7500,7 @@
    "pending": null
   },
   "rate_arrival_peak_s_swr": {
-   "value": 3.075,
+   "value": 3.1125000000000003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -7516,7 +7516,7 @@
    "pending": null
   },
   "rate_arrival_peak_sessions_non_local": {
-   "value": 99,
+   "value": 105,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7532,7 +7532,7 @@
    "pending": null
   },
   "rate_arrival_peak_sessions_non_local_no_swr": {
-   "value": 96,
+   "value": 97,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7548,7 +7548,7 @@
    "pending": null
   },
   "rate_arrival_peak_sessions_non_local_swr": {
-   "value": 83,
+   "value": 80,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7564,7 +7564,7 @@
    "pending": null
   },
   "rate_arrival_peak_sessions_swr": {
-   "value": 86,
+   "value": 89,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7580,7 +7580,7 @@
    "pending": null
   },
   "rate_arrival_separated_fraction_high": {
-   "value": 0.630901287553648,
+   "value": 0.6396396396396397,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7596,7 +7596,7 @@
    "pending": null
   },
   "rate_arrival_separated_fraction_low": {
-   "value": 0.5822784810126582,
+   "value": 0.5606694560669456,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7612,7 +7612,7 @@
    "pending": null
   },
   "rate_arrival_separated_fraction_non_local": {
-   "value": 0.5822784810126582,
+   "value": 0.5606694560669456,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7628,7 +7628,7 @@
    "pending": null
   },
   "rate_arrival_separated_fraction_non_local_no_swr": {
-   "value": 0.5932203389830508,
+   "value": 0.5854700854700855,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7644,7 +7644,7 @@
    "pending": null
   },
   "rate_arrival_separated_fraction_non_local_swr": {
-   "value": 0.6261261261261262,
+   "value": 0.6396396396396397,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7660,7 +7660,7 @@
    "pending": null
   },
   "rate_arrival_separated_fraction_swr": {
-   "value": 0.630901287553648,
+   "value": 0.6212765957446809,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7676,7 +7676,7 @@
    "pending": null
   },
   "rate_arrival_time_cv_nan_fraction_non_local": {
-   "value": 0.9240506329113924,
+   "value": 0.9246861924686193,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -7706,7 +7706,7 @@
    "pending": null
   },
   "rate_arrival_time_sessions_non_local": {
-   "value": 237,
+   "value": 239,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7721,7 +7721,7 @@
    "pending": null
   },
   "rate_arrival_time_sessions_non_local_no_swr": {
-   "value": 236,
+   "value": 234,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7751,7 +7751,7 @@
    "pending": null
   },
   "rate_arrival_time_sessions_swr": {
-   "value": 233,
+   "value": 235,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -7841,7 +7841,7 @@
    "pending": null
   },
   "rate_baseline_lower_quartile_non_local": {
-   "value": 0.3246610367050303,
+   "value": 0.33483909647651466,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -7856,7 +7856,7 @@
    "pending": null
   },
   "rate_baseline_lower_quartile_non_local_no_swr": {
-   "value": 0.1476769067273786,
+   "value": 0.1522786142992368,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -7871,7 +7871,7 @@
    "pending": null
   },
   "rate_baseline_lower_quartile_non_local_swr": {
-   "value": 0.17508359050453448,
+   "value": 0.18149436451928325,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -7886,7 +7886,7 @@
    "pending": null
   },
   "rate_baseline_lower_quartile_swr": {
-   "value": 0.22948911082610482,
+   "value": 0.23514445487702568,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -7901,11 +7901,11 @@
    "pending": null
   },
   "rate_baseline_non_local": {
-   "value": 0.43054203178597666,
+   "value": 0.4469268488626452,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
-   "description": "non-local (all): median over sessions of exp(intercept) of M0_const, events per second of immobility",
+   "description": "non-local (all): median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing)",
    "claims": [
     "19c"
    ],
@@ -7917,11 +7917,11 @@
    "pending": null
   },
   "rate_baseline_non_local_no_swr": {
-   "value": 0.21571741285725543,
+   "value": 0.22564248633001027,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
-   "description": "non-local without SWR: median over sessions of exp(intercept) of M0_const, events per second of immobility",
+   "description": "non-local without SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing)",
    "claims": [
     "19c"
    ],
@@ -7933,11 +7933,11 @@
    "pending": null
   },
   "rate_baseline_non_local_swr": {
-   "value": 0.211625226612289,
+   "value": 0.21952217623904835,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
-   "description": "non-local with SWR: median over sessions of exp(intercept) of M0_const, events per second of immobility",
+   "description": "non-local with SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing)",
    "claims": [
     "19c"
    ],
@@ -7949,7 +7949,7 @@
    "pending": null
   },
   "rate_baseline_ratio_no_swr_to_swr": {
-   "value": 0.7742379766199711,
+   "value": 0.7822954499279421,
    "kind": "quantity",
    "style": "dec2",
    "unit": "ratio",
@@ -7964,7 +7964,7 @@
    "pending": null
   },
   "rate_baseline_ratio_no_swr_to_swr_p": {
-   "value": 8.29614620332791e-11,
+   "value": 8.786017104820493e-10,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -7979,7 +7979,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_coupled_to_no_swr": {
-   "value": 0.9775337790361005,
+   "value": 0.9775337790368815,
    "kind": "quantity",
    "style": "dec2",
    "unit": "ratio",
@@ -7994,7 +7994,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_coupled_to_no_swr_p": {
-   "value": 0.2992910450224049,
+   "value": 0.29779869197949616,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -8009,7 +8009,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_coupled_to_non_local": {
-   "value": 0.49431946450514,
+   "value": 0.4943194645086318,
    "kind": "quantity",
    "style": "dec2",
    "unit": "ratio",
@@ -8039,7 +8039,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_coupled_to_swr": {
-   "value": 0.802680788413084,
+   "value": 0.8152086157215214,
    "kind": "quantity",
    "style": "dec2",
    "unit": "ratio",
@@ -8054,7 +8054,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_coupled_to_swr_p": {
-   "value": 2.991127787515412e-41,
+   "value": 4.330912459839274e-40,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -8069,7 +8069,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_to_non_local": {
-   "value": 0.6322056686909229,
+   "value": 0.627723613102613,
    "kind": "quantity",
    "style": "dec2",
    "unit": "ratio",
@@ -8084,7 +8084,7 @@
    "pending": null
   },
   "rate_baseline_ratio_swr_to_non_local_p": {
-   "value": 6.32601054892088e-39,
+   "value": 5.2169243844825253e-39,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -8099,11 +8099,11 @@
    "pending": null
   },
   "rate_baseline_swr": {
-   "value": 0.2667496326526487,
+   "value": 0.27269869960626014,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
-   "description": "detected SWR: median over sessions of exp(intercept) of M0_const, events per second of immobility",
+   "description": "detected SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing)",
    "claims": [
     "19c"
    ],
@@ -8115,7 +8115,7 @@
    "pending": null
   },
   "rate_baseline_upper_quartile_non_local": {
-   "value": 0.562131793672206,
+   "value": 0.5888275954691696,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -8130,7 +8130,7 @@
    "pending": null
   },
   "rate_baseline_upper_quartile_non_local_no_swr": {
-   "value": 0.29975066967522807,
+   "value": 0.3134604367611391,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -8145,7 +8145,7 @@
    "pending": null
   },
   "rate_baseline_upper_quartile_non_local_swr": {
-   "value": 0.2551258998958879,
+   "value": 0.26805103827799664,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -8160,7 +8160,7 @@
    "pending": null
   },
   "rate_baseline_upper_quartile_swr": {
-   "value": 0.30661224220960304,
+   "value": 0.3169174982125379,
    "kind": "quantity",
    "style": "dec2",
    "unit": "events/s",
@@ -8175,7 +8175,7 @@
    "pending": null
   },
   "rate_bin_count_non_local": {
-   "value": 0.00645813047678965,
+   "value": 0.006703902732939678,
    "kind": "quantity",
    "style": "sig2",
    "unit": "events/bin",
@@ -8190,7 +8190,7 @@
    "pending": null
   },
   "rate_bin_count_non_local_no_swr": {
-   "value": 0.0032357611928588315,
+   "value": 0.003384637294950154,
    "kind": "quantity",
    "style": "sig2",
    "unit": "events/bin",
@@ -8205,7 +8205,7 @@
    "pending": null
   },
   "rate_bin_count_non_local_swr": {
-   "value": 0.0031743783991843347,
+   "value": 0.003292832643585725,
    "kind": "quantity",
    "style": "sig2",
    "unit": "events/bin",
@@ -8220,7 +8220,7 @@
    "pending": null
   },
   "rate_bin_count_swr": {
-   "value": 0.004001244489789731,
+   "value": 0.004090480494093902,
    "kind": "quantity",
    "style": "sig2",
    "unit": "events/bin",
@@ -8235,11 +8235,27 @@
    "pending": null
   },
   "rate_bins": {
-   "value": 7535050,
+   "value": 7280203,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "15 ms bins in the frozen common cohort",
+   "description": "15 ms bins at risk in the frozen common cohort, non-local populations (the bins inside a non-local event are not at risk)",
+   "claims": [
+    "19c"
+   ],
+   "used_in": [
+    "paper",
+    "supplement"
+   ],
+   "source": "Processed-Data/replay_content/models_per_bin_rate/all_models.pkl (rate.per_bin.at_well) and Processed-Data/replay_content/models_per_bin_rate/all_models_allstops.pkl (rate.per_bin.all_stops)",
+   "pending": null
+  },
+  "rate_bins_swr": {
+   "value": 7359637,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "15 ms bins at risk in the frozen common cohort, detected SWR (the bins inside a Kay SWR are not at risk)",
    "claims": [
     "19c"
    ],
@@ -8311,7 +8327,7 @@
    "pending": null
   },
   "rate_bump_one_positive_fraction_non_local": {
-   "value": 0.1825726141078838,
+   "value": 0.175,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8326,7 +8342,7 @@
    "pending": null
   },
   "rate_bump_one_positive_fraction_non_local_no_swr": {
-   "value": 0.3623853211009174,
+   "value": 0.3395348837209302,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8341,7 +8357,7 @@
    "pending": null
   },
   "rate_bump_one_positive_fraction_non_local_swr": {
-   "value": 0.13777777777777778,
+   "value": 0.13615023474178403,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8356,7 +8372,7 @@
    "pending": null
   },
   "rate_bump_one_positive_fraction_swr": {
-   "value": 0.14583333333333334,
+   "value": 0.14225941422594143,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8371,7 +8387,7 @@
    "pending": null
   },
   "rate_bump_one_session_non_local": {
-   "value": 0.05080950168106021,
+   "value": 0.05475376667479944,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8386,7 +8402,7 @@
    "pending": null
   },
   "rate_bump_one_session_non_local_no_swr": {
-   "value": 0.17491452385009384,
+   "value": 0.16477222985437903,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8401,7 +8417,7 @@
    "pending": null
   },
   "rate_bump_one_session_non_local_swr": {
-   "value": 0.008750849527498447,
+   "value": 0.014612174702147315,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8416,7 +8432,7 @@
    "pending": null
   },
   "rate_bump_one_session_swr": {
-   "value": 0.021424108339494544,
+   "value": 0.023725681278485067,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8506,7 +8522,7 @@
    "pending": null
   },
   "rate_bump_two_positive_fraction_non_local_no_swr": {
-   "value": 0.6101694915254238,
+   "value": 0.6317991631799164,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8521,7 +8537,7 @@
    "pending": null
   },
   "rate_bump_two_positive_fraction_non_local_swr": {
-   "value": 0.8340248962655602,
+   "value": 0.8333333333333334,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8551,7 +8567,7 @@
    "pending": null
   },
   "rate_bump_two_session_non_local": {
-   "value": 5.228910881735936,
+   "value": 4.816671455256652,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8566,7 +8582,7 @@
    "pending": null
   },
   "rate_bump_two_session_non_local_no_swr": {
-   "value": 2.446628233203664,
+   "value": 2.762044011585348,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8581,7 +8597,7 @@
    "pending": null
   },
   "rate_bump_two_session_non_local_swr": {
-   "value": 14.922948492546887,
+   "value": 13.526625941254311,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8596,7 +8612,7 @@
    "pending": null
   },
   "rate_bump_two_session_swr": {
-   "value": 7.690815907419913,
+   "value": 7.234809346273589,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -8611,7 +8627,7 @@
    "pending": null
   },
   "rate_clock_ks_high": {
-   "value": 0.09013862986990567,
+   "value": 0.08611982088127601,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -8627,7 +8643,7 @@
    "pending": null
   },
   "rate_clock_ks_low": {
-   "value": 0.07546996353838897,
+   "value": 0.07547705810010151,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -8643,7 +8659,7 @@
    "pending": null
   },
   "rate_clock_ks_non_local": {
-   "value": 0.07546996353838897,
+   "value": 0.07547705810010151,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -8659,7 +8675,7 @@
    "pending": null
   },
   "rate_clock_ks_non_local_no_swr": {
-   "value": 0.08334477967258333,
+   "value": 0.08336693031080003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -8675,7 +8691,7 @@
    "pending": null
   },
   "rate_clock_ks_non_local_swr": {
-   "value": 0.09013862986990567,
+   "value": 0.08530052646937654,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -8691,7 +8707,7 @@
    "pending": null
   },
   "rate_clock_ks_swr": {
-   "value": 0.08704675519997432,
+   "value": 0.08611982088127601,
    "kind": "quantity",
    "style": "dec2",
    "unit": "",
@@ -8707,7 +8723,7 @@
    "pending": null
   },
   "rate_conditional_reward_delta_aic_non_local": {
-   "value": 1.0145793751977408,
+   "value": 1.0485462821129659,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -8723,7 +8739,7 @@
    "pending": null
   },
   "rate_conditional_reward_delta_aic_non_local_no_swr": {
-   "value": 2.440390350699431,
+   "value": 2.155353245918036,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -8739,7 +8755,7 @@
    "pending": null
   },
   "rate_conditional_reward_delta_aic_non_local_swr": {
-   "value": 1.6232117924851082,
+   "value": 1.7615322306031658,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -8755,7 +8771,7 @@
    "pending": null
   },
   "rate_conditional_reward_delta_aic_swr": {
-   "value": 0.9390887763705678,
+   "value": 1.1976235447071986,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -8786,7 +8802,7 @@
    "pending": null
   },
   "rate_contrast_expanded_fits_high": {
-   "value": 240,
+   "value": 242,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8801,7 +8817,7 @@
    "pending": null
   },
   "rate_contrast_expanded_fits_low": {
-   "value": 235,
+   "value": 242,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8816,7 +8832,7 @@
    "pending": null
   },
   "rate_contrast_expanded_flagged_high": {
-   "value": 196,
+   "value": 239,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8831,7 +8847,7 @@
    "pending": null
   },
   "rate_contrast_expanded_flagged_low": {
-   "value": 173,
+   "value": 223,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8846,7 +8862,7 @@
    "pending": null
   },
   "rate_contrast_expanded_separated_high": {
-   "value": 206,
+   "value": 239,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8861,7 +8877,7 @@
    "pending": null
   },
   "rate_contrast_expanded_separated_low": {
-   "value": 193,
+   "value": 231,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8876,7 +8892,7 @@
    "pending": null
   },
   "rate_contrast_most_dropped": {
-   "value": 23,
+   "value": 31,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8891,7 +8907,7 @@
    "pending": null
   },
   "rate_contrast_most_dropped_of": {
-   "value": 236,
+   "value": 242,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8921,7 +8937,7 @@
    "pending": null
   },
   "rate_contrast_plain_flagged": {
-   "value": 0,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -8936,7 +8952,7 @@
    "pending": null
   },
   "rate_contrast_separated_fraction_post_outcome": {
-   "value": 0.6680613668061367,
+   "value": 0.6790633608815427,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8951,7 +8967,7 @@
    "pending": null
   },
   "rate_contrast_separated_fraction_primary": {
-   "value": 0.7052238805970149,
+   "value": 0.7607897153351699,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8966,7 +8982,7 @@
    "pending": null
   },
   "rate_contrast_term_separated_fraction": {
-   "value": 0.7494145199063232,
+   "value": 0.938475665748393,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -8981,7 +8997,7 @@
    "pending": null
   },
   "rate_contrast_terms_losing_sessions": {
-   "value": 2,
+   "value": 1,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9012,7 +9028,7 @@
    "pending": null
   },
   "rate_full_sessions_non_local_no_swr": {
-   "value": 240,
+   "value": 242,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9060,11 +9076,11 @@
    "pending": null
   },
   "rate_hist_separated_fraction_non_local": {
-   "value": 0.2809917355371901,
+   "value": 0.012396694214876033,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "non-local (all): share of those fits flagging a hist_rcos term separated",
+   "description": "non-local (all): share of those fits flagging a self-history term (counted from event ends) separated",
    "claims": [
     "19c"
    ],
@@ -9075,11 +9091,11 @@
    "pending": null
   },
   "rate_hist_separated_fraction_non_local_no_swr": {
-   "value": 0.3958333333333333,
+   "value": 0.2396694214876033,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "non-local without SWR: share of those fits flagging a hist_rcos term separated",
+   "description": "non-local without SWR: share of those fits flagging a self-history term (counted from event ends) separated",
    "claims": [
     "19c"
    ],
@@ -9090,11 +9106,11 @@
    "pending": null
   },
   "rate_hist_separated_fraction_non_local_swr": {
-   "value": 0.41735537190082644,
+   "value": 0.1322314049586777,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "non-local with SWR: share of those fits flagging a hist_rcos term separated",
+   "description": "non-local with SWR: share of those fits flagging a self-history term (counted from event ends) separated",
    "claims": [
     "19c"
    ],
@@ -9105,11 +9121,11 @@
    "pending": null
   },
   "rate_hist_separated_fraction_swr": {
-   "value": 0.4049586776859504,
+   "value": 0.024793388429752067,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "detected SWR: share of those fits flagging a hist_rcos term separated",
+   "description": "detected SWR: share of those fits flagging a self-history term (counted from event ends) separated",
    "claims": [
     "19c"
    ],
@@ -9135,7 +9151,7 @@
    "pending": null
   },
   "rate_hist_sessions_non_local_no_swr": {
-   "value": 240,
+   "value": 242,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9180,7 +9196,7 @@
    "pending": null
   },
   "rate_immediate_animal_non_local": {
-   "value": 2.9118383779024852,
+   "value": 2.911020061575844,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9196,7 +9212,7 @@
    "pending": null
   },
   "rate_immediate_animal_non_local_no_swr": {
-   "value": 1.2435925641872885,
+   "value": 1.3376494228453524,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9212,7 +9228,7 @@
    "pending": null
   },
   "rate_immediate_animal_non_local_swr": {
-   "value": 8.828947418199903,
+   "value": 9.326585842425349,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9228,7 +9244,7 @@
    "pending": null
   },
   "rate_immediate_animal_swr": {
-   "value": 5.3533851749207475,
+   "value": 5.326717474581946,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9308,7 +9324,7 @@
    "pending": null
   },
   "rate_immediate_ratio_swr_to_no_swr": {
-   "value": 6.999797978588438,
+   "value": 6.651921911981918,
    "kind": "quantity",
    "style": "sig2",
    "unit": "ratio",
@@ -9388,7 +9404,7 @@
    "pending": null
   },
   "rate_immediate_session_non_local": {
-   "value": 3.2680354822073197,
+   "value": 3.1810944854620393,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9404,7 +9420,7 @@
    "pending": null
   },
   "rate_immediate_session_non_local_no_swr": {
-   "value": 1.4152678160728829,
+   "value": 1.4726137244474442,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9420,7 +9436,7 @@
    "pending": null
   },
   "rate_immediate_session_non_local_swr": {
-   "value": 9.906588798108238,
+   "value": 9.795711501537257,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9436,7 +9452,7 @@
    "pending": null
   },
   "rate_immediate_session_p_non_local": {
-   "value": 1.3342887897533539e-22,
+   "value": 5.934683456565005e-23,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -9452,7 +9468,7 @@
    "pending": null
   },
   "rate_immediate_session_p_non_local_no_swr": {
-   "value": 0.002563099306879845,
+   "value": 0.0009112196086236581,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -9468,7 +9484,7 @@
    "pending": null
   },
   "rate_immediate_session_p_non_local_swr": {
-   "value": 8.049288456492484e-33,
+   "value": 5.007250564545313e-33,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -9484,7 +9500,7 @@
    "pending": null
   },
   "rate_immediate_session_p_swr": {
-   "value": 7.9211363612567e-28,
+   "value": 6.212667488515864e-28,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -9516,7 +9532,7 @@
    "pending": null
   },
   "rate_immediate_session_positive_fraction_non_local_no_swr": {
-   "value": 0.5791666666666667,
+   "value": 0.5826446280991735,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -9532,7 +9548,7 @@
    "pending": null
   },
   "rate_immediate_session_positive_fraction_non_local_swr": {
-   "value": 0.871900826446281,
+   "value": 0.8760330578512396,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -9564,7 +9580,7 @@
    "pending": null
   },
   "rate_immediate_session_swr": {
-   "value": 6.387588691985245,
+   "value": 6.317564508580605,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -9745,7 +9761,7 @@
    "pending": null
   },
   "rate_kernel_dropped_non_local": {
-   "value": 1,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9761,7 +9777,7 @@
    "pending": null
   },
   "rate_kernel_dropped_non_local_no_swr": {
-   "value": 22,
+   "value": 27,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9777,7 +9793,7 @@
    "pending": null
   },
   "rate_kernel_dropped_non_local_swr": {
-   "value": 17,
+   "value": 29,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9793,7 +9809,7 @@
    "pending": null
   },
   "rate_kernel_dropped_swr": {
-   "value": 2,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -9809,7 +9825,7 @@
    "pending": null
   },
   "rate_kernel_lag_eight_non_local": {
-   "value": 0.9784921462926376,
+   "value": 0.9801109702990896,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9824,7 +9840,7 @@
    "pending": null
   },
   "rate_kernel_lag_eight_non_local_no_swr": {
-   "value": 0.9794778027696371,
+   "value": 0.977790893254418,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9839,7 +9855,7 @@
    "pending": null
   },
   "rate_kernel_lag_eight_non_local_swr": {
-   "value": 0.9803897753386134,
+   "value": 0.9799573716289977,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9854,7 +9870,7 @@
    "pending": null
   },
   "rate_kernel_lag_eight_swr": {
-   "value": 0.9722709364487347,
+   "value": 0.9719775983717558,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9869,7 +9885,7 @@
    "pending": null
   },
   "rate_kernel_lag_five_non_local": {
-   "value": 0.9148842055169615,
+   "value": 0.9152154450008163,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9884,7 +9900,7 @@
    "pending": null
   },
   "rate_kernel_lag_five_non_local_no_swr": {
-   "value": 0.9403224762620361,
+   "value": 0.9399947990591045,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9899,7 +9915,7 @@
    "pending": null
   },
   "rate_kernel_lag_five_non_local_swr": {
-   "value": 0.8900561816350088,
+   "value": 0.8926321854113961,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9914,7 +9930,7 @@
    "pending": null
   },
   "rate_kernel_lag_five_swr": {
-   "value": 0.9019666445846112,
+   "value": 0.9014919063890835,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9929,7 +9945,7 @@
    "pending": null
   },
   "rate_kernel_lag_four_non_local": {
-   "value": 0.9085040427901897,
+   "value": 0.9093067225165988,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9944,7 +9960,7 @@
    "pending": null
   },
   "rate_kernel_lag_four_non_local_no_swr": {
-   "value": 0.924327158807555,
+   "value": 0.9300546544267754,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9959,7 +9975,7 @@
    "pending": null
   },
   "rate_kernel_lag_four_non_local_swr": {
-   "value": 0.8980130577341214,
+   "value": 0.8966465007259484,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9974,7 +9990,7 @@
    "pending": null
   },
   "rate_kernel_lag_four_swr": {
-   "value": 0.8952091913841458,
+   "value": 0.899973862519624,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -9989,7 +10005,7 @@
    "pending": null
   },
   "rate_kernel_lag_nine_non_local": {
-   "value": 1.0072820067423205,
+   "value": 1.0069066387218282,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10004,7 +10020,7 @@
    "pending": null
   },
   "rate_kernel_lag_nine_non_local_no_swr": {
-   "value": 0.9933292603594861,
+   "value": 0.9939661188067149,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10019,7 +10035,7 @@
    "pending": null
   },
   "rate_kernel_lag_nine_non_local_swr": {
-   "value": 1.0228570224857851,
+   "value": 1.0197029669921818,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10034,7 +10050,7 @@
    "pending": null
   },
   "rate_kernel_lag_nine_swr": {
-   "value": 1.004778044025214,
+   "value": 1.005265067610016,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10049,7 +10065,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_animal_non_local": {
-   "value": 1.2151540430306522,
+   "value": 1.2166221185769073,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10065,7 +10081,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_animal_non_local_no_swr": {
-   "value": 1.0109346647122461,
+   "value": 1.0018981830542706,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10081,7 +10097,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_animal_non_local_swr": {
-   "value": 1.4871037328212888,
+   "value": 1.4741047281287647,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10097,7 +10113,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_animal_swr": {
-   "value": 1.4144834229661678,
+   "value": 1.4114534553599982,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10177,7 +10193,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_non_local": {
-   "value": 1.182610928485814,
+   "value": 1.183454129451945,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10193,7 +10209,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_non_local_no_swr": {
-   "value": 1.0000124235648498,
+   "value": 1.0073249986900161,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10209,7 +10225,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_non_local_swr": {
-   "value": 1.495127328955266,
+   "value": 1.4413477681586677,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10225,7 +10241,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_p_non_local": {
-   "value": 3.753873524629194e-17,
+   "value": 2.52059755018677e-17,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -10241,7 +10257,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_p_non_local_no_swr": {
-   "value": 0.547019228159241,
+   "value": 0.28617662334395144,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -10257,7 +10273,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_p_non_local_swr": {
-   "value": 3.16067892099186e-28,
+   "value": 3.40610761119694e-26,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -10273,7 +10289,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_p_swr": {
-   "value": 1.8542111352416162e-24,
+   "value": 1.582137511943495e-24,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -10289,7 +10305,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_positive_fraction_non_local": {
-   "value": 0.7178423236514523,
+   "value": 0.725,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -10305,7 +10321,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_positive_fraction_non_local_no_swr": {
-   "value": 0.5,
+   "value": 0.5069767441860465,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -10321,7 +10337,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_positive_fraction_non_local_swr": {
-   "value": 0.8533333333333334,
+   "value": 0.8591549295774648,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -10337,7 +10353,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_positive_fraction_swr": {
-   "value": 0.8083333333333333,
+   "value": 0.8075313807531381,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -10353,7 +10369,7 @@
    "pending": null
   },
   "rate_kernel_lag_one_swr": {
-   "value": 1.3784663724922068,
+   "value": 1.3947273333817247,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10369,7 +10385,7 @@
    "pending": null
   },
   "rate_kernel_lag_seven_non_local": {
-   "value": 0.9503828053384409,
+   "value": 0.9511682191151534,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10384,7 +10400,7 @@
    "pending": null
   },
   "rate_kernel_lag_seven_non_local_no_swr": {
-   "value": 0.9698289423745509,
+   "value": 0.9671592119501117,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10399,7 +10415,7 @@
    "pending": null
   },
   "rate_kernel_lag_seven_non_local_swr": {
-   "value": 0.9349965697316915,
+   "value": 0.9360430524401667,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10414,7 +10430,7 @@
    "pending": null
   },
   "rate_kernel_lag_seven_swr": {
-   "value": 0.9410091261883715,
+   "value": 0.9417619313702094,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10429,7 +10445,7 @@
    "pending": null
   },
   "rate_kernel_lag_six_non_local": {
-   "value": 0.9330595654617779,
+   "value": 0.9326796031240265,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10444,7 +10460,7 @@
    "pending": null
   },
   "rate_kernel_lag_six_non_local_no_swr": {
-   "value": 0.9535598784798176,
+   "value": 0.9518518914525288,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10459,7 +10475,7 @@
    "pending": null
   },
   "rate_kernel_lag_six_non_local_swr": {
-   "value": 0.9109963658006859,
+   "value": 0.9117932295324878,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10474,7 +10490,7 @@
    "pending": null
   },
   "rate_kernel_lag_six_swr": {
-   "value": 0.9168326272084069,
+   "value": 0.9167997395586693,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10489,7 +10505,7 @@
    "pending": null
   },
   "rate_kernel_lag_ten_non_local": {
-   "value": 1.0381178983614725,
+   "value": 1.0372533256942664,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10505,7 +10521,7 @@
    "pending": null
   },
   "rate_kernel_lag_ten_non_local_no_swr": {
-   "value": 1.0082103804868132,
+   "value": 1.0095678076598822,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10521,7 +10537,7 @@
    "pending": null
   },
   "rate_kernel_lag_ten_non_local_swr": {
-   "value": 1.06516422751556,
+   "value": 1.061286649332174,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10537,7 +10553,7 @@
    "pending": null
   },
   "rate_kernel_lag_ten_swr": {
-   "value": 1.0414460780702373,
+   "value": 1.0405933105400376,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10553,7 +10569,7 @@
    "pending": null
   },
   "rate_kernel_lag_three_non_local": {
-   "value": 0.925209479597311,
+   "value": 0.9257695606468499,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10568,7 +10584,7 @@
    "pending": null
   },
   "rate_kernel_lag_three_non_local_no_swr": {
-   "value": 0.9343657899338146,
+   "value": 0.9292278660649598,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10583,7 +10599,7 @@
    "pending": null
   },
   "rate_kernel_lag_three_non_local_swr": {
-   "value": 0.9465238372338114,
+   "value": 0.9452767242211708,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10598,7 +10614,7 @@
    "pending": null
   },
   "rate_kernel_lag_three_swr": {
-   "value": 0.9303850252175296,
+   "value": 0.9316050455924421,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10613,7 +10629,7 @@
    "pending": null
   },
   "rate_kernel_lag_two_non_local": {
-   "value": 0.9917340029979068,
+   "value": 0.9946991935797647,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10628,7 +10644,7 @@
    "pending": null
   },
   "rate_kernel_lag_two_non_local_no_swr": {
-   "value": 0.9495111471529296,
+   "value": 0.9484404650001832,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10643,7 +10659,7 @@
    "pending": null
   },
   "rate_kernel_lag_two_non_local_swr": {
-   "value": 1.0710909746648525,
+   "value": 1.0629536231040908,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10658,7 +10674,7 @@
    "pending": null
   },
   "rate_kernel_lag_two_swr": {
-   "value": 1.0445706785469806,
+   "value": 1.0519088448097154,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10673,7 +10689,7 @@
    "pending": null
   },
   "rate_kernel_late_max_non_local": {
-   "value": 1.0381178983614725,
+   "value": 1.0372533256942664,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10689,7 +10705,7 @@
    "pending": null
   },
   "rate_kernel_late_max_non_local_no_swr": {
-   "value": 1.0082103804868132,
+   "value": 1.0095678076598822,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10705,7 +10721,7 @@
    "pending": null
   },
   "rate_kernel_late_max_non_local_swr": {
-   "value": 1.06516422751556,
+   "value": 1.061286649332174,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10721,7 +10737,7 @@
    "pending": null
   },
   "rate_kernel_late_max_swr": {
-   "value": 1.0414460780702373,
+   "value": 1.0405933105400376,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10737,7 +10753,7 @@
    "pending": null
   },
   "rate_kernel_late_min_high": {
-   "value": 0.924327158807555,
+   "value": 0.9292278660649598,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10753,7 +10769,7 @@
    "pending": null
   },
   "rate_kernel_late_min_low": {
-   "value": 0.8900561816350088,
+   "value": 0.8926321854113961,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10769,7 +10785,7 @@
    "pending": null
   },
   "rate_kernel_late_min_non_local": {
-   "value": 0.9085040427901897,
+   "value": 0.9093067225165988,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10785,7 +10801,7 @@
    "pending": null
   },
   "rate_kernel_late_min_non_local_no_swr": {
-   "value": 0.924327158807555,
+   "value": 0.9292278660649598,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10801,7 +10817,7 @@
    "pending": null
   },
   "rate_kernel_late_min_non_local_swr": {
-   "value": 0.8900561816350088,
+   "value": 0.8926321854113961,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10817,7 +10833,7 @@
    "pending": null
   },
   "rate_kernel_late_min_swr": {
-   "value": 0.8952091913841458,
+   "value": 0.899973862519624,
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
@@ -10833,7 +10849,7 @@
    "pending": null
   },
   "rate_kernel_nonconverged_non_local": {
-   "value": 39,
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10849,7 +10865,7 @@
    "pending": null
   },
   "rate_kernel_nonconverged_non_local_no_swr": {
-   "value": 62,
+   "value": 24,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10865,7 +10881,7 @@
    "pending": null
   },
   "rate_kernel_nonconverged_non_local_swr": {
-   "value": 78,
+   "value": 14,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10881,7 +10897,7 @@
    "pending": null
   },
   "rate_kernel_nonconverged_swr": {
-   "value": 59,
+   "value": 2,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10897,7 +10913,7 @@
    "pending": null
   },
   "rate_kernel_sessions_non_local": {
-   "value": 241,
+   "value": 240,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10913,7 +10929,7 @@
    "pending": null
   },
   "rate_kernel_sessions_non_local_no_swr": {
-   "value": 218,
+   "value": 215,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10929,7 +10945,7 @@
    "pending": null
   },
   "rate_kernel_sessions_non_local_swr": {
-   "value": 225,
+   "value": 213,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10945,7 +10961,7 @@
    "pending": null
   },
   "rate_kernel_sessions_swr": {
-   "value": 240,
+   "value": 239,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -10961,7 +10977,7 @@
    "pending": null
   },
   "rate_ladder_aic_const": {
-   "value": 2227.4411316847554,
+   "value": 2414.8605777999182,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -10977,7 +10993,7 @@
    "pending": null
   },
   "rate_ladder_aic_full": {
-   "value": 2127.659620805643,
+   "value": 2302.957471669326,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -10993,7 +11009,7 @@
    "pending": null
   },
   "rate_ladder_aic_histcos": {
-   "value": 2207.3966603111276,
+   "value": 2383.9065352241714,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -11008,7 +11024,7 @@
    "pending": null
   },
   "rate_ladder_aic_rew": {
-   "value": 2221.4270736625667,
+   "value": 2408.623803933718,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -11023,7 +11039,7 @@
    "pending": null
   },
   "rate_ladder_aic_reward_by_time": {
-   "value": 2133.3466957380856,
+   "value": 2307.600966689044,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -11039,7 +11055,7 @@
    "pending": null
   },
   "rate_ladder_aic_time": {
-   "value": 2138.0961653758086,
+   "value": 2319.9579968730036,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -11055,7 +11071,7 @@
    "pending": null
   },
   "rate_ladder_aic_time_histcos": {
-   "value": 2127.6828847986417,
+   "value": 2307.264579789394,
    "kind": "quantity",
    "style": "int",
    "unit": "AIC",
@@ -11086,7 +11102,7 @@
    "pending": null
   },
   "rate_ladder_cv_bits_full": {
-   "value": 0.21611901819914672,
+   "value": 0.29745103641633636,
    "kind": "quantity",
    "style": "dec2",
    "unit": "bits/event",
@@ -11102,7 +11118,7 @@
    "pending": null
   },
   "rate_ladder_cv_bits_histcos": {
-   "value": 0.049271067670787955,
+   "value": 0.0892697065072682,
    "kind": "quantity",
    "style": "dec2",
    "unit": "bits/event",
@@ -11117,7 +11133,7 @@
    "pending": null
   },
   "rate_ladder_cv_bits_rew": {
-   "value": 0.02447453015353391,
+   "value": 0.026075348923053937,
    "kind": "quantity",
    "style": "dec2",
    "unit": "bits/event",
@@ -11132,7 +11148,7 @@
    "pending": null
   },
   "rate_ladder_cv_bits_reward_by_time": {
-   "value": 0.17747899870586825,
+   "value": 0.2378205945888552,
    "kind": "quantity",
    "style": "dec2",
    "unit": "bits/event",
@@ -11148,7 +11164,7 @@
    "pending": null
   },
   "rate_ladder_cv_bits_time": {
-   "value": 0.23792921638543096,
+   "value": 0.25285298963182223,
    "kind": "quantity",
    "style": "dec2",
    "unit": "bits/event",
@@ -11164,7 +11180,7 @@
    "pending": null
   },
   "rate_ladder_cv_bits_time_histcos": {
-   "value": 0.22041913439683636,
+   "value": 0.30091287020008695,
    "kind": "quantity",
    "style": "dec2",
    "unit": "bits/event",
@@ -11195,7 +11211,7 @@
    "pending": null
   },
   "rate_ladder_cv_sessions_full": {
-   "value": 61,
+   "value": 213,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11211,7 +11227,7 @@
    "pending": null
   },
   "rate_ladder_cv_sessions_histcos": {
-   "value": 67,
+   "value": 230,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11241,7 +11257,7 @@
    "pending": null
   },
   "rate_ladder_cv_sessions_reward_by_time": {
-   "value": 40,
+   "value": 128,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11273,7 +11289,7 @@
    "pending": null
   },
   "rate_ladder_cv_sessions_time_histcos": {
-   "value": 62,
+   "value": 216,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11288,7 +11304,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_const": {
-   "value": 0.45454545454545453,
+   "value": 0.3140495867768595,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11304,7 +11320,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_full": {
-   "value": 0.9628099173553719,
+   "value": 0.9545454545454546,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11320,7 +11336,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_histcos": {
-   "value": 0.3677685950413223,
+   "value": 0.2975206611570248,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11335,7 +11351,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_rew": {
-   "value": 0.3677685950413223,
+   "value": 0.256198347107438,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11350,7 +11366,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_reward_by_time": {
-   "value": 0.9545454545454546,
+   "value": 0.9462809917355371,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11366,7 +11382,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_time": {
-   "value": 0.9338842975206612,
+   "value": 0.71900826446281,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11382,7 +11398,7 @@
    "pending": null
   },
   "rate_ladder_ks_band_time_histcos": {
-   "value": 0.9628099173553719,
+   "value": 0.9380165289256198,
    "kind": "fraction",
    "style": "dec2",
    "unit": "",
@@ -11502,7 +11518,7 @@
    "pending": null
   },
   "rate_marginal_reward_child_better_fraction_non_local": {
-   "value": 0.8388429752066116,
+   "value": 0.8471074380165289,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -11517,7 +11533,7 @@
    "pending": null
   },
   "rate_marginal_reward_child_better_fraction_non_local_no_swr": {
-   "value": 0.49173553719008267,
+   "value": 0.5206611570247934,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -11532,7 +11548,7 @@
    "pending": null
   },
   "rate_marginal_reward_child_better_fraction_non_local_swr": {
-   "value": 0.8264462809917356,
+   "value": 0.8305785123966942,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -11547,7 +11563,7 @@
    "pending": null
   },
   "rate_marginal_reward_child_better_fraction_swr": {
-   "value": 0.7851239669421488,
+   "value": 0.7975206611570248,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -11562,7 +11578,7 @@
    "pending": null
   },
   "rate_marginal_reward_delta_aic_non_local": {
-   "value": -7.835829763608217,
+   "value": -8.927267039574872,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -11578,7 +11594,7 @@
    "pending": null
   },
   "rate_marginal_reward_delta_aic_non_local_no_swr": {
-   "value": 0.08942629156786097,
+   "value": -0.5276013807545041,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -11594,7 +11610,7 @@
    "pending": null
   },
   "rate_marginal_reward_delta_aic_non_local_swr": {
-   "value": -5.3707198066231285,
+   "value": -5.98739777542346,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -11610,7 +11626,7 @@
    "pending": null
   },
   "rate_marginal_reward_delta_aic_swr": {
-   "value": -6.8343301900869164,
+   "value": -7.562506165481409,
    "kind": "quantity",
    "style": "sig2s",
    "unit": "AIC",
@@ -11642,7 +11658,7 @@
    "pending": null
   },
   "rate_paired_p": {
-   "value": 3.1175137786456315e-19,
+   "value": 3.1838012746810427e-18,
    "kind": "quantity",
    "style": "pval",
    "unit": "",
@@ -11658,7 +11674,7 @@
    "pending": null
   },
   "rate_paired_positive_fraction": {
-   "value": 0.7874396135265701,
+   "value": 0.7817258883248731,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
@@ -11674,7 +11690,7 @@
    "pending": null
   },
   "rate_paired_sessions": {
-   "value": 207,
+   "value": 197,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11690,7 +11706,7 @@
    "pending": null
   },
   "rate_raw_immediate_session_non_local": {
-   "value": 30.30012047762476,
+   "value": 32.39650735621129,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -11705,7 +11721,7 @@
    "pending": null
   },
   "rate_raw_immediate_session_non_local_no_swr": {
-   "value": 11.866167592873792,
+   "value": 13.186663869893959,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -11720,7 +11736,7 @@
    "pending": null
   },
   "rate_raw_immediate_session_non_local_swr": {
-   "value": 125.39441245694366,
+   "value": 132.94122523952245,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -11735,7 +11751,7 @@
    "pending": null
   },
   "rate_raw_immediate_session_swr": {
-   "value": 58.13361580859525,
+   "value": 63.3589703269626,
    "kind": "quantity",
    "style": "sig2",
    "unit": "rate ratio",
@@ -11782,7 +11798,7 @@
    "pending": null
   },
   "rate_time_peak_edge_count": {
-   "value": 1,
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11814,7 +11830,7 @@
    "pending": null
   },
   "rate_time_peak_edge_non_local_no_swr": {
-   "value": 1,
+   "value": 0,
    "kind": "count",
    "style": "count",
    "unit": "",
@@ -11862,7 +11878,7 @@
    "pending": null
   },
   "rate_time_peak_s_high": {
-   "value": 2.955,
+   "value": 2.9450000000000003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -11878,7 +11894,7 @@
    "pending": null
   },
   "rate_time_peak_s_low": {
-   "value": 2.48,
+   "value": 2.475,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -11894,7 +11910,7 @@
    "pending": null
   },
   "rate_time_peak_s_non_local": {
-   "value": 2.955,
+   "value": 2.9450000000000003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -11910,11 +11926,11 @@
    "pending": null
   },
   "rate_time_peak_s_non_local_no_swr": {
-   "value": 3.0,
+   "value": 2.475,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
-   "description": "non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s; it sits on the interval's edge, so it bounds the peak rather than locating it",
+   "description": "non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s",
    "claims": [
     "19c"
    ],
@@ -11926,7 +11942,7 @@
    "pending": null
   },
   "rate_time_peak_s_non_local_swr": {
-   "value": 2.48,
+   "value": 2.505,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -11942,7 +11958,7 @@
    "pending": null
   },
   "rate_time_peak_s_swr": {
-   "value": 2.62,
+   "value": 2.6100000000000003,
    "kind": "quantity",
    "style": "dec2",
    "unit": "s",
@@ -12006,7 +12022,7 @@
    "pending": null
   },
   "rate_time_peak_sessions_swr": {
-   "value": 233,
+   "value": 232,
    "kind": "count",
    "style": "count",
    "unit": "",
