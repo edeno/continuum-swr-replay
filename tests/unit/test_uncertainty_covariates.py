@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 from continuum_swr_replay.paths import replay_content_dir, table_path
 from continuum_swr_replay.tables.io import read_table, table_exists
 from continuum_swr_replay.tables.session_keys import subset_max_per_animal
+from tests.unit._event_end_fixtures import with_event_ends
 
 _SPEC = importlib.util.spec_from_file_location(
     "fit_uncertainty_rate",
@@ -923,7 +924,7 @@ def test_complete_case_gate_blocks_rewarded_only_uncertainty_fit(
         ),
     )
 
-    models = fur.fit_uncertainty_rate(stop, onsets)
+    models = fur.fit_uncertainty_rate(stop, with_event_ends(onsets))
 
     assert models.empty
     assert calls == []

@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MODEL_PER_BIN_RATE,
     N_HISTORY_LAGS,
+    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     SPLINE_KNOTS,
@@ -318,16 +319,16 @@ def _panel_reward_kernel(ax, df):
 def _panel_selfhistory(ax, df):
     """Self-history kernel reconstructed from the raised-cosine coefficients.
 
-    ``hist_rcos_k`` is the plain projection of the ``onset_lag{j}`` counts onto
-    the raw bumps, so an onset ``j`` bins back contributes
-    ``sum_k coef_k * B[k, j]`` to the log rate.
+    ``offhist_rcos_k`` is the plain projection of the ``offset_lag{j}`` counts
+    (event ends) onto the raw bumps, so an event that ended ``j`` bins back
+    contributes ``sum_k coef_k * B[k, j]`` to the log rate.
     """
     lags = np.arange(1, N_HISTORY_LAGS + 1)
     for oc in POPS4:
         sessions = df[(df.model == FULL) & (df.outcome == oc)]
         ax.plot(
             lags * 15,
-            self_history_rate_ratios(sessions),
+            self_history_rate_ratios(sessions, PER_BIN_HISTORY_COLUMNS),
             marker="o",
             color=STYLE[oc][1],
             label=STYLE[oc][0],
@@ -335,9 +336,9 @@ def _panel_selfhistory(ax, df):
             ms=4,
         )
     ax.axhline(1, color="0.5", ls=":")
-    ax.set_xlabel("self-history lag (ms)")
+    ax.set_xlabel("time since the previous event ended (ms)")
     ax.set_ylabel("rate ratio")
-    ax.set_title("D. Self-history (M7r): refractory then bursty ~100 ms")
+    ax.set_title("D. Self-history from event ends (M7r)")
     ax.legend(frameon=False, fontsize=7)
 
 

@@ -42,6 +42,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
     MODEL_PER_BIN_RATE,
     N_HISTORY_LAGS,
+    PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
 )
@@ -168,7 +169,10 @@ def section_kernel(title, model):
         s = df[(df.model == model) & (df.outcome == oc)]
         print(
             f"  {LABEL[oc]:16s} "
-            + " ".join(f"{v:5.2f}" for v in self_history_rate_ratios(s))
+            + " ".join(
+                f"{v:5.2f}"
+                for v in self_history_rate_ratios(s, PER_BIN_HISTORY_COLUMNS)
+            )
         )
 
 
@@ -189,14 +193,17 @@ def section_reward_kernel(title, model):
 
 def section_selfhistory(model):
     print("\n" + "=" * 78)
-    print(f"   self-history kernel detail   ({model}: reconstructed, 15 ms lags)")
+    print(
+        f"   self-history kernel detail   ({model}: reconstructed, 15 ms lags "
+        "after the previous event's end)"
+    )
     print("=" * 78)
     print(
-        f"  {'population':16s} {'refractory(<1 lags)':>20} {'burst peak RR':>14} {'@lag(ms)':>9}"
+        f"  {'population':16s} {'lags with RR<1':>20} {'peak RR':>14} {'@lag(ms)':>9}"
     )
     for oc in OUT:
         s = df[(df.model == model) & (df.outcome == oc)]
-        rr = self_history_rate_ratios(s)
+        rr = self_history_rate_ratios(s, PER_BIN_HISTORY_COLUMNS)
         refr = [j for j in range(1, 11) if rr[j - 1] < 1.0]
         refr_lags = f"{len(refr)} (≤{max(refr) * 15 if refr else 0}ms)"
         pk = int(np.nanargmax(rr)) + 1

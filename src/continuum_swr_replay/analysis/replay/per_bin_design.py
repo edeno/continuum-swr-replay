@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
@@ -452,11 +453,14 @@ def reward_kernel_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
     return np.median(np.exp(kernels), axis=0)
 
 
-def self_history_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
+def self_history_rate_ratios(
+    sessions: pd.DataFrame, basis_columns: Sequence[str]
+) -> np.ndarray:
     """Across-session median of the per-session reconstructed self-history kernel.
 
-    ``hist_rcos_k`` is the plain projection of the ``onset_lag{j}`` counts onto
-    the raw raised-cosine bumps, so an onset ``j`` bins back contributes
+    A history basis column (``hist_rcos_k`` from onsets, ``offhist_rcos_k`` from
+    event ends) is the plain projection of the per-lag counts onto the raw
+    raised-cosine bumps, so an event ``j`` bins back contributes
     ``sum_k coef_k * B[k, j]`` to the log rate -- the un-normalized basis,
     unlike the reward block's bump-weighted fractions.
 
@@ -464,15 +468,18 @@ def self_history_rate_ratios(sessions: pd.DataFrame) -> np.ndarray:
     ----------
     sessions : pd.DataFrame
         One row per session for a single (model, outcome), carrying
-        ``coef_hist_rcos_*``. Sessions with any NaN basis coefficient
-        contribute nothing.
+        ``coef_<column>`` for each of ``basis_columns``. Sessions with any NaN
+        basis coefficient contribute nothing.
+    basis_columns : sequence of str
+        The block's ``N_HISTORY_BASIS`` basis columns, in basis order (the
+        per-bin rate ladders' are ``model_specs.PER_BIN_HISTORY_COLUMNS``).
 
     Returns
     -------
     np.ndarray, shape (N_HISTORY_LAGS,)
         Median rate ratio at each lag ``1..N_HISTORY_LAGS``.
     """
-    columns = [f"coef_hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+    columns = [f"coef_{c}" for c in basis_columns]
     kernels = reconstruct_self_history_kernels(
         sessions[columns].to_numpy(dtype=float), N_HISTORY_LAGS, N_HISTORY_BASIS
     )

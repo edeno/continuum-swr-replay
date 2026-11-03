@@ -120,6 +120,10 @@ def test_sessions_missing_the_block_do_not_contribute():
     )
 
 
+# The basis columns the fixture's history block carries.
+HIST = [f"hist_rcos_{k}" for k in range(N_HISTORY_BASIS)]
+
+
 def _history_sessions() -> pd.DataFrame:
     """Two sessions' raised-cosine self-history coefficients."""
     return pd.DataFrame(
@@ -147,7 +151,7 @@ def test_self_history_kernel_uses_the_unnormalized_basis():
         np.exp(sessions[columns].to_numpy(dtype=float) @ basis), axis=0
     )
 
-    kernel = spbrm.self_history_rate_ratios(sessions)
+    kernel = spbrm.self_history_rate_ratios(sessions, HIST)
 
     np.testing.assert_allclose(kernel, expected, rtol=1e-12)
     normalized = np.median(
@@ -169,7 +173,7 @@ def test_self_history_sessions_missing_the_block_do_not_contribute():
     )
 
     np.testing.assert_allclose(
-        spbrm.self_history_rate_ratios(with_gap),
-        spbrm.self_history_rate_ratios(sessions),
+        spbrm.self_history_rate_ratios(with_gap, HIST),
+        spbrm.self_history_rate_ratios(sessions, HIST),
         rtol=1e-12,
     )

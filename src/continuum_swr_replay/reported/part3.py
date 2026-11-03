@@ -638,7 +638,7 @@ def per_bin_values(
                 np.exp(base["coef_Intercept"].dropna()).median(),
                 "quantity",
                 "dec2",
-                f"{label}: median over sessions of exp(intercept) of M0_const, events per second of immobility",
+                f"{label}: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing)",
                 "events/s",
             ),
             make(

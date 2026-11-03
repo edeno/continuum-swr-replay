@@ -410,7 +410,7 @@ Dirichlet-multinomial fitter for replay content over candidate categories.
 
 The duration-aware per-bin history design on real events, and its readouts.
 
-`attach_event_ends`, `build_design`, `history_kernels`, `lag_support`, `onset_offset_collinearity`, `fit_pooled_history`
+`attach_event_ends`, `at_risk_events`, `build_design`, `history_kernels`, `lag_support`, `onset_offset_collinearity`, `fit_pooled_history`
 
 ### `src/continuum_swr_replay/analysis/replay/duration_history_simulation.py`
 
