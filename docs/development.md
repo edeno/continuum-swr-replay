@@ -76,17 +76,19 @@ src/continuum_swr_replay/
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
+├── reported/              # reported numbers: the part{n} summary builders, values, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
 ├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
 └── data_types.py          # shared type definitions
 
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
-├── decoding/  detection/  tables/  rate/  coupling/  content/  behavior/  figures/  qa/  pfc/
+├── decoding/  detection/  tables/  rate/  coupling/  content/  behavior/  figures/  qa/  pfc/  reported/
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
 ├── reported/              #   part{n}.json summaries every reported number is read from
 ├── reported_values.tex    #   generated macros, one per reported number (make reported-values)
+├── tables/                #   Supplementary Table S1 and the literature survey CSV it is built from
 └── figures/<topic>/       #   Publication figures in topic subdirs (no loose files)
 Makefile                   # Common tasks: make help
 docs/                      # Published reference — see docs/README.md for the doc-type→home scheme
@@ -371,7 +373,7 @@ macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
 ## Animal and Session Information
 
-The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. After the R11 swap: 242 epochs in 45 NWB files.
+The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. The register analyses 242 epochs in 45 NWB files.
 
 | Animal | NWB Files | Epochs | Dates |
 |--------|-----------|--------|-------|
@@ -392,7 +394,7 @@ How to run the decoders, their settings and their outputs are in
 
 Every number the project reports is read from a summary file, `paper/reported/part{n}.json`, one per part
 of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_reported_values.py`; design
-`docs/design/2026-10-26-reported-values-design.md`). All four parts are built. Part 0 holds the
+`docs/design/2026-10-26-reported-values-design.md`). All five summaries (parts 0–4) are built. Part 0 holds the
 literature numbers the introduction quotes, computed from the replay-study survey of Supplementary
 Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
 
@@ -402,6 +404,9 @@ Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
 - In a doc, write a reported number inside a marker, `<!--v:part{n}.key-->…<!--/v-->`, and let the
   emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
 - A value with a `pending` note is not quoted as a finding.
+- A number quoted from a cited paper (for example, another study's share of replays) is not a result
+  of this project and has no summary key: write it as text beside its citation. A number this project
+  computes, even from published sources (part 0's literature survey), is a reported number.
 
 ## Important Conventions
 
