@@ -392,7 +392,9 @@ How to run the decoders, their settings and their outputs are in
 
 Every number the project reports is read from a summary file, `paper/reported/part{n}.json`, one per part
 of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_reported_values.py`; design
-`docs/design/2026-10-26-reported-values-design.md`). All four parts are built.
+`docs/design/2026-10-26-reported-values-design.md`). All four parts are built. Part 0 holds the
+literature numbers the introduction quotes, computed from the replay-study survey of Supplementary
+Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it

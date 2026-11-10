@@ -36,7 +36,7 @@ MARKER = re.compile(
 _CODE = re.compile(r"```.*?```|~~~.*?~~~|`[^`\n]*`", re.DOTALL)
 """Fenced code blocks and inline code spans: a marker shown in code is an
 example, not a value."""
-_PART_WORDS = {1: "One", 2: "Two", 3: "Three", 4: "Four"}
+_PART_WORDS = {0: "Zero", 1: "One", 2: "Two", 3: "Three", 4: "Four"}
 
 
 def _outside_code(text: str, replace) -> str:

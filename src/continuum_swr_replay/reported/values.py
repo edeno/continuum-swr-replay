@@ -14,8 +14,15 @@ from typing import Any
 SCHEMA_VERSION = 1
 """The layout of a summary file. Bump it when a field is added or renamed."""
 
-PARTS = {1: "the model", 2: "the events", 3: "behavior", 4: "other brain areas"}
-"""The paper's four parts (``docs/analysis_map.md``)."""
+PARTS = {
+    0: "the surveyed literature",
+    1: "the model",
+    2: "the events",
+    3: "behavior",
+    4: "other brain areas",
+}
+"""The paper's four parts (``docs/analysis_map.md``), and part 0, the published
+replay studies the introduction summarizes (Supplementary Table S1)."""
 
 KINDS = ("count", "fraction", "quantity")
 """A count is exact; a fraction is a share in [0, 1]; a quantity has a unit."""

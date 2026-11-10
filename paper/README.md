@@ -19,7 +19,7 @@ Python nor the lab's data: it uses the committed figures and
 | `main.tex` | The manuscript and its preamble |
 | `references.bib` | The bibliography (BibTeX) |
 | `reported_values.tex` | Generated: one LaTeX macro per reported number, read by `main.tex` |
-| `reported/part{n}.json` | The four summary files every reported number is read from |
+| `reported/part{n}.json` | The summary files every reported number is read from: parts 1–4, and part 0 for the literature numbers the introduction quotes |
 | `reported/values_index.md`, `reported/overview.md` | Every reported value with its meaning; the values read question by question |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
 | `tables/` | Generated supplementary tables: `table_s1_literature.tex` (Supplementary Table S1) and `table_s1_literature_parameters.csv` (the full survey, Supplementary Data 1) |
@@ -38,7 +38,7 @@ lists every key. The macro for summary key `part1.sweep_replays` is
 When a summary changes, regenerate the macros, then rebuild:
 
 ```bash
-make summaries        # rebuild reported/part{n}.json (needs the lab's processed data)
+make summaries        # rebuild reported/part{n}.json (parts 1-4 need the lab's processed data)
 make reported-values  # write the macros and the docs' inline values
 make manuscript
 ```
@@ -72,8 +72,12 @@ regenerate:
 uv run --frozen python scripts/figures/generate_supp_literature_table.py
 ```
 
-`tests/unit/test_literature_table.py` fails when the committed table no longer
-matches the installed package.
+The introduction's literature numbers (modes, ranges and shares) are computed
+from the same survey into `reported/part0.json`; after regenerating the table, run
+`uv run --frozen python scripts/reported/summarize_part.py --part 0` and
+`make reported-values`. `tests/unit/test_literature_table.py` and
+`tests/unit/test_reported_part0.py` fail when the committed table or summary no
+longer matches the installed package.
 
 ## Bibliography
 

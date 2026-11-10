@@ -2,7 +2,7 @@
 # scripts/ and the package in src/; each target only calls them.
 UV ?= uv
 RUN = $(UV) run --frozen
-PARTS = 1 2 3 4
+PARTS = 0 1 2 3 4
 
 .DEFAULT_GOAL := help
 .PHONY: help sync sync-dev format check figures summaries reported-values manuscript
@@ -13,7 +13,7 @@ help:
 	@echo "make format           Format and lint-fix src/, scripts/ and tests/"
 	@echo "make check            Run the CI checks: format check, lint, full test suite"
 	@echo "make figures          Regenerate the main figures (needs the lab's processed data)"
-	@echo "make summaries        Rebuild paper/reported/part{1..4}.json (needs the lab's processed data)"
+	@echo "make summaries        Rebuild paper/reported/part{0..4}.json (parts 1-4 need the lab's processed data)"
 	@echo "make reported-values  Write the summaries' values into the LaTeX macros and the docs"
 	@echo "make manuscript       Build paper/main.pdf from the committed figures and macros"
 

@@ -14,8 +14,8 @@ from pathlib import Path
 
 PAPER = Path(__file__).resolve().parents[2] / "paper"
 
-_DEFINED = re.compile(r"\\newcommand\{\\(Part(?:One|Two|Three|Four)[A-Za-z]+)\}")
-_USED = re.compile(r"\\(Part(?:One|Two|Three|Four)[A-Za-z]+)")
+_DEFINED = re.compile(r"\\newcommand\{\\(Part(?:Zero|One|Two|Three|Four)[A-Za-z]+)\}")
+_USED = re.compile(r"\\(Part(?:Zero|One|Two|Three|Four)[A-Za-z]+)")
 _COMMENT = re.compile(r"(?<!\\)%.*$", re.MULTILINE)
 
 
