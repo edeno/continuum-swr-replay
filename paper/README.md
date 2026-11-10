@@ -60,9 +60,12 @@ Figure 1 has, and commit it with the rebuilt `main.pdf`.
 
 ## Bibliography
 
-Until the text cites a work, BibTeX reports that it found no citations; the
-build still succeeds. The style is `unsrtnat` (numbered, in order of citation)
-until a journal is chosen.
+`references.bib` holds entries from Eric Denovellis's Zotero library, keyed by
+their Better BibTeX citation keys, so a key copied from Zotero works in
+`\cite{}`. Add a work by exporting it from Zotero (Better BibTeX) and
+appending its entry. Works cited in the draft but not yet in Zotero are written
+as plain text. The style is `unsrtnat` (numbered, in order of citation) until a
+journal is chosen.
 
 ## Direct LaTeX commands
 
