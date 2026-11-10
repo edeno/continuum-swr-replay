@@ -1,10 +1,12 @@
-"""Every reported-value macro the manuscript uses must be defined.
+"""The manuscript's reported-value macros are defined and hold current values.
 
-``paper/main.tex`` writes result numbers as macros (``\\PartTwoNEvents``) that
-``paper/reported_values.tex`` defines; the emitter writes that file from the
-part summaries. A macro the emitter no longer writes -- a renamed or removed
-summary key -- would only show up as a LaTeX error, or not at all in a
-non-stop build. This test reads both files as text, so it needs no LaTeX.
+``paper/main.tex`` writes result numbers as macros (``\\PartZeroBandLowMode``)
+that ``paper/reported_values.tex`` defines; the emitter writes that file, the
+values index and the docs' inline values from the part summaries. A macro the
+emitter no longer writes -- a renamed or removed summary key -- would only show
+up as a LaTeX error, or not at all in a non-stop build; a summary rebuilt
+without rerunning the emitter would leave the old number in the PDF. These
+tests read the files as text, so they need no LaTeX and no lab data.
 """
 
 from __future__ import annotations
@@ -12,7 +14,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-PAPER = Path(__file__).resolve().parents[2] / "paper"
+from continuum_swr_replay.reported import emit, values
+
+ROOT = Path(__file__).resolve().parents[2]
+PAPER = ROOT / "paper"
 
 _DEFINED = re.compile(r"\\newcommand\{\\(Part(?:Zero|One|Two|Three|Four)[A-Za-z]+)\}")
 _USED = re.compile(r"\\(Part(?:Zero|One|Two|Three|Four)[A-Za-z]+)")
@@ -61,3 +66,23 @@ def test_every_macro_the_manuscript_uses_is_defined():
         f"main.tex uses macros reported_values.tex does not define: {missing}. "
         "Rebuild the summaries and run `make reported-values`, or fix the name."
     )
+
+
+def test_emitted_files_hold_the_committed_summaries():
+    summaries = {
+        s.part: s
+        for s in map(values.read_summary, sorted(PAPER.glob("reported/part*.json")))
+    }
+    assert set(summaries) == set(values.PARTS)
+    stale = "is stale: run `make reported-values`"
+    assert (PAPER / "reported_values.tex").read_text() == emit.tex_file(summaries), (
+        f"paper/reported_values.tex {stale}"
+    )
+    assert (PAPER / "reported" / "values_index.md").read_text() == (
+        emit.values_index(summaries)
+    ), f"paper/reported/values_index.md {stale}"
+    by_key = values.values_by_key(summaries)
+    for doc in emit.marked_docs((PAPER, ROOT / "docs")):
+        text = doc.read_text()
+        filled, _ = emit.fill_markers(text, by_key, str(doc.relative_to(ROOT)))
+        assert filled == text, f"{doc.relative_to(ROOT)} {stale}"
