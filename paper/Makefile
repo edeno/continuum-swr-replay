@@ -4,10 +4,11 @@
 # Everything main.tex reads. reported_values.tex is generated
 # (`make reported-values` from the repository root) but not regenerated here.
 FIGURES := $(wildcard figures/figure0*/figure0*.pdf)
+TABLES := $(wildcard tables/*.tex)
 
 all: main.pdf
 
-main.pdf: main.tex reported_values.tex references.bib $(FIGURES)
+main.pdf: main.tex reported_values.tex references.bib $(FIGURES) $(TABLES)
 	latexmk -pdf main.tex
 
 clean:

@@ -50,6 +50,15 @@ The Part 3 figures that read the fits are drawn by `scripts/qa/run_refits.py`;
 [analysis_map.md](analysis_map.md) names each by its run (`rate.fig.*`,
 `content.fig.*`).
 
+## Supplementary tables
+
+| Table | Script | Reads | Output | Tests |
+| --- | --- | --- | --- | --- |
+| S1. Detection and decoding parameters in 57 replay studies | `scripts/figures/generate_supp_literature_table.py` | the survey packaged in `ripple_detection` (`continuum_swr_replay.reported.literature`) | `paper/tables/table_s1_literature.tex`, and the full survey as `paper/tables/table_s1_literature_parameters.csv` (Supplementary Data 1) | `tests/unit/test_literature_table.py` |
+
+Table S1 needs no lab data. Its values are corrected in `ripple_detection`, not
+here ([paper/README.md](../paper/README.md#supplementary-tables)).
+
 ## Captions
 
 A caption draft sits beside its figure as `<topic>_caption.md` (for example

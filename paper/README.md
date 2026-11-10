@@ -22,6 +22,7 @@ Python nor the lab's data: it uses the committed figures and
 | `reported/part{n}.json` | The four summary files every reported number is read from |
 | `reported/values_index.md`, `reported/overview.md` | Every reported value with its meaning; the values read question by question |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
+| `tables/` | Generated supplementary tables: `table_s1_literature.tex` (Supplementary Table S1) and `table_s1_literature_parameters.csv` (the full survey, Supplementary Data 1) |
 | `claims_table.md`, `figure_claims_plan.md` | Each claim, the comparison that supports it, and where it goes |
 | `Makefile`, `.latexmkrc` | Build settings |
 | `LICENSE` | CC BY 4.0 for the manuscript text and figures |
@@ -57,6 +58,22 @@ data).
 Git ignores the figure files under `figures/` by default. When a figure is
 final, add a `!paper/figures/<topic>/<name>.pdf` line to `.gitignore`, as
 Figure 1 has, and commit it with the rebuilt `main.pdf`.
+
+## Supplementary tables
+
+Supplementary Table S1 is the survey of replay-detection and decoding parameters
+in 57 published studies. Its source is the survey the `ripple_detection` package
+ships (`ripple_detection/data/literature_detection_parameters.csv`, at the
+version `uv.lock` pins), audited there against each paper's methods, supplement
+and released code. Correct a value there, not here; then update the pin and
+regenerate:
+
+```bash
+uv run --frozen python scripts/figures/generate_supp_literature_table.py
+```
+
+`tests/unit/test_literature_table.py` fails when the committed table no longer
+matches the installed package.
 
 ## Bibliography
 
