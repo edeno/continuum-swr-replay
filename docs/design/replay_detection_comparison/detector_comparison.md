@@ -51,11 +51,10 @@ code base, and [03](03-inventory-comparison.md) is the direct comparison.
 
 The literature survey is a lab-compiled table of 57 replay papers that decode replay content
 (1999–2025), first kept in the shared Google Sheet `12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`.
-Its authoritative copy is now the one `ripple_detection` packages
-(`ripple_detection/data/literature_detection_parameters.csv`), audited there against each
-paper's methods, supplement and released code through 2026-09-25; this repo's copy is
-Supplementary Table S1,
-[../../../paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv).
+Its copy for the paper is Supplementary Table S1,
+[../../../paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv),
+taken from the `ripple_detection` repository's audit against each paper's methods, supplement
+and released code (through 2026-09-25).
 **The values were first checked against the papers and corrected here;
 see [literature_parameter_corrections.md](literature_parameter_corrections.md)** for the
 corrections with their evidence, the cells still flagged, the papers that could not be

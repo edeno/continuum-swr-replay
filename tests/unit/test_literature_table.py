@@ -1,15 +1,14 @@
-"""Supplementary Table S1 shows the packaged literature survey without changing it.
+"""Supplementary Table S1 shows the literature survey without changing it.
 
-The table is rendered from the survey ``ripple_detection`` packages. These tests
-check the display rules on small cases, that every surveyed paper appears once
-with its values, that the supplementary CSV is the packaged file byte for byte,
-and that the committed table is what the generator writes from the installed
-package, so a package update cannot leave a stale table in the paper.
+The table is rendered from the survey CSV, ``paper/tables/table_s1_literature_parameters.csv``.
+These tests check the display rules on small cases, that every surveyed paper
+appears once with its values, and that the committed table is what the
+generator writes from the CSV, so a corrected value cannot leave a stale table
+in the paper.
 """
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -82,25 +81,17 @@ def test_shown_values_are_the_survey_values(survey):
 
 
 def test_rendered_table_has_one_row_per_paper(survey):
-    tex = literature.table_tex(literature.display_table(survey), len(survey), "pkg 1.0")
+    tex = literature.table_tex(literature.display_table(survey), len(survey))
     body = tex.split(r"\endlastfoot")[1].split(r"\end{longtable}")[0]
     rows = [line for line in body.splitlines() if line.endswith(r"\\")]
     assert len(rows) == len(survey)
     assert r"\label{tab:literature}" in tex
-    assert "pkg 1.0" in tex
-
-
-def test_write_table_copies_the_packaged_survey(tmp_path):
-    tex_path, csv_path = literature.write_table(tmp_path)
-    assert csv_path.read_bytes() == literature.source_path().read_bytes()
-    assert re.search(r"\\begin\{longtable\}", tex_path.read_text())
 
 
 def test_committed_table_is_current(tmp_path):
-    tex_path, csv_path = literature.write_table(tmp_path)
-    committed_tex = PAPER_TABLES / tex_path.name
-    committed_csv = PAPER_TABLES / csv_path.name
-    assert committed_tex.read_text() == tex_path.read_text(), (
-        "paper/tables/ is stale: run scripts/figures/generate_supp_literature_table.py"
+    fresh = literature.write_table(tex_path=tmp_path / "table.tex")
+    committed = PAPER_TABLES / "table_s1_literature.tex"
+    assert committed.read_text() == fresh.read_text(), (
+        "paper/tables/table_s1_literature.tex is stale: run "
+        "scripts/figures/generate_supp_literature_table.py"
     )
-    assert committed_csv.read_bytes() == csv_path.read_bytes()

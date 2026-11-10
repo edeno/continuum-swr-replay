@@ -3,10 +3,10 @@
  "part": 0,
  "title": "the surveyed literature",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "bbe5cd97c74b-dirty",
+ "commit": "006a7ecf4aaf-dirty",
  "inputs": [
   {
-   "path": ".venv/lib/python3.11/site-packages/ripple_detection/data/literature_detection_parameters.csv",
+   "path": "paper/tables/table_s1_literature_parameters.csv",
    "sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda"
   }
  ],
@@ -23,7 +23,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "band_high_min": {
@@ -38,7 +38,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "band_high_mode": {
@@ -53,7 +53,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "band_low_max": {
@@ -68,7 +68,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "band_low_min": {
@@ -83,7 +83,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "band_low_mode": {
@@ -98,7 +98,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "bayes_fraction": {
@@ -113,7 +113,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "cells_max": {
@@ -128,7 +128,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "cells_min": {
@@ -143,7 +143,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "cells_mode": {
@@ -158,7 +158,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "longest_max": {
@@ -173,7 +173,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "longest_min": {
@@ -188,7 +188,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "longest_mode": {
@@ -203,7 +203,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "mua_only_fraction": {
@@ -218,7 +218,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "papers": {
@@ -233,7 +233,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "position_bin_max": {
@@ -248,7 +248,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "position_bin_min": {
@@ -263,7 +263,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "position_bin_mode": {
@@ -278,7 +278,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "shortest_max": {
@@ -293,7 +293,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "shortest_min": {
@@ -308,7 +308,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "shortest_mode": {
@@ -323,7 +323,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "speed_max": {
@@ -338,7 +338,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "speed_min": {
@@ -353,7 +353,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "speed_mode": {
@@ -368,7 +368,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "swr_and_mua_fraction": {
@@ -383,7 +383,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "swr_only_fraction": {
@@ -398,7 +398,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "threshold_max": {
@@ -413,7 +413,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "threshold_min": {
@@ -428,7 +428,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "threshold_mode": {
@@ -443,7 +443,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "time_bin_max": {
@@ -458,7 +458,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "time_bin_min": {
@@ -473,7 +473,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   },
   "time_bin_mode": {
@@ -488,7 +488,7 @@
    "used_in": [
     "paper"
    ],
-   "source": "the replay-literature survey packaged in ripple_detection 1.7.2.dev367+g9766fd487 (Supplementary Table S1)",
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
    "pending": null
   }
  }

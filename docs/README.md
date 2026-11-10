@@ -148,11 +148,10 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     [detector_comparison.md](design/replay_detection_comparison/detector_comparison.md)
     tabulates every detection method considered, with a verified DOI for every work
     cited;
-    the lab's 57-paper survey of detection and decoding settings is packaged in
-    `ripple_detection`, where it was audited against each paper's methods, supplement and
-    released code; this repo's copy is Supplementary Table S1
-    ([../paper/tables/table_s1_literature_parameters.csv](../paper/tables/table_s1_literature_parameters.csv)),
-    and
+    the lab's 57-paper survey of detection and decoding settings is
+    [../paper/tables/table_s1_literature_parameters.csv](../paper/tables/table_s1_literature_parameters.csv)
+    (Supplementary Table S1; the paper's one copy, audited against each paper's methods,
+    supplement and released code), and
     [literature_parameter_corrections.md](design/replay_detection_comparison/literature_parameter_corrections.md)
     records the first round of corrections (2026-09-21). Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/) and

@@ -1,24 +1,23 @@
 """The surveyed replay literature: Supplementary Table S1 and its source.
 
 The table is the 57-paper survey of candidate-event detection and decoding
-parameters that ``ripple_detection`` packages
-(``ripple_detection/data/literature_detection_parameters.csv``), audited there
-against each paper's methods, supplement and released code. This module reads
-that file, renders a selection of its columns as the manuscript's LaTeX table,
-and copies the full file beside it as supplementary data. It changes no value.
+parameters, kept in this repository as ``paper/tables/table_s1_literature_parameters.csv``
+(Supplementary Data 1). That file is the one copy the paper reads: correct a
+value there. This module renders a selection of its columns as the
+manuscript's LaTeX table. It changes no value.
 """
 
 from __future__ import annotations
 
 import re
-from importlib.metadata import version
-from importlib.resources import files
 from pathlib import Path
 
 import pandas as pd
 
-SOURCE_PACKAGE = "ripple_detection"
-SOURCE_FILE = "literature_detection_parameters.csv"
+from continuum_swr_replay.paths import ROOT_DIR
+
+SURVEY_PATH = ROOT_DIR / "paper" / "tables" / "table_s1_literature_parameters.csv"
+"""The survey, one row per paper: the paper's only copy."""
 
 #: Columns shown in the PDF table: header -> source column. The study, the band
 #: and the durations combine source columns and are built in :func:`display_table`.
@@ -57,30 +56,23 @@ _LATEX_SPECIALS = {
 }
 
 
-def source_path() -> Path:
-    """Path of the packaged survey CSV."""
-    return Path(str(files(f"{SOURCE_PACKAGE}.data") / SOURCE_FILE))
-
-
-def source_version() -> str:
-    """Installed version of the package the survey comes from."""
-    return version(SOURCE_PACKAGE.replace("_", "-"))
-
-
-def load_survey() -> pd.DataFrame:
+def load_survey(path: Path = SURVEY_PATH) -> pd.DataFrame:
     """The survey with every cell as its literal text.
+
+    Parameters
+    ----------
+    path : Path
+        The survey CSV; :data:`SURVEY_PATH` by default.
 
     Returns
     -------
     survey : pd.DataFrame, shape (n_papers, 35)
-        One row per paper, in the package's order (newest first). ``#N/A`` and
+        One row per paper, in the file's order (newest first). ``#N/A`` and
         ``Not reported`` are kept as written: the first means the parameter does
         not apply to the paper's method, the second that the paper does not
         state it.
     """
-    return pd.read_csv(
-        source_path(), dtype=str, keep_default_na=False, encoding="utf-8-sig"
-    )
+    return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
 
 
 def _cell(text: str) -> str:
@@ -188,7 +180,7 @@ _COLUMN_SPEC = (
 )
 
 
-def table_tex(table: pd.DataFrame, n_papers: int, source: str) -> str:
+def table_tex(table: pd.DataFrame, n_papers: int) -> str:
     """The LaTeX of Supplementary Table S1, a ``longtable``.
 
     Parameters
@@ -197,8 +189,6 @@ def table_tex(table: pd.DataFrame, n_papers: int, source: str) -> str:
         From :func:`display_table`.
     n_papers : int
         Number of surveyed papers, for the caption.
-    source : str
-        The package and version the survey comes from, for the caption.
 
     Returns
     -------
@@ -216,9 +206,8 @@ def table_tex(table: pd.DataFrame, n_papers: int, source: str) -> str:
         r"maximum only). --, not applicable to the "
         r"study's method; n.r., not reported. The full table, with each study's DOI, "
         r"detection and decoding notes, smoothing, merging, shuffle and significance "
-        r"settings, is Supplementary Data~1 (\texttt{table\_s1\_literature\_parameters.csv}); "
-        rf"it is the survey packaged in {_escape(source)}, where each value's source in "
-        r"the paper, supplement or released code is recorded.}"
+        r"settings, is Supplementary Data~1 (\texttt{table\_s1\_literature\_parameters.csv}). "
+        r"Each value was checked against the study's methods, supplement or released code.}"
     )
     rows = [
         " & ".join(_escape(str(v)) for v in row) + r" \\"
@@ -248,24 +237,25 @@ def table_tex(table: pd.DataFrame, n_papers: int, source: str) -> str:
     return "\n".join(lines)
 
 
-def write_table(out_dir: Path) -> tuple[Path, Path]:
-    """Write Supplementary Table S1 and its full CSV into `out_dir`.
+TABLE_PATH = ROOT_DIR / "paper" / "tables" / "table_s1_literature.tex"
+"""Where :func:`write_table` writes the LaTeX table by default."""
+
+
+def write_table(survey_path: Path = SURVEY_PATH, tex_path: Path = TABLE_PATH) -> Path:
+    """Write Supplementary Table S1's LaTeX from the survey.
 
     Parameters
     ----------
-    out_dir : Path
-        Usually ``paper/tables/``; created if missing.
+    survey_path : Path
+        The survey CSV; :data:`SURVEY_PATH` by default.
+    tex_path : Path
+        Where to write the table; :data:`TABLE_PATH` by default.
 
     Returns
     -------
-    tex_path, csv_path : Path
-        The LaTeX table and the copy of the full survey.
+    tex_path : Path
     """
-    out_dir.mkdir(parents=True, exist_ok=True)
-    survey = load_survey()
-    source = f"{SOURCE_PACKAGE} {source_version()}"
-    tex_path = out_dir / "table_s1_literature.tex"
-    csv_path = out_dir / "table_s1_literature_parameters.csv"
-    tex_path.write_text(table_tex(display_table(survey), len(survey), source))
-    csv_path.write_bytes(source_path().read_bytes())
-    return tex_path, csv_path
+    survey = load_survey(survey_path)
+    tex_path.parent.mkdir(parents=True, exist_ok=True)
+    tex_path.write_text(table_tex(display_table(survey), len(survey)))
+    return tex_path

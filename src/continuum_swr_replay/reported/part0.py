@@ -5,8 +5,7 @@ events and decode them, from the 57-paper survey in Supplementary Table S1
 (``continuum_swr_replay.reported.literature``). The values here are computed
 from that survey, so a correction to it reaches the text.
 
-A numeric parameter keeps a cell only when it is a bare number, the rule
-``ripple_detection.load_literature_parameters`` uses: a range (``1-3``), a bound
+A numeric parameter keeps a cell only when it is a bare number: a range (``1-3``), a bound
 (``>4``), a share (``15% of ensemble``), ``Adaptive``, ``Not reported`` and
 ``#N/A`` are left out. Each mode, minimum and maximum is over the papers whose
 cell is a number. A tie for the mode is an error rather than a silent choice.
@@ -35,8 +34,8 @@ class Part0Inputs:
 
 
 def default_inputs() -> Part0Inputs:
-    """The survey the installed ``ripple_detection`` packages."""
-    return Part0Inputs(survey=literature.source_path())
+    """The survey of Supplementary Table S1."""
+    return Part0Inputs(survey=literature.SURVEY_PATH)
 
 
 def _mode(values: pd.Series, what: str) -> float:
@@ -215,10 +214,7 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
 def summarize(inputs: Part0Inputs, produced_by: str, commit: str) -> Summary:
     """Part 0's summary from ``inputs``."""
     summary = Summary(part=0, produced_by=produced_by, commit=commit)
-    source = (
-        f"the replay-literature survey packaged in {literature.SOURCE_PACKAGE} "
-        f"{literature.source_version()} (Supplementary Table S1)"
-    )
+    source = "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)"
     survey = pd.read_csv(
         inputs.survey, dtype=str, keep_default_na=False, encoding="utf-8-sig"
     )
