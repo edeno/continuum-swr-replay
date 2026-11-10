@@ -83,7 +83,12 @@ src/continuum_swr_replay/
 scripts/                   # Analysis scripts, grouped by domain — see scripts/README.md
 ├── decoding/  detection/  tables/  rate/  coupling/  content/  behavior/  figures/  qa/  pfc/
 └── exploratory/           #   unsupported one-offs (_*.py)
-paper/figures/<topic>/     # Publication figures in topic subdirs (no loose files)
+paper/                     # The manuscript — see paper/README.md
+├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
+├── reported/              #   part{n}.json summaries every reported number is read from
+├── reported_values.tex    #   generated macros, one per reported number (make reported-values)
+└── figures/<topic>/       #   Publication figures in topic subdirs (no loose files)
+Makefile                   # Common tasks: make help
 docs/                      # Published reference — see docs/README.md for the doc-type→home scheme
 ├── design/               #   scientific/methodological design specs (human-discoverable)
 └── known_issues/

@@ -1,0 +1,127 @@
+% Manuscript. Build with `make manuscript` from the repository root, or
+% `latexmk -pdf main.tex` from this directory (see README.md).
+%
+% Numbers: every result number is a macro from reported_values.tex, which
+% scripts/reported/emit_reported_values.py writes from paper/reported/part{n}.json.
+% Do not type a result number by hand.
+%
+% TODO: the working title, the authors and the journal's document class are
+% placeholders (TODO.md).
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{authblk}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\input{reported_values.tex}
+
+% A figure file is drawn if it exists; otherwise a framed box names the file
+% and the script that makes it, so the PDF builds before every figure exists.
+\newcommand{\paperfigure}[2]{%
+  \IfFileExists{#1}%
+    {\includegraphics[width=\textwidth]{#1}}%
+    {\fbox{\parbox[c][0.3\textheight][c]{0.9\textwidth}{\centering
+      Figure not yet generated: \texttt{\detokenize{#1}}\\[0.5em]
+      Run \texttt{\detokenize{#2}}}}}%
+}
+
+\title{Non-local hippocampal events outside sharp-wave ripples\\
+  \large (working title)}
+% Tentative author order (TODO.md).
+\author[1,2]{Eric L. Denovellis}
+\author[3]{Alison E. Comrie}
+\author[4]{Ari E. Kahn}
+\author[5,6,7]{Joshua D. Berke}
+\author[8,9]{Nathaniel D. Daw}
+\author[10]{Uri T. Eden}
+\author[1,2,6]{Loren M. Frank}
+\affil[1]{Departments of Physiology and Psychiatry, University of California,
+  San Francisco}
+\affil[2]{Howard Hughes Medical Institute, University of California, San Francisco}
+\affil[3]{Howard Hughes Medical Institute, Janelia Research Campus}
+\affil[4]{Department of Psychology, University of Arizona}
+\affil[5]{Department of Neurology and Department of Psychiatry and Behavioral
+  Science, University of California, San Francisco}
+\affil[6]{Kavli Institute for Fundamental Neuroscience, University of
+  California, San Francisco}
+\affil[7]{Weill Institute for Neurosciences, University of California, San
+  Francisco}
+\affil[8]{Princeton Neuroscience Institute, Princeton University}
+\affil[9]{Department of Psychology, Princeton University}
+\affil[10]{Department of Mathematics and Statistics, Boston University}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+To be written.
+\end{abstract}
+
+\section{Introduction}
+
+\section{Results}
+
+% The four parts follow docs/analysis_map.md and paper/claims_table.md.
+
+\subsection{The model: how it works and what it captures}
+
+\subsection{The events: what they are, and how they compare with SWRs and
+  sequence-detector events}
+
+\subsection{Behavior: how the events relate to the task}
+
+\subsection{Other brain areas: how they respond to the events}
+
+\section{Discussion}
+
+\section{Methods}
+
+\section*{Data and code availability}
+
+The code for every analysis and figure is at
+\url{https://github.com/edeno/continuum-swr-replay}.
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\clearpage
+
+% Main figures, made by scripts/figures/generate_all_figures.py.
+
+\begin{figure}[p]
+  \centering
+  \paperfigure{figures/figure01/figure01.pdf}{scripts/figures/generate_figure01.py}
+  \caption{To be written.}
+  \label{fig:figure01}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \paperfigure{figures/figure02/figure02.pdf}{scripts/figures/generate_figure02.py}
+  \caption{To be written.}
+  \label{fig:figure02}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \paperfigure{figures/figure03/figure03.pdf}{scripts/figures/generate_figure03.py}
+  \caption{To be written.}
+  \label{fig:figure03}
+\end{figure}
+
+\begin{figure}[p]
+  \centering
+  \paperfigure{figures/figure04/figure04.pdf}{scripts/figures/generate_figure04.py}
+  \caption{To be written.}
+  \label{fig:figure04}
+\end{figure}
+
+\end{document}
