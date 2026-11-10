@@ -3,7 +3,7 @@
  "part": 0,
  "title": "the surveyed literature",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "006a7ecf4aaf-dirty",
+ "commit": "f6ac0bb9240d-dirty",
  "inputs": [
   {
    "path": "paper/tables/table_s1_literature_parameters.csv",
@@ -106,7 +106,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes')",
+   "description": "Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)",
    "claims": [
     "introduction"
    ],
@@ -211,7 +211,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection is exactly 'MUA')",
+   "description": "Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection names MUA only)",
    "claims": [
     "introduction"
    ],
@@ -376,7 +376,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection is 'SWR, MUA')",
+   "description": "Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection names SWR and MUA only)",
    "claims": [
     "introduction"
    ],
@@ -391,7 +391,7 @@
    "kind": "fraction",
    "style": "pctnum",
    "unit": "",
-   "description": "Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection is exactly 'SWR')",
+   "description": "Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection names SWR only)",
    "claims": [
     "introduction"
    ],
