@@ -31,7 +31,7 @@ make check      # what CI runs: format check, lint, the full test suite
 ```
 
 `make help` lists every target. `make sync` installs the analysis environment
-without the development tools; the GPU build is `uv sync --frozen --extra cuda`
+without the development tools; the GPU build is `uv sync --frozen --inexact --extra gpu`
 (Linux only). Commands run inside the environment with `uv run --frozen`, which
 uses the locked versions and does not re-solve them.
 
@@ -362,10 +362,10 @@ This project uses **JAX** for machine learning. The base install is
 macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
 - Default: `pip install` / `uv sync` resolves plain `jax`.
-- GPU: install the `cuda` extra to pull in `jax[cuda12]` —
-  ``uv sync --extra cuda``. Linux-only.
-- The legacy `gpu` extra also bundles `dask-cuda` and
-  `cuda-bindings` for GPU-aware Dask: ``uv sync --extra gpu``.
+- GPU: the `cuda` extra adds `jax-cuda12-plugin` (the CUDA build of JAX), and
+  the `gpu` extra adds it with `dask-cuda` and `cuda-bindings`, which the
+  decoders' GPU cluster needs: ``uv sync --frozen --inexact --extra gpu``.
+  Linux-only; `uv.lock` locks both extras.
 - Consider using GPU-aware code when implementing new analyses.
 - Dask is available for parallel processing across CPU cores.
 

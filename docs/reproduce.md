@@ -22,7 +22,8 @@ summaries is planned (see `TODO.md`).
   and the committed `uv.lock`; `.python-version` selects Python 3.11.
   `make sync` installs the analysis environment and `make sync-dev` adds the
   development tools. The decoders and the Part 4 fits run on NVIDIA GPUs; install
-  the CUDA build of JAX with `uv sync --frozen --extra cuda` (Linux only).
+  the CUDA build of JAX and the decoders' GPU cluster (`dask-cuda`) with
+  `uv sync --frozen --inexact --extra gpu` (Linux only; `--inexact` keeps the development tools).
 - **LaTeX.** `latexmk`, `pdflatex` and BibTeX, from TeX Live or MacTeX, for
   `make manuscript`.
 - **The lab's data.** Loading a session (`load_data`) queries the lab's
