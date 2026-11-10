@@ -148,12 +148,13 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     [detector_comparison.md](design/replay_detection_comparison/detector_comparison.md)
     tabulates every detection method considered, with a verified DOI for every work
     cited;
-    [literature_detection_parameters.csv](design/replay_detection_comparison/literature_detection_parameters.csv)
-    holds the lab's 57-paper survey of detection and decoding settings, corrected
-    against the papers, with
+    the lab's 57-paper survey of detection and decoding settings is packaged in
+    `ripple_detection`, where it was audited against each paper's methods, supplement and
+    released code; this repo's copy is Supplementary Table S1
+    ([../paper/tables/table_s1_literature_parameters.csv](../paper/tables/table_s1_literature_parameters.csv)),
+    and
     [literature_parameter_corrections.md](design/replay_detection_comparison/literature_parameter_corrections.md)
-    recording each change, the cells still flagged, and the papers that could not be
-    retrieved. Reference source vendored at
+    records the first round of corrections (2026-09-21). Reference source vendored at
     [reference/widloski_foster_2025/](../reference/widloski_foster_2025/) and
     [reference/yu_2017_franklab/](../reference/yu_2017_franklab/).
     Status: the memoryless sequence detector of spec 02, its significance shuffle,

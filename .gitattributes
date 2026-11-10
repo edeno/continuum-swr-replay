@@ -7,7 +7,3 @@
 uv.lock text eol=lf
 *.tex text eol=lf
 *.bib text eol=lf
-
-# A spreadsheet export: its rows end in CRLF and its quoted cells hold LF line
-# breaks. Store it byte for byte.
-docs/design/replay_detection_comparison/literature_detection_parameters.csv -text
