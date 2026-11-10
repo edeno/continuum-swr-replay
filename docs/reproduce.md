@@ -1,0 +1,172 @@
+# Reproduce the analyses
+
+How to rebuild the paper's results, from the recordings to the PDF. Run every
+command from the repository root.
+
+There are three levels, each needing more than the one before:
+
+| What | Command | Needs |
+| --- | --- | --- |
+| Build the PDF | `make manuscript` | LaTeX |
+| Write the reported numbers into the LaTeX macros and the docs | `make reported-values` | the committed summaries; Python |
+| Rebuild the summaries and the main figures | `make summaries`, `make figures` | the lab's processed data |
+| Rebuild everything, from the recordings | [the full rebuild](#the-full-rebuild) | the lab's Spyglass database, the NWB files, GPUs |
+
+There is no public reproduction yet: every analysis reads the lab's data.
+Archiving the analysis tables so that others can rebuild the figures and the
+summaries is planned (see `TODO.md`).
+
+## Requirements
+
+- **Python environment.** [uv](https://docs.astral.sh/uv/getting-started/installation/)
+  and the committed `uv.lock`; `.python-version` selects Python 3.11.
+  `make sync` installs the analysis environment and `make sync-dev` adds the
+  development tools. The decoders and the Part 4 fits run on NVIDIA GPUs; install
+  the CUDA build of JAX with `uv sync --frozen --extra cuda` (Linux only).
+- **LaTeX.** `latexmk`, `pdflatex` and BibTeX, from TeX Live or MacTeX, for
+  `make manuscript`.
+- **The lab's data.** Loading a session (`load_data`) queries the lab's
+  Spyglass database and reads its NWB files, so the decodes, the detectors, the
+  table builds and Figures 2–4 need a machine with database access (a DataJoint
+  configuration, `dj_local_conf.json`).
+- **The processed-data root.** Every script reads and writes under one root,
+  `$CSR_PROCESSED_DATA_DIR` if it is set, else the checkout's `Processed-Data/`
+  (`continuum_swr_replay.paths.processed_data_dir`). Point it at the shared copy
+  to reuse existing outputs:
+
+  ```bash
+  export CSR_PROCESSED_DATA_DIR=/path/to/Processed-Data
+  ```
+
+[Data lineage](data-lineage.md) lists what each step reads and writes.
+
+## The full rebuild
+
+All scripts are in `scripts/`. Steps 1–7 are the full rebuild. After a change to the table code, start at step 4;
+after a change to fitting code only, start at step 6.
+
+1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
+   [epoch_register.md](epoch_register.md)).
+2. **Artifacts and SWRs.**
+   - Run `detection/run_artifact_detection.py` (the artifact mask), then `detection/run_swr_detection.py` (the
+     four SWR inventories).
+   - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
+     `src/continuum_swr_replay/analysis/events/swr_source.py`. A decode refuses to start without them.
+3. **Decodes.** `decoding/run_decoding_bandit.py` (non-local detector) and `decoding/run_decoding_contfrag.py`
+   (ContFrag), on GPUs.
+4. **Tables**, in this order:
+   1. `behavior/fetch_spatial_bandit_behavior.sh`;
+   2. `tables/prepare_replay_content_data.py --stop-only` (the stop table);
+   3. `behavior/build_qvals_table.py --write` (needs the stop table);
+   4. `tables/prepare_replay_content_data.py` (the event, event × arm, event × patch, sequence and stop
+      tables; needs `qvals_table`);
+   5. `tables/build_timebin_tables.py`;
+   6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
+5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
+   the supplements).
+6. **Part 3 fits and the figures that read them:** `qa/run_refits.py`.
+7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
+
+`figures/generate_all_figures.py` draws Figures 1–4 in one go. Run it only after step 7.
+8. **Summaries, macros, PDF.** Rebuild the four summary files, write their
+   values into the LaTeX macros and the docs, and build the PDF:
+
+   ```bash
+   make summaries        # scripts/reported/summarize_part.py --part 1 ... 4
+   make reported-values  # scripts/reported/emit_reported_values.py
+   make manuscript
+   ```
+
+   `make reported-values` lists every number that changed, on the screen and in
+   `paper/reported/changes.md`. Read that list before committing.
+
+## Decoding
+
+The main analysis workflow is in `scripts/decoding/run_decoding_bandit.py`, which performs continuum decoding using non-local detection algorithms.
+
+### Decoding Workflow
+
+1. **Load data**: Use `load_data()` to get all session data
+2. **Set up environment**: Create `Environment` with place bins and track graph
+3. **Select training data**: Exclude ripple times or use all data (via `get_training_timepoints()`)
+4. **Perform decoding**: Use detector-specific methods:
+   - `NonLocalClusterlessDetector` for HPC (uses waveform features)
+   - `NonLocalSortedSpikesDetector` for mPFC/OFC (uses sorted spikes)
+5. **Organize results**: Compute derived measures (ahead/behind distance, HPD)
+6. **Save outputs**: Results as NetCDF (.nc), models as pickle (.pkl)
+7. **Generate figurl**: Interactive visualization URL (optional)
+
+### Key Decoding Parameters
+
+```python
+# Place binning
+place_bin_size = 2.0  # cm for 1D, 3.5 cm for 2D
+
+# Decoding parameters (HPC clusterless)
+position_std = np.sqrt(12.5)  # ~3.5 cm
+waveform_std = 24.0
+block_size = 1024  # for GPU processing
+
+# Training options
+training_type = "no_ripple"  # or "all"
+non_stationary = False  # if True, uses speed as transition covariate
+non_local_threshold = 0.8  # threshold for classifying non-local events
+```
+
+### Command-Line Usage
+
+```bash
+# Decode all sessions for an animal
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --brain_area HPC
+
+# Decode specific session
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
+
+# With non-stationary model and figurl
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
+
+# Overwrite existing results
+uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --overwrite
+```
+
+### GPU and Distributed Computing
+
+The script uses Dask with CUDA for GPU-accelerated parallel processing:
+
+```python
+# Automatically sets up LocalCUDACluster
+# Configure visible GPUs via command line
+--cuda_visible_devices "0,1,2,3"  # Use specific GPUs
+
+# Set XLA memory fraction (done automatically in script)
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
+```
+
+Multiple sessions are processed in parallel using `dask.delayed` and `dask.compute`.
+
+### Output Files
+
+Results are saved to `--save_dir`, by default `paths.processed_data_dir()` (`$CSR_PROCESSED_DATA_DIR`, else the checkout's `Processed-Data/`):
+
+- `{epoch_identifier}_results.nc` - Decoding results (xarray Dataset)
+- `{epoch_identifier}_detector.pkl` - Fitted detector model
+- `{epoch_identifier}_environment.pkl` - Environment configuration
+- `{epoch_identifier}_{threshold}_data_over_time.pkl` - Derived time series data
+
+Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibility.
+
+## What is committed
+
+| Committed | Made by |
+| --- | --- |
+| `paper/reported/part{n}.json` | `make summaries` |
+| `paper/reported_values.tex`, `paper/reported/values_index.md`, the inline values in `docs/` and `paper/` | `make reported-values` |
+| `paper/main.pdf` | `make manuscript` |
+| Final figures under `paper/figures/` (each listed in `.gitignore` as an exception) | the figure scripts |
+
+Decodes, tables, fits, logs and every other file under the processed-data root
+are not committed. After a change that alters results, commit the summaries,
+the macros, the docs they fill and the rebuilt PDF together.
+
+[Figure pipeline](figure-pipeline.md) traces each figure from its claim to its
+script and inputs.

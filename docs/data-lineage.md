@@ -1,0 +1,61 @@
+# Data lineage
+
+Where the data comes from and where each stage writes, from the recordings to
+the numbers in the paper. [reproduce.md](reproduce.md#the-full-rebuild) gives
+the order to run the stages in; this page gives what each one reads and writes.
+
+Paths below are relative to the processed-data root, `$CSR_PROCESSED_DATA_DIR`
+if it is set, else the checkout's `Processed-Data/`
+(`continuum_swr_replay.paths`). Use the functions there to build a path, not a
+hand-joined string. Nothing under the root is committed.
+
+## Recordings and cohort
+
+- **NWB files and the Spyglass database.** The raw data are NWB files from five
+  rats (chimi, j16, peanut, senor, wilbur), read through the lab's Spyglass
+  database. `NWB_FILES` in `src/continuum_swr_replay/data_loaders/constants.py`
+  lists every file the loaders search. `load_data` reads position, spikes, LFP
+  and task events from the Spyglass tables listed in
+  [development.md](development.md#data-integration-with-spyglass).
+- **Cohort.** Which run epochs are analysed is decided by the epoch register,
+  `src/continuum_swr_replay/data_loaders/epoch_register.csv`, one row per epoch
+  with its status and the reason for every exclusion
+  ([epoch_register.md](epoch_register.md)). Every stage reads it; no stage globs
+  a folder to find epochs.
+
+## Stages
+
+| Stage | Output (under the root) | Written by |
+| --- | --- | --- |
+| Artifact mask | `artifact_intervals/<run id>/` | `scripts/detection/run_artifact_detection.py` |
+| SWR inventories (Kay, Karlsson, Yu, Zugaro) | `replay_detection_comparison/swr/<run id>/` | `scripts/detection/run_swr_detection.py` |
+| Decodes, non-local detector | `{epoch_id}_results.nc`, `_detector.pkl`, `_environment.pkl`, `_80_data_over_time.pkl` | `scripts/decoding/run_decoding_bandit.py` |
+| Decodes, ContFrag | the same names, for the SWR and MUA event sources | `scripts/decoding/run_decoding_contfrag.py` |
+| Canonical tables | `replay_content/{event,event_arm,event_patch,event_sequence,stop,qvals,event_onset,stop_timebin}_table.parquet`; ContFrag tables under `contfrag_replay_content/` | `scripts/tables/` and `scripts/behavior/` (order in [reproduce.md](reproduce.md#the-full-rebuild)) |
+| Part 3 fits | `replay_content/models*/` and the other result folders under `replay_content/` | `scripts/rate/`, `scripts/content/`, `scripts/behavior/`, all run by `scripts/qa/run_refits.py` |
+| Detector comparison | `replay_detection_comparison/{memoryless,carey,inventory,event_features}/<run id>/` | `scripts/detection/` |
+| Part 4 fits (mPFC) | `{epoch_id}_mPFC_modulation.pkl` and its `.npy` arrays | `scripts/pfc/run_pfc_analysis_bandit.py` |
+
+Two settings tie the decodes to the detector runs:
+`ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
+`src/continuum_swr_replay/analysis/events/swr_source.py` name the artifact and
+SWR runs every decode and every analysis reads. A decode refuses to start
+without them. The rule for which time and which events are analysed is
+described in [development.md](development.md#canonical-per-event-classification-table).
+
+The event, event × arm, event sequence and stop tables share event ids, so they
+are rebuilt together; a partial rebuild mis-joins silently
+([development.md](development.md#canonical-per-event-classification-table)).
+
+## From results to the paper
+
+| Stage | Output (in the repository) | Written by |
+| --- | --- | --- |
+| Summaries | `paper/reported/part{n}.json` | `scripts/reported/summarize_part.py --part n` (`make summaries`) |
+| Macros and inline values | `paper/reported_values.tex`; the `<!--v:…-->` values in `docs/` and `paper/` | `scripts/reported/emit_reported_values.py` (`make reported-values`) |
+| Figures | `paper/figures/<topic>/` | `scripts/figures/` ([figure-pipeline.md](figure-pipeline.md)) |
+| Manuscript | `paper/main.pdf` | `make manuscript` |
+
+Each summary records the commit that built it and the SHA-256 of every file it
+read (its `inputs` list), so a reported number can be traced to the files
+under the root that it came from.

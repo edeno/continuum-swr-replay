@@ -27,6 +27,12 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 
 - [analysis_map.md](analysis_map.md) — *start here*: the five questions, each analysis that answers
   them, its run name, script, outputs, figures and claims rows, and the flow from decodes to figures.
+- [reproduce.md](reproduce.md) — *how to run*: what each level of rebuild needs, the full
+  rebuild in order (from the cohort to the PDF), the decoders, and what is committed.
+- [figure-pipeline.md](figure-pipeline.md) — *figures*: each figure's claims, script, inputs,
+  output and tests.
+- [data-lineage.md](data-lineage.md) — *data*: where each stage reads and writes, from the NWB
+  files to the summaries.
 - [development.md](development.md) — *development guide*: the task and data model, the
   code layout, the analysis conventions and the reported-numbers rule. `CLAUDE.md`
   imports it.

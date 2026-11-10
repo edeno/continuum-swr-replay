@@ -385,78 +385,8 @@ See `NWB_FILES` in `data_loaders/constants.py` for the complete file list.
 
 ## Running Decoding Analysis
 
-The main analysis workflow is in `scripts/decoding/run_decoding_bandit.py`, which performs continuum decoding using non-local detection algorithms.
-
-### Decoding Workflow
-
-1. **Load data**: Use `load_data()` to get all session data
-2. **Set up environment**: Create `Environment` with place bins and track graph
-3. **Select training data**: Exclude ripple times or use all data (via `get_training_timepoints()`)
-4. **Perform decoding**: Use detector-specific methods:
-   - `NonLocalClusterlessDetector` for HPC (uses waveform features)
-   - `NonLocalSortedSpikesDetector` for mPFC/OFC (uses sorted spikes)
-5. **Organize results**: Compute derived measures (ahead/behind distance, HPD)
-6. **Save outputs**: Results as NetCDF (.nc), models as pickle (.pkl)
-7. **Generate figurl**: Interactive visualization URL (optional)
-
-### Key Decoding Parameters
-
-```python
-# Place binning
-place_bin_size = 2.0  # cm for 1D, 3.5 cm for 2D
-
-# Decoding parameters (HPC clusterless)
-position_std = np.sqrt(12.5)  # ~3.5 cm
-waveform_std = 24.0
-block_size = 1024  # for GPU processing
-
-# Training options
-training_type = "no_ripple"  # or "all"
-non_stationary = False  # if True, uses speed as transition covariate
-non_local_threshold = 0.8  # threshold for classifying non-local events
-```
-
-### Command-Line Usage
-
-```bash
-# Decode all sessions for an animal
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --brain_area HPC
-
-# Decode specific session
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
-
-# With non-stationary model and figurl
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
-
-# Overwrite existing results
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --overwrite
-```
-
-### GPU and Distributed Computing
-
-The script uses Dask with CUDA for GPU-accelerated parallel processing:
-
-```python
-# Automatically sets up LocalCUDACluster
-# Configure visible GPUs via command line
---cuda_visible_devices "0,1,2,3"  # Use specific GPUs
-
-# Set XLA memory fraction (done automatically in script)
-os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "0.99"
-```
-
-Multiple sessions are processed in parallel using `dask.delayed` and `dask.compute`.
-
-### Output Files
-
-Results are saved to `--save_dir`, by default `paths.processed_data_dir()` (`$CSR_PROCESSED_DATA_DIR`, else the checkout's `Processed-Data/`):
-
-- `{epoch_identifier}_results.nc` - Decoding results (xarray Dataset)
-- `{epoch_identifier}_detector.pkl` - Fitted detector model
-- `{epoch_identifier}_environment.pkl` - Environment configuration
-- `{epoch_identifier}_{threshold}_data_over_time.pkl` - Derived time series data
-
-Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibility.
+How to run the decoders, their settings and their outputs are in
+[reproduce.md](reproduce.md#decoding).
 
 ## Reported numbers
 
