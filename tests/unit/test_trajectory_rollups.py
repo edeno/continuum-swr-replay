@@ -45,7 +45,9 @@ def test_count_ab_reversals():
     # Flat steps are ignored even at delta=0
     assert _count_ab_reversals(np.array([0.0, 1.0, 1.0, 0.0]), delta=0.0) == 1
     # NaN bins are dropped before counting: [0, 5, 0] -> 1
-    assert _count_ab_reversals(np.array([0.0, np.nan, 5.0, np.nan, 0.0]), delta=1.0) == 1
+    assert (
+        _count_ab_reversals(np.array([0.0, np.nan, 5.0, np.nan, 0.0]), delta=1.0) == 1
+    )
 
 
 def test_terminates_at_well_proximity():
@@ -60,10 +62,17 @@ def test_terminates_at_well_proximity():
     zeros = np.zeros(4)
     cont = np.full(4, 0.9)
     _, out = trajectory_dynamics(
-        event_id=event_id, map_estimate=map_estimate, step_distance=zeros,
-        map_speed=np.full(4, 5.0), decoded_arm=decoded_arm, continuous_prob=cont,
-        fragmented_prob=1.0 - cont, run_speed_baseline=np.full(4, 50.0),
-        ahead_behind_distance=ahead_behind, env=env, place_bin_size=2.0,
+        event_id=event_id,
+        map_estimate=map_estimate,
+        step_distance=zeros,
+        map_speed=np.full(4, 5.0),
+        decoded_arm=decoded_arm,
+        continuous_prob=cont,
+        fragmented_prob=1.0 - cont,
+        run_speed_baseline=np.full(4, 50.0),
+        ahead_behind_distance=ahead_behind,
+        env=env,
+        place_bin_size=2.0,
     )
     np.testing.assert_array_equal(out["terminates_at_well"], [True, False])
 
@@ -144,10 +153,17 @@ def test_trajectory_dynamics_forward_and_outback():
     ahead_behind = np.array([0.0, 10.0, 20.0, 0.0, 20.0, 0.0])
 
     ids, out = trajectory_dynamics(
-        event_id=event_id, map_estimate=map_estimate, step_distance=step_distance,
-        map_speed=map_speed, decoded_arm=decoded_arm, continuous_prob=cont,
-        fragmented_prob=frag, run_speed_baseline=baseline,
-        ahead_behind_distance=ahead_behind, env=env, place_bin_size=2.0,
+        event_id=event_id,
+        map_estimate=map_estimate,
+        step_distance=step_distance,
+        map_speed=map_speed,
+        decoded_arm=decoded_arm,
+        continuous_prob=cont,
+        fragmented_prob=frag,
+        run_speed_baseline=baseline,
+        ahead_behind_distance=ahead_behind,
+        env=env,
+        place_bin_size=2.0,
     )
     np.testing.assert_array_equal(ids, [1, 2])
 
@@ -185,8 +201,11 @@ def test_brain_state_means_and_fraction():
     extra = {"ripple_power": np.array([10.0, 20.0, 5.0, 7.0])}
 
     ids, out = brain_state_means(
-        event_id=event_id, nonlocal_prob=nonlocal_prob,
-        state_probs=state_probs, extra_means=extra, non_local_threshold=0.8,
+        event_id=event_id,
+        nonlocal_prob=nonlocal_prob,
+        state_probs=state_probs,
+        extra_means=extra,
+        non_local_threshold=0.8,
     )
     np.testing.assert_array_equal(ids, [1, 2])
     np.testing.assert_allclose(out["local_prob_mean"], [0.2, 0.1])
@@ -200,7 +219,9 @@ def test_brain_state_means_skips_nan_signal_bins():
     event_id = np.array([1, 1, 2, 2])
     extra = {"ripple_power": np.array([10.0, np.nan, np.nan, np.nan])}
     ids, out = brain_state_means(
-        event_id=event_id, state_probs={}, extra_means=extra,
+        event_id=event_id,
+        state_probs={},
+        extra_means=extra,
     )
     np.testing.assert_array_equal(ids, [1, 2])
     # event1: mean of the one finite bin (10.0); event2: all NaN -> NaN
@@ -217,8 +238,11 @@ def test_ahead_behind_direction_and_reach():
     current_arm = np.array([0.0, 0.0, 0.0, 2.0, 2.0, 2.0])
 
     ids, out = ahead_behind_summary(
-        event_id=event_id, ahead_behind_distance=ab,
-        decoded_arm=decoded_arm, current_arm=current_arm, time=time,
+        event_id=event_id,
+        ahead_behind_distance=ab,
+        decoded_arm=decoded_arm,
+        current_arm=current_arm,
+        time=time,
     )
     np.testing.assert_array_equal(ids, [1, 2])
     np.testing.assert_allclose(out["ab_slope_cm_s"], [10.0, -10.0])
@@ -255,8 +279,11 @@ def test_uncertainty_extra_multimodal_and_hpd():
         ]
     )
     ids, out = uncertainty_extra(
-        event_id=event_id, hpd=hpd, arm_posterior=arm_posterior,
-        arm_adjacency=adjacency, coverage=0.95,
+        event_id=event_id,
+        hpd=hpd,
+        arm_posterior=arm_posterior,
+        arm_adjacency=adjacency,
+        coverage=0.95,
     )
     np.testing.assert_array_equal(ids, [1])
     np.testing.assert_allclose(out["hpd_coverage_cm"], [20.0])
@@ -344,8 +371,12 @@ def test_orchestrator_contfrag_2state_omits_nonlocal_only_columns():
         nonlocal_prob=None,  # ContFrag: both states non-local
     )
     # 4-state-only columns must be absent
-    for col in ("nonlocal_fraction", "nospike_fraction", "local_prob_mean",
-                "nospike_prob_mean"):
+    for col in (
+        "nonlocal_fraction",
+        "nospike_fraction",
+        "local_prob_mean",
+        "nospike_prob_mean",
+    ):
         assert col not in out, f"{col} must not be produced for ContFrag"
     # continuous_prob_mean is produced and correct
     np.testing.assert_allclose(out["continuous_prob_mean"], [(0.7 + 0.6 + 0.8) / 3])

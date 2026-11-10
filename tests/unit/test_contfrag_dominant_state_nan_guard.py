@@ -196,11 +196,14 @@ class TestContfragDominantStateNaNGuard:
         could break under partial asymmetric NaNs.
         """
         cases = [
-            (np.array([0.9, 0.1]), np.array([0.8, np.nan])),       # paired: cont wins
-            (np.array([0.1, 0.9]), np.array([np.nan, 0.8])),       # paired: cont wins (mirror)
-            (np.array([0.2, 0.95]), np.array([0.6, np.nan])),      # paired: frag wins
-            (np.array([0.7, 0.6]), np.array([0.2, 0.3])),          # all-finite, cont
-            (np.array([0.2, 0.3]), np.array([0.7, 0.6])),          # all-finite, frag
+            (np.array([0.9, 0.1]), np.array([0.8, np.nan])),  # paired: cont wins
+            (
+                np.array([0.1, 0.9]),
+                np.array([np.nan, 0.8]),
+            ),  # paired: cont wins (mirror)
+            (np.array([0.2, 0.95]), np.array([0.6, np.nan])),  # paired: frag wins
+            (np.array([0.7, 0.6]), np.array([0.2, 0.3])),  # all-finite, cont
+            (np.array([0.2, 0.3]), np.array([0.7, 0.6])),  # all-finite, frag
         ]
         for cont, frag in cases:
             cm, fm, dom, cf = _summarize_event_state(cont, frag)

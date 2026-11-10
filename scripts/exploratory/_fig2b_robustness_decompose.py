@@ -27,8 +27,9 @@ from continuum_swr_replay.analysis.hippocampus import (
 )
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
-                    datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
+)
 
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/fig2b_outputs"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -43,7 +44,9 @@ def class_breakdown(df: pd.DataFrame) -> dict:
     total = int(len(df))
     c["total"] = total
     c["f_nonswr"] = c["non_swr"] / total if total else np.nan
-    c["f_swr_any"] = (c["swr_contained"] + c["swr_partial"]) / total if total else np.nan
+    c["f_swr_any"] = (
+        (c["swr_contained"] + c["swr_partial"]) / total if total else np.nan
+    )
     # D1 plurality: non_swr is strictly the largest class
     c["non_swr_is_plurality"] = total > 0 and c["non_swr"] > max(
         c["swr_contained"], c["swr_partial"]
@@ -78,6 +81,7 @@ def main() -> None:
     pooled_bd = class_breakdown(immobile)
 
     lines = []
+
     def emit(s=""):
         lines.append(s)
         print(s)
@@ -85,17 +89,23 @@ def main() -> None:
     emit("=" * 72)
     emit("FIG 2b ROBUSTNESS DECOMPOSITION")
     emit("=" * 72)
-    emit(f"Sessions: {immobile.groupby(['animal','day','epoch']).ngroups}  "
-         f"Animals: {immobile['animal'].nunique()}")
+    emit(
+        f"Sessions: {immobile.groupby(['animal', 'day', 'epoch']).ngroups}  "
+        f"Animals: {immobile['animal'].nunique()}"
+    )
     emit(f"Total non-local events (all): {len(tbl):,}  immobile: {len(immobile):,}")
     emit("")
     emit("[0] POOLED (event-weighted) — should match panel b:")
-    emit(f"    contained={pooled['swr_contained']:,}  "
-         f"partial={pooled['swr_partial']:,}  non_swr={pooled['non_swr']:,}  "
-         f"total={pooled['total']:,}")
-    emit(f"    f_nonswr (pooled) = {pooled_bd['f_nonswr']:.3f}   "
-         f"non_swr plurality={pooled_bd['non_swr_is_plurality']}  "
-         f"majority={pooled_bd['non_swr_is_majority']}")
+    emit(
+        f"    contained={pooled['swr_contained']:,}  "
+        f"partial={pooled['swr_partial']:,}  non_swr={pooled['non_swr']:,}  "
+        f"total={pooled['total']:,}"
+    )
+    emit(
+        f"    f_nonswr (pooled) = {pooled_bd['f_nonswr']:.3f}   "
+        f"non_swr plurality={pooled_bd['non_swr_is_plurality']}  "
+        f"majority={pooled_bd['non_swr_is_majority']}"
+    )
     assert pooled["non_swr"] == pooled_bd["non_swr"], "reproduction mismatch"
 
     # ── 1. Per-animal ──
@@ -107,19 +117,25 @@ def main() -> None:
         bd["animal"] = animal
         bd["n_sessions"] = g.groupby(["day", "epoch"]).ngroups
         rows.append(bd)
-        emit(f"    {animal:8s} n={bd['total']:6,d} sess={bd['n_sessions']:3d}  "
-             f"contained={bd['swr_contained']:5d} partial={bd['swr_partial']:5d} "
-             f"non_swr={bd['non_swr']:6d}  f_nonswr={bd['f_nonswr']:.3f}  "
-             f"plurality={str(bd['non_swr_is_plurality']):5s} "
-             f"majority={bd['non_swr_is_majority']}")
+        emit(
+            f"    {animal:8s} n={bd['total']:6,d} sess={bd['n_sessions']:3d}  "
+            f"contained={bd['swr_contained']:5d} partial={bd['swr_partial']:5d} "
+            f"non_swr={bd['non_swr']:6d}  f_nonswr={bd['f_nonswr']:.3f}  "
+            f"plurality={str(bd['non_swr_is_plurality']):5s} "
+            f"majority={bd['non_swr_is_majority']}"
+        )
     per_animal = pd.DataFrame(rows).set_index("animal")
     per_animal.to_csv(OUT / "per_animal.csv")
 
     n_animals_plurality = int(per_animal["non_swr_is_plurality"].sum())
-    emit(f"    --> non_swr is plurality in {n_animals_plurality}/"
-         f"{len(per_animal)} animals")
-    emit(f"    --> f_nonswr range across animals: "
-         f"[{per_animal['f_nonswr'].min():.3f}, {per_animal['f_nonswr'].max():.3f}]")
+    emit(
+        f"    --> non_swr is plurality in {n_animals_plurality}/"
+        f"{len(per_animal)} animals"
+    )
+    emit(
+        f"    --> f_nonswr range across animals: "
+        f"[{per_animal['f_nonswr'].min():.3f}, {per_animal['f_nonswr'].max():.3f}]"
+    )
 
     # ── 2. Per-session ──
     emit("")
@@ -135,37 +151,51 @@ def main() -> None:
     # require a minimum number of events for a session-level fraction to count
     MIN_N = 10
     sized = per_session[per_session["total"] >= MIN_N]
-    emit(f"    {len(per_session)} sessions; {len(sized)} with >= {MIN_N} immobile events")
-    emit(f"    session event-count: median={per_session['total'].median():.0f} "
-         f"min={per_session['total'].min():.0f} max={per_session['total'].max():.0f}")
-    emit(f"    f_nonswr per session (>= {MIN_N} ev): "
-         f"median={sized['f_nonswr'].median():.3f}  "
-         f"mean(unweighted)={sized['f_nonswr'].mean():.3f}  "
-         f"IQR=[{sized['f_nonswr'].quantile(.25):.3f}, "
-         f"{sized['f_nonswr'].quantile(.75):.3f}]")
+    emit(
+        f"    {len(per_session)} sessions; {len(sized)} with >= {MIN_N} immobile events"
+    )
+    emit(
+        f"    session event-count: median={per_session['total'].median():.0f} "
+        f"min={per_session['total'].min():.0f} max={per_session['total'].max():.0f}"
+    )
+    emit(
+        f"    f_nonswr per session (>= {MIN_N} ev): "
+        f"median={sized['f_nonswr'].median():.3f}  "
+        f"mean(unweighted)={sized['f_nonswr'].mean():.3f}  "
+        f"IQR=[{sized['f_nonswr'].quantile(0.25):.3f}, "
+        f"{sized['f_nonswr'].quantile(0.75):.3f}]"
+    )
     frac_plur = sized["non_swr_is_plurality"].mean()
     frac_maj = sized["non_swr_is_majority"].mean()
-    emit(f"    sessions where non_swr is PLURALITY: {frac_plur:.1%} "
-         f"({int(sized['non_swr_is_plurality'].sum())}/{len(sized)})")
+    emit(
+        f"    sessions where non_swr is PLURALITY: {frac_plur:.1%} "
+        f"({int(sized['non_swr_is_plurality'].sum())}/{len(sized)})"
+    )
     emit(f"    sessions where non_swr is MAJORITY:  {frac_maj:.1%}")
-    emit(f"    --> event-weighted pooled f_nonswr={pooled_bd['f_nonswr']:.3f} vs "
-         f"unweighted session-mean f_nonswr={sized['f_nonswr'].mean():.3f} "
-         f"(H3 Simpson check: large gap => count-imbalance)")
+    emit(
+        f"    --> event-weighted pooled f_nonswr={pooled_bd['f_nonswr']:.3f} vs "
+        f"unweighted session-mean f_nonswr={sized['f_nonswr'].mean():.3f} "
+        f"(H3 Simpson check: large gap => count-imbalance)"
+    )
 
     # ── 3. Concentration ──
     emit("")
     emit("[3] CONCENTRATION of non_swr events:")
     tot_nonswr = per_session["non_swr"].sum()
     top_animal = per_animal["non_swr"].sort_values(ascending=False)
-    emit(f"    top animal by non_swr count: {top_animal.index[0]} "
-         f"({top_animal.iloc[0]:,} = {top_animal.iloc[0]/tot_nonswr:.1%} of all non_swr)")
+    emit(
+        f"    top animal by non_swr count: {top_animal.index[0]} "
+        f"({top_animal.iloc[0]:,} = {top_animal.iloc[0] / tot_nonswr:.1%} of all non_swr)"
+    )
     sess_sorted = per_session.sort_values("non_swr", ascending=False)
     for k in (1, 5, 10):
         share = sess_sorted["non_swr"].head(k).sum() / tot_nonswr
         emit(f"    top {k:2d} sessions hold {share:.1%} of all non_swr events")
-    emit(f"    Gini of non_swr across sessions: "
-         f"{gini(per_session['non_swr'].values):.3f}  "
-         f"(events/session Gini: {gini(per_session['total'].values):.3f})")
+    emit(
+        f"    Gini of non_swr across sessions: "
+        f"{gini(per_session['non_swr'].values):.3f}  "
+        f"(events/session Gini: {gini(per_session['total'].values):.3f})"
+    )
 
     # ── 4. Leave-one-animal-out ──
     emit("")
@@ -173,9 +203,11 @@ def main() -> None:
     for animal in sorted(immobile["animal"].unique()):
         sub = immobile[immobile["animal"] != animal]
         bd = class_breakdown(sub)
-        emit(f"    drop {animal:8s}: non_swr={bd['non_swr']:6d} "
-             f"partial={bd['swr_partial']:5d} contained={bd['swr_contained']:5d}  "
-             f"f_nonswr={bd['f_nonswr']:.3f}  plurality={bd['non_swr_is_plurality']}")
+        emit(
+            f"    drop {animal:8s}: non_swr={bd['non_swr']:6d} "
+            f"partial={bd['swr_partial']:5d} contained={bd['swr_contained']:5d}  "
+            f"f_nonswr={bd['f_nonswr']:.3f}  plurality={bd['non_swr_is_plurality']}"
+        )
 
     # ── 5. H3: f_nonswr vs session size ──
     emit("")

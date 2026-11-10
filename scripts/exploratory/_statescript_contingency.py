@@ -220,7 +220,9 @@ def solve_time_offset(
         shifted = ss_s + offset
         idx = np.clip(np.searchsorted(dio, shifted), 1, dio.size - 1)
         left, right = dio[idx - 1], dio[idx]
-        nearest = np.where(np.abs(right - shifted) < np.abs(left - shifted), right, left)
+        nearest = np.where(
+            np.abs(right - shifted) < np.abs(left - shifted), right, left
+        )
         return np.abs(nearest - shifted), nearest
 
     resid, nearest = _residuals(coarse_offset)
@@ -230,7 +232,11 @@ def solve_time_offset(
         resid, _ = _residuals(coarse_offset)
         matched = resid < match_tolerance_s
 
-    return coarse_offset, float(np.median(resid[matched])) if matched.any() else np.inf, int(matched.sum())
+    return (
+        coarse_offset,
+        float(np.median(resid[matched])) if matched.any() else np.inf,
+        int(matched.sum()),
+    )
 
 
 def _best_patch(task_probability: np.ndarray) -> int:
@@ -345,8 +351,14 @@ def _assert_invariants(table: pd.DataFrame) -> None:
     finite = vals[np.isfinite(vals)]
     bad = sorted(set(np.round(finite, 3)) - VALID_P_REWARD)
     assert not bad, f"p_reward values outside the documented schedule: {bad}"
-    vd = table["task_reward_probability_patch_mean_gap_best_vs_second"].dropna().to_numpy()
-    assert (vd >= -1e-9).all(), "task_reward_probability_patch_mean_gap_best_vs_second must be >= 0"
+    vd = (
+        table["task_reward_probability_patch_mean_gap_best_vs_second"]
+        .dropna()
+        .to_numpy()
+    )
+    assert (vd >= -1e-9).all(), (
+        "task_reward_probability_patch_mean_gap_best_vs_second must be >= 0"
+    )
     assert table["stop_id"].is_unique, "one row per stop_id"
 
 
@@ -392,7 +404,9 @@ def _epoch_to_int(epoch_name: str) -> int:
     return int(epoch_name.split("_")[0])
 
 
-def _load_session_inputs(nwb_file_name: str, epoch_name: str) -> tuple[str, np.ndarray, np.ndarray]:
+def _load_session_inputs(
+    nwb_file_name: str, epoch_name: str
+) -> tuple[str, np.ndarray, np.ndarray]:
     """Fetch the StateScript log, its poke edges, and DIO poke ON edges.
 
     Returns ``(content, poke_times_ms, dio_poke_on_sec)`` restricted to the
@@ -403,8 +417,10 @@ def _load_session_inputs(nwb_file_name: str, epoch_name: str) -> tuple[str, np.n
 
     epoch_int = _epoch_to_int(epoch_name)
     content = (
-        StateScriptFile() & {"nwb_file_name": nwb_file_name, "epoch": epoch_int}
-    ).fetch_nwb()[0]["file"].content
+        (StateScriptFile() & {"nwb_file_name": nwb_file_name, "epoch": epoch_int})
+        .fetch_nwb()[0]["file"]
+        .content
+    )
     poke_times_ms = parse_poke_times_ms(content)
 
     valid = (
@@ -415,9 +431,7 @@ def _load_session_inputs(nwb_file_name: str, epoch_name: str) -> tuple[str, np.n
     t0, t1 = float(valid[0][0]), float(valid[-1][-1])
 
     dio = (
-        DIOEvents()
-        & f"nwb_file_name='{nwb_file_name}'"
-        & "dio_event_name LIKE 'Poke%'"
+        DIOEvents() & f"nwb_file_name='{nwb_file_name}'" & "dio_event_name LIKE 'Poke%'"
     ).fetch_nwb()
     on = []
     for d in dio:
@@ -492,13 +506,7 @@ def main() -> None:
     contingency_table.to_pickle(out)
 
     port_cols = [f"task_reward_probability_port_{p}" for p in range(6)]
-    hist = (
-        contingency_table[port_cols]
-        .stack()
-        .value_counts()
-        .sort_index()
-        .to_dict()
-    )
+    hist = contingency_table[port_cols].stack().value_counts().sort_index().to_dict()
     logger.info(
         "Wrote %d stops from %d sessions (%d failed) to %s",
         len(contingency_table),
@@ -509,7 +517,11 @@ def main() -> None:
     logger.info("p_reward value histogram: %s", hist)
     logger.info(
         "block-count distribution: %s",
-        contingency_table.groupby("stop_id")["block_number"].first().value_counts().sort_index().to_dict(),
+        contingency_table.groupby("stop_id")["block_number"]
+        .first()
+        .value_counts()
+        .sort_index()
+        .to_dict(),
     )
 
 

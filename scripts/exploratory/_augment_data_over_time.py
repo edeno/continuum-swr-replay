@@ -83,7 +83,9 @@ def _step_distance_from_results(
 _STALE_COLUMNS = ["ripple_power", "mua_rate", "theta_power"]
 
 
-def _augment_pkl(pkl: Path, scenario: str, base: str, env: Environment, check_only: bool) -> None:
+def _augment_pkl(
+    pkl: Path, scenario: str, base: str, env: Environment, check_only: bool
+) -> None:
     dot = pd.read_pickle(pkl)
     dot = dot.drop(columns=_STALE_COLUMNS, errors="ignore")
 
@@ -91,7 +93,9 @@ def _augment_pkl(pkl: Path, scenario: str, base: str, env: Environment, check_on
 
     run_speed_baseline = float(np.nanpercentile(dot["head_speed"].to_numpy(), 90))
     if not np.isfinite(run_speed_baseline):
-        raise ValueError(f"{pkl.name}: run_speed_baseline is not finite (head_speed all-NaN?)")
+        raise ValueError(
+            f"{pkl.name}: run_speed_baseline is not finite (head_speed all-NaN?)"
+        )
 
     dot["step_distance"] = step_distance
     dot["run_speed_baseline"] = run_speed_baseline
@@ -106,8 +110,12 @@ def _augment_pkl(pkl: Path, scenario: str, base: str, env: Environment, check_on
 
 
 def _augment_epoch(
-    animal: str, epoch_name: str, brain_area: str,
-    scenarios: dict[str, Path], check_only: bool, force: bool,
+    animal: str,
+    epoch_name: str,
+    brain_area: str,
+    scenarios: dict[str, Path],
+    check_only: bool,
+    force: bool,
 ) -> None:
     def _needs_augment(p: Path) -> bool:
         if force:
@@ -176,9 +184,12 @@ def main() -> None:
     for animal, epoch_name, brain_area in keys:
         try:
             _augment_epoch(
-                animal, epoch_name, brain_area,
+                animal,
+                epoch_name,
+                brain_area,
                 epochs[(animal, epoch_name, brain_area)],
-                args.check_only, args.force,
+                args.check_only,
+                args.force,
             )
         except MemoryError:
             raise

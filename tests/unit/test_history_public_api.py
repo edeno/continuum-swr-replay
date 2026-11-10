@@ -63,6 +63,10 @@ def test_history_names_still_resolve_through_covariates_package():
     """The public names re-exported through ``covariates`` are unchanged objects."""
     history = importlib.import_module(_HISTORY)
     covariates = importlib.import_module(_COVARIATES)
-    for name in ("rolling_reward_count_all_events", "visit_recency_all_events",
-                 "canonical_port_value_history", "q_all_arm"):
+    for name in (
+        "rolling_reward_count_all_events",
+        "visit_recency_all_events",
+        "canonical_port_value_history",
+        "q_all_arm",
+    ):
         assert getattr(covariates, name) is getattr(history, name), name

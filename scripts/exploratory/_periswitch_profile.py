@@ -65,12 +65,20 @@ def _signed_dist_to_switch(is_switch: np.ndarray) -> np.ndarray:
 
 def prep(stop: pd.DataFrame) -> pd.DataFrame:
     df = stop.copy()
-    df = df[(df["immobility_duration_s"] > 0) & df["current_patch"].notna()
-            & df["occupancy_well_arm"].notna()].copy()
+    df = df[
+        (df["immobility_duration_s"] > 0)
+        & df["current_patch"].notna()
+        & df["occupancy_well_arm"].notna()
+    ].copy()
     df["session"] = (
-        df["animal"].astype(str) + df["session_date"].astype(str) + "_" + df["epoch"].astype(str)
+        df["animal"].astype(str)
+        + df["session_date"].astype(str)
+        + "_"
+        + df["epoch"].astype(str)
     )
-    df["after_omission"] = (1.0 - df["is_rewarded_outcome"].astype(float)).fillna(0).astype(int)
+    df["after_omission"] = (
+        (1.0 - df["is_rewarded_outcome"].astype(float)).fillna(0).astype(int)
+    )
     df["log_off"] = np.log(df["immobility_duration_s"].to_numpy(dtype=float))
     # Global order by (session, time) so positional indices line up per group.
     df = df.sort_values(["session", "stop_start"]).reset_index(drop=True)
@@ -102,8 +110,11 @@ def main():
 
     res = GEE.from_formula(
         "n_events ~ C(bin, Treatment('far')) + after_omission",
-        groups="session", data=df, family=sm.families.Poisson(),
-        offset=df["log_off"].to_numpy(), cov_struct=Independence(),
+        groups="session",
+        data=df,
+        family=sm.families.Poisson(),
+        offset=df["log_off"].to_numpy(),
+        cov_struct=Independence(),
     ).fit()
 
     order = [f"{d:+d}".replace("+0", "0") for d in range(-MAXD, MAXD + 1)]
@@ -112,16 +123,23 @@ def main():
         term = f"C(bin, Treatment('far'))[T.{b}]"
         if term in res.params.index:
             lo, hi = res.conf_int().loc[term]
-            rr[b] = (np.exp(res.params[term]), np.exp(lo), np.exp(hi),
-                     res.pvalues[term])
+            rr[b] = (
+                np.exp(res.params[term]),
+                np.exp(lo),
+                np.exp(hi),
+                res.pvalues[term],
+            )
         else:
             rr[b] = (1.0, np.nan, np.nan, np.nan)  # the baseline itself
     print("\nrate ratio vs 'far' baseline (adjusted for after_omission):")
     for b in order:
         r, lo, hi, p = rr[b]
         ci = f"[{lo:.2f}, {hi:.2f}]" if np.isfinite(lo) else "(baseline)"
-        print(f"  trials_from_switch {b:>3s}: ×{r:.3f} {ci}  p={p:.1e}"
-              if np.isfinite(p) else f"  trials_from_switch {b:>3s}: ×{r:.3f} {ci}")
+        print(
+            f"  trials_from_switch {b:>3s}: ×{r:.3f} {ci}  p={p:.1e}"
+            if np.isfinite(p)
+            else f"  trials_from_switch {b:>3s}: ×{r:.3f} {ci}"
+        )
     print(f"  after_omission: ×{np.exp(res.params['after_omission']):.3f}")
 
     # Plot the profile.
@@ -133,10 +151,16 @@ def main():
     ax.axhline(1.0, color="0.6", lw=0.8, ls="--", label="far baseline")
     ax.axvline(0, color="crimson", lw=1.0, alpha=0.6, label="switch")
     ax.errorbar(
-        xs, ys,
-        yerr=[np.array(ys) - np.nan_to_num(los, nan=ys),
-              np.nan_to_num(his, nan=ys) - np.array(ys)],
-        fmt="o-", color="C0", capsize=3, lw=2,
+        xs,
+        ys,
+        yerr=[
+            np.array(ys) - np.nan_to_num(los, nan=ys),
+            np.nan_to_num(his, nan=ys) - np.array(ys),
+        ],
+        fmt="o-",
+        color="C0",
+        capsize=3,
+        lw=2,
     )
     ax.set_xticks(xs)
     ax.set_xlabel("trials from patch switch  (− before · + after)")
@@ -146,7 +170,9 @@ def main():
     fig.tight_layout()
     SCRATCH.mkdir(exist_ok=True)
     out = SCRATCH / "periswitch_profile.png"
-    save_figure(fig, out.stem, base_dir=out.parent, dpi=140, formats=["png"], transparent=False)
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=140, formats=["png"], transparent=False
+    )
     logging.info("Saved %s", out)
 
 

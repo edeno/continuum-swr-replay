@@ -35,7 +35,11 @@ class TestContainsPathToNextEmptyInputs:
         )
         seq = pd.DataFrame(
             columns=[
-                "animal", "session_date", "epoch", "event_id", "t_in_event",
+                "animal",
+                "session_date",
+                "epoch",
+                "event_id",
+                "t_in_event",
                 "decoded_arm_map",
             ]
         )

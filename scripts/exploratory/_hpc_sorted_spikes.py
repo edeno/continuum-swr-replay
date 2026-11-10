@@ -76,7 +76,9 @@ def get_hpc_sorted_spike_times(
                     "n_spikes": st.size,
                     "first_s": st[0] if st.size else np.nan,
                     "last_s": st[-1] if st.size else np.nan,
-                    "mean_rate_hz": st.size / duration if duration and duration > 0 else np.nan,
+                    "mean_rate_hz": st.size / duration
+                    if duration and duration > 0
+                    else np.nan,
                 }
             )
 

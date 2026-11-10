@@ -52,7 +52,6 @@ class TestPlotRasterRelativeToEvent:
         plt.close(fig)
 
 
-
 class TestPlotHistRelativeToEvent:
     """Test event-aligned histogram (PSTH) plotting."""
 
@@ -85,7 +84,6 @@ class TestPlotHistRelativeToEvent:
         plt.close(fig)
 
 
-
 class TestPlotAICs:
     """Test AIC comparison plotting."""
 
@@ -94,7 +92,13 @@ class TestPlotAICs:
         """Create mock GLM results with AIC values."""
         # Create mock result objects with AIC attribute
         mock_results = {}
-        model_names = ["constant", "SWR", "non_local_SWR", "non_local_no_SWR", "non_local"]
+        model_names = [
+            "constant",
+            "SWR",
+            "non_local_SWR",
+            "non_local_no_SWR",
+            "non_local",
+        ]
         aic_values = [1000.0, 950.0, 920.0, 930.0, 925.0]
 
         for name, aic in zip(model_names, aic_values, strict=True):

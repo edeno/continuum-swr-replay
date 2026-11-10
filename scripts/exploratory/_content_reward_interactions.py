@@ -69,28 +69,41 @@ def _assemble() -> pd.DataFrame:
     stop = add_uncertainty_covariates(stop)
     cont = read_table(table_path("qvals_table", RC))
     require_covariate_schema(cont, table="qvals")
-    ev = ev.merge(stop[["stop_id", "known_reward_outcome_lag_1", "patch_switch_fraction_last5_completed_trips"]],
-                  on="stop_id", how="left")
-    ev = ev.merge(cont[["stop_id", "task_reward_probability_chosen_arm"]], on="stop_id", how="left")
+    ev = ev.merge(
+        stop[
+            [
+                "stop_id",
+                "known_reward_outcome_lag_1",
+                "patch_switch_fraction_last5_completed_trips",
+            ]
+        ],
+        on="stop_id",
+        how="left",
+    )
+    ev = ev.merge(
+        cont[["stop_id", "task_reward_probability_chosen_arm"]],
+        on="stop_id",
+        how="left",
+    )
     # scalars are constant within an event (one stop per event), so dropping
     # NaN-scalar rows drops whole events cleanly.
     ev = ev.dropna(subset=SCALARS).reset_index(drop=True)
     cur = ev["is_current_arm"].to_numpy(dtype=float)
-    ev["known_reward_outcome_lag_1_x_is_current_arm"] = (
-        cur * ev["known_reward_outcome_lag_1"].to_numpy(dtype=float)
-    )
+    ev["known_reward_outcome_lag_1_x_is_current_arm"] = cur * ev[
+        "known_reward_outcome_lag_1"
+    ].to_numpy(dtype=float)
     # `task_reward_probability_chosen_arm` is the *scheduled* contingency the animal never
     # observes (covariate_dictionary F.0), so calling it "value" invites a
     # belief reading it does not support.
-    ev["task_reward_probability_chosen_arm_x_is_current_arm"] = (
-        cur * ev["task_reward_probability_chosen_arm"].to_numpy(dtype=float)
-    )
+    ev["task_reward_probability_chosen_arm_x_is_current_arm"] = cur * ev[
+        "task_reward_probability_chosen_arm"
+    ].to_numpy(dtype=float)
     # recent_switch_rate is a 5-trial fraction that is exactly 0 on 64% of stops
     # and exactly 0.2 on 28%, so a per-unit coefficient extrapolates 5x beyond
     # the modal step; read it per 0.2, not per 1.
-    ev["patch_switch_fraction_last5_completed_trips_x_is_current_arm"] = (
-        cur * ev["patch_switch_fraction_last5_completed_trips"].to_numpy(dtype=float)
-    )
+    ev["patch_switch_fraction_last5_completed_trips_x_is_current_arm"] = cur * ev[
+        "patch_switch_fraction_last5_completed_trips"
+    ].to_numpy(dtype=float)
     # duration control: within-stop time on the current arm (z(log1p), so the
     # 0-105 s range and the long-stop outliers don't dominate the conditioning).
     tsc = np.log1p(ev["time_since_stop_start_s"].to_numpy(dtype=float))
@@ -106,13 +119,20 @@ def _fit(ev: pd.DataFrame, predictors: list[str]) -> pd.DataFrame:
         if len(g) < 18:
             continue
         r = fit_conditional_poisson(
-            g, predictors=predictors, response_col="arm_count_hard",
-            event_col="event_id", n_categories=9,
+            g,
+            predictors=predictors,
+            response_col="arm_count_hard",
+            event_col="event_id",
+            n_categories=9,
         )
         if r is None:
             continue
-        rows.append({**dict(zip(SC, keys, strict=True)),
-                     **{k: v for k, v in r.items() if k.startswith("coef_")}})
+        rows.append(
+            {
+                **dict(zip(SC, keys, strict=True)),
+                **{k: v for k, v in r.items() if k.startswith("coef_")},
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -126,8 +146,10 @@ def _line(mdf: pd.DataFrame, col: str) -> None:
         print(f"  {col:<20}{'(n<5)':>10}")
         return
     n_an = (mdf.groupby("animal")[c].median() > 0).sum()
-    print(f"  {col:<20}{s.median():>+10.3f}{(s > 0).mean() * 100:>6.0f}%"
-          f"{f'{n_an}/5':>9}{wilcoxon(s)[1]:>10.1e}{f'  n={len(s)}':>8}")
+    print(
+        f"  {col:<20}{s.median():>+10.3f}{(s > 0).mean() * 100:>6.0f}%"
+        f"{f'{n_an}/5':>9}{wilcoxon(s)[1]:>10.1e}{f'  n={len(s)}':>8}"
+    )
 
 
 def main() -> None:
@@ -135,8 +157,10 @@ def main() -> None:
     base = list(MODEL_HIERARCHY["M5"].predictors)
     # The three is_current interactions are mutually collinear (each is
     # is_current * an event-constant scalar), so add ONE at a time on top of M5.
-    print(f"M5 + ONE current-arm interaction at a time; {len(ev)} arm-rows, "
-          f"{ev['event_id'].nunique()} events\n")
+    print(
+        f"M5 + ONE current-arm interaction at a time; {len(ev)} arm-rows, "
+        f"{ev['event_id'].nunique()} events\n"
+    )
     for label, sub in [
         ("ALL non-local", ev),
         ("with-SWR", ev[ev.is_swr]),

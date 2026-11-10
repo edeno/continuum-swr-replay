@@ -95,9 +95,7 @@ def test_a_steep_slope_on_a_narrow_covariate_is_not_a_backstop_exclusion():
     ``|coef| = 12`` with an SD of 0.01 is a swing of 0.12: identified, kept by
     ``aggregate_contrast``, and so counted here as no exclusion at all.
     """
-    contrast = _contrast(
-        [("chimi", 12.0, ""), ("j16", -40.0, "")], "contrast", sd=0.01
-    )
+    contrast = _contrast([("chimi", 12.0, ""), ("j16", -40.0, "")], "contrast", sd=0.01)
     out = drop_mechanism_table(contrast, _audited("contrast", 0))
     row = out.iloc[0]
     assert int(row.n_flag_only) == 0
@@ -107,9 +105,7 @@ def test_a_steep_slope_on_a_narrow_covariate_is_not_a_backstop_exclusion():
 
 def test_legacy_frame_without_predictor_sds_uses_the_raw_coefficient():
     """With no ``sd_`` column the only available scale is the coefficient itself."""
-    contrast = _contrast(
-        [("chimi", 12.0, ""), ("j16", 0.5, "")], "contrast", sd=None
-    )
+    contrast = _contrast([("chimi", 12.0, ""), ("j16", 0.5, "")], "contrast", sd=None)
     out = drop_mechanism_table(contrast, _audited("contrast", 1))
     assert int(out.iloc[0].n_backstop_only) == 1
 

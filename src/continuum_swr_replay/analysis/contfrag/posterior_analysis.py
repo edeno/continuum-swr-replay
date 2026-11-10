@@ -36,10 +36,9 @@ def get_contfrag_posterior(
         with negligible state probability are forward/backward filled.
     """
     if state == "combined":
-        posterior = (
-            results.acausal_posterior.sel(state="Continuous")
-            + results.acausal_posterior.sel(state="Fragmented")
-        )
+        posterior = results.acausal_posterior.sel(
+            state="Continuous"
+        ) + results.acausal_posterior.sel(state="Fragmented")
         # Combined posterior is already normalized (sums to 1 per time bin)
         return posterior
 

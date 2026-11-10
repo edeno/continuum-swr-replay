@@ -5,7 +5,12 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
-_SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "exploratory" / "_augment_data_over_time.py"
+_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "scripts"
+    / "exploratory"
+    / "_augment_data_over_time.py"
+)
 _spec = importlib.util.spec_from_file_location("_augment_dot", _SCRIPT)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
@@ -25,7 +30,9 @@ def test_discover_groups_nonlocal_and_contfrag_by_epoch():
     }
     assert epochs[("j1620210706", "04_r2", "HPC")] == {"nonlocal:80": files[2]}
     # unrecognized filename is not grouped
-    assert all("unrecognized" not in str(p) for d in epochs.values() for p in d.values())
+    assert all(
+        "unrecognized" not in str(p) for d in epochs.values() for p in d.values()
+    )
 
 
 def test_new_and_stale_column_constants():

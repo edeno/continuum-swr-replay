@@ -42,9 +42,7 @@ def position_info():
         {
             "projected_x_position": np.linspace(0, 20, n),
             "projected_y_position": np.zeros(n),
-            "track_segment_id": np.where(
-                np.linspace(0, 20, n) < 10, 0, 1
-            ).astype(int),
+            "track_segment_id": np.where(np.linspace(0, 20, n) < 10, 0, 1).astype(int),
             "linear_position": np.linspace(0, 20, n),
             "head_speed": np.full(n, 5.0),
         },
@@ -76,12 +74,12 @@ def trials_df():
 class TestMakeTaskVariablesOutput:
     """Test that make_task_variables returns correct structure."""
 
-    def test_index_matches_position_info(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_index_matches_position_info(self, position_info, trials_df, linear_track):
         """Output index should match position_info index."""
         result = make_task_variables(position_info, trials_df, linear_track)
-        np.testing.assert_array_equal(result.index.to_numpy(), position_info.index.to_numpy())
+        np.testing.assert_array_equal(
+            result.index.to_numpy(), position_info.index.to_numpy()
+        )
 
     def test_has_required_columns(self, position_info, trials_df, linear_track):
         """Output should contain all required columns."""
@@ -107,9 +105,7 @@ class TestMakeTaskVariablesOutput:
             col = f"is_no_reward_{shift}"
             assert col in result.columns, f"Missing column: {col}"
 
-    def test_has_patch_change_columns(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_has_patch_change_columns(self, position_info, trials_df, linear_track):
         """Output should have is_patch_changeN columns for default shifts."""
         result = make_task_variables(position_info, trials_df, linear_track)
 
@@ -117,9 +113,7 @@ class TestMakeTaskVariablesOutput:
             col = f"is_patch_change{shift}"
             assert col in result.columns, f"Missing column: {col}"
 
-    def test_custom_omission_shifts(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_custom_omission_shifts(self, position_info, trials_df, linear_track):
         """Custom omission shifts should produce corresponding columns."""
         result = make_task_variables(
             position_info, trials_df, linear_track, omission_shifts=[1, 2]
@@ -129,9 +123,7 @@ class TestMakeTaskVariablesOutput:
         assert "is_no_reward_2" in result.columns
         assert "is_no_reward_3" not in result.columns
 
-    def test_custom_patch_change_shifts(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_custom_patch_change_shifts(self, position_info, trials_df, linear_track):
         """Custom patch change shifts should produce corresponding columns."""
         result = make_task_variables(
             position_info, trials_df, linear_track, patch_change_shifts=[-1, 0, 1]
@@ -168,9 +160,7 @@ class TestMakeTaskVariablesValues:
         trial_1_nums = result.loc[trial_1_mask, "trial_number"]
         assert (trial_1_nums == 1).all()
 
-    def test_start_and_goal_node_ids(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_start_and_goal_node_ids(self, position_info, trials_df, linear_track):
         """Start and goal node IDs should match trial definitions."""
         result = make_task_variables(position_info, trials_df, linear_track)
 
@@ -208,9 +198,7 @@ class TestMakeTaskVariablesValues:
         post_goal = result.loc[1.5:1.998, "time_to_goal"]
         assert (post_goal == 0.0).all()
 
-    def test_path_progress_in_bounds(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_path_progress_in_bounds(self, position_info, trials_df, linear_track):
         """Path progress should be in [0, 1]."""
         result = make_task_variables(position_info, trials_df, linear_track)
 
@@ -227,9 +215,7 @@ class TestMakeTaskVariablesValues:
         post_goal = result.loc[1.5:1.998, "path_progress"]
         assert (post_goal == 0.0).all()
 
-    def test_dist_to_goal_non_negative(
-        self, position_info, trials_df, linear_track
-    ):
+    def test_dist_to_goal_non_negative(self, position_info, trials_df, linear_track):
         """Distance to goal should be non-negative."""
         result = make_task_variables(position_info, trials_df, linear_track)
 

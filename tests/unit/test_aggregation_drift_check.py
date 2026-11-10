@@ -39,27 +39,21 @@ class TestValidateResultsPositionTimeAlignment:
     def test_same_length_time_shifted_axes_raise(self):
         t = np.linspace(100.0, 110.0, 1000)
         with pytest.raises(ValueError, match="drifts from position_info.index"):
-            validate_results_position_time_alignment(
-                t, pd.Index(t + 0.5, name="time")
-            )
+            validate_results_position_time_alignment(t, pd.Index(t + 0.5, name="time"))
 
     def test_within_tolerance_passes(self):
         """1e-9 drift sits well below the 1e-6 tolerance — confirms the
         boundary, so a regression that tightens the tolerance to e.g.
         1e-12 (rejecting genuine float-roundtrip drift) trips here."""
         t = np.linspace(100.0, 110.0, 1000)
-        validate_results_position_time_alignment(
-            t, pd.Index(t + 1e-9, name="time")
-        )
+        validate_results_position_time_alignment(t, pd.Index(t + 1e-9, name="time"))
 
     def test_just_above_tolerance_raises(self):
         """A regression that loosens the tolerance to e.g. 1e-3 must
         not silently accept drift just above 1e-6."""
         t = np.linspace(100.0, 110.0, 1000)
         with pytest.raises(ValueError, match="drifts from position_info.index"):
-            validate_results_position_time_alignment(
-                t, pd.Index(t + 2e-6, name="time")
-            )
+            validate_results_position_time_alignment(t, pd.Index(t + 2e-6, name="time"))
 
     def test_max_reducer_not_mean(self):
         """Pin the reducer: a *single* drifting bin must trip the
@@ -71,9 +65,7 @@ class TestValidateResultsPositionTimeAlignment:
         idx_vals = t.copy()
         idx_vals[500] = idx_vals[500] + 1.0  # one bin off by 1s
         with pytest.raises(ValueError, match="drifts from position_info.index"):
-            validate_results_position_time_alignment(
-                t, pd.Index(idx_vals, name="time")
-            )
+            validate_results_position_time_alignment(t, pd.Index(idx_vals, name="time"))
 
     def test_drift_computed_against_position_index_not_zero(self):
         """A regression that diffed ``results_time`` against itself,
@@ -82,6 +74,4 @@ class TestValidateResultsPositionTimeAlignment:
         re-encoded as the same offset)."""
         t = np.linspace(100.0, 110.0, 1000)
         with pytest.raises(ValueError, match="drifts from position_info.index"):
-            validate_results_position_time_alignment(
-                t, pd.Index(t + 5.0, name="time")
-            )
+            validate_results_position_time_alignment(t, pd.Index(t + 5.0, name="time"))

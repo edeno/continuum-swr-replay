@@ -83,7 +83,11 @@ class TestGetSignalWindows:
         assert result.shape[2] == 3  # 3 signals
 
         # Check coordinates
-        assert list(result.coords["signal"].values) == ["theta_power", "ripple_power", "speed"]
+        assert list(result.coords["signal"].values) == [
+            "theta_power",
+            "ripple_power",
+            "speed",
+        ]
 
         # Check time axis is centered at 0
         time_values = result.coords["time"].values

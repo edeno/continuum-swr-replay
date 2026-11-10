@@ -43,7 +43,9 @@ def check_position(nwb_file_name: str, epoch_name: str) -> dict:
             PositionIntervalMap
             & {"nwb_file_name": nwb_file_name, "interval_list_name": epoch_name}
         ).fetch1("position_interval_name")
-        position_data = get_position_info(nwb_file_name, epoch_name, position_interval_name)
+        position_data = get_position_info(
+            nwb_file_name, epoch_name, position_interval_name
+        )
         pos_info = position_data["position_info"].dropna(
             subset=["head_position_x", "head_position_y"]
         )
@@ -70,9 +72,7 @@ def check_spikes(nwb_file_name: str) -> dict:
     try:
         spike_data = get_spike_data(nwb_file_name)
         brain_areas = sorted(spike_data["spike_times"].keys())
-        n_units = {
-            area: len(spike_data["spike_times"][area]) for area in brain_areas
-        }
+        n_units = {area: len(spike_data["spike_times"][area]) for area in brain_areas}
         return {
             "spikes_ok": True,
             "spikes_error": "",
@@ -187,7 +187,13 @@ def check_session(nwb_file_name: str, epoch_name: str, animal: str, date: int) -
 
     # Position (must succeed for other checks that need time bounds)
     pos_result = check_position(nwb_file_name, epoch_name)
-    result.update({k: v for k, v in pos_result.items() if k not in ("position_data", "position_info")})
+    result.update(
+        {
+            k: v
+            for k, v in pos_result.items()
+            if k not in ("position_data", "position_info")
+        }
+    )
 
     # Spikes (independent of position)
     spike_result = check_spikes(nwb_file_name)
@@ -216,20 +222,26 @@ def check_session(nwb_file_name: str, epoch_name: str, animal: str, date: int) -
     result.update(dio_result)
 
     # Summary
-    result["all_ok"] = all([
-        result["position_ok"],
-        result["spikes_ok"],
-        result["ripple_ok"],
-        result["theta_ok"],
-        result["dios_ok"],
-    ])
+    result["all_ok"] = all(
+        [
+            result["position_ok"],
+            result["spikes_ok"],
+            result["ripple_ok"],
+            result["theta_ok"],
+            result["dios_ok"],
+        ]
+    )
 
     return result
 
 
 def main(argv: Sequence[str] | None = None):
-    parser = argparse.ArgumentParser(description="Check data availability for all sessions")
-    parser.add_argument("--animal", type=str, default=None, help="Filter to specific animal")
+    parser = argparse.ArgumentParser(
+        description="Check data availability for all sessions"
+    )
+    parser.add_argument(
+        "--animal", type=str, default=None, help="Filter to specific animal"
+    )
     parser.add_argument("--output", type=str, default=None, help="Save results to CSV")
     args = parser.parse_args(argv)
 
@@ -301,7 +313,9 @@ def main(argv: Sequence[str] | None = None):
         col = f"{component}_ok"
         if col in df.columns:
             n_ok = df[col].sum()
-            print(f"  {component:10s}: {n_ok}/{len(df)} OK ({100 * n_ok / len(df):.0f}%)")
+            print(
+                f"  {component:10s}: {n_ok}/{len(df)} OK ({100 * n_ok / len(df):.0f}%)"
+            )
 
     # Per-animal breakdown
     print("\nPer-animal breakdown:")

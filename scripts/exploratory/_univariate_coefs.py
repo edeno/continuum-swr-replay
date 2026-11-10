@@ -34,8 +34,13 @@ warnings.filterwarnings("ignore")
 RC = REPLAY_CONTENT_DIR
 SESSION = list(SESSION_COLUMNS)
 
-ARM_P = ["is_current_arm", "is_prev_arm", "reward_fraction_candidate_arm_last10_visits", "visit_recency_trials_event_leaf_centered",
-         "is_last_rewarded_noncurrent_arm"]
+ARM_P = [
+    "is_current_arm",
+    "is_prev_arm",
+    "reward_fraction_candidate_arm_last10_visits",
+    "visit_recency_trials_event_leaf_centered",
+    "is_last_rewarded_noncurrent_arm",
+]
 PATCH_P = [
     "is_current_patch",
     "is_last_rewarded_noncurrent_patch",
@@ -82,19 +87,27 @@ def main():
     require_covariate_schema(arm_tbl, table="event_arm")
     arm_tbl = add_arm_fixed_effects(arm_tbl)
     logging.info("arm univariate fits...")
-    arm_uni = _pool(_univariate(
-        arm_tbl, ARM_P,
-        lambda g, p: fit_conditional_poisson(g, [*ARM_FE_PREDICTORS, p]),
-    ))
+    arm_uni = _pool(
+        _univariate(
+            arm_tbl,
+            ARM_P,
+            lambda g, p: fit_conditional_poisson(g, [*ARM_FE_PREDICTORS, p]),
+        )
+    )
 
     # Patch: one predictor alone (3-category conditional Poisson).
     patch_tbl = read_table(table_path("event_patch_table", RC))
     require_covariate_schema(patch_tbl, table="event_patch")
     logging.info("patch univariate fits...")
-    patch_uni = _pool(_univariate(
-        patch_tbl, PATCH_P,
-        lambda g, p: fit_conditional_poisson(g, [p], response_col="patch_count_hard"),
-    ))
+    patch_uni = _pool(
+        _univariate(
+            patch_tbl,
+            PATCH_P,
+            lambda g, p: fit_conditional_poisson(
+                g, [p], response_col="patch_count_hard"
+            ),
+        )
+    )
 
     # Rate: intercept + one predictor (Poisson w/ log-immobility offset).
     stop = read_table(table_path("stop_table", RC))
@@ -109,11 +122,15 @@ def main():
 
     def joint(df, model, p):
         c = df[df.model == model].get(f"coef_{p}")
-        return np.exp(c.dropna().median()) if c is not None and c.notna().any() else np.nan
+        return (
+            np.exp(c.dropna().median()) if c is not None and c.notna().any() else np.nan
+        )
 
     def show(title, uni, df, joint_model):
         print(f"\n{title}   (univariate  vs  joint @ {joint_model})")
-        print(f"  {'predictor':34s} {'uni ×':>8s} {'fdr p':>9s} {'n':>4s}   {'joint ×':>8s}")
+        print(
+            f"  {'predictor':34s} {'uni ×':>8s} {'fdr p':>9s} {'n':>4s}   {'joint ×':>8s}"
+        )
         for p, (rr, pv, n) in uni.items():
             jr = joint(df, joint_model, p)
             print(f"  {p:34s} {rr:8.2f} {pv:9.1e} {n:4d}   {jr:8.2f}")

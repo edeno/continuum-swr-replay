@@ -30,7 +30,9 @@ class TestRippleLFPFiltering:
         time_index = pd.Index(np.arange(0.0, 10.0, 0.001), name="time")
 
         ripple_data = {
-            "ripple_times": pd.DataFrame({"start_time": [1.0, 3.0], "end_time": [1.5, 3.5]}),
+            "ripple_times": pd.DataFrame(
+                {"start_time": [1.0, 3.0], "end_time": [1.5, 3.5]}
+            ),
             "ripple_filtered_lfps": pd.DataFrame(
                 np.random.RandomState(42).randn(len(time_index), 4),
                 index=time_index,
@@ -83,21 +85,31 @@ class TestRippleLFPFiltering:
         time_index = pd.Index(np.arange(0.0, 10.0, 0.001), name="time")
 
         ripple_data = {
-            "ripple_times": pd.DataFrame({
-                "start_time": [1.5, 3.0],
-                "end_time": [2.5, 3.5],
-            }),
+            "ripple_times": pd.DataFrame(
+                {
+                    "start_time": [1.5, 3.0],
+                    "end_time": [2.5, 3.5],
+                }
+            ),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+                np.zeros((len(time_index), 1)),
+                index=time_index,
+                columns=["e1"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+                np.zeros((len(time_index), 1)),
+                index=time_index,
+                columns=["e1"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.zeros(len(time_index)), index=time_index, name="c",
+                np.zeros(len(time_index)),
+                index=time_index,
+                name="c",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.zeros(len(time_index)), index=time_index, name="zc",
+                np.zeros(len(time_index)),
+                index=time_index,
+                name="zc",
             ),
         }
 
@@ -114,21 +126,31 @@ class TestRippleLFPFiltering:
         time_index = pd.Index(np.arange(0.0, 10.0, 0.001), name="time")
 
         ripple_data = {
-            "ripple_times": pd.DataFrame({
-                "start_time": [3.0, 7.5],
-                "end_time": [3.5, 8.5],
-            }),
+            "ripple_times": pd.DataFrame(
+                {
+                    "start_time": [3.0, 7.5],
+                    "end_time": [3.5, 8.5],
+                }
+            ),
             "ripple_filtered_lfps": pd.DataFrame(
-                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+                np.zeros((len(time_index), 1)),
+                index=time_index,
+                columns=["e1"],
             ),
             "ripple_lfps": pd.DataFrame(
-                np.zeros((len(time_index), 1)), index=time_index, columns=["e1"],
+                np.zeros((len(time_index), 1)),
+                index=time_index,
+                columns=["e1"],
             ),
             "ripple_consensus_trace": pd.Series(
-                np.zeros(len(time_index)), index=time_index, name="c",
+                np.zeros(len(time_index)),
+                index=time_index,
+                name="c",
             ),
             "zscored_ripple_consensus_trace": pd.Series(
-                np.zeros(len(time_index)), index=time_index, name="zc",
+                np.zeros(len(time_index)),
+                index=time_index,
+                name="zc",
             ),
         }
 
@@ -216,13 +238,13 @@ class TestRippleLFPFiltering:
         assert len(ripple_data["ripple_filtered_lfps"]) == 3
         np.testing.assert_array_equal(
             ripple_data["ripple_filtered_lfps"].index.to_numpy(),
-            np.array([2.0, 3.0, 4.0])
+            np.array([2.0, 3.0, 4.0]),
         )
 
         assert len(ripple_data["ripple_consensus_trace"]) == 3
         np.testing.assert_array_equal(
             ripple_data["ripple_consensus_trace"].index.to_numpy(),
-            np.array([2.0, 3.0, 4.0])
+            np.array([2.0, 3.0, 4.0]),
         )
 
     def test_all_data_outside_bounds(self):
@@ -339,8 +361,16 @@ class TestRippleLFPFiltering:
         ripple_data = filter_ripple_lfp_time(ripple_data, position_time)
 
         # Check that column names are preserved
-        assert list(ripple_data["ripple_filtered_lfps"].columns) == ["CA1_01", "CA1_02", "CA1_03"]
-        assert list(ripple_data["ripple_lfps"].columns) == ["CA1_01", "CA1_02", "CA1_03"]
+        assert list(ripple_data["ripple_filtered_lfps"].columns) == [
+            "CA1_01",
+            "CA1_02",
+            "CA1_03",
+        ]
+        assert list(ripple_data["ripple_lfps"].columns) == [
+            "CA1_01",
+            "CA1_02",
+            "CA1_03",
+        ]
 
         # Check that Series names are preserved
         assert ripple_data["ripple_consensus_trace"].name == "consensus"
@@ -388,8 +418,12 @@ class TestRippleLFPFiltering:
 
         assert result is not None, "Function should return new dict"
         assert result is not original_ripple_data, "Should be a new dict object"
-        assert len(result["ripple_filtered_lfps"]) < original_length, "Returned data should be filtered"
-        assert len(original_ripple_data["ripple_filtered_lfps"]) == original_length, "Original data should be unchanged"
+        assert len(result["ripple_filtered_lfps"]) < original_length, (
+            "Returned data should be filtered"
+        )
+        assert len(original_ripple_data["ripple_filtered_lfps"]) == original_length, (
+            "Original data should be unchanged"
+        )
 
 
 # --- The ripple keys and the band-electrode check ---------------------------

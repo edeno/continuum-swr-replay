@@ -94,12 +94,16 @@ def test_derived_interaction_timing(rows):
     for name in _POST_OUTCOME_DERIVED:
         assert name in rows, f"{name} row missing"
         ta = rows[name]["time_availability"]
-        assert "POST-outcome" in ta, f"{name} must inherit its source's post-outcome flag; got {ta!r}"
+        assert "POST-outcome" in ta, (
+            f"{name} must inherit its source's post-outcome flag; got {ta!r}"
+        )
 
     for name in _FUTURE_DERIVED:
         assert name in rows, f"{name} row missing"
         ta = rows[name]["time_availability"]
-        assert "FUTURE-referencing" in ta, f"{name} must inherit future-referencing; got {ta!r}"
+        assert "FUTURE-referencing" in ta, (
+            f"{name} must inherit future-referencing; got {ta!r}"
+        )
 
     for name in _SAFE_DERIVED:
         assert name in rows, f"{name} row missing"

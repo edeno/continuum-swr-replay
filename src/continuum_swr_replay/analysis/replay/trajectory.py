@@ -28,37 +28,70 @@ _TRUNK_ARMS = frozenset(TRUNK_ARMS)
 #: per-event columns produced identically for both scenarios (parity target).
 SHARED_TRAJECTORY_COLUMNS: tuple[str, ...] = (
     # trajectory_dynamics
-    "replay_start_position_cm", "replay_end_position_cm", "start_arm", "end_arm", "net_displacement_cm",
-    "path_length_cm", "tortuosity", "replay_speed_median_cm_s", "replay_speed_p90_cm_s",
-    "replay_speed_continuous_median_cm_s", "step_distance_median_cm", "step_distance_p90_cm",
-    "step_distance_max_cm", "spatial_extent_cm", "n_reversals", "pause_fraction",
-    "n_patches_visited", "crosses_trunk", "terminates_at_well", "compression_factor",
+    "replay_start_position_cm",
+    "replay_end_position_cm",
+    "start_arm",
+    "end_arm",
+    "net_displacement_cm",
+    "path_length_cm",
+    "tortuosity",
+    "replay_speed_median_cm_s",
+    "replay_speed_p90_cm_s",
+    "replay_speed_continuous_median_cm_s",
+    "step_distance_median_cm",
+    "step_distance_p90_cm",
+    "step_distance_max_cm",
+    "spatial_extent_cm",
+    "n_reversals",
+    "pause_fraction",
+    "n_patches_visited",
+    "crosses_trunk",
+    "terminates_at_well",
+    "compression_factor",
     # ahead_behind_summary
-    "mean_abs_ahead_behind_cm", "max_ahead_cm", "max_behind_cm", "max_abs_ahead_behind_cm",
-    "remote_fraction", "ab_slope_cm_s", "is_outbound",
+    "mean_abs_ahead_behind_cm",
+    "max_ahead_cm",
+    "max_behind_cm",
+    "max_abs_ahead_behind_cm",
+    "remote_fraction",
+    "ab_slope_cm_s",
+    "is_outbound",
     # uncertainty_extra
-    "hpd_coverage_cm", "multimodal_fraction",
+    "hpd_coverage_cm",
+    "multimodal_fraction",
     # path_continuity
     "path_continuity_fraction",
     # neural signal means (z-scored; the raw traces require re-loading data
     # that has drifted from the decode axis, so the stored per-session
     # z-scores are used directly)
-    "ripple_power_z", "mua_rate_z", "theta_z",
+    "ripple_power_z",
+    "mua_rate_z",
+    "theta_z",
     # state means shared by both scenarios
-    "continuous_prob_mean", "fragmented_prob_mean",
+    "continuous_prob_mean",
+    "fragmented_prob_mean",
 )
 
 #: per-event columns specific to the 4-state Non-Local model.
 NONLOCAL_ONLY_COLUMNS: tuple[str, ...] = (
-    "local_prob_mean", "nospike_prob_mean", "nonlocal_fraction", "nospike_fraction",
+    "local_prob_mean",
+    "nospike_prob_mean",
+    "nonlocal_fraction",
+    "nospike_fraction",
 )
 
 #: non-state, non-signal data_over_time columns the rollup families read
 #: directly (``decoded_arm`` / ``track_segment_id`` are added by the table
 #: builder's ``_prepare_dot`` before the rollups run).
 _REQUIRED_DOT_COLUMNS: tuple[str, ...] = (
-    "map_estimate", "step_distance", "map_speed", "decoded_arm",
-    "run_speed_baseline", "ahead_behind_distance", "hpd", "track_segment_id",
+    "map_estimate",
+    "step_distance",
+    "map_speed",
+    "decoded_arm",
+    "run_speed_baseline",
+    "ahead_behind_distance",
+    "hpd",
+    "track_segment_id",
 )
 
 #: per-session z-scored neural signals already in data_over_time (both
@@ -85,6 +118,7 @@ def _nan_safe(col: str, reducer):
     ``nanpercentile`` emit for an event whose bins are all junction
     placeholders (NaN ``step_distance``), matching the guarded speed stats.
     """
+
     def _fn(g: pd.DataFrame) -> float:
         v = g[col].to_numpy()
         return float(reducer(v)) if np.isfinite(v).any() else np.nan
@@ -140,7 +174,9 @@ def brain_state_means(
     # ``nonlocal_fraction`` only applies to the 4-state Non-Local model;
     # the 2-state ContFrag model has no ``w_t`` (both states are non-local).
     if nonlocal_prob is not None:
-        out["nonlocal_fraction"] = _mean(np.asarray(nonlocal_prob, float) > non_local_threshold)
+        out["nonlocal_fraction"] = _mean(
+            np.asarray(nonlocal_prob, float) > non_local_threshold
+        )
     return unique, out
 
 
@@ -183,7 +219,9 @@ def ahead_behind_summary(
 
     ab = grouped["ab"]
     out = {
-        "mean_abs_ahead_behind_cm": ab.apply(lambda s: np.nanmean(np.abs(s))).to_numpy(),
+        "mean_abs_ahead_behind_cm": ab.apply(
+            lambda s: np.nanmean(np.abs(s))
+        ).to_numpy(),
         "max_ahead_cm": np.clip(ab.max().to_numpy(), 0.0, None),
         "max_behind_cm": np.clip(-ab.min().to_numpy(), 0.0, None),
         "max_abs_ahead_behind_cm": ab.apply(lambda s: np.nanmax(np.abs(s))).to_numpy(),
@@ -678,7 +716,9 @@ def compute_trajectory_rollups(
 
     adj = arm_adjacency(track_graph)
     pc = (
-        pd.DataFrame({"event_id": np.asarray(event_id), "decoded_arm": col("decoded_arm")})
+        pd.DataFrame(
+            {"event_id": np.asarray(event_id), "decoded_arm": col("decoded_arm")}
+        )
         .groupby("event_id", sort=True)["decoded_arm"]
         .apply(lambda s: path_continuity(s.to_numpy(), adj))
         .to_numpy()

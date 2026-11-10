@@ -34,16 +34,15 @@ def _stop_table(n_per_session=20, n_immobility_bad=2, n_rewardbasis_nan=3, seed=
                 "session_date": session_date,
                 "epoch": "e",
                 "immobility_duration_s": rng.uniform(5, 30, n),
-                **{
-                    f"reward_history_rcos_{k}": rng.uniform(0, 1, n)
-                    for k in range(3)
-                },
+                **{f"reward_history_rcos_{k}": rng.uniform(0, 1, n) for k in range(3)},
                 "reward_history_incomplete": 0.0,
             }
         )
         frames.append(df)
     stop = pd.concat(frames, ignore_index=True)
-    stop.loc[: n_immobility_bad - 1, "immobility_duration_s"] = 0.0  # immobility<=0 own-drop
+    stop.loc[: n_immobility_bad - 1, "immobility_duration_s"] = (
+        0.0  # immobility<=0 own-drop
+    )
     stop.loc[
         n_immobility_bad : n_immobility_bad + n_rewardbasis_nan - 1,
         "reward_history_rcos_0",
@@ -501,7 +500,9 @@ def test_per_stop_hierarchy_records_reconcile():
                     },
                     "reward_history_incomplete": 0.0,
                     "is_after_omission": rng.integers(0, 2, n).astype(float),
-                    "did_last_completed_trip_switch_patch": rng.integers(0, 2, n).astype(float),
+                    "did_last_completed_trip_switch_patch": rng.integers(
+                        0, 2, n
+                    ).astype(float),
                     "recent_trial_reward_rate": rng.uniform(0, 1, n),
                 }
             )
@@ -534,7 +535,10 @@ def test_contrast_ladder_rungs_share_one_cohort():
     for sid in range(40):
         immobility = float(rng.uniform(1.0, 1.6))
         row = {
-            "animal": "a", "session_date": 1, "epoch": "02_r1", "stop_id": sid,
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_id": sid,
             "immobility_duration_s": immobility,
             "reward_history_rcos_0": float(sid % 2),
             "reward_history_rcos_1": float(rng.uniform(0, 1)),
@@ -546,12 +550,17 @@ def test_contrast_ladder_rungs_share_one_cohort():
             row["rpe_postoutcome"] = np.nan
         stop_rows.append(row)
         for _ in range(rng.poisson(12 * immobility)):
-            onset_rows.append({
-                "animal": "a", "session_date": 1, "epoch": "02_r1",
-                "stop_id": sid, "event_type": "non_local",
-                "t_since_stop_onset": float(rng.uniform(0, immobility)),
-                "is_swr": bool(rng.integers(0, 2)),
-            })
+            onset_rows.append(
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "stop_id": sid,
+                    "event_type": "non_local",
+                    "t_since_stop_onset": float(rng.uniform(0, immobility)),
+                    "is_swr": bool(rng.integers(0, 2)),
+                }
+            )
     stop = pd.DataFrame(stop_rows)
 
     # The synthetic stops carry neither the arrival clocks nor the outcome

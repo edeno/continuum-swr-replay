@@ -210,4 +210,3 @@ def test_horserace_values_name_each_population_and_predictor():
     assert values["horserace_value_non_swr_animals"].value == 4
     assert values["horserace_condition_number_non_swr"].value == pytest.approx(5.0)
     assert len(values) == 3 * (4 * 2 + 1)
-

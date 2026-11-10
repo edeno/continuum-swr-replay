@@ -45,12 +45,14 @@ def _two_event_table_one_clean_one_nan() -> pd.DataFrame:
     rows = []
     for event_id, predictor_vals in [(1, [1.0, 0.0, 0.0]), (2, [1.0, np.nan, 0.0])]:
         for arm, p in enumerate(predictor_vals):
-            rows.append({
-                "event_id": event_id,
-                "candidate_arm": arm,
-                "is_occupancy_well_arm": p,
-                "arm_fraction": 0.5 if arm == 0 else 0.25,
-            })
+            rows.append(
+                {
+                    "event_id": event_id,
+                    "candidate_arm": arm,
+                    "is_occupancy_well_arm": p,
+                    "arm_fraction": 0.5 if arm == 0 else 0.25,
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -108,7 +110,8 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
                     "reward_fraction_candidate_arm_last10_visits": 0.0,
                     "reward_belief_mean_candidate_arm_preoutcome": 0.5,
                     "task_reward_probability_candidate_arm": 0.5,
-                    "distance_to_candidate_arm_cm": 0.0, "candidate_arm_distance_rank": 0.0,
+                    "distance_to_candidate_arm_cm": 0.0,
+                    "candidate_arm_distance_rank": 0.0,
                     "is_same_patch_as_current": 0,
                     "current_patch": 1,
                 }
@@ -116,7 +119,13 @@ class TestBuildResidualizedChoiceDatasetPropagatesNaN:
             ]
         )
         et = pd.DataFrame(
-            [{"event_id": 1, "current_patch": 1, "did_last_completed_trip_switch_patch": 0}]
+            [
+                {
+                    "event_id": 1,
+                    "current_patch": 1,
+                    "did_last_completed_trip_switch_patch": 0,
+                }
+            ]
         )
         st = pd.DataFrame(
             [

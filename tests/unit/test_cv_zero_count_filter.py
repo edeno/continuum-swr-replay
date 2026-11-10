@@ -29,11 +29,13 @@ def _toy_long_df(n_events: int, n_arms: int = 9) -> pd.DataFrame:
         if counts.sum() == 0:
             counts[0] = 1.0
         for arm in range(n_arms):
-            rows.append({
-                "event_id": ei,
-                "candidate_arm": arm,
-                "arm_count_hard": counts[arm],
-            })
+            rows.append(
+                {
+                    "event_id": ei,
+                    "candidate_arm": arm,
+                    "arm_count_hard": counts[arm],
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -84,12 +86,14 @@ def _toy_long_df_with_predictor(n_events: int, n_arms: int = 9) -> pd.DataFrame:
         x = rng.normal(size=n_arms)
         chosen = int(np.argmax(x + rng.normal(size=n_arms)))
         for arm in range(n_arms):
-            rows.append({
-                "event_id": ei,
-                "candidate_arm": arm,
-                "arm_count_hard": float(arm == chosen),
-                "pred": float(x[arm]),
-            })
+            rows.append(
+                {
+                    "event_id": ei,
+                    "candidate_arm": arm,
+                    "arm_count_hard": float(arm == chosen),
+                    "pred": float(x[arm]),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -110,8 +114,11 @@ class TestCvConditionalPoissonInvalidation:
         monkeypatch.setattr(model_checking, "fit_status", fake_fit_status)
         df = _toy_long_df_with_predictor(n_events=90)
         out = cross_validate_conditional_poisson(
-            df, predictors=["pred"], event_col="event_id",
-            response_col="arm_count_hard", n_folds=5,
+            df,
+            predictors=["pred"],
+            event_col="event_id",
+            response_col="arm_count_hard",
+            n_folds=5,
         )
         assert out is not None  # fold NOT dropped
         assert out["cv_n_folds"] == 5  # all folds scored, none silently averaged away

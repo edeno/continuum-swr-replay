@@ -97,9 +97,7 @@ class TestPosteriorHpdWidth:
         w = np.array([0.9, 0.85, 0.95, 0.81, 0.9])
         event_id = np.zeros(5, dtype=int)
         for cov in (0.5, 0.8, 0.95):
-            _, width = posterior_hpd_width(
-                arm_post, w, event_id, coverage=cov
-            )
+            _, width = posterior_hpd_width(arm_post, w, event_id, coverage=cov)
             np.testing.assert_allclose(width, 1.0)
 
     def test_uniform_posterior_width_is_n_arms_at_all_coverages(self):

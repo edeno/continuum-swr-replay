@@ -96,9 +96,17 @@ CANDIDATES = (
 def _spec(extra: tuple[str, ...]) -> PerBinRateModelSpec:
     name = "base" if not extra else "+".join(extra)
     return PerBinRateModelSpec(
-        name, True, N_REWARD_LAGS, False, N_HISTORY_LAGS, False, False,
-        "covariate-ranking spec", "M7r_time_histcos_rew",
-        self_history_basis=N_HISTORY_BASIS, extra_covariates=extra,
+        name,
+        True,
+        N_REWARD_LAGS,
+        False,
+        N_HISTORY_LAGS,
+        False,
+        False,
+        "covariate-ranking spec",
+        "M7r_time_histcos_rew",
+        self_history_basis=N_HISTORY_BASIS,
+        extra_covariates=extra,
     )
 
 
@@ -117,25 +125,39 @@ def _run_session(keys, stops_g, onsets_g) -> list[dict]:
     rows: list[dict] = []
     for pop in POPULATIONS_TO_FIT:
         d = aggregate_to_timebins(
-            stops_g, POPULATIONS[pop](onsets_g), bin_s=BIN_S, tmax=TMAX,
-            reward_lags=N_REWARD_LAGS, self_history_lags=N_HISTORY_LAGS,
-            self_history_basis=N_HISTORY_BASIS, stop_covariates=stop_covariates,
+            stops_g,
+            POPULATIONS[pop](onsets_g),
+            bin_s=BIN_S,
+            tmax=TMAX,
+            reward_lags=N_REWARD_LAGS,
+            self_history_lags=N_HISTORY_LAGS,
+            self_history_basis=N_HISTORY_BASIS,
+            stop_covariates=stop_covariates,
         )
         aic_base = _aic(d, ())
         aic_full = _aic(d, CANDIDATES)
         base = dict(zip(SESSION_COLUMNS, keys, strict=True))
         for c in CANDIDATES:
             drop = tuple(x for x in CANDIDATES if x != c)
-            rows.append({
-                **base, "population": pop, "covariate": c,
-                "d_aic_uni": _aic(d, (c,)) - aic_base,   # <0 = improves
-                "d_aic_drop": _aic(d, drop) - aic_full,   # >0 = removing hurts
-            })
-        rows.append({
-            **base, "population": pop, "covariate": "(block)",
-            "cv_base": _cv(d, ()), "cv_full": _cv(d, CANDIDATES),
-            "d_aic_block": aic_full - aic_base,
-        })
+            rows.append(
+                {
+                    **base,
+                    "population": pop,
+                    "covariate": c,
+                    "d_aic_uni": _aic(d, (c,)) - aic_base,  # <0 = improves
+                    "d_aic_drop": _aic(d, drop) - aic_full,  # >0 = removing hurts
+                }
+            )
+        rows.append(
+            {
+                **base,
+                "population": pop,
+                "covariate": "(block)",
+                "cv_base": _cv(d, ()),
+                "cv_full": _cv(d, CANDIDATES),
+                "d_aic_block": aic_full - aic_base,
+            }
+        )
     return rows
 
 
@@ -146,11 +168,17 @@ def _load() -> tuple[pd.DataFrame, pd.DataFrame]:
     cont = read_table(table_path("qvals_table", RC))
     require_covariate_schema(cont, table="qvals")
     stop = stop.merge(
-        cont[["stop_id", *VALUE_COLS]], on="stop_id", how="inner", validate="many_to_one"
+        cont[["stop_id", *VALUE_COLS]],
+        on="stop_id",
+        how="inner",
+        validate="many_to_one",
     )
     first = (
-        stop[list(SESSION_COLUMNS)].drop_duplicates().sort_values(list(SESSION_COLUMNS))
-        .groupby("animal", as_index=False).first()
+        stop[list(SESSION_COLUMNS)]
+        .drop_duplicates()
+        .sort_values(list(SESSION_COLUMNS))
+        .groupby("animal", as_index=False)
+        .first()
     )
     merged = stop.merge(first, on=list(SESSION_COLUMNS), how="left", indicator=True)
     stop = stop[merged["_merge"].to_numpy() == "left_only"]
@@ -184,8 +212,12 @@ def main() -> None:
         for keys, g in stop.groupby(list(SESSION_COLUMNS), sort=False)
         if keys in onset_groups
     ]
-    logger.info("Ranking %d covariates over %d sessions (workers=%d)...",
-                len(CANDIDATES), len(tasks), args.workers)
+    logger.info(
+        "Ranking %d covariates over %d sessions (workers=%d)...",
+        len(CANDIDATES),
+        len(tasks),
+        args.workers,
+    )
 
     rows: list[dict] = []
     if args.workers > 1:
@@ -199,7 +231,9 @@ def main() -> None:
             rows.extend(_run_session(keys, g, og))
     df = pd.DataFrame(rows)
     out = model_dir("per_bin_rate", RC) / (
-        "covariate_ranking_smoke.pkl" if args.max_per_animal else "covariate_ranking.pkl"
+        "covariate_ranking_smoke.pkl"
+        if args.max_per_animal
+        else "covariate_ranking.pkl"
     )
     df.to_pickle(out)
 
@@ -208,23 +242,34 @@ def main() -> None:
         s = cov[cov.population == pop]
         agg = (
             s.groupby("covariate")
-            .agg(uni_dAIC=("d_aic_uni", "median"),
-                 uni_pct_improve=("d_aic_uni", lambda x: (x < 0).mean() * 100),
-                 drop_dAIC=("d_aic_drop", "median"),
-                 n=("d_aic_uni", "size"))
+            .agg(
+                uni_dAIC=("d_aic_uni", "median"),
+                uni_pct_improve=("d_aic_uni", lambda x: (x < 0).mean() * 100),
+                drop_dAIC=("d_aic_drop", "median"),
+                n=("d_aic_uni", "size"),
+            )
             .sort_values("uni_dAIC")  # most negative (best) first
         )
-        logger.info("=== %s: univariate & drop-one ΔAIC (negative uni = improves) ===\n%s",
-                    pop, agg.round(2).to_string())
+        logger.info(
+            "=== %s: univariate & drop-one ΔAIC (negative uni = improves) ===\n%s",
+            pop,
+            agg.round(2).to_string(),
+        )
 
     blk = df[df.covariate == "(block)"]
     logger.info("=== whole curated block: held-out cv_bits (base -> full) ===")
     for pop in POPULATIONS_TO_FIT:
         b = blk[blk.population == pop]
         d = (b["cv_full"] - b["cv_base"]).dropna()
-        logger.info("  %-18s base=%.4f full=%.4f  Δcv_bits median=%+.4f  %%pos=%.0f%% n=%d",
-                    pop, b["cv_base"].median(), b["cv_full"].median(),
-                    d.median(), (d > 0).mean() * 100, len(d))
+        logger.info(
+            "  %-18s base=%.4f full=%.4f  Δcv_bits median=%+.4f  %%pos=%.0f%% n=%d",
+            pop,
+            b["cv_base"].median(),
+            b["cv_full"].median(),
+            d.median(),
+            (d > 0).mean() * 100,
+            len(d),
+        )
     logger.info("Saved %d rows to %s in %.1fs", len(df), out, time.perf_counter() - t0)
 
 

@@ -1422,18 +1422,14 @@ data_over_time.loc[data_over_time["SWR_event"] > 0].groupby(
     ["animal", "day", "epoch", "SWR_event"]
 ).filter(lambda g: (g["non_local_event"] == 0).all()).groupby(
     ["animal", "day", "epoch", "SWR_event"]
-)[
-    "Local_prob"
-].mean().mean()
+)["Local_prob"].mean().mean()
 
 # %%
 data_over_time.loc[data_over_time["MUA_event"] > 0].groupby(
     ["animal", "day", "epoch", "MUA_event"]
 ).filter(lambda g: (g["non_local_event"] == 0).all()).groupby(
     ["animal", "day", "epoch", "MUA_event"]
-)[
-    "Local_prob"
-].mean().mean()
+)["Local_prob"].mean().mean()
 
 # %%
 immobile_non_local_events.map_speed.hist(

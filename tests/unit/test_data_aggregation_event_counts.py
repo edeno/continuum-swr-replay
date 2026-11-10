@@ -18,8 +18,8 @@ from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
 
 def _frame(rows: list[dict]) -> pd.DataFrame:
     df = pd.DataFrame(rows)
-    df["Non-Local_Continuous_prob"] = df["non_local_event"].gt(0).map(
-        {True: 0.9, False: 0.1}
+    df["Non-Local_Continuous_prob"] = (
+        df["non_local_event"].gt(0).map({True: 0.9, False: 0.1})
     )
     df["Non-Local_Fragmented_prob"] = 0.0
     return df.set_index("time").rename_axis(None)
@@ -32,16 +32,31 @@ class TestEmptyA:
         df = _frame(
             [
                 {
-                    "time": 0.0, "animal": "m", "day": 1, "epoch": "e",
-                    "head_speed": 50.0, "non_local_event": 0, "SWR_event": 0,
+                    "time": 0.0,
+                    "animal": "m",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 50.0,
+                    "non_local_event": 0,
+                    "SWR_event": 0,
                 },
                 {
-                    "time": 0.5, "animal": "m", "day": 1, "epoch": "e",
-                    "head_speed": 0.0, "non_local_event": 0, "SWR_event": 1,
+                    "time": 0.5,
+                    "animal": "m",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 1,
                 },
                 {
-                    "time": 1.0, "animal": "m", "day": 1, "epoch": "e",
-                    "head_speed": 0.0, "non_local_event": 0, "SWR_event": 1,
+                    "time": 1.0,
+                    "animal": "m",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 1,
                 },
             ]
         )
@@ -63,21 +78,41 @@ class TestCrossSessionTimeCollision:
             [
                 # Session 1 — NL and SWR overlap.
                 {
-                    "time": 0.0, "animal": "s1", "day": 1, "epoch": "e",
-                    "head_speed": 0.0, "non_local_event": 1, "SWR_event": 1,
+                    "time": 0.0,
+                    "animal": "s1",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 1,
                 },
                 {
-                    "time": 0.5, "animal": "s1", "day": 1, "epoch": "e",
-                    "head_speed": 0.0, "non_local_event": 1, "SWR_event": 1,
+                    "time": 0.5,
+                    "animal": "s1",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 1,
                 },
                 # Session 2 — an SWR alone, at the same times.
                 {
-                    "time": 0.0, "animal": "s2", "day": 1, "epoch": "e",
-                    "head_speed": 0.0, "non_local_event": 0, "SWR_event": 1,
+                    "time": 0.0,
+                    "animal": "s2",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 1,
                 },
                 {
-                    "time": 0.5, "animal": "s2", "day": 1, "epoch": "e",
-                    "head_speed": 0.0, "non_local_event": 0, "SWR_event": 1,
+                    "time": 0.5,
+                    "animal": "s2",
+                    "day": 1,
+                    "epoch": "e",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 1,
                 },
             ]
         )
@@ -106,16 +141,51 @@ class TestBoundaryTouchOverlap:
         # the boundary timestamp at t=1.0.
         df = _frame(
             [
-                {"time": 0.0, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 0},
-                {"time": 0.5, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 0},
-                {"time": 1.0, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 2},
-                {"time": 1.5, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 0, "SWR_event": 2},
-                {"time": 2.0, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 0, "SWR_event": 2},
+                {
+                    "time": 0.0,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 0,
+                },
+                {
+                    "time": 0.5,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 0,
+                },
+                {
+                    "time": 1.0,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 2,
+                },
+                {
+                    "time": 1.5,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 2,
+                },
+                {
+                    "time": 2.0,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 2,
+                },
             ]
         )
         out = compute_swr_nl_event_counts(df)
@@ -135,17 +205,52 @@ class TestBoundaryTouchOverlap:
         only in extending NL's labels by one bin into SWR's range."""
         df = _frame(
             [
-                {"time": 0.0, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 0},
-                {"time": 0.5, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 0},
-                {"time": 1.0, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 2},
+                {
+                    "time": 0.0,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 0,
+                },
+                {
+                    "time": 0.5,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 0,
+                },
+                {
+                    "time": 1.0,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 2,
+                },
                 # NL extends to t=1.5 (overlap of [1.0, 1.5] with SWR).
-                {"time": 1.5, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 1, "SWR_event": 2},
-                {"time": 2.0, "animal": "a", "day": 1, "epoch": "e1",
-                 "head_speed": 0.0, "non_local_event": 0, "SWR_event": 2},
+                {
+                    "time": 1.5,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 1,
+                    "SWR_event": 2,
+                },
+                {
+                    "time": 2.0,
+                    "animal": "a",
+                    "day": 1,
+                    "epoch": "e1",
+                    "head_speed": 0.0,
+                    "non_local_event": 0,
+                    "SWR_event": 2,
+                },
             ]
         )
         out = compute_swr_nl_event_counts(df)

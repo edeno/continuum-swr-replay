@@ -251,9 +251,13 @@ class TestBuildChoiceDataset:
 
         ds = build_choice_dataset(et, eat, st).set_index("candidate_arm")
 
-        np.testing.assert_allclose(ds["reward_belief_mean_candidate_arm_preoutcome"], ds.index.to_numpy() / 10.0)
         np.testing.assert_allclose(
-            ds["task_reward_probability_candidate_arm"], 1.0 - ds.index.to_numpy() / 20.0
+            ds["reward_belief_mean_candidate_arm_preoutcome"],
+            ds.index.to_numpy() / 10.0,
+        )
+        np.testing.assert_allclose(
+            ds["task_reward_probability_candidate_arm"],
+            1.0 - ds.index.to_numpy() / 20.0,
         )
 
     def test_drops_stops_with_nan_next_arm(self):
@@ -498,11 +502,15 @@ class TestPredictArmFractions:
         # arm 0 has logit 1000; everything else has logit 0. After
         # max-shift, arm 0's exp(0) = 1; others exp(-1000) ≈ 0. So
         # arm 0 fraction ≈ 1.
-        assert out.loc[out["candidate_arm"] == 0, "predicted_frac"].iloc[0] == pytest.approx(1.0)
+        assert out.loc[out["candidate_arm"] == 0, "predicted_frac"].iloc[
+            0
+        ] == pytest.approx(1.0)
 
     def test_nonfinite_predictor_drops_whole_event(self):
         eat = self._eat_for_softmax(n_events=2)
-        eat.loc[(eat["event_id"] == 1) & (eat["candidate_arm"] == 0), "is_prev_arm"] = np.inf
+        eat.loc[(eat["event_id"] == 1) & (eat["candidate_arm"] == 0), "is_prev_arm"] = (
+            np.inf
+        )
 
         out = predict_arm_fractions(
             eat, {"coef_is_prev_arm": 1.0}, predictors=["is_prev_arm"]

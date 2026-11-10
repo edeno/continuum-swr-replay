@@ -70,20 +70,45 @@ def main() -> None:
     for name, t in pops.items():
         h, _ = np.histogram(t.dropna().to_numpy(), TBINS)
         rate = h / np.where(sec > 0, sec, np.nan)
-        ax.plot(CENT, rate, color=COLORS[name], lw=2, label=f"{name} (n={int(t.notna().sum()):,})")
+        ax.plot(
+            CENT,
+            rate,
+            color=COLORS[name],
+            lw=2,
+            label=f"{name} (n={int(t.notna().sum()):,})",
+        )
         pk = np.nanmax(rate)
         tpk = CENT[np.nanargmax(rate)]
-        tail = h[(CENT >= 7) & (CENT < 10)].sum() / max(sec[(CENT >= 7) & (CENT < 10)].sum(), 1e-9)
-        print(f"{name:17s} | {int(t.notna().sum()):6,} | {pk:9.3f} | {tpk:9.2f} | {tail:10.3f} | {pk / max(tail, 1e-9):.2f}")
+        tail = h[(CENT >= 7) & (CENT < 10)].sum() / max(
+            sec[(CENT >= 7) & (CENT < 10)].sum(), 1e-9
+        )
+        print(
+            f"{name:17s} | {int(t.notna().sum()):6,} | {pk:9.3f} | {tpk:9.2f} | {tail:10.3f} | {pk / max(tail, 1e-9):.2f}"
+        )
     ax.axvspan(0, 1.0, color="0.9", zorder=0)
-    ax.text(0.5, ax.get_ylim()[1] * 0.04, "consumption", ha="center", fontsize=8, color="0.4")
+    ax.text(
+        0.5,
+        ax.get_ylim()[1] * 0.04,
+        "consumption",
+        ha="center",
+        fontsize=8,
+        color="0.4",
+    )
     ax.set_xlabel("time since reward pump (s)")
     ax.set_ylabel("onset rate (events / s of immobility)")
-    ax.set_title("Time-resolved onset rate vs time since reward\n(equal-exposure 4 ms bins, all immobility)")
+    ax.set_title(
+        "Time-resolved onset rate vs time since reward\n(equal-exposure 4 ms bins, all immobility)"
+    )
     ax.legend(frameon=False, fontsize=9)
     ax.set_xlim(0, 10)
     fig.tight_layout()
-    out = P.parent / ".claude" / "research" / "rate_psth_outputs" / "rate_timecourse_vs_pump.png"
+    out = (
+        P.parent
+        / ".claude"
+        / "research"
+        / "rate_psth_outputs"
+        / "rate_timecourse_vs_pump.png"
+    )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=150)

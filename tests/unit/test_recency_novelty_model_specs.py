@@ -8,7 +8,10 @@ def _has_recency(predictors) -> bool:
     """Both the linear and log-scale recency forms carry the same hazard."""
     return any(
         p in predictors
-        for p in ("visit_recency_trials_event_leaf_centered", *specs.RECENCY_SPLINE_COLUMNS)
+        for p in (
+            "visit_recency_trials_event_leaf_centered",
+            *specs.RECENCY_SPLINE_COLUMNS,
+        )
     )
 
 
@@ -18,7 +21,9 @@ def test_arm_hierarchy_adds_novelty_main_effect_with_recency():
             c in specs.MODEL_HIERARCHY[name].predictors
             for c in specs.RECENCY_SPLINE_COLUMNS
         )
-        assert "is_candidate_arm_never_visited" in specs.MODEL_HIERARCHY[name].predictors
+        assert (
+            "is_candidate_arm_never_visited" in specs.MODEL_HIERARCHY[name].predictors
+        )
     assert any(
         f"swr_x_{c}" in specs.MODEL_HIERARCHY["M6"].predictors
         for c in specs.RECENCY_SPLINE_COLUMNS
@@ -53,7 +58,9 @@ def test_primary_choice_and_patch_models_use_rate_and_learned_value():
 
 
 def test_novelty_timing_is_past_only():
-    assert timing_of("is_candidate_arm_never_visited") == ["is_candidate_arm_never_visited"]
+    assert timing_of("is_candidate_arm_never_visited") == [
+        "is_candidate_arm_never_visited"
+    ]
     assert timing_of("is_patch_never_visited") == ["is_patch_never_visited"]
     assert timing_of("swr_x_is_candidate_arm_never_visited") == [
         "is_candidate_arm_never_visited"
@@ -95,6 +102,5 @@ def test_every_recency_rung_carries_the_novelty_companion():
             unpaired.append(f"SWR_CONTRAST_ARM:{name}")
 
     assert not unpaired, (
-        "rungs carry a recency term without arm_never_visited: "
-        f"{unpaired}"
+        f"rungs carry a recency term without arm_never_visited: {unpaired}"
     )

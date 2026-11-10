@@ -112,7 +112,12 @@ def plot_duration_histograms_separate(
         DPI for raster formats
     """
     fig, axes = plt.subplots(
-        3, 1, figsize=get_figure_size(3, 1), sharex=True, sharey=True, constrained_layout=True
+        3,
+        1,
+        figsize=get_figure_size(3, 1),
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
     )
 
     # Non-local
@@ -604,7 +609,12 @@ def plot_nonlocal_prob_during_events(
         DPI for raster formats
     """
     fig, axes = plt.subplots(
-        1, 2, figsize=FIGURE_TWO_PANEL_HORIZONTAL, sharey=True, sharex=True, constrained_layout=True
+        1,
+        2,
+        figsize=FIGURE_TWO_PANEL_HORIZONTAL,
+        sharey=True,
+        sharex=True,
+        constrained_layout=True,
     )
 
     data[data["SWR_event"] > 0]["Non-Local_prob"].hist(

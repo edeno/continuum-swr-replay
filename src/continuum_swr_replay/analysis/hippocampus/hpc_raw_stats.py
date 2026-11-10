@@ -174,15 +174,17 @@ def compute_hpc_raw_stats_single(
 
     if n_total == 0:
         stats = _nan_stats()
-        stats.update({
-            "n_tetrodes": n_tet,
-            "n_spikes_total": 0,
-            "epoch_duration_s": float(epoch_duration_s),
-            "rate_hz_total": 0.0,
-            "rate_hz_per_tetrode": 0.0,
-            "median_spikes_per_tetrode": 0.0,
-            "min_spikes_per_tetrode": 0,
-        })
+        stats.update(
+            {
+                "n_tetrodes": n_tet,
+                "n_spikes_total": 0,
+                "epoch_duration_s": float(epoch_duration_s),
+                "rate_hz_total": 0.0,
+                "rate_hz_per_tetrode": 0.0,
+                "median_spikes_per_tetrode": 0.0,
+                "min_spikes_per_tetrode": 0,
+            }
+        )
         return stats
 
     per_tet_abs_medians: list[float] = []
@@ -302,9 +304,9 @@ def check_transition_matrix_flags(summary: pd.DataFrame) -> pd.DataFrame:
 
     # --- Diagonal upper-bound errors (absorbing / stuck states) ---
     diag_error_hi = {
-        "T_local_local": 0.9999,     # dwell > 20 s — absorbing
+        "T_local_local": 0.9999,  # dwell > 20 s — absorbing
         "T_nospike_nospike": 0.9999,  # dwell > 20 s — absorbing
-        "T_nlc_nlc": 0.998,           # dwell > 1 s — stuck in non-local
+        "T_nlc_nlc": 0.998,  # dwell > 1 s — stuck in non-local
     }
     for col, threshold in diag_error_hi.items():
         errors |= (_col(col) > threshold).fillna(False)
@@ -342,9 +344,7 @@ def check_transition_matrix_flags(summary: pd.DataFrame) -> pd.DataFrame:
             # happen to sum to ≠1.
             row_sum = out[present].sum(axis=1, min_count=4)
             row_has_nan = out[present].isna().any(axis=1)
-            errors |= (
-                ((row_sum - 1.0).abs() > 1e-6).fillna(False) | row_has_nan
-            )
+            errors |= ((row_sum - 1.0).abs() > 1e-6).fillna(False) | row_has_nan
 
     out["flag_transition_error"] = errors
 
@@ -361,10 +361,10 @@ def check_transition_matrix_flags(summary: pd.DataFrame) -> pd.DataFrame:
         warnings += (_col(col) < threshold).fillna(False).astype(int)
 
     diag_warn_hi = {
-        "T_local_local": 0.9999,      # absorbing Local
-        "T_nospike_nospike": 0.999,    # dwell > 2 s — near-absorbing No-Spike
-        "T_nlc_nlc": 0.9867,           # dwell > 150 ms — non-local events longer
-    }                                   # than typical SWR replay
+        "T_local_local": 0.9999,  # absorbing Local
+        "T_nospike_nospike": 0.999,  # dwell > 2 s — near-absorbing No-Spike
+        "T_nlc_nlc": 0.9867,  # dwell > 150 ms — non-local events longer
+    }  # than typical SWR replay
     for col, threshold in diag_warn_hi.items():
         warnings += (_col(col) > threshold).fillna(False).astype(int)
 

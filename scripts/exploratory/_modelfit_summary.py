@@ -212,11 +212,17 @@ def panel_coef_heatmap(ax, df, models, predictors, title):
 
     vmax = np.nanmax(np.abs(beta)) if np.isfinite(beta).any() else 1.0
     im = ax.imshow(beta, cmap="RdBu_r", vmin=-vmax, vmax=vmax, aspect="auto")
-    for (i, j) in cells:
+    for i, j in cells:
         star = _star(fdr.get((i, j), 1.0))
-        ax.text(j, i, f"×{np.exp(beta[i, j]):.2f}\n{star}", ha="center",
-                va="center", fontsize=5,
-                color="white" if abs(beta[i, j]) > 0.6 * vmax else "black")
+        ax.text(
+            j,
+            i,
+            f"×{np.exp(beta[i, j]):.2f}\n{star}",
+            ha="center",
+            va="center",
+            fontsize=5,
+            color="white" if abs(beta[i, j]) > 0.6 * vmax else "black",
+        )
     ax.set_xticks(range(n_m))
     ax.set_xticklabels(models, fontsize=7)
     ax.set_yticks(range(n_p))
@@ -236,39 +242,75 @@ def main():
     arm = load_arm_fits()
     patch = load_patch_fits()
     rate = load_rate_fits()
-    n = {k: v.groupby(SESSION).ngroups for k, v in
-         (("candidate_arm", arm), ("patch", patch), ("rate", rate))}
+    n = {
+        k: v.groupby(SESSION).ngroups
+        for k, v in (("candidate_arm", arm), ("patch", patch), ("rate", rate))
+    }
     logging.info("epochs — arm %(arm)d, patch %(patch)d, rate %(rate)d", n)
 
-    fig, axs = plt.subplots(3, 3, figsize=(16, 13), dpi=150,
-                            gridspec_kw={"width_ratios": [1.1, 1.1, 1.3]})
+    fig, axs = plt.subplots(
+        3, 3, figsize=(16, 13), dpi=150, gridspec_kw={"width_ratios": [1.1, 1.1, 1.3]}
+    )
 
     # All three blocks now use cross-validated LL (higher = better) as the
     # selection metric. Arm/patch: held-out per-event conditional LL; rate:
     # held-out per-stop Poisson LL.
     blocks = [
-        (0, arm, "cv_ll_per_event_mean", "CV LL / event", ARM_ORDER,
-         ARM_ORDER[2:], ARM_PREDICTORS,
-         "ARM pooled exp(β): content relative-rate (M1–M7)", "ARM  M0–M7"),
-        (1, patch, "cv_ll_per_event_mean", "CV LL / event", PATCH_ORDER,
-         PATCH_ORDER[1:], PATCH_PREDICTORS,
-         "PATCH pooled exp(β): content relative-rate (P1–P4)", "PATCH  P0–P4"),
-        (2, rate, "cv_ll_per_stop_mean", "CV LL / stop", RATE_ORDER,
-         RATE_ORDER[1:], RATE_PREDICTORS,
-         "RATE pooled exp(β): event-rate ratio (R1–R3)", "RATE  R0–R3"),
+        (
+            0,
+            arm,
+            "cv_ll_per_event_mean",
+            "CV LL / event",
+            ARM_ORDER,
+            ARM_ORDER[2:],
+            ARM_PREDICTORS,
+            "ARM pooled exp(β): content relative-rate (M1–M7)",
+            "ARM  M0–M7",
+        ),
+        (
+            1,
+            patch,
+            "cv_ll_per_event_mean",
+            "CV LL / event",
+            PATCH_ORDER,
+            PATCH_ORDER[1:],
+            PATCH_PREDICTORS,
+            "PATCH pooled exp(β): content relative-rate (P1–P4)",
+            "PATCH  P0–P4",
+        ),
+        (
+            2,
+            rate,
+            "cv_ll_per_stop_mean",
+            "CV LL / stop",
+            RATE_ORDER,
+            RATE_ORDER[1:],
+            RATE_PREDICTORS,
+            "RATE pooled exp(β): event-rate ratio (R1–R3)",
+            "RATE  R0–R3",
+        ),
     ]
     for r, df, metric, ylabel, order, coef_models, preds, heat_title, tag in blocks:
         panel_trajectory(axs[r, 0], df, metric, order, ylabel, higher_better=True)
         panel_step_delta(axs[r, 1], df, metric, order, higher_better=True)
         panel_coef_heatmap(axs[r, 2], df, coef_models, preds, heat_title)
-        which = {"candidate_arm": "candidate_arm", "patch": "patch", "rate": "rate"}[tag.split()[0].lower()]
-        axs[r, 0].annotate(f"{tag}  (n={n[which]} epochs)", (-0.15, 1.13),
-                           xycoords="axes fraction", fontsize=12, fontweight="bold")
+        which = {"candidate_arm": "candidate_arm", "patch": "patch", "rate": "rate"}[
+            tag.split()[0].lower()
+        ]
+        axs[r, 0].annotate(
+            f"{tag}  (n={n[which]} epochs)",
+            (-0.15, 1.13),
+            xycoords="axes fraction",
+            fontsize=12,
+            fontweight="bold",
+        )
 
     fig.tight_layout()
     SCRATCH.mkdir(exist_ok=True)
     out = SCRATCH / "modelfit_summary.png"
-    save_figure(fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False)
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
+    )
     logging.info("Saved %s", out)
 
 

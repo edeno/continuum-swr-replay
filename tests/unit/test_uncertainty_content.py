@@ -74,12 +74,10 @@ def test_within_arm_horserace_recovers_uncertainty_and_excludes_current_trunk():
     assert row[
         "coef_reward_belief_variance_candidate_arm_preoutcome_z"
     ] == pytest.approx(0.1, abs=1e-6)
-    assert row[
-        "coef_reward_belief_mean_candidate_arm_preoutcome_z"
-    ] == pytest.approx(0.0, abs=1e-6)
-    assert row["coef_distance_to_candidate_arm_cm_z"] == pytest.approx(
+    assert row["coef_reward_belief_mean_candidate_arm_preoutcome_z"] == pytest.approx(
         0.0, abs=1e-6
     )
+    assert row["coef_distance_to_candidate_arm_cm_z"] == pytest.approx(0.0, abs=1e-6)
     assert row["coef_visit_recency_trials_z"] == pytest.approx(0.0, abs=1e-6)
     assert np.isfinite(row["cond_number"])
 
@@ -88,9 +86,13 @@ def test_within_arm_horserace_skips_rank_deficient_session_without_crashing():
     # Make two predictors perfectly collinear (distance == value) so the within-arm
     # design is rank-deficient; the session must be dropped, not crash or emit garbage.
     frame = _horserace_frame(0.1)
-    frame["distance_to_candidate_arm_cm"] = frame["reward_belief_mean_candidate_arm_preoutcome"]
+    frame["distance_to_candidate_arm_cm"] = frame[
+        "reward_belief_mean_candidate_arm_preoutcome"
+    ]
     coefs = within_arm_horserace(frame, min_rows=10)
-    assert coefs.empty  # every (session, population) design is rank-deficient -> skipped
+    assert (
+        coefs.empty
+    )  # every (session, population) design is rank-deficient -> skipped
 
 
 def test_within_arm_horserace_recovers_per_population_slopes_on_mixed_swr():
@@ -106,10 +108,17 @@ def test_within_arm_horserace_recovers_per_population_slopes_on_mixed_swr():
             fraction = 0.9 if (arm > 5 or is_current) else 0.2 + slope * uncertainty
             rows.append(
                 {
-                    "animal": "rat", "session_date": 1, "epoch": "e1", "event_id": 100 + event,
-                    "candidate_arm": arm, "is_current_arm": is_current, "is_swr": bool(is_swr),
-                    "arm_fraction": fraction, "reward_belief_variance_candidate_arm_preoutcome_z": uncertainty,
-                    "reward_belief_mean_candidate_arm_preoutcome": float(event % 5), "distance_to_candidate_arm_cm": float((event * 7) % 11),
+                    "animal": "rat",
+                    "session_date": 1,
+                    "epoch": "e1",
+                    "event_id": 100 + event,
+                    "candidate_arm": arm,
+                    "is_current_arm": is_current,
+                    "is_swr": bool(is_swr),
+                    "arm_fraction": fraction,
+                    "reward_belief_variance_candidate_arm_preoutcome_z": uncertainty,
+                    "reward_belief_mean_candidate_arm_preoutcome": float(event % 5),
+                    "distance_to_candidate_arm_cm": float((event * 7) % 11),
                     "visit_recency_trials": float((event * 3) % 13),
                 }
             )
@@ -123,7 +132,10 @@ def test_within_arm_horserace_recovers_per_population_slopes_on_mixed_swr():
     assert _coef("SWR") == pytest.approx(0.2, abs=1e-6)
     assert _coef("non_SWR") == pytest.approx(0.05, abs=1e-6)
     # 20 events x 5 non-current leaf arms per population; all = SWR + non_SWR
-    n = {p: int(coefs[coefs.population == p]["n_rows"].iloc[0]) for p in ("all", "SWR", "non_SWR")}
+    n = {
+        p: int(coefs[coefs.population == p]["n_rows"].iloc[0])
+        for p in ("all", "SWR", "non_SWR")
+    }
     assert n["SWR"] == 100 and n["non_SWR"] == 100 and n["all"] == 200
 
 
@@ -180,7 +192,9 @@ def _synthetic_inputs() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         }
         # Each physical well has four ordered, trial-level uncertainty states.
         for arm in range(6):
-            qval_row[f"reward_belief_variance_port_{arm}"] = 0.01 * (trial + 1) + arm * 1e-4
+            qval_row[f"reward_belief_variance_port_{arm}"] = (
+                0.01 * (trial + 1) + arm * 1e-4
+            )
         qval_rows.append(qval_row)
 
     # Trial 0 has one event at each of its two stops. Trial 2 and 3 have one.
@@ -221,7 +235,12 @@ def test_build_trial_leaf_table_aggregates_repeated_stops_once_per_trial():
     trial_leaf, audit = build_trial_leaf_table(event_arm, stops, qvals)
 
     assert len(trial_leaf) == 4 * 6
-    assert trial_leaf.groupby("trial_number_by_epoch")["candidate_arm"].nunique().eq(6).all()
+    assert (
+        trial_leaf.groupby("trial_number_by_epoch")["candidate_arm"]
+        .nunique()
+        .eq(6)
+        .all()
+    )
     assert audit["n_mapped_trials"] == 4
 
     trial0 = trial_leaf[trial_leaf["trial_number_by_epoch"] == 0]
@@ -266,15 +285,15 @@ def test_build_trial_leaf_table_maps_leaf_uncertainty_and_chosen_arm_exactly():
     event_arm, stops, qvals = _synthetic_inputs()
 
     trial_leaf, _ = build_trial_leaf_table(event_arm, stops, qvals)
-    row = trial_leaf.query(
-        "trial_number_by_epoch == 2 and candidate_arm == 4"
-    ).iloc[0]
+    row = trial_leaf.query("trial_number_by_epoch == 2 and candidate_arm == 4").iloc[0]
 
-    assert row["reward_belief_variance_candidate_arm_preoutcome"] == pytest.approx(0.0304)
+    assert row["reward_belief_variance_candidate_arm_preoutcome"] == pytest.approx(
+        0.0304
+    )
     assert not bool(row["is_chosen"])
-    chosen = trial_leaf.query(
-        "trial_number_by_epoch == 2 and candidate_arm == 2"
-    ).iloc[0]
+    chosen = trial_leaf.query("trial_number_by_epoch == 2 and candidate_arm == 2").iloc[
+        0
+    ]
     assert bool(chosen["is_chosen"])
 
 
@@ -283,7 +302,8 @@ def test_assign_within_arm_quantiles_preserves_ties_and_marks_constants():
         {
             "session_id": ["s"] * 10,
             "candidate_arm": [0] * 5 + [1] * 5,
-            "reward_belief_variance_candidate_arm_preoutcome": [1.0, 1.0, 2.0, 3.0, 4.0] + [2.0] * 5,
+            "reward_belief_variance_candidate_arm_preoutcome": [1.0, 1.0, 2.0, 3.0, 4.0]
+            + [2.0] * 5,
         }
     )
 

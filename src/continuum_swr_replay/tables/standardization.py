@@ -140,7 +140,9 @@ def attach_standardized(
                 )
             label = str(reference[c]["support"])
             if not label:
-                raise ValueError(f"standardization reference support for {c!r} is empty")
+                raise ValueError(
+                    f"standardization reference support for {c!r} is empty"
+                )
             if support_label != "all_rows" and label != support_label:
                 raise ValueError(
                     f"standardization reference support for {c!r} is {label!r}, "
@@ -217,14 +219,12 @@ def assert_standardized_present(
     if missing:
         raise RuntimeError(f"standardized columns missing after build: {missing}")
     bad_source = []  # source entirely NaN -> a failed upstream join, not zero-variance
-    wiped = []       # _z all-NaN while the source has real variance
+    wiped = []  # _z all-NaN while the source has real variance
     for c in present_sources:
         zc = f"{c}_z"
         col = df[c].to_numpy(dtype=float)
         if np.isinf(col).any():
-            raise RuntimeError(
-                f"standardization source column contains infinity: {c}"
-            )
+            raise RuntimeError(f"standardization source column contains infinity: {c}")
         z = df[zc].to_numpy(dtype=float)
         if np.isinf(z).any():
             raise RuntimeError(f"standardized column contains infinity: {zc}")

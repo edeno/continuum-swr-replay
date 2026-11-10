@@ -49,8 +49,9 @@ class TestCoincidentSpikeDetection:
         # With such large separation, all spikes should be preserved exactly
         total_original = sum(len(st) for st in spike_times)
         total_filtered = sum(len(st) for st in filtered_times)
-        assert total_filtered == total_original, \
+        assert total_filtered == total_original, (
             f"Expected all {total_original} spikes preserved, got {total_filtered}"
+        )
 
     def test_coincident_spikes_removed_correctly(self):
         """Spikes within 40μs across >33% tetrodes should be detected and removed.
@@ -63,28 +64,40 @@ class TestCoincidentSpikeDetection:
             np.array([1.0, 2.0, 5.0]),
             np.array([1.00002, 3.0, 5.00001]),  # 20μs from first at t≈1.0 and t≈5.0
             np.array([1.00003, 4.0, 5.00002]),  # 30μs from first at t≈1.0 and t≈5.0
-            np.array([6.0, 7.0, 8.0]),          # Well separated
+            np.array([6.0, 7.0, 8.0]),  # Well separated
         ]
         filtered_times, filtered_indices = detect_coincident_spikes(spike_times)
 
         # Should have removed some spikes
         total_original = sum(len(st) for st in spike_times)
         total_filtered = sum(len(st) for st in filtered_times)
-        assert total_filtered < total_original, \
+        assert total_filtered < total_original, (
             f"Expected some spikes removed, got {total_filtered}/{total_original}"
+        )
 
         # At least 2 spikes should be removed (from the coincident groups)
-        assert total_original - total_filtered >= 2, \
+        assert total_original - total_filtered >= 2, (
             f"Expected at least 2 spikes removed, got {total_original - total_filtered}"
+        )
 
         # Non-coincident spikes should be preserved
-        all_filtered = np.concatenate(filtered_times) if filtered_times else np.array([])
+        all_filtered = (
+            np.concatenate(filtered_times) if filtered_times else np.array([])
+        )
         if len(all_filtered) > 0:
             # Well-separated spikes should definitely be kept
-            assert np.any(np.abs(all_filtered - 2.0) < 0.01), "Spike at t=2.0 should be preserved"
-            assert np.any(np.abs(all_filtered - 3.0) < 0.01), "Spike at t=3.0 should be preserved"
-            assert np.any(np.abs(all_filtered - 4.0) < 0.01), "Spike at t=4.0 should be preserved"
-            assert np.any(np.abs(all_filtered - 6.0) < 0.01), "Spike at t=6.0 should be preserved"
+            assert np.any(np.abs(all_filtered - 2.0) < 0.01), (
+                "Spike at t=2.0 should be preserved"
+            )
+            assert np.any(np.abs(all_filtered - 3.0) < 0.01), (
+                "Spike at t=3.0 should be preserved"
+            )
+            assert np.any(np.abs(all_filtered - 4.0) < 0.01), (
+                "Spike at t=4.0 should be preserved"
+            )
+            assert np.any(np.abs(all_filtered - 6.0) < 0.01), (
+                "Spike at t=6.0 should be preserved"
+            )
 
     def test_two_of_four_coincident_above_threshold_removed(self):
         """Two distinct tetrodes spiking within 40μs on a 4-tetrode session
@@ -98,10 +111,10 @@ class TestCoincidentSpikeDetection:
         # 4 tetrodes; tetrodes 0+1 produce a 2-spike coincidence at t≈1.0,
         # everything else is well-separated.
         spike_times = [
-            np.array([1.0, 5.0]),         # tetrode 0: leading spike of pair
-            np.array([1.00002, 6.0]),     # tetrode 1: trailing spike (20μs)
-            np.array([3.0, 7.0]),         # tetrode 2: clean
-            np.array([4.0, 8.0]),         # tetrode 3: clean
+            np.array([1.0, 5.0]),  # tetrode 0: leading spike of pair
+            np.array([1.00002, 6.0]),  # tetrode 1: trailing spike (20μs)
+            np.array([3.0, 7.0]),  # tetrode 2: clean
+            np.array([4.0, 8.0]),  # tetrode 3: clean
         ]
         filtered_times, _ = detect_coincident_spikes(spike_times)
 
@@ -144,16 +157,18 @@ class TestCoincidentSpikeDetection:
         # 4 tetrodes: tetrode 1 only has coincident spikes that will be removed
         spike_times = [
             np.array([1.0, 2.0, 5.0]),
-            np.array([1.00001, 5.00001]),       # Only coincident spikes
+            np.array([1.00001, 5.00001]),  # Only coincident spikes
             np.array([1.00002, 3.0, 5.00002]),
             np.array([6.0, 7.0, 8.0]),
         ]
         filtered_times, filtered_indices = detect_coincident_spikes(spike_times)
 
-        assert len(filtered_times) == len(spike_times), \
+        assert len(filtered_times) == len(spike_times), (
             f"Expected {len(spike_times)} groups, got {len(filtered_times)}"
-        assert len(filtered_indices) == len(spike_times), \
+        )
+        assert len(filtered_indices) == len(spike_times), (
             f"Expected {len(spike_times)} groups, got {len(filtered_indices)}"
+        )
 
     def test_empty_groups_get_empty_arrays(self):
         """Sort groups that lose all spikes should get empty arrays, not be omitted."""
@@ -162,7 +177,7 @@ class TestCoincidentSpikeDetection:
         # should be removed, including the first one in sorted order.
         spike_times = [
             np.array([1.00000, 3.0, 4.0]),
-            np.array([1.00001]),                 # Only coincident — should become empty
+            np.array([1.00001]),  # Only coincident — should become empty
             np.array([1.00002, 5.0, 6.0]),
             np.array([1.00003, 7.0, 8.0]),
         ]
@@ -179,8 +194,9 @@ class TestCoincidentSpikeDetection:
         assert filtered_indices[1].dtype == np.int_
 
         # The coincident spike at t=1.00000 from tetrode 0 should also be removed
-        assert 1.00000 not in filtered_times[0], \
+        assert 1.00000 not in filtered_times[0], (
             "First spike in artifact cluster should also be removed"
+        )
         # But non-coincident spikes on tetrode 0 should survive
         assert 3.0 in filtered_times[0]
         assert 4.0 in filtered_times[0]
@@ -190,7 +206,7 @@ class TestCoincidentSpikeDetection:
         # 4 tetrodes, with tetrode 1 losing all spikes to coincidence
         spike_times = [
             np.array([1.0, 2.0, 5.0]),
-            np.array([1.00001, 5.00001]),        # Only coincident spikes
+            np.array([1.00001, 5.00001]),  # Only coincident spikes
             np.array([1.00002, 3.0, 5.00002]),
             np.array([6.0, 7.0, 8.0]),
         ]
@@ -210,8 +226,9 @@ class TestCoincidentSpikeDetection:
 
         # Verify alignment: each filtered feature set matches its spike times
         for i in range(len(spike_times)):
-            assert len(filtered_features[i]) == len(filtered_times[i]), \
+            assert len(filtered_features[i]) == len(filtered_times[i]), (
                 f"Tetrode {i}: {len(filtered_features[i])} features vs {len(filtered_times[i])} spikes"
+            )
 
         # Verify tetrode 3's features come from tetrode 3 (not shifted from tetrode 2)
         # Tetrode 3 had no coincident spikes, so all should be preserved
@@ -235,9 +252,12 @@ class TestCoincidentSpikeDetection:
 
         # ALL 4 artifact spikes around t=1.0 should be removed
         all_filtered = np.concatenate(filtered_times)
-        artifact_survivors = all_filtered[(all_filtered >= 0.999) & (all_filtered <= 1.001)]
-        assert len(artifact_survivors) == 0, \
+        artifact_survivors = all_filtered[
+            (all_filtered >= 0.999) & (all_filtered <= 1.001)
+        ]
+        assert len(artifact_survivors) == 0, (
             f"All artifact spikes should be removed, but {len(artifact_survivors)} survived: {artifact_survivors}"
+        )
 
         # Non-coincident spikes should be preserved
         assert np.any(np.abs(all_filtered - 5.0) < 0.01)
@@ -278,7 +298,9 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # Check temporal bounds
         assert spike_times["HPC"][0].min() >= 1.0
@@ -294,7 +316,9 @@ class TestSpikeFiltering:
         position_time = np.arange(0, 10, 0.1)
 
         # Should not raise
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
     def test_all_spikes_filtered_out(self):
         """If all spikes outside bounds, the brain area is dropped entirely."""
@@ -306,7 +330,9 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # No surviving units → brain area absent from both dicts so downstream
         # "brain_area in data['spike_times']" checks treat the session as
@@ -318,9 +344,9 @@ class TestSpikeFiltering:
         """Tetrodes with no spikes after filtering are dropped; others kept."""
         spike_times = {
             "HPC": [
-                np.array([0.1, 0.2]),       # All outside — should be dropped
+                np.array([0.1, 0.2]),  # All outside — should be dropped
                 np.array([1.5, 2.5, 3.5]),  # All inside — should be kept
-                np.array([0.3]),             # Outside — should be dropped
+                np.array([0.3]),  # Outside — should be dropped
             ],
         }
         spike_features = {
@@ -332,7 +358,9 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # Only the second tetrode survives
         assert len(spike_times["HPC"]) == 1
@@ -359,7 +387,9 @@ class TestSpikeFiltering:
         # Store original counts
         original_counts = [len(st) for st in spike_times["HPC"]]
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # All spikes should be preserved
         assert len(spike_times["HPC"][0]) == original_counts[0]
@@ -381,13 +411,13 @@ class TestSpikeFiltering:
             "HPC": [np.random.RandomState(42).randn(5, 4)],
         }
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # Should have exactly 3 spikes: 1.0, 2.5, 5.0
         assert len(spike_times["HPC"][0]) == 3
-        np.testing.assert_array_equal(
-            spike_times["HPC"][0], np.array([1.0, 2.5, 5.0])
-        )
+        np.testing.assert_array_equal(spike_times["HPC"][0], np.array([1.0, 2.5, 5.0]))
 
     def test_multiple_brain_areas(self):
         """Test filtering with multiple brain areas simultaneously."""
@@ -412,23 +442,19 @@ class TestSpikeFiltering:
         # position_time goes from 1.0 to 4.9 (arange stops before 5.0)
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # Check HPC
         assert len(spike_times["HPC"][0]) == 2  # 1.5, 2.5
         assert len(spike_times["HPC"][1]) == 3  # 1.0, 3.0, 4.8
-        np.testing.assert_array_equal(
-            spike_times["HPC"][0], np.array([1.5, 2.5])
-        )
-        np.testing.assert_array_equal(
-            spike_times["HPC"][1], np.array([1.0, 3.0, 4.8])
-        )
+        np.testing.assert_array_equal(spike_times["HPC"][0], np.array([1.5, 2.5]))
+        np.testing.assert_array_equal(spike_times["HPC"][1], np.array([1.0, 3.0, 4.8]))
 
         # Check mPFC
         assert len(spike_times["mPFC"][0]) == 2  # 2.0, 4.0
-        np.testing.assert_array_equal(
-            spike_times["mPFC"][0], np.array([2.0, 4.0])
-        )
+        np.testing.assert_array_equal(spike_times["mPFC"][0], np.array([2.0, 4.0]))
 
     def test_brain_area_without_features(self):
         """Test filtering when features dict doesn't have a brain area (KeyError handling)."""
@@ -443,7 +469,9 @@ class TestSpikeFiltering:
         position_time = np.arange(1.0, 5.0, 0.1)
 
         # Should not raise KeyError
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # Both brain areas should be filtered
         assert len(spike_times["HPC"][0]) == 2  # 1.5, 2.5
@@ -459,7 +487,9 @@ class TestSpikeFiltering:
         }
         position_time = np.arange(1.0, 5.0, 0.1)
 
-        spike_times, spike_features = filter_spike_times(spike_times, spike_features, position_time)
+        spike_times, spike_features = filter_spike_times(
+            spike_times, spike_features, position_time
+        )
 
         # Should be in order
         filtered = spike_times["HPC"][0]
@@ -475,7 +505,9 @@ class TestSpikeDataIntegrity:
         spike_times = [
             np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
             np.array([1.5, 2.5, 3.5, 4.5]),
-            np.array([1.0000001, 2.0000001, 3.0000001]),  # near-coincident with tetrode 0
+            np.array(
+                [1.0000001, 2.0000001, 3.0000001]
+            ),  # near-coincident with tetrode 0
         ]
 
         filtered_times, _ = detect_coincident_spikes(spike_times)
@@ -524,7 +556,11 @@ class TestSpikeDataIntegrity:
 
         for brain_area in filtered_times:
             for i, (times, feats) in enumerate(
-                zip(filtered_times[brain_area], filtered_features[brain_area], strict=True)
+                zip(
+                    filtered_times[brain_area],
+                    filtered_features[brain_area],
+                    strict=True,
+                )
             ):
                 assert feats.shape[0] == len(times), (
                     f"{brain_area} sort group {i}: {feats.shape[0]} features != {len(times)} spikes"

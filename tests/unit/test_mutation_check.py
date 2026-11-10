@@ -18,26 +18,28 @@ mutation_check = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(mutation_check)
 
 
-_SNIPPET = '''
+_SNIPPET = """
 import numpy as np
 def f(x, a, b):
     i = np.searchsorted(a, x, side="right")
     if x < 3:
         return a - b + i
     return 0
-'''
+"""
 
 
 def _descs(code: str):
-    return {desc for _lineno, desc, _payload in mutation_check._enumerate(ast.parse(code))}
+    return {
+        desc for _lineno, desc, _payload in mutation_check._enumerate(ast.parse(code))
+    }
 
 
 def test_enumerates_expected_sites():
     descs = _descs(_SNIPPET)
-    assert 'side "right"->"left"' in descs   # searchsorted side
-    assert "Lt->LtE" in descs                # the `x < 3` comparison
-    assert "Sub->Add" in descs               # the `a - b`
-    assert "Add->Sub" in descs               # the `... + i`
+    assert 'side "right"->"left"' in descs  # searchsorted side
+    assert "Lt->LtE" in descs  # the `x < 3` comparison
+    assert "Sub->Add" in descs  # the `a - b`
+    assert "Add->Sub" in descs  # the `... + i`
 
 
 def test_apply_side_flip_changes_source():

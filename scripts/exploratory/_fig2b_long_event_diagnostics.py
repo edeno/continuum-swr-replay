@@ -14,6 +14,7 @@ For each immobile non-local event we aggregate its data_over_time bins and
 compare three groups: long non-SWR (>1 s and >0.5 s), short non-SWR (<0.1 s),
 and SWR-overlapping. Writes a group summary + per-long-event table.
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,8 +28,9 @@ from continuum_swr_replay.analysis.events.classified_table import (
 from continuum_swr_replay.analysis.hippocampus import load_data_over_time
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
-                    datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
+)
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/fig2b_outputs"
 KEYS = ["animal", "day", "epoch", "non_local_event"]
 
@@ -58,7 +60,7 @@ def main() -> None:
         mua_z_mean=("MUA_zscore", "mean"),
         mua_z_max=("MUA_zscore", "max"),
         swr_z_mean=("SWR_zscore", "mean"),
-        map_pos_std=("map_estimate", "std"),     # cm; frozen MAP -> ~0
+        map_pos_std=("map_estimate", "std"),  # cm; frozen MAP -> ~0
         map_pos_range=("map_estimate", lambda s: float(s.max() - s.min())),
         map_speed_mean=("map_speed", "mean"),
         hpd_mean=("hpd", "mean"),
@@ -88,12 +90,15 @@ def main() -> None:
     ]
 
     lines = []
+
     def emit(x=""):
         lines.append(x)
         print(x)
 
     emit("=" * 92)
-    emit("LONG NON-SWR EVENTS: real vs model-spec artifact — per-event posterior diagnostics")
+    emit(
+        "LONG NON-SWR EVENTS: real vs model-spec artifact — per-event posterior diagnostics"
+    )
     emit("=" * 92)
     emit("Group sizes: " + ", ".join(f"{k}={len(v)}" for k, v in groups.items()))
     emit("")
@@ -108,36 +113,58 @@ def main() -> None:
     emit("")
     emit("Interpretation guide:")
     emit("  A real        -> long-group MUA z >> 0 and MAP speed/std large (moves)")
-    emit("  B spike desert -> long-group MUA z near/below SWR & short groups, "
-         "No-Spike max high")
-    emit("  C frozen prior -> long-group MAP pos std ~0 and MAP speed ~0 despite "
-         "long duration")
+    emit(
+        "  B spike desert -> long-group MUA z near/below SWR & short groups, "
+        "No-Spike max high"
+    )
+    emit(
+        "  C frozen prior -> long-group MAP pos std ~0 and MAP speed ~0 despite "
+        "long duration"
+    )
     emit("")
 
     # fraction of long events that look frozen / spike-poor
     long1 = groups["non-SWR >1s"]
     short = groups["non-SWR <0.1s"]
     swr = groups["SWR-overlap (all)"]
+
     def frac(df, mask):
         return float(mask.mean()) if len(df) else np.nan
+
     emit(f"Diagnostic flags on the >1s non-SWR events (n={len(long1)}):")
-    emit(f"  MUA z_mean < 0 (below-baseline spiking): "
-         f"{frac(long1, long1['mua_z_mean'] < 0):.0%}  "
-         f"(short non-SWR: {frac(short, short['mua_z_mean'] < 0):.0%}, "
-         f"SWR-ovlp: {frac(swr, swr['mua_z_mean'] < 0):.0%})")
-    emit(f"  MAP pos std < 2 cm (near-frozen): "
-         f"{frac(long1, long1['map_pos_std'] < 2):.0%}  "
-         f"(short non-SWR: {frac(short, short['map_pos_std'] < 2):.0%}, "
-         f"SWR-ovlp: {frac(swr, swr['map_pos_std'] < 2):.0%})")
-    emit(f"  No-Spike max > 0.3 (No-Spike competed): "
-         f"{frac(long1, long1['nospike_max'] > 0.3):.0%}  "
-         f"(short non-SWR: {frac(short, short['nospike_max'] > 0.3):.0%})")
+    emit(
+        f"  MUA z_mean < 0 (below-baseline spiking): "
+        f"{frac(long1, long1['mua_z_mean'] < 0):.0%}  "
+        f"(short non-SWR: {frac(short, short['mua_z_mean'] < 0):.0%}, "
+        f"SWR-ovlp: {frac(swr, swr['mua_z_mean'] < 0):.0%})"
+    )
+    emit(
+        f"  MAP pos std < 2 cm (near-frozen): "
+        f"{frac(long1, long1['map_pos_std'] < 2):.0%}  "
+        f"(short non-SWR: {frac(short, short['map_pos_std'] < 2):.0%}, "
+        f"SWR-ovlp: {frac(swr, swr['map_pos_std'] < 2):.0%})"
+    )
+    emit(
+        f"  No-Spike max > 0.3 (No-Spike competed): "
+        f"{frac(long1, long1['nospike_max'] > 0.3):.0%}  "
+        f"(short non-SWR: {frac(short, short['nospike_max'] > 0.3):.0%})"
+    )
     emit("")
 
     # per-long-event detail
-    cols = KEYS + ["event_duration", "n_bins", "mua_z_mean", "mua_z_max",
-                   "nospike_max", "map_pos_std", "map_speed_mean", "hpd_mean",
-                   "frag_mean", "cont_mean", "animal_max_speed_cm_s"]
+    cols = KEYS + [
+        "event_duration",
+        "n_bins",
+        "mua_z_mean",
+        "mua_z_max",
+        "nospike_max",
+        "map_pos_std",
+        "map_speed_mean",
+        "hpd_mean",
+        "frag_mean",
+        "cont_mean",
+        "animal_max_speed_cm_s",
+    ]
     cols = [c for c in cols if c in long1.columns]
     detail = long1.sort_values("event_duration", ascending=False)[cols]
     emit("All >1s non-SWR events:")
@@ -145,7 +172,9 @@ def main() -> None:
     detail.to_csv(OUT / "long_nonswr_diagnostics.csv", index=False)
 
     (OUT / "long_event_diagnostics_summary.txt").write_text("\n".join(lines))
-    emit(f"\nWrote long_nonswr_diagnostics.csv, long_event_diagnostics_summary.txt to {OUT}")
+    emit(
+        f"\nWrote long_nonswr_diagnostics.csv, long_event_diagnostics_summary.txt to {OUT}"
+    )
 
 
 if __name__ == "__main__":

@@ -43,7 +43,7 @@ def _toy_inputs() -> dict[str, pd.DataFrame]:
                 **sess,
                 "event_id": 1,
                 "stop_id": 10,
-                "occupancy_well_arm": 0,        # patch 1 — the NaN patch
+                "occupancy_well_arm": 0,  # patch 1 — the NaN patch
                 "prev_arm": 0,
                 "next_arm": 0,
                 "last_rewarded_arm": 0,
@@ -87,8 +87,7 @@ class TestStopReplaySummaryPatchNaN:
         # which are all NaN.
         row = out.iloc[0]
         assert pd.isna(row["frac_on_current"]), (
-            "arm-level ``frac_on_current`` should be NaN; "
-            f"got {row['frac_on_current']}"
+            f"arm-level ``frac_on_current`` should be NaN; got {row['frac_on_current']}"
         )
         assert pd.isna(row["frac_on_current_patch"]), (
             "patch-level ``frac_on_current_patch`` returned "

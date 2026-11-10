@@ -12,6 +12,7 @@ section without anyone noticing. Pin the invariants:
 - multi-session guard for ``stop_label_shuffle``
 - non-identity behavior for ``next_arm_circular_shift``
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -37,9 +38,7 @@ class TestCircularTimeShuffle:
         arms = rng.integers(0, 9, size=500)
         event_ids = np.repeat(np.arange(10), 50)
 
-        shuffled = circular_time_shuffle(
-            arms, event_ids, rng=np.random.default_rng(0)
-        )
+        shuffled = circular_time_shuffle(arms, event_ids, rng=np.random.default_rng(0))
 
         for ev in np.unique(event_ids):
             orig_counts = np.bincount(arms[event_ids == ev], minlength=9)
@@ -108,27 +107,66 @@ class TestStopLabelShuffle:
         """Cross-session shuffling would swap labels between animals or
         epochs — never the intended null, but easy to do by accident
         if a caller passes the concatenated multi-session table."""
-        stops = self._stops_from_dicts([
-            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": True},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": False},
-            {"animal": "b", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": True},
-        ])
+        stops = self._stops_from_dicts(
+            [
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": True,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": False,
+                },
+                {
+                    "animal": "b",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": True,
+                },
+            ]
+        )
         with pytest.raises(ValueError, match="session"):
             stop_label_shuffle(stops, rng=np.random.default_rng(0))
 
     def test_marginal_preserved_for_shuffled_columns(self):
         """The set of label values per column is unchanged — only
         which stop has which label changes."""
-        stops = self._stops_from_dicts([
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "is_rewarded_outcome": True, "occupancy_well_arm": 0},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "is_rewarded_outcome": True, "occupancy_well_arm": 1},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "is_rewarded_outcome": False, "occupancy_well_arm": 2},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "is_rewarded_outcome": False, "occupancy_well_arm": 3},
-        ])
+        stops = self._stops_from_dicts(
+            [
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": True,
+                    "occupancy_well_arm": 0,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": True,
+                    "occupancy_well_arm": 1,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": False,
+                    "occupancy_well_arm": 2,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": False,
+                    "occupancy_well_arm": 3,
+                },
+            ]
+        )
         out = stop_label_shuffle(stops, rng=np.random.default_rng(11))
 
         assert sorted(out["is_rewarded_outcome"].tolist()) == sorted(
@@ -141,14 +179,31 @@ class TestStopLabelShuffle:
     def test_non_specified_columns_unchanged(self):
         """Only the columns in the ``columns`` argument are shuffled.
         Other columns (e.g. session keys) must remain row-aligned."""
-        stops = self._stops_from_dicts([
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "stop_id": 100, "is_rewarded_outcome": True},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "stop_id": 200, "is_rewarded_outcome": False},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1",
-             "stop_id": 300, "is_rewarded_outcome": False},
-        ])
+        stops = self._stops_from_dicts(
+            [
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "stop_id": 100,
+                    "is_rewarded_outcome": True,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "stop_id": 200,
+                    "is_rewarded_outcome": False,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "stop_id": 300,
+                    "is_rewarded_outcome": False,
+                },
+            ]
+        )
         out = stop_label_shuffle(
             stops, columns=("is_rewarded_outcome",), rng=np.random.default_rng(0)
         )
@@ -157,10 +212,22 @@ class TestStopLabelShuffle:
 
     def test_input_table_not_modified(self):
         """Returns a copy; caller's frame is untouched."""
-        stops = self._stops_from_dicts([
-            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": True},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1", "is_rewarded_outcome": False},
-        ])
+        stops = self._stops_from_dicts(
+            [
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": True,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "is_rewarded_outcome": False,
+                },
+            ]
+        )
         before = stops.copy()
         _ = stop_label_shuffle(stops, rng=np.random.default_rng(0))
         pd.testing.assert_frame_equal(stops, before)
@@ -169,12 +236,25 @@ class TestStopLabelShuffle:
         """Columns named in ``columns`` but absent from the frame are
         skipped — typical when an analysis doesn't compute a particular
         contextual variable."""
-        stops = self._stops_from_dicts([
-            {"animal": "a", "session_date": 1, "epoch": "02_r1", "occupancy_well_arm": 0},
-            {"animal": "a", "session_date": 1, "epoch": "02_r1", "occupancy_well_arm": 1},
-        ])
+        stops = self._stops_from_dicts(
+            [
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "occupancy_well_arm": 0,
+                },
+                {
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "02_r1",
+                    "occupancy_well_arm": 1,
+                },
+            ]
+        )
         out = stop_label_shuffle(
-            stops, columns=("occupancy_well_arm", "missing_col"),
+            stops,
+            columns=("occupancy_well_arm", "missing_col"),
             rng=np.random.default_rng(0),
         )
         assert "missing_col" not in out.columns
@@ -204,9 +284,7 @@ class TestNextArmCircularShift:
     def test_marginal_preserved(self):
         events = self._events(20)
         out = next_arm_circular_shift(events, rng=np.random.default_rng(0))
-        assert sorted(out["next_arm"].tolist()) == sorted(
-            events["next_arm"].tolist()
-        )
+        assert sorted(out["next_arm"].tolist()) == sorted(events["next_arm"].tolist())
 
     def test_non_identity_shift_for_n_at_least_two(self):
         """The shift is sampled from [1, n-1] so the output never

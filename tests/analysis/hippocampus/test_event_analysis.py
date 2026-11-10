@@ -29,19 +29,38 @@ class TestGetImmobileEvents:
         # Event 1: times 0-8 (speed: 3.0 at start, 5.0 at end, max 6.0)
         # Event 2: times 10-14 (speed: 2.0 at start/end, max 3.0)
         # Event 3: times 16-19 (speed: 5.0 at start/end, max 5.0)
-        event_labels = np.array([1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 2, 2, 2, 0, 3, 3, 3, 3])
-        speeds = np.array([
-            # Event 1: start low, goes high
-            3.0, 4.0, 5.0, 6.0, 5.5, 5.0, 4.5, 4.0, 5.0,
-            # No event
-            1.0,
-            # Event 2: stays low
-            2.0, 2.5, 3.0, 2.5, 2.0,
-            # No event
-            1.0,
-            # Event 3: stays at 5.0
-            5.0, 5.0, 5.0, 5.0,
-        ])
+        event_labels = np.array(
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 2, 2, 2, 2, 2, 0, 3, 3, 3, 3]
+        )
+        speeds = np.array(
+            [
+                # Event 1: start low, goes high
+                3.0,
+                4.0,
+                5.0,
+                6.0,
+                5.5,
+                5.0,
+                4.5,
+                4.0,
+                5.0,
+                # No event
+                1.0,
+                # Event 2: stays low
+                2.0,
+                2.5,
+                3.0,
+                2.5,
+                2.0,
+                # No event
+                1.0,
+                # Event 3: stays at 5.0
+                5.0,
+                5.0,
+                5.0,
+                5.0,
+            ]
+        )
 
         return pd.DataFrame(
             {
@@ -92,9 +111,9 @@ class TestGetImmobileEvents:
         """Missing/nonfinite/exact-threshold samples reject the whole event."""
         data = mock_event_data.copy()
         event_2_rows = np.flatnonzero(data["event"].to_numpy() == 2)
-        data.iloc[event_2_rows[len(event_2_rows) // 2], data.columns.get_loc("head_speed")] = (
-            bad_speed
-        )
+        data.iloc[
+            event_2_rows[len(event_2_rows) // 2], data.columns.get_loc("head_speed")
+        ] = bad_speed
 
         result = get_immobile_events(data, event_col="event")
 
@@ -122,7 +141,9 @@ class TestGetImmobileEvents:
         """Data with only event=0 (non-events) should return empty."""
         mock_event_data["event"] = 0  # All non-events
 
-        result = get_immobile_events(mock_event_data, event_col="event", speed_threshold=4.0)
+        result = get_immobile_events(
+            mock_event_data, event_col="event", speed_threshold=4.0
+        )
 
         assert len(result) == 0
 
@@ -132,13 +153,18 @@ class TestGetImmobileEvents:
             get_immobile_events(mock_event_data, event_col="event", speed_threshold=0.0)
 
         with pytest.raises(ValueError, match="speed_threshold must be positive"):
-            get_immobile_events(mock_event_data, event_col="event", speed_threshold=-1.0)
+            get_immobile_events(
+                mock_event_data, event_col="event", speed_threshold=-1.0
+            )
 
     def test_invalid_method_raises_error(self, mock_event_data):
         """Invalid method should raise ValueError."""
         with pytest.raises(ValueError, match="method must be"):
             get_immobile_events(
-                mock_event_data, event_col="event", speed_threshold=4.0, method="invalid"
+                mock_event_data,
+                event_col="event",
+                speed_threshold=4.0,
+                method="invalid",
             )
 
     def test_missing_event_col_raises_error(self, mock_event_data):

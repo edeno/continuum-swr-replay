@@ -206,7 +206,12 @@ class TestChosenPatchFractionNaNPropagation:
     def test_empty_event_arm_table_yields_nan(self):
         eat = pd.DataFrame(
             columns=[
-                "animal", "day", "epoch", "event_id", "candidate_arm", "arm_fraction",
+                "animal",
+                "day",
+                "epoch",
+                "event_id",
+                "candidate_arm",
+                "arm_fraction",
             ]
         )
         et = pd.DataFrame(

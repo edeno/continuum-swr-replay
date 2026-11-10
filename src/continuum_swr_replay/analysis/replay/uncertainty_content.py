@@ -259,12 +259,14 @@ def build_trial_leaf_table(
         var_name="uncertainty_source",
         value_name="reward_belief_variance_candidate_arm_preoutcome",
     )
-    long_stops["candidate_arm"] = long_stops["uncertainty_source"].str.extract(
-        r"(\d+)$"
-    )[0].astype(int)
+    long_stops["candidate_arm"] = (
+        long_stops["uncertainty_source"].str.extract(r"(\d+)$")[0].astype(int)
+    )
     long_stops = long_stops.drop(columns="uncertainty_source")
 
-    leaf_events = event_arm_table[event_arm_table["candidate_arm"].isin(LEAF_ARMS)].copy()
+    leaf_events = event_arm_table[
+        event_arm_table["candidate_arm"].isin(LEAF_ARMS)
+    ].copy()
     content_by_stop_arm = (
         leaf_events.groupby(["stop_id", "candidate_arm"], observed=True, as_index=False)
         .agg(
@@ -273,7 +275,9 @@ def build_trial_leaf_table(
         )
         .astype(dict.fromkeys(RESPONSE_COLUMNS.values(), float))
     )
-    _require_unique(content_by_stop_arm, ["stop_id", "candidate_arm"], "content summary")
+    _require_unique(
+        content_by_stop_arm, ["stop_id", "candidate_arm"], "content summary"
+    )
     content_by_stop_total = (
         event_arm_table.groupby("stop_id", observed=True, as_index=False)
         .agg(
@@ -339,7 +343,10 @@ def build_trial_leaf_table(
             as_index=False,
         )
         .agg(
-            reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "first"),
+            reward_belief_variance_candidate_arm_preoutcome=(
+                "reward_belief_variance_candidate_arm_preoutcome",
+                "first",
+            ),
             chosen_arm=("chosen_arm", "first"),
             trial_reward=("trial_reward", "first"),
             any_in_poke=("in_poke", "max"),
@@ -490,21 +497,32 @@ def hierarchical_quartile_profile(
     data = data[finite]
     if data.empty:
         empty = pd.DataFrame()
-        return {"candidate_arm": empty, "session": empty, "animal": empty, "overall": empty}
+        return {
+            "candidate_arm": empty,
+            "session": empty,
+            "animal": empty,
+            "overall": empty,
+        }
 
     arm_keys = ["animal", "session_id", "candidate_arm", quartile_col]
     grouped = data.groupby(arm_keys, observed=True)
     if denominator_col is None:
         arm_profile = grouped.agg(
             value=(numerator_col, "mean"),
-            reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
+            reward_belief_variance_candidate_arm_preoutcome=(
+                "reward_belief_variance_candidate_arm_preoutcome",
+                "mean",
+            ),
             n_trials=(numerator_col, "size"),
         ).reset_index()
     else:
         sums = grouped.agg(
             numerator=(numerator_col, "sum"),
             denominator=(denominator_col, "sum"),
-            reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
+            reward_belief_variance_candidate_arm_preoutcome=(
+                "reward_belief_variance_candidate_arm_preoutcome",
+                "mean",
+            ),
             n_trials=(numerator_col, "size"),
         ).reset_index()
         sums["value"] = sums["numerator"] / sums["denominator"]
@@ -514,7 +532,10 @@ def hierarchical_quartile_profile(
         ["animal", "session_id", quartile_col], observed=True, as_index=False
     ).agg(
         value=("value", "mean"),
-        reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
+        reward_belief_variance_candidate_arm_preoutcome=(
+            "reward_belief_variance_candidate_arm_preoutcome",
+            "mean",
+        ),
         n_arms=("candidate_arm", "nunique"),
         n_trials=("n_trials", "sum"),
     )
@@ -522,7 +543,10 @@ def hierarchical_quartile_profile(
         ["animal", quartile_col], observed=True, as_index=False
     ).agg(
         value=("value", "mean"),
-        reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
+        reward_belief_variance_candidate_arm_preoutcome=(
+            "reward_belief_variance_candidate_arm_preoutcome",
+            "mean",
+        ),
         n_sessions=("session_id", "nunique"),
     )
     overall_profile = animal_profile.groupby(
@@ -530,7 +554,10 @@ def hierarchical_quartile_profile(
     ).agg(
         value=("value", "mean"),
         sem=("value", lambda x: x.std(ddof=1) / np.sqrt(len(x))),
-        reward_belief_variance_candidate_arm_preoutcome=("reward_belief_variance_candidate_arm_preoutcome", "mean"),
+        reward_belief_variance_candidate_arm_preoutcome=(
+            "reward_belief_variance_candidate_arm_preoutcome",
+            "mean",
+        ),
         n_animals=("animal", "nunique"),
     )
     return {
@@ -563,7 +590,12 @@ def paired_quartile_contrasts(
     )
     if low not in wide.columns or high not in wide.columns:
         empty = pd.DataFrame()
-        return {"candidate_arm": empty, "session": empty, "animal": empty, "overall": empty}
+        return {
+            "candidate_arm": empty,
+            "session": empty,
+            "animal": empty,
+            "overall": empty,
+        }
     arm = (wide[high] - wide[low]).dropna().rename("contrast").reset_index()
     session = arm.groupby(["animal", "session_id"], observed=True, as_index=False).agg(
         contrast=("contrast", "mean"), n_arms=("candidate_arm", "nunique")
@@ -578,7 +610,12 @@ def paired_quartile_contrasts(
             "n_animals": [animal["animal"].nunique()],
         }
     )
-    return {"candidate_arm": arm, "session": session, "animal": animal, "overall": overall}
+    return {
+        "candidate_arm": arm,
+        "session": session,
+        "animal": animal,
+        "overall": overall,
+    }
 
 
 def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFrame]:
@@ -704,10 +741,21 @@ def within_arm_horserace(
     # reported without complaint. ``predictors`` is gated rather than the module
     # constant so a caller-supplied override is checked too.
     assert_predictor_timing(predictors)
-    needed = {"animal", "session_date", "epoch", "event_id", "candidate_arm", "is_current_arm", "is_swr",
-              response, *predictors}
+    needed = {
+        "animal",
+        "session_date",
+        "epoch",
+        "event_id",
+        "candidate_arm",
+        "is_current_arm",
+        "is_swr",
+        response,
+        *predictors,
+    }
     _require_columns(event_arm, needed, "event-arm table")
-    frame = event_arm[(event_arm["candidate_arm"] <= 5) & (event_arm["is_current_arm"] == 0)].copy()
+    frame = event_arm[
+        (event_arm["candidate_arm"] <= 5) & (event_arm["is_current_arm"] == 0)
+    ].copy()
     frame["session_id"] = _session_id(frame)
 
     design_cols: list[str] = []
@@ -741,15 +789,17 @@ def within_arm_horserace(
             if fit["candidate_arm"].nunique() < 2 or len(fit) < min_rows:
                 n_too_few += 1
                 continue
-            demeaned = fit[[response, *design_cols]] - fit.groupby(fit["candidate_arm"])[
-                [response, *design_cols]
-            ].transform("mean")
+            demeaned = fit[[response, *design_cols]] - fit.groupby(
+                fit["candidate_arm"]
+            )[[response, *design_cols]].transform("mean")
             design = demeaned[design_cols].to_numpy()
             if np.linalg.matrix_rank(design) < design.shape[1]:
                 n_rank_deficient += 1
                 continue
             n_fit += 1
-            beta, *_ = np.linalg.lstsq(design, demeaned[response].to_numpy(), rcond=None)
+            beta, *_ = np.linalg.lstsq(
+                design, demeaned[response].to_numpy(), rcond=None
+            )
             rows.append(
                 {
                     "animal": animal,
@@ -770,7 +820,11 @@ def within_arm_horserace(
         LOGGER.info(
             "within_arm_horserace[%s]: fit %d/%d sessions (%d < min_rows/arms, "
             "%d rank-deficient)",
-            population, n_fit, n_seen, n_too_few, n_rank_deficient,
+            population,
+            n_fit,
+            n_seen,
+            n_too_few,
+            n_rank_deficient,
         )
     return pd.DataFrame(rows)
 
@@ -803,7 +857,7 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
             rows.append(
                 {
                     "population": population,
-                    "predictor": coef_col[len("coef_"):],
+                    "predictor": coef_col[len("coef_") :],
                     "median": median,
                     "n_animals_consistent": int(
                         (np.sign(per_animal) == np.sign(median)).sum()
