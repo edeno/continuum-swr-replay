@@ -2,9 +2,9 @@
 
 The table is rendered from the survey CSV, ``paper/tables/table_s1_literature_parameters.csv``.
 These tests check the display rules on small cases, that every surveyed paper
-appears once with its values, and that the committed table is what the
-generator writes from the CSV, so a corrected value cannot leave a stale table
-in the paper.
+appears once, a few rows checked by hand against the CSV, that the survey's
+bounds are ordered, and that the committed table is what the generator writes
+from the CSV, so a corrected value cannot leave a stale table in the paper.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported import literature
+from continuum_swr_replay.reported import literature, part0
 
 PAPER_TABLES = Path(__file__).resolve().parents[2] / "paper" / "tables"
 
@@ -33,6 +33,8 @@ def survey() -> pd.DataFrame:
         ("#N/A", "#N/A", "--"),
         ("Not reported", "Not reported", "n.r."),
         ("Not reported", "250", "n.r.--250"),
+        ("Not reported", "#N/A", "n.r."),
+        ("#N/A", "Not reported", "n.r."),
     ],
 )
 def test_range_cells(low, high, expected):
@@ -73,11 +75,86 @@ def test_every_paper_appears_once_in_survey_order(survey):
     assert table["Last author"].tolist() == survey["Last Author"].tolist()
 
 
-def test_shown_values_are_the_survey_values(survey):
-    table = literature.display_table(survey)
-    for header, column in literature.SHOWN_COLUMNS.items():
-        expected = survey[column].map(literature._cell)
-        assert table[header].tolist() == expected.tolist(), header
+# Rows of the table, written by hand from the CSV's cells: a minimum-only
+# duration, a maximum-only one with many inapplicable cells and a multi-line
+# Decoding cell, and a paper told apart by its journal with unreported cells.
+HAND_CHECKED_ROWS = [
+    {
+        "Study": "Mallory 2025",
+        "Last author": "Foster",
+        "Trigger": "MUA, Decoding",
+        "SWR z (SD)": "3",
+        "MUA z (SD)": "3",
+        "Speed (cm/s)": "5",
+        "Min. cells": "10",
+        "SWR band (Hz)": "150--250",
+        "Duration (ms)": "≥50",
+        "SWR electrodes": "1",
+        "Decoding": "Bayes; rank-order correlation (track control)",
+        "Time bin (ms)": "20 (track); 80 (arena)",
+        "Position bin (cm)": "2",
+        "Trajectory": "Weighted correlation (track); posterior center of mass (arena)",
+    },
+    {
+        "Study": "Ólafsdóttir 2015",
+        "Last author": "Spiers",
+        "Trigger": "MUA",
+        "SWR z (SD)": "--",
+        "MUA z (SD)": "--",
+        "Speed (cm/s)": "--",
+        "Min. cells": "15% of template cells",
+        "SWR band (Hz)": "--",
+        "Duration (ms)": "≤300",
+        "SWR electrodes": "--",
+        "Decoding": "Template Matching; Bayes",
+        "Time bin (ms)": "5",
+        "Position bin (cm)": "1",
+        "Trajectory": "Radon transform",
+    },
+    {
+        "Study": "Farooq 2019 (Neuron)",
+        "Last author": "Dragoi",
+        "Trigger": "MUA",
+        "SWR z (SD)": "n.r.",
+        "MUA z (SD)": "2",
+        "Speed (cm/s)": "1",
+        "Min. cells": "5",
+        "SWR band (Hz)": "175--225",
+        "Duration (ms)": "100--800",
+        "SWR electrodes": "n.r.",
+        "Decoding": "Bayes",
+        "Time bin (ms)": "20",
+        "Position bin (cm)": "1",
+        "Trajectory": "Weighted correlation, Radon transform",
+    },
+]
+
+
+@pytest.mark.parametrize("row", HAND_CHECKED_ROWS, ids=lambda row: row["Study"])
+def test_rows_checked_by_hand(survey, row):
+    table = literature.display_table(survey).set_index("Study", drop=False)
+    assert table.loc[row["Study"]].to_dict() == row
+
+
+def test_shown_cells_are_not_blank(survey):
+    shown = survey[list(literature.SHOWN_COLUMNS.values())]
+    blank = shown.apply(lambda column: column.str.strip() == "")
+    assert not blank.any().any(), shown.columns[blank.any()].tolist()
+
+
+@pytest.mark.parametrize(
+    ("low", "high"),
+    [
+        ("SWR Low Band (Hz)", "SWR High Band (Hz)"),
+        ("Min. Duration (ms)", "Max Duration (ms)"),
+    ],
+)
+def test_survey_lower_bounds_are_below_upper_bounds(survey, low, high):
+    numbers = part0.numeric(survey[[low, high]]).dropna()
+    assert len(numbers) > 0
+    swapped = numbers.index[numbers[low] >= numbers[high]]
+    papers = survey.loc[swapped, ["First Author", "Year"]]
+    assert papers.empty, papers.to_dict("records")
 
 
 def test_rendered_table_has_one_row_per_paper(survey):

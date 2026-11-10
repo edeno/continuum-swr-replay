@@ -1,6 +1,6 @@
 """The surveyed replay literature: Supplementary Table S1 and its source.
 
-The table is the 57-paper survey of candidate-event detection and decoding
+The table is the survey of candidate-event detection and decoding
 parameters, kept in this repository as ``paper/tables/table_s1_literature_parameters.csv``
 (Supplementary Data 1). That file is the one copy the paper reads: correct a
 value there. This module renders a selection of its columns as the
@@ -88,12 +88,14 @@ def _cell(text: str) -> str:
 def _range(low: str, high: str) -> str:
     """Two bounds as one cell.
 
-    ``150--250`` when both are given, ``≥50`` or ``≤500`` when only one applies,
-    and the shared marker when neither is a value.
+    ``150--250`` when both are given, ``≥50`` or ``≤500`` when the other bound
+    does not apply, ``n.r.--250`` when it is not reported. When neither is a
+    value: ``--`` when neither applies, else ``n.r.``.
     """
     low, high = _cell(low), _cell(high)
-    if low == high and low in ("--", "n.r."):
-        return low
+    markers = ("--", "n.r.")
+    if low in markers and high in markers:
+        return "--" if low == high == "--" else "n.r."
     if high == "--":
         return f"≥{low}"
     if low == "--":
@@ -117,7 +119,7 @@ def display_table(survey: pd.DataFrame) -> pd.DataFrame:
         band and the minimum and maximum event durations, in survey order.
     """
     study = survey["First Author"] + " " + survey["Year"]
-    # Two papers share a first author and year (Farooq & Dragoi 2019); name their journals.
+    # Papers that share a first author and year are told apart by their journals.
     shared = study.duplicated(keep=False)
     study[shared] = study[shared] + " (" + survey.loc[shared, "Journal"] + ")"
     out = pd.DataFrame({"Study": study})

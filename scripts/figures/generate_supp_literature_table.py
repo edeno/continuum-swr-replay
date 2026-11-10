@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 """Write Supplementary Table S1, the surveyed replay literature's parameters.
 
-Reads the 57-paper survey, ``paper/tables/table_s1_literature_parameters.csv``
+Reads the literature survey, ``paper/tables/table_s1_literature_parameters.csv``
 (Supplementary Data 1, the paper's one copy), and writes
 ``paper/tables/table_s1_literature.tex``, the table ``paper/main.tex`` inputs.
 Needs no lab data.
 
 Usage::
 
-    uv run python scripts/figures/generate_supp_literature_table.py
+    uv run --frozen python scripts/figures/generate_supp_literature_table.py
 """
 
 from __future__ import annotations
