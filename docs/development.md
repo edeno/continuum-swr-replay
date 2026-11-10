@@ -21,47 +21,39 @@ implant, and recording setup, see
 
 ## Development Setup
 
-This project uses **UV** for package management (not pip/conda):
+This project uses **uv** for package management (not pip/conda). Install
+[uv](https://docs.astral.sh/uv/getting-started/installation/), then run from the
+repository root:
 
 ```bash
-# Install UV
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Create environment and install dependencies
-uv sync
-
-# Activate environment
-source .venv/bin/activate
-
-# Install in development mode
-uv pip install -e .
-
-# Install with dev dependencies
-uv sync --extra dev
+make sync-dev   # the locked environment (uv.lock) with the development tools
+make check      # what CI runs: format check, lint, the full test suite
 ```
+
+`make help` lists every target. `make sync` installs the analysis environment
+without the development tools; the GPU build is `uv sync --frozen --extra cuda`
+(Linux only). Commands run inside the environment with `uv run --frozen`, which
+uses the locked versions and does not re-solve them.
 
 ### Code Quality Tools
 
-When dev dependencies are installed:
-
-- **ruff** - Fast Python linter and formatter (combines black, flake8, and more)
-- **mypy** - Type checking
-- **pytest** - Testing (testpaths: `tests/`)
-
-Run these tools directly:
+- **ruff** formats and lints `src/`, `scripts/` and `tests/` (`make format`).
+  CI fails on unformatted code. Notebooks and the vendored `.claude/skills/`
+  are not formatted.
+- **pre-commit** runs ruff and the basic file checks on each commit. Install the
+  hook once with `uv run pre-commit install`.
+- **pytest** runs the suite in `tests/` (`uv run --frozen pytest`). The full
+  suite takes about 8 minutes on an Apple-silicon laptop; run a single file
+  while working. On macOS, 15 tests of the CPU-pinning runners
+  (`test_run_memoryless_detection.py`, `test_run_refits.py`) fail because
+  `os.sched_getaffinity` exists only on Linux; CI runs on Linux.
+- **mypy** is configured but does not pass yet, so neither CI nor pre-commit
+  runs it (see `TODO.md`).
 
 ```bash
-# Lint and check code
-uv run ruff check src/
-
-# Format code (ruff also handles formatting)
-uv run ruff format src/
-
-# Type checking
-uv run mypy src/
-
-# Run tests
-uv run pytest
+uv run --frozen pytest tests/unit/test_epoch_register_doc.py
+uv run --frozen ruff check src scripts tests
+uv run --frozen mypy src/
 ```
 
 ## Project Structure
