@@ -30,7 +30,7 @@ hand-joined string. Nothing under the root is committed.
 | Artifact mask | `artifact_intervals/<run id>/` | `scripts/detection/run_artifact_detection.py` |
 | SWR inventories (Kay, Karlsson, Yu, Zugaro) | `replay_detection_comparison/swr/<run id>/` | `scripts/detection/run_swr_detection.py` |
 | Decodes, non-local detector | `{epoch_id}_results.nc`, `_detector.pkl`, `_environment.pkl`, `_80_data_over_time.pkl` | `scripts/decoding/run_decoding_bandit.py` |
-| Decodes, ContFrag | the same names, for the SWR and MUA event sources | `scripts/decoding/run_decoding_contfrag.py` |
+| Decodes, ContFrag | `{epoch_id}_contfrag_results.nc`, `_contfrag_detector.pkl`, `_contfrag_environment.pkl`, `_contfrag_data_over_time.pkl`; the SWR or MUA event source is chosen later, by `prepare_contfrag_replay_content_data.py --event-source` | `scripts/decoding/run_decoding_contfrag.py` |
 | Canonical tables | `replay_content/{event,event_arm,event_patch,event_sequence,stop,qvals,event_onset,stop_timebin}_table.parquet`; ContFrag tables under `contfrag_replay_content/` | `scripts/tables/` and `scripts/behavior/` (order in [reproduce.md](reproduce.md#the-full-rebuild)) |
 | Part 3 fits | `replay_content/models*/` and the other result folders under `replay_content/` | `scripts/rate/`, `scripts/content/`, `scripts/behavior/`, all run by `scripts/qa/run_refits.py` |
 | Detector comparison | `replay_detection_comparison/{memoryless,carey,inventory,event_features}/<run id>/` | `scripts/detection/` |
@@ -43,8 +43,9 @@ SWR runs every decode and every analysis reads. A decode refuses to start
 without them. The rule for which time and which events are analysed is
 described in [development.md](development.md#canonical-per-event-classification-table).
 
-The event, event × arm, event sequence and stop tables share event ids, so they
-are rebuilt together; a partial rebuild mis-joins silently
+The event, event × arm, event × patch, event sequence and stop tables share
+event ids, and the qvals table joins to them, so they are rebuilt together; a
+partial rebuild mis-joins silently
 ([development.md](development.md#canonical-per-event-classification-table)).
 
 ## From results to the paper
@@ -57,5 +58,7 @@ are rebuilt together; a partial rebuild mis-joins silently
 | Manuscript | `paper/main.pdf` | `make manuscript` |
 
 Each summary records the commit that built it and the SHA-256 of every file it
-read (its `inputs` list), so a reported number can be traced to the files
-under the root that it came from.
+read (its `inputs` list), so a reported number can be traced to the files it
+came from: under the root for parts 1–4, in the repository for part 0. The
+trace is not yet exact: some summaries record absolute paths or were built at a
+`-dirty` commit (see "Summary provenance" in `TODO.md`).

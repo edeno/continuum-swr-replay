@@ -6,8 +6,10 @@ behind the figures, and the claims they support, are in
 [analysis_map.md](analysis_map.md); the claims themselves are in
 [../paper/claims_table.md](../paper/claims_table.md).
 
-Run each script from the repository root. Each one writes a PDF and a PNG to its
-output folder. `make figures` draws Figures 1–4 in one go
+Run each script from the repository root. Each one writes to its output folder,
+most as a PDF and a PNG; `plot_swr_contrast_coefs.py` and the two example
+galleries (`generate_inventory_examples.py`, `generate_event_feature_examples.py`)
+write PNGs only. `make figures` draws Figures 1–4 in one go
 (`scripts/figures/generate_all_figures.py`); run it only after the full rebuild
 ([reproduce.md](reproduce.md#the-full-rebuild)), because Figure 4 reads the
 Part 4 fits.

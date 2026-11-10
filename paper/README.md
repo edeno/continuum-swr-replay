@@ -81,8 +81,7 @@ from the same survey into `reported/part0.json`; after regenerating the table, r
 longer matches the CSV.
 
 The lab's shared Google Sheet (`12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`)
-holds the same values as of 2026-11-10 but does not feed the paper: a change made
-only in the Sheet does not reach it.
+does not feed the paper: a change made only in the Sheet does not reach it.
 
 ## Bibliography
 

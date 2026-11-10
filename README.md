@@ -14,7 +14,8 @@ events inside and outside SWRs throughout.
 
 ## Build the manuscript
 
-The figures and the reported-value macros are committed. With LaTeX and
+The reported-value macros and the finished figures (so far Figure 1) are
+committed; a figure not yet committed builds as a placeholder box. With LaTeX and
 `latexmk` installed, run from the repository root:
 
 ```bash
