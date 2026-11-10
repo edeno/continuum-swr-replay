@@ -27,6 +27,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
 
 - [analysis_map.md](analysis_map.md) — *start here*: the five questions, each analysis that answers
   them, its run name, script, outputs, figures and claims rows, and the flow from decodes to figures.
+- [development.md](development.md) — *development guide*: the task and data model, the
+  code layout, the analysis conventions and the reported-numbers rule. `CLAUDE.md`
+  imports it.
 - [models_table.md](models_table.md) — *catalog*: every model in R formula notation.
 - [covariate_dictionary.md](covariate_dictionary.md) — *definitions*: covariate semantics across families.
 - [behavior_model_covariates.md](behavior_model_covariates.md) — *definitions*: `qvals_table.parquet` data dictionary.
