@@ -81,12 +81,15 @@ longer matches the installed package.
 
 ## Bibliography
 
-`references.bib` holds entries from Eric Denovellis's Zotero library, keyed by
-their Better BibTeX citation keys, so a key copied from Zotero works in
-`\cite{}`. Add a work by exporting it from Zotero (Better BibTeX) and
-appending its entry. Works cited in the draft but not yet in Zotero are written
-as plain text. The style is `unsrtnat` (numbered, in order of citation) until a
-journal is chosen.
+`references.bib` is exported from Eric Denovellis's Zotero library by Better
+BibTeX: the **Non-Local-Paper** collection, with "Keep updated", so Zotero
+rewrites the file whenever the collection changes. Do not edit it by hand; fix
+a reference in Zotero. To cite a new work, add it to the collection and use its
+citation key in `\cite{}`. The export omits `abstract`, `file`, `urldate` and
+`copyright` (Better BibTeX settings, Export → Fields), so no local file paths
+enter the repository. A work in the collection that the text does not cite is
+harmless: BibTeX prints only cited works. The style is `unsrtnat` (numbered, in
+order of citation) until a journal is chosen.
 
 ## Direct LaTeX commands
 
