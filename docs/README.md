@@ -148,7 +148,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     [detector_comparison.md](design/replay_detection_comparison/detector_comparison.md)
     tabulates every detection method considered, with a verified DOI for every work
     cited;
-    the lab's 57-paper survey of detection and decoding settings is
+    the lab's <!--v:part0.papers-->57<!--/v-->-paper survey of detection and decoding settings is
     [../paper/tables/table_s1_literature_parameters.csv](../paper/tables/table_s1_literature_parameters.csv)
     (Supplementary Table S1; the paper's one copy, audited against each paper's methods,
     supplement and released code), and

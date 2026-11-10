@@ -49,7 +49,7 @@ code base, and [03](03-inventory-comparison.md) is the direct comparison.
 
 ## Literature parameter survey
 
-The literature survey is a lab-compiled table of 57 replay papers that decode replay content
+The literature survey is a lab-compiled table of <!--v:part0.papers-->57<!--/v--> replay papers that decode replay content
 (1999–2025), first kept in the shared Google Sheet `12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`.
 Its copy for the paper is Supplementary Table S1,
 [../../../paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv),
