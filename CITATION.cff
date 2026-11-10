@@ -1,0 +1,75 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper as below."
+# TODO: replace the working title; the author list is tentative (see TODO.md).
+title: "continuum-swr-replay: Source code for 'Non-local hippocampal events outside sharp-wave ripples' (working title)"
+abstract: >-
+  Source code, analysis scripts, and figure pipeline for a paper that
+  characterizes non-local hippocampal events detected by a switching
+  state-space decoder, inside and outside sharp-wave ripples, in rats
+  performing a spatial bandit task, and how the events relate to behavior
+  and to activity in prefrontal cortex.
+type: software
+version: "0.1.0"
+license: MIT
+repository-code: "https://github.com/edeno/continuum-swr-replay"
+authors:
+  - family-names: Denovellis
+    given-names: Eric L.
+    email: eric.denovellis@ucsf.edu
+    orcid: "https://orcid.org/0000-0003-4606-087X"
+    affiliation: >-
+      Departments of Physiology and Psychiatry, University of California, San
+      Francisco; Howard Hughes Medical Institute, University of California, San
+      Francisco
+  - family-names: Comrie
+    given-names: Alison E.
+    orcid: "https://orcid.org/0000-0002-2251-4892"
+    affiliation: "Howard Hughes Medical Institute, Janelia Research Campus"
+  - family-names: Kahn
+    given-names: Ari E.
+    orcid: "https://orcid.org/0000-0002-2127-0507"
+    affiliation: "Department of Psychology, University of Arizona"
+  - family-names: Berke
+    given-names: Joshua D.
+    orcid: "https://orcid.org/0000-0003-1436-6823"
+    affiliation: >-
+      Department of Neurology, Department of Psychiatry and Behavioral Science,
+      Kavli Institute for Fundamental Neuroscience, and Weill Institute for
+      Neurosciences, University of California, San Francisco
+  - family-names: Daw
+    given-names: Nathaniel D.
+    orcid: "https://orcid.org/0000-0001-5029-1430"
+    affiliation: >-
+      Princeton Neuroscience Institute and Department of Psychology, Princeton
+      University
+  - family-names: Eden
+    given-names: Uri T.
+    orcid: "https://orcid.org/0000-0002-2058-3691"
+    affiliation: "Department of Mathematics and Statistics, Boston University"
+  - family-names: Frank
+    given-names: Loren M.
+    orcid: "https://orcid.org/0000-0002-1752-5677"
+    affiliation: >-
+      Departments of Physiology and Psychiatry, University of California, San
+      Francisco; Kavli Institute for Fundamental Neuroscience, University of
+      California, San Francisco; Howard Hughes Medical Institute, University of
+      California, San Francisco
+preferred-citation:
+  type: article
+  title: "Non-local hippocampal events outside sharp-wave ripples (working title)"
+  authors:
+    - family-names: Denovellis
+      given-names: Eric L.
+    - family-names: Comrie
+      given-names: Alison E.
+    - family-names: Kahn
+      given-names: Ari E.
+    - family-names: Berke
+      given-names: Joshua D.
+    - family-names: Daw
+      given-names: Nathaniel D.
+    - family-names: Eden
+      given-names: Uri T.
+    - family-names: Frank
+      given-names: Loren M.
+  year: 2026
