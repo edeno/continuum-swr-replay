@@ -1,0 +1,6 @@
+# Commits git blame skips. Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub applies this file automatically.
+
+# Format src, scripts and tests with ruff
+31590408f3ec17cd4baea1cd892244b81d70271a
