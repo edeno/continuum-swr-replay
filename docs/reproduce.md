@@ -3,7 +3,7 @@
 How to rebuild the paper's results, from the recordings to the PDF. Run every
 command from the repository root.
 
-There are three levels, each needing more than the one before:
+There are four levels, each needing more than the one before:
 
 | What | Command | Needs |
 | --- | --- | --- |
@@ -43,7 +43,7 @@ summaries is planned (see `TODO.md`).
 
 ## The full rebuild
 
-All scripts are in `scripts/`. Steps 1–7 are the full rebuild. After a change to the table code, start at step 4;
+All scripts are in `scripts/`. Steps 1–8 are the full rebuild. After a change to the table code, start at step 4;
 after a change to fitting code only, start at step 6.
 
 1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
@@ -67,13 +67,12 @@ after a change to fitting code only, start at step 6.
    the supplements).
 6. **Part 3 fits and the figures that read them:** `qa/run_refits.py`.
 7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
-
-`figures/generate_all_figures.py` draws Figures 1–4 in one go. Run it only after step 7.
-8. **Summaries, macros, PDF.** Rebuild the four summary files, write their
+   `figures/generate_all_figures.py` draws Figures 1–4 in one go; run it only after this step.
+8. **Summaries, macros, PDF.** Rebuild the five summary files (parts 0–4), write their
    values into the LaTeX macros and the docs, and build the PDF:
 
    ```bash
-   make summaries        # scripts/reported/summarize_part.py --part 1 ... 4
+   make summaries        # scripts/reported/summarize_part.py --part 0 ... 4
    make reported-values  # scripts/reported/emit_reported_values.py
    make manuscript
    ```
@@ -118,16 +117,16 @@ non_local_threshold = 0.8  # threshold for classifying non-local events
 
 ```bash
 # Decode all sessions for an animal
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --brain_area HPC
+uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --brain_area HPC
 
 # Decode specific session
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
+uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
 
 # With non-stationary model and figurl
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
+uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
 
 # Overwrite existing results
-uv run python scripts/decoding/run_decoding_bandit.py --animal chimi --overwrite
+uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --overwrite
 ```
 
 ### GPU and Distributed Computing
@@ -162,7 +161,7 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 | --- | --- |
 | `paper/reported/part{n}.json` | `make summaries` |
 | `paper/reported_values.tex`, `paper/reported/values_index.md`, the inline values in `docs/` and `paper/` | `make reported-values` |
-| `paper/tables/` (Supplementary Table S1 and its CSV) | `scripts/figures/generate_supp_literature_table.py` |
+| `paper/tables/table_s1_literature.tex` (Supplementary Table S1) | `scripts/figures/generate_supp_literature_table.py`, from the survey CSV beside it, which is edited by hand |
 | `paper/main.pdf` | `make manuscript` |
 | Final figures under `paper/figures/` (each listed in `.gitignore` as an exception) | the figure scripts |
 
