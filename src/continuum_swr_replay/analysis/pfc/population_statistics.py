@@ -652,20 +652,13 @@ def replay_class_overlap_statistics(
             )
     animal_ratios = [overlap["odds_ratio"] for overlap in by_animal.values()]
     either = swr_called | non_called
+    named = {"n_first_only": "n_swr_only", "n_second_only": "n_non_swr_only"}
     return {
-        "n_tested": pooled["n_tested"],
-        "n_both": pooled["n_both"],
-        "n_swr_only": pooled["n_first_only"],
-        "n_non_swr_only": pooled["n_second_only"],
-        "n_neither": pooled["n_neither"],
-        "n_both_expected": pooled["n_both_expected"],
-        "odds_ratio": pooled["odds_ratio"],
+        **{named.get(name, name): value for name, value in pooled.items()},
         "odds_ratio_animal_min": min(animal_ratios),
         "odds_ratio_animal_max": max(animal_ratios),
         "n_animals_odds_ratio_above_one": sum(r > 1 for r in animal_ratios),
-        "rank_correlation": pooled["rank_correlation"],
         "rank_correlation_called": overlap_of(either)["rank_correlation"],
-        "same_sign_fraction_both": pooled["same_sign_fraction_both"],
         "swr_larger_fraction_called": float(
             (np.abs(swr_peak[either]) > np.abs(non_peak[either])).mean()
         ),
