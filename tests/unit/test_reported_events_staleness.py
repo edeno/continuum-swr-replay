@@ -77,14 +77,9 @@ def test_a_manifest_recording_no_table_is_stale():
     assert note == "event_gamma records no event-table SHA-256; rerun it before citing"
 
 
-def test_the_pending_note_reaches_the_selected_values():
+def test_the_pending_note_reaches_every_value():
     values = [_value("slow_gamma_median_swr"), _value("theta_median_swr")]
-    out = {
-        v.key: v
-        for v in pend(values, "stale", lambda v: v.key.startswith("slow_gamma_"))
-    }
-    assert out["slow_gamma_median_swr"].pending == "stale"
-    assert out["theta_median_swr"].pending is None
+    assert [v.pending for v in pend(values, "stale")] == ["stale", "stale"]
     # an existing note is kept, and no note leaves the values unchanged
     assert pend([_value("x", "untracked")], "stale")[0].pending == "untracked; stale"
     assert pend(values, None) == values

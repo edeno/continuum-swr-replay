@@ -298,12 +298,8 @@ class Summary:
         tmp.replace(path)
 
 
-def pend(
-    values: Iterable[Value],
-    note: str | None,
-    selected: Callable[[Value], bool] = lambda value: True,
-) -> list[Value]:
-    """``values`` with ``note`` added to the pending note of the selected ones.
+def pend(values: Iterable[Value], note: str | None) -> list[Value]:
+    """``values`` with ``note`` added to their pending notes.
 
     The one rule for a value read from a stale output (one made from other
     tables than the current ones): it is kept and marked pending with the
@@ -314,8 +310,6 @@ def pend(
         return list(values)
     return [
         replace(v, pending=note if v.pending is None else f"{v.pending}; {note}")
-        if selected(v)
-        else v
         for v in values
     ]
 

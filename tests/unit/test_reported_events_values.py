@@ -16,7 +16,7 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
 )
 from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.reported import events as builder
-from continuum_swr_replay.reported.values import Value, pend
+from continuum_swr_replay.reported.values import Value
 from tests.analysis.test_inventory_nonlocal_comparison import _write_run
 
 NAN = np.nan
@@ -209,7 +209,10 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def test_brain_state_values_name_each_signal_class_and_reference():
-    values = _by_key(builder.brain_state_values(*_signal_tables(), "s"))
+    values = _by_key(
+        builder.brain_state_values(*_signal_tables(), "s")
+        + builder.gamma_z_values(*_signal_tables(), "s")
+    )
     numbers = {key: value.value for key, value in values.items()}
     for k, signal in enumerate(builder._SIGNAL_EVENT_COLUMNS):
         own = {
@@ -430,7 +433,10 @@ def _property_events() -> pd.DataFrame:
 
 
 def test_property_values_name_each_property_class_and_direction():
-    values = _by_key(builder.property_values(_property_events(), "s"))
+    values = _by_key(
+        builder.property_values(_property_events(), "s")
+        + builder.start_distance_values(_property_events(), "s")
+    )
     assert len(values) == 3 * len(builder._PROPERTIES)
     for i, (word, _, scale, unit, _, direction, _) in enumerate(builder._PROPERTIES):
         assert values[f"{word}_median_non_swr"].value == scale * (i + 2.0), word
@@ -527,41 +533,26 @@ def test_content_occupancy_values_name_each_group_and_place():
     }
 
 
-def test_a_stale_output_pends_the_values_read_from_it_and_no_other():
-    """The two selections the summary applies to a stale output: of the
-    brain-state values, those of the gamma pass; of the property values, the
-    start distance's."""
-    note = builder.event_table_staleness(
-        {"event_table": {"sha256": "b" * 64}}, "a" * 64, "Processed-Data/out"
-    )
-    assert note is not None
-    brain_state = _by_key(
-        pend(
-            builder.brain_state_values(*_signal_tables(), "s"),
-            note,
-            builder.read_from_gamma_pass,
-        )
-    )
-    pending = {key for key, value in brain_state.items() if value.pending}
-    assert len(pending) == 16
-    assert pending == {
-        key for key in brain_state if key.split("_")[0] in ("slow", "fast")
-    }
-    assert brain_state["slow_gamma_median_swr"].pending == note
-    assert brain_state["theta_median_swr"].pending is None
+def test_the_values_read_from_another_output_have_a_builder_of_their_own():
+    """The summary pends the values of a stale output by their builder: the
+    gamma pass's are ``gamma_z_values``', the start-distance output's
+    ``start_distance_values``'; the event table's are in neither."""
+    gamma = _by_key(builder.gamma_z_values(*_signal_tables(), "s"))
+    assert len(gamma) == 16
+    assert {key.split("_")[0] for key in gamma} == {"slow", "fast"}
+    assert {v.function for v in gamma.values()} == {"gamma_z_values"}
+    brain_state = _by_key(builder.brain_state_values(*_signal_tables(), "s"))
+    assert {key.split("_")[0] for key in brain_state} == {"theta", "ripple", "mua"}
 
-    properties = _by_key(
-        pend(
-            builder.property_values(_property_events(), "s"),
-            note,
-            builder.read_from_start_distance_output,
-        )
-    )
-    assert {key for key, value in properties.items() if value.pending} == {
+    start = _by_key(builder.start_distance_values(_property_events(), "s"))
+    assert set(start) == {
         "start_distance_median_non_swr",
         "start_distance_median_swr",
         "start_distance_animals_in_direction",
     }
+    assert {v.function for v in start.values()} == {"start_distance_values"}
+    properties = builder.property_values(_property_events(), "s")
+    assert not {v.key for v in properties} & set(start)
 
 
 def test_spike_evidence_metrics_read_every_epoch_and_refuse_a_missing_one(tmp_path):

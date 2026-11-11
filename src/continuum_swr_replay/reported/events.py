@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -198,20 +199,6 @@ def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str
 
 def _manifest(folder: Path) -> dict:
     return json.loads((folder / "manifest.json").read_text())
-
-
-def read_from_start_distance_output(value: Value) -> bool:
-    """Whether a property value (:func:`property_values`) is read from the
-    start-distance output: the start distance's are; the other properties are
-    the event table's own columns, which that output's staleness does not touch."""
-    return value.key.startswith("start_distance_")
-
-
-def read_from_gamma_pass(value: Value) -> bool:
-    """Whether a brain-state value (:func:`brain_state_values`) is read from the
-    gamma pass: slow and fast gamma's are; theta, ripple power and MUA are the
-    event table's and the brain-state reference's."""
-    return value.key.startswith(("slow_gamma_", "fast_gamma_"))
 
 
 # --- how common the events are, and how they sit against SWRs ----------------
@@ -603,27 +590,55 @@ _SIGNAL_LABELS = {
 def brain_state_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Questions 2c.1 and 2b.5: theta, ripple power, MUA and slow and fast gamma during
-    events, against running and quiet rest.
+    """Questions 2c.1 and 2b.5: theta, ripple power and MUA during events, against
+    running and quiet rest.
 
     Each event's value is its mean over its bins of the epoch's z-scored signal
-    (the event table's ``theta_z``, ``ripple_power_z``, ``mua_rate_z``, and the
-    gamma pass's ``slow_gamma_z``, ``fast_gamma_z``, joined on ``event_id``); the
+    (the event table's ``theta_z``, ``ripple_power_z``, ``mua_rate_z``); the
     references are each epoch's median during running (>10 cm/s) and quiet rest
     (<4 cm/s, in no event), on the same scale (``brain_state_reference``). An
     event is theta-like when its theta reaches its epoch's running median.
     """
-    levels = event_statistics.reference_medians(reference, list(_SIGNAL_EVENT_COLUMNS))
-    statistics = event_statistics.event_signal_statistics(
-        events, reference, _SIGNAL_EVENT_COLUMNS
-    )
-    values: list[Value] = []
-    for word in _SIGNAL_EVENT_COLUMNS:
-        make = value_factory(
+    makes = {
+        word: value_factory(
             brain_state_values,
             source,
             TAGS["ripple"] if word == "ripple" else TAGS["brain_state"],
         )
+        for word in ("theta", "ripple", "mua")
+    }
+    return _signal_values(makes, events, reference)
+
+
+def gamma_z_values(
+    events: pd.DataFrame, reference: pd.DataFrame, source: str
+) -> list[Value]:
+    """Question 2c.1: slow and fast gamma during events, against running and quiet
+    rest.
+
+    As :func:`brain_state_values`, on the gamma pass's ``slow_gamma_z`` and
+    ``fast_gamma_z``, joined on ``event_id``, and its epochs' running and
+    quiet-rest levels on the same scale.
+    """
+    make = value_factory(gamma_z_values, source, TAGS["brain_state"])
+    return _signal_values({"slow_gamma": make, "fast_gamma": make}, events, reference)
+
+
+def _signal_values(
+    makes: dict[str, Callable[..., Value]],
+    events: pd.DataFrame,
+    reference: pd.DataFrame,
+) -> list[Value]:
+    """The values of each signal in ``makes``, made by its maker: its running and
+    rest references, and each class's median and animal counts (and, for theta,
+    the theta-like share)."""
+    words = list(makes)
+    levels = event_statistics.reference_medians(reference, words)
+    statistics = event_statistics.event_signal_statistics(
+        events, reference, {word: _SIGNAL_EVENT_COLUMNS[word] for word in words}
+    )
+    values: list[Value] = []
+    for word, make in makes.items():
         label = _SIGNAL_LABELS[word]
         values += [
             make(
@@ -695,7 +710,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     SWR or MUA event, outside excluded time), on the same band power the z
     values are made from (``scripts/detection/measure_event_gamma.py``). The
     median over epochs, and the animals whose median over their epochs is above
-    0 dB. The z values (``brain_state_values``) stay as they are.
+    0 dB. The z values (``gamma_z_values``) stay as they are.
     """
     make = value_factory(gamma_db_values, source, TAGS["brain_state"])
     bands = ["slow_gamma", "fast_gamma"]
@@ -1201,39 +1216,62 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2d.1–2d.6: per-event properties, non-SWR against SWR.
 
     Plain medians of all events, and the number of animals whose own medians
-    differ in the claim's direction. Not duration-controlled.
+    differ in the claim's direction. Not duration-controlled. The properties
+    are the event table's own columns; the start distance, read from another
+    output, is made by :func:`start_distance_values`.
     """
     values = []
-    for word, column, scale, unit, style, direction, tags in _PROPERTIES:
-        make = value_factory(property_values, source, tags)
-        stats = event_statistics.class_medians(events, column, direction)
-        name = _PROPERTY_NAMES[word]
-        values += [
-            make(
-                f"{word}_median_non_swr",
-                scale * stats["median_non_swr"],
-                "quantity",
-                style,
-                f"median {name} of immobile non-SWR non-local events",
-                unit,
-            ),
-            make(
-                f"{word}_median_swr",
-                scale * stats["median_swr"],
-                "quantity",
-                style,
-                f"median {name} of immobile SWR-overlapping non-local events",
-                unit,
-            ),
-            make(
-                f"{word}_animals_in_direction",
-                stats["n_animals_in_direction"],
-                "count",
-                "count",
-                f"animals whose non-SWR median {name} is {direction} than their SWR median",
-            ),
-        ]
+    for prop in _PROPERTIES:
+        if prop[0] != "start_distance":
+            values += _class_median_values(
+                value_factory(property_values, source, prop[6]), events, prop
+            )
     return values
+
+
+def start_distance_values(events: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2d.1: the start distance of events, non-SWR against SWR, as
+    :func:`property_values`; read from the start-distance output's
+    ``start_distance_cm``."""
+    (prop,) = (p for p in _PROPERTIES if p[0] == "start_distance")
+    return _class_median_values(
+        value_factory(start_distance_values, source, prop[6]), events, prop
+    )
+
+
+def _class_median_values(
+    make: Callable[..., Value], events: pd.DataFrame, prop: tuple
+) -> list[Value]:
+    """One property's class medians and animals in direction, made by ``make``;
+    ``prop`` is its row of :data:`_PROPERTIES`."""
+    word, column, scale, unit, style, direction, _ = prop
+    stats = event_statistics.class_medians(events, column, direction)
+    name = _PROPERTY_NAMES[word]
+    return [
+        make(
+            f"{word}_median_non_swr",
+            scale * stats["median_non_swr"],
+            "quantity",
+            style,
+            f"median {name} of immobile non-SWR non-local events",
+            unit,
+        ),
+        make(
+            f"{word}_median_swr",
+            scale * stats["median_swr"],
+            "quantity",
+            style,
+            f"median {name} of immobile SWR-overlapping non-local events",
+            unit,
+        ),
+        make(
+            f"{word}_animals_in_direction",
+            stats["n_animals_in_direction"],
+            "count",
+            "count",
+            f"animals whose non-SWR median {name} is {direction} than their SWR median",
+        ),
+    ]
 
 
 def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value]:
@@ -1442,12 +1480,9 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         "(scripts/detection/measure_event_start_and_rest_theta.py)"
     )
     extras_stale = stale(inputs.event_start_rest_theta)
+    summary.add(*property_values(events_with_extras, extras_source))
     summary.add(
-        *pend(
-            property_values(events_with_extras, extras_source),
-            extras_stale,
-            read_from_start_distance_output,
-        )
+        *pend(start_distance_values(events_with_extras, extras_source), extras_stale)
     )
     summary.add(
         *pend(rest_theta_values(events_with_extras, extras_source), extras_stale)
@@ -1494,18 +1529,17 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     )
     if events_with_gamma[["slow_gamma_z", "fast_gamma_z"]].isna().all(axis=1).any():
         raise ValueError("an event has no gamma value")
+    signal_source = (
+        f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) "
+        f"and {rel(inputs.brain_state_reference)} (scripts/detection/"
+        "measure_brain_state_reference.py) and the gamma pass "
+        f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)"
+    )
+    summary.add(*brain_state_values(events_with_gamma, reference, signal_source))
     summary.add(
         *pend(
-            brain_state_values(
-                events_with_gamma,
-                reference,
-                f"{rel(inputs.event_table)} (event theta_z, ripple_power_z, mua_rate_z) "
-                f"and {rel(inputs.brain_state_reference)} (scripts/detection/"
-                "measure_brain_state_reference.py) and the gamma pass "
-                f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)",
-            ),
+            gamma_z_values(events_with_gamma, reference, signal_source),
             stale(inputs.event_gamma),
-            read_from_gamma_pass,
         )
     )
     summary.inputs += [
