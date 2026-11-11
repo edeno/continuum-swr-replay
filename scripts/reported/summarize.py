@@ -16,6 +16,7 @@ package module loaded during the build (the summary's builder and this script's 
 imports), this script, and the package's data files, with their digests; the
 commit; and the digest of ``uv.lock``. Only the requested summary's builder,
 ``reported.<name>``, is imported, so other builders' modules are not recorded.
+The commit the summary names is that record's (``code_record.commit_label``).
 
 A summary in ``paper/reported/`` is built from committed code: when any of those
 files, or ``uv.lock``, differs from the commit, nothing is written there. Commit
@@ -35,9 +36,10 @@ from continuum_swr_replay.reported.code_record import (
     CodeRecord,
     build_files,
     code_record,
+    commit_label,
 )
 from continuum_swr_replay.reported.values import SUMMARIES
-from continuum_swr_replay.runs.provenance import described_commit, produced_by
+from continuum_swr_replay.runs.provenance import produced_by
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
 
@@ -69,11 +71,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         return code
 
     builder = importlib.import_module(f"continuum_swr_replay.reported.{args.summary}")
-    recorded()  # before the build, so uncommitted code costs no build
+    before = recorded()  # before the build, so uncommitted code costs no build
     summary = builder.summarize(
-        builder.default_inputs(), produced_by(__file__), described_commit()
+        builder.default_inputs(), produced_by(__file__), commit_label(before)
     )
     summary.code = recorded()
+    if commit_label(summary.code) != summary.commit:
+        parser.exit(
+            1, "not written: the code changed while the summary was built; rebuild\n"
+        )
     path = args.output_dir / f"{args.summary}.json"
     summary.write(path)
     n_pending = sum(v.pending is not None for v in summary.values.values())

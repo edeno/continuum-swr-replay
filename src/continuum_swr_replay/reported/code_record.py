@@ -209,6 +209,14 @@ def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
     }
 
 
+def commit_label(record: CodeRecord) -> str:
+    """The commit a summary names as its build: the first 12 characters of
+    ``head``, with ``-dirty`` when a file the build used was uncommitted. Other
+    uncommitted files in the checkout (a summary just written, a draft) do not
+    make it dirty."""
+    return record["head"][:12] + ("-dirty" if record["uncommitted"] else "")
+
+
 def code_changes(record: CodeRecord, repo: Path) -> list[str]:
     """The recorded files that differ from the working tree now, and ``uv.lock``
     if it changed; empty when the summary is current.

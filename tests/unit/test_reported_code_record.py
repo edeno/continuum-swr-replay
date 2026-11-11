@@ -564,8 +564,14 @@ def test_summarize_writes_no_canonical_summary_from_uncommitted_code(
 
     trial = repo / "trial"
     script.main(["--summary", "survey", "--output-dir", str(trial)])
-    assert values.read_summary(trial / "survey.json").code["uncommitted"] == ["uv.lock"]
+    built = values.read_summary(trial / "survey.json")
+    head = _git(repo, "rev-parse", "HEAD").strip()
+    assert built.code["uncommitted"] == ["uv.lock"]
+    assert built.commit == head[:12] + "-dirty"
 
     _git(repo, "commit", "-q", "-am", "lock 2")
+    (repo / "notes.md").write_text("an uncommitted file no build uses\n")
     script.main(["--summary", "survey"])
-    assert values.read_summary(canonical / "survey.json").code["uncommitted"] == []
+    built = values.read_summary(canonical / "survey.json")
+    assert built.code["uncommitted"] == []
+    assert built.commit == _git(repo, "rev-parse", "HEAD").strip()[:12]
