@@ -68,6 +68,8 @@ def _py(code):
 
 
 def _cpus(n):
+    if not hasattr(os, "sched_getaffinity"):
+        pytest.skip("CPU affinity (os.sched_getaffinity) exists only on Linux")
     cpus = sorted(os.sched_getaffinity(0))
     if len(cpus) < n:
         pytest.skip(f"needs {n} CPUs")

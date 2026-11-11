@@ -45,8 +45,8 @@ uses the locked versions and does not re-solve them.
 - **pytest** runs the suite in `tests/` (`uv run --frozen pytest`). The full
   suite takes about 8 minutes on an Apple-silicon laptop; run a single file
   while working. On macOS, 15 tests of the CPU-pinning runners
-  (`test_run_memoryless_detection.py`, `test_run_refits.py`) fail because
-  `os.sched_getaffinity` exists only on Linux; CI runs on Linux.
+  (`test_run_memoryless_detection.py`, `test_run_refits.py`) are skipped because
+  `os.sched_getaffinity` exists only on Linux; CI runs on Linux, where they run.
 - **mypy** is configured but does not pass yet, so neither CI nor pre-commit
   runs it (see `TODO.md`).
 
