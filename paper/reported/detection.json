@@ -23,6 +23,11 @@
     "change": "questions merged and renumbered, the pilot values moved to 2a.4, figure ids named for their folders",
     "script_commit": "d833fa8bcc00141bf739f139b11b16c2f061912b",
     "ran_at": "d833fa8bcc00141bf739f139b11b16c2f061912b"
+   },
+   {
+    "change": "the simulated comparison moved to Part 1 (question 1.1) and the later questions of section 2a renumbered",
+    "script_commit": "5a6db9ed423c46ef1c56e0c167111eab46d9d39d",
+    "ran_at": "5a6db9ed423c46ef1c56e0c167111eab46d9d39d"
    }
   ]
  },
@@ -68,7 +73,7 @@
    "unit": "",
    "description": "the same for our detector",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -84,7 +89,7 @@
    "unit": "",
    "description": "the same for our detector",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -100,7 +105,7 @@
    "unit": "",
    "description": "continuing chains at the longest gap: share of trials the sliding window reports as one event per part",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -116,7 +121,7 @@
    "unit": "",
    "description": "continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -132,7 +137,7 @@
    "unit": "",
    "description": "the same at the longest gap",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -148,7 +153,7 @@
    "unit": "",
    "description": "chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -164,7 +169,7 @@
    "unit": "",
    "description": "highest such share",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -180,7 +185,7 @@
    "unit": "",
    "description": "chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -196,7 +201,7 @@
    "unit": "",
    "description": "highest such share",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -212,7 +217,7 @@
    "unit": "",
    "description": "lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts)",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -228,7 +233,7 @@
    "unit": "",
    "description": "highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -244,7 +249,7 @@
    "unit": "",
    "description": "share of jumping bursts our continuous state alone covers",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -260,7 +265,7 @@
    "unit": "",
    "description": "share of jumping bursts our detector's non-local events cover",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -276,7 +281,7 @@
    "unit": "",
    "description": "the same before its significance test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -292,7 +297,7 @@
    "unit": "",
    "description": "share of jumping bursts the sliding window reports under the published definition",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -308,7 +313,7 @@
    "unit": "",
    "description": "two-part trials over every jump and chain condition",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -324,7 +329,7 @@
    "unit": "min",
    "description": "minutes of simulated immobility with no replay; no output reported any event there",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -340,7 +345,7 @@
    "unit": "events per minute",
    "description": "95 % upper bound on the false event rate with none observed (the rule of three over those minutes)",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -356,7 +361,7 @@
    "unit": "",
    "description": "simulated recordings the no-replay stretches come from",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -372,7 +377,7 @@
    "unit": "",
    "description": "trials in which our detector recovers fewer parts inside the event than alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -388,7 +393,7 @@
    "unit": "",
    "description": "trials in which it recovers more inside the event than alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -404,7 +409,7 @@
    "unit": "",
    "description": "the same with each part decoded alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -420,7 +425,7 @@
    "unit": "",
    "description": "share of parts our detector recovers inside the event, the same mean",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -436,7 +441,7 @@
    "unit": "",
    "description": "share of place-less bursts our continuous state alone covers",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -452,7 +457,7 @@
    "unit": "",
    "description": "highest share of a place-less burst's time in the fragmented state, over burst durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -468,7 +473,7 @@
    "unit": "",
    "description": "lowest share of a place-less burst's time in the fragmented state, over burst durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -484,7 +489,7 @@
    "unit": "",
    "description": "share of place-less bursts our detector's non-local events cover, pooled over the three peak rates",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -500,7 +505,7 @@
    "unit": "",
    "description": "share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -516,7 +521,7 @@
    "unit": "",
    "description": "the same before its significance test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -532,7 +537,7 @@
    "unit": "",
    "description": "share of place-less bursts the sliding window reports under the published definition",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -548,7 +553,7 @@
    "unit": "",
    "description": "trials in which the sliding window recovers fewer parts inside the event than alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -564,7 +569,7 @@
    "unit": "",
    "description": "trials in which it recovers more inside the event than alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -580,7 +585,7 @@
    "unit": "",
    "description": "the same with each part decoded alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -596,7 +601,7 @@
    "unit": "",
    "description": "share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -804,7 +809,7 @@
    "unit": "",
    "description": "lowest share over folds of the events informative under both content estimates on which they agree",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -916,7 +921,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -932,7 +937,7 @@
    "unit": "",
    "description": "jumping bursts: lower of folds A and B's share with held-out support",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1140,7 +1145,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1156,7 +1161,7 @@
    "unit": "",
    "description": "replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1172,7 +1177,7 @@
    "unit": "",
    "description": "the same share in fold C",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1188,7 +1193,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1204,7 +1209,7 @@
    "unit": "",
    "description": "replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1220,7 +1225,7 @@
    "unit": "",
    "description": "informative place-less burst events over the three folds (none has held-out support)",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1236,7 +1241,7 @@
    "unit": "",
    "description": "place-less burst events informative at that floor",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1252,7 +1257,7 @@
    "unit": "",
    "description": "place-less burst events with held-out support at a floor of 2 expected spikes",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1268,7 +1273,7 @@
    "unit": "",
    "description": "the higher of the two",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1284,7 +1289,7 @@
    "unit": "",
    "description": "shared replays: lower of folds A and B's share the evaluation cells can judge at all",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1300,7 +1305,7 @@
    "unit": "",
    "description": "replays both detectors reported: share with held-out support, the same in every fold",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1316,7 +1321,7 @@
    "unit": "",
    "description": "of those, calls whose dispersion clears the threshold only with kept windows outside every piece",
    "questions": [
-    "2a.4"
+    "2a.3"
    ],
    "used_in": [
     "supplement",
@@ -1332,7 +1337,7 @@
    "unit": "",
    "description": "sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1",
    "questions": [
-    "2a.4"
+    "2a.3"
    ],
    "used_in": [
     "supplement",
@@ -1348,7 +1353,7 @@
    "unit": "",
    "description": "significance test of the inbound replay: jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1364,7 +1369,7 @@
    "unit": "",
    "description": "significance test of the inbound replay: spread half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1380,7 +1385,7 @@
    "unit": "",
    "description": "how many more shuffle draws below the observed value than a pass allows",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1396,7 +1401,7 @@
    "unit": "",
    "description": "the sliding window's reported duration of the continuous outbound replay over its true duration",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1412,7 +1417,7 @@
    "unit": "",
    "description": "share of that reported event's kept windows decoding the animal's own place (within 15 cm)",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1428,7 +1433,7 @@
    "unit": "",
    "description": "significance test of the outbound replay: jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1444,7 +1449,7 @@
    "unit": "",
    "description": "significance test of the outbound replay: spread half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1460,7 +1465,7 @@
    "unit": "cm",
    "description": "largest dispersion of a candidate over the remote stationary event",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1476,7 +1481,7 @@
    "unit": "cm",
    "description": "largest dispersion of a sliding-window candidate over the 30 cm replay",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1492,7 +1497,7 @@
    "unit": "",
    "description": "the sliding window's reported duration of the 80 ms replay over its true duration",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1508,7 +1513,7 @@
    "unit": "",
    "description": "share of that reported event's kept windows decoding the animal's own place",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1524,7 +1529,7 @@
    "unit": "",
    "description": "significance test of the 80 ms replay: jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1540,7 +1545,7 @@
    "unit": "",
    "description": "significance test of the 80 ms replay: spread half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1556,7 +1561,7 @@
    "unit": "ms",
    "description": "largest error in either bound of the state-space detector's reports of the four zoomed events",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1572,7 +1577,7 @@
    "unit": "cm",
    "description": "its dispersion with the window outside every piece",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1588,7 +1593,7 @@
    "unit": "cm",
    "description": "distance from the animal of the far cell whose two spikes fill the stray window",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1604,7 +1609,7 @@
    "unit": "ms",
    "description": "the stray-window event's reported duration",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1620,7 +1625,7 @@
    "unit": "",
    "description": "share of the stray-window event's kept windows decoding within 15 cm of the animal",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1636,7 +1641,7 @@
    "unit": "",
    "description": "significance test of the stray-window event: jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1652,7 +1657,7 @@
    "unit": "",
    "description": "significance test of the stray-window event: spread half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1668,7 +1673,7 @@
    "unit": "cm",
    "description": "its dispersion without that window",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1732,7 +1737,7 @@
    "unit": "",
    "description": "share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms)",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1748,7 +1753,7 @@
    "unit": "",
    "description": "on the shared target, share the sliding-window detector reports before its significance test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1764,7 +1769,7 @@
    "unit": "",
    "description": "on the shared target, share the sliding-window detector reports after its significance test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1780,7 +1785,7 @@
    "unit": "",
    "description": "on the shared target, share the state-space detector reports under its own acceptance criteria",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1796,7 +1801,7 @@
    "unit": "",
    "description": "on the shared target, share the state-space detector reports held to the published duration and dispersion criteria",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1812,7 +1817,7 @@
    "unit": "",
    "description": "share the sliding-window detector reported and then failed on its significance test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1828,7 +1833,7 @@
    "unit": "",
    "description": "of the replays the sliding window reported before its test, share passing the test's jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1844,7 +1849,7 @@
    "unit": "",
    "description": "share of the longest (500 ms) replays passing the jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1860,7 +1865,7 @@
    "unit": "",
    "description": "share of the shortest (40 ms) replays passing the jump half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1876,7 +1881,7 @@
    "unit": "",
    "description": "replays swept (grid cells)",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1892,7 +1897,7 @@
    "unit": "ms",
    "description": "median amount the sliding window ends the shortest replays late",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1908,7 +1913,7 @@
    "unit": "ms",
    "description": "median duration the sliding window reports for the shortest replays",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1924,7 +1929,7 @@
    "unit": "ms",
    "description": "median amount the sliding window starts the shortest replays early",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1940,7 +1945,7 @@
    "unit": "",
    "description": "over the whole grid, share the sliding-window detector reports before its significance test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1956,7 +1961,7 @@
    "unit": "ms",
    "description": "largest median amount the sliding window ends late, over true durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1972,7 +1977,7 @@
    "unit": "ms",
    "description": "smallest median amount the sliding window ends late, over true durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -1988,7 +1993,7 @@
    "unit": "ms",
    "description": "largest upper quartile of the sliding window's end error, over true durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2004,7 +2009,7 @@
    "unit": "",
    "description": "over the whole grid, share the sliding-window detector reports under its own criteria, significance test included",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2020,7 +2025,7 @@
    "unit": "",
    "description": "share of the sliding-window detector's accepted events that are not the replay put in",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2036,7 +2041,7 @@
    "unit": "",
    "description": "the same, counting the sliding window's reports before its test",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2052,7 +2057,7 @@
    "unit": "",
    "description": "swept replays the sliding-window detector reported and the state-space detector did not",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2068,7 +2073,7 @@
    "unit": "",
    "description": "over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2084,7 +2089,7 @@
    "unit": "ms",
    "description": "largest median amount the sliding window starts early, over true durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2100,7 +2105,7 @@
    "unit": "ms",
    "description": "smallest median amount the sliding window starts early, over true durations",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2116,7 +2121,7 @@
    "unit": "",
    "description": "of the replays the sliding window reported before its test, share passing the test's spread half",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2132,7 +2137,7 @@
    "unit": "ms",
    "description": "largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2148,7 +2153,7 @@
    "unit": "",
    "description": "over the whole grid, share the state-space detector reports under its own criteria",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",
@@ -2164,7 +2169,7 @@
    "unit": "",
    "description": "share of the swept replays reported by the state-space detector and not by the sliding-window detector",
    "questions": [
-    "2a.3"
+    "1.1"
    ],
    "used_in": [
     "supplement",

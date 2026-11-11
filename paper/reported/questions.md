@@ -66,21 +66,9 @@ Sources:
 
 ## Part 1: the model
 
-No question in this section yet.
+### 1.1. On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?
 
-## Part 2: it works
-
-### 2a.1. Is the decoder accurate, in sample and on held-out data?
-
-Status: not computed; no summary value; Figure 2e and the decoder-validation supplement plot the in-sample decoding error. Figures: 2e, decoder_validation. Values: 0.
-
-### 2a.2. Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?
-
-Status: not computed; no script (held-out model selection). Values: 0.
-
-### 2a.3. On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?
-
-Status: computed. Figures: memoryless_comparison. Values: 97.
+Status: computed. Figures: 1, memoryless_comparison. Values: 97.
 
 Sources:
 
@@ -189,9 +177,19 @@ Sources:
 | `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | supplement, figure: memoryless_comparison |
 | `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | supplement, figure: memoryless_comparison |
 
-### 2a.4. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
+## Part 2: it works
 
-Status: computed. Figures: memoryless_comparison. Values: 2.
+### 2a.1. Is the decoder accurate, in sample and on held-out data?
+
+Status: not computed; no summary value; Figure 2e and the decoder-validation supplement plot the in-sample decoding error. Figures: 2e, decoder_validation. Values: 0.
+
+### 2a.2. Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?
+
+Status: not computed; no script (held-out model selection). Values: 0.
+
+### 2a.3. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
+
+Status: computed. Figures: 2, memoryless_comparison. Values: 2.
 
 Sources:
 
@@ -202,11 +200,11 @@ Sources:
 | `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | supplement, figure: memoryless_comparison |
 | `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | supplement, figure: memoryless_comparison |
 
-### 2a.5. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
+### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
 
 Status: not computed; no script (the false-positive rate on real data). Values: 0.
 
-### 2a.6. How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?
+### 2a.5. How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?
 
 Status: not computed; no script (the threshold sweep). Values: 0.
 
@@ -2723,11 +2721,11 @@ Sources:
 
 ### Figure 1: The switching state-space model
 
-Script: `scripts/figures/generate_figure01.py`. Questions: none.
+Script: `scripts/figures/generate_figure01.py`. Questions: 1.1.
 
 ### Figure 2: Non-local events and SWRs
 
-Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2b.1, 2b.2, 2b.3, 2b.4, 2c.2, 2c.3, 2c.5, 2c.7, 2c.8, 2d.1.
+Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2a.3, 2b.1, 2b.2, 2b.3, 2b.4, 2c.2, 2c.3, 2c.5, 2c.7, 2c.8, 2d.1.
 
 Unlettered: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineScored`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsEvidenceAnimals`, `\EventsEvidenceEpochs`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsKayTimeS`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsNonlocalEventsOutsideKayFraction`, `\EventsNonlocalEventsOutsideKayPerHour`, `\EventsNonlocalEventsOutsideKay`, `\EventsNonlocalEventsOutsideTriggerFraction`, `\EventsNonlocalEventsOutsideTriggerPerHour`, `\EventsNonlocalEventsOutsideTrigger`, `\EventsNonlocalEventsOutsideWidloskiFraction`, `\EventsNonlocalEventsOutsideWidloskiPerHour`, `\EventsNonlocalEventsOutsideWidloski`, `\EventsNonlocalTimeOutsideKayFraction`, `\EventsNonlocalTimeOutsideKayS`, `\EventsNonlocalTimeOutsideSwrFraction`, `\EventsNonlocalTimeOutsideSwrS`, `\EventsNonlocalTimeOutsideTriggerFraction`, `\EventsNonlocalTimeOutsideTriggerS`, `\EventsNonlocalTimeOutsideWidloskiFraction`, `\EventsNonlocalTimeOutsideWidloskiS`, `\EventsNonlocalTimeS`, `\EventsOccupancyEpochs`, `\EventsRestHours`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
 
@@ -2759,7 +2757,7 @@ Script: `scripts/figures/generate_supp_decoder_validation.py`. Questions: 2a.1, 
 
 ### Figure memoryless_comparison: Our detector and the Widloski & Foster detector on simulated replays
 
-Script: `scripts/figures/generate_memoryless_comparison.py`. Questions: 2a.3, 2a.4.
+Script: `scripts/figures/generate_memoryless_comparison.py`. Questions: 1.1, 2a.3.
 
 Unlettered: `\DetectionControlsContinuingOursOnePerPartLongestFraction`, `\DetectionControlsContinuingOursSpanningShortestFraction`, `\DetectionControlsContinuingSlidingOnePerPartLongestFraction`, `\DetectionControlsContinuingSlidingSpanningShortestFraction`, `\DetectionControlsElsewhereOursOnePerPartLongestFraction`, `\DetectionControlsElsewhereOursOnePerPartShortestFraction`, `\DetectionControlsElsewhereSlidingMissingMax`, `\DetectionControlsElsewhereSlidingMissingMin`, `\DetectionControlsJumpOursSpanningMax`, `\DetectionControlsJumpOursSpanningMin`, `\DetectionControlsJumpSlidingSpanningMax`, `\DetectionControlsJumpingContinuousFraction`, `\DetectionControlsJumpingNonlocalFraction`, `\DetectionControlsJumpingSlidingBeforeTestFraction`, `\DetectionControlsJumpingSlidingFraction`, `\DetectionControlsMultipartTrials`, `\DetectionControlsNoReplayMinutes`, `\DetectionControlsNoReplayRateBound`, `\DetectionControlsNoReplayRecordings`, `\DetectionControlsOursFewerInEventTrials`, `\DetectionControlsOursMoreInEventTrials`, `\DetectionControlsOursRecoveryAloneFraction`, `\DetectionControlsOursRecoveryInEventFraction`, `\DetectionControlsPlacelessContinuousFraction`, `\DetectionControlsPlacelessFragmentedShareMax`, `\DetectionControlsPlacelessFragmentedShareMin`, `\DetectionControlsPlacelessNonlocalFraction`, `\DetectionControlsPlacelessNonlocalLowestRateFraction`, `\DetectionControlsPlacelessSlidingBeforeTestFraction`, `\DetectionControlsPlacelessSlidingFraction`, `\DetectionControlsSlidingFewerInEventTrials`, `\DetectionControlsSlidingMoreInEventTrials`, `\DetectionControlsSlidingRecoveryAloneFraction`, `\DetectionControlsSlidingRecoveryInEventFraction`, `\DetectionHeldoutEstimatorAgreementMin`, `\DetectionHeldoutJumpingSupportMax`, `\DetectionHeldoutJumpingSupportMin`, `\DetectionHeldoutOursOnlyInformativeMax`, `\DetectionHeldoutOursOnlyInformativeMin`, `\DetectionHeldoutOursOnlySupportFoldC`, `\DetectionHeldoutOursOnlySupportMax`, `\DetectionHeldoutOursOnlySupportMin`, `\DetectionHeldoutPlacelessInformativeEvents`, `\DetectionHeldoutPlacelessLooseEvents`, `\DetectionHeldoutPlacelessLooseSupportedEvents`, `\DetectionHeldoutSharedInformativeMax`, `\DetectionHeldoutSharedInformativeMin`, `\DetectionHeldoutSharedSupport`, `\DetectionPilotCallsDecidedByOutsideWindow`, `\DetectionPilotReplayCalls`, `\DetectionRecordingInboundPJump`, `\DetectionRecordingInboundPSpread`, `\DetectionRecordingOutboundDrawsFromPassing`, `\DetectionRecordingOutboundDurationRatio`, `\DetectionRecordingOutboundLocalFraction`, `\DetectionRecordingOutboundPJump`, `\DetectionRecordingOutboundPSpread`, `\DetectionRecordingRemoteStationaryDispersionCm`, `\DetectionRecordingShortPathDispersionCm`, `\DetectionRecordingShortReplayDurationRatio`, `\DetectionRecordingShortReplayLocalFraction`, `\DetectionRecordingShortReplayPJump`, `\DetectionRecordingShortReplayPSpread`, `\DetectionRecordingStateSpaceBoundErrorMs`, `\DetectionRecordingStrayWindowDispersionCm`, `\DetectionRecordingStrayWindowDistanceCm`, `\DetectionRecordingStrayWindowDurationMs`, `\DetectionRecordingStrayWindowLocalFraction`, `\DetectionRecordingStrayWindowPJump`, `\DetectionRecordingStrayWindowPSpread`, `\DetectionRecordingStrayWindowPiecesDispersionCm`, `\DetectionSweepDomainFraction`, `\DetectionSweepDomainSlidingBeforeTestFraction`, `\DetectionSweepDomainSlidingFraction`, `\DetectionSweepDomainStateSpaceFraction`, `\DetectionSweepDomainStateSpacePublishedFraction`, `\DetectionSweepFailedTestFraction`, `\DetectionSweepJumpHalfPassFraction`, `\DetectionSweepJumpHalfPassLongestFraction`, `\DetectionSweepJumpHalfPassShortestFraction`, `\DetectionSweepReplays`, `\DetectionSweepShortestEndLateMs`, `\DetectionSweepShortestReportedDurationMs`, `\DetectionSweepShortestStartEarlyMs`, `\DetectionSweepSlidingBeforeTestFraction`, `\DetectionSweepSlidingEndLateMaxMs`, `\DetectionSweepSlidingEndLateMinMs`, `\DetectionSweepSlidingEndLateUpperQuartileMaxMs`, `\DetectionSweepSlidingFraction`, `\DetectionSweepSlidingNotTheReplayFraction`, `\DetectionSweepSlidingOnlyBeforeTestReplays`, `\DetectionSweepSlidingOnlyReplays`, `\DetectionSweepSlidingSpreadOnlyFraction`, `\DetectionSweepSlidingStartEarlyMaxMs`, `\DetectionSweepSlidingStartEarlyMinMs`, `\DetectionSweepSpreadHalfPassFraction`, `\DetectionSweepStateSpaceEdgeErrorMaxMs`, `\DetectionSweepStateSpaceFraction`, `\DetectionSweepStateSpaceOnlyFraction`
 

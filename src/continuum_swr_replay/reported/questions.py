@@ -181,6 +181,11 @@ QUESTIONS: tuple[Question, ...] = (
         "0.1", "What detection and decoding parameters do published replay studies use?"
     ),
     Question(
+        "1.1",
+        "On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?",
+        figures=("1", "memoryless_comparison"),
+    ),
+    Question(
         "2a.1",
         "Is the decoder accurate, in sample and on held-out data?",
         status="not computed",
@@ -195,22 +200,17 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     Question(
         "2a.3",
-        "On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?",
-        figures=("memoryless_comparison",),
+        "On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?",
+        figures=("2", "memoryless_comparison"),
     ),
     Question(
         "2a.4",
-        "On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?",
-        figures=("memoryless_comparison",),
-    ),
-    Question(
-        "2a.5",
         "How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?",
         status="not computed",
         reason="no script (the false-positive rate on real data)",
     ),
     Question(
-        "2a.6",
+        "2a.5",
         "How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?",
         status="not computed",
         reason="no script (the threshold sweep)",

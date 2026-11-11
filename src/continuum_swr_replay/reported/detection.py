@@ -50,8 +50,8 @@ SWEEP_DIR = Path("docs/design/replay_detection_comparison")
 
 TAGS = {
     "state_evidence": Tags(("2c.3",), ("paper", "supplement")),
-    "memoryless": Tags(("2a.3",), ("supplement", "figure: memoryless_comparison")),
-    "pilot": Tags(("2a.4",), ("supplement", "figure: memoryless_comparison")),
+    "memoryless": Tags(("1.1",), ("supplement", "figure: memoryless_comparison")),
+    "pilot": Tags(("2a.3",), ("supplement", "figure: memoryless_comparison")),
 }
 """Each group of values: the questions it answers and where it is used. The
 memoryless-comparison values are used in that supplementary figure and its
