@@ -110,6 +110,11 @@ def test_left_out_seconds_subtract_each_covering_from_the_nonlocal_time(tmp_path
     }
 
 
+def test_left_out_seconds_refuse_a_run_without_features_tables(tmp_path):
+    with pytest.raises(FileNotFoundError, match="no features tables"):
+        comparison.left_out_seconds(tmp_path)
+
+
 def test_left_out_statistics_count_events_time_and_rates(tmp_path):
     _write_run(tmp_path / "run", tmp_path / "report")
     result = comparison.left_out_statistics(tmp_path / "run", tmp_path / "report")

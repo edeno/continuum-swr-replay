@@ -161,11 +161,19 @@ def left_out_seconds(run_dir: Path) -> dict[str, float]:
     (``nonlocal``), the time Kay's SWRs span (``kay``), and, for each of
     :data:`COVERINGS`, the part of the non-local event time that no event of
     those inventories covers (``outside_<covering>``).
+
+    Raises
+    ------
+    FileNotFoundError
+        If the run holds no features table.
     """
     totals = dict.fromkeys(
         ("nonlocal", "kay", *(f"outside_{name}" for name in COVERINGS)), 0.0
     )
-    for path in sorted(run_dir.glob("*_features.parquet")):
+    paths = sorted(run_dir.glob("*_features.parquet"))
+    if not paths:
+        raise FileNotFoundError(f"no features tables in {run_dir}")
+    for path in paths:
         table = pd.read_parquet(
             path, columns=["detector", "event_start_s", "event_end_s"]
         )
