@@ -142,7 +142,7 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
         ("a", "e2", False, 1.3),
         ("b", "e1", False, -1.0),
         ("b", "e1", False, 5.0),
-        ("b", "e1", False, 0.0),
+        ("b", "e1", False, 1.0),
         ("a", "e1", True, -0.7),
         ("a", "e1", True, -0.8),
         ("a", "e1", True, -0.6),
@@ -164,17 +164,17 @@ def test_event_signal_statistics_compare_each_event_with_its_own_epoch():
     events, reference = _signal_tables()
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
-    # -1, 0, 0.8, 1.2, 1.3, 1.4, 5: the median is 1.2 (the mean is 1.24)
+    # -1, 0.8, 1, 1.2, 1.3, 1.4, 5: the median is 1.2 (the mean is 1.39)
     assert non_swr["median"] == pytest.approx(1.2)
     # a: event median 1.25 against the running levels 1, 1, 1, 2 of its events'
     # epochs, median 1.0: not below (it is below 1.5, the median of a's two
-    # epochs). b: 0.0 against 1.0: below.
-    assert non_swr["n_animals_below_running"] == 1
-    # a: 1.25 against rest -1.0; b: 0.0 against -0.5
+    # epochs). b: 1.0 against 1.0: equal, which is not below.
+    assert non_swr["n_animals_below_running"] == 0
+    # a: 1.25 against rest -1.0; b: 1.0 against -0.5
     assert non_swr["n_animals_above_rest"] == 2
-    # 1.2, 1.4 and 5.0 reach their epoch's 1.0; 0.8, -1.0 and 0.0 do not, and
-    # 1.3 does not reach e2's 2.0
-    assert non_swr["reaches_running_fraction"] == pytest.approx(3 / 7)
+    # 1.2, 1.4 and 5.0 reach their epoch's 1.0, and b's 1.0 equals it, which
+    # reaches it; 0.8 and -1.0 do not, and 1.3 does not reach e2's 2.0
+    assert non_swr["reaches_running_fraction"] == pytest.approx(4 / 7)
     swr = result.loc[("theta", True)]
     # -0.8, -0.75, -0.7, -0.6, 0.0
     assert swr["median"] == pytest.approx(-0.7)
@@ -237,7 +237,8 @@ def test_rest_matched_theta_statistics_average_events_not_windows():
         {
             "animal": ["a", "a", "b", "b"],
             "is_swr": [False, False, False, True],
-            "theta_z": [2.0, 0.0, 0.0, 5.0],
+            # a's first event equals the running level, which is theta-like
+            "theta_z": [1.0, 0.0, 0.0, 5.0],
             "theta_running_median": 1.0,
             "rest_windows": [10, 5, 10, 10],
             "rest_theta_like_share": [0.2, 0.4, 0.1, 0.3],
