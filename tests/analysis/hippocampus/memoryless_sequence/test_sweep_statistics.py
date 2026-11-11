@@ -227,6 +227,9 @@ CONTROLS_ROWS = [
     ("bursts", "fragmented_share", "placeless_burst", 0.2, OURS, 0.75),
     ("bursts", "fragmented_share", "placeless_burst", 0.5, OURS, 0.7),
     ("bursts", "fragmented_share", "jumping_burst", 0.08, OURS, 0.1),
+    # another output's share at one duration, and a row pooled over durations
+    ("bursts", "fragmented_share", "placeless_burst", 0.2, SLIDING, 0.01),
+    ("bursts", "fragmented_share", "placeless_burst", np.nan, OURS, 0.99),
     ("bursts", "continuous_share", "placeless_burst", 0.08, OURS, 0.05),
     # jumps of 0, 20, 40 and 80 cm, listed out of order
     *_cells("segmentation_spanning", "j1", OURS, {20: 0.9, 0: 0.5, 80: 0.4, 40: 0.2}),
@@ -292,9 +295,47 @@ def test_no_replay_statistics_count_the_outputs_that_reported_an_event():
     assert (result["n_outputs"], result["n_outputs_with_events"]) == (3, 1)
 
 
-def test_burst_share_range_is_over_one_conditions_burst_durations():
-    result = stats.burst_share_range(CONTROLS, "placeless_burst", "fragmented_share")
+def test_no_replay_statistics_refuse_two_counts_for_one_output():
+    twice = pd.concat([CONTROLS, CONTROLS.iloc[[2]]], ignore_index=True)
+    assert twice.iloc[-1]["measure"] == "n_events"
+    with pytest.raises(ValueError, match="several rows for one detector output"):
+        stats.no_replay_statistics(twice)
+
+
+@pytest.mark.parametrize("measure", ["immobile_minutes", "n_recordings"])
+def test_no_replay_statistics_refuse_two_rows_of_the_minutes_or_recordings(measure):
+    row = CONTROLS[CONTROLS["measure"] == measure]
+    assert len(row) == 1
+    twice = pd.concat([CONTROLS, row.assign(value=99.0)], ignore_index=True)
+    with pytest.raises(ValueError, match=f"{measure}: 2 rows"):
+        stats.no_replay_statistics(twice)
+    with pytest.raises(ValueError, match=f"{measure}: 0 rows"):
+        stats.no_replay_statistics(CONTROLS[CONTROLS["measure"] != measure])
+
+
+def test_burst_share_range_is_over_one_outputs_shares_at_the_burst_durations():
+    result = stats.burst_share_range(
+        CONTROLS, "placeless_burst", "fragmented_share", OURS
+    )
     assert result == {"min": 0.6, "max": 0.75}
+
+
+def test_burst_share_range_refuses_a_duration_the_output_has_no_one_share_at():
+    # the sliding window has a share at one of the three durations only
+    with pytest.raises(ValueError, match="0 rows"):
+        stats.burst_share_range(
+            CONTROLS, "placeless_burst", "fragmented_share", SLIDING
+        )
+    twice = pd.concat(
+        [CONTROLS, CONTROLS[CONTROLS["value"] == 0.75]], ignore_index=True
+    )
+    with pytest.raises(ValueError, match="2 rows"):
+        stats.burst_share_range(twice, "placeless_burst", "fragmented_share", OURS)
+
+
+def test_burst_share_range_refuses_a_condition_with_no_share():
+    with pytest.raises(ValueError, match="at any burst duration"):
+        stats.burst_share_range(CONTROLS, "no_such_burst", "fragmented_share", OURS)
 
 
 def test_carving_statistics_pool_conditions_at_each_level():

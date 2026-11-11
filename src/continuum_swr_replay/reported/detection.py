@@ -656,6 +656,11 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
             controls, "bursts", measure, condition, None, detector
         )
 
+    def trials(condition: str, detector: str) -> float:
+        return sweep_statistics.controls_value(
+            controls, "parts", "n_trials", condition, None, detector
+        )
+
     def carving(
         conditions: tuple[str, ...], label: str, detector: str
     ) -> dict[str, float]:
@@ -670,7 +675,7 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
             "the controls summary disagrees"
         )
     fragmented = sweep_statistics.burst_share_range(
-        controls, "placeless_burst", "fragmented_share"
+        controls, "placeless_burst", "fragmented_share", _OURS
     )
     jumps = ("jump_120ms", "jump_200ms")
     spanning_ours = carving(jumps, "spanning", _OURS)
@@ -688,7 +693,10 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         )
         for detector in (_SLIDING, _OURS)
     }
-    if recovery[_SLIDING]["n_trials"] != recovery[_OURS]["n_trials"]:
+    if any(
+        trials(condition, _SLIDING) != trials(condition, _OURS)
+        for condition in _MULTIPART
+    ):
         raise ValueError("the two detectors are scored on different multi-part trials")
 
     return [

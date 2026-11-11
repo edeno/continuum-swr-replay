@@ -106,14 +106,31 @@ def test_a_controls_summary_without_the_no_replay_counts_is_refused(controls):
         detection.controls_values(controls[~counts], "source")
 
 
-def test_detectors_scored_on_different_trials_are_refused(controls):
-    changed = _with_value(
+def _with_sliding_trials(
+    controls: pd.DataFrame, condition: str, n_trials: float
+) -> pd.DataFrame:
+    return _with_value(
         controls,
-        7.0,
+        n_trials,
         summary="parts",
         measure="n_trials",
-        condition="jump_120ms",
+        condition=condition,
         detector="sliding_published",
+    )
+
+
+# each jump condition has 96 trials for both detectors
+@pytest.mark.parametrize("n_trials", [7.0, 100.0])
+def test_detectors_scored_on_different_trials_are_refused(controls, n_trials):
+    changed = _with_sliding_trials(controls, "jump_120ms", n_trials)
+    with pytest.raises(ValueError, match="different multi-part trials"):
+        detection.controls_values(changed, "source")
+
+
+def test_detectors_scored_on_as_many_trials_of_other_conditions_are_refused(controls):
+    # 100 and 92 trials of the two jump conditions: the same 192 in all
+    changed = _with_sliding_trials(
+        _with_sliding_trials(controls, "jump_120ms", 100.0), "jump_200ms", 92.0
     )
     with pytest.raises(ValueError, match="different multi-part trials"):
         detection.controls_values(changed, "source")

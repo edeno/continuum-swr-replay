@@ -255,9 +255,22 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
 # --- the controls: activity that is not one clean replay -------------------------
 
 
+def _only_value(rows: pd.DataFrame, what: str) -> float:
+    """The value of the one row of ``rows``.
+
+    Raises
+    ------
+    ValueError
+        If ``rows`` is not exactly one row.
+    """
+    if len(rows) != 1:
+        raise ValueError(f"{what}: {len(rows)} rows; expected one")
+    return float(rows["value"].iloc[0])
+
+
 def controls_value(
     controls: pd.DataFrame,
-    summary: str,
+    block: str,
     measure: str,
     condition: str,
     level: float | None,
@@ -272,7 +285,7 @@ def controls_value(
         ``condition``, ``level`` (a jump in cm, a gap or a burst duration in
         seconds; missing on a row pooled over levels), ``detector`` and
         ``value``.
-    summary, measure, condition, detector : str
+    block, measure, condition, detector : str
         The row's block, measure, injected condition and detector output.
     level : float or None
         The row's level; None for the row pooled over levels.
@@ -287,7 +300,7 @@ def controls_value(
         If the summary does not hold exactly one such row.
     """
     rows = controls[
-        (controls["summary"] == summary)
+        (controls["summary"] == block)
         & (controls["measure"] == measure)
         & (controls["condition"] == condition)
         & (controls["detector"] == detector)
@@ -297,12 +310,10 @@ def controls_value(
         if level is None
         else rows[np.isclose(rows["level"], level)]
     )
-    if len(rows) != 1:
-        raise ValueError(
-            f"controls summary: {len(rows)} rows for {summary}, {measure}, "
-            f"{condition}, {level}, {detector}; expected one"
-        )
-    return float(rows["value"].iloc[0])
+    return _only_value(
+        rows,
+        f"controls summary: {block}, {measure}, {condition}, {level}, {detector}",
+    )
 
 
 def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
@@ -326,39 +337,49 @@ def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
     statistics : dict
         - ``minutes``: the simulated immobility with no replay, in minutes.
         - ``n_recordings``: the simulated recordings it comes from.
-        - ``n_outputs``: the detector outputs run on it.
-        - ``n_outputs_with_events``: of those, the outputs that reported any
-          event there.
+        - ``n_outputs``: the detector outputs run on it (the rows of its event
+          counts, one per output).
+        - ``n_outputs_with_events``: of those, the outputs whose event count
+          there is not zero.
         - ``rate_bound_per_minute``: the 95 % upper bound on an output's false
           event rate when it reported none, by the rule of three (3 over the
           minutes), in events per minute.
+
+    Raises
+    ------
+    ValueError
+        If the summary holds two event counts for one output, or not exactly
+        one row of the minutes or of the recordings.
     """
-    n_events = controls[
-        (controls["summary"] == "no_replay") & (controls["measure"] == "n_events")
-    ]["value"]
-    minutes = float(
-        controls[
-            (controls["summary"] == "no_replay")
-            & (controls["measure"] == "immobile_minutes")
-        ]["value"].iloc[0]
+    no_replay = controls[controls["summary"] == "no_replay"]
+    n_events = no_replay[no_replay["measure"] == "n_events"]
+    if n_events["detector"].duplicated().any():
+        raise ValueError(
+            "controls summary: no_replay, n_events has several rows for one "
+            "detector output"
+        )
+    minutes = _only_value(
+        no_replay[no_replay["measure"] == "immobile_minutes"],
+        "controls summary: no_replay, immobile_minutes",
     )
-    n_recordings = float(
+    n_recordings = _only_value(
         controls[
             (controls["summary"] == "provenance")
             & (controls["measure"] == "n_recordings")
-        ]["value"].iloc[0]
+        ],
+        "controls summary: provenance, n_recordings",
     )
     return {
         "minutes": minutes,
         "n_recordings": n_recordings,
         "n_outputs": len(n_events),
-        "n_outputs_with_events": int((n_events != 0).sum()),
+        "n_outputs_with_events": int((n_events["value"] != 0).sum()),
         "rate_bound_per_minute": 3 / minutes,
     }
 
 
 def burst_share_range(
-    controls: pd.DataFrame, condition: str, share: str
+    controls: pd.DataFrame, condition: str, share: str, detector: str
 ) -> dict[str, float]:
     """The range, over burst durations, of the share of a burst's time in a state.
 
@@ -370,19 +391,40 @@ def burst_share_range(
         A burst condition (``"placeless_burst"`` or ``"jumping_burst"``).
     share : str
         ``"fragmented_share"`` or ``"continuous_share"``: the mean share of a
-        burst's time the state-space detector gives that state.
+        burst's time the detector output gives that state.
+    detector : str
+        The detector output (a state-space one; the sliding window has no
+        states).
 
     Returns
     -------
     statistics : dict
-        ``min`` and ``max``, the lowest and highest share over burst durations.
+        ``min`` and ``max``, the lowest and highest share over the burst
+        durations the summary has a row of the share for.
+
+    Raises
+    ------
+    ValueError
+        If the summary has no such share at any burst duration, or not exactly
+        one of the detector output's at a duration.
     """
-    values = controls[
+    rows = controls[
         (controls["summary"] == "bursts")
         & (controls["measure"] == share)
         & (controls["condition"] == condition)
-    ]["value"]
-    return {"min": values.min(), "max": values.max()}
+    ]
+    durations = sorted(rows["level"].dropna().unique())
+    if not durations:
+        raise ValueError(
+            f"controls summary: no {share} of {condition} at any burst duration"
+        )
+    shares = np.array(
+        [
+            controls_value(controls, "bursts", share, condition, duration, detector)
+            for duration in durations
+        ]
+    )
+    return {"min": float(shares.min()), "max": float(shares.max())}
 
 
 def carving_statistics(
@@ -432,10 +474,10 @@ def carving_statistics(
         ]
     )
     return {
-        "min": shares.min(),
-        "max": shares.max(),
-        "at_lowest_level": shares[0],
-        "at_highest_level": shares[-1],
+        "min": float(shares.min()),
+        "max": float(shares.max()),
+        "at_lowest_level": float(shares[0]),
+        "at_highest_level": float(shares[-1]),
     }
 
 
