@@ -459,7 +459,7 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 def plot_best_model_selection(df, ax):
     """Distribution of the best model per unit, by held-out deviance.
 
-    Each bar is a share of every unit
+    Each bar is a share of the units with a best model
     (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.best_model_fractions`).
     """
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]

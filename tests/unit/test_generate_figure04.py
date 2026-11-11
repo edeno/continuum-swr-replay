@@ -46,7 +46,7 @@ def test_panel_d_uses_the_canonical_control_draw_count():
 def test_panel_d_bars_are_the_called_and_best_model_shares_as_percents():
     """Four units. SWR: one untested, two of the three tested called.
     Engagement: three of four called. The other tests: one of four. Best
-    model: one constant, two SWR, one with none, over all four units."""
+    model: one constant, two SWR, and one unit with none, which is left out."""
     pvalues = {name: [0.01, 0.5, 0.5, 0.5] for name in HELDOUT_P_COLUMNS}
     pvalues["SWR"] = [0.01, 0.01, 0.5, np.nan]
     pvalues["engagement"] = [0.01, 0.01, 0.01, 0.5]
@@ -77,9 +77,9 @@ def test_panel_d_bars_are_the_called_and_best_model_shares_as_percents():
             "SWR+\nno-SWR",
         ]
         assert [bar.get_height() for bar in best_ax.patches] == pytest.approx(
-            [25.0, 50.0, 0.0, 0.0]
+            [100 / 3, 200 / 3, 0.0, 0.0]
         )
-        assert [t.get_text() for t in best_ax.texts] == ["25%", "50%"]
+        assert [t.get_text() for t in best_ax.texts] == ["33%", "67%"]
     finally:
         plt.close(fig)
 

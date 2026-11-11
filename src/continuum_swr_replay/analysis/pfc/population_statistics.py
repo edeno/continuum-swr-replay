@@ -187,6 +187,17 @@ def prior_binding_percent(population: pd.DataFrame, curves: Sequence[str]) -> pd
 
 # --- the units called for each test ---------------------------------------------------
 
+#: The p-value column of SWRs without replay, which only the extended event set
+#: has (it is not one of ``HELDOUT_P_COLUMNS``).
+SWR_WITHOUT_REPLAY_P_COLUMN = "SWR_no_non_local: p_heldout"
+
+
+def _tested_and_called(pvalue: pd.Series, alpha: float) -> tuple[NDArray, NDArray]:
+    """Which units are tested for one test (a finite p-value) and which are
+    called (a p-value below ``alpha``). Two boolean arrays, shape (n_units,)."""
+    values = pvalue.to_numpy(dtype=float)
+    return np.isfinite(values), values < alpha
+
 
 def called_units(population: pd.DataFrame, name: str, alpha: float) -> NDArray:
     """Which units are called for one test.
@@ -207,8 +218,7 @@ def called_units(population: pd.DataFrame, name: str, alpha: float) -> NDArray:
         True where the unit's p-value is below ``alpha``; False for an
         untested unit.
     """
-    pvalue = population[HELDOUT_P_COLUMNS[name]].to_numpy(dtype=float)
-    return pvalue < alpha
+    return _tested_and_called(population[HELDOUT_P_COLUMNS[name]], alpha)[1]
 
 
 def called_fractions(population: pd.DataFrame, alpha: float) -> pd.DataFrame:
@@ -329,11 +339,16 @@ def best_model_fractions(
     Returns
     -------
     fractions : dict
-        By model: the units whose best model it is, as a share of every unit
-        (a unit with no best model is in the denominator).
+        By model: the units whose best model it is, as a share of the units
+        with a best model (a unit with none is left out). NaN when no unit has
+        a best model.
     """
-    counts = population[column].value_counts()
-    return {model: counts.get(model, 0) / len(population) for model in models}
+    best = population[column]
+    n_known = int(best.notna().sum())
+    return {
+        model: float((best == model).sum() / n_known) if n_known else np.nan
+        for model in models
+    }
 
 
 def units_at_or_above_rate(
@@ -476,35 +491,73 @@ def unmatchable_event_statistics(windows: pd.DataFrame) -> dict[str, object]:
 # --- SWR-coupled against non-SWR replay ---------------------------------------------
 
 
-def odds_ratio(a: int, b: int, c: int, d: int, what: str = "") -> float:
-    """Odds ratio ``(a * d) / (b * c)`` of a 2 x 2 table of unit counts.
+def call_overlap_statistics(
+    first_called: NDArray,
+    second_called: NDArray,
+    first_peak: NDArray,
+    second_peak: NDArray,
+) -> dict[str, float]:
+    """Whether the same units are called for two event classes.
 
-    ``a`` both called, ``b`` and ``c`` called for one class only, ``d`` neither.
-    An empty off-diagonal cell makes the ratio infinite, so it is refused
-    rather than raise a bare ZeroDivisionError or give a meaningless number.
+    Over the units given, which the caller restricts to those tested for both
+    classes.
 
     Parameters
     ----------
-    a, b, c, d : int
-        The four cells.
-    what : str
-        What the table counts, for the error.
+    first_called, second_called : NDArray of bool, shape (n_units,)
+        Whether each unit is called for the first and for the second class.
+    first_peak, second_peak : NDArray, shape (n_units,)
+        Each unit's peak for the two classes; NaN where a unit has none.
 
     Returns
     -------
-    ratio : float
-
-    Raises
-    ------
-    ValueError
-        If ``b`` or ``c`` is zero.
+    statistics : dict
+        - ``n_tested``: the units given.
+        - ``n_both``, ``n_first_only``, ``n_second_only``, ``n_neither``: those
+          called for both classes, for one only and for neither.
+        - ``n_both_expected``: the units called for both if the two calls were
+          independent: the product of the two called shares, times
+          ``n_tested``. NaN when no unit is given.
+        - ``odds_ratio``: ``n_both * n_neither / (n_first_only *
+          n_second_only)``. NaN when either one-only count is zero: the ratio
+          is then infinite or undefined.
+        - ``rank_correlation``: the Spearman correlation of the two peaks over
+          the units with both peaks. NaN with fewer than three such units.
+        - ``same_sign_fraction_both``: of the units called for both, the share
+          whose two peaks have the same sign (a unit missing a peak counts as
+          not the same). NaN when no unit is called for both.
     """
-    if b * c == 0:
-        raise ValueError(
-            f"odds ratio undefined for {what or 'this table'}: a one-class-only "
-            f"cell is empty (both {a}, one-only {b} and {c}, neither {d})"
+    n = len(first_called)
+    both = first_called & second_called
+    n_both = int(both.sum())
+    n_first_only = int((first_called & ~second_called).sum())
+    n_second_only = int((~first_called & second_called).sum())
+    n_neither = int((~first_called & ~second_called).sum())
+    statistics: dict[str, float] = {
+        "n_tested": n,
+        "n_both": n_both,
+        "n_first_only": n_first_only,
+        "n_second_only": n_second_only,
+        "n_neither": n_neither,
+        "n_both_expected": np.nan,
+        "odds_ratio": np.nan,
+        "rank_correlation": np.nan,
+        "same_sign_fraction_both": np.nan,
+    }
+    if n:
+        statistics["n_both_expected"] = first_called.mean() * second_called.mean() * n
+    if n_first_only and n_second_only:
+        statistics["odds_ratio"] = (n_both * n_neither) / (n_first_only * n_second_only)
+    with_peaks = np.isfinite(first_peak) & np.isfinite(second_peak)
+    if with_peaks.sum() > 2:
+        statistics["rank_correlation"] = stats.spearmanr(
+            first_peak[with_peaks], second_peak[with_peaks]
+        ).statistic
+    if n_both:
+        statistics["same_sign_fraction_both"] = float(
+            (np.sign(first_peak[both]) == np.sign(second_peak[both])).mean()
         )
-    return (a * d) / (b * c)
+    return statistics
 
 
 def replay_class_overlap_statistics(
@@ -529,91 +582,82 @@ def replay_class_overlap_statistics(
         - ``n_tested``: the units tested for both.
         - ``n_both``, ``n_swr_only``, ``n_non_swr_only``, ``n_neither``: those
           called for both classes, for one only and for neither.
-        - ``n_both_expected``: the units called for both if the two calls were
-          independent: the product of the two called shares, times
-          ``n_tested``.
-        - ``odds_ratio``: :func:`odds_ratio` of the four counts, pooled over
-          units.
+        - ``n_both_expected``, ``odds_ratio``, ``rank_correlation``,
+          ``same_sign_fraction_both``: as in :func:`call_overlap_statistics`,
+          SWR-coupled replay first, pooled over the units tested for both.
         - ``odds_ratio_animal_min``, ``odds_ratio_animal_max``: the lowest and
-          highest of the animals' own odds ratios.
+          highest of the animals' own odds ratios, over the animals with a
+          unit tested for both.
         - ``n_animals_odds_ratio_above_one``: animals whose own ratio is above 1.
-        - ``rank_correlation``: the Spearman correlation over units of the two
-          classes' peaks; ``rank_correlation_called``: the same over the units
+        - ``rank_correlation_called``: the rank correlation over the units
           called for either class.
-        - ``same_sign_fraction_both``: of the units called for both, the share
-          whose two peaks have the same sign.
         - ``swr_larger_fraction_called``: of the units called for either, the
-          share whose absolute peak is larger for SWR-coupled replay.
+          share whose absolute peak is larger for SWR-coupled replay (a unit
+          missing a peak counts as not larger).
         - ``abs_peak_median_called_swr``, ``abs_peak_median_called_non_swr``:
-          the median absolute peak for a class over the units called for it.
+          the median absolute peak for a class over the units tested for both
+          that are called for that class and have the peak.
 
     Raises
     ------
     ValueError
-        If no unit, pooled or within an animal, is called for one class only
-        (:func:`odds_ratio`).
+        If the odds ratio of the pooled units or of an animal is undefined:
+        no unit is called for SWR-coupled replay only, or none for non-SWR
+        replay only.
     """
-    swr_p = population[HELDOUT_P_COLUMNS["non_local_SWR"]]
-    non_p = population[HELDOUT_P_COLUMNS["non_local_no_SWR"]]
-    tested = swr_p.notna() & non_p.notna()
+    swr_tested, swr_called = _tested_and_called(
+        population[HELDOUT_P_COLUMNS["non_local_SWR"]], alpha
+    )
+    non_tested, non_called = _tested_and_called(
+        population[HELDOUT_P_COLUMNS["non_local_no_SWR"]], alpha
+    )
+    tested = swr_tested & non_tested
     frame = population[tested]
-    swr_called = (swr_p[tested] < alpha).to_numpy()
-    non_called = (non_p[tested] < alpha).to_numpy()
-    both, swr_only = (
-        int((swr_called & non_called).sum()),
-        int((swr_called & ~non_called).sum()),
-    )
-    non_only, neither = (
-        int((~swr_called & non_called).sum()),
-        int((~swr_called & ~non_called).sum()),
-    )
-    n = int(tested.sum())
+    swr_called, non_called = swr_called[tested], non_called[tested]
+    swr_peak = frame["non_local_SWR: peak_log_modulation"].to_numpy(dtype=float)
+    non_peak = frame["non_local_no_SWR: peak_log_modulation"].to_numpy(dtype=float)
     animals = (
         frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]).to_numpy()
     )
-    per_animal = []
-    for animal in np.unique(animals):
-        sc, nc = swr_called[animals == animal], non_called[animals == animal]
-        per_animal.append(
-            odds_ratio(
-                int((sc & nc).sum()),
-                int((sc & ~nc).sum()),
-                int((~sc & nc).sum()),
-                int((~sc & ~nc).sum()),
-                what=f"animal {animal}",
+    units = (swr_called, non_called, swr_peak, non_peak)
+    pooled = call_overlap_statistics(*units)
+    by_animal = {
+        animal: call_overlap_statistics(*(of[animals == animal] for of in units))
+        for animal in np.unique(animals)
+    }
+    for what, overlap in [
+        ("pooled units", pooled),
+        *((f"animal {animal}", overlap) for animal, overlap in by_animal.items()),
+    ]:
+        if np.isnan(overlap["odds_ratio"]):
+            raise ValueError(
+                f"odds ratio undefined for {what}: a one-class-only cell is empty "
+                f"(both {overlap['n_both']}, one-only {overlap['n_first_only']} "
+                f"and {overlap['n_second_only']}, neither {overlap['n_neither']})"
             )
-        )
-    swr_peak = frame["non_local_SWR: peak_log_modulation"]
-    non_peak = frame["non_local_no_SWR: peak_log_modulation"]
+    animal_ratios = [overlap["odds_ratio"] for overlap in by_animal.values()]
     either = swr_called | non_called
     return {
-        "n_tested": n,
-        "n_both": both,
-        "n_swr_only": swr_only,
-        "n_non_swr_only": non_only,
-        "n_neither": neither,
-        "n_both_expected": swr_called.mean() * non_called.mean() * n,
-        "odds_ratio": odds_ratio(
-            both, swr_only, non_only, neither, what="pooled units"
-        ),
-        "odds_ratio_animal_min": min(per_animal),
-        "odds_ratio_animal_max": max(per_animal),
-        "n_animals_odds_ratio_above_one": sum(r > 1 for r in per_animal),
-        "rank_correlation": stats.spearmanr(swr_peak, non_peak).statistic,
-        "rank_correlation_called": stats.spearmanr(
-            swr_peak[either], non_peak[either]
-        ).statistic,
-        "same_sign_fraction_both": float(
-            (
-                np.sign(swr_peak[swr_called & non_called])
-                == np.sign(non_peak[swr_called & non_called])
-            ).mean()
-        ),
+        "n_tested": pooled["n_tested"],
+        "n_both": pooled["n_both"],
+        "n_swr_only": pooled["n_first_only"],
+        "n_non_swr_only": pooled["n_second_only"],
+        "n_neither": pooled["n_neither"],
+        "n_both_expected": pooled["n_both_expected"],
+        "odds_ratio": pooled["odds_ratio"],
+        "odds_ratio_animal_min": min(animal_ratios),
+        "odds_ratio_animal_max": max(animal_ratios),
+        "n_animals_odds_ratio_above_one": sum(r > 1 for r in animal_ratios),
+        "rank_correlation": pooled["rank_correlation"],
+        "rank_correlation_called": call_overlap_statistics(
+            *(of[either] for of in units)
+        )["rank_correlation"],
+        "same_sign_fraction_both": pooled["same_sign_fraction_both"],
         "swr_larger_fraction_called": float(
-            (swr_peak[either].abs() > non_peak[either].abs()).mean()
+            (np.abs(swr_peak[either]) > np.abs(non_peak[either])).mean()
         ),
-        "abs_peak_median_called_swr": swr_peak[swr_called].abs().median(),
-        "abs_peak_median_called_non_swr": non_peak[non_called].abs().median(),
+        "abs_peak_median_called_swr": np.nanmedian(np.abs(swr_peak[swr_called])),
+        "abs_peak_median_called_non_swr": np.nanmedian(np.abs(non_peak[non_called])),
     }
 
 
@@ -634,17 +678,15 @@ def replay_split_statistics(population: pd.DataFrame) -> dict[str, float]:
         - ``improves_fraction``: of the units with an improvement, the share
           whose improvement is positive.
         - ``best_model_fraction``: of the units with a best model, the share
-          whose best model is the split.
+          whose best model is the split (:func:`best_model_fractions`).
     """
-    split = population[
-        "non_local_SWR + non_local_no_SWR vs. non_local: heldout_delta_dev"
-    ]
-    best = population["min_heldout_model_replay_split"]
+    split_model = "non_local_SWR + non_local_no_SWR"
+    split = population[f"{split_model} vs. non_local: heldout_delta_dev"]
     return {
         "improves_fraction": float((split.dropna() > 0).mean()),
-        "best_model_fraction": float(
-            (best == "non_local_SWR + non_local_no_SWR").sum() / best.notna().sum()
-        ),
+        "best_model_fraction": best_model_fractions(
+            population, [split_model], column="min_heldout_model_replay_split"
+        )[split_model],
     }
 
 
@@ -801,36 +843,31 @@ def swr_without_replay_unit_statistics(
     statistics : pd.DataFrame, shape (2, n_statistics)
         Indexed by group of sessions (``"all"``: every session;
         ``"min_events"``: sessions with at least ``min_events`` SWRs without
-        replay). A statistic over an empty set of units is NaN.
+        replay). A count over an empty set of units is 0; any other statistic
+        over an empty set is NaN.
 
         - ``n_units``: the group's units; ``n_tested``: those tested for SWRs
-          without replay.
-        - ``called_fraction``, ``n_called``: the tested units called for SWRs
-          without replay, as a share and a count (NaN when none is tested).
+          without replay; ``n_called``: those called for them.
+        - ``called_fraction``: ``n_called`` as a share of ``n_tested``.
         - ``n_overlap_tested``: units tested for both SWRs without replay and
-          SWR-coupled replay; ``n_overlap_both``,
-          ``n_overlap_swr_no_replay_only``, ``n_overlap_swr_replay_only``,
-          ``n_overlap_neither``: those called for both, for one only and for
-          neither; ``n_overlap_expected``: the units called for both if the two
-          calls were independent (the product of the two called shares, times
-          ``n_overlap_tested``). All NaN when no unit is tested for both.
-        - ``overlap_odds_ratio``: both times neither, over the product of the
-          two one-only counts (NaN when either is zero).
-        - ``rank_correlation``: the Spearman correlation of the two peaks over
-          the units tested for both with both peaks (NaN with fewer than
-          three).
-        - ``same_sign_fraction``: of the units called for both, the share whose
-          two peaks have the same sign.
+          SWR-coupled replay. Over those units, with SWRs without replay the
+          first class (:func:`call_overlap_statistics`): ``n_overlap_both``,
+          ``n_overlap_swr_no_replay_only``, ``n_overlap_swr_replay_only`` and
+          ``n_overlap_neither`` (its four counts), ``n_overlap_expected`` (its
+          ``n_both_expected``), ``overlap_odds_ratio`` (its ``odds_ratio``),
+          ``rank_correlation`` and ``same_sign_fraction`` (its
+          ``same_sign_fraction_both``).
         - ``abs_peak_median_swr_no_replay``, ``abs_peak_median_swr_replay``:
-          the median over the group's units of each absolute peak;
-          ``rate_multiplier_median_*``: ``exp`` of it;
+          the median of each absolute peak over the group's units with that
+          peak; ``rate_multiplier_median_*``: ``exp`` of it;
           ``abs_peak_median_called_*``: the same median over the units called
-          for SWRs without replay.
+          for SWRs without replay (for both peaks).
         - ``adds_to_split_fraction``: of the units with an improvement of the
           three-class model over the replay split, the share whose
           improvement is positive.
         - ``best_model_fraction``: of the units with a best model, the share
-          whose best model is the three-class model.
+          whose best model is the three-class model
+          (:func:`best_model_fractions`).
 
     Raises
     ------
@@ -838,8 +875,12 @@ def swr_without_replay_unit_statistics(
         If a unit's session is not in ``sessions``.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
-    new_p = population["SWR_no_non_local: p_heldout"].to_numpy(dtype=float)
-    swr_p = population[HELDOUT_P_COLUMNS["non_local_SWR"]].to_numpy(dtype=float)
+    new_tested, new_called = _tested_and_called(
+        population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha
+    )
+    swr_tested, swr_called = _tested_and_called(
+        population[HELDOUT_P_COLUMNS["non_local_SWR"]], alpha
+    )
     new_peak = population["SWR_no_non_local: peak_log_modulation"].to_numpy(dtype=float)
     swr_peak = population["non_local_SWR_3class: peak_log_modulation"].to_numpy(
         dtype=float
@@ -847,7 +888,6 @@ def swr_without_replay_unit_statistics(
     improves = population[
         f"{three_class_model} vs. non_local_SWR + non_local_no_SWR: heldout_delta_dev"
     ].to_numpy(dtype=float)
-    best = population["min_heldout_model_three_class"]
 
     columns = [
         "n_units",
@@ -875,39 +915,28 @@ def swr_without_replay_unit_statistics(
     rows = {}
     for subset, keep in subsets.items():
         row: dict[str, float] = dict.fromkeys(columns, np.nan)
-        tested = keep & np.isfinite(new_p)
-        called = tested & (new_p < alpha)
+        tested, called = keep & new_tested, keep & new_called
         row["n_units"] = int(keep.sum())
         row["n_tested"] = int(tested.sum())
+        row["n_called"] = int(called.sum())
         if tested.any():
             row["called_fraction"] = called.sum() / tested.sum()
-            row["n_called"] = int(called.sum())
-        both_tested = tested & np.isfinite(swr_p)
-        a = called & (swr_p < alpha)
-        b = called & ~(swr_p < alpha) & both_tested
-        c = both_tested & ~called & (swr_p < alpha)
-        d = both_tested & ~called & ~(swr_p < alpha)
-        n_both = int(both_tested.sum())
-        if n_both:
-            row["n_overlap_tested"] = n_both
-            row["n_overlap_both"] = int(a.sum())
-            row["n_overlap_swr_no_replay_only"] = int(b.sum())
-            row["n_overlap_swr_replay_only"] = int(c.sum())
-            row["n_overlap_neither"] = int(d.sum())
-            row["n_overlap_expected"] = (
-                (a | b)[both_tested].mean() * (a | c)[both_tested].mean() * n_both
-            )
-            if b.sum() and c.sum():
-                row["overlap_odds_ratio"] = (a.sum() * d.sum()) / (b.sum() * c.sum())
-            finite = both_tested & np.isfinite(new_peak) & np.isfinite(swr_peak)
-            if finite.sum() > 2:
-                row["rank_correlation"] = stats.spearmanr(
-                    new_peak[finite], swr_peak[finite]
-                ).statistic
-            if a.sum():
-                row["same_sign_fraction"] = float(
-                    (np.sign(new_peak[a]) == np.sign(swr_peak[a])).mean()
-                )
+        both_tested = tested & swr_tested
+        overlap = call_overlap_statistics(
+            called[both_tested],
+            swr_called[both_tested],
+            new_peak[both_tested],
+            swr_peak[both_tested],
+        )
+        row["n_overlap_tested"] = overlap["n_tested"]
+        row["n_overlap_both"] = overlap["n_both"]
+        row["n_overlap_swr_no_replay_only"] = overlap["n_first_only"]
+        row["n_overlap_swr_replay_only"] = overlap["n_second_only"]
+        row["n_overlap_neither"] = overlap["n_neither"]
+        row["n_overlap_expected"] = overlap["n_both_expected"]
+        row["overlap_odds_ratio"] = overlap["odds_ratio"]
+        row["rank_correlation"] = overlap["rank_correlation"]
+        row["same_sign_fraction"] = overlap["same_sign_fraction_both"]
         for word, peak in (("swr_no_replay", new_peak), ("swr_replay", swr_peak)):
             finite = keep & np.isfinite(peak)
             if not finite.any():
@@ -925,11 +954,11 @@ def swr_without_replay_unit_statistics(
             row["adds_to_split_fraction"] = float(
                 (improves[improves_finite] > 0).mean()
             )
-        best_known = keep & best.notna().to_numpy()
-        if best_known.any():
-            row["best_model_fraction"] = float(
-                (best[best_known] == three_class_model).mean()
-            )
+        row["best_model_fraction"] = best_model_fractions(
+            population[keep],
+            [three_class_model],
+            column="min_heldout_model_three_class",
+        )[three_class_model]
         rows[subset] = row
     return pd.DataFrame.from_dict(rows, orient="index", columns=columns)
 
@@ -964,17 +993,17 @@ def swr_without_replay_called_by_animal(
         its tested units.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
-    new_p = population["SWR_no_non_local: p_heldout"].to_numpy(dtype=float)
+    new_tested, new_called = _tested_and_called(
+        population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha
+    )
     animals = population["animal"].to_numpy()
     index, fractions = [], []
     for subset, keep in subsets.items():
-        tested = keep & np.isfinite(new_p)
-        called = tested & (new_p < alpha)
-        if tested.any():
-            for animal in np.unique(animals[tested]):
-                own = tested & (animals == animal)
-                index.append((subset, animal))
-                fractions.append(called[own].sum() / own.sum())
+        tested = keep & new_tested
+        for animal in np.unique(animals[tested]):
+            own = tested & (animals == animal)
+            index.append((subset, animal))
+            fractions.append(new_called[own].sum() / own.sum())
     return pd.DataFrame(
         {"called_fraction": fractions},
         index=pd.MultiIndex.from_arrays(
@@ -1037,12 +1066,12 @@ def swr_without_replay_timing_statistics(
           the direction has no unit.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
-    new_p = population["SWR_no_non_local: p_heldout"].to_numpy(dtype=float)
+    _, new_called = _tested_and_called(population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha)
     days = population["nwb_file_name"].astype(str).to_numpy()
     peak = peak_and_onset(curves, lag_time).peak
     rows = {}
     for subset, keep in subsets.items():
-        called = keep & (new_p < alpha)
+        called = keep & new_called
         for direction, sign in DIRECTIONS.items():
             chosen = called & (np.sign(peak) == sign)
             rows[(subset, direction)] = {

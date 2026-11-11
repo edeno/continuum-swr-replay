@@ -86,14 +86,3 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
             "marked_content_current_arm_swr_replay_heldout_gain_fraction"
         ].description
     )
-
-
-def test_odds_ratio_refuses_an_empty_one_class_cell():
-    import pytest
-
-    from continuum_swr_replay.analysis.pfc.population_statistics import odds_ratio
-
-    assert odds_ratio(4, 2, 2, 8) == 8.0
-    assert odds_ratio(0, 2, 2, 8) == 0.0
-    with pytest.raises(ValueError, match="animal x: a one-class-only cell is empty"):
-        odds_ratio(3, 0, 2, 8, what="animal x")

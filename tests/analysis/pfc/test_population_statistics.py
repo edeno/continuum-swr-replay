@@ -152,13 +152,19 @@ def test_bh_called_fraction_adjusts_the_tested_units_p_values():
     assert stats.bh_called_fraction(population, "engagement", ALPHA) == 0.25
 
 
-def test_best_model_fractions_are_shares_of_every_unit():
+def test_best_model_fractions_are_shares_of_the_units_with_a_best_model():
     population = pd.DataFrame({"min_heldout_model": ["constant", "SWR", "SWR", None]})
     fractions = stats.best_model_fractions(population, ["constant", "SWR", "non_local"])
-    # the unit with no best model stays in the denominator
-    assert fractions == {"constant": 0.25, "SWR": 0.5, "non_local": 0.0}
+    # the unit with no best model is left out: three units, not four
+    assert fractions == {
+        "constant": pytest.approx(1 / 3),
+        "SWR": pytest.approx(2 / 3),
+        "non_local": 0.0,
+    }
     other = pd.DataFrame({"best": ["a", "b"]})
     assert stats.best_model_fractions(other, ["a"], column="best") == {"a": 0.5}
+    nobody = pd.DataFrame({"best": [None, None]})
+    assert np.isnan(stats.best_model_fractions(nobody, ["a"], column="best")["a"])
 
 
 def test_units_at_or_above_rate_keep_the_cutoff_itself():
@@ -236,10 +242,71 @@ def test_unmatchable_event_statistics_refuse_a_table_without_events():
 # --- SWR-coupled against non-SWR replay ---------------------------------------------
 
 
-def test_odds_ratio_of_a_two_by_two_table():
-    assert stats.odds_ratio(3, 2, 2, 5) == 3.75
-    with pytest.raises(ValueError, match="odds ratio undefined for this table"):
-        stats.odds_ratio(3, 2, 0, 5)
+def _calls(first: str, second: str) -> tuple[np.ndarray, np.ndarray]:
+    """Two boolean arrays from two strings of ``1`` (called) and ``0``."""
+    return (
+        np.array([c == "1" for c in first]),
+        np.array([c == "1" for c in second]),
+    )
+
+
+def test_call_overlap_statistics_of_two_calls():
+    # seven units: 2 called for both, 3 for the first only, 1 for the second
+    # only, 1 for neither
+    first, second = _calls("1111100", "1100010")
+    first_peak = np.array([1.0, -2.0, 0.5, NAN, 3.0, 0.2, -0.4])
+    second_peak = np.array([0.5, 1.0, 0.7, 0.1, 0.9, NAN, -0.3])
+    result = stats.call_overlap_statistics(first, second, first_peak, second_peak)
+    assert result["n_tested"] == 7
+    assert (
+        result["n_both"],
+        result["n_first_only"],
+        result["n_second_only"],
+        result["n_neither"],
+    ) == (2, 3, 1, 1)
+    # 5 of 7 are called for the first class and 3 of 7 for the second
+    assert result["n_both_expected"] == pytest.approx(7 * (5 / 7) * (3 / 7))
+    # both times neither over the two one-only counts: (2 * 1) / (3 * 1)
+    assert result["odds_ratio"] == pytest.approx(2 / 3)
+    # Units 3 and 5 miss a peak. Ranks of the other five (0, 1, 2, 4, 6):
+    #   first: 4, 1, 3, 5, 2; second: 2, 5, 3, 4, 1
+    # squared rank differences sum to 4 + 16 + 0 + 1 + 1 = 22
+    assert result["rank_correlation"] == pytest.approx(1 - 6 * 22 / (5 * 24))
+    # of units 0 and 1, called for both, unit 1's peaks have opposite signs
+    assert result["same_sign_fraction_both"] == 0.5
+
+
+def test_call_overlap_statistics_without_a_one_only_unit_has_no_odds_ratio():
+    peak = np.arange(4.0)
+    # no unit is called for the second class only
+    first, second = _calls("1110", "1000")
+    assert np.isnan(
+        stats.call_overlap_statistics(first, second, peak, peak)["odds_ratio"]
+    )
+    # nor, the other way round, for the first only
+    assert np.isnan(
+        stats.call_overlap_statistics(second, first, peak, peak)["odds_ratio"]
+    )
+    # with one of each the ratio is defined, and zero when none is called for both
+    first, second = _calls("1100", "0110")
+    assert stats.call_overlap_statistics(first, second, peak, peak)["odds_ratio"] == 1.0
+    first, second = _calls("1000", "0110")
+    assert stats.call_overlap_statistics(first, second, peak, peak)["odds_ratio"] == 0.0
+
+
+def test_call_overlap_statistics_over_too_few_units_are_missing():
+    # two units with both peaks: no rank correlation; none called for both
+    first, second = _calls("100", "010")
+    result = stats.call_overlap_statistics(
+        first, second, np.array([1.0, 2.0, NAN]), np.array([2.0, 1.0, 3.0])
+    )
+    assert np.isnan(result["rank_correlation"])
+    assert np.isnan(result["same_sign_fraction_both"])
+    nobody = np.zeros(0, dtype=bool)
+    nothing = stats.call_overlap_statistics(nobody, nobody, np.zeros(0), np.zeros(0))
+    assert (nothing["n_tested"], nothing["n_both"], nothing["n_neither"]) == (0, 0, 0)
+    assert np.isnan(nothing["n_both_expected"])
+    assert np.isnan(nothing["odds_ratio"])
 
 
 #: (animal's file, p SWR-coupled, p non-SWR, peak SWR-coupled, peak non-SWR)
@@ -320,7 +387,11 @@ def test_replay_class_overlap_statistics_on_twelve_tested_units():
 def test_replay_class_overlap_statistics_refuse_an_animal_without_a_one_only_unit():
     # without unit 7, wilbur has no unit called for SWR-coupled replay only
     units = [unit for i, unit in enumerate(_OVERLAP_UNITS) if i != 7]
-    with pytest.raises(ValueError, match="odds ratio undefined for animal wilbur"):
+    with pytest.raises(
+        ValueError,
+        match=r"odds ratio undefined for animal wilbur: a one-class-only cell is "
+        r"empty \(both 1, one-only 0 and 1, neither 3\)",
+    ):
         stats.replay_class_overlap_statistics(_overlap_population(units), ALPHA)
 
 
@@ -523,8 +594,12 @@ def test_swr_without_replay_unit_statistics_are_missing_over_no_units():
         min_events=31,
         three_class_model=THREE_CLASS,
     ).loc["min_events"]
-    assert (result["n_units"], result["n_tested"]) == (0, 0)
-    assert result.drop(["n_units", "n_tested"]).isna().all()
+    counts = ["n_units", "n_tested", "n_called", "n_overlap_tested"] + [
+        f"n_overlap_{cell}"
+        for cell in ("both", "swr_no_replay_only", "swr_replay_only", "neither")
+    ]
+    assert (result[counts] == 0).all()
+    assert result.drop(counts).isna().all()
 
 
 def test_swr_without_replay_statistics_refuse_a_unit_of_an_unknown_session():
