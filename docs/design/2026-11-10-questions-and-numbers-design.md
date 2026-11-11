@@ -121,6 +121,12 @@ The mpfc summary followed the same day: `analysis/pfc/population_statistics.py`,
 and the timing statistics in `analysis/pfc/timing.py`. All 604 values are
 bit-identical before and after, on the cluster's data.
 
+## As built: the held-out split's script (2026-11-11)
+
+The held-out test split by SWR (question 2c.3) was made by the tracked
+`scripts/detection/split_state_evidence_by_swr.py` at `e78273b5` with no
+uncommitted change (its provenance file), so its ten values stand.
+
 ## As built: naming (2026-11-11)
 
 - **Summaries are named for what they hold:** `survey`, `detection`, `events`,

@@ -514,6 +514,8 @@ Sources:
 
 Status: computed. Figures: 2. Values: 65.
 
+*Note:* The held-out test split by SWR (the heldout_* values) was made by the tracked scripts/detection/split_state_evidence_by_swr.py at commit e78273b5 (the run's provenance file, read 2026-11-11); the retired claims table called these values pending.
+
 Sources:
 
 - Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
