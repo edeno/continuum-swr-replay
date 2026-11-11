@@ -8,7 +8,6 @@ import pytest
 
 from continuum_swr_replay.reported.behavior import (
     current_arm_paired_values,
-    trunk_shares,
     trunk_values,
 )
 
@@ -38,32 +37,16 @@ def _arm_table() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_trunk_shares_split_by_the_current_patch():
-    events = trunk_shares(_arm_table()).set_index("event_id")
-    assert events.loc["a-0", "trunk"] == pytest.approx(0.2)
-    assert events.loc["a-0", "current_patch_trunk"] == pytest.approx(0.1)
-    assert events.loc["a-1", "current_patch_trunk"] == pytest.approx(0.2)
-    assert events.loc["a-1", "other_trunks"] == pytest.approx(0.3)
-
-
 def test_trunk_values_summarize_over_animals():
-    values = {v.key: v.value for v in trunk_values(_arm_table(), "x")}
-    assert values["trunk_share_swr"] == pytest.approx(0.5)
-    assert values["trunk_share_non_swr"] == pytest.approx(0.2)
-    assert values["trunk_share_animals_swr_higher"] == 3
-    assert values["trunk_share_current_patch_swr"] == pytest.approx(0.2)
-    assert values["trunk_share_other_patches_non_swr"] == pytest.approx(0.1)
-    assert values["trunk_current_patch_fraction_swr"] == pytest.approx(0.4)
-    assert values["trunk_current_patch_fraction_non_swr"] == pytest.approx(0.5)
-
-
-def test_an_event_without_one_current_arm_is_left_out():
-    table = _arm_table()
-    table.loc[
-        (table["event_id"] == "a-1") & (table["candidate_arm"] == 3), "is_current_arm"
-    ] = 1
-    events = trunk_shares(table)
-    assert "a-1" not in set(events["event_id"])
+    values = {v.key: v for v in trunk_values(_arm_table(), "x")}
+    assert values["trunk_share_swr"].value == pytest.approx(0.5)
+    assert "over the 3 animals" in values["trunk_share_swr"].description
+    assert values["trunk_share_non_swr"].value == pytest.approx(0.2)
+    assert values["trunk_share_animals_swr_higher"].value == 3
+    assert values["trunk_share_current_patch_swr"].value == pytest.approx(0.2)
+    assert values["trunk_share_other_patches_non_swr"].value == pytest.approx(0.1)
+    assert values["trunk_current_patch_fraction_swr"].value == pytest.approx(0.4)
+    assert values["trunk_current_patch_fraction_non_swr"].value == pytest.approx(0.5)
 
 
 def _fits(differences: dict[str, list[float]]) -> pd.DataFrame:
@@ -110,4 +93,5 @@ def test_paired_difference_drops_a_session_missing_one_split():
     )
     values = current_arm_paired_values(fits, "x")
     assert "25 sessions" in values[0].description
+    assert "over the 5 animals" in values[0].description
     assert np.isclose(values[0].value, 0.2)

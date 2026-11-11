@@ -65,7 +65,11 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_event_cohort,
     select_stop_cohort,
 )
-from continuum_swr_replay.analysis.replay import rate_fit_statistics, stop_statistics
+from continuum_swr_replay.analysis.replay import (
+    content_statistics,
+    rate_fit_statistics,
+    stop_statistics,
+)
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     aic_difference_statistics,
     audited_drop_statistics,
@@ -98,10 +102,6 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     TMAX,
-)
-from continuum_swr_replay.data_loaders.constants import (
-    TRACK_SEGMENT_TO_PATCH,
-    WELL_PATCH_MAPPING,
 )
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
@@ -1408,61 +1408,6 @@ def stop_table_values(
     return values
 
 
-#: Trunk arm of each patch (``TRACK_SEGMENT_TO_PATCH``): patch -> trunk arm.
-PATCH_TRUNK = {
-    patch: arm
-    for arm, patch in TRACK_SEGMENT_TO_PATCH.items()
-    if arm not in WELL_PATCH_MAPPING
-}
-#: The event-arm columns the trunk values read.
-TRUNK_COLUMNS = ["animal", "event_id", "is_swr", "candidate_arm", "is_current_arm"]
-TRUNK_RESPONSE = "arm_fraction"
-
-
-def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
-    """Each event's content share on the trunks, split by the current patch.
-
-    Parameters
-    ----------
-    arm : pd.DataFrame
-        The event-arm table on the content contrast's cohort (at-well events):
-        one row per event x candidate arm, with :data:`TRUNK_COLUMNS` and
-        ``arm_fraction``.
-
-    Returns
-    -------
-    pd.DataFrame
-        One row per event with exactly one current arm: ``animal``, ``is_swr``,
-        ``trunk`` (share on arms 6-8), ``current_patch_trunk`` (the trunk of the
-        patch holding the current arm) and ``other_trunks`` (the other two).
-    """
-    arm = arm[arm["is_swr"].notna()]
-    current = arm.loc[arm["is_current_arm"] == 1, ["event_id", "candidate_arm"]]
-    current = current[~current["event_id"].duplicated(keep=False)]
-    trunk_of = current.set_index("event_id")["candidate_arm"].map(
-        lambda a: PATCH_TRUNK[TRACK_SEGMENT_TO_PATCH[int(a)]]
-    )
-    arm = arm[arm["event_id"].isin(trunk_of.index)]
-    on_trunk = arm["candidate_arm"].isin(PATCH_TRUNK.values())
-    on_current = (
-        arm["candidate_arm"].to_numpy() == arm["event_id"].map(trunk_of).to_numpy()
-    )
-    share = arm[TRUNK_RESPONSE].astype(float)
-    frame = pd.DataFrame(
-        {
-            "event_id": arm["event_id"],
-            "trunk": share.where(on_trunk, 0.0),
-            "current_patch_trunk": share.where(on_trunk & on_current, 0.0),
-        }
-    )
-    events = frame.groupby("event_id", sort=False).sum()
-    events["other_trunks"] = events["trunk"] - events["current_patch_trunk"]
-    meta = arm.drop_duplicates("event_id").set_index("event_id")[["animal", "is_swr"]]
-    events = events.join(meta)
-    events["is_swr"] = events["is_swr"].astype(bool)
-    return events.reset_index()
-
-
 def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
     """Question 3.1: SWR content shifts onto the trunk arms, and which trunk.
 
@@ -1470,10 +1415,9 @@ def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
     median over animals, with the animals where the SWR share is higher.
     """
     make = value_factory(trunk_values, source, TAGS["anchoring"])
-    events = trunk_shares(arm)
-    per_animal = events.groupby(["animal", "is_swr"])[
-        ["trunk", "current_patch_trunk", "other_trunks"]
-    ].mean()
+    events = content_statistics.trunk_shares(arm)
+    shares = content_statistics.trunk_share_statistics(events)
+    current_patch = content_statistics.current_patch_trunk_fraction(events)
     values: list[Value] = []
     labels = {
         "trunk": "all three trunks",
@@ -1484,19 +1428,18 @@ def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
         word = {"trunk": "", "current_patch_trunk": "_current_patch"}.get(
             column, "_other_patches"
         )
-        table = per_animal[column].unstack("is_swr")
         values += [
             make(
                 f"trunk_share{word}_swr",
-                table[True].median(),
+                shares.loc[column, "swr_median"],
                 "fraction",
                 "pct",
                 f"SWR events: mean share of an event's content on {label}, median "
-                f"over the {len(table)} animals (at-well events)",
+                f"over the {shares.loc[column, 'n_animals']} animals (at-well events)",
             ),
             make(
                 f"trunk_share{word}_non_swr",
-                table[False].median(),
+                shares.loc[column, "non_swr_median"],
                 "fraction",
                 "pct",
                 f"non-SWR events: mean share of an event's content on {label}, "
@@ -1504,18 +1447,17 @@ def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"trunk_share{word}_animals_swr_higher",
-                int((table[True] > table[False]).sum()),
+                shares.loc[column, "n_animals_swr_higher"],
                 "count",
                 "count",
                 f"animals whose SWR share on {label} is above their non-SWR share",
             ),
         ]
     for flag, word in ((True, "swr"), (False, "non_swr")):
-        means = per_animal.xs(flag, level="is_swr")
         values.append(
             make(
                 f"trunk_current_patch_fraction_{word}",
-                (means["current_patch_trunk"] / means["trunk"]).median(),
+                current_patch[word],
                 "fraction",
                 "pct",
                 f"{'SWR' if flag else 'non-SWR'} events: the current patch's trunk "
@@ -1999,13 +1941,14 @@ def breadth_derived_values(
 ) -> list[Value]:
     """Question 3.1: what the concentration contrast means, and event length."""
     make = value_factory(breadth_derived_values, source, TAGS["anchoring"])
-    total = values["dm_breadth"].value
-    adjusted = values["dm_breadth_length_adjusted"].value
-    bins = events.groupby("is_swr")["n_nonlocal_bins"].median()
+    contrast = content_statistics.concentration_contrast_statistics(
+        values["dm_breadth"].value, values["dm_breadth_length_adjusted"].value
+    )
+    length = content_statistics.event_length_statistics(events)
     return [
         make(
             "dm_breadth_ratio",
-            np.exp(total),
+            contrast["ratio"],
             "quantity",
             "sig2",
             "exp of the concentration contrast log_phi_is_swr on C2_base: an SWR event's Dirichlet concentration over a non-SWR event's",
@@ -2013,7 +1956,7 @@ def breadth_derived_values(
         ),
         make(
             "dm_breadth_length_adjusted_ratio",
-            np.exp(adjusted),
+            contrast["length_adjusted_ratio"],
             "quantity",
             "sig2",
             "the same with the length-dependent concentration",
@@ -2021,14 +1964,14 @@ def breadth_derived_values(
         ),
         make(
             "dm_breadth_length_share",
-            1 - adjusted / total,
+            contrast["length_share"],
             "fraction",
             "pct",
             "share of the concentration contrast that the length term absorbs: 1 - adjusted / total",
         ),
         make(
             "event_bins_median_swr",
-            bins[True],
+            length["median_bins_swr"],
             "quantity",
             "int",
             "median non-local bins of SWR-overlapping events (event table)",
@@ -2036,7 +1979,7 @@ def breadth_derived_values(
         ),
         make(
             "event_bins_median_non_swr",
-            bins[False],
+            length["median_bins_non_swr"],
             "quantity",
             "int",
             "median non-local bins of non-SWR events (event table)",
@@ -2044,7 +1987,7 @@ def breadth_derived_values(
         ),
         make(
             "event_bins_median",
-            events["n_nonlocal_bins"].median(),
+            length["median_bins"],
             "quantity",
             "int",
             "median non-local bins per event, all events (event table)",
@@ -2052,7 +1995,7 @@ def breadth_derived_values(
         ),
         make(
             "event_bins_ratio",
-            bins[True] / bins[False],
+            length["swr_to_non_swr_ratio"],
             "quantity",
             "sig2",
             "ratio of those medians",
@@ -3053,7 +2996,9 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     )
     content = content_contrast_values(audited, sources)
     summary.add(*pend(content, content_stale))
-    events = pd.read_parquet(inputs.event_table, columns=["is_swr", "n_nonlocal_bins"])
+    events = pd.read_parquet(
+        inputs.event_table, columns=["animal", "is_swr", "n_nonlocal_bins"]
+    )
     summary.add(
         *pend(
             breadth_derived_values(
@@ -3148,7 +3093,11 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     arm, _ = select_event_cohort(
         pd.read_parquet(
             inputs.event_arm_table,
-            columns=[*TRUNK_COLUMNS, TRUNK_RESPONSE, "occupancy_state"],
+            columns=[
+                *content_statistics.TRUNK_COLUMNS,
+                content_statistics.TRUNK_RESPONSE,
+                "occupancy_state",
+            ],
         ),
         cohort="at_well",
     )
