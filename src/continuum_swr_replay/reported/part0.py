@@ -62,7 +62,8 @@ PARAMETER_COLUMNS: tuple[str, ...] = tuple(
 )
 """The survey columns :data:`PARAMETERS` reads, in order."""
 
-_BARE_NUMBER = re.compile(r"\d+(\.\d+)?")
+_NUMBER = r"\d+(\.\d+)?"
+_BARE_NUMBER = re.compile(_NUMBER)
 
 #: The forms of a parameter cell that are not a bare number and are left out.
 #: Each pattern must match the whole (stripped) cell.
@@ -70,8 +71,8 @@ EXCLUDED_FORMS: dict[str, re.Pattern[str]] = {
     "missing marker": re.compile(
         f"{re.escape(literature.NOT_APPLICABLE)}|{re.escape(literature.NOT_REPORTED)}"
     ),
-    "bound": re.compile(r"[<>≥≤]\s*\d+(\.\d+)?"),
-    "range": re.compile(r"\d+(\.\d+)?\s*-\s*\d+(\.\d+)?"),
+    "bound": re.compile(rf"[<>≥≤]\s*{_NUMBER}"),
+    "range": re.compile(rf"{_NUMBER}\s*-\s*{_NUMBER}"),
     "share": re.compile(r".*(%|\d+/\d+ of ).*"),
     "adaptive": re.compile(r"Adaptive\b.*"),
     "annotated": re.compile(r"[^()]*\d[^()]*\(.+\)"),
