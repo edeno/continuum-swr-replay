@@ -230,12 +230,13 @@ def test_fits_without_a_standard_error_use_their_p_values():
 
 def test_the_exp_median_ratio_divides_each_fit_s_own_gated_session_median():
     log = np.log
-    # a: session median log 4 (its median over animals is log 8); the runaway
-    # fit is left out. b: log 2.
-    a = _fits([log(4), log(4), log(4), log(16), 500.0], ["a", "a", "a", "b", "b"])
+    # a: session median log 6 (its median over animals is log sqrt(96)); the
+    # runaway fit is left out. b: log 2. The ratio of the exps is 3; the ratio
+    # of the medians themselves, log 6 / log 2, is 2.58.
+    a = _fits([log(6), log(6), log(6), log(16), 500.0], ["a", "a", "a", "b", "b"])
     b = _fits([log(1), log(2), log(4)], ["a", "b", "c"])
-    assert stats.gated_exp_median_ratio(a, b, "x") == pytest.approx(2.0)
-    assert stats.gated_exp_median_ratio(b, a, "x") == pytest.approx(0.5)
+    assert stats.gated_exp_median_ratio(a, b, "x") == pytest.approx(3.0)
+    assert stats.gated_exp_median_ratio(b, a, "x") == pytest.approx(1 / 3)
 
 
 # --- one coefficient in two fits of the same sessions ---------------------------------

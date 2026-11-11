@@ -129,11 +129,12 @@ def _intercepts(rates) -> pd.DataFrame:
 
 
 def test_the_baseline_rate_is_exp_of_the_intercept_over_sessions():
-    fits = _intercepts([1.0, 2.0, 3.0, 4.0, NAN])
+    # rates 1, 2, 3, 10: the median is 2.5 and the mean 4
+    fits = _intercepts([1.0, 2.0, 3.0, 10.0, NAN])
     result = stats.baseline_rate_statistics(fits)
     assert result["median"] == pytest.approx(2.5)
-    assert result["lower_quartile"] == pytest.approx(1.75)
-    assert result["upper_quartile"] == pytest.approx(3.25)
+    assert result["lower_quartile"] == pytest.approx(1.75)  # 1 + 0.75 * (2 - 1)
+    assert result["upper_quartile"] == pytest.approx(4.75)  # 3 + 0.25 * (10 - 3)
     assert result["events_per_bin"] == pytest.approx(0.0375)  # 2.5 per s * 15 ms
 
 
@@ -149,16 +150,18 @@ def test_the_baseline_statistics_refuse_two_fits_of_one_session():
 
 
 def test_the_baseline_ratio_is_within_session():
-    # ratios 2, 4, 4, 8 in the four sessions both populations fit: median 4
-    a = _intercepts([2.0, 4.0, 8.0, 16.0, 5.0, 7.0])
-    b = _intercepts([1.0, 1.0, 2.0, 2.0, NAN])
+    # Ratios 2, 3, 4, 10, 1.5 in the five sessions both populations fit: median
+    # 3. The ratio of the populations' own medians over those sessions is
+    # 8 / 3.
+    a = _intercepts([2.0, 9.0, 8.0, 30.0, 6.0, 5.0, 7.0])
+    b = _intercepts([1.0, 3.0, 2.0, 3.0, 4.0, NAN])
     result = stats.baseline_rate_ratio_statistics(a, b)
-    assert result["n_sessions"] == 4
-    assert result["median_ratio"] == pytest.approx(4.0)
-    # all four differences positive: two-sided exact p = 2 / 2 ** 4
-    assert result["signed_rank_p"] == pytest.approx(0.125)
+    assert result["n_sessions"] == 5
+    assert result["median_ratio"] == pytest.approx(3.0)
+    # all five differences positive: two-sided exact p = 2 / 2 ** 5
+    assert result["signed_rank_p"] == pytest.approx(0.0625)
     assert stats.baseline_rate_ratio_statistics(b, a)["median_ratio"] == pytest.approx(
-        0.25
+        1 / 3
     )
 
 
