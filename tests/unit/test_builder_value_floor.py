@@ -49,20 +49,22 @@ def _trials(end_times, is_reward, to_well=None) -> pd.DataFrame:
 def test_recent_trial_reward_rate_includes_experience_on_cutoff():
     """side='right' counts the experience whose outcome is known exactly at the
     query time; side='left' would drop it. (history/ recent_trial_reward_rate)"""
-    pe = port_experiences_from_trials(_trials([1.0, 2.0, 3.0], [1, 0, 1]),
-                                      prepend_initial=False)
+    pe = port_experiences_from_trials(
+        _trials([1.0, 2.0, 3.0], [1, 0, 1]), prepend_initial=False
+    )
     out = recent_trial_reward_rate(np.array([2.0]), pe, k=10)
-    assert out[0] == 0.5   # mean([1, 0]); a 'left' flip would give 1.0
+    assert out[0] == 0.5  # mean([1, 0]); a 'left' flip would give 1.0
 
 
 def test_lagged_trial_rewards_lag1_is_current_outcome_on_cutoff():
     """On the cutoff, lag1 is the current outcome (side='right'); a 'left' flip
     shifts every lag back one. (history/ lagged_trial_rewards)"""
-    pe = port_experiences_from_trials(_trials([1.0, 2.0, 3.0], [1, 0, 1]),
-                                      prepend_initial=False)
+    pe = port_experiences_from_trials(
+        _trials([1.0, 2.0, 3.0], [1, 0, 1]), prepend_initial=False
+    )
     out = lagged_trial_rewards(np.array([2.0]), pe, k=3)
-    assert out[0, 0] == 0.0   # lag1 = the t=2 outcome (r=0); 'left' -> 1.0
-    assert out[0, 1] == 1.0   # lag2 = the t=1 outcome (r=1)
+    assert out[0, 0] == 0.0  # lag1 = the t=2 outcome (r=0); 'left' -> 1.0
+    assert out[0, 1] == 1.0  # lag2 = the t=1 outcome (r=1)
     assert np.isnan(out[0, 2])  # only two outcomes are known by t=2
 
 
@@ -73,8 +75,8 @@ def test_rolling_reward_count_counts_arm_reward_on_cutoff():
         _trials([1.0, 2.0], [1, 1], to_well=[0, 1]), prepend_initial=False
     )
     out = rolling_reward_count_all_events(np.array([2.0]), pe, _WELL_TO_ARM, window=10)
-    assert out[0, 1] == 1.0   # arm 1 (well 1) reward at t=2 counted; 'left' -> 0
-    assert out[0, 0] == 1.0   # arm 0 reward at t=1 counted
+    assert out[0, 1] == 1.0  # arm 1 (well 1) reward at t=2 counted; 'left' -> 0
+    assert out[0, 0] == 1.0  # arm 0 reward at t=1 counted
 
 
 def test_visit_recency_counts_arrival_on_cutoff():
@@ -86,7 +88,7 @@ def test_visit_recency_counts_arrival_on_cutoff():
     _recency, never = visit_recency_and_never_visited_all_events(
         np.array([2.0]), pe, _WELL_TO_ARM
     )
-    assert never[0, 1] == 0.0   # well 1 arrived at t=2 -> visited; 'left' -> 1.0
+    assert never[0, 1] == 0.0  # well 1 arrived at t=2 -> visited; 'left' -> 1.0
 
 
 # ── merge how='left' : missing stops survive as NaN, not dropped ──
@@ -104,9 +106,9 @@ def test_attach_arm_uncertainty_left_join_keeps_missing_stop_as_nan():
     a right-join flip would drop it and misalign every row.
     (history/ attach_arm_uncertainty)"""
     arm = np.array([0, 0])
-    stop_id = np.array([1, 2])          # stop 2 is not in the contingency
+    stop_id = np.array([1, 2])  # stop 2 is not in the contingency
     out = attach_arm_uncertainty(arm, stop_id, _contingency([1]))
-    assert len(out) == 2                # left join preserves both query rows
+    assert len(out) == 2  # left join preserves both query rows
     assert out[0] == 0.1
     assert np.isnan(out[1])
 
@@ -116,8 +118,8 @@ def test_attach_arm_uncertainty_trunk_arm_takes_zero_not_a_leaf_value():
     leaf variance. `arm < len(WELL_ARMS)` must stay strict `<`.
     (history/ attach_arm_uncertainty leaf/trunk split)"""
     out = attach_arm_uncertainty(np.array([0, 6]), np.array([1, 1]), _contingency([1]))
-    assert out[0] == 0.1   # leaf arm 0
-    assert out[1] == 0.0   # trunk arm 6 present in contingency -> 0.0, not 0.1
+    assert out[0] == 0.1  # leaf arm 0
+    assert out[1] == 0.0  # trunk arm 6 present in contingency -> 0.0, not 0.1
 
 
 def test_attach_arm_uncertainty_rejects_out_of_range_variance():
@@ -139,7 +141,7 @@ def test_recent_trial_reward_rate_denominator_is_window_size():
         _trials([1.0, 2.0, 3.0, 4.0, 5.0], [0, 0, 0, 1, 1]), prepend_initial=False
     )
     out = recent_trial_reward_rate(np.array([6.0]), pe, k=2)
-    assert out[0] == 1.0   # last two are rewarded -> 2/2; a wrong denominator gives 0.25
+    assert out[0] == 1.0  # last two are rewarded -> 2/2; a wrong denominator gives 0.25
 
 
 def _hand_experiences(arrival, outcome, is_reward, ports) -> pd.DataFrame:
@@ -155,8 +157,11 @@ def _hand_experiences(arrival, outcome, is_reward, ports) -> pd.DataFrame:
             "patch": [1 + p // 2 for p in ports],
             "arrival_time": np.asarray(arrival, dtype=float),
             "departure_time": np.asarray(arrival, dtype=float) + 0.1,
-            "reward_on_time": np.where(np.asarray(is_reward, dtype=bool),
-                                       np.asarray(outcome, dtype=float), np.nan),
+            "reward_on_time": np.where(
+                np.asarray(is_reward, dtype=bool),
+                np.asarray(outcome, dtype=float),
+                np.nan,
+            ),
             "outcome_known_time": np.asarray(outcome, dtype=float),
             "is_reward": np.asarray(is_reward, dtype=bool),
         }
@@ -192,7 +197,9 @@ def test_history_builders_are_io_pure(monkeypatch):
 
     monkeypatch.setattr(value_mod, "read_table", _explode)
 
-    pe = port_experiences_from_trials(_trials([1.0, 2.0], [1, 0]), prepend_initial=False)
+    pe = port_experiences_from_trials(
+        _trials([1.0, 2.0], [1, 0]), prepend_initial=False
+    )
     # A representative spread of builders, all given only in-memory frames.
     assert recent_trial_reward_rate(np.array([3.0]), pe, k=10)[0] == 0.5
     assert lagged_trial_rewards(np.array([3.0]), pe, k=2).shape == (1, 2)

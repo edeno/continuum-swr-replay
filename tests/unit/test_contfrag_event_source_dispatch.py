@@ -20,9 +20,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TABLES_PATH = (
-    REPO_ROOT / "src/continuum_swr_replay/analysis/contfrag/tables.py"
-)
+TABLES_PATH = REPO_ROOT / "src/continuum_swr_replay/analysis/contfrag/tables.py"
 
 
 def _load_helper(name: str):

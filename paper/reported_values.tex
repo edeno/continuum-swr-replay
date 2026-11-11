@@ -2,6 +2,40 @@
 % Every value is read from a summary file, paper/reported/part{n}.json;
 % each macro's comment names its key and what it is.
 
+% --- Part 0 (commit 1577f7209200)
+\newcommand{\PartZeroBandHighMax}{300}  % part0.band_high_max: Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
+\newcommand{\PartZeroBandHighMin}{200}  % part0.band_high_min: Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
+\newcommand{\PartZeroBandHighMode}{250}  % part0.band_high_mode: Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)
+\newcommand{\PartZeroBandLowMax}{180}  % part0.band_low_max: Largest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)
+\newcommand{\PartZeroBandLowMin}{80}  % part0.band_low_min: Smallest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)
+\newcommand{\PartZeroBandLowMode}{150}  % part0.band_low_mode: Most common lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)
+\newcommand{\PartZeroBayesFraction}{81}  % part0.bayes_fraction: Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)
+\newcommand{\PartZeroCellsMax}{10}  % part0.cells_max: Largest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)
+\newcommand{\PartZeroCellsMin}{3}  % part0.cells_min: Smallest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)
+\newcommand{\PartZeroCellsMode}{5}  % part0.cells_mode: Most common minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)
+\newcommand{\PartZeroLongestMax}{2000}  % part0.longest_max: Largest maximum event duration, over the 24 numeric cells of Max Duration (ms)
+\newcommand{\PartZeroLongestMin}{300}  % part0.longest_min: Smallest maximum event duration, over the 24 numeric cells of Max Duration (ms)
+\newcommand{\PartZeroLongestMode}{500}  % part0.longest_mode: Most common maximum event duration, over the 24 numeric cells of Max Duration (ms)
+\newcommand{\PartZeroMuaOnlyFraction}{42}  % part0.mua_only_fraction: Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection names MUA only)
+\newcommand{\PartZeroPapers}{57}  % part0.papers: Papers in the survey
+\newcommand{\PartZeroPositionBinMax}{10}  % part0.position_bin_max: Largest decoding position bin, over the 46 numeric cells of Position bin (cm)
+\newcommand{\PartZeroPositionBinMin}{1}  % part0.position_bin_min: Smallest decoding position bin, over the 46 numeric cells of Position bin (cm)
+\newcommand{\PartZeroPositionBinMode}{2}  % part0.position_bin_mode: Most common decoding position bin, over the 46 numeric cells of Position bin (cm)
+\newcommand{\PartZeroShortestMax}{100}  % part0.shortest_max: Largest minimum event duration, over the 40 numeric cells of Min. Duration (ms)
+\newcommand{\PartZeroShortestMin}{15}  % part0.shortest_min: Smallest minimum event duration, over the 40 numeric cells of Min. Duration (ms)
+\newcommand{\PartZeroShortestMode}{50}  % part0.shortest_mode: Most common minimum event duration, over the 40 numeric cells of Min. Duration (ms)
+\newcommand{\PartZeroSpeedMax}{10}  % part0.speed_max: Largest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)
+\newcommand{\PartZeroSpeedMin}{1}  % part0.speed_min: Smallest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)
+\newcommand{\PartZeroSpeedMode}{5}  % part0.speed_mode: Most common running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)
+\newcommand{\PartZeroSwrAndMuaFraction}{23}  % part0.swr_and_mua_fraction: Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection names SWR and MUA only)
+\newcommand{\PartZeroSwrOnlyFraction}{28}  % part0.swr_only_fraction: Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection names SWR only)
+\newcommand{\PartZeroThresholdMax}{8}  % part0.threshold_max: Largest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)
+\newcommand{\PartZeroThresholdMin}{1}  % part0.threshold_min: Smallest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)
+\newcommand{\PartZeroThresholdMode}{3}  % part0.threshold_mode: Most common candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)
+\newcommand{\PartZeroTimeBinMax}{100}  % part0.time_bin_max: Largest decoding time bin, over the 46 numeric cells of Time bin (ms)
+\newcommand{\PartZeroTimeBinMin}{2}  % part0.time_bin_min: Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)
+\newcommand{\PartZeroTimeBinMode}{20}  % part0.time_bin_mode: Most common decoding time bin, over the 46 numeric cells of Time bin (ms)
+
 % --- Part 1 (commit 7fb1dcfa84ad)
 \newcommand{\PartOneControlsContinuingOursOnePerPartLongestFraction}{79}  % part1.controls_continuing_ours_one_per_part_longest_fraction: the same for our detector
 \newcommand{\PartOneControlsContinuingOursSpanningShortestFraction}{88}  % part1.controls_continuing_ours_spanning_shortest_fraction: the same for our detector

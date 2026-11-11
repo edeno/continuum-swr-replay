@@ -71,7 +71,9 @@ def test_glm_converged(benign_poisson):
 def test_separation_flagged(separated_binary):
     """Perfect separation must be flagged (large coef / non-finite SE), not returned clean."""
     y, X = separated_binary
-    with capture_fit_warnings():  # separation emits warnings we don't want on the console
+    with (
+        capture_fit_warnings()
+    ):  # separation emits warnings we don't want on the console
         res = sm.GLM(y, X, family=sm.families.Binomial()).fit()
     status = fit_status(res, "glm")
     assert status["separated"] is True
@@ -172,7 +174,9 @@ def test_warnings_captured():
     assert count_fit_quality_warnings(caught) == 1
 
 
-@pytest.mark.filterwarnings("ignore::statsmodels.tools.sm_exceptions.ConvergenceWarning")
+@pytest.mark.filterwarnings(
+    "ignore::statsmodels.tools.sm_exceptions.ConvergenceWarning"
+)
 def test_warnings_captured_even_after_prior_emit():
     """simplefilter('always') ensures a repeat warning is still recorded (not de-duped)."""
     # Emit once outside so Python's default 'once/default' filter would suppress a repeat.
@@ -262,9 +266,10 @@ def test_effect_scale_rule_is_applied_per_term(benign_poisson):
     inflated = sd.copy()
     inflated[1] = 1.05 * SEPARATION_EFFECT_SE / x_bse
 
-    assert fit_status(res, "glm", predictor_sd=sd, term_names=names)[
-        "separated_terms"
-    ] == ()
+    assert (
+        fit_status(res, "glm", predictor_sd=sd, term_names=names)["separated_terms"]
+        == ()
+    )
     assert fit_status(res, "glm", predictor_sd=inflated, term_names=names)[
         "separated_terms"
     ] == ("x",)
@@ -285,6 +290,6 @@ def test_term_names_default_to_the_params_index():
     res = smf.glm("y ~ x", data=frame, family=sm.families.Poisson()).fit()
     status = fit_status(res, "glm", predictor_sd=np.asarray(res.model.exog).std(axis=0))
     assert status["separated_terms"] == ()
-    assert fit_status(
-        res, "glm", predictor_sd=np.array([0.0, 1e9])
-    )["separated_terms"] == ("x",)
+    assert fit_status(res, "glm", predictor_sd=np.array([0.0, 1e9]))[
+        "separated_terms"
+    ] == ("x",)

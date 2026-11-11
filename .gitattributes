@@ -1,0 +1,11 @@
+# Normalize line endings of text files to LF in the repository.
+* text=auto
+
+# Always check out Python, the lockfile, LaTeX and CSV with LF endings, so a
+# Windows checkout (core.autocrlf) matches every other one byte for byte. The
+# literature survey's checksum is recorded in paper/reported/part0.json.
+*.py text eol=lf
+uv.lock text eol=lf
+*.tex text eol=lf
+*.bib text eol=lf
+*.csv text eol=lf

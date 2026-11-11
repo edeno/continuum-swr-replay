@@ -62,11 +62,17 @@ def predict_marginals(x, y, durv, rl, tbins, rbins, n_folds=5):
     yc, ee = cnt[si, bi], expo[si, bi]
     logoff = np.log(ee)
     tc = 0.5 * (tbins[:-1] + tbins[1:])
-    X = dmatrix("bs(t, df=4) + rl", {"t": tc[bi], "rl": rl[si]}, return_type="dataframe").to_numpy()
+    X = dmatrix(
+        "bs(t, df=4) + rl", {"t": tc[bi], "rl": rl[si]}, return_type="dataframe"
+    ).to_numpy()
     X0 = np.ones((len(si), 1))
 
-    lam_is = np.asarray(sm.GLM(yc, X, family=sm.families.Poisson(), offset=logoff).fit().predict(X))
-    fold = si % n_folds  # fold by stop -> all bins of a held-out stop predicted out-of-fold
+    lam_is = np.asarray(
+        sm.GLM(yc, X, family=sm.families.Poisson(), offset=logoff).fit().predict(X)
+    )
+    fold = (
+        si % n_folds
+    )  # fold by stop -> all bins of a held-out stop predicted out-of-fold
     lam_cv = np.full(len(si), np.nan)
     lam0_cv = np.full(len(si), np.nan)
     for f in range(n_folds):
@@ -74,45 +80,71 @@ def predict_marginals(x, y, durv, rl, tbins, rbins, n_folds=5):
         if not te.any():
             continue
         po = sm.families.Poisson()
-        lam_cv[te] = sm.GLM(yc[tr], X[tr], family=po, offset=logoff[tr]).fit().predict(X[te])
-        lam0_cv[te] = sm.GLM(yc[tr], X0[tr], family=po, offset=logoff[tr]).fit().predict(X0[te])
+        lam_cv[te] = (
+            sm.GLM(yc[tr], X[tr], family=po, offset=logoff[tr]).fit().predict(X[te])
+        )
+        lam0_cv[te] = (
+            sm.GLM(yc[tr], X0[tr], family=po, offset=logoff[tr]).fit().predict(X0[te])
+        )
 
     def _dev(mu):
         with np.errstate(divide="ignore", invalid="ignore"):
             term = np.where(yc > 0, yc * np.log(yc / mu), 0.0)
         return 2 * (term - (yc - mu)).sum()
+
     d2 = 1 - _dev(lam_cv * ee) / _dev(lam0_cv * ee)
 
     rowidx = np.arange(len(durv))
+
     def _marg(lam):
-        top = np.array([(lam[bi == j] * ee[bi == j]).sum() / ee[bi == j].sum()
-                        if (bi == j).any() else np.nan for j in range(nb)])
+        top = np.array(
+            [
+                (lam[bi == j] * ee[bi == j]).sum() / ee[bi == j].sum()
+                if (bi == j).any()
+                else np.nan
+                for j in range(nb)
+            ]
+        )
         pc = np.zeros(len(durv))
         np.add.at(pc, si, lam * ee)
-        right = np.array([pc[(rowidx >= lo) & (rowidx < hi)].sum()
-                          / max(durv[(rowidx >= lo) & (rowidx < hi)].sum(), 1e-9)
-                          for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)])
+        right = np.array(
+            [
+                pc[(rowidx >= lo) & (rowidx < hi)].sum()
+                / max(durv[(rowidx >= lo) & (rowidx < hi)].sum(), 1e-9)
+                for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)
+            ]
+        )
         return top, right
+
     top_is, right_is = _marg(lam_is)
     top_cv, right_cv = _marg(lam_cv)
     return tc, top_is, right_is, top_cv, right_cv, d2
 
 
-def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
-         title: str, rate: bool = False, model: bool = False) -> None:
+def draw(
+    ss: pd.DataFrame,
+    row: pd.Series,
+    populations: list,
+    out_name: str,
+    title: str,
+    rate: bool = False,
+    model: bool = False,
+) -> None:
     """Draw one chronological raster with marginals. populations = list of (label, df, color).
 
     Marginals are onset COUNT by default, or exposure-corrected RATE (events/s) when
     rate=True. Top marginal: vs time-since-stop-onset (within-stop time course).
     Right marginal: vs stop number (across-session/between-trial axis).
     """
+
     def sel(df):
         s = df[df.stop_id.isin(row.index) & (df.t_since_stop_onset < XMAX)]
         return s.t_since_stop_onset.to_numpy(), row.loc[s.stop_id].to_numpy()
 
     fig = plt.figure(figsize=(10, 15))
-    gs = fig.add_gridspec(2, 2, width_ratios=[5, 1.1], height_ratios=[1.1, 8],
-                          hspace=0.03, wspace=0.03)
+    gs = fig.add_gridspec(
+        2, 2, width_ratios=[5, 1.1], height_ratios=[1.1, 8], hspace=0.03, wspace=0.03
+    )
     ax = fig.add_subplot(gs[1, 0])
     axtop = fig.add_subplot(gs[0, 0], sharex=ax)
     axright = fig.add_subplot(gs[1, 1], sharey=ax)
@@ -127,15 +159,30 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
         axright.axhline(b - 0.5, color="C1", lw=1.0, alpha=0.5, zorder=1)
     ax.plot([], [], color="C1", lw=1.3, label="patch switch")
     for lo, hi in zip(bnds[:-1], bnds[1:], strict=False):
-        ax.text(-0.42, (lo + hi) / 2, f"P{int(cp[lo])}", va="center", ha="center",
-                fontsize=9, color="C1", weight="bold")
+        ax.text(
+            -0.42,
+            (lo + hi) / 2,
+            f"P{int(cp[lo])}",
+            va="center",
+            ha="center",
+            fontsize=9,
+            color="C1",
+            weight="bold",
+        )
     # reward strip + shaded immobility window
     rcolors = np.where(ss.is_rewarded_outcome.to_numpy() == 1, "C2", "0.7")
     ax.barh(ss.row.to_numpy(), 0.12, left=-0.30, height=1.0, color=rcolors, zorder=2)
     ax.plot([], [], marker="s", ls="", color="C2", label="rewarded stop")
     ax.plot([], [], marker="s", ls="", color="0.7", label="omitted stop")
-    ax.barh(ss.row.to_numpy(), ss.immobility_duration_s.clip(upper=XMAX).to_numpy(),
-            left=0, height=1.0, color="0.88", zorder=0, label="stop (immobility) window")
+    ax.barh(
+        ss.row.to_numpy(),
+        ss.immobility_duration_s.clip(upper=XMAX).to_numpy(),
+        left=0,
+        height=1.0,
+        color="0.88",
+        zorder=0,
+        label="stop (immobility) window",
+    )
     # event ticks (raster) + marginals: raw count, or exposure-corrected rate.
     # Rate divides each bin by its available immobile-seconds (top: the stop-window
     # survival; right: total immobile time per stop-bin). The top rate is masked
@@ -148,12 +195,20 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     rl = ss.known_reward_outcome_lag_1.fillna(0).to_numpy()
     rowv = ss.row.to_numpy()
     if rate:
-        top_expo = np.array([np.clip(durv - lo, 0, hi - lo).sum()
-                             for lo, hi in zip(tbins[:-1], tbins[1:], strict=False)])
+        top_expo = np.array(
+            [
+                np.clip(durv - lo, 0, hi - lo).sum()
+                for lo, hi in zip(tbins[:-1], tbins[1:], strict=False)
+            ]
+        )
         surv = np.array([(durv > lo).sum() for lo in tbins[:-1]])
         top_expo = np.where(surv >= 5, top_expo, np.nan)
-        right_expo = np.array([durv[(rowv >= lo) & (rowv < hi)].sum()
-                               for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)])
+        right_expo = np.array(
+            [
+                durv[(rowv >= lo) & (rowv < hi)].sum()
+                for lo, hi in zip(rbins[:-1], rbins[1:], strict=False)
+            ]
+        )
         right_expo = np.where(right_expo > 0, right_expo, np.nan)
     notes = []
     for label, df, color in populations:
@@ -168,7 +223,9 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
         axright.stairs(cr, rbins, color=color, lw=1.3, orientation="horizontal")
         if model and rate:
             try:
-                tc, t_is, r_is, t_cv, r_cv, d2 = predict_marginals(x, y, durv, rl, tbins, rbins)
+                tc, t_is, r_is, t_cv, r_cv, d2 = predict_marginals(
+                    x, y, durv, rl, tbins, rbins
+                )
                 axtop.plot(tc, t_is, color=color, lw=1.2, ls="--", alpha=0.45)
                 axtop.plot(tc, t_cv, color=color, lw=1.7, ls=":")
                 axright.plot(r_is, rcz, color=color, lw=1.2, ls="--", alpha=0.45)
@@ -188,12 +245,16 @@ def draw(ss: pd.DataFrame, row: pd.Series, populations: list, out_name: str,
     h, lab = ax.get_legend_handles_labels()
     axleg.legend(h, lab, loc="center", fontsize=8, frameon=False)
     if model and rate:
-        title += ("\nmodel bs(t,df4)+known_reward_outcome_lag_1 — solid=empirical, dashed=in-sample, "
-                  "dotted=CV · " + " · ".join(notes))
+        title += (
+            "\nmodel bs(t,df4)+known_reward_outcome_lag_1 — solid=empirical, dashed=in-sample, "
+            "dotted=CV · " + " · ".join(notes)
+        )
     fig.suptitle(title, x=0.5, y=0.998, fontsize=10)
     out = P.parent / ".claude" / "research" / "session_raster_outputs" / out_name
     out.parent.mkdir(parents=True, exist_ok=True)
-    save_figure(fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False)
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=150, formats=["png"], transparent=False
+    )
     print("saved", out)
 
 
@@ -223,7 +284,10 @@ def main() -> None:
     else:
         nstops = st[st.immobility_duration_s > 0].groupby(SC).size().rename("nstops")
         score = (
-            nl_no.groupby(SC).size().rename("nnl").to_frame()
+            nl_no.groupby(SC)
+            .size()
+            .rename("nnl")
+            .to_frame()
             .join(swr.groupby(SC).size().rename("nswr"))
             .join(nstops)
             .dropna()
@@ -246,12 +310,24 @@ def main() -> None:
     sid = f"{a}{d}_{e}"
     suffix = "_model" if model else ("_rate" if rate else "")
     base = f"{a} {d} {e} · {len(ss)} stops · marginals: {'rate' if rate else 'count'}"
-    draw(ss, row, [("SWR", swr, "k"), ("non-SWR non-local", nl_no, "C0")],
-         f"session_raster_{sid}_swr{suffix}.png",
-         f"Single-session SWR raster (chronological): {base}", rate, model)
-    draw(ss, row, [("non-local w/ SWR", nl_swr, "C3"), ("non-local no-SWR", nl_no, "C0")],
-         f"session_raster_{sid}_nonlocal{suffix}.png",
-         f"Single-session non-local raster (chronological): {base}", rate, model)
+    draw(
+        ss,
+        row,
+        [("SWR", swr, "k"), ("non-SWR non-local", nl_no, "C0")],
+        f"session_raster_{sid}_swr{suffix}.png",
+        f"Single-session SWR raster (chronological): {base}",
+        rate,
+        model,
+    )
+    draw(
+        ss,
+        row,
+        [("non-local w/ SWR", nl_swr, "C3"), ("non-local no-SWR", nl_no, "C0")],
+        f"session_raster_{sid}_nonlocal{suffix}.png",
+        f"Single-session non-local raster (chronological): {base}",
+        rate,
+        model,
+    )
 
 
 if __name__ == "__main__":

@@ -49,8 +49,15 @@ def plot_robustness_scatter(
 
     ax.scatter(x, y, s=1, alpha=0.15, color="k", rasterized=True)
 
-    lim = max(abs(x.quantile(0.01)), abs(x.quantile(0.99)),
-              abs(y.quantile(0.01)), abs(y.quantile(0.99))) * 1.1
+    lim = (
+        max(
+            abs(x.quantile(0.01)),
+            abs(x.quantile(0.99)),
+            abs(y.quantile(0.01)),
+            abs(y.quantile(0.99)),
+        )
+        * 1.1
+    )
     ax.plot([-lim, lim], [-lim, lim], "r--", linewidth=0.5, label="Identity")
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
@@ -73,8 +80,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("paper/figures/figure04"))
-    parser.add_argument("--format", type=str, choices=["pdf", "png", "svg"], default=None)
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path("paper/figures/figure04")
+    )
+    parser.add_argument(
+        "--format", type=str, choices=["pdf", "png", "svg"], default=None
+    )
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--min-firing-rate", type=float, default=1.0)
     parser.add_argument("--data-dir", type=Path, default=processed_data_dir())
@@ -86,7 +97,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     df, _, _ = load_population_data(args.data_dir, min_firing_rate=args.min_firing_rate)
 
     plot_robustness_scatter(
-        df, args.output_dir, "fig04g_robustness_scatter", formats, args.dpi,
+        df,
+        args.output_dir,
+        "fig04g_robustness_scatter",
+        formats,
+        args.dpi,
     )
 
 

@@ -85,15 +85,36 @@ def make_per_bin_rate_design(
             )
             mu = base_rate * tp * ap * (reward_effect if reward else 1.0)
             recs.append(
-                ("sim", 1, "02_r1", s, b, tc, bin_s, reward, rcos1, rcos2,
-                 incomplete, int(rng.poisson(mu)))
+                (
+                    "sim",
+                    1,
+                    "02_r1",
+                    s,
+                    b,
+                    tc,
+                    bin_s,
+                    reward,
+                    rcos1,
+                    rcos2,
+                    incomplete,
+                    int(rng.poisson(mu)),
+                )
             )
     design = pd.DataFrame(
         recs,
         columns=[
-            "animal", "session_date", "epoch", "stop_id", "binj", "tc",
-            "exposure", "reward_history_rcos_0", "reward_history_rcos_1",
-            "reward_history_rcos_2", "reward_history_incomplete", "count",
+            "animal",
+            "session_date",
+            "epoch",
+            "stop_id",
+            "binj",
+            "tc",
+            "exposure",
+            "reward_history_rcos_0",
+            "reward_history_rcos_1",
+            "reward_history_rcos_2",
+            "reward_history_incomplete",
+            "count",
         ],
     )
     if not arrival_clocks:
@@ -235,14 +256,36 @@ def test_separation_no_crash():
         for b in range(40):
             onset_lag1 = float(b % 5 == 0)  # structured "previous-bin had event"
             count = 0 if onset_lag1 else int(rng.poisson(0.1))
-            recs.append(("sim", 1, "02_r1", s, b, (b + 0.5) * 0.015, 0.015,
-                         float(s % 2), onset_lag1, count))
-    design = pd.DataFrame(recs, columns=[
-        "animal", "session_date", "epoch", "stop_id", "binj", "tc", "exposure",
-        "reward_history_rcos_0", "onset_lag1", "count"])
-    spec = PerBinRateModelSpec(
-        "hist1", False, 0, False, 1, False, False, "test", None
+            recs.append(
+                (
+                    "sim",
+                    1,
+                    "02_r1",
+                    s,
+                    b,
+                    (b + 0.5) * 0.015,
+                    0.015,
+                    float(s % 2),
+                    onset_lag1,
+                    count,
+                )
+            )
+    design = pd.DataFrame(
+        recs,
+        columns=[
+            "animal",
+            "session_date",
+            "epoch",
+            "stop_id",
+            "binj",
+            "tc",
+            "exposure",
+            "reward_history_rcos_0",
+            "onset_lag1",
+            "count",
+        ],
     )
+    spec = PerBinRateModelSpec("hist1", False, 0, False, 1, False, False, "test", None)
     # Must not raise; returns None or a finite fit dict.
     result = fit_per_bin_rate_model(design, spec)
     assert result is None or np.isfinite(result["llf"])
@@ -395,8 +438,11 @@ def test_cross_history_recovers_planted_excitation():
     stop_ids = np.arange(n_stops)
     stops = pd.DataFrame(
         {
-            "animal": "x", "session_date": 1, "epoch": "02_r1",
-            "stop_id": stop_ids, "immobility_duration_s": nbin * bin_s,
+            "animal": "x",
+            "session_date": 1,
+            "epoch": "02_r1",
+            "stop_id": stop_ids,
+            "immobility_duration_s": nbin * bin_s,
         }
     )
     cross_rows, resp_rows = [], []
@@ -415,11 +461,25 @@ def test_cross_history_recovers_planted_excitation():
     resp = pd.DataFrame(resp_rows, columns=["stop_id", "t_since_stop_onset"])
 
     design = aggregate_to_timebins(
-        stops, resp, bin_s=bin_s, tmax=nbin * bin_s,
-        cross_onset_times=cross, cross_history_lags=4, arrival_clocks=False,
+        stops,
+        resp,
+        bin_s=bin_s,
+        tmax=nbin * bin_s,
+        cross_onset_times=cross,
+        cross_history_lags=4,
+        arrival_clocks=False,
     )
     spec = PerBinRateModelSpec(
-        "Mx", False, 0, False, 0, False, False, "", None, cross_history_lags=4,
+        "Mx",
+        False,
+        0,
+        False,
+        0,
+        False,
+        False,
+        "",
+        None,
+        cross_history_lags=4,
     )
     fit = fit_per_bin_rate_model(design, spec, min_bins=50, min_events=20)
     assert fit is not None
@@ -446,8 +506,16 @@ def test_freeze_per_bin_cohort_makes_rungs_share_rows():
     design.loc[design["stop_id"] % 10 == 0, "extra_cov"] = np.nan
 
     with_extra = PerBinRateModelSpec(
-        "M_extra", True, REWARD_HISTORY_N_BASIS, False, 0, False, False,
-        "test", None, extra_covariates=("extra_cov",),
+        "M_extra",
+        True,
+        REWARD_HISTORY_N_BASIS,
+        False,
+        0,
+        False,
+        False,
+        "test",
+        None,
+        extra_covariates=("extra_cov",),
     )
     ladder = [
         MODEL_PER_BIN_RATE["M0_const"],
@@ -510,14 +578,38 @@ def _design_with_separated_indicator(seed: int = 11) -> pd.DataFrame:
         for b in range(40):
             mu = 0.0 if incomplete else 0.08 * (2.5 if reward else 1.0)
             recs.append(
-                ("sim", 1, "02_r1", s, b, (b + 0.5) * 0.015, 0.015,
-                 reward, 0.0, 0.0, incomplete, int(rng.poisson(mu)))
+                (
+                    "sim",
+                    1,
+                    "02_r1",
+                    s,
+                    b,
+                    (b + 0.5) * 0.015,
+                    0.015,
+                    reward,
+                    0.0,
+                    0.0,
+                    incomplete,
+                    int(rng.poisson(mu)),
+                )
             )
-    return pd.DataFrame(recs, columns=[
-        "animal", "session_date", "epoch", "stop_id", "binj", "tc", "exposure",
-        "reward_history_rcos_0", "reward_history_rcos_1", "reward_history_rcos_2",
-        "reward_history_incomplete", "count",
-    ])
+    return pd.DataFrame(
+        recs,
+        columns=[
+            "animal",
+            "session_date",
+            "epoch",
+            "stop_id",
+            "binj",
+            "tc",
+            "exposure",
+            "reward_history_rcos_0",
+            "reward_history_rcos_1",
+            "reward_history_rcos_2",
+            "reward_history_incomplete",
+            "count",
+        ],
+    )
 
 
 def test_fit_reports_separated_terms_and_predictor_sds():
@@ -632,9 +724,7 @@ def test_arrival_clock_recovers_a_peak_the_stop_clock_smears():
     }
     assert all(fit is not None for fit in fits.values())
     exposure = windowed["exposure"].to_numpy()
-    rates = {
-        name: fit["predicted"].to_numpy() / exposure for name, fit in fits.items()
-    }
+    rates = {name: fit["predicted"].to_numpy() / exposure for name, fit in fits.items()}
 
     clock = windowed["time_since_last_well_arrival_s"].to_numpy()
     interior = (clock >= 0.5) & (clock <= 7.5)

@@ -43,9 +43,9 @@ class TestGetMapSpeedPlaceholderBleed:
         # the fix.
         posterior = np.array(
             [
-                [0.1, 0.9],   # MAP = bin 1 (node 1)
+                [0.1, 0.9],  # MAP = bin 1 (node 1)
                 [np.nan, np.nan],
-                [0.1, 0.9],   # MAP = bin 1 (node 1)
+                [0.1, 0.9],  # MAP = bin 1 (node 1)
             ]
         )
         speed = get_map_speed(
@@ -76,11 +76,11 @@ class TestGetMapSpeedPlaceholderBleed:
         # decode to nodes 0, 1, 1, 1.
         posterior = np.array(
             [
-                [0.9, 0.1],   # node 0
-                [0.1, 0.9],   # node 1
+                [0.9, 0.1],  # node 0
+                [0.1, 0.9],  # node 1
                 [np.nan, np.nan],
-                [0.1, 0.9],   # node 1
-                [0.1, 0.9],   # node 1
+                [0.1, 0.9],  # node 1
+                [0.1, 0.9],  # node 1
             ]
         )
         speed = get_map_speed(
@@ -102,17 +102,17 @@ class TestGetMapSpeedPlaceholderBleed:
         # Indices 0 (step 0→1, valid) and 3, 4 (steps 3→4 and the
         # last-bin reuse) carry their honest values.
         assert speed[0] == 10.0  # 0 → 1: 10 cm
-        assert speed[3] == 0.0   # 1 → 1
-        assert speed[4] == 0.0   # backward-difference reuse of speed[3]
+        assert speed[3] == 0.0  # 1 → 1
+        assert speed[4] == 0.0  # backward-difference reuse of speed[3]
 
     def test_pure_valid_motion_still_computes_correctly(self):
         # Sanity check: when there are no NaN rows, motion is preserved.
         place_bin_center_ind_to_node = np.array([0, 1])
         posterior = np.array(
             [
-                [0.9, 0.1],   # node 0
-                [0.1, 0.9],   # node 1
-                [0.9, 0.1],   # node 0
+                [0.9, 0.1],  # node 0
+                [0.1, 0.9],  # node 1
+                [0.9, 0.1],  # node 0
             ]
         )
         speed = get_map_speed(

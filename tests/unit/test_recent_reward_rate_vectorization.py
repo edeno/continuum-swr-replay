@@ -158,24 +158,22 @@ _CASES = [
     ),
     (
         "multi_arm_mixed",
-        _trials(
-            [0, 1, 0, 2, 1, 0], [True, False, True, True, False, False]
-        ),
+        _trials([0, 1, 0, 2, 1, 0], [True, False, True, True, False, False]),
         np.array([1.0, 12.0, 22.0, 32.0, 42.0, 52.0, 100.0]),
         3,
     ),
     (
         "multi_arm_long_window",
-        _trials(
-            [0, 1, 0, 2, 1, 0], [True, False, True, True, False, False]
-        ),
+        _trials([0, 1, 0, 2, 1, 0], [True, False, True, True, False, False]),
         np.array([1.0, 12.0, 22.0, 32.0, 42.0, 52.0, 100.0]),
         10,
     ),
 ]
 
 
-@pytest.mark.parametrize("label,trials,event_times,k", _CASES, ids=[c[0] for c in _CASES])
+@pytest.mark.parametrize(
+    "label,trials,event_times,k", _CASES, ids=[c[0] for c in _CASES]
+)
 def test_recent_reward_rate_vectorized_equals_loop(label, trials, event_times, k):
     """Vectorized production form == nested-loop reference, exactly (NaN-aware)."""
     pe = port_experiences_from_trials(trials, prepend_initial=False)

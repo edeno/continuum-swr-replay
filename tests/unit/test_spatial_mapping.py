@@ -10,6 +10,7 @@ This module is the canonical pattern for junction-bin exclusion. The fix that ma
 - arm_to_well returns NaN for trunk arms (6/7/8) and leaves (0-5)
 - well_to_arm_set respects degree-1 well property on the real graph
 """
+
 from __future__ import annotations
 
 import networkx as nx
@@ -68,10 +69,15 @@ def _bandit_graph() -> nx.Graph:
     """Real bandit topology: 6 leaf arms (0..5) + 3 trunk arms (6..8)."""
     g = nx.Graph()
     for u, v, eid in (
-        (0, 6, 0), (1, 6, 1),
-        (2, 7, 2), (3, 7, 3),
-        (4, 8, 4), (5, 8, 5),
-        (6, 9, 6), (7, 9, 7), (8, 9, 8),
+        (0, 6, 0),
+        (1, 6, 1),
+        (2, 7, 2),
+        (3, 7, 3),
+        (4, 8, 4),
+        (5, 8, 5),
+        (6, 9, 6),
+        (7, 9, 7),
+        (8, 9, 8),
     ):
         g.add_edge(u, v, edge_id=eid)
     return g
@@ -129,15 +135,15 @@ class TestMapEstimateToPatch:
     @pytest.mark.parametrize(
         "linear_position,expected_patch",
         [
-            (0.0, 1),    # arm 0 → patch 1
-            (3.0, 1),    # arm 1 → patch 1
-            (4.0, 2),    # arm 2 → patch 2
-            (7.0, 2),    # arm 3 → patch 2
-            (8.0, 3),    # arm 4 → patch 3
-            (11.0, 3),   # arm 5 → patch 3
-            (12.0, 1),   # arm 6 (trunk for patch 1) → patch 1
-            (14.0, 2),   # arm 7 (trunk for patch 2) → patch 2
-            (16.0, 3),   # arm 8 (trunk for patch 3) → patch 3
+            (0.0, 1),  # arm 0 → patch 1
+            (3.0, 1),  # arm 1 → patch 1
+            (4.0, 2),  # arm 2 → patch 2
+            (7.0, 2),  # arm 3 → patch 2
+            (8.0, 3),  # arm 4 → patch 3
+            (11.0, 3),  # arm 5 → patch 3
+            (12.0, 1),  # arm 6 (trunk for patch 1) → patch 1
+            (14.0, 2),  # arm 7 (trunk for patch 2) → patch 2
+            (16.0, 3),  # arm 8 (trunk for patch 3) → patch 3
         ],
     )
     def test_each_arm_maps_to_correct_patch(self, linear_position, expected_patch):
@@ -180,9 +186,17 @@ class TestMapEstimateToPatch:
 
 
 class TestArmToWell:
-    @pytest.mark.parametrize("leaf_arm,expected_well", [
-        (0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5),
-    ])
+    @pytest.mark.parametrize(
+        "leaf_arm,expected_well",
+        [
+            (0, 0),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (4, 4),
+            (5, 5),
+        ],
+    )
     def test_leaf_arms_return_their_well(self, leaf_arm, expected_well):
         """Leaf arms 0-5 each terminate at well 0-5 respectively."""
         graph = _bandit_graph()
@@ -218,9 +232,17 @@ class TestArmToWell:
 
 
 class TestWellToArmSet:
-    @pytest.mark.parametrize("well,expected_arms", [
-        (0, {0}), (1, {1}), (2, {2}), (3, {3}), (4, {4}), (5, {5}),
-    ])
+    @pytest.mark.parametrize(
+        "well,expected_arms",
+        [
+            (0, {0}),
+            (1, {1}),
+            (2, {2}),
+            (3, {3}),
+            (4, {4}),
+            (5, {5}),
+        ],
+    )
     def test_each_well_has_exactly_one_arm_on_real_graph(self, well, expected_arms):
         """Each well is degree-1 on the real
         bandit graph, so well_to_arm_set returns a set of size 1.

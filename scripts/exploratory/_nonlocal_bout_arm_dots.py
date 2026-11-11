@@ -70,12 +70,14 @@ from continuum_swr_replay.visualization.palettes import patch_grouped_arm_palett
 
 # Publication-friendly text: sans-serif with editable (Type-42) fonts so a PDF
 # export opens with selectable/editable text. Arial if available, else fallback.
-plt.rcParams.update({
-    "pdf.fonttype": 42,
-    "ps.fonttype": 42,
-    "font.family": "sans-serif",
-    "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
-})
+plt.rcParams.update(
+    {
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+    }
+)
 
 # Row order top->bottom: patch 1 (0,1,6), patch 2 (2,3,7), patch 3 (4,5,8).
 ARM_ROW_ORDER = [0, 1, 6, 2, 3, 7, 4, 5, 8]
@@ -162,12 +164,12 @@ def build_figure(
     # apart past lag 1 (inter-trial stops), so a trials-back kernel cannot be
     # read positionally. Stops-back is aligned by construction and matches the
     # trials-back known_reward_outcome_lag_1 ~91% of the time.
-    stop_seq = evo["stop_id"].to_numpy()          # per-event stop id, time order
-    uniq_stops = list(dict.fromkeys(stop_seq))    # ordered unique stops
+    stop_seq = evo["stop_id"].to_numpy()  # per-event stop id, time order
+    uniq_stops = list(dict.fromkeys(stop_seq))  # ordered unique stops
     pos_of = {s: i for i, s in enumerate(uniq_stops)}
     ro_of = {}
     for s, r in zip(stop_seq, rew_col, strict=True):
-        ro_of.setdefault(s, r)                    # reward_outcome is stop-constant
+        ro_of.setdefault(s, r)  # reward_outcome is stop-constant
     ro_by_pos = np.array([ro_of[s] for s in uniq_stops])
     col_pos = np.array([pos_of[s] for s in stop_seq])
     kernel = np.full((N_REWARD_LAGS, n_bouts), np.nan)
@@ -188,12 +190,8 @@ def build_figure(
     rsr_col = stop_scalar("patch_switch_fraction_last5_completed_trips")
     relval_col = stop_scalar("relative_value_switch_minus_stay_preoutcome")
     rpe_col = stop_scalar("rpe_postoutcome")
-    entropy_col = stop_scalar(
-        "reward_belief_differential_entropy_leaf_mean_preoutcome"
-    )
-    vupdate_col = stop_scalar(
-        "reward_belief_mean_update_l1_all_ports_postoutcome"
-    )
+    entropy_col = stop_scalar("reward_belief_differential_entropy_leaf_mean_preoutcome")
+    vupdate_col = stop_scalar("reward_belief_mean_update_l1_all_ports_postoutcome")
 
     # Immobility-period (stop) membership. Each column is one non-local event;
     # several may share a stop. Per-stop covariates are drawn once per stop as a
@@ -214,16 +212,23 @@ def build_figure(
 
     def cov_matrix(colname):
         """Pivot a per-arm covariate to (n_arms, n_bouts), rows in ARM_ROW_ORDER."""
-        piv = sub.pivot_table(index="candidate_arm", columns="event_id",
-                              values=colname, aggfunc="first")
+        piv = sub.pivot_table(
+            index="candidate_arm", columns="event_id", values=colname, aggfunc="first"
+        )
         return piv.reindex(index=ARM_ROW_ORDER, columns=order.index).to_numpy()
 
     # --- panel plan (top -> bottom) -----------------------------------------
     # (kind, data, label, extra, gran); gran "event" draws per event column,
     # "stop" draws one cell per immobility period. Only content and SWR are
     # per-event; every other covariate is per-stop.
-    BINARY_H, STRIP_H, HEAT_H, KERNEL_H, CONTENT_H, COV_H = \
-        0.55, 0.55, 0.8, 2.6, 7.0, 4.2
+    BINARY_H, STRIP_H, HEAT_H, KERNEL_H, CONTENT_H, COV_H = (
+        0.55,
+        0.55,
+        0.8,
+        2.6,
+        7.0,
+        4.2,
+    )
     # Content-centered, themed order: per-stop context header at top (grouped
     # reward-history / switch-state / RL-value-state), the per-event SWR track
     # immediately above content, then the per-arm heatmaps below content grouped
@@ -251,24 +256,75 @@ def build_figure(
         # per-arm (content-aligned): spatial / arm structure
         ("armstrip", prev_arm_col, "prev arm", None, "stop"),
         ("armstrip", lastrew_arm_col, "last rew arm", None, "stop"),
-        ("cov", "candidate_arm_distance_rank", "arm dist rank (1=near)", ("magma_r", False), "stop"),
-        ("cov", "visit_recency_trials_event_leaf_centered", "visit recency (dem)", ("PuOr", True), "stop"),
-        ("cov", "visit_recency_trials", "visit recency (raw)", ("Purples", False), "stop"),
+        (
+            "cov",
+            "candidate_arm_distance_rank",
+            "arm dist rank (1=near)",
+            ("magma_r", False),
+            "stop",
+        ),
+        (
+            "cov",
+            "visit_recency_trials_event_leaf_centered",
+            "visit recency (dem)",
+            ("PuOr", True),
+            "stop",
+        ),
+        (
+            "cov",
+            "visit_recency_trials",
+            "visit recency (raw)",
+            ("Purples", False),
+            "stop",
+        ),
         # per-arm: reward
-        ("cov", "reward_fraction_candidate_arm_last10_visits", "reward rate k10 (frac)", ("plasma", False), "stop"),
-        ("cov", "reward_count_candidate_arm_last10_known_trials", "cumul reward (n)", ("YlGn", False), "stop"),
-        ("cov", "task_reward_probability_candidate_arm", "P(reward)", ("cividis", False), "stop"),
+        (
+            "cov",
+            "reward_fraction_candidate_arm_last10_visits",
+            "reward rate k10 (frac)",
+            ("plasma", False),
+            "stop",
+        ),
+        (
+            "cov",
+            "reward_count_candidate_arm_last10_known_trials",
+            "cumul reward (n)",
+            ("YlGn", False),
+            "stop",
+        ),
+        (
+            "cov",
+            "task_reward_probability_candidate_arm",
+            "P(reward)",
+            ("cividis", False),
+            "stop",
+        ),
         # per-arm: value
-        ("cov", "reward_belief_mean_candidate_arm_preoutcome", "belief value (P)", ("viridis", False), "stop"),
+        (
+            "cov",
+            "reward_belief_mean_candidate_arm_preoutcome",
+            "belief value (P)",
+            ("viridis", False),
+            "stop",
+        ),
     ]
-    hmap = {"binary": BINARY_H, "heatbout": HEAT_H, "kernel": KERNEL_H,
-            "armstrip": STRIP_H, "content": CONTENT_H, "cov": COV_H}
+    hmap = {
+        "binary": BINARY_H,
+        "heatbout": HEAT_H,
+        "kernel": KERNEL_H,
+        "armstrip": STRIP_H,
+        "content": CONTENT_H,
+        "cov": COV_H,
+    }
     heights = [hmap[k] for k, *_ in panels]
 
-    fig = plt.figure(figsize=(max(11, n_bouts * 0.1), 0.155 * sum(heights) + 1.6),
-                     constrained_layout=True)
-    gs = GridSpec(len(panels), 2, figure=fig, height_ratios=heights,
-                  width_ratios=[60, 1])
+    fig = plt.figure(
+        figsize=(max(11, n_bouts * 0.1), 0.155 * sum(heights) + 1.6),
+        constrained_layout=True,
+    )
+    gs = GridSpec(
+        len(panels), 2, figure=fig, height_ratios=heights, width_ratios=[60, 1]
+    )
     axes = []
     ax0 = None
     for i, _panel in enumerate(panels):
@@ -295,14 +351,14 @@ def build_figure(
         axis.tick_params(axis="both", length=0)
 
     def row_ylabel(axis, text):
-        axis.set_ylabel(text, fontsize=8, rotation=0, ha="right", va="center",
-                        labelpad=22)
+        axis.set_ylabel(
+            text, fontsize=8, rotation=0, ha="right", va="center", labelpad=22
+        )
         for s in ("top", "right", "left", "bottom"):
             axis.spines[s].set_visible(False)
 
     def cbar(axis_idx, mappable, ticks=None):
-        cb = fig.colorbar(mappable, cax=fig.add_subplot(gs[axis_idx, 1]),
-                          ticks=ticks)
+        cb = fig.colorbar(mappable, cax=fig.add_subplot(gs[axis_idx, 1]), ticks=ticks)
         cb.ax.tick_params(labelsize=6, length=2)
 
     for i, (kind, data, label, extra, gran) in enumerate(panels):
@@ -311,16 +367,37 @@ def build_figure(
             # Per-event content: shaded bands mark immobility periods (stops).
             for g in range(n_stops):
                 if g % 2 == 0:
-                    ax.axvspan(starts[g] - 0.5, ends[g] + 0.5, color="0.5",
-                               alpha=0.10, lw=0, zorder=0)
+                    ax.axvspan(
+                        starts[g] - 0.5,
+                        ends[g] + 0.5,
+                        color="0.5",
+                        alpha=0.10,
+                        lw=0,
+                        zorder=0,
+                    )
             frac = sub["arm_fraction_posterior"].to_numpy().clip(0, 1)
             cc = np.array([palette[a] for a in sub["candidate_arm"]], dtype=float)
             cc[:, 3] = frac
-            ax.scatter(sub["col"], sub["y"], s=32, c=cc, edgecolors="none",
-                       zorder=2, rasterized=True)
+            ax.scatter(
+                sub["col"],
+                sub["y"],
+                s=32,
+                c=cc,
+                edgecolors="none",
+                zorder=2,
+                rasterized=True,
+            )
             cur = sub[sub["is_current_arm"] == 1]
-            ax.scatter(cur["col"], cur["y"], s=46, facecolors="none",
-                       edgecolors="black", linewidths=0.9, zorder=3, rasterized=True)
+            ax.scatter(
+                cur["col"],
+                cur["y"],
+                s=46,
+                facecolors="none",
+                edgecolors="black",
+                linewidths=0.9,
+                zorder=3,
+                rasterized=True,
+            )
             for yb in (2.5, 5.5):
                 ax.axhline(yb, color="0.85", lw=0.7, zorder=1)
             ax.set_ylim(-0.5, n_arms - 0.5)
@@ -337,37 +414,78 @@ def build_figure(
             # Per-event binary (SWR): one square per event; missing -> grey x.
             v = np.asarray(data, dtype=float)
             no, yes, miss = v == 0, v == 1, ~np.isfinite(v)
-            ax.scatter(cols[no], np.zeros(no.sum()), s=26, marker="s", c="0.85",
-                       edgecolors="0.6", linewidths=0.35, zorder=2, rasterized=True)
-            ax.scatter(cols[yes], np.zeros(yes.sum()), s=26, marker="s",
-                       c="#222222", edgecolors="none", zorder=2, rasterized=True)
+            ax.scatter(
+                cols[no],
+                np.zeros(no.sum()),
+                s=26,
+                marker="s",
+                c="0.85",
+                edgecolors="0.6",
+                linewidths=0.35,
+                zorder=2,
+                rasterized=True,
+            )
+            ax.scatter(
+                cols[yes],
+                np.zeros(yes.sum()),
+                s=26,
+                marker="s",
+                c="#222222",
+                edgecolors="none",
+                zorder=2,
+                rasterized=True,
+            )
             if miss.any():
-                ax.scatter(cols[miss], np.zeros(miss.sum()), s=16, marker="x",
-                           c="0.6", linewidths=0.6, zorder=3, rasterized=True)
+                ax.scatter(
+                    cols[miss],
+                    np.zeros(miss.sum()),
+                    s=16,
+                    marker="x",
+                    c="0.6",
+                    linewidths=0.6,
+                    zorder=3,
+                    rasterized=True,
+                )
             style_track(ax, label)
         elif kind == "binary":
             # Per-stop binary: one cell per immobility period spanning its band.
             vs = to_stop(np.asarray(data, dtype=float))
             cmap = ListedColormap(["0.85", "#222222"])
             cmap.set_bad("white")
-            ax.pcolormesh(stop_edges, [-0.5, 0.5],
-                          np.ma.masked_invalid(vs)[None, :], cmap=cmap,
-                          norm=BoundaryNorm([-0.5, 0.5, 1.5], 2), rasterized=True)
+            ax.pcolormesh(
+                stop_edges,
+                [-0.5, 0.5],
+                np.ma.masked_invalid(vs)[None, :],
+                cmap=cmap,
+                norm=BoundaryNorm([-0.5, 0.5, 1.5], 2),
+                rasterized=True,
+            )
             miss = ~np.isfinite(vs)
             if miss.any():
-                ax.scatter(stop_centers[miss], np.zeros(miss.sum()), s=16,
-                           marker="x", c="0.6", linewidths=0.6, zorder=3,
-                           rasterized=True)
+                ax.scatter(
+                    stop_centers[miss],
+                    np.zeros(miss.sum()),
+                    s=16,
+                    marker="x",
+                    c="0.6",
+                    linewidths=0.6,
+                    zorder=3,
+                    rasterized=True,
+                )
             style_track(ax, label)
         elif kind == "armstrip":
             # Per-stop arm identity: one arm-colored cell per immobility period.
             vs = to_stop(np.asarray(data, dtype=float))
             cmap = ListedColormap([palette[a][:3] for a in range(9)])
             cmap.set_bad("white")
-            ax.pcolormesh(stop_edges, [-0.5, 0.5],
-                          np.ma.masked_invalid(vs)[None, :], cmap=cmap,
-                          norm=BoundaryNorm(np.arange(-0.5, 9.5, 1.0), 9),
-                          rasterized=True)
+            ax.pcolormesh(
+                stop_edges,
+                [-0.5, 0.5],
+                np.ma.masked_invalid(vs)[None, :],
+                cmap=cmap,
+                norm=BoundaryNorm(np.arange(-0.5, 9.5, 1.0), 9),
+                rasterized=True,
+            )
             style_track(ax, label)
         elif kind == "heatbout":
             # Per-stop scalar: one cell per immobility period.
@@ -376,8 +494,15 @@ def build_figure(
             cmap = plt.get_cmap(cmap_name).copy()
             cmap.set_bad("0.9")
             vmin, vmax = _vlims(vs, diverging)
-            mesh = ax.pcolormesh(stop_edges, [-0.5, 0.5], vs[None, :], cmap=cmap,
-                                 vmin=vmin, vmax=vmax, rasterized=True)
+            mesh = ax.pcolormesh(
+                stop_edges,
+                [-0.5, 0.5],
+                vs[None, :],
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+                rasterized=True,
+            )
             style_track(ax, label)
             cbar(i, mesh, ticks=[vmin, vmax])
         elif kind == "kernel":
@@ -387,8 +512,15 @@ def build_figure(
             Ks = np.ma.masked_invalid(to_stop(data))  # (n_lag, n_stops)
             cmap = plt.get_cmap(cmap_name).copy()
             cmap.set_bad("0.9")
-            mesh = ax.pcolormesh(stop_edges, np.arange(n_lag + 1) - 0.5, Ks,
-                                 cmap=cmap, vmin=0, vmax=1, rasterized=True)
+            mesh = ax.pcolormesh(
+                stop_edges,
+                np.arange(n_lag + 1) - 0.5,
+                Ks,
+                cmap=cmap,
+                vmin=0,
+                vmax=1,
+                rasterized=True,
+            )
             ax.set_ylim(n_lag - 0.5, -0.5)  # lag 1 at top
             ax.set_yticks(range(n_lag))
             ax.set_yticklabels([str(j + 1) for j in range(n_lag)], fontsize=5.5)
@@ -402,8 +534,15 @@ def build_figure(
             cmap = plt.get_cmap(cmap_name).copy()
             cmap.set_bad("0.9")
             vmin, vmax = _vlims(Ms, diverging)
-            mesh = ax.pcolormesh(stop_edges, np.arange(n_arms + 1) - 0.5, Ms,
-                                 cmap=cmap, vmin=vmin, vmax=vmax, rasterized=True)
+            mesh = ax.pcolormesh(
+                stop_edges,
+                np.arange(n_arms + 1) - 0.5,
+                Ms,
+                cmap=cmap,
+                vmin=vmin,
+                vmax=vmax,
+                rasterized=True,
+            )
             ax.set_ylim(n_arms - 0.5, -0.5)  # arm 0 at top
             arm_yticks(ax, full=False)
             row_ylabel(ax, label)
@@ -413,9 +552,17 @@ def build_figure(
     # stop can be traced top-to-bottom across all panels (heatmap cells with the
     # same value merge otherwise, hiding the boundary).
     for ax in axes:
-        ax.vlines(stop_edges[1:-1], 0, 1, transform=ax.get_xaxis_transform(),
-                  colors="0.3", linewidths=0.45, alpha=0.5, zorder=4,
-                  rasterized=True)
+        ax.vlines(
+            stop_edges[1:-1],
+            0,
+            1,
+            transform=ax.get_xaxis_transform(),
+            colors="0.3",
+            linewidths=0.45,
+            alpha=0.5,
+            zorder=4,
+            rasterized=True,
+        )
 
     for ax in axes[:-1]:
         ax.tick_params(labelbottom=False)
@@ -437,34 +584,83 @@ def build_figure(
     )
 
     legend = [
-        Line2D([0], [0], marker="o", color="none", markerfacecolor="0.35",
-               markersize=8, label="content: opacity = posterior fraction"),
-        Line2D([0], [0], marker="o", color="none", markerfacecolor="none",
-               markeredgecolor="black", markersize=8, label="animal's current arm"),
-        Line2D([0], [0], marker="s", color="none", markerfacecolor="#222222",
-               markersize=7, label="binary track filled = yes"),
-        Line2D([0], [0], marker="x", color="0.6", linestyle="none",
-               markersize=7, label="missing covariate"),
-        Line2D([0], [0], marker="s", color="none", markerfacecolor=palette[2],
-               markersize=7, label="arm strip: color = arm identity"),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="none",
+            markerfacecolor="0.35",
+            markersize=8,
+            label="content: opacity = posterior fraction",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="none",
+            markerfacecolor="none",
+            markeredgecolor="black",
+            markersize=8,
+            label="animal's current arm",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="s",
+            color="none",
+            markerfacecolor="#222222",
+            markersize=7,
+            label="binary track filled = yes",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="x",
+            color="0.6",
+            linestyle="none",
+            markersize=7,
+            label="missing covariate",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker="s",
+            color="none",
+            markerfacecolor=palette[2],
+            markersize=7,
+            label="arm strip: color = arm identity",
+        ),
     ]
-    axes[-1].legend(handles=legend, loc="upper left", bbox_to_anchor=(0, -0.55),
-                    frameon=False, fontsize=7.5, ncol=5)
+    axes[-1].legend(
+        handles=legend,
+        loc="upper left",
+        bbox_to_anchor=(0, -0.55),
+        frameon=False,
+        fontsize=7.5,
+        ncol=5,
+    )
     return fig, n_bouts
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     p.add_argument("--animal", default="chimi")
     p.add_argument("--day", type=int, default=20200227)
     p.add_argument("--epoch", default="04_r2")
-    p.add_argument("--out", default=None,
-                   help="output PNG path (default: .claude/research/...)")
-    p.add_argument("--pdf", action="store_true",
-                   help="also write a vector PDF alongside the PNG")
-    p.add_argument("--dpi", type=int, default=150,
-                   help="raster DPI (heatmaps/scatter are rasterized)")
+    p.add_argument(
+        "--out", default=None, help="output PNG path (default: .claude/research/...)"
+    )
+    p.add_argument(
+        "--pdf", action="store_true", help="also write a vector PDF alongside the PNG"
+    )
+    p.add_argument(
+        "--dpi",
+        type=int,
+        default=150,
+        help="raster DPI (heatmaps/scatter are rasterized)",
+    )
     args = p.parse_args()
 
     event_arm = read_table(table_path("event_arm_table", RC_DIR))
@@ -494,8 +690,11 @@ def main() -> None:
     stops = stops.merge(qvals[["stop_id", *value_state]], on="stop_id", how="left")
 
     def slc(df):
-        return df[(df.animal == args.animal) & (df.session_date == args.day)
-                  & (df.epoch == args.epoch)]
+        return df[
+            (df.animal == args.animal)
+            & (df.session_date == args.day)
+            & (df.epoch == args.epoch)
+        ]
 
     sub, sst = slc(event_arm), slc(stops)
     if sub.empty:
@@ -509,8 +708,10 @@ def main() -> None:
     out = args.out
     if out is None:
         os.makedirs(DEFAULT_OUT_DIR, exist_ok=True)
-        out = str(DEFAULT_OUT_DIR
-                  / f"{args.animal}{args.day}_{args.epoch}_nonlocal_bout_arms.png")
+        out = str(
+            DEFAULT_OUT_DIR
+            / f"{args.animal}{args.day}_{args.epoch}_nonlocal_bout_arms.png"
+        )
     fig.savefig(out, dpi=args.dpi, bbox_inches="tight")
     written = [out]
     if args.pdf:

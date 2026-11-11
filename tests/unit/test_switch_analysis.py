@@ -1,4 +1,5 @@
 """Tests for switch_analysis session-boundary handling."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -37,24 +38,34 @@ def _make_two_session_stop_table() -> pd.DataFrame:
     rows = []
     # Session 1: 5 stops, last one is a switch (is_stay=0)
     for i in range(5):
-        rows.append({
-            "animal": "test", "session_date": 20200101, "epoch": "02_r1",
-            "stop_idx": i, "stop_id": i,
-            "is_stay": 1.0 if i < 4 else 0.0,
-            "current_patch": 1,
-            "has_replay": True,
-            "n_selected_events": 2,
-        })
+        rows.append(
+            {
+                "animal": "test",
+                "session_date": 20200101,
+                "epoch": "02_r1",
+                "stop_idx": i,
+                "stop_id": i,
+                "is_stay": 1.0 if i < 4 else 0.0,
+                "current_patch": 1,
+                "has_replay": True,
+                "n_selected_events": 2,
+            }
+        )
     # Session 2: 5 stops, first one is also a switch
     for i in range(5):
-        rows.append({
-            "animal": "test", "session_date": 20200102, "epoch": "02_r1",
-            "stop_idx": i, "stop_id": 100 + i,
-            "is_stay": 0.0 if i == 0 else 1.0,
-            "current_patch": 2,
-            "has_replay": True,
-            "n_selected_events": 2,
-        })
+        rows.append(
+            {
+                "animal": "test",
+                "session_date": 20200102,
+                "epoch": "02_r1",
+                "stop_idx": i,
+                "stop_id": 100 + i,
+                "is_stay": 0.0 if i == 0 else 1.0,
+                "current_patch": 2,
+                "has_replay": True,
+                "n_selected_events": 2,
+            }
+        )
     return _with_trip_record(pd.DataFrame(rows))
 
 
@@ -118,8 +129,9 @@ def test_shift_does_not_leak_across_sessions():
 
     assert first_switches is not None
     keys = list(
-        first_switches[["animal", "session_date", "epoch", "stop_idx"]]
-        .itertuples(index=False, name=None)
+        first_switches[["animal", "session_date", "epoch", "stop_idx"]].itertuples(
+            index=False, name=None
+        )
     )
     assert ("test", 20200101, "02_r1", 4) in keys, (
         "Session 1's last stop is a switch and must be detected as a "
@@ -173,32 +185,82 @@ def test_first_switch_detection_sorts_by_stop_idx():
     # patch-relative tests below — replay tied to stop 0 so each
     # detected first-switch episode adds at least one preceding row.
     stop_rows = [
-        {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
-         "stop_idx": 3, "stop_id": 3, "is_stay": 0.0,
-         "current_patch": 1, "has_replay": False, "n_selected_events": 0},
-        {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
-         "stop_idx": 0, "stop_id": 0, "is_stay": 1.0,
-         "current_patch": 1, "has_replay": True, "n_selected_events": 1},
-        {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
-         "stop_idx": 1, "stop_id": 1, "is_stay": 1.0,
-         "current_patch": 1, "has_replay": False, "n_selected_events": 0},
-        {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
-         "stop_idx": 2, "stop_id": 2, "is_stay": 0.0,
-         "current_patch": 1, "has_replay": False, "n_selected_events": 0},
+        {
+            "animal": "test",
+            "session_date": 20200101,
+            "epoch": "02_r1",
+            "stop_idx": 3,
+            "stop_id": 3,
+            "is_stay": 0.0,
+            "current_patch": 1,
+            "has_replay": False,
+            "n_selected_events": 0,
+        },
+        {
+            "animal": "test",
+            "session_date": 20200101,
+            "epoch": "02_r1",
+            "stop_idx": 0,
+            "stop_id": 0,
+            "is_stay": 1.0,
+            "current_patch": 1,
+            "has_replay": True,
+            "n_selected_events": 1,
+        },
+        {
+            "animal": "test",
+            "session_date": 20200101,
+            "epoch": "02_r1",
+            "stop_idx": 1,
+            "stop_id": 1,
+            "is_stay": 1.0,
+            "current_patch": 1,
+            "has_replay": False,
+            "n_selected_events": 0,
+        },
+        {
+            "animal": "test",
+            "session_date": 20200101,
+            "epoch": "02_r1",
+            "stop_idx": 2,
+            "stop_id": 2,
+            "is_stay": 0.0,
+            "current_patch": 1,
+            "has_replay": False,
+            "n_selected_events": 0,
+        },
     ]
     stop_table = _with_trip_record(pd.DataFrame(stop_rows))
 
-    event_table = pd.DataFrame([
-        {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
-         "event_id": 100, "stop_id": 0, "current_patch": 1,
-         "is_swr": True, "is_mua": False},
-    ])
-    event_arm_table = pd.DataFrame([
-        {"animal": "test", "session_date": 20200101, "epoch": "02_r1",
-         "event_id": 100, "stop_id": 0, "candidate_arm": arm,
-         "arm_fraction": 1.0 if arm == 0 else 0.0, "current_patch": 1}
-        for arm in range(9)
-    ])
+    event_table = pd.DataFrame(
+        [
+            {
+                "animal": "test",
+                "session_date": 20200101,
+                "epoch": "02_r1",
+                "event_id": 100,
+                "stop_id": 0,
+                "current_patch": 1,
+                "is_swr": True,
+                "is_mua": False,
+            },
+        ]
+    )
+    event_arm_table = pd.DataFrame(
+        [
+            {
+                "animal": "test",
+                "session_date": 20200101,
+                "epoch": "02_r1",
+                "event_id": 100,
+                "stop_id": 0,
+                "candidate_arm": arm,
+                "arm_fraction": 1.0 if arm == 0 else 0.0,
+                "current_patch": 1,
+            }
+            for arm in range(9)
+        ]
+    )
 
     out = build_switch_aligned_table(
         stop_table, event_table, event_arm_table, max_lag=5
@@ -211,7 +273,9 @@ def test_first_switch_detection_sorts_by_stop_idx():
     )
 
 
-def _make_control_window_fixture() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _make_control_window_fixture() -> tuple[
+    pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame
+]:
     """One session, 30 stops, single switch at stop_idx=5 plus a
     second switch at stop_idx=20 used as the episode's switch_stop_idx.
 
@@ -228,17 +292,19 @@ def _make_control_window_fixture() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataF
     """
     rows = []
     for i in range(30):
-        rows.append({
-            "animal": "test",
-            "session_date": 20200101,
-            "epoch": "02_r1",
-            "stop_idx": i,
-            "stop_id": i,
-            "is_stay": 0.0 if i in (5, 20) else 1.0,
-            "current_patch": 1,
-            "has_replay": True,
-            "n_selected_events": 2,
-        })
+        rows.append(
+            {
+                "animal": "test",
+                "session_date": 20200101,
+                "epoch": "02_r1",
+                "stop_idx": i,
+                "stop_id": i,
+                "is_stay": 0.0 if i in (5, 20) else 1.0,
+                "current_patch": 1,
+                "has_replay": True,
+                "n_selected_events": 2,
+            }
+        )
     stop_table = pd.DataFrame(rows)
 
     # One event per stop on a single arm (arm 0, patch 1).
@@ -254,13 +320,15 @@ def _make_control_window_fixture() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataF
     eat_rows = []
     for sid in stop_table["stop_id"]:
         for arm in range(9):
-            eat_rows.append({
-                "event_id": int(sid),
-                "stop_id": int(sid),
-                "candidate_arm": arm,
-                "arm_fraction": 1.0 if arm == 0 else 0.0,
-                "current_patch": 1,
-            })
+            eat_rows.append(
+                {
+                    "event_id": int(sid),
+                    "stop_id": int(sid),
+                    "candidate_arm": arm,
+                    "arm_fraction": 1.0 if arm == 0 else 0.0,
+                    "current_patch": 1,
+                }
+            )
     event_arm_table = pd.DataFrame(eat_rows)
 
     switch_episodes = pd.DataFrame(
@@ -340,26 +408,78 @@ def _make_patch_relative_fixture():
     reported ``replay_fraction_current_patch=1.0`` against the switch's
     current_patch=2, even though that replay landed on patch 1.
     """
-    stop_table = pd.DataFrame([
-        {"animal": "a", "session_date": 1, "epoch": "e1", "stop_idx": 0, "stop_id": 0,
-         "is_stay": 1.0, "current_patch": 1, "has_replay": True, "n_selected_events": 1},
-        {"animal": "a", "session_date": 1, "epoch": "e1", "stop_idx": 1, "stop_id": 1,
-         "is_stay": 1.0, "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-        {"animal": "a", "session_date": 1, "epoch": "e1", "stop_idx": 2, "stop_id": 2,
-         "is_stay": 1.0, "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-        {"animal": "a", "session_date": 1, "epoch": "e1", "stop_idx": 3, "stop_id": 3,
-         "is_stay": 0.0, "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-    ])
+    stop_table = pd.DataFrame(
+        [
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "stop_idx": 0,
+                "stop_id": 0,
+                "is_stay": 1.0,
+                "current_patch": 1,
+                "has_replay": True,
+                "n_selected_events": 1,
+            },
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "stop_idx": 1,
+                "stop_id": 1,
+                "is_stay": 1.0,
+                "current_patch": 2,
+                "has_replay": False,
+                "n_selected_events": 0,
+            },
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "stop_idx": 2,
+                "stop_id": 2,
+                "is_stay": 1.0,
+                "current_patch": 2,
+                "has_replay": False,
+                "n_selected_events": 0,
+            },
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "stop_idx": 3,
+                "stop_id": 3,
+                "is_stay": 0.0,
+                "current_patch": 2,
+                "has_replay": False,
+                "n_selected_events": 0,
+            },
+        ]
+    )
     stop_table = _with_trip_record(stop_table)
-    event_table = pd.DataFrame([
-        {"event_id": 100, "stop_id": 0, "current_patch": 1,
-         "is_swr": True, "is_mua": False},
-    ])
-    event_arm_table = pd.DataFrame([
-        {"event_id": 100, "stop_id": 0, "candidate_arm": arm,
-         "arm_fraction": 1.0 if arm == 0 else 0.0, "current_patch": 1}
-        for arm in range(9)
-    ])
+    event_table = pd.DataFrame(
+        [
+            {
+                "event_id": 100,
+                "stop_id": 0,
+                "current_patch": 1,
+                "is_swr": True,
+                "is_mua": False,
+            },
+        ]
+    )
+    event_arm_table = pd.DataFrame(
+        [
+            {
+                "event_id": 100,
+                "stop_id": 0,
+                "candidate_arm": arm,
+                "arm_fraction": 1.0 if arm == 0 else 0.0,
+                "current_patch": 1,
+            }
+            for arm in range(9)
+        ]
+    )
     return stop_table, event_table, event_arm_table
 
 
@@ -397,12 +517,8 @@ def test_switch_aligned_replay_attributes_when_replay_matches_switch():
     # Move the replay to arm 2 (patch 2), so it now matches the
     # switch's current_patch=2.
     event_arm_table = event_arm_table.copy()
-    event_arm_table.loc[
-        event_arm_table["candidate_arm"] == 0, "arm_fraction"
-    ] = 0.0
-    event_arm_table.loc[
-        event_arm_table["candidate_arm"] == 2, "arm_fraction"
-    ] = 1.0
+    event_arm_table.loc[event_arm_table["candidate_arm"] == 0, "arm_fraction"] = 0.0
+    event_arm_table.loc[event_arm_table["candidate_arm"] == 2, "arm_fraction"] = 1.0
     out = build_switch_aligned_table(
         stop_table, event_table, event_arm_table, max_lag=5
     )
@@ -431,42 +547,85 @@ def test_control_aligned_replay_relative_to_switch_patch():
     # outside the ±max_lag exclusion zone.
     rows = []
     for i in range(4):
-        rows.append({
-            "animal": "a", "session_date": 1, "epoch": "e1",
-            "stop_idx": i, "stop_id": 1000 + i,
-            "is_stay": 1.0, "current_patch": 1,
-            "has_replay": False, "n_selected_events": 0,
-        })
-    rows.append({
-        "animal": "a", "session_date": 1, "epoch": "e1",
-        "stop_idx": 4, "stop_id": 0,
-        "is_stay": 1.0, "current_patch": 1,
-        "has_replay": True, "n_selected_events": 1,
-    })
+        rows.append(
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "stop_idx": i,
+                "stop_id": 1000 + i,
+                "is_stay": 1.0,
+                "current_patch": 1,
+                "has_replay": False,
+                "n_selected_events": 0,
+            }
+        )
+    rows.append(
+        {
+            "animal": "a",
+            "session_date": 1,
+            "epoch": "e1",
+            "stop_idx": 4,
+            "stop_id": 0,
+            "is_stay": 1.0,
+            "current_patch": 1,
+            "has_replay": True,
+            "n_selected_events": 1,
+        }
+    )
     for i in range(5, 15):
-        rows.append({
-            "animal": "a", "session_date": 1, "epoch": "e1",
-            "stop_idx": i, "stop_id": 1000 + i,
-            "is_stay": 1.0, "current_patch": 1,
-            "has_replay": False, "n_selected_events": 0,
-        })
+        rows.append(
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "stop_idx": i,
+                "stop_id": 1000 + i,
+                "is_stay": 1.0,
+                "current_patch": 1,
+                "has_replay": False,
+                "n_selected_events": 0,
+            }
+        )
     stop_table = pd.DataFrame(rows)
-    event_table = pd.DataFrame([
-        {"event_id": 200, "stop_id": 0, "current_patch": 1,
-         "is_swr": True, "is_mua": False},
-    ])
-    event_arm_table = pd.DataFrame([
-        {"event_id": 200, "stop_id": 0, "candidate_arm": arm,
-         "arm_fraction": 1.0 if arm == 0 else 0.0, "current_patch": 1}
-        for arm in range(9)
-    ])
+    event_table = pd.DataFrame(
+        [
+            {
+                "event_id": 200,
+                "stop_id": 0,
+                "current_patch": 1,
+                "is_swr": True,
+                "is_mua": False,
+            },
+        ]
+    )
+    event_arm_table = pd.DataFrame(
+        [
+            {
+                "event_id": 200,
+                "stop_id": 0,
+                "candidate_arm": arm,
+                "arm_fraction": 1.0 if arm == 0 else 0.0,
+                "current_patch": 1,
+            }
+            for arm in range(9)
+        ]
+    )
     # Matched switch episode: current_patch=2, switch_stop_idx=200
     # (far outside ±max_lag, so all stays in the session are
     # eligible anchors).
-    switch_episodes = pd.DataFrame([
-        {"episode_id": 1, "animal": "a", "session_date": 1, "epoch": "e1",
-         "current_patch": 2, "switch_stop_idx": 200},
-    ])
+    switch_episodes = pd.DataFrame(
+        [
+            {
+                "episode_id": 1,
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "current_patch": 2,
+                "switch_stop_idx": 200,
+            },
+        ]
+    )
 
     # Pin the rng so ``possible_anchors.iloc[5]`` is picked — that
     # corresponds to stop_idx=10 in the fixture, whose [0, 10) window
@@ -509,34 +668,84 @@ def _make_two_session_collision_fixture(replay_arms: tuple[int, int]):
     rows_st = []
     rows_et = []
     rows_eat = []
-    for animal, session_date, arm in (("a", 1, replay_arms[0]), ("b", 2, replay_arms[1])):
-        rows_st.extend([
-            {"animal": animal, "session_date": session_date, "epoch": "e1",
-             "stop_idx": 0, "stop_id": 0, "is_stay": 1.0,
-             "current_patch": 1, "has_replay": True, "n_selected_events": 1},
-            {"animal": animal, "session_date": session_date, "epoch": "e1",
-             "stop_idx": 1, "stop_id": 1, "is_stay": 1.0,
-             "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-            {"animal": animal, "session_date": session_date, "epoch": "e1",
-             "stop_idx": 2, "stop_id": 2, "is_stay": 1.0,
-             "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-            {"animal": animal, "session_date": session_date, "epoch": "e1",
-             "stop_idx": 3, "stop_id": 3, "is_stay": 0.0,
-             "current_patch": 2, "has_replay": False, "n_selected_events": 0},
-        ])
+    for animal, session_date, arm in (
+        ("a", 1, replay_arms[0]),
+        ("b", 2, replay_arms[1]),
+    ):
+        rows_st.extend(
+            [
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": "e1",
+                    "stop_idx": 0,
+                    "stop_id": 0,
+                    "is_stay": 1.0,
+                    "current_patch": 1,
+                    "has_replay": True,
+                    "n_selected_events": 1,
+                },
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": "e1",
+                    "stop_idx": 1,
+                    "stop_id": 1,
+                    "is_stay": 1.0,
+                    "current_patch": 2,
+                    "has_replay": False,
+                    "n_selected_events": 0,
+                },
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": "e1",
+                    "stop_idx": 2,
+                    "stop_id": 2,
+                    "is_stay": 1.0,
+                    "current_patch": 2,
+                    "has_replay": False,
+                    "n_selected_events": 0,
+                },
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": "e1",
+                    "stop_idx": 3,
+                    "stop_id": 3,
+                    "is_stay": 0.0,
+                    "current_patch": 2,
+                    "has_replay": False,
+                    "n_selected_events": 0,
+                },
+            ]
+        )
         eid = 100 if animal == "a" else 101
-        rows_et.append({
-            "animal": animal, "session_date": session_date, "epoch": "e1",
-            "event_id": eid, "stop_id": 0, "current_patch": 1,
-            "is_swr": True, "is_mua": False,
-        })
-        for a in range(9):
-            rows_eat.append({
-                "animal": animal, "session_date": session_date, "epoch": "e1",
-                "event_id": eid, "stop_id": 0, "candidate_arm": a,
-                "arm_fraction": 1.0 if a == arm else 0.0,
+        rows_et.append(
+            {
+                "animal": animal,
+                "session_date": session_date,
+                "epoch": "e1",
+                "event_id": eid,
+                "stop_id": 0,
                 "current_patch": 1,
-            })
+                "is_swr": True,
+                "is_mua": False,
+            }
+        )
+        for a in range(9):
+            rows_eat.append(
+                {
+                    "animal": animal,
+                    "session_date": session_date,
+                    "epoch": "e1",
+                    "event_id": eid,
+                    "stop_id": 0,
+                    "candidate_arm": a,
+                    "arm_fraction": 1.0 if a == arm else 0.0,
+                    "current_patch": 1,
+                }
+            )
     return (
         _with_trip_record(pd.DataFrame(rows_st)),
         pd.DataFrame(rows_et),
@@ -606,16 +815,22 @@ def test_stop_replay_per_patch_fallback_merge_still_validates_stop_id():
         [
             *(
                 {
-                    "animal": "a", "session_date": 1, "epoch": "e1",
-                    "event_id": 100, "candidate_arm": a,
+                    "animal": "a",
+                    "session_date": 1,
+                    "epoch": "e1",
+                    "event_id": 100,
+                    "candidate_arm": a,
                     "arm_fraction": 1.0 if a == 0 else 0.0,
                 }
                 for a in range(9)
             ),
             *(
                 {
-                    "animal": "b", "session_date": 2, "epoch": "e1",
-                    "event_id": 101, "candidate_arm": a,
+                    "animal": "b",
+                    "session_date": 2,
+                    "epoch": "e1",
+                    "event_id": 101,
+                    "candidate_arm": a,
                     "arm_fraction": 1.0 if a == 2 else 0.0,
                 }
                 for a in range(9)
@@ -624,10 +839,20 @@ def test_stop_replay_per_patch_fallback_merge_still_validates_stop_id():
     )
     et = pd.DataFrame(
         [
-            {"animal": "a", "session_date": 1, "epoch": "e1",
-             "event_id": 100, "stop_id": 0},
-            {"animal": "b", "session_date": 2, "epoch": "e1",
-             "event_id": 101, "stop_id": 0},
+            {
+                "animal": "a",
+                "session_date": 1,
+                "epoch": "e1",
+                "event_id": 100,
+                "stop_id": 0,
+            },
+            {
+                "animal": "b",
+                "session_date": 2,
+                "epoch": "e1",
+                "event_id": 101,
+                "stop_id": 0,
+            },
         ]
     )
     with pytest.raises(ValueError, match="must be globally unique across sessions"):

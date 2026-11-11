@@ -1,8 +1,15 @@
 # Corrections to the literature parameter sheet
 
-*Record of what was checked in
-[literature_detection_parameters.csv](literature_detection_parameters.csv), what was
+*Record of what was checked in `literature_detection_parameters.csv`, what was
 changed, and what remains unverified. Checked 2026-09-21 against the papers' Methods.*
+
+*Historical record. The CSV this describes was removed from this directory on 2026-11-10.
+The survey was audited further in the `ripple_detection` repository (against primary sources
+and released code, through 2026-09-25); the paper's copy of that audited survey is
+Supplementary Table S1,
+[../../../paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv).
+"Both the CSV in this directory and the Google Sheet" below describes the state on
+2026-09-21.*
 
 Both the CSV in this directory and the Google Sheet it came from carry the 67
 corrections below, the three papers and seven columns added afterwards, and the

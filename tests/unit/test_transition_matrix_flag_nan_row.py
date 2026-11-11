@@ -29,17 +29,25 @@ def _summary_row(**transitions: float) -> pd.DataFrame:
     """
     base: dict[str, float] = {
         # Local row
-        "T_local_local": 0.99, "T_local_nospike": 0.005,
-        "T_local_nlc": 0.003, "T_local_nlf": 0.002,
+        "T_local_local": 0.99,
+        "T_local_nospike": 0.005,
+        "T_local_nlc": 0.003,
+        "T_local_nlf": 0.002,
         # No-Spike row
-        "T_nospike_local": 0.04, "T_nospike_nospike": 0.95,
-        "T_nospike_nlc": 0.005, "T_nospike_nlf": 0.005,
+        "T_nospike_local": 0.04,
+        "T_nospike_nospike": 0.95,
+        "T_nospike_nlc": 0.005,
+        "T_nospike_nlf": 0.005,
         # NLC row
-        "T_nlc_local": 0.04, "T_nlc_nospike": 0.005,
-        "T_nlc_nlc": 0.94, "T_nlc_nlf": 0.015,
+        "T_nlc_local": 0.04,
+        "T_nlc_nospike": 0.005,
+        "T_nlc_nlc": 0.94,
+        "T_nlc_nlf": 0.015,
         # NLF row (cross-type < self-transition)
-        "T_nlf_local": 0.04, "T_nlf_nospike": 0.005,
-        "T_nlf_nlc": 0.025, "T_nlf_nlf": 0.93,
+        "T_nlf_local": 0.04,
+        "T_nlf_nospike": 0.005,
+        "T_nlf_nlc": 0.025,
+        "T_nlf_nlf": 0.93,
     }
     base.update(transitions)
     return pd.DataFrame([base])

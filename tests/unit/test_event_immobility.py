@@ -74,9 +74,7 @@ def test_empty_speed_array_is_not_immobile():
 
 def test_cohort_preserves_source_ids_when_an_earlier_event_is_rejected():
     """Filtering must leave ID gaps rather than renumber surviving events."""
-    events = pd.DataFrame(
-        {"start_time": [0.0, 3.0], "end_time": [1.0, 4.0]}
-    )
+    events = pd.DataFrame({"start_time": [0.0, 3.0], "end_time": [1.0, 4.0]})
     time = pd.Index(np.arange(5, dtype=float), name="time")
     speed = np.array([4.0, 1.0, 0.0, 1.0, 1.0])
 
@@ -98,9 +96,7 @@ def test_cohort_preserves_source_ids_when_an_earlier_event_is_rejected():
 
 def test_cohort_can_number_only_eligible_nonlocal_intervals():
     """Non-Local IDs retain the historical post-selection numbering rule."""
-    events = pd.DataFrame(
-        {"start_time": [0.0, 3.0], "end_time": [1.0, 4.0]}
-    )
+    events = pd.DataFrame({"start_time": [0.0, 3.0], "end_time": [1.0, 4.0]})
     time = pd.Index(np.arange(5, dtype=float), name="time")
     speed = np.array([4.0, 1.0, 0.0, 1.0, 1.0])
 
@@ -141,9 +137,7 @@ def test_cohort_rejects_same_source_intervals_sharing_a_sample():
     Label overwrite followed by filtering used to let a rejected later event
     erase the overlapping tail of an otherwise eligible earlier event.
     """
-    events = pd.DataFrame(
-        {"start_time": [0.0, 1.0], "end_time": [2.0, 3.0]}
-    )
+    events = pd.DataFrame({"start_time": [0.0, 1.0], "end_time": [2.0, 3.0]})
     time = pd.Index(np.arange(4, dtype=float), name="time")
     speed = np.array([1.0, 1.0, 1.0, 5.0])
 
@@ -206,9 +200,7 @@ def test_filtering_labels_is_atomic_and_does_not_mutate_input():
     )
     original = data.copy()
 
-    filtered = filter_event_labels_by_speed(
-        data, ["SWR_event", "MUA_event"]
-    )
+    filtered = filter_event_labels_by_speed(data, ["SWR_event", "MUA_event"])
 
     assert filtered["SWR_event"].tolist() == [0, 0, 0, 0, 2, 2]
     assert filtered["MUA_event"].tolist() == [0, 0, 0, 0, 4, 4]
@@ -260,9 +252,7 @@ def test_nonlocal_probability_columns_are_required_only_for_active_labels():
         )
 
 
-@pytest.mark.parametrize(
-    "threshold", [0.0, -1.0, np.nan, np.inf, -np.inf]
-)
+@pytest.mark.parametrize("threshold", [0.0, -1.0, np.nan, np.inf, -np.inf])
 def test_invalid_speed_threshold_raises(threshold):
     data = pd.DataFrame(
         {

@@ -3,6 +3,7 @@
 Run with:
     python tests/benchmarks/bench_conditional_ll.py
 """
+
 from __future__ import annotations
 
 import time
@@ -58,12 +59,16 @@ def main():
 
     # Verify identical output
     np.testing.assert_allclose(
-        old, new, rtol=1e-10,
+        old,
+        new,
+        rtol=1e-10,
         err_msg="_held_out_conditional_ll: vectorized differs from loop",
     )
 
     speedup = t_old / t_new if t_new > 0 else float("inf")
-    print(f"_held_out_conditional_ll  loop={t_old:.4f}s  vectorized={t_new:.4f}s  speedup={speedup:.1f}x")
+    print(
+        f"_held_out_conditional_ll  loop={t_old:.4f}s  vectorized={t_new:.4f}s  speedup={speedup:.1f}x"
+    )
     print(f"  LL value: {new:.6f}")
     print("\nOutputs match (rtol=1e-10).")
 

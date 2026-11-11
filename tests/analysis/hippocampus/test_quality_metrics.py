@@ -169,7 +169,9 @@ class TestComputeLocalDecodingError:
         assert result["p90_error_cm"].iloc[0] == pytest.approx(0.0)
 
     def test_collapsed_session_excludes_bad_bins(self, collapsed_session):
-        result = compute_local_decoding_error(collapsed_session, local_prob_threshold=0.5)
+        result = compute_local_decoding_error(
+            collapsed_session, local_prob_threshold=0.5
+        )
         assert result["median_error_cm"].iloc[0] == pytest.approx(0.0)
         assert result["n_local_bins"].iloc[0] < N_BINS
 
@@ -181,8 +183,12 @@ class TestComputeLocalDecodingError:
     def test_empty_data_returns_empty_df(self):
         empty = pd.DataFrame(
             columns=[
-                "Local_prob", "ahead_behind_distance",
-                "animal", "day", "epoch", "in_excluded_time",
+                "Local_prob",
+                "ahead_behind_distance",
+                "animal",
+                "day",
+                "epoch",
+                "in_excluded_time",
             ]
         ).astype({"in_excluded_time": bool})
         result = compute_local_decoding_error(empty)
@@ -192,7 +198,8 @@ class TestComputeLocalDecodingError:
 class TestComputeStateFractionDuringMovement:
     def test_perfect_session_local_fraction_is_one(self, perfect_session):
         result = compute_state_fraction_during_movement(
-            perfect_session, sampling_frequency=SAMPLING_FREQUENCY,
+            perfect_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert result["local_fraction"].iloc[0] == pytest.approx(1.0)
         assert result["max_collapse_duration_sec"].iloc[0] == pytest.approx(0.0)
@@ -200,7 +207,8 @@ class TestComputeStateFractionDuringMovement:
 
     def test_collapsed_session_detects_collapse(self, collapsed_session):
         result = compute_state_fraction_during_movement(
-            collapsed_session, sampling_frequency=SAMPLING_FREQUENCY,
+            collapsed_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         # local_fraction is mean of Local_prob during movement: (0.9*600 + 0.1*400)/1000 = 0.58
         assert result["local_fraction"].iloc[0] < 1.0
@@ -212,7 +220,8 @@ class TestComputeStateFractionDuringMovement:
     def test_immobile_session_excluded(self, session_with_events):
         """Session where animal is immobile should have no moving bins."""
         result = compute_state_fraction_during_movement(
-            session_with_events, speed_threshold=4.0,
+            session_with_events,
+            speed_threshold=4.0,
         )
         assert len(result) == 0
 
@@ -220,7 +229,8 @@ class TestComputeStateFractionDuringMovement:
 class TestComputeNonLocalDuringMovement:
     def test_no_nonlocal_during_movement(self, perfect_session):
         result = compute_non_local_during_movement(
-            perfect_session, sampling_frequency=SAMPLING_FREQUENCY,
+            perfect_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert result["n_nonlocal_movement_events"].iloc[0] == 0
         assert result["nonlocal_movement_fraction"].iloc[0] == pytest.approx(0.0)
@@ -228,7 +238,8 @@ class TestComputeNonLocalDuringMovement:
     def test_detects_nonlocal_during_movement(self, collapsed_session):
         """Collapsed session has high non-local prob during movement."""
         result = compute_non_local_during_movement(
-            collapsed_session, non_local_threshold=0.5,
+            collapsed_session,
+            non_local_threshold=0.5,
             sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert result["n_nonlocal_movement_events"].iloc[0] >= 1
@@ -255,14 +266,16 @@ class TestComputeNoSpikeFiringCorrespondence:
         nospike = -mua + rng.normal(0, 0.1, n)
         nospike = np.clip(nospike, 0, 1)
 
-        data = pd.DataFrame({
-            "No-Spike_prob": nospike,
-            "MUA_zscore": mua,
-            "animal": "mouse1",
-            "day": 20200101,
-            "epoch": "02_r1",
-            "in_excluded_time": False,
-        })
+        data = pd.DataFrame(
+            {
+                "No-Spike_prob": nospike,
+                "MUA_zscore": mua,
+                "animal": "mouse1",
+                "day": 20200101,
+                "epoch": "02_r1",
+                "in_excluded_time": False,
+            }
+        )
         result = compute_no_spike_firing_correspondence(data)
         assert result["nospike_mua_rho"].iloc[0] < 0
 
@@ -274,14 +287,16 @@ class TestComputeNoSpikeFiringCorrespondence:
         nospike = mua + rng.normal(0, 0.1, n)
         nospike = np.clip(nospike, 0, 1)
 
-        data = pd.DataFrame({
-            "No-Spike_prob": nospike,
-            "MUA_zscore": mua,
-            "animal": "mouse1",
-            "day": 20200101,
-            "epoch": "02_r1",
-            "in_excluded_time": False,
-        })
+        data = pd.DataFrame(
+            {
+                "No-Spike_prob": nospike,
+                "MUA_zscore": mua,
+                "animal": "mouse1",
+                "day": 20200101,
+                "epoch": "02_r1",
+                "in_excluded_time": False,
+            }
+        )
         result = compute_no_spike_firing_correspondence(data)
         assert result["nospike_mua_rho"].iloc[0] > 0
 
@@ -314,7 +329,8 @@ class TestComputeNonLocalEventContext:
 
     def test_classifies_swr_theta_neither(self, session_with_events):
         result = compute_non_local_event_context(
-            session_with_events, theta_power_threshold=2.0,
+            session_with_events,
+            theta_power_threshold=2.0,
         )
         assert result["n_events"].iloc[0] == 3
         assert result["frac_swr"].iloc[0] == pytest.approx(1 / 3)
@@ -375,7 +391,11 @@ class TestComputeNonLocalEventContext:
 
     def test_fractions_sum_to_one(self, session_with_events):
         result = compute_non_local_event_context(session_with_events)
-        total = result["frac_swr"].iloc[0] + result["frac_theta"].iloc[0] + result["frac_neither"].iloc[0]
+        total = (
+            result["frac_swr"].iloc[0]
+            + result["frac_theta"].iloc[0]
+            + result["frac_neither"].iloc[0]
+        )
         assert total == pytest.approx(1.0)
 
     def test_no_events_returns_empty(self, perfect_session):
@@ -438,7 +458,13 @@ class TestComputeNonLocalEventContext:
         # Event 1: 5 samples, two are NaN — should average over the
         # three finite samples.
         finite_phases = [0.5, 0.55, 0.6]
-        sample_phases = [finite_phases[0], np.nan, finite_phases[1], np.nan, finite_phases[2]]
+        sample_phases = [
+            finite_phases[0],
+            np.nan,
+            finite_phases[1],
+            np.nan,
+            finite_phases[2],
+        ]
         for phase in sample_phases:
             rows.append(
                 {
@@ -491,21 +517,23 @@ class TestComputeNonLocalEventContext:
         positive-duration semantics must classify it as theta- or
         neither-associated, not SWR-associated."""
         # NL labels [0.0, 1.0]; SWR labels [1.0, 2.0]; share t=1.0.
-        df = _with_valid_nonlocal_probabilities(pd.DataFrame(
-            {
-                "animal": ["a"] * 5,
-                "day": [1] * 5,
-                "epoch": ["e1"] * 5,
-                "non_local_event": [1, 1, 1, 0, 0],
-                "SWR_event": [0, 0, 2, 2, 2],
-                "MUA_event": [0, 0, 0, 0, 0],
-                "head_speed": [0.0] * 5,
-                "theta_phase": [np.nan] * 5,
-                "theta_power_zscore": [0.0] * 5,
-                "in_excluded_time": False,
-            },
-            index=[0.0, 0.5, 1.0, 1.5, 2.0],
-        ))
+        df = _with_valid_nonlocal_probabilities(
+            pd.DataFrame(
+                {
+                    "animal": ["a"] * 5,
+                    "day": [1] * 5,
+                    "epoch": ["e1"] * 5,
+                    "non_local_event": [1, 1, 1, 0, 0],
+                    "SWR_event": [0, 0, 2, 2, 2],
+                    "MUA_event": [0, 0, 0, 0, 0],
+                    "head_speed": [0.0] * 5,
+                    "theta_phase": [np.nan] * 5,
+                    "theta_power_zscore": [0.0] * 5,
+                    "in_excluded_time": False,
+                },
+                index=[0.0, 0.5, 1.0, 1.5, 2.0],
+            )
+        )
         out = compute_non_local_event_context(df)
         assert out["frac_swr"].iloc[0] == 0.0, (
             f"frac_swr={out['frac_swr'].iloc[0]} — boundary-touch SWR "
@@ -545,13 +573,15 @@ class TestComputeNonLocalEventContext:
 class TestComputeLocalStateCollapseDetails:
     def test_no_collapse_in_perfect_session(self, perfect_session):
         result = compute_local_state_collapse_details(
-            perfect_session, sampling_frequency=SAMPLING_FREQUENCY,
+            perfect_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert len(result) == 0
 
     def test_detects_collapse_episode(self, collapsed_session):
         result = compute_local_state_collapse_details(
-            collapsed_session, sampling_frequency=SAMPLING_FREQUENCY,
+            collapsed_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert len(result) >= 1
         episode = result.iloc[0]
@@ -563,7 +593,8 @@ class TestComputeLocalStateCollapseDetails:
         """Collapse region has hpd=50, rest has hpd=5, so session median ~ 5.
         Collapse hpd (50) > median (5) -> uncertain."""
         result = compute_local_state_collapse_details(
-            collapsed_session, sampling_frequency=SAMPLING_FREQUENCY,
+            collapsed_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert result.iloc[0]["classification"] == "uncertain"
 
@@ -571,7 +602,10 @@ class TestComputeLocalStateCollapseDetails:
 class TestComputeCalibrationCurve:
     def test_perfect_session_monotonic(self, perfect_session):
         result = compute_calibration_curve(perfect_session)
-        assert result["is_monotonic_decreasing"].iloc[0] is True or result["is_monotonic_decreasing"].iloc[0] == True  # noqa: E712
+        assert (
+            result["is_monotonic_decreasing"].iloc[0] is True
+            or result["is_monotonic_decreasing"].iloc[0] == True  # noqa: E712
+        )
 
     def test_negative_slope_for_good_decoder(self):
         """Higher Local_prob should mean lower error."""
@@ -580,14 +614,16 @@ class TestComputeCalibrationCurve:
         local_prob = rng.uniform(0, 1, n)
         error = (1 - local_prob) * 50 + rng.normal(0, 1, n)
 
-        data = pd.DataFrame({
-            "Local_prob": local_prob,
-            "ahead_behind_distance": error,
-            "animal": "mouse1",
-            "day": 20200101,
-            "epoch": "02_r1",
-            "in_excluded_time": False,
-        })
+        data = pd.DataFrame(
+            {
+                "Local_prob": local_prob,
+                "ahead_behind_distance": error,
+                "animal": "mouse1",
+                "day": 20200101,
+                "epoch": "02_r1",
+                "in_excluded_time": False,
+            }
+        )
         result = compute_calibration_curve(data)
         assert result["calibration_slope"].iloc[0] < 0
 
@@ -614,8 +650,14 @@ class TestComputeCalibrationCurve:
                 # the high bin contains only NaN-error rows.
                 "Local_prob": [0.05, 0.10, 0.40, 0.60, 0.85, 0.95, 0.90, 0.92],
                 "ahead_behind_distance": [
-                    42.0, 40.0, 12.0, 10.0,
-                    np.nan, np.nan, np.nan, np.nan,
+                    42.0,
+                    40.0,
+                    12.0,
+                    10.0,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
                 ],
                 "in_excluded_time": False,
             }
@@ -655,7 +697,8 @@ class TestComputeSessionQualitySummary:
 
     def test_perfect_session_no_flags(self, perfect_session):
         result = compute_session_quality_summary(
-            perfect_session, sampling_frequency=SAMPLING_FREQUENCY,
+            perfect_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert len(result) == 1
         assert result["n_flags"].iloc[0] == 0
@@ -664,7 +707,8 @@ class TestComputeSessionQualitySummary:
         """Collapsed session should show collapse in state fractions even if
         flags don't trigger (local fraction may still be > 0.5 overall)."""
         result = compute_session_quality_summary(
-            collapsed_session, sampling_frequency=SAMPLING_FREQUENCY,
+            collapsed_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         # local_fraction < 1 because 400/1000 bins are collapsed
         assert result["local_fraction"].iloc[0] < 1.0
@@ -673,17 +717,22 @@ class TestComputeSessionQualitySummary:
     def test_multi_session(self, perfect_session, collapsed_session):
         combined = pd.concat([perfect_session, collapsed_session])
         result = compute_session_quality_summary(
-            combined, sampling_frequency=SAMPLING_FREQUENCY,
+            combined,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         assert len(result) == 2
 
     def test_output_has_continuous_metrics(self, perfect_session):
         result = compute_session_quality_summary(
-            perfect_session, sampling_frequency=SAMPLING_FREQUENCY,
+            perfect_session,
+            sampling_frequency=SAMPLING_FREQUENCY,
         )
         expected_cols = [
-            "median_error_cm", "local_fraction", "nospike_mua_rho",
-            "calibration_slope", "n_flags",
+            "median_error_cm",
+            "local_fraction",
+            "nospike_mua_rho",
+            "calibration_slope",
+            "n_flags",
         ]
         for col in expected_cols:
             assert col in result.columns, f"Missing column: {col}"

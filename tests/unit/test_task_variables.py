@@ -26,22 +26,27 @@ class TestPathProgressForRunSegment:
         time = np.arange(0, 1.0, 0.002)
         linear_position = np.linspace(0, 20, len(time))  # 0 to 20 cm
 
-        pos_info = pd.DataFrame({
-            'projected_x_position': linear_position,
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': np.concatenate([
-                np.zeros(len(time)//2, dtype=int),  # First half on edge 0
-                np.ones(len(time)//2, dtype=int),   # Second half on edge 1
-            ]),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": linear_position,
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": np.concatenate(
+                    [
+                        np.zeros(len(time) // 2, dtype=int),  # First half on edge 0
+                        np.ones(len(time) // 2, dtype=int),  # Second half on edge 1
+                    ]
+                ),
+            },
+            index=time,
+        )
 
         # Set node positions for distance calculation
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
         # Set edge IDs
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         progress = path_progress_for_run_segment(
             pos_info,
@@ -60,17 +65,20 @@ class TestPathProgressForRunSegment:
     def test_same_start_and_end_returns_zeros(self, simple_linear_track):
         """When start and end nodes are the same, should return all zeros."""
         time = np.arange(0, 0.5, 0.002)
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.zeros(len(time)),
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': np.zeros(len(time), dtype=int),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.zeros(len(time)),
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": np.zeros(len(time), dtype=int),
+            },
+            index=time,
+        )
 
         # Set node positions
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
 
         # Same start and end node
         progress = path_progress_for_run_segment(
@@ -86,15 +94,18 @@ class TestPathProgressForRunSegment:
     def test_empty_path_edges_returns_zeros(self, simple_linear_track):
         """When path has no edges, should return zeros."""
         time = np.arange(0, 0.5, 0.002)
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.zeros(len(time)),
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': np.zeros(len(time), dtype=int),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.zeros(len(time)),
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": np.zeros(len(time), dtype=int),
+            },
+            index=time,
+        )
 
         # Set node positions
         for node in simple_linear_track.nodes:
-            simple_linear_track.nodes[node]['pos'] = (0, 0)
+            simple_linear_track.nodes[node]["pos"] = (0, 0)
 
         # Same node means empty path
         progress = path_progress_for_run_segment(
@@ -116,18 +127,21 @@ class TestPathProgressForRunSegment:
         # The repo's deterministic-test convention is "no calls to
         # global ``np.random.*`` without a fixed seed".
         rng = np.random.default_rng(0)
-        pos_info = pd.DataFrame({
-            'projected_x_position': rng.standard_normal(len(time)) * 5,
-            'projected_y_position': rng.standard_normal(len(time)) * 5,
-            'track_segment_id': rng.choice([0, 1], size=len(time)),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": rng.standard_normal(len(time)) * 5,
+                "projected_y_position": rng.standard_normal(len(time)) * 5,
+                "track_segment_id": rng.choice([0, 1], size=len(time)),
+            },
+            index=time,
+        )
 
         # Set node positions
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         progress = path_progress_for_run_segment(
             pos_info,
@@ -146,18 +160,21 @@ class TestPathProgressForRunSegment:
         track_segments = np.zeros(len(time), dtype=float)
         track_segments[::5] = np.nan  # Every 5th point is NaN
 
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.linspace(0, 10, len(time)),
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': track_segments,
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.linspace(0, 10, len(time)),
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": track_segments,
+            },
+            index=time,
+        )
 
         # Set node positions and edge IDs
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         # Should interpolate over NaN values
         progress = path_progress_for_run_segment(
@@ -178,14 +195,19 @@ class TestPathProgressForRunSegment:
 
         # Path from well 0 to well 2 goes through center (6)
         # Segments: (6,0) -> (6,2)
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.linspace(0, 20, len(time)),
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': np.concatenate([
-                np.zeros(len(time)//2, dtype=int),  # First segment
-                np.ones(len(time)//2, dtype=int),   # Second segment
-            ]),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.linspace(0, 20, len(time)),
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": np.concatenate(
+                    [
+                        np.zeros(len(time) // 2, dtype=int),  # First segment
+                        np.ones(len(time) // 2, dtype=int),  # Second segment
+                    ]
+                ),
+            },
+            index=time,
+        )
 
         # Set node positions (arbitrary layout)
         positions = {
@@ -198,12 +220,12 @@ class TestPathProgressForRunSegment:
             6: (10, 0),  # Center
         }
         for node, pos in positions.items():
-            simplified_star_track.nodes[node]['pos'] = pos
+            simplified_star_track.nodes[node]["pos"] = pos
 
         # Set edge IDs
         edge_id = 0
         for edge in simplified_star_track.edges:
-            simplified_star_track.edges[edge]['edge_id'] = edge_id
+            simplified_star_track.edges[edge]["edge_id"] = edge_id
             edge_id += 1
 
         progress = path_progress_for_run_segment(
@@ -219,17 +241,20 @@ class TestPathProgressForRunSegment:
 
     def test_single_timepoint(self, simple_linear_track):
         """Single time point should return valid progress."""
-        pos_info = pd.DataFrame({
-            'projected_x_position': [5.0],
-            'projected_y_position': [0.0],
-            'track_segment_id': [0],
-        }, index=[0.0])
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": [5.0],
+                "projected_y_position": [0.0],
+                "track_segment_id": [0],
+            },
+            index=[0.0],
+        )
 
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         progress = path_progress_for_run_segment(
             pos_info,
@@ -249,10 +274,10 @@ class TestDistToGoal:
         """Distance to goal should decrease as animal approaches."""
         # Set node positions
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         track_segment_id_to_edge = {
             0: (0, 1),
@@ -261,13 +286,16 @@ class TestDistToGoal:
 
         # Three positions: start (x=0), middle (x=10), goal (x=20)
         time = np.array([0.0, 0.002, 0.004])
-        pos_info = pd.DataFrame({
-            'projected_x_position': [0.0, 10.0, 20.0],
-            'projected_y_position': [0.0, 0.0, 0.0],
-            'track_segment_id': [0, 1, 1],
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": [0.0, 10.0, 20.0],
+                "projected_y_position": [0.0, 0.0, 0.0],
+                "track_segment_id": [0, 1, 1],
+            },
+            index=time,
+        )
 
-        trial = pd.Series({'to_well': 2, "movement_start_time": 0.0, 'end_time': 0.006})
+        trial = pd.Series({"to_well": 2, "movement_start_time": 0.0, "end_time": 0.006})
 
         distances = dist_to_goal(
             pos_info,
@@ -283,22 +311,25 @@ class TestDistToGoal:
     def test_distance_always_non_negative(self, simple_linear_track):
         """Distance must always be non-negative."""
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         track_segment_id_to_edge = {0: (0, 1), 1: (1, 2)}
 
         x_positions = [0.0, 5.0, 10.0, 15.0, 20.0]
         time = np.arange(len(x_positions)) * 0.002
-        pos_info = pd.DataFrame({
-            'projected_x_position': x_positions,
-            'projected_y_position': [0.0] * len(x_positions),
-            'track_segment_id': [0 if x < 10 else 1 for x in x_positions],
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": x_positions,
+                "projected_y_position": [0.0] * len(x_positions),
+                "track_segment_id": [0 if x < 10 else 1 for x in x_positions],
+            },
+            index=time,
+        )
 
-        trial = pd.Series({'to_well': 2, "movement_start_time": 0.0, 'end_time': 0.01})
+        trial = pd.Series({"to_well": 2, "movement_start_time": 0.0, "end_time": 0.01})
 
         distances = dist_to_goal(
             pos_info,
@@ -307,7 +338,9 @@ class TestDistToGoal:
             track_segment_id_to_edge=track_segment_id_to_edge,
         )
 
-        assert np.all(distances >= 0.0), f"All distances must be non-negative, got {distances}"
+        assert np.all(distances >= 0.0), (
+            f"All distances must be non-negative, got {distances}"
+        )
 
 
 class TestTurnDirection:
@@ -321,33 +354,40 @@ class TestTurnDirection:
             0: (0, 0),
             1: (10, 0),
             2: (10, 10),  # Turn left from (0,0)->(10,0) to (10,0)->(10,10)
-            6: (5, 0),    # Center node
+            6: (5, 0),  # Center node
         }
         for node, pos in positions.items():
             if node in simplified_star_track.nodes:
-                simplified_star_track.nodes[node]['pos'] = pos
+                simplified_star_track.nodes[node]["pos"] = pos
 
         # Create trial data
         time = np.arange(0, 1.0, 0.002)
-        pos_info = pd.DataFrame({
-            'track_segment_id': np.concatenate([
-                np.zeros(len(time)//2, dtype=int),
-                np.ones(len(time)//2, dtype=int),
-            ]),
-            'projected_x_position': np.linspace(0, 10, len(time)),
-            'projected_y_position': np.linspace(0, 10, len(time)),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "track_segment_id": np.concatenate(
+                    [
+                        np.zeros(len(time) // 2, dtype=int),
+                        np.ones(len(time) // 2, dtype=int),
+                    ]
+                ),
+                "projected_x_position": np.linspace(0, 10, len(time)),
+                "projected_y_position": np.linspace(0, 10, len(time)),
+            },
+            index=time,
+        )
 
-        trial = pd.Series({
-            "movement_start_time": 0.0,
-            'end_time': 1.0,
-            'from_well': 0,
-            'to_well': 2,
-        })
+        trial = pd.Series(
+            {
+                "movement_start_time": 0.0,
+                "end_time": 1.0,
+                "from_well": 0,
+                "to_well": 2,
+            }
+        )
 
         # Set edge IDs
         for i, edge in enumerate(simplified_star_track.edges):
-            simplified_star_track.edges[edge]['edge_id'] = i
+            simplified_star_track.edges[edge]["edge_id"] = i
 
         # This should detect turn direction
         # Note: Actual result depends on graph structure
@@ -356,7 +396,7 @@ class TestTurnDirection:
         # Direction should be a string
         assert isinstance(direction, str)
         # Should contain turn directions
-        assert all(turn in ['left', 'right'] for turn in direction.split('-') if turn)
+        assert all(turn in ["left", "right"] for turn in direction.split("-") if turn)
 
     def test_known_left_turn_geometry(self):
         """A 90-degree counterclockwise turn (y-up) should be 'left'.
@@ -380,33 +420,44 @@ class TestTurnDirection:
         graph = nx.Graph()
         graph.add_edge(0, 1, edge_id=0, distance=10.0)
         graph.add_edge(1, 2, edge_id=1, distance=10.0)
-        graph.nodes[0]['pos'] = (0, 0)
-        graph.nodes[1]['pos'] = (10, 0)
-        graph.nodes[2]['pos'] = (10, 10)
+        graph.nodes[0]["pos"] = (0, 0)
+        graph.nodes[1]["pos"] = (10, 0)
+        graph.nodes[2]["pos"] = (10, 10)
 
         time = np.arange(0, 1.0, 0.002)
         n = len(time)
-        pos_info = pd.DataFrame({
-            'track_segment_id': np.concatenate([
-                np.zeros(n // 2, dtype=int),
-                np.ones(n // 2, dtype=int),
-            ]),
-            'projected_x_position': np.concatenate([
-                np.linspace(0, 10, n // 2),
-                np.full(n - n // 2, 10.0),
-            ]),
-            'projected_y_position': np.concatenate([
-                np.zeros(n // 2),
-                np.linspace(0, 10, n - n // 2),
-            ]),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "track_segment_id": np.concatenate(
+                    [
+                        np.zeros(n // 2, dtype=int),
+                        np.ones(n // 2, dtype=int),
+                    ]
+                ),
+                "projected_x_position": np.concatenate(
+                    [
+                        np.linspace(0, 10, n // 2),
+                        np.full(n - n // 2, 10.0),
+                    ]
+                ),
+                "projected_y_position": np.concatenate(
+                    [
+                        np.zeros(n // 2),
+                        np.linspace(0, 10, n - n // 2),
+                    ]
+                ),
+            },
+            index=time,
+        )
 
-        trial = pd.Series({
-            "movement_start_time": 0.0,
-            'end_time': 1.0,
-            'from_well': 0,
-            'to_well': 2,
-        })
+        trial = pd.Series(
+            {
+                "movement_start_time": 0.0,
+                "end_time": 1.0,
+                "from_well": 0,
+                "to_well": 2,
+            }
+        )
 
         direction = turn_direction(trial, pos_info, graph)
         assert direction == "left"
@@ -422,33 +473,44 @@ class TestTurnDirection:
         graph = nx.Graph()
         graph.add_edge(0, 1, edge_id=0, distance=10.0)
         graph.add_edge(1, 2, edge_id=1, distance=10.0)
-        graph.nodes[0]['pos'] = (0, 0)
-        graph.nodes[1]['pos'] = (10, 0)
-        graph.nodes[2]['pos'] = (10, -10)
+        graph.nodes[0]["pos"] = (0, 0)
+        graph.nodes[1]["pos"] = (10, 0)
+        graph.nodes[2]["pos"] = (10, -10)
 
         time = np.arange(0, 1.0, 0.002)
         n = len(time)
-        pos_info = pd.DataFrame({
-            'track_segment_id': np.concatenate([
-                np.zeros(n // 2, dtype=int),
-                np.ones(n // 2, dtype=int),
-            ]),
-            'projected_x_position': np.concatenate([
-                np.linspace(0, 10, n // 2),
-                np.full(n - n // 2, 10.0),
-            ]),
-            'projected_y_position': np.concatenate([
-                np.zeros(n // 2),
-                np.linspace(0, -10, n - n // 2),
-            ]),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "track_segment_id": np.concatenate(
+                    [
+                        np.zeros(n // 2, dtype=int),
+                        np.ones(n // 2, dtype=int),
+                    ]
+                ),
+                "projected_x_position": np.concatenate(
+                    [
+                        np.linspace(0, 10, n // 2),
+                        np.full(n - n // 2, 10.0),
+                    ]
+                ),
+                "projected_y_position": np.concatenate(
+                    [
+                        np.zeros(n // 2),
+                        np.linspace(0, -10, n - n // 2),
+                    ]
+                ),
+            },
+            index=time,
+        )
 
-        trial = pd.Series({
-            "movement_start_time": 0.0,
-            'end_time': 1.0,
-            'from_well': 0,
-            'to_well': 2,
-        })
+        trial = pd.Series(
+            {
+                "movement_start_time": 0.0,
+                "end_time": 1.0,
+                "from_well": 0,
+                "to_well": 2,
+            }
+        )
 
         direction = turn_direction(trial, pos_info, graph)
         assert direction == "right"
@@ -491,18 +553,24 @@ class TestTurnDirection:
         n = len(time)
         pos_info = pd.DataFrame(
             {
-                "track_segment_id": np.concatenate([
-                    np.full(n // 2, 2, dtype=int),   # on edge (0,1) (edge_id=2)
-                    np.zeros(n - n // 2, dtype=int), # on edge (1,2) (edge_id=0)
-                ]),
-                "projected_x_position": np.concatenate([
-                    np.linspace(0, 10, n // 2),
-                    np.full(n - n // 2, 10.0),
-                ]),
-                "projected_y_position": np.concatenate([
-                    np.zeros(n // 2),
-                    np.linspace(0, 10, n - n // 2),
-                ]),
+                "track_segment_id": np.concatenate(
+                    [
+                        np.full(n // 2, 2, dtype=int),  # on edge (0,1) (edge_id=2)
+                        np.zeros(n - n // 2, dtype=int),  # on edge (1,2) (edge_id=0)
+                    ]
+                ),
+                "projected_x_position": np.concatenate(
+                    [
+                        np.linspace(0, 10, n // 2),
+                        np.full(n - n // 2, 10.0),
+                    ]
+                ),
+                "projected_y_position": np.concatenate(
+                    [
+                        np.zeros(n // 2),
+                        np.linspace(0, 10, n - n // 2),
+                    ]
+                ),
             },
             index=time,
         )
@@ -519,27 +587,34 @@ class TestTurnDirection:
     def test_straight_path_no_turns(self, simple_linear_track):
         """Straight path should have no turns."""
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
         time = np.arange(0, 1.0, 0.002)
-        pos_info = pd.DataFrame({
-            'track_segment_id': np.concatenate([
-                np.zeros(len(time)//2, dtype=int),
-                np.ones(len(time)//2, dtype=int),
-            ]),
-            'projected_x_position': np.linspace(0, 20, len(time)),
-            'projected_y_position': np.zeros(len(time)),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "track_segment_id": np.concatenate(
+                    [
+                        np.zeros(len(time) // 2, dtype=int),
+                        np.ones(len(time) // 2, dtype=int),
+                    ]
+                ),
+                "projected_x_position": np.linspace(0, 20, len(time)),
+                "projected_y_position": np.zeros(len(time)),
+            },
+            index=time,
+        )
 
-        trial = pd.Series({
-            "movement_start_time": 0.0,
-            'end_time': 1.0,
-            'from_well': 0,
-            'to_well': 2,
-        })
+        trial = pd.Series(
+            {
+                "movement_start_time": 0.0,
+                "end_time": 1.0,
+                "from_well": 0,
+                "to_well": 2,
+            }
+        )
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         direction = turn_direction(trial, pos_info, simple_linear_track)
 
@@ -556,17 +631,22 @@ class TestEdgeCases:
         time = np.arange(0, 0.5, 0.002)
 
         # Position data that doesn't match any track segment
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.zeros(len(time)),
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': np.full(len(time), 999, dtype=int),  # Invalid segment
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.zeros(len(time)),
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": np.full(
+                    len(time), 999, dtype=int
+                ),  # Invalid segment
+            },
+            index=time,
+        )
 
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         progress = path_progress_for_run_segment(
             pos_info,
@@ -579,9 +659,7 @@ class TestEdgeCases:
         assert progress.shape == (len(time),)
         np.testing.assert_array_equal(progress, np.zeros(len(time)))
 
-    def test_turn_direction_short_trial_returns_empty_string(
-        self, simple_linear_track
-    ):
+    def test_turn_direction_short_trial_returns_empty_string(self, simple_linear_track):
         """Regression: ``turn_direction`` calls ``np.diff(times)`` to
         infer the sampling frequency. A trial slice with 0 or 1
         position samples (dropped DLC frames, very short DIO trials)
@@ -598,15 +676,11 @@ class TestEdgeCases:
         )
 
         # Single-sample slice.
-        single = pd.DataFrame(
-            {"track_segment_id": [0]}, index=[1.0]
-        )
+        single = pd.DataFrame({"track_segment_id": [0]}, index=[1.0])
         assert turn_direction(trial, single, simple_linear_track) == ""
 
         # Empty slice.
-        empty = pd.DataFrame(
-            {"track_segment_id": []}, index=pd.Index([], dtype=float)
-        )
+        empty = pd.DataFrame({"track_segment_id": []}, index=pd.Index([], dtype=float))
         assert turn_direction(trial, empty, simple_linear_track) == ""
 
     def test_path_progress_normalizes_by_planned_path_length_not_max_observed(
@@ -658,17 +732,20 @@ class TestEdgeCases:
 
     def test_very_short_segment(self, simple_linear_track):
         """Very short time segment should still work."""
-        pos_info = pd.DataFrame({
-            'projected_x_position': [0.0, 5.0],
-            'projected_y_position': [0.0, 0.0],
-            'track_segment_id': [0, 0],
-        }, index=[0.0, 0.002])
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": [0.0, 5.0],
+                "projected_y_position": [0.0, 0.0],
+                "track_segment_id": [0, 0],
+            },
+            index=[0.0, 0.002],
+        )
 
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         progress = path_progress_for_run_segment(
             pos_info,
@@ -693,17 +770,20 @@ class TestNumericalStabilityFixes:
         time = np.arange(0, 0.1, 0.002)
 
         # Create position data at essentially the same point
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.full(len(time), 0.0),
-            'projected_y_position': np.full(len(time), 0.0),
-            'track_segment_id': np.zeros(len(time), dtype=int),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.full(len(time), 0.0),
+                "projected_y_position": np.full(len(time), 0.0),
+                "track_segment_id": np.zeros(len(time), dtype=int),
+            },
+            index=time,
+        )
 
         for node, pos in [(0, (0, 0)), (1, (1e-12, 0)), (2, (2e-12, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         # Same start and end node produces very small max_dist
         progress = path_progress_for_run_segment(
@@ -729,26 +809,31 @@ class TestNumericalStabilityFixes:
         time = np.arange(0, 0.1, 0.002)
 
         # Position slightly outside the segment bounds
-        pos_info = pd.DataFrame({
-            'projected_x_position': np.full(len(time), -0.001),  # Slightly negative
-            'projected_y_position': np.zeros(len(time)),
-            'track_segment_id': np.zeros(len(time), dtype=int),
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": np.full(len(time), -0.001),  # Slightly negative
+                "projected_y_position": np.zeros(len(time)),
+                "track_segment_id": np.zeros(len(time), dtype=int),
+            },
+            index=time,
+        )
 
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
+            simple_linear_track.nodes[node]["pos"] = pos
 
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         track_segment_id_to_edge = {0: (0, 1), 1: (1, 2)}
 
         # Create a mock trial Series with to_well as the goal
-        trial = pd.Series({
-            'to_well': 2,
-            "movement_start_time": 0.0,
-            'end_time': 0.1,
-        })
+        trial = pd.Series(
+            {
+                "to_well": 2,
+                "movement_start_time": 0.0,
+                "end_time": 0.1,
+            }
+        )
 
         distances = dist_to_goal(
             pos_info,
@@ -774,9 +859,9 @@ class TestNumericalStabilityFixes:
         )
 
         for node, pos in [(0, (0, 0)), (1, (10, 0)), (2, (20, 0))]:
-            simple_linear_track.nodes[node]['pos'] = pos
-        simple_linear_track.edges[(0, 1)]['edge_id'] = 0
-        simple_linear_track.edges[(1, 2)]['edge_id'] = 1
+            simple_linear_track.nodes[node]["pos"] = pos
+        simple_linear_track.edges[(0, 1)]["edge_id"] = 0
+        simple_linear_track.edges[(1, 2)]["edge_id"] = 1
 
         track_segment_id_to_edge = {0: (0, 1), 1: (1, 2)}
 
@@ -784,17 +869,23 @@ class TestNumericalStabilityFixes:
         x_positions = np.linspace(0, 20, 200)
         segment_ids = np.where(x_positions < 10, 0, 1).astype(int)
         time = np.arange(len(x_positions)) * 0.002
-        pos_info = pd.DataFrame({
-            'projected_x_position': x_positions,
-            'projected_y_position': np.zeros(len(x_positions)),
-            'track_segment_id': segment_ids,
-        }, index=time)
+        pos_info = pd.DataFrame(
+            {
+                "projected_x_position": x_positions,
+                "projected_y_position": np.zeros(len(x_positions)),
+                "track_segment_id": segment_ids,
+            },
+            index=time,
+        )
 
-        trial = pd.Series({'to_well': 2, "movement_start_time": 0.0, 'end_time': time[-1] + 0.002})
+        trial = pd.Series(
+            {"to_well": 2, "movement_start_time": 0.0, "end_time": time[-1] + 0.002}
+        )
 
         # Vectorized result
         vectorized = dist_to_goal(
-            pos_info, trial=trial,
+            pos_info,
+            trial=trial,
             track_graph=simple_linear_track,
             track_segment_id_to_edge=track_segment_id_to_edge,
         )
@@ -808,7 +899,7 @@ class TestNumericalStabilityFixes:
             seg_id = segment_ids[i]
             d1, d2, el = seg_dists[seg_id]
             node1, _ = track_segment_id_to_edge[seg_id]
-            node1_pos = np.array(simple_linear_track.nodes[node1]['pos'])
+            node1_pos = np.array(simple_linear_track.nodes[node1]["pos"])
             proj = np.array([x_positions[i], 0.0])
             dfn1 = np.clip(np.linalg.norm(proj - node1_pos), 0.0, el)
             expected[i] = min(dfn1 + d1, (el - dfn1) + d2)

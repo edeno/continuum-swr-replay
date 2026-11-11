@@ -70,7 +70,9 @@ def _make_tables(
                 "event_id": e["event_id"],
                 "candidate_arm": arm,
                 "arm_fraction": e["arm_fracs"][arm],
-                "reward_fraction_candidate_arm_last10_visits": e.get("rrr", [np.nan] * 9)[arm],
+                "reward_fraction_candidate_arm_last10_visits": e.get(
+                    "rrr", [np.nan] * 9
+                )[arm],
                 "is_swr": e.get("is_swr", False),
                 "is_mua": e.get("is_mua", False),
             }
@@ -384,7 +386,15 @@ class TestStopReplaySummary:
                     # Other arms keep finite values so prev / last_rewarded
                     # roles still see two finite contributors.
                     "arm_fracs": [
-                        np.nan, 0.40, 0.10, 0.10, 0.10, 0.10, 0.10, 0.06, 0.04,
+                        np.nan,
+                        0.40,
+                        0.10,
+                        0.10,
+                        0.10,
+                        0.10,
+                        0.10,
+                        0.06,
+                        0.04,
                     ],
                     "rrr": [0.8, 0.2, 0.0, 0.4, 0.0, 0.6, np.nan, np.nan, np.nan],
                 },
@@ -513,8 +523,7 @@ class TestFitIsStayLogistic:
         assert np.isfinite(row["se_inter"]) and row["se_inter"] > 0
         z = (row["beta_inter"] - 3.0) / row["se_inter"]
         assert abs(z) < 3, (
-            f"beta_inter={row['beta_inter']:.3f}, "
-            f"se={row['se_inter']:.3f}, z={z:.2f}"
+            f"beta_inter={row['beta_inter']:.3f}, se={row['se_inter']:.3f}, z={z:.2f}"
         )
 
 

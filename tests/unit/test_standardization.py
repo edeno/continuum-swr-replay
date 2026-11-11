@@ -59,7 +59,9 @@ def test_reference_roundtrip(tmp_path):
     applied, used = attach_standardized(fresh, ["a", "b"], reference=loaded)
     direct, _ = attach_standardized(df.copy(), ["a", "b"])
     for c in ("a_z", "b_z"):
-        np.testing.assert_allclose(applied[c].to_numpy(), direct[c].to_numpy(), atol=1e-12)
+        np.testing.assert_allclose(
+            applied[c].to_numpy(), direct[c].to_numpy(), atol=1e-12
+        )
     assert used == loaded
 
 

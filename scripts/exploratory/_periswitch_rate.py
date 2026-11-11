@@ -56,9 +56,14 @@ def prep(stop: pd.DataFrame) -> pd.DataFrame:
         df = df[df[c].notna()]
     df["pre_switch"] = (df["next_patch"] != df["current_patch"]).astype(int)
     df["post_switch"] = (df["current_patch"] != df["prev_patch"]).astype(int)
-    df["after_omission"] = (1.0 - df["is_rewarded_outcome"].astype(float)).fillna(0).astype(int)
+    df["after_omission"] = (
+        (1.0 - df["is_rewarded_outcome"].astype(float)).fillna(0).astype(int)
+    )
     df["session"] = (
-        df["animal"].astype(str) + df["session_date"].astype(str) + "_" + df["epoch"].astype(str)
+        df["animal"].astype(str)
+        + df["session_date"].astype(str)
+        + "_"
+        + df["epoch"].astype(str)
     )
     df["log_off"] = np.log(df["immobility_duration_s"].to_numpy(dtype=float))
     return df
@@ -66,8 +71,12 @@ def prep(stop: pd.DataFrame) -> pd.DataFrame:
 
 def fit_gee(df, formula):
     res = GEE.from_formula(
-        formula, groups="session", data=df, family=sm.families.Poisson(),
-        offset=df["log_off"].to_numpy(), cov_struct=Independence(),
+        formula,
+        groups="session",
+        data=df,
+        family=sm.families.Poisson(),
+        offset=df["log_off"].to_numpy(),
+        cov_struct=Independence(),
     ).fit()
     return res
 
@@ -89,7 +98,10 @@ def main():
     n_sess = df["session"].nunique()
     logging.info(
         "%d stops, %d sessions | pre_switch=%d post_switch=%d after_omission=%d",
-        len(df), n_sess, df.pre_switch.sum(), df.post_switch.sum(),
+        len(df),
+        n_sess,
+        df.pre_switch.sum(),
+        df.post_switch.sum(),
         df.after_omission.sum(),
     )
 
@@ -102,8 +114,16 @@ def main():
         df,
         "n_events ~ pre_switch * after_omission + post_switch * after_omission",
     )
-    rr2 = rr_table(m2, ["pre_switch", "post_switch", "after_omission",
-                        "pre_switch:after_omission", "post_switch:after_omission"])
+    rr2 = rr_table(
+        m2,
+        [
+            "pre_switch",
+            "post_switch",
+            "after_omission",
+            "pre_switch:after_omission",
+            "post_switch:after_omission",
+        ],
+    )
 
     # 3. Matched contrast: within after-omission stops, pre_switch vs stay.
     om = df[df.after_omission == 1]
@@ -133,8 +153,12 @@ def main():
             r, lo, hi, p = rr[t]
             ax.plot([lo, hi], [yi, yi], color="black", lw=2)
             ax.plot(r, yi, "o", color="C0" if r >= 1 else "C1", ms=7)
-            ax.annotate(f"×{r:.2f}{'*' if p < 0.05 else ''}", (r, yi + 0.15),
-                        fontsize=8, ha="center")
+            ax.annotate(
+                f"×{r:.2f}{'*' if p < 0.05 else ''}",
+                (r, yi + 0.15),
+                fontsize=8,
+                ha="center",
+            )
         ax.set_yticks(y)
         ax.set_yticklabels(terms, fontsize=9)
         ax.set_xlabel("event-rate ratio exp(β)", fontsize=9)
@@ -143,7 +167,9 @@ def main():
     fig.tight_layout()
     SCRATCH.mkdir(exist_ok=True)
     out = SCRATCH / "periswitch_rate.png"
-    save_figure(fig, out.stem, base_dir=out.parent, dpi=140, formats=["png"], transparent=False)
+    save_figure(
+        fig, out.stem, base_dir=out.parent, dpi=140, formats=["png"], transparent=False
+    )
     logging.info("Saved %s", out)
 
 

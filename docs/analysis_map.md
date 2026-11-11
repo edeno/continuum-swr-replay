@@ -35,32 +35,8 @@ named in full or `--include-optional` is given.
 
 ## The flow
 
-All scripts are in `scripts/`. Steps 1–7 are the full rebuild. After a change to the table code, start at step 4;
-after a change to fitting code only, start at step 6.
-
-1. **Cohort.** The analysed epochs are the register's (`data_loaders/epoch_register.csv`;
-   [epoch_register.md](epoch_register.md)).
-2. **Artifacts and SWRs.**
-   - Run `detection/run_artifact_detection.py` (the artifact mask), then `detection/run_swr_detection.py` (the
-     four SWR inventories).
-   - Then set the two run ids the decoders read: `ARTIFACT_INTERVALS_RUN_ID` and `SWR_INVENTORY_RUN_ID` in
-     `src/continuum_swr_replay/analysis/events/swr_source.py`. A decode refuses to start without them.
-3. **Decodes.** `decoding/run_decoding_bandit.py` (non-local detector) and `decoding/run_decoding_contfrag.py`
-   (ContFrag), on GPUs.
-4. **Tables**, in this order:
-   1. `behavior/fetch_spatial_bandit_behavior.sh`;
-   2. `tables/prepare_replay_content_data.py --stop-only` (the stop table);
-   3. `behavior/build_qvals_table.py --write` (needs the stop table);
-   4. `tables/prepare_replay_content_data.py` (the event, event × arm, event × patch, sequence and stop
-      tables; needs `qvals_table`);
-   5. `tables/build_timebin_tables.py`;
-   6. `tables/prepare_contfrag_replay_content_data.py --event-source SWR` and `--event-source MUA`.
-5. **Parts 1 and 2** on the decodes: the checks, the detector comparison and the decode-only figures (Figures 1–3,
-   the supplements).
-6. **Part 3 fits and the figures that read them:** `qa/run_refits.py`.
-7. **Part 4:** `pfc/run_pfc_analysis_bandit.py` on GPUs, then `figures/generate_figure04.py`.
-
-`figures/generate_all_figures.py` draws Figures 1–4 in one go. Run it only after step 7.
+The order of the steps in a full rebuild, with the script for each, is in
+[reproduce.md](reproduce.md#the-full-rebuild).
 
 ## Part 1. The model: how it works and what it captures
 

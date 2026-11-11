@@ -49,10 +49,13 @@ code base, and [03](03-inventory-comparison.md) is the direct comparison.
 
 ## Literature parameter survey
 
-[literature_detection_parameters.csv](literature_detection_parameters.csv) is a lab-compiled
-table of 57 replay papers that decode replay content (1999–2025; source: the shared Google Sheet
-`12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`, exported 2026-09-21; column headers
-flattened to one line). **The values have been checked against the papers and corrected;
+The literature survey is a lab-compiled table of <!--v:part0.papers-->57<!--/v--> replay papers that decode replay content
+(1999–2025), first kept in the shared Google Sheet `12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`.
+Its copy for the paper is Supplementary Table S1,
+[../../../paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv),
+taken from the `ripple_detection` repository's audit against each paper's methods, supplement
+and released code (through 2026-09-25).
+**The values were first checked against the papers and corrected here;
 see [literature_parameter_corrections.md](literature_parameter_corrections.md)** for the
 corrections with their evidence, the cells still flagged, the papers that could not be
 retrieved, and the systematic issues (sliding-window width recorded as a time bin,
@@ -195,9 +198,9 @@ Code with no paper: FMAToolbox `FindRipples.m` (H. Hirase's algorithm, M. Zugaro
 implementation; no license file, GPL-3 in the file headers), buzcode `bz_DetectSWR.m`
 (J. D. Long II; GPL-3), neurocode `eventSpikingTreshold.m` (M. Valero; no license
 file), and E. Stark's `detect_hfos` filtering routines, which survive only inside
-buzcode. The per-paper detection settings in
-[literature_detection_parameters.csv](literature_detection_parameters.csv) carry a
-DOI per row.
+buzcode. The per-paper detection settings in the literature survey
+([../../../paper/tables/table_s1_literature_parameters.csv](../../../paper/tables/table_s1_literature_parameters.csv))
+carry a DOI per row.
 
 ## Reading the table
 

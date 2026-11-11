@@ -46,8 +46,11 @@ def _report(mdf: pd.DataFrame, model: str) -> None:
     if sub.empty:
         print(f"    {model}: (no rows)")
         return
-    coef_cols = [c for c in sub.columns if c.startswith("coef_")
-                 and not c.startswith("coef_arm_fe")]
+    coef_cols = [
+        c
+        for c in sub.columns
+        if c.startswith("coef_") and not c.startswith("coef_arm_fe")
+    ]
     stats = []
     for c in coef_cols:
         s = sub[c].dropna()
@@ -63,7 +66,9 @@ def _report(mdf: pd.DataFrame, model: str) -> None:
     print(f"      {'predictor':<32}{'med':>8}{'%pos':>7}{'an':>5}{'p(FDR)':>10}  note")
     for (name, med, pos, n_an, _p, _n), q in zip(stats, fdr, strict=True):
         note = next((v for k, v in EXPECT.items() if k == name), "")
-        print(f"      {name:<32}{med:>+8.2f}{pos:>6.0f}%{f'{n_an}/5':>5}{q:>10.1e}  {note}")
+        print(
+            f"      {name:<32}{med:>+8.2f}{pos:>6.0f}%{f'{n_an}/5':>5}{q:>10.1e}  {note}"
+        )
 
 
 def main() -> None:

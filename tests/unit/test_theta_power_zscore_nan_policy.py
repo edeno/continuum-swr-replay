@@ -28,9 +28,7 @@ class TestThetaPowerZScore:
         """When no NaN is present the helper matches a plain z-score."""
         x = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         out = theta_power_zscore(x)
-        np.testing.assert_allclose(
-            out, (x - x.mean()) / x.std(), atol=1e-12
-        )
+        np.testing.assert_allclose(out, (x - x.mean()) / x.std(), atol=1e-12)
 
     def test_partial_nan_input_keeps_finite_z_scores(self):
         """The user's hazard: a single NaN in the trace must not zero

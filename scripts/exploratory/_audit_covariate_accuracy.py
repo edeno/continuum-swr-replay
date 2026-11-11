@@ -63,13 +63,7 @@ def _fur():
 
 
 def _within_epoch_pos(df: pd.DataFrame) -> pd.Series:
-    key = (
-        df["animal"]
-        + "_"
-        + df["session_date"].astype(str)
-        + "_"
-        + df["epoch"]
-    )
+    key = df["animal"] + "_" + df["session_date"].astype(str) + "_" + df["epoch"]
     return df.assign(_k=key).groupby("_k")["stop_idx"].rank(pct=True)
 
 
@@ -86,9 +80,13 @@ def main(reconstruct_n: int = 0) -> None:
     )
     aw = aw[aw["in_poke"]].copy()
     aw["is_rewarded_outcome"] = aw["is_rewarded_outcome"].astype(float)
-    cal = aw.groupby("task_reward_probability_chosen_arm")["is_rewarded_outcome"].agg(["size", "mean"])
+    cal = aw.groupby("task_reward_probability_chosen_arm")["is_rewarded_outcome"].agg(
+        ["size", "mean"]
+    )
     x, y = cal.index.to_numpy(), cal["mean"].to_numpy()
-    print("=== #1a task_reward_probability_chosen_arm calibration vs DIO reward (at-well) ===")
+    print(
+        "=== #1a task_reward_probability_chosen_arm calibration vs DIO reward (at-well) ==="
+    )
     print(cal.round(3).to_string())
     print(
         f"  slope(emp~nominal)={np.polyfit(x, y, 1)[0]:.2f} (expect ~1.0), "
@@ -264,9 +262,7 @@ def _nonrl_checks(st: pd.DataFrame) -> None:
     """
     ea = read_table(table_path("event_arm_table", RC))
     require_covariate_schema(ea, table="event_arm")
-    print(
-        "\n=== non-RL: occupancy_well_arm cross-source (event_arm vs stop_table) ==="
-    )
+    print("\n=== non-RL: occupancy_well_arm cross-source (event_arm vs stop_table) ===")
     m = (
         ea[["stop_id", "occupancy_well_arm"]]
         .drop_duplicates()

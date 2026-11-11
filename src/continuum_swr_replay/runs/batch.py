@@ -253,7 +253,7 @@ def run_batch(
     if local_cuda_cluster is None and not args.allow_cpu:
         raise RuntimeError(
             "dask_cuda is not importable, so this batch would decode on a CPU "
-            "cluster. Install dask-cuda by hand (see docs/README.md), or pass "
+            "cluster. Install it with `uv sync --frozen --inexact --extra gpu`, or pass "
             "--allow_cpu to decode on CPU."
         )
 

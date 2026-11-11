@@ -13,6 +13,7 @@ the animal's occupancy well arm.
 
 Writes to .claude/research/peri_departure_outputs/.
 """
+
 from pathlib import Path
 
 import matplotlib
@@ -79,15 +80,30 @@ def main() -> None:
         ax.plot(-centers, rate, color=color, lw=lw, label=f"{label} (n={len(t)})")
 
     ax.axvline(0, color="k", lw=1.2, ls="--", alpha=0.7)
-    ax.text(-0.05, ax.get_ylim()[1] * 0.97, "departure", rotation=90,
-            va="top", ha="right", fontsize=9, alpha=0.7)
+    ax.text(
+        -0.05,
+        ax.get_ylim()[1] * 0.97,
+        "departure",
+        rotation=90,
+        va="top",
+        ha="right",
+        fontsize=9,
+        alpha=0.7,
+    )
     ax.set_xlabel("time relative to departure (s)   [0 = animal leaves]")
     ax.set_ylabel("event rate (events / s, among still-immobile stops)")
     ax.set_title("Peri-departure rate of non-local events by type")
     ax.legend(frameon=False, fontsize=9, loc="upper left")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    save_figure(fig, "peri_departure_rate", base_dir=OUT, dpi=140, formats=["png"], transparent=False)
+    save_figure(
+        fig,
+        "peri_departure_rate",
+        base_dir=OUT,
+        dpi=140,
+        formats=["png"],
+        transparent=False,
+    )
     pd.DataFrame(table).to_csv(OUT / "peri_departure_rate.csv", index=False)
     print("wrote", OUT / "peri_departure_rate.png")
     print("wrote", OUT / "peri_departure_rate.csv")

@@ -36,8 +36,9 @@ from continuum_swr_replay.analysis.hippocampus import load_data_over_time
 from continuum_swr_replay.parameters import PROCESSED_DATA_DIR
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS_DAY
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
-                    datefmt="%H:%M:%S")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S"
+)
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/fig2b_outputs"
 OUT.mkdir(parents=True, exist_ok=True)
 SESSION = list(SESSION_COLUMNS_DAY)
@@ -79,19 +80,25 @@ def main() -> None:
         swr_labels = g["SWR_event"].to_numpy()
         n_swr = int(np.unique(swr_labels[swr_labels > 0]).size)
         recs.append(
-            {"animal": animal, "day": day, "epoch": epoch,
-             "total_min": total_min, "immobile_min": immobile_min,
-             "n_swr": n_swr}
+            {
+                "animal": animal,
+                "day": day,
+                "epoch": epoch,
+                "total_min": total_min,
+                "immobile_min": immobile_min,
+                "n_swr": n_swr,
+            }
         )
     dur = pd.DataFrame(recs)
 
     s = nl.merge(dur, on=SESSION, how="left")
-    s["nonlocal_rate"] = s["n_nonlocal"] / s["immobile_min"]      # per immobile min
-    s["swr_rate"] = s["n_swr"] / s["immobile_min"]                # per immobile min
+    s["nonlocal_rate"] = s["n_nonlocal"] / s["immobile_min"]  # per immobile min
+    s["swr_rate"] = s["n_swr"] / s["immobile_min"]  # per immobile min
     s = s.sort_values(SESSION).reset_index(drop=True)
     s.to_csv(OUT / "per_session_dated.csv", index=False)
 
     lines = []
+
     def emit(x=""):
         lines.append(x)
         print(x)
@@ -99,8 +106,10 @@ def main() -> None:
     emit("=" * 76)
     emit("NON-LOCAL AMOUNT vs DATE, PER ANIMAL")
     emit("=" * 76)
-    emit(f"{len(s)} sessions. Rates per immobile-minute. Trend = Spearman vs "
-         f"ordinal date within animal (sessions same-day share a rank tie via day).")
+    emit(
+        f"{len(s)} sessions. Rates per immobile-minute. Trend = Spearman vs "
+        f"ordinal date within animal (sessions same-day share a rank tie via day)."
+    )
     emit("")
 
     metrics = ["nonlocal_rate", "swr_rate", "f_nonswr", "n_nonlocal", "immobile_min"]
@@ -110,8 +119,10 @@ def main() -> None:
         # ordinal date index within animal (1 per distinct day)
         day_rank = g["day"].rank(method="dense").to_numpy()
         n_days = int(g["day"].nunique())
-        emit(f"--- {animal}  ({len(g)} sessions over {n_days} days: "
-             f"{g['day'].min()}..{g['day'].max()}) ---")
+        emit(
+            f"--- {animal}  ({len(g)} sessions over {n_days} days: "
+            f"{g['day'].min()}..{g['day'].max()}) ---"
+        )
         row = {"animal": animal, "n_sessions": len(g), "n_days": n_days}
         for m in metrics:
             rho, p = spearmanr(day_rank, g[m].to_numpy())
@@ -120,8 +131,10 @@ def main() -> None:
             first = g[g["day"] == g["day"].min()][m].mean()
             last = g[g["day"] == g["day"].max()][m].mean()
             star = "*" if p < 0.05 else " "
-            emit(f"    {m:14s} rho={rho:+.3f} p={p:.3f}{star}  "
-                 f"first-day mean={first:8.3f}  last-day mean={last:8.3f}")
+            emit(
+                f"    {m:14s} rho={rho:+.3f} p={p:.3f}{star}  "
+                f"first-day mean={first:8.3f}  last-day mean={last:8.3f}"
+            )
         summary.append(row)
         emit("")
 
@@ -134,15 +147,19 @@ def main() -> None:
     for m in ["swr_rate", "nonlocal_rate", "f_nonswr"]:
         rhos = summ[f"{m}_rho"]
         sig = summ[f"{m}_p"] < 0.05
-        emit(f"    {m:14s}: {int((rhos<0).sum())} down / {int((rhos>0).sum())} up "
-             f"({int((sig & (rhos<0)).sum())} sig-down, "
-             f"{int((sig & (rhos>0)).sum())} sig-up)  "
-             f"rho range [{rhos.min():+.2f}, {rhos.max():+.2f}]")
+        emit(
+            f"    {m:14s}: {int((rhos < 0).sum())} down / {int((rhos > 0).sum())} up "
+            f"({int((sig & (rhos < 0)).sum())} sig-down, "
+            f"{int((sig & (rhos > 0)).sum())} sig-up)  "
+            f"rho range [{rhos.min():+.2f}, {rhos.max():+.2f}]"
+        )
 
     (OUT / "date_trends_summary.txt").write_text("\n".join(lines))
     emit("")
-    emit(f"Wrote per_session_dated.csv, per_animal_date_trends.csv, "
-         f"date_trends_summary.txt to {OUT}")
+    emit(
+        f"Wrote per_session_dated.csv, per_animal_date_trends.csv, "
+        f"date_trends_summary.txt to {OUT}"
+    )
 
 
 if __name__ == "__main__":

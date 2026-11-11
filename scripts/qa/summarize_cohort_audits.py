@@ -74,11 +74,15 @@ def flag(df: pd.DataFrame, *, min_retained: float) -> pd.DataFrame:
 def main(argv: Sequence[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        "--root", type=Path, default=processed_data_dir(),
+        "--root",
+        type=Path,
+        default=processed_data_dir(),
         help="directory to scan recursively for *_cohort_audit.csv",
     )
     ap.add_argument(
-        "--min-retained", type=float, default=0.9,
+        "--min-retained",
+        type=float,
+        default=0.9,
         help="flag rows whose n_modeled/n_in falls below this (default 0.9)",
     )
     ap.add_argument("--out", type=Path, default=None, help="optional combined-CSV path")
@@ -98,11 +102,21 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"WARNING: {len(bad)} row(s) do not reconcile (n_in - Σdrops != n_modeled):",
             file=sys.stderr,
         )
-        print(bad[["source", "model", "population"]].to_string(index=False), file=sys.stderr)
+        print(
+            bad[["source", "model", "population"]].to_string(index=False),
+            file=sys.stderr,
+        )
 
     cols = [
-        "source", "model", "population", "grain", "n_in", "n_modeled",
-        "retained_frac", *DROP_FIELDS, "flag",
+        "source",
+        "model",
+        "population",
+        "grain",
+        "n_in",
+        "n_modeled",
+        "retained_frac",
+        *DROP_FIELDS,
+        "flag",
     ]
     with pd.option_context("display.max_rows", None, "display.width", 240):
         print(flagged[cols].round(3).to_string(index=False))

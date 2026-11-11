@@ -47,8 +47,12 @@ _DEFAULT_TESTS = (
     "tests/unit/test_recent_reward_rate.py",
 )
 _CMP_SWAP = {
-    ast.Lt: ast.LtE, ast.LtE: ast.Lt, ast.Gt: ast.GtE, ast.GtE: ast.Gt,
-    ast.Eq: ast.NotEq, ast.NotEq: ast.Eq,
+    ast.Lt: ast.LtE,
+    ast.LtE: ast.Lt,
+    ast.Gt: ast.GtE,
+    ast.GtE: ast.Gt,
+    ast.Eq: ast.NotEq,
+    ast.NotEq: ast.Eq,
 }
 
 
@@ -59,16 +63,27 @@ def _enumerate(tree: ast.AST) -> list[tuple[int, str, tuple]]:
         if isinstance(node, ast.Compare) and len(node.ops) == 1:
             swap = _CMP_SWAP.get(type(node.ops[0]))
             if swap is not None:
-                muts.append((node.lineno, f"{type(node.ops[0]).__name__}->{swap.__name__}",
-                             ("cmp", node, swap)))
+                muts.append(
+                    (
+                        node.lineno,
+                        f"{type(node.ops[0]).__name__}->{swap.__name__}",
+                        ("cmp", node, swap),
+                    )
+                )
         elif isinstance(node, ast.Constant) and node.value in ("right", "left"):
             other = "left" if node.value == "right" else "right"
-            muts.append((node.lineno, f'side "{node.value}"->"{other}"',
-                         ("str", node, other)))
+            muts.append(
+                (node.lineno, f'side "{node.value}"->"{other}"', ("str", node, other))
+            )
         elif isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub)):
             swap = ast.Sub if isinstance(node.op, ast.Add) else ast.Add
-            muts.append((node.lineno, f"{type(node.op).__name__}->{swap.__name__}",
-                         ("binop", node, swap)))
+            muts.append(
+                (
+                    node.lineno,
+                    f"{type(node.op).__name__}->{swap.__name__}",
+                    ("binop", node, swap),
+                )
+            )
     return muts
 
 
@@ -83,7 +98,9 @@ def _apply(kind: str, node: ast.AST, payload) -> None:
 
 def _run_tests(tests: tuple[str, ...]) -> int:
     cmd = ["python", "-m", "pytest", "-x", "-q", "-p", "no:cacheprovider", *tests]
-    return subprocess.run(cmd, cwd=REPO, capture_output=True, text=True, timeout=1200).returncode
+    return subprocess.run(
+        cmd, cwd=REPO, capture_output=True, text=True, timeout=1200
+    ).returncode
 
 
 def check(targets: tuple[str, ...], tests: tuple[str, ...]) -> int:
@@ -117,14 +134,18 @@ def check(targets: tuple[str, ...], tests: tuple[str, ...]) -> int:
             status = "KILLED" if killed else "SURVIVED"
             if not killed:
                 survivors.append(f"{target.name}:{lineno}  {desc}")
-            print(f"  [{i + 1}/{len(muts)}] L{lineno} {desc:26s} {status} ({time.time() - t0:.0f}s)")
+            print(
+                f"  [{i + 1}/{len(muts)}] L{lineno} {desc:26s} {status} ({time.time() - t0:.0f}s)"
+            )
 
     print("\n===== SURVIVORS (coverage gaps) =====")
     for s in survivors:
         print(f"  {s}")
     killed = total - len(survivors)
-    print(f"\nSCORE: killed {killed}/{total} ({100 * killed / max(total, 1):.0f}%), "
-          f"survivors {len(survivors)}")
+    print(
+        f"\nSCORE: killed {killed}/{total} ({100 * killed / max(total, 1):.0f}%), "
+        f"survivors {len(survivors)}"
+    )
     return 0
 
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Diagnostic plot: non-local rate, SWR rate, non-SWR fraction vs date/animal."""
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -10,12 +11,13 @@ from continuum_swr_replay.figure_utilities import save_figure
 OUT = Path(__file__).resolve().parents[2] / ".claude/research/fig2b_outputs"
 s = pd.read_csv(OUT / "per_session_dated.csv")
 animals = sorted(s["animal"].unique())
-metrics = [("nonlocal_rate", "non-local /immob-min"),
-           ("swr_rate", "SWR /immob-min"),
-           ("f_nonswr", "non-SWR fraction")]
+metrics = [
+    ("nonlocal_rate", "non-local /immob-min"),
+    ("swr_rate", "SWR /immob-min"),
+    ("f_nonswr", "non-SWR fraction"),
+]
 
-fig, axes = plt.subplots(3, len(animals), figsize=(3.0 * len(animals), 8),
-                         sharex="col")
+fig, axes = plt.subplots(3, len(animals), figsize=(3.0 * len(animals), 8), sharex="col")
 for j, animal in enumerate(animals):
     g = s[s["animal"] == animal].copy()
     g["di"] = g["day"].rank(method="dense").astype(int)
@@ -33,8 +35,12 @@ for j, animal in enumerate(animals):
             ax.set_ylabel(lbl)
         if i == 2:
             ax.set_xlabel("day index")
-fig.suptitle("Non-local activity & SWR rate over dates, per animal "
-             "(grey=session, red=day-mean)", y=1.0)
+fig.suptitle(
+    "Non-local activity & SWR rate over dates, per animal (grey=session, red=day-mean)",
+    y=1.0,
+)
 fig.tight_layout()
-save_figure(fig, "dates_trends", base_dir=OUT, dpi=140, formats=["png"], transparent=False)
+save_figure(
+    fig, "dates_trends", base_dir=OUT, dpi=140, formats=["png"], transparent=False
+)
 print("wrote", OUT / "dates_trends.png")

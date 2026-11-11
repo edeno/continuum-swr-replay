@@ -30,8 +30,10 @@ from continuum_swr_replay.tables.covariate_registry import (
 from continuum_swr_replay.tables.io import read_table
 
 RC = REPLAY_CONTENT_DIR
-PARQUET = sys.argv[1] if len(sys.argv) > 1 else (
-    "/tmp/claude-39494/reality_reward/event_spike_evidence_metrics.parquet"
+PARQUET = (
+    sys.argv[1]
+    if len(sys.argv) > 1
+    else ("/tmp/claude-39494/reality_reward/event_spike_evidence_metrics.parquet")
 )
 
 
@@ -42,8 +44,11 @@ def main() -> None:
     stop = read_table(table_path("stop_table", RC))
     require_covariate_schema(stop, table="stop")
     stop = stop.assign(
-        epoch_id=stop["animal"].astype(str) + stop["session_date"].astype(str)
-        + "_" + stop["epoch"].astype(str) + "_HPC",
+        epoch_id=stop["animal"].astype(str)
+        + stop["session_date"].astype(str)
+        + "_"
+        + stop["epoch"].astype(str)
+        + "_HPC",
         stop_end=stop["stop_start"] + stop["immobility_duration_s"],
     )
 
@@ -66,32 +71,48 @@ def main() -> None:
         rew[g.index.to_numpy()] = vals
     ev["known_reward_outcome_lag_1"] = rew
     matched = ev["known_reward_outcome_lag_1"].notna()
-    print(f"events={len(ev)}, matched to a stop={matched.sum()} "
-          f"({100*matched.mean():.0f}%); sessions={ev.epoch_id.nunique()}\n")
+    print(
+        f"events={len(ev)}, matched to a stop={matched.sum()} "
+        f"({100 * matched.mean():.0f}%); sessions={ev.epoch_id.nunique()}\n"
+    )
 
     d = ev[matched].copy()
     print(f"{'group':<16}{'reward':<9}{'n':>5}{'dll/spike med':>15}{'%>0':>7}")
     for grp in ["baseline", "nonSWR-close", "nonSWR-remote", "SWR-remote"]:
         sub = d[d.group == grp]
-        for rlab, rmask in [("omit", sub.known_reward_outcome_lag_1 == 0), ("rewarded", sub.known_reward_outcome_lag_1 == 1)]:
+        for rlab, rmask in [
+            ("omit", sub.known_reward_outcome_lag_1 == 0),
+            ("rewarded", sub.known_reward_outcome_lag_1 == 1),
+        ]:
             s = sub[rmask]["dll_per_spike"]
             if len(s) == 0:
                 continue
-            print(f"{grp:<16}{rlab:<9}{len(s):>5}{s.median():>15.3f}{(s>0).mean()*100:>6.0f}%")
+            print(
+                f"{grp:<16}{rlab:<9}{len(s):>5}{s.median():>15.3f}{(s > 0).mean() * 100:>6.0f}%"
+            )
         print()
 
     # key test: is non-SWR (esp. remote/off-current) content spike-supported AFTER reward?
-    nr = d[(d.group == "nonSWR-remote") & (d.known_reward_outcome_lag_1 == 1)]["dll_per_spike"]
+    nr = d[(d.group == "nonSWR-remote") & (d.known_reward_outcome_lag_1 == 1)][
+        "dll_per_spike"
+    ]
     base = d[d.group == "baseline"]["dll_per_spike"]
-    print(f"post-reward nonSWR-remote dll/spike: median {nr.median():.3f}, "
-          f"{(nr>0).mean()*100:.0f}% > 0, n={len(nr)}  (baseline median {base.median():.3f})")
+    print(
+        f"post-reward nonSWR-remote dll/spike: median {nr.median():.3f}, "
+        f"{(nr > 0).mean() * 100:.0f}% > 0, n={len(nr)}  (baseline median {base.median():.3f})"
+    )
 
     # content shift: is the off-current (remote) fraction of non-SWR events higher after reward?
     ns = d[d.group.isin(["nonSWR-close", "nonSWR-remote"])]
-    for rlab, rmask in [("omit", ns.known_reward_outcome_lag_1 == 0), ("rewarded", ns.known_reward_outcome_lag_1 == 1)]:
+    for rlab, rmask in [
+        ("omit", ns.known_reward_outcome_lag_1 == 0),
+        ("rewarded", ns.known_reward_outcome_lag_1 == 1),
+    ]:
         sub = ns[rmask]
         frac = (sub.group == "nonSWR-remote").mean() if len(sub) else np.nan
-        print(f"non-SWR off-current(remote) fraction [{rlab}]: {frac:.2f} (n={len(sub)})")
+        print(
+            f"non-SWR off-current(remote) fraction [{rlab}]: {frac:.2f} (n={len(sub)})"
+        )
 
 
 if __name__ == "__main__":

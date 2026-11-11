@@ -106,11 +106,8 @@ class TestEventSizeFilter:
 
         # Both should be close to truth, and to each other.
         z_diff = (
-            fit_full["coef_is_current_arm"]
-            - fit_filtered["coef_is_current_arm"]
-        ) / np.hypot(
-            fit_full["bse_is_current_arm"], fit_filtered["bse_is_current_arm"]
-        )
+            fit_full["coef_is_current_arm"] - fit_filtered["coef_is_current_arm"]
+        ) / np.hypot(fit_full["bse_is_current_arm"], fit_filtered["bse_is_current_arm"])
         assert abs(z_diff) < 3, (
             f"filter changed coef by {z_diff:.2f} σ: "
             f"full={fit_full['coef_is_current_arm']:.3f}, "

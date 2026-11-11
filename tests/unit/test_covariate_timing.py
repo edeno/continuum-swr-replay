@@ -45,9 +45,7 @@ def test_rate_swr_interaction_caught():
     assert timing_of("is_swr:rpe_postoutcome") == ["rpe_postoutcome"]
     with pytest.raises(ValueError, match="post-outcome"):
         assert_predictor_timing(["is_swr:rpe_postoutcome"])
-    assert timing_of("is_swr:periswitch_index_trials") == [
-        "periswitch_index_trials"
-    ]
+    assert timing_of("is_swr:periswitch_index_trials") == ["periswitch_index_trials"]
     with pytest.raises(ValueError, match="future-referencing"):
         assert_predictor_timing(["is_swr:periswitch_index_trials"])
 
@@ -86,7 +84,9 @@ def test_uncertainty_rate_post_outcome_names_require_retrospective_gate(predicto
 def test_is_after_switch_is_safe():
     """Last-completed-trip switch status is past-only and never rejected."""
     assert_predictor_timing(["did_last_completed_trip_switch_patch"])  # no raise
-    assert timing_of("did_last_completed_trip_switch_patch") == ["did_last_completed_trip_switch_patch"]
+    assert timing_of("did_last_completed_trip_switch_patch") == [
+        "did_last_completed_trip_switch_patch"
+    ]
 
 
 @pytest.mark.parametrize("predictor", ["is_rewarded_outcome", "is_omitted_outcome"])

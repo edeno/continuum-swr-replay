@@ -939,7 +939,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.cuda_visible_devices is not None and cuda_cluster_class() is None:
         sys.exit(
             "--cuda_visible_devices needs dask_cuda, which is not importable. "
-            "Install dask-cuda by hand (see docs/README.md), or leave out "
+            "Install it with `uv sync --frozen --inexact --extra gpu`, or leave out "
             "--cuda_visible_devices to run the epochs one after another in "
             "this process."
         )

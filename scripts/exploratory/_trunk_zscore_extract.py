@@ -65,8 +65,12 @@ def main():
                 continue
             rows.append(
                 {
-                    "event_id": r.event_id, "animal": a, "session_date": d, "epoch": e,
-                    "is_swr": bool(r.is_swr), "is_mua": bool(r.is_mua),
+                    "event_id": r.event_id,
+                    "animal": a,
+                    "session_date": d,
+                    "epoch": e,
+                    "is_swr": bool(r.is_swr),
+                    "is_mua": bool(r.is_mua),
                     "trunk_share": r.trunk_share,
                     "n_arms_with_mass": r.n_arms_with_mass,
                     "swr_z": float(np.nanmax(sw[lo:hi])),
@@ -74,14 +78,20 @@ def main():
                 }
             )
         if (i + 1) % 25 == 0:
-            print(f"  {i+1}/{len(sessions)} sessions, {len(rows)} events, "
-                  f"{time.time()-t0:.0f}s", flush=True)
+            print(
+                f"  {i + 1}/{len(sessions)} sessions, {len(rows)} events, "
+                f"{time.time() - t0:.0f}s",
+                flush=True,
+            )
 
     out = pd.DataFrame(rows)
     out_path = PD / "replay_content" / "_trunk_zscore_per_event.pkl"
     out.to_pickle(out_path)
-    print(f"\nDONE: {len(out)} events from {out['epoch'].count()} rows -> {out_path} "
-          f"({time.time()-t0:.0f}s)", flush=True)
+    print(
+        f"\nDONE: {len(out)} events from {out['epoch'].count()} rows -> {out_path} "
+        f"({time.time() - t0:.0f}s)",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

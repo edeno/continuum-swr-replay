@@ -1,0 +1,495 @@
+{
+ "schema_version": 1,
+ "part": 0,
+ "title": "the surveyed literature",
+ "produced_by": "scripts/reported/summarize_part.py",
+ "commit": "1577f7209200",
+ "inputs": [
+  {
+   "path": "paper/tables/table_s1_literature_parameters.csv",
+   "sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda"
+  }
+ ],
+ "values": {
+  "band_high_max": {
+   "value": 300.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "band_high_min": {
+   "value": 200.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "band_high_mode": {
+   "value": 250.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "band_low_max": {
+   "value": 180.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Largest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "band_low_min": {
+   "value": 80.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Smallest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "band_low_mode": {
+   "value": 150.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Most common lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "bayes_fraction": {
+   "value": 0.8070175438596491,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "cells_max": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cells",
+   "description": "Largest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "cells_min": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cells",
+   "description": "Smallest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "cells_mode": {
+   "value": 5.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cells",
+   "description": "Most common minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "longest_max": {
+   "value": 2000.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Largest maximum event duration, over the 24 numeric cells of Max Duration (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "longest_min": {
+   "value": 300.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Smallest maximum event duration, over the 24 numeric cells of Max Duration (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "longest_mode": {
+   "value": 500.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Most common maximum event duration, over the 24 numeric cells of Max Duration (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "mua_only_fraction": {
+   "value": 0.42105263157894735,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection names MUA only)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "papers": {
+   "value": 57,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "Papers in the survey",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "position_bin_max": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "Largest decoding position bin, over the 46 numeric cells of Position bin (cm)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "position_bin_min": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "Smallest decoding position bin, over the 46 numeric cells of Position bin (cm)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "position_bin_mode": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "Most common decoding position bin, over the 46 numeric cells of Position bin (cm)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "shortest_max": {
+   "value": 100.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Largest minimum event duration, over the 40 numeric cells of Min. Duration (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "shortest_min": {
+   "value": 15.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Smallest minimum event duration, over the 40 numeric cells of Min. Duration (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "shortest_mode": {
+   "value": 50.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Most common minimum event duration, over the 40 numeric cells of Min. Duration (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "speed_max": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm/s",
+   "description": "Largest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "speed_min": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm/s",
+   "description": "Smallest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "speed_mode": {
+   "value": 5.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm/s",
+   "description": "Most common running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "swr_and_mua_fraction": {
+   "value": 0.22807017543859648,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection names SWR and MUA only)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "swr_only_fraction": {
+   "value": 0.2807017543859649,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection names SWR only)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "threshold_max": {
+   "value": 8.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "SD",
+   "description": "Largest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "threshold_min": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "SD",
+   "description": "Smallest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "threshold_mode": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "SD",
+   "description": "Most common candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "time_bin_max": {
+   "value": 100.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Largest decoding time bin, over the 46 numeric cells of Time bin (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "time_bin_min": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  },
+  "time_bin_mode": {
+   "value": 20.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Most common decoding time bin, over the 46 numeric cells of Time bin (ms)",
+   "claims": [
+    "introduction"
+   ],
+   "used_in": [
+    "paper"
+   ],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "pending": null
+  }
+ }
+}

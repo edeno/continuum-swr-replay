@@ -24,14 +24,24 @@ def _empty_schema_frame() -> pd.DataFrame:
     """Schema-complete frame with zero rows that the summary should
     be able to digest without crashing."""
     columns = [
-        "animal", "day", "epoch",
-        "head_speed", "linear_position",
-        "Local_prob", "No-Spike_prob",
-        "Non-Local_Continuous_prob", "Non-Local_Fragmented_prob",
-        "ahead_behind_distance", "hpd",
-        "non_local_event", "SWR_event", "MUA_event",
+        "animal",
+        "day",
+        "epoch",
+        "head_speed",
+        "linear_position",
+        "Local_prob",
+        "No-Spike_prob",
+        "Non-Local_Continuous_prob",
+        "Non-Local_Fragmented_prob",
+        "ahead_behind_distance",
+        "hpd",
+        "non_local_event",
+        "SWR_event",
+        "MUA_event",
         "theta_power_zscore",
-        "max_distance", "max_coverage", "max_linear_position",
+        "max_distance",
+        "max_coverage",
+        "max_linear_position",
     ]
     return pd.DataFrame(
         {

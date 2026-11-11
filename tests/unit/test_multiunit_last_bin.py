@@ -21,9 +21,7 @@ class TestMultiunitLastBinReachable:
         bin_time = np.array([0.0, 1.0, 2.0, 3.0])
         speed = np.zeros(bin_time.shape[0])
 
-        _, multiunit_firing_rate, _ = get_multiunit_hse(
-            spike_times, speed, bin_time
-        )
+        _, multiunit_firing_rate, _ = get_multiunit_hse(spike_times, speed, bin_time)
 
         # The final output bin (index -1) must contain a non-zero rate.
         last_bin_rate = multiunit_firing_rate["firing_rate"].iloc[-1]
@@ -40,9 +38,7 @@ class TestMultiunitLastBinReachable:
         bin_time = np.array([0.0, 1.0, 2.0, 3.0])
         speed = np.zeros(bin_time.shape[0])
 
-        _, multiunit_firing_rate, _ = get_multiunit_hse(
-            spike_times, speed, bin_time
-        )
+        _, multiunit_firing_rate, _ = get_multiunit_hse(spike_times, speed, bin_time)
 
         rates = multiunit_firing_rate["firing_rate"].to_numpy()
         # Penultimate (bin 2) and last (bin 3) both non-zero.

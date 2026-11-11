@@ -51,8 +51,12 @@ def main():
             print(f"  MISSING {a}{d}_{e}", flush=True)
             continue
         cols = [
-            "Non-Local_Continuous_prob", "Non-Local_Fragmented_prob",
-            "map_estimate", "SWR_zscore", "MUA_zscore", "head_speed",
+            "Non-Local_Continuous_prob",
+            "Non-Local_Fragmented_prob",
+            "map_estimate",
+            "SWR_zscore",
+            "MUA_zscore",
+            "head_speed",
         ]
         dot = pd.read_pickle(dot_fn)[cols].sort_index()
         env = pd.read_pickle(env_fn)
@@ -114,26 +118,39 @@ def main():
                     we_sp_mua = spearmanr(df["zm_d"], df["tk_d"]).statistic
 
         per_session.append(
-            {"animal": a, "session_date": d, "epoch": e, "n_timebins": len(is_trunk),
-             "trunk_rate": float(is_trunk.mean()),
-             "spearman_swr": sp_swr, "spearman_mua": sp_mua,
-             "we_spearman_swr": we_sp_swr, "we_spearman_mua": we_sp_mua,
-             "n_we_events": n_we_events}
+            {
+                "animal": a,
+                "session_date": d,
+                "epoch": e,
+                "n_timebins": len(is_trunk),
+                "trunk_rate": float(is_trunk.mean()),
+                "spearman_swr": sp_swr,
+                "spearman_mua": sp_mua,
+                "we_spearman_swr": we_sp_swr,
+                "we_spearman_mua": we_sp_mua,
+                "n_we_events": n_we_events,
+            }
         )
         if (i + 1) % 25 == 0:
-            print(f"  {i+1}/{len(sessions)} sessions, {time.time()-t0:.0f}s",
-                  flush=True)
+            print(
+                f"  {i + 1}/{len(sessions)} sessions, {time.time() - t0:.0f}s",
+                flush=True,
+            )
 
     centers = 0.5 * (BIN_EDGES[:-1] + BIN_EDGES[1:])
     binned = pd.DataFrame(
-        {"z_center": centers, "swr_n": acc["swr_n"],
-         "swr_trunk": acc["swr_trunk"], "mua_n": acc["mua_n"],
-         "mua_trunk": acc["mua_trunk"]}
+        {
+            "z_center": centers,
+            "swr_n": acc["swr_n"],
+            "swr_trunk": acc["swr_trunk"],
+            "mua_n": acc["mua_n"],
+            "mua_trunk": acc["mua_trunk"],
+        }
     )
     ps = pd.DataFrame(per_session)
     binned.to_pickle(PD / "replay_content" / "_trunk_zscore_timebin_binned.pkl")
     ps.to_pickle(PD / "replay_content" / "_trunk_zscore_timebin_persession.pkl")
-    print(f"\nDONE: {len(ps)} sessions, {time.time()-t0:.0f}s", flush=True)
+    print(f"\nDONE: {len(ps)} sessions, {time.time() - t0:.0f}s", flush=True)
 
 
 if __name__ == "__main__":
