@@ -196,6 +196,14 @@ This project relies on the Spyglass DataJoint pipeline. Key tables used:
 
 When modifying data loading, respect the DataJoint query patterns and restriction syntax.
 
+**The analyses only read the lab's database.** `load_data`, `get_epoch_info` and the
+other loaders fetch from Spyglass; nothing in `src/` or `scripts/` inserts, populates,
+deletes, creates a schema or exports. Keep it that way. Never write to the lab's
+Spyglass database without the explicit approval, from the person who owns the data, of
+that specific step; a script that must write is a lab operation, documented on its own,
+not part of the analysis. `tests/unit/test_no_database_writes.py` fails when code here
+calls a DataJoint write method.
+
 ### Spike Data Processing
 
 - **HPC**: Uses clusterless thresholding with waveform feature extraction. Automatically detects and removes coincident spikes across tetrodes (likely artifacts).
