@@ -3,13 +3,13 @@
  "part": 0,
  "title": "the surveyed literature",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "0ce50179395e-dirty",
+ "commit": "ba60938a5c97",
  "code": {
-  "head": "0ce50179395e6d8b3bece0650e156558b87a4aef",
+  "head": "ba60938a5c9736734fb0e4b8e9e446784ceabf25",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
-  "uncommitted": true,
-  "diff": "diff --git a/scripts/reported/summarize_part.py b/scripts/reported/summarize_part.py\nindex 13f1dbd0..d716bc9c 100644\n--- a/scripts/reported/summarize_part.py\n+++ b/scripts/reported/summarize_part.py\n@@ -12,8 +12,9 @@ Usage::\n     uv run python scripts/reported/summarize_part.py --part 2\n \n The summary records the code that built it: every package module the part's\n-builder loaded, with its digests, the digest of ``uv.lock``, and the diff of those\n-modules when they differ from ``HEAD`` (``reported/code_record.py``). A build from\n+builder loaded and the package's data files, with their digests, the commit, the\n+digest of ``uv.lock``, and the diff of those files and the ones git does not track\n+when they differ from the commit (``reported/code_record.py``). A build from\n uncommitted code is allowed and recorded; ``scripts/reported/check_release.py``\n flags it at a milestone. Only the requested part's builder is imported, so the\n record lists only the modules that part uses.\n@@ -23,10 +24,11 @@ from __future__ import annotations\n \n import argparse\n import importlib\n+import time\n from collections.abc import Sequence\n \n from continuum_swr_replay.paths import ROOT_DIR\n-from continuum_swr_replay.reported.code_record import code_record, loaded_modules\n+from continuum_swr_replay.reported.code_record import build_files, try_code_record\n from continuum_swr_replay.runs.provenance import described_commit, produced_by\n \n SUMMARY_DIR = ROOT_DIR / \"paper\" / \"reported\"\n@@ -38,19 +40,22 @@ def main(argv: Sequence[str] | None = None) -> None:\n     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])\n     parser.add_argument(\"--part\", type=int, required=True, choices=PARTS)\n     args = parser.parse_args(argv)\n+    started = time.time()\n     builder = importlib.import_module(f\"continuum_swr_replay.reported.part{args.part}\")\n     summary = builder.summarize(\n         builder.default_inputs(), produced_by(__file__), described_commit()\n     )\n-    summary.code = code_record(ROOT_DIR, loaded_modules(ROOT_DIR))\n+    summary.code = try_code_record(ROOT_DIR, build_files(ROOT_DIR), started)\n     path = SUMMARY_DIR / f\"part{args.part}.json\"\n     summary.write(path)\n     n_pending = sum(v.pending is not None for v in summary.values.values())\n-    uncommitted = \" from uncommitted code\" if summary.code[\"uncommitted\"] else \"\"\n-    print(\n-        f\"wrote {len(summary.values)} values ({n_pending} pending){uncommitted} to \"\n-        f\"{path}; the code record lists {len(summary.code['modules'])} files\"\n-    )\n+    code = summary.code\n+    if \"error\" in code:\n+        note = \"with no code record\"\n+    else:\n+        uncommitted = \", from uncommitted code\" if code[\"uncommitted\"] else \"\"\n+        note = f\"with a code record of {len(code['files'])} files{uncommitted}\"\n+    print(f\"wrote {len(summary.values)} values ({n_pending} pending) to {path}, {note}\")\n \n \n if __name__ == \"__main__\":\n",
+  "uncommitted": false,
+  "diff": "",
   "untracked": [],
   "modified_during_build": [],
   "files": {
