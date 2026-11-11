@@ -33,7 +33,8 @@ Python nor the lab's data: it uses the committed figures and
 Do not type a result number into `main.tex`. Use the macro that
 `reported_values.tex` defines for it, for example
 `\PartOneSweepReplays{}`; [reported/questions.md](reported/questions.md)
-lists every value under the question it answers, with its macro. The macro for summary key `part1.sweep_replays` is
+lists every value under the question it answers, with its macro (or, until its
+summary is rebuilt, among the values with tag problems). The macro for summary key `part1.sweep_replays` is
 `\PartOne` followed by the key in CamelCase.
 
 When a summary changes, regenerate the macros, then rebuild:

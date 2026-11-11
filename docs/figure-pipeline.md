@@ -1,10 +1,13 @@
 # Figure pipeline
 
-How each figure is made: the claims it supports, the script that draws it, what
-the script reads, where it writes, and the tests that guard it. The analyses
-behind the figures, and the claims they support, are in
-[analysis_map.md](analysis_map.md); the claims themselves are in
-[../paper/claims_table.md](../paper/claims_table.md).
+How each figure is made: the script that draws it, what the script reads, where
+it writes, and the tests that guard it. Which questions and values each figure
+shows is written once, in the question list
+(`src/continuum_swr_replay/reported/questions.py`), and listed by figure and panel
+at the end of [../paper/reported/questions.md](../paper/reported/questions.md); a
+question placed in a figure whose panels are not designed yet is listed under it
+unlettered. The analyses behind the figures are in
+[analysis_map.md](analysis_map.md).
 
 Run each script from the repository root. Each one writes to its output folder,
 most as a PDF and a PNG; `plot_swr_contrast_coefs.py` and the two example
@@ -18,12 +21,12 @@ Part 4 fits.
 
 `paper/main.tex` draws each one from `paper/figures/figureNN/figureNN.pdf`.
 
-| Figure | Panels | Claims | Script | Reads | Tests |
-| --- | --- | --- | --- | --- | --- |
-| 1. The switching state-space model | a: states and transitions; b: observation likelihoods; c: position transitions; d: a simulated decode | — | `scripts/figures/generate_figure01.py` | nothing: it simulates its data (`--seed`, `--n-neurons`) | — |
-| 2. Non-local events and SWRs | a: one example event per SWR-overlap class; b: events by overlap class; c: non-local probability and SWR z-score around event starts; d: event start and end against the matched SWR; e: decoding error in the Local state | 1, 2, 22 (a, b, d); 10 (e) | `scripts/figures/generate_figure02.py` | one example session (`--nwb-file-name`, `--epoch-name`; default `wilbur20210329_.nwb`, `02_r1`) through `load_data` and its decode; every analysed epoch's `{epoch_id}_80_data_over_time.pkl` | `tests/unit/test_figure_script_fixes.py`, `tests/unit/test_swr_source_consumers.py` |
-| 3. Non-local events outside SWRs | a: an example event with no SWR; b: SWR z-score at Local and Non-Local times; c: replay speed by SWR overlap; d: replayed position by SWR overlap | 24 (b), 15 (c) | `scripts/figures/generate_figure03.py` | as Figure 2 | `tests/unit/test_figure_script_fixes.py`, `tests/unit/test_swr_source_consumers.py` |
-| 4. mPFC responses to SWR and non-SWR events | a: one neuron's modulation by both event kinds; b: the population, both kinds, one sort order; c: population mean modulation; d: the share of neurons whose event term improves held-out deviance, and the best model per neuron | 20 | `scripts/figures/generate_figure04.py` | the example session's HPC decode, stops, events and SWRs; the mPFC modulation bundles, `{epoch_id}_mPFC_modulation.pkl` and their `.npy` arrays, from `scripts/pfc/run_pfc_analysis_bandit.py` | `tests/unit/test_generate_figure04.py` |
+| Figure | Panels | Script | Reads | Tests |
+| --- | --- | --- | --- | --- |
+| 1. The switching state-space model | a: states and transitions; b: observation likelihoods; c: position transitions; d: a simulated decode | `scripts/figures/generate_figure01.py` | nothing: it simulates its data (`--seed`, `--n-neurons`) | — |
+| 2. Non-local events and SWRs | a: one example event per SWR-overlap class; b: events by overlap class; c: non-local probability and SWR z-score around event starts; d: event start and end against the matched SWR; e: decoding error in the Local state | `scripts/figures/generate_figure02.py` | one example session (`--nwb-file-name`, `--epoch-name`; default `wilbur20210329_.nwb`, `02_r1`) through `load_data` and its decode; every analysed epoch's `{epoch_id}_80_data_over_time.pkl` | `tests/unit/test_figure_script_fixes.py`, `tests/unit/test_swr_source_consumers.py` |
+| 3. Non-local events outside SWRs | a: an example event with no SWR; b: SWR z-score at Local and Non-Local times; c: replay speed by SWR overlap; d: replayed position by SWR overlap | `scripts/figures/generate_figure03.py` | as Figure 2 | `tests/unit/test_figure_script_fixes.py`, `tests/unit/test_swr_source_consumers.py` |
+| 4. mPFC responses to SWR and non-SWR events | a: one neuron's modulation by both event kinds; b: the population, both kinds, one sort order; c: population mean modulation; d: the share of neurons whose event term improves held-out deviance, and the best model per neuron | `scripts/figures/generate_figure04.py` | the example session's HPC decode, stops, events and SWRs; the mPFC modulation bundles, `{epoch_id}_mPFC_modulation.pkl` and their `.npy` arrays, from `scripts/pfc/run_pfc_analysis_bandit.py` | `tests/unit/test_generate_figure04.py` |
 
 Figure 1 needs no data. Figures 2–4 need the lab's Spyglass database and the
 processed-data root ([reproduce.md](reproduce.md#requirements)).
@@ -38,16 +41,16 @@ final, add it to `.gitignore` as an exception, as Figure 1 is
 These are not in `paper/main.tex` yet. Each script's docstring describes its
 panels.
 
-| Figure | Claims | Script | Output |
-| --- | --- | --- | --- |
-| Decoder validation: the 0.8 threshold, state fractions, calibration, triggered averages, event durations | 10, 5 | `scripts/figures/generate_supp_decoder_validation.py` | `paper/figures/supp_decoder_validation/` |
-| Our detector and the Widloski & Foster detector on simulated replays | — | `scripts/figures/generate_memoryless_comparison.py` | `paper/figures/memoryless_comparison/` |
-| The analysis pipeline, as a schematic and as a data flow | — | `scripts/figures/generate_supp_pipeline_schematic.py`, `scripts/figures/generate_supp_pipeline_data_flow.py` | `paper/figures/qc_diagnosis/` |
-| Examples from each cell of the detector comparison | 23 | `scripts/figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` |
-| Comparator-only and ours-only events, with their spike evidence | 23 | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |
-| Content against reward-belief uncertainty (run `content.fig.uncertainty`) | 19g | `scripts/figures/generate_uncertainty_content_figure.py` | `paper/figures/uncertainty_content/` |
-| SWR against non-SWR coefficients, rate and content (run `content.fig.swr_contrast_coefs`) | 19a, 19b, 19c, 19f, 19g | `scripts/figures/plot_swr_contrast_coefs.py` | `paper/figures/swr_contrast/` |
-| Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | 19a, 19f, 19g | `scripts/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
+| Figure | Script | Output |
+| --- | --- | --- |
+| Decoder validation: the 0.8 threshold, state fractions, calibration, triggered averages, event durations | `scripts/figures/generate_supp_decoder_validation.py` | `paper/figures/supp_decoder_validation/` |
+| Our detector and the Widloski & Foster detector on simulated replays | `scripts/figures/generate_memoryless_comparison.py` | `paper/figures/memoryless_comparison/` |
+| The analysis pipeline, as a schematic and as a data flow | `scripts/figures/generate_supp_pipeline_schematic.py`, `scripts/figures/generate_supp_pipeline_data_flow.py` | `paper/figures/qc_diagnosis/` |
+| Examples from each cell of the detector comparison | `scripts/figures/generate_inventory_examples.py` | `paper/figures/inventory_comparison/<run id>/examples/` |
+| Comparator-only and ours-only events, with their spike evidence | `scripts/figures/generate_event_feature_examples.py` | `paper/figures/event_features/<run id>/examples/` |
+| Content against reward-belief uncertainty (run `content.fig.uncertainty`) | `scripts/figures/generate_uncertainty_content_figure.py` | `paper/figures/uncertainty_content/` |
+| SWR against non-SWR coefficients, rate and content (run `content.fig.swr_contrast_coefs`) | `scripts/figures/plot_swr_contrast_coefs.py` | `paper/figures/swr_contrast/` |
+| Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | `scripts/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
 
 The Part 3 figures that read the fits are drawn by `scripts/qa/run_refits.py`;
 [analysis_map.md](analysis_map.md) names each by its run (`rate.fig.*`,

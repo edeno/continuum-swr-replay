@@ -408,9 +408,11 @@ literature numbers the introduction quotes, computed from the replay-study surve
 Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
 
 Which question each value answers, and which figure shows it, is written once, in the question list
-(`src/continuum_swr_replay/reported/questions.py`). A value whose question or figure tag the list does
-not know is refused. `make reported-values` writes `paper/reported/questions.md`: every question in the
-paper's outline, with the values that answer it, their macros, and the values by figure.
+(`src/continuum_swr_replay/reported/questions.py`). It organizes the writing by part: a question need
+not have a figure. A builder that writes a value whose question or figure tag the list does not know
+fails; a summary written before the list changed is still emitted, and its mis-tagged values are listed
+in `paper/reported/questions.md` until it is rebuilt. `make reported-values` writes that file: every
+question in the paper's outline, with the values that answer it, their macros, and the values by figure.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it

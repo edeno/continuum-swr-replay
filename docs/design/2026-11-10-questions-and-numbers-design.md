@@ -1,6 +1,6 @@
 # Questions and their numbers: one list, one map, interpretation in the Results
 
-**Status:** draft for the lead, 2026-11-10. Nothing here is built yet. Every
+**Status:** steps 1–4 of the order of work are built (branch `questions-and-numbers`, 2026-11-11); see "As built" for where the build departs from the design below. Every
 count and every finding in this document was read from the files named beside it,
 at commit `3bcca2e7`. The inventory script is
 `.claude/docs/plans/questions-and-numbers/inventory.py` (run from the repository
@@ -12,6 +12,50 @@ once per claim.
 
 No result value is quoted. Where a claim's text holds a number, the key stands in
 its place, as `[part2.key]`.
+
+## As built (2026-11-11)
+
+Where the build departs from the design below, after two independent reviews:
+
+- **The question list** (`reported/questions.py`): each `Question` has `id`,
+  `part` (an integer) with a separate `section` (the outline's sub-question), `text`,
+  `status`, `reason`, `figures` and `note`. A question need not have a figure: the
+  list organizes the writing by part. A figure tag names the figure the paper
+  places a value in, which may be one whose panels are not designed yet
+  (unlettered, `figure: 2`). `ANSWERED` holds the statuses that have values.
+- **Refusal:** `Value` refuses an unknown claim or use, a figure its question does
+  not list, and a question whose status has no values. `read_summary(check_tags=False)`
+  (a flag on `Value`, not hidden state) reads summaries built before the list
+  changed; the emitter and the release check read them so, and list their
+  problems.
+- **`figure-pipeline.md`** stays tables, without the Claims columns: which
+  questions a figure shows is only in the question list, and in `questions.md`'s
+  "Values by figure". Its test checks that each figure's script is named there.
+- **`questions.md`**: grouped by part and section; a summary table at the top
+  (build commit, code record, values, tag problems); per question its status,
+  figures (only when it has some), value count, note, sources and values; a value
+  from a summary with no code record is marked *(tags not yet rebuilt)*; a section
+  of values with tag problems; the values by figure. No live staleness.
+- **The code record** (schema 3, `reported/code_record.py`): per file two digests
+  (bytes; docstring-stripped syntax tree, compared only under the same Python);
+  the files are the package modules loaded during the build, the building script
+  and the package's data files; the commit, `uv.lock`'s digest, an applicable diff
+  of the tracked files and `uv.lock` (taken with options that ignore the user's git
+  configuration), the untracked files, and the files modified during the build. A
+  git failure is recorded with git's message, and the summary is still written.
+- **`make release-check`** fails on a missing or unexpected summary file, no code
+  record, untracked or uncommitted code, files modified during the build, code or
+  `uv.lock` changed since, single-file inputs changed or absent, and tag problems.
+  Input file sets are only noted (their records name a label, not the builder's
+  selection; `TODO.md`). `--code-only` skips the inputs. There is no release
+  workflow; it is run by hand at a milestone.
+- **The emitter** reads exactly `part0`–`part4`, and does everything that can fail
+  (rendering, staleness, filling every doc in memory) before it writes any file.
+- **Tests:** the builders' tags are checked statically in pairs, and the halves
+  the scan cannot resolve must equal a listed set; the committed summaries'
+  expected tag problems and status mismatches are pinned exactly
+  (`EXPECTED_TAG_PROBLEMS`, `EXPECTED_STATUS_MISMATCHES`), not xfailed; the
+  scripts' `main()` paths are tested, Part 0's build in a subprocess.
 
 ## The problem
 
@@ -577,15 +621,16 @@ migration and stay.
 
 Each step is one commit, and the tests pass after each.
 
-1. `questions.py`, with the list above as the lead edits it. Tests 1, 2 and 4
-   start in report-only mode and list today's mismatches.
+1. `questions.py`, with the list above as the lead edits it. The committed
+   summaries' current mismatches are pinned exactly (see "As built").
 2. Builders use the question and figure ids; the stray tags are fixed per the
    lead's decisions. The summaries must then be rebuilt on the data machine, so
    tests 1 and 2 are made strict after that rebuild.
 3. The emitter writes `questions.md` and stops writing `values_index.md`. Test 3.
 4. Provenance:
    - the build records the loaded modules' digests, `uv.lock` and any diff;
-   - the emitter and `questions.md` report staleness;
+   - the emitter reports staleness; `questions.md` shows each summary's build
+     commit and code record;
    - `make release-check` blocks.
 
    Nothing blocks during development.
@@ -597,4 +642,4 @@ Each step is one commit, and the tests pass after each.
    that needs the Results, so they can be retired earlier.
    The `TODO.md` item "Summary provenance" (refuse a dirty tree) is replaced by
    step 4.
-6. Rebuild the summaries on the data machine; make tests 1 and 2 strict.
+6. Rebuild Parts 1–4 on the data machine; empty the pinned mismatch sets.

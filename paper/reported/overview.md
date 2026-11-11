@@ -1,7 +1,7 @@
 # What the reported numbers say, question by question
 
 Every number on this page is filled by `scripts/reported/emit_reported_values.py` from the summary files
-`paper/reported/part{n}.json`; none is typed by hand. Every value, with what it is, is listed under the question it answers in
+`paper/reported/part{n}.json`; none is typed by hand. Every value, with what it is, is listed under the question it answers (or, until its summary is rebuilt, among the values with tag problems) in
 [questions.md](questions.md). The interpretations are the assistant's reading of those values
 (2026-10-26), for the lead to check; "pending" marks values that may not be quoted as findings yet.
 

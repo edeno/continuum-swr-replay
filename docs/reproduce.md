@@ -81,12 +81,15 @@ after a change to fitting code only, start at step 6.
    `make reported-values` lists every number that changed, on the screen and in
    `paper/reported/changes.md`. Read that list before committing.
 
-   Each summary records the code that built it: the package modules its builder
-   loaded, with their digests, the digest of `uv.lock`, and the diff of those
-   modules if they were not committed. `make reported-values` names a summary whose
-   code has changed since, but never refuses it. `make release-check` fails on a
-   stale summary, one built from uncommitted code, or one whose tags the question
-   list does not know; run it at a milestone, then rebuild only the parts it names.
+   Each summary records the code that built it: the package modules and data files
+   the build loaded, with their digests, the commit, the digest of `uv.lock`, the
+   diff of any that were not committed, and the names of files git does not track.
+   `make reported-values` names a summary whose code has changed since, but never
+   refuses it. `make release-check` fails on a missing summary file, a summary with
+   no code record, a stale one, one built from uncommitted code, one whose
+   single-file inputs changed or are absent, or one with tag problems. Run it at a
+   milestone where the processed data is (`--code-only` skips the inputs), then
+   rebuild only the parts it names.
 
 ## Decoding
 

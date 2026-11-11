@@ -28,21 +28,24 @@ Work that is deferred on purpose. Each item says when it should be done.
 - [ ] **Summary input paths and rebuild comparison.** Record input paths
   relative to the data root, not absolute paths (`part2.json` records
   `/cumulus/...`). Add a script that compares a rebuilt summary with the
-  committed one within stated tolerances. (The code that built each summary is
-  now recorded, uncommitted builds included, and `make release-check` flags a
-  stale one; a dirty tree is no longer refused.)
+  committed one within stated tolerances. Record each input file set's glob, not
+  a label, so `make release-check` can re-check sets too (today it re-checks only
+  single files). (Each build now records the code that built it, uncommitted
+  builds included, and `make release-check` flags a stale one; a dirty tree is no
+  longer refused.)
   *When:* together with Tier 1, or when a number in the paper cannot be traced
   back to a commit.
 
 ## Reported values
 
-- [ ] **Rebuild every summary on the cluster.** No committed summary has a code
-  record yet, and Parts 1–3 still carry the tags from before the question list
-  (`make release-check` lists them). Rebuild all five from committed code
-  (`make summaries`; Parts 1–4 need the processed data), run
-  `make reported-values`, read `paper/reported/changes.md`, then remove each
-  rebuilt part from `AWAITING_REBUILD` in `tests/unit/test_reported_questions.py`.
-  Parts 3 and 4 were built from uncommitted code, so their numbers may move.
+- [ ] **Rebuild Parts 1–4 on the cluster.** They have no code record yet (Part 0
+  was rebuilt with one), and Parts 1–3 still carry the tags from before the
+  question list (`make release-check` lists them). Rebuild them from committed
+  code (`make summaries`), run `make reported-values`, read
+  `paper/reported/changes.md`, then update `EXPECTED_TAG_PROBLEMS` and
+  `EXPECTED_STATUS_MISMATCHES` in `tests/unit/test_reported_questions.py` (both
+  end empty). Parts 3 and 4 were built from uncommitted code, so their numbers may
+  move.
   *When:* at the next session on the cluster, before the Results are drafted.
 
 - [ ] **Held-out test split by SWR (claim 7): confirm which script made it.**
