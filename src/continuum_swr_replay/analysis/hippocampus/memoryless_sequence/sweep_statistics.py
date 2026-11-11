@@ -61,12 +61,21 @@ def sweep_measures(summary: pd.DataFrame, block: str) -> pd.Series:
 
 
 def _by_duration(summary: pd.DataFrame, block: str, measure: str) -> pd.Series:
-    """One measure of a by-duration block: its value at each true duration (s),
-    shortest first."""
-    rows = summary[
-        (summary["summary"] == block) & (summary["measure"] == measure)
-    ].sort_values("duration_s")
-    return rows.set_index("duration_s")["value"]
+    """One measure of a by-duration block: its value at each true duration (s)
+    the block has a row for, shortest first.
+
+    Raises
+    ------
+    ValueError
+        If the block has no row of the measure, or one with no ``duration_s``.
+    """
+    rows = summary[(summary["summary"] == block) & (summary["measure"] == measure)]
+    if rows.empty or rows["duration_s"].isna().any():
+        raise ValueError(
+            f"replay sweep summary: {block}, {measure} has no row, or a row with "
+            "no duration_s"
+        )
+    return rows.sort_values("duration_s").set_index("duration_s")["value"]
 
 
 def _whole_count(share: float, n: float) -> int:
@@ -110,10 +119,10 @@ def sweep_grid_statistics(summary: pd.DataFrame) -> dict[str, float]:
     """
     overall = sweep_measures(summary, "overall")
     domain = sweep_measures(summary, "overall_in_domain")
-    n = overall["n_cells"]
+    n = float(overall["n_cells"])
     return {
         "n_replays": n,
-        "domain_fraction": domain["n_cells"] / n,
+        "domain_fraction": float(domain["n_cells"]) / n,
         "n_sliding_only": _whole_count(overall["found_by_sliding_window_only"], n),
         "n_sliding_only_before_test": _whole_count(
             overall["found_by_sliding_window_only_before_shuffle"], n
@@ -134,19 +143,25 @@ def sweep_jump_pass_statistics(summary: pd.DataFrame) -> dict[str, float]:
     -------
     statistics : dict
         - ``shortest_duration_s``, ``longest_duration_s``: the shortest and
-          longest true durations swept, in seconds.
+          longest true durations the block has a jump-half row for, in
+          seconds.
         - ``shortest_fraction``, ``longest_fraction``: at each, the share
           passing the jump half among the replays the sliding window reported
           before its test.
+
+    Raises
+    ------
+    ValueError
+        If the block has no jump-half row, or one with no ``duration_s``.
     """
     jump_pass = _by_duration(
         summary, "shuffle_pass_rate_by_duration", "sliding_jump_pass"
     )
     return {
-        "shortest_duration_s": jump_pass.index[0],
-        "shortest_fraction": jump_pass.iloc[0],
-        "longest_duration_s": jump_pass.index[-1],
-        "longest_fraction": jump_pass.iloc[-1],
+        "shortest_duration_s": float(jump_pass.index[0]),
+        "shortest_fraction": float(jump_pass.iloc[0]),
+        "longest_duration_s": float(jump_pass.index[-1]),
+        "longest_fraction": float(jump_pass.iloc[-1]),
     }
 
 
@@ -167,8 +182,12 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        All in milliseconds; "over durations" is over the true durations swept.
+        The errors and the reported duration are in milliseconds, as the
+        summary stores them; "over durations" is over the true durations the
+        two blocks have rows for, the same for every measure read.
 
+        - ``shortest_duration_s``, ``longest_duration_s``: the shortest and
+          longest of those durations, in seconds.
         - ``state_space_edge_error_max_ms``: the largest absolute median start
           or end error of the state-space detector over durations.
         - ``sliding_start_early_min_ms``, ``sliding_start_early_max_ms``: the
@@ -183,31 +202,53 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
         - ``shortest_reported_duration_ms``: the median duration the sliding
           window reports for the shortest replays (the shortest duration times
           the median ratio of reported to true duration there).
+
+    Raises
+    ------
+    ValueError
+        If a measure has no row or a row with no ``duration_s``, or the
+        measures are not all at the same durations.
     """
 
-    def errors(detector: str, edge: str, statistic: str) -> np.ndarray:
+    def errors(detector: str, edge: str, statistic: str) -> pd.Series:
         return _by_duration(
             summary, "timing_by_duration", f"{detector}_{edge}_error_ms_{statistic}"
-        ).to_numpy()
+        )
 
     sliding_start = errors("sliding", "start", "median")
     sliding_end = errors("sliding", "end", "median")
-    state_space_edges = np.concatenate(
-        [errors("state_space", edge, "median") for edge in ("start", "end")]
-    )
+    sliding_end_upper_quartile = errors("sliding", "end", "q75")
+    state_space = [errors("state_space", edge, "median") for edge in ("start", "end")]
     ratio = _by_duration(
         summary, "median_duration_ratio_by_duration", "sliding_duration_ratio"
     )
+    durations = sliding_start.index
+    if not all(
+        measure.index.equals(durations)
+        for measure in (sliding_end, sliding_end_upper_quartile, *state_space, ratio)
+    ):
+        raise ValueError(
+            "replay sweep summary: the timing errors and the duration ratio are "
+            "not all at the same durations"
+        )
+    # as arrays, so that a missing value is NaN in the result and not skipped
+    start, end = sliding_start.to_numpy(), sliding_end.to_numpy()
     return {
-        "state_space_edge_error_max_ms": np.abs(state_space_edges).max(),
-        "sliding_start_early_min_ms": -sliding_start.max(),
-        "sliding_start_early_max_ms": -sliding_start.min(),
-        "sliding_end_late_min_ms": sliding_end.min(),
-        "sliding_end_late_max_ms": sliding_end.max(),
-        "sliding_end_late_upper_quartile_max_ms": errors("sliding", "end", "q75").max(),
-        "shortest_start_early_ms": -sliding_start[0],
-        "shortest_end_late_ms": sliding_end[0],
-        "shortest_reported_duration_ms": 1000 * ratio.index[0] * ratio.iloc[0],
+        "shortest_duration_s": float(durations[0]),
+        "longest_duration_s": float(durations[-1]),
+        "state_space_edge_error_max_ms": float(
+            np.abs(np.concatenate(state_space)).max()
+        ),
+        "sliding_start_early_min_ms": float(-start.max()),
+        "sliding_start_early_max_ms": float(-start.min()),
+        "sliding_end_late_min_ms": float(end.min()),
+        "sliding_end_late_max_ms": float(end.max()),
+        "sliding_end_late_upper_quartile_max_ms": float(
+            sliding_end_upper_quartile.to_numpy().max()
+        ),
+        "shortest_start_early_ms": float(-start[0]),
+        "shortest_end_late_ms": float(end[0]),
+        "shortest_reported_duration_ms": float(1000 * durations[0] * ratio.iloc[0]),
     }
 
 

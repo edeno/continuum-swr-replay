@@ -69,6 +69,31 @@ def test_a_sliding_window_that_does_not_start_early_and_end_late_is_refused(
         detection.sweep_values(changed, "source")
 
 
+def test_jump_pass_rates_and_timing_errors_at_other_durations_are_refused(sweep):
+    # without its 40 ms rows, the shortest replays of the pass rates are 60 ms
+    # ones, and those of the timing errors still 40 ms ones
+    shortest = (sweep["summary"] == "shuffle_pass_rate_by_duration") & (
+        sweep["duration_s"] == 0.04
+    )
+    assert shortest.sum() == 2
+    with pytest.raises(ValueError, match="not of the same durations"):
+        detection.sweep_values(sweep[~shortest], "source")
+
+
+def test_the_sweep_descriptions_state_the_durations_the_summary_holds(sweep):
+    # every true duration doubled: 80 to 1000 ms in place of 40 to 500 ms
+    doubled = sweep.assign(duration_s=2 * sweep["duration_s"])
+    description = {
+        value.key: value.description
+        for value in detection.sweep_values(doubled, "source")
+    }
+    assert "shortest (80 ms)" in description["sweep_jump_half_pass_shortest_fraction"]
+    assert "longest (1000 ms)" in description["sweep_jump_half_pass_longest_fraction"]
+    assert "shortest (80 ms)" in description["sweep_shortest_start_early_ms"]
+    assert "shortest (80 ms)" in description["sweep_shortest_reported_duration_ms"]
+    assert "(80 to 1000 ms)" in description["sweep_sliding_end_late_max_ms"]
+
+
 def test_an_event_where_there_was_no_replay_is_refused(controls):
     changed = _with_value(controls, 1.0, summary="no_replay", measure="n_events")
     with pytest.raises(ValueError, match="no output reported an event"):

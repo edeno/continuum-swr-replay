@@ -99,8 +99,48 @@ def test_sweep_jump_pass_statistics_read_the_shortest_and_longest_durations():
     assert result["longest_fraction"] == 0.9
 
 
+def _without(block: str, measure: str, duration_s: float) -> pd.DataFrame:
+    """``SWEEP`` less one measure's row at one duration."""
+    row = (
+        (SWEEP["summary"] == block)
+        & (SWEEP["measure"] == measure)
+        & (SWEEP["duration_s"] == duration_s)
+    )
+    assert row.sum() == 1
+    return SWEEP[~row]
+
+
+def _with_no_duration(block: str, measure: str, duration_s: float) -> pd.DataFrame:
+    """``SWEEP`` with one measure's row at one duration left without a duration."""
+    row = (
+        (SWEEP["summary"] == block)
+        & (SWEEP["measure"] == measure)
+        & (SWEEP["duration_s"] == duration_s)
+    )
+    assert row.sum() == 1
+    changed = SWEEP.copy()
+    changed.loc[row, "duration_s"] = np.nan
+    return changed
+
+
+def test_sweep_jump_pass_statistics_refuse_a_row_with_no_duration():
+    # sorted, a missing duration would come last and be read as the longest
+    changed = _with_no_duration(
+        "shuffle_pass_rate_by_duration", "sliding_jump_pass", 0.04
+    )
+    with pytest.raises(ValueError, match="no duration_s"):
+        stats.sweep_jump_pass_statistics(changed)
+
+
+def test_sweep_jump_pass_statistics_refuse_a_summary_without_the_block():
+    with pytest.raises(ValueError, match="has no row"):
+        stats.sweep_jump_pass_statistics(SWEEP[SWEEP["summary"] == "overall"])
+
+
 def test_sweep_timing_statistics_are_in_ms_and_signed_as_early_and_late():
     result = stats.sweep_timing_statistics(SWEEP)
+    assert result["shortest_duration_s"] == 0.04
+    assert result["longest_duration_s"] == 0.2
     assert result["state_space_edge_error_max_ms"] == 4.0
     # start errors -25, -12, -30 ms at 40, 100, 200 ms
     assert result["sliding_start_early_min_ms"] == 12.0
@@ -113,6 +153,42 @@ def test_sweep_timing_statistics_are_in_ms_and_signed_as_early_and_late():
     assert result["sliding_end_late_upper_quartile_max_ms"] == 70.0
     # 40 ms replays reported 2.5 times as long
     assert result["shortest_reported_duration_ms"] == pytest.approx(100.0)
+
+
+@pytest.mark.parametrize(
+    ("block", "measure"),
+    [
+        ("timing_by_duration", "sliding_start_error_ms_median"),
+        ("timing_by_duration", "sliding_end_error_ms_median"),
+        ("timing_by_duration", "sliding_end_error_ms_q75"),
+        ("timing_by_duration", "state_space_start_error_ms_median"),
+        ("timing_by_duration", "state_space_end_error_ms_median"),
+        ("median_duration_ratio_by_duration", "sliding_duration_ratio"),
+    ],
+)
+def test_sweep_timing_statistics_refuse_measures_at_different_durations(block, measure):
+    # without its 40 ms row, a measure's first value is the 100 ms one
+    with pytest.raises(ValueError, match="not all at the same durations"):
+        stats.sweep_timing_statistics(_without(block, measure, 0.04))
+
+
+def test_sweep_timing_statistics_refuse_a_row_with_no_duration():
+    changed = _with_no_duration(
+        "timing_by_duration", "sliding_end_error_ms_median", 0.1
+    )
+    with pytest.raises(ValueError, match="no duration_s"):
+        stats.sweep_timing_statistics(changed)
+
+
+def test_sweep_timing_statistics_do_not_skip_a_missing_error():
+    row = (SWEEP["measure"] == "sliding_end_error_ms_median") & (
+        SWEEP["duration_s"] == 0.1
+    )
+    changed = SWEEP.copy()
+    changed.loc[row, "value"] = np.nan
+    result = stats.sweep_timing_statistics(changed)
+    assert np.isnan(result["sliding_end_late_min_ms"])
+    assert np.isnan(result["sliding_end_late_max_ms"])
 
 
 # --- the controls ---------------------------------------------------------------

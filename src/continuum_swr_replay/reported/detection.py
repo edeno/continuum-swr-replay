@@ -450,6 +450,18 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
             "the caption says the sliding window starts early and ends late at "
             "every duration; the sweep's median timing errors disagree"
         )
+    durations = (timing["shortest_duration_s"], timing["longest_duration_s"])
+    jump_durations = (jump_pass["shortest_duration_s"], jump_pass["longest_duration_s"])
+    if jump_durations != durations:
+        raise ValueError(
+            "the shortest and longest replays of the jump half's pass rates and of "
+            f"the timing errors are not of the same durations: {jump_durations} and "
+            f"{durations} s"
+        )
+    shortest_ms, longest_ms = (f"{1000 * duration:.0f}" for duration in durations)
+    shortest = f"shortest ({shortest_ms} ms)"
+    longest = f"longest ({longest_ms} ms)"
+    over_durations = f"over true durations ({shortest_ms} to {longest_ms} ms)"
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
@@ -534,14 +546,12 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         share(
             "sweep_jump_half_pass_shortest_fraction",
             jump_pass["shortest_fraction"],
-            f"share of the shortest ({1000 * jump_pass['shortest_duration_s']:.0f} ms) "
-            "replays passing the jump half",
+            f"share of the {shortest} replays passing the jump half",
         ),
         share(
             "sweep_jump_half_pass_longest_fraction",
             jump_pass["longest_fraction"],
-            f"share of the longest ({1000 * jump_pass['longest_duration_s']:.0f} ms) "
-            "replays passing the jump half",
+            f"share of the {longest} replays passing the jump half",
         ),
         share(
             "sweep_state_space_only_fraction",
@@ -574,49 +584,48 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
             "sweep_state_space_edge_error_max_ms",
             timing["state_space_edge_error_max_ms"],
             "largest absolute median start or end error of the state-space "
-            "detector over true durations, replays both detectors reported",
+            f"detector {over_durations}, replays both detectors reported",
         ),
         ms(
             "sweep_sliding_start_early_min_ms",
             timing["sliding_start_early_min_ms"],
-            "smallest median amount the sliding window starts early, over true "
-            "durations",
+            f"smallest median amount the sliding window starts early, {over_durations}",
         ),
         ms(
             "sweep_sliding_start_early_max_ms",
             timing["sliding_start_early_max_ms"],
-            "largest median amount the sliding window starts early, over true durations",
+            f"largest median amount the sliding window starts early, {over_durations}",
         ),
         ms(
             "sweep_sliding_end_late_min_ms",
             timing["sliding_end_late_min_ms"],
-            "smallest median amount the sliding window ends late, over true durations",
+            f"smallest median amount the sliding window ends late, {over_durations}",
         ),
         ms(
             "sweep_sliding_end_late_max_ms",
             timing["sliding_end_late_max_ms"],
-            "largest median amount the sliding window ends late, over true durations",
+            f"largest median amount the sliding window ends late, {over_durations}",
         ),
         ms(
             "sweep_sliding_end_late_upper_quartile_max_ms",
             timing["sliding_end_late_upper_quartile_max_ms"],
-            "largest upper quartile of the sliding window's end error, over true "
-            "durations",
+            "largest upper quartile of the sliding window's end error, "
+            f"{over_durations}",
         ),
         ms(
             "sweep_shortest_start_early_ms",
             timing["shortest_start_early_ms"],
-            "median amount the sliding window starts the shortest replays early",
+            f"median amount the sliding window starts the {shortest} replays early",
         ),
         ms(
             "sweep_shortest_end_late_ms",
             timing["shortest_end_late_ms"],
-            "median amount the sliding window ends the shortest replays late",
+            f"median amount the sliding window ends the {shortest} replays late",
         ),
         ms(
             "sweep_shortest_reported_duration_ms",
             timing["shortest_reported_duration_ms"],
-            "median duration the sliding window reports for the shortest replays",
+            f"median duration the sliding window reports for the {shortest} replays",
         ),
         share(
             "sweep_sliding_not_the_replay_fraction",
