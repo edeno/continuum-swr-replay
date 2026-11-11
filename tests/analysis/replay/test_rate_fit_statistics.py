@@ -391,11 +391,38 @@ def _time_fits(spline: str, n_basis: int, intercepts, bumps=None, separated=None
 
 def test_a_flat_time_course_is_the_median_session_rate():
     fits = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0, 4.0]))
-    grid, curve, n_curves = stats.fitted_time_course(fits, "tc", (1.0, 2.0, 3.0), 4.0)
+    grid, curve, n_curves = stats.fitted_time_course(fits, "stop")
     assert grid.shape == curve.shape == (401,)
     assert grid[0] == 1.0 and grid[-1] == 3.0 and grid[200] == 2.0
     np.testing.assert_allclose(curve, 2.0)
     assert n_curves == 3
+
+
+def test_the_time_course_is_the_fitted_spline_of_each_clock():
+    # A cubic spline reproduces a straight line when each basis column's
+    # coefficient is the mean of its three inner knots. Stop clock, knots
+    # 0,0,0,0,1,2,3,4,4,4,4: 1/3, 1, 2, 3, 11/3, 4 (the first column, at 0, is
+    # the dropped intercept). Arrival clock, knots 0,0,0,0,1,2,4,6,8,8,8,8:
+    # 1/3, 1, 7/3, 4, 6, 22/3, 8. With those coefficients times log 2 the rate
+    # is 2 ** t on either clock, whatever the knots.
+    log2 = np.log(2.0)
+    stop = _time_fits(
+        STOP_SPLINE,
+        6,
+        [0.0],
+        bumps=dict(enumerate(log2 * np.array([1 / 3, 1, 2, 3, 11 / 3, 4]))),
+    )
+    grid, curve, _ = stats.fitted_time_course(stop, "stop")
+    np.testing.assert_allclose(curve, 2.0**grid)
+    arrival = _time_fits(
+        ARRIVAL_SPLINE,
+        7,
+        [0.0],
+        bumps=dict(enumerate(log2 * np.array([1 / 3, 1, 7 / 3, 4, 6, 22 / 3, 8]))),
+    )
+    grid, curve, _ = stats.fitted_time_course(arrival, "arrival")
+    assert grid[0] == 1.0 and grid[-1] == 6.0
+    np.testing.assert_allclose(curve, 2.0**grid)
 
 
 def test_the_time_course_leaves_out_separated_and_non_finite_sessions():
@@ -408,7 +435,7 @@ def test_the_time_course_leaves_out_separated_and_non_finite_sessions():
         separated=[False, False, None, True, False, False, False],
     )
     fits.loc[6, f"{STOP_SPLINE}[3]"] = NAN
-    _, curve, n_curves = stats.fitted_time_course(fits, "tc", (1.0, 2.0, 3.0), 4.0)
+    _, curve, n_curves = stats.fitted_time_course(fits, "stop")
     np.testing.assert_allclose(curve, 2.0)
     assert n_curves == 3
 
@@ -438,6 +465,25 @@ def test_a_peak_inside_the_interval_is_located_and_one_at_its_end_is_not():
     assert result["time_peak_sessions"] == 3
 
 
+def test_a_peak_on_the_arrival_clock_is_located_on_its_own_knots():
+    # A cubic spline reproduces t * (10 - t), which peaks at 5 s, when each
+    # column's coefficient is 10 times the mean of its three inner knots less
+    # the mean of their pairwise products. Arrival knots 0,0,0,0,1,2,4,6,8,8,8,8:
+    # means 1/3, 1, 7/3, 4, 6, 22/3, 8 and pairwise means 0, 2/3, 14/3, 44/3,
+    # 104/3, 160/3, 64, so 10/3, 28/3, 56/3, 76/3, 76/3, 20, 16.
+    coefficients = np.array([10 / 3, 28 / 3, 56 / 3, 76 / 3, 76 / 3, 20, 16]) / 10
+    peaked = _time_fits(
+        ARRIVAL_SPLINE, 7, np.log([1.0, 3.0]), bumps=dict(enumerate(coefficients))
+    )
+    flat_stop = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0, 4.0]))
+    result = stats.clock_shape_statistics(flat_stop, peaked)
+    assert result["arrival_peak_s"] == pytest.approx(5.0)
+    assert result["arrival_peak_edge"] == 0
+    assert result["arrival_peak_sessions"] == 2
+    assert result["time_peak_s"] == 1.0  # flat: its first point
+    assert result["time_peak_edge"] == 1
+
+
 def test_the_ks_distance_compares_shapes_on_relative_position():
     flat_stop = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0, 4.0]))
     flat_arrival = _time_fits(ARRIVAL_SPLINE, 7, np.log([3.0, 5.0]))
@@ -445,12 +491,18 @@ def test_the_ks_distance_compares_shapes_on_relative_position():
     assert stats.clock_shape_statistics(flat_stop, flat_arrival)[
         "clock_ks"
     ] == pytest.approx(0.0, abs=1e-12)
-    # A course that rises through its interval has its mass late: its
-    # cumulative shape lies below the flat one's everywhere inside, so the
-    # signed difference is negative and the distance is its size.
-    rising = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0, 3.0]), bumps={4: 3.0})
-    ks = stats.clock_shape_statistics(rising, flat_arrival)["clock_ks"]
-    assert 0.05 < ks < 1.0
+    # A stop-clock rate of 2 ** t (coefficients log 2 times 1/3, 1, 2, 3, 11/3,
+    # 4) has the cumulative shape (2 ** t - 2) / 6 on [1, 3] s; a flat course
+    # has (t - 1) / 2. They are furthest apart where 2 ** t = 3 / log 2, at
+    # t = 2.1137 s: 0.556865 - 0.388014 = 0.168851.
+    doubling = _time_fits(
+        STOP_SPLINE,
+        6,
+        np.log([1.0, 2.0, 3.0]),
+        bumps=dict(enumerate(np.log(2.0) * np.array([1 / 3, 1, 2, 3, 11 / 3, 4]))),
+    )
+    ks = stats.clock_shape_statistics(doubling, flat_arrival)["clock_ks"]
+    assert ks == pytest.approx(0.168851, abs=2e-5)
 
 
 def test_the_cumulative_shape_is_the_trapezoid_area_scaled_to_one():

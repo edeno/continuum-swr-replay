@@ -19,7 +19,7 @@ Summaries of one coefficient, and of one rung against another, are in
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -34,15 +34,11 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
-    ARRIVAL_CLOCK_COLUMN,
-    ARRIVAL_SPLINE_KNOTS,
     BIN_S,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
-    SPLINE_KNOTS,
-    TMAX,
-    TMAX_ARRIVAL,
+    time_course_spline,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
@@ -50,8 +46,8 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
-STOP_CLOCK_COLUMN = "tc"
-"""The stop clock's column in the per-bin design: seconds since the stop began."""
+TIME_COURSE_GRID_POINTS = 401
+"""The evenly spaced times a fitted time course is evaluated at."""
 
 FIRST_LATE_REWARD_LAG = 3
 """The first lag of the reward kernel's late part, read apart from lags 1 and 2."""
@@ -385,64 +381,45 @@ def arrival_window_statistics(cohort: Mapping[str, int]) -> dict[str, float]:
 # --- the fitted time course -----------------------------------------------------------
 
 
-def _spline_columns(fits: pd.DataFrame, clock: str) -> list[str]:
-    """The clock's B-spline main-effect coefficient columns, in basis order."""
-    prefix = f"coef_bs({clock},"
-    columns = [
-        c
-        for c in fits.columns
-        if isinstance(c, str)
-        and c.startswith(prefix)
-        and c.endswith("]")
-        and ":" not in c
-    ]
-    return sorted(columns, key=lambda c: int(c.rsplit("[", 1)[1][:-1]))
-
-
 def fitted_time_course(
-    fits: pd.DataFrame, clock: str, knots: Sequence[float], tmax: float
+    fits: pd.DataFrame, time_clock: str
 ) -> tuple[np.ndarray, np.ndarray, int]:
     """The across-session median fitted rate over a clock's supported interior.
 
-    The interior is the span of the outermost interior knots: outside it the
-    spline is held by few bins. A session flagged separated, or whose curve is
-    not finite, is left out.
+    The curve is the fitted intercept and time-course spline of the ladder
+    (:func:`~continuum_swr_replay.analysis.replay.model_specs.time_course_spline`),
+    evaluated on a grid. The interior is the span of the spline's outermost
+    interior knots: outside it the spline is held by few bins. A session
+    flagged separated, or whose curve is not finite, is left out.
 
     Parameters
     ----------
     fits : pd.DataFrame
         Per-session fits of one time rung and population, with
-        ``coef_Intercept``, ``separated`` and the clock's B-spline coefficients
-        (``coef_bs(<clock>, ...)[k]``).
-    clock : str
-        The clock's column in the per-bin design.
-    knots : sequence of float
-        The spline's interior knots, in seconds.
-    tmax : float
-        The spline's upper boundary knot, in seconds.
+        ``coef_Intercept``, ``separated`` and the coefficient of each basis
+        column of the clock's spline (``coef_<term>[k]``).
+    time_clock : str
+        ``"stop"`` or ``"arrival"``: the clock the rung's spline is on.
 
     Returns
     -------
-    grid : np.ndarray, shape (401,)
+    grid : np.ndarray, shape (TIME_COURSE_GRID_POINTS,)
         Times on the clock from the first to the last interior knot, in seconds.
-    curve : np.ndarray, shape (401,)
+    curve : np.ndarray, shape (TIME_COURSE_GRID_POINTS,)
         The median over sessions of the fitted rate at each time, in events per
         at-risk second.
     n_curves : int
         The session curves the median is over.
     """
-    grid = np.linspace(float(knots[0]), float(knots[-1]), 401)
-    beta = fits[_spline_columns(fits, clock)].to_numpy(dtype=float)
+    term, column, knots = time_course_spline(time_clock)
+    grid = np.linspace(knots[0], knots[-1], TIME_COURSE_GRID_POINTS)
+    basis = np.asarray(dmatrix(f"{term} - 1", {column: grid}, return_type="dataframe"))
+    beta = fits[[f"coef_{term}[{k}]" for k in range(basis.shape[1])]].to_numpy(
+        dtype=float
+    )
     intercept = fits["coef_Intercept"].to_numpy(dtype=float)
     ok = np.isfinite(beta).all(axis=1) & np.isfinite(intercept)
     ok &= ~(fits["separated"] == True).to_numpy()  # noqa: E712 (NaN must not count)
-    basis = np.asarray(
-        dmatrix(
-            f"bs(x, knots={tuple(knots)}, lower_bound=0.0, upper_bound={tmax}) - 1",
-            {"x": grid},
-            return_type="dataframe",
-        )
-    )
     with np.errstate(over="ignore"):
         curves = np.exp(intercept[ok, None] + beta[ok] @ basis.T)
     curves = curves[np.isfinite(curves).all(axis=1)]
@@ -484,12 +461,8 @@ def clock_shape_statistics(
         cumulative shapes, each normalized over its own supported interval and
         read on relative position.
     """
-    grid, stop_curve, n_stop = fitted_time_course(
-        stop_fits, STOP_CLOCK_COLUMN, SPLINE_KNOTS, TMAX
-    )
-    arrival_grid, arrival_curve, n_arrival = fitted_time_course(
-        arrival_fits, ARRIVAL_CLOCK_COLUMN, ARRIVAL_SPLINE_KNOTS, TMAX_ARRIVAL
-    )
+    grid, stop_curve, n_stop = fitted_time_course(stop_fits, "stop")
+    arrival_grid, arrival_curve, n_arrival = fitted_time_course(arrival_fits, "arrival")
     ks = np.nanmax(
         np.abs(_shape_cdf(grid, stop_curve) - _shape_cdf(arrival_grid, arrival_curve))
     )

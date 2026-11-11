@@ -131,6 +131,7 @@ __all__ = [
     "TMAX_ARRIVAL",
     "default_content_model_names",
     "longest_history_window_s",
+    "time_course_spline",
 ]
 
 
@@ -571,6 +572,30 @@ def _spline_term(time_clock: str) -> PerBinTerm:
     if time_clock == "arrival":
         return PerBinTerm(_ARRIVAL_SPLINE, (ARRIVAL_CLOCK_COLUMN,))
     return PerBinTerm(_SPLINE, ("tc",))
+
+
+def time_course_spline(time_clock: str) -> tuple[str, str, tuple[float, ...]]:
+    """The time-course spline the per-bin rungs fit on one clock.
+
+    Parameters
+    ----------
+    time_clock : str
+        ``"stop"`` (seconds since the stop began) or ``"arrival"`` (seconds
+        since the animal reached the well).
+
+    Returns
+    -------
+    term : str
+        The spline as written in the rungs' patsy formula. A fit names the
+        coefficient of its ``k``-th basis column ``<term>[k]``.
+    column : str
+        The design column the spline reads: the clock, in seconds.
+    interior_knots : tuple of float
+        The spline's interior knots, in seconds.
+    """
+    term = _spline_term(time_clock)
+    knots = ARRIVAL_SPLINE_KNOTS if time_clock == "arrival" else SPLINE_KNOTS
+    return term.term, term.columns[0], knots
 
 
 def _column_terms(columns: Iterable[str], history_lags: int = 0) -> list[PerBinTerm]:
