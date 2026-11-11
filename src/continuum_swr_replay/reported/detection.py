@@ -36,7 +36,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data_dir
-from continuum_swr_replay.reported.values import Summary, Value, file_record
+from continuum_swr_replay.reported.values import Summary, Tags, Value, file_record
 
 STATE_EVIDENCE_RUN = "_refresh_20261016"
 """The held-out tetrode run the detection summary reads (242 epochs, all ``ok``)."""
@@ -48,8 +48,14 @@ MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 
 SWEEP_DIR = Path("docs/design/replay_detection_comparison")
 
-MEMORYLESS_FIGURE = ("supplement", "figure: memoryless_comparison")
-"""Where the sweep values are used: the supplemental figure and its caption."""
+TAGS = {
+    "state_evidence": Tags(("2c.3",), ("paper", "supplement")),
+    "memoryless": Tags(("2a.3",), ("supplement", "figure: memoryless_comparison")),
+    "pilot": Tags(("2a.4",), ("supplement", "figure: memoryless_comparison")),
+}
+"""Each group of values: the questions it answers and where it is used. The
+memoryless-comparison values are used in that supplementary figure and its
+caption; the pilot values come from one real epoch, not the simulations."""
 
 
 @dataclass(frozen=True)
@@ -78,8 +84,8 @@ def default_inputs() -> DetectionInputs:
     )
 
 
-def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, ...]):
-    """A :class:`Value` builder with the shared source, claims and use filled in."""
+def _value_factory(source: str, tags: Tags):
+    """A :class:`Value` builder with the shared source and tags filled in."""
 
     def make(
         key: str,
@@ -104,8 +110,8 @@ def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, 
             style=style,
             unit=unit,
             description=description,
-            questions=questions,
-            used_in=used_in,
+            questions=tags.questions,
+            used_in=tags.used_in,
             source=source,
             pending=pending,
         )
@@ -171,7 +177,7 @@ def state_evidence_values(
     counts the animals whose mean is above zero. Bouts are the primary
     (``runcv_``, time-held-out running-only encoding) rows of ``bout_stats``.
     """
-    make = _value_factory(source, ("2c.3",), ("paper", "supplement"))
+    make = _value_factory(source, TAGS["state_evidence"])
     statuses = pd.Series({k: r["status"] for k, r in manifest["epochs"].items()})
     n_animals = int(bouts["n_animals"].max())
     values = [
@@ -274,7 +280,7 @@ def pilot_stray_window_values(
     dispersion clears the threshold only with them: the pieces' own
     dispersion does not.
     """
-    make = _value_factory(source, ("2a.4",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, TAGS["pilot"])
     replay = events[events["is_replay"]]
     decided = replay[
         (replay["n_kept_windows_outside_pieces"] > 0)
@@ -311,7 +317,7 @@ def pilot_stray_window_values(
 def recording_values(numbers: dict, source: str) -> list[Value]:
     """Panels (a-f): what each detector made of the labeled events of one
     simulated recording, as the figure script computed them."""
-    make = _value_factory(source, ("2a.3",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, TAGS["memoryless"])
     if not numbers["outbound_draws_from_passing"] > 1:
         raise ValueError(
             "the caption says the outbound continuous replay fails the test by "
@@ -462,7 +468,7 @@ def _timing(summary: pd.DataFrame, detector: str, edge: str, statistic: str):
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     """Panels (g-k): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
-    make = _value_factory(source, ("2a.3",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, TAGS["memoryless"])
     overall = summary[summary["summary"] == "overall"].set_index("measure")["value"]
     domain = summary[summary["summary"] == "overall_in_domain"].set_index("measure")[
         "value"
@@ -706,7 +712,7 @@ def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     """Panels (l-o): bursts with no clean replay, stretches with no replay, and
     events in two parts."""
-    make = _value_factory(source, ("2a.3",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, TAGS["memoryless"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
@@ -1040,7 +1046,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     """Panels (p, q): content estimated from discovery cells, scored on held-out
     evaluation cells. Folds A and B tile the track; fold C's evaluation cells
     cover half of it."""
-    make = _value_factory(source, ("2a.3",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, TAGS["memoryless"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)

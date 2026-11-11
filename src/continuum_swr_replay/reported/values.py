@@ -45,6 +45,24 @@ _KEY = re.compile(r"[a-z]+(_[a-z]+)*")
 
 
 @dataclass(frozen=True)
+class Tags:
+    """Which questions a group of values answers, and where they are used: what a
+    builder declares once, in its ``TAGS`` table, for each group of values.
+
+    Attributes
+    ----------
+    questions : tuple of str
+        Question ids (:data:`~continuum_swr_replay.reported.questions.QUESTIONS`).
+    used_in : tuple of str
+        "paper", "supplement", or a figure (``"figure: <id>"``,
+        ``"figure: <id><panel>"``).
+    """
+
+    questions: tuple[str, ...]
+    used_in: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Value:
     """One reported number and where it comes from.
 

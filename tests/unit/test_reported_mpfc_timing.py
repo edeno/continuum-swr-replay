@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
-from continuum_swr_replay.reported.mpfc import _value_factory, timing_values
+from continuum_swr_replay.reported.mpfc import TAGS, _value_factory, timing_values
 
 LAG_TIME = np.arange(-100, 101) / 500.0
 
@@ -102,7 +102,7 @@ def population_and_curves():
 
 def test_timing_values_keys_kinds_and_directions(population_and_curves):
     population, curves, calibration = population_and_curves
-    make = _value_factory("synthetic", ("4.1",), ("paper",))
+    make = _value_factory("synthetic", TAGS["paper"])
 
     values = {
         v.key: v for v in timing_values(population, curves, LAG_TIME, calibration, make)
@@ -159,7 +159,7 @@ def test_timing_values_keys_kinds_and_directions(population_and_curves):
 
 def test_timing_values_without_calibration_omit_its_keys(population_and_curves):
     population, curves, _ = population_and_curves
-    make = _value_factory("synthetic", ("4.1",), ("paper",))
+    make = _value_factory("synthetic", TAGS["paper"])
 
     keys = {v.key for v in timing_values(population, curves, LAG_TIME, None, make)}
 
@@ -172,7 +172,7 @@ def test_rise_onset_is_measured_from_each_unit_window_start(population_and_curve
     peak's sign) moves the half-maximum onset measured from zero earlier, but
     not the rise onset measured from the curve's value at -200 ms."""
     population, curves, _ = population_and_curves
-    make = _value_factory("synthetic", ("4.1",), ("paper",))
+    make = _value_factory("synthetic", TAGS["paper"])
     rng = np.random.default_rng(1)
     shifted = dict(curves)
     for key in ("swr", "non_local_swr", "non_local_no_swr"):

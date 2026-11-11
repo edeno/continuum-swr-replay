@@ -69,10 +69,45 @@ from continuum_swr_replay.paths import (
 from continuum_swr_replay.reported.detection import STATE_EVIDENCE_RUN
 from continuum_swr_replay.reported.values import (
     Summary,
+    Tags,
     Value,
     file_record,
     files_record,
 )
+
+_FIGURE_2 = ("paper", "figure: 2")
+TAGS = {
+    "cohort": Tags(("2b.2",), ("paper", "figure: 2b")),
+    "left_out": Tags(("2b.2",), _FIGURE_2),
+    "other_detectors_main": Tags(("2b.3",), _FIGURE_2),
+    "other_detectors": Tags(("2b.3",), ("supplement",)),
+    "boundaries": Tags(("2b.4",), ("paper", "figure: 2d")),
+    "ripple": Tags(("2c.1", "2b.5"), ("paper", "figure: 3b")),
+    "brain_state": Tags(("2c.1",), ("supplement",)),
+    "rest_theta": Tags(("2c.1",), ("paper",)),
+    "class_distribution": Tags(("2b.5",), ("supplement",)),
+    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("paper",)),
+    "class_step_evidence": Tags(("2b.5", "2c.3"), ("paper",)),
+    "spike": Tags(("2c.2", "2c.3", "2c.5"), _FIGURE_2),
+    "spike_remote": Tags(("2c.2", "2c.3", "2c.5", "2c.7"), _FIGURE_2),
+    "spike_count": Tags(("2c.2",), _FIGURE_2),
+    "spike_count_remote": Tags(("2c.2", "2c.7"), _FIGURE_2),
+    "spike_evidence": Tags(("2c.3",), _FIGURE_2),
+    "spike_evidence_remote": Tags(("2c.3", "2c.7"), _FIGURE_2),
+    "spike_evidence_baseline": Tags(("2c.3", "2c.5"), _FIGURE_2),
+    "spike_gpi": Tags(("2c.4",), ("supplement",)),
+    "spike_gpi_remote": Tags(("2c.4", "2c.7"), ("supplement",)),
+    "content_occupancy": Tags(("2d.1", "2c.8"), _FIGURE_2),
+    "duration": Tags(("2d.6",), ("supplement",)),
+    "extent": Tags(("2d.3",), ("paper", "figure: 3")),
+    "speed": Tags(("2d.2",), ("paper", "figure: 3c")),
+    "certainty": Tags(("2d.5",), ("supplement",)),
+    "stillness": Tags(("2d.4",), ("paper", "figure: 3")),
+    "location": Tags(("2d.1",), ("paper", "figure: 3")),
+}
+"""Each group of values: the questions it answers and where it is used. The
+``_remote`` groups are the remote events' spike support, which also answers
+question 2c.7."""
 
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run the events summary reads (242 epochs, all ``ok``)."""
@@ -131,8 +166,9 @@ def default_inputs() -> EventsInputs:
     )
 
 
-def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, ...]):
-    """A :class:`Value` builder with the shared source, claims and use filled in."""
+def _value_factory(source: str, tags: Tags):
+    """A :class:`Value` builder with the shared source and tags filled in;
+    ``tags_`` overrides the tags of one value."""
 
     def make(
         key: str,
@@ -143,8 +179,7 @@ def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, 
         unit: str = "",
         *,
         pending: str | None = None,
-        questions_: tuple[str, ...] | None = None,
-        used_in_: tuple[str, ...] | None = None,
+        tags_: Tags | None = None,
     ) -> Value:
         if kind == "count" and float(value).is_integer():
             value = int(value)
@@ -157,8 +192,8 @@ def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, 
             style=style,
             unit=unit,
             description=description,
-            questions=questions_ or questions,
-            used_in=used_in_ or used_in,
+            questions=(tags_ or tags).questions,
+            used_in=(tags_ or tags).used_in,
             source=source,
             pending=pending,
         )
@@ -214,7 +249,7 @@ def _manifest(folder: Path) -> dict:
 
 def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.2: how many immobile non-local events carry no SWR."""
-    make = _value_factory(source, ("2b.2",), ("paper", "figure: 2b"))
+    make = _value_factory(source, TAGS["cohort"])
     if not events["whole_event_speed_eligible"].all():
         raise ValueError(
             "the event table holds events that are not whole-event immobile"
@@ -297,7 +332,7 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
-    make = _value_factory(source, ("2b.4",), ("paper", "figure: 2d"))
+    make = _value_factory(source, TAGS["boundaries"])
     overlap = events[events["overlap_class"] != "non_swr"]
     start_ms = 1000 * (overlap["event_start_s"] - overlap["matched_swr_start"]).dropna()
     end_ms = 1000 * (overlap["event_end_s"] - overlap["matched_swr_end"]).dropna()
@@ -385,9 +420,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     for word, detector in DETECTORS.items():
         main = word == MAIN_DETECTOR
         make = _value_factory(
-            source,
-            ("2b.3",),
-            ("paper", "figure: 2") if main else ("supplement",),
+            source, TAGS["other_detectors_main"] if main else TAGS["other_detectors"]
         )
         mine = events[events["detector"] == detector]
         alone = mine[~mine["matched"]]
@@ -566,7 +599,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
     analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
     from the Widloski detector) does not include, in total and per hour of rest.
     """
-    make = _value_factory(source, ("2b.2",), ("paper", "figure: 2"))
+    make = _value_factory(source, TAGS["left_out"])
     counts = pd.read_csv(report_dir / "counts_by_animal.csv")
     exposure_s = float(
         counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
@@ -745,9 +778,7 @@ def brain_state_values(
     values: list[Value] = []
     for word, column in _SIGNAL_EVENT_COLUMNS.items():
         make = _value_factory(
-            source,
-            ("2c.1", "2b.5") if word == "ripple" else ("2c.1",),
-            ("paper", "figure: 3b") if word == "ripple" else ("supplement",),
+            source, TAGS["ripple"] if word == "ripple" else TAGS["brain_state"]
         )
         label = _SIGNAL_LABELS[word]
         values += [
@@ -827,7 +858,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     median over epochs, and the animals whose median over their epochs is above
     0 dB. The z values (``brain_state_values``) stay as they are.
     """
-    make = _value_factory(source, ("2c.1",), ("supplement",))
+    make = _value_factory(source, TAGS["brain_state"])
     values: list[Value] = []
     for word in ("slow_gamma", "fast_gamma"):
         label = _SIGNAL_LABELS[word]
@@ -905,7 +936,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
     run scores every event and quiet window (no cap). The remote groups' values
     also answer question 2c.7, whether remote events pass these tests."""
-    make = _value_factory(source, ("2c.2", "2c.3", "2c.5"), ("paper", "figure: 2"))
+    make = _value_factory(source, TAGS["spike"])
     values = [
         make(
             "evidence_epochs",
@@ -922,6 +953,12 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     for word, group in groups.items():
         rows = metrics[metrics["group"] == group]
         label = "matched quiet windows" if word == "baseline" else f"{group} events"
+        remote = word.endswith("remote")
+
+        def pick(plain: Tags, far: Tags, remote: bool = remote) -> Tags:
+            """The remote groups' values also answer question 2c.7."""
+            return far if remote else plain
+
         values += [
             make(
                 f"{word}_scored",
@@ -929,6 +966,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{label} scored",
+                tags_=pick(TAGS["spike"], TAGS["spike_remote"]),
             ),
             make(
                 f"{word}_spikes_median",
@@ -937,7 +975,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median spike count of {label}",
                 "spikes",
-                questions_=("2c.2",),
+                tags_=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
             ),
             make(
                 f"{word}_tetrodes_median",
@@ -946,7 +984,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median number of tetrodes with a spike in {label}",
                 "tetrodes",
-                questions_=("2c.2",),
+                tags_=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
             ),
             make(
                 f"{word}_dll_per_spike_median",
@@ -956,7 +994,9 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median log-likelihood ratio per spike, decoded location against the "
                 f"animal's, of {label}",
                 "nats per spike",
-                questions_=("2c.3", "2c.5") if word == "baseline" else ("2c.3",),
+                tags_=TAGS["spike_evidence_baseline"]
+                if word == "baseline"
+                else pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
             make(
                 f"{word}_gpi_distance_median_cm",
@@ -966,8 +1006,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median track distance from the MAP of {label} to the ground-process "
                 "intensity peak",
                 "cm",
-                questions_=("2c.4",),
-                used_in_=("supplement",),
+                tags_=pick(TAGS["spike_gpi"], TAGS["spike_gpi_remote"]),
             ),
         ]
         if word == "baseline":
@@ -982,7 +1021,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
                 "window, per spike",
-                questions_=("2c.3",),
+                tags_=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
             make(
                 f"{word}_epochs_scored",
@@ -990,7 +1029,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
-                questions_=("2c.3",),
+                tags_=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
             make(
                 f"{word}_animals_above_baseline",
@@ -999,7 +1038,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
                 "window, per spike",
-                questions_=("2c.3",),
+                tags_=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
         ]
     values.append(
@@ -1011,17 +1050,13 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             "animals in the spike-evidence run",
         )
     )
-    remote = tuple(f"{word}_" for word in _REALITY_GROUPS if word.endswith("remote"))
-    return [
-        replace(v, questions=(*v.questions, "2c.7")) if v.key.startswith(remote) else v
-        for v in values
-    ]
+    return values
 
 
 def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode test of immobile Non-Local Continuous bouts,
     split by SWR, per held-out spike against the animal's position."""
-    make = _value_factory(source, ("2c.3",), ("paper", "figure: 2"))
+    make = _value_factory(source, TAGS["spike_evidence"])
     rows = stats[
         (stats["regime"] == "immobile") & (stats["metric"] == "runcv_nl_anim_mark_ps")
     ]
@@ -1104,7 +1139,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs.
     """
-    make = _value_factory(source, ("2b.5",), ("supplement",))
+    make = _value_factory(source, TAGS["class_distribution"])
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
@@ -1165,9 +1200,9 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     attained = ", ".join(
         _OTHER_STEP_PROPERTIES[p] for p in others.index[others == others.max()]
     )
-    make = _value_factory(source, ("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("paper",))
+    make = _value_factory(source, TAGS["class_step"])
     evidence = main[main.property == "evidence"]
-    make_evidence = _value_factory(source, ("2b.5", "2c.3"), ("paper",))
+    make_evidence = _value_factory(source, TAGS["class_step_evidence"])
     return [
         make(
             "step_other_properties_criterion_animals_max",
@@ -1208,8 +1243,8 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
 
 # --- 2c: properties -----------------------------------------------------------
 
-#: (word, column, scale, unit, style, the claim's direction for non-SWR against
-#: SWR, claims, use)
+#: (word, column, scale, unit, style, the expected direction for non-SWR against
+#: SWR, tags)
 _PROPERTIES = (
     (
         "duration",
@@ -1218,8 +1253,7 @@ _PROPERTIES = (
         "ms",
         "int",
         "lower",
-        ("2d.6",),
-        ("supplement",),
+        TAGS["duration"],
     ),
     (
         "extent",
@@ -1228,8 +1262,7 @@ _PROPERTIES = (
         "cm",
         "sig2",
         "lower",
-        ("2d.3",),
-        ("paper", "figure: 3"),
+        TAGS["extent"],
     ),
     (
         "speed",
@@ -1238,8 +1271,7 @@ _PROPERTIES = (
         "cm/s",
         "sig2",
         "lower",
-        ("2d.2",),
-        ("paper", "figure: 3c"),
+        TAGS["speed"],
     ),
     (
         "peak",
@@ -1248,10 +1280,9 @@ _PROPERTIES = (
         "",
         "dec2",
         "higher",
-        ("2d.5",),
-        ("supplement",),
+        TAGS["certainty"],
     ),
-    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", ("2d.5",), ("supplement",)),
+    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", TAGS["certainty"]),
     (
         "pause",
         "pause_fraction",
@@ -1259,8 +1290,7 @@ _PROPERTIES = (
         "",
         "dec2",
         "higher",
-        ("2d.4",),
-        ("paper", "figure: 3"),
+        TAGS["stillness"],
     ),
     (
         "max_step",
@@ -1269,8 +1299,7 @@ _PROPERTIES = (
         "cm",
         "sig2",
         "lower",
-        ("2d.4",),
-        ("paper", "figure: 3"),
+        TAGS["stillness"],
     ),
     (
         "reversals",
@@ -1279,8 +1308,7 @@ _PROPERTIES = (
         "",
         "int",
         "lower",
-        ("2d.4",),
-        ("paper", "figure: 3"),
+        TAGS["stillness"],
     ),
     (
         "multimodal",
@@ -1289,8 +1317,7 @@ _PROPERTIES = (
         "",
         "dec2",
         "lower",
-        ("2d.5",),
-        ("supplement",),
+        TAGS["certainty"],
     ),
     (
         "start_distance",
@@ -1299,8 +1326,7 @@ _PROPERTIES = (
         "cm",
         "sig2",
         "lower",
-        ("2d.1",),
-        ("paper", "figure: 3"),
+        TAGS["location"],
     ),
     (
         "arms",
@@ -1309,8 +1335,7 @@ _PROPERTIES = (
         "",
         "int",
         "lower",
-        ("2d.3",),
-        ("paper", "figure: 3"),
+        TAGS["extent"],
     ),
 )
 
@@ -1339,8 +1364,8 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     differ in the claim's direction. Not duration-controlled.
     """
     values = []
-    for word, column, scale, unit, style, direction, questions, used_in in _PROPERTIES:
-        make = _value_factory(source, questions, used_in)
+    for word, column, scale, unit, style, direction, tags in _PROPERTIES:
+        make = _value_factory(source, tags)
         x = events[[column, "is_swr", "animal"]].dropna(subset=[column])
         x = x.assign(v=x[column] * scale)
         med = x.groupby("is_swr")["v"].median()
@@ -1400,8 +1425,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
     if (share > MAX_NAN_REPLICATE_SHARE).any(axis=None):
         raise ValueError(f"too many bootstrap replicates without estimate:\n{share}")
     values: list[Value] = []
-    for word, _, _, unit, _, _, questions, used_in in _PROPERTIES:
-        make = _value_factory(source, questions, used_in)
+    for word, _, _, unit, _, _, tags in _PROPERTIES:
+        make = _value_factory(source, tags)
         row = intervals.loc[word]
         name = _PROPERTY_NAMES[word]
         skipped = (
@@ -1473,7 +1498,7 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
     windows: an event whose length no rest stretch of its epoch holds would
     have none, and raises rather than leaving the comparison silently.
     """
-    make = _value_factory(source, ("2c.1",), ("paper",))
+    make = _value_factory(source, TAGS["rest_theta"])
     if (events.rest_windows <= 0).any():
         raise ValueError(
             f"{int((events.rest_windows <= 0).sum())} events have no duration-matched "
@@ -1520,7 +1545,7 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
     at a remote well, at the animal's own well, on a remote path, near the
     animal off the wells.
     """
-    make = _value_factory(source, ("2d.1", "2c.8"), ("paper", "figure: 2"))
+    make = _value_factory(source, TAGS["content_occupancy"])
     occupancy = occupancy.assign(
         at_well=occupancy["remote_well"] + occupancy["own_well"]
     )

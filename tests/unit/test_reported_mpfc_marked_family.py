@@ -2,7 +2,11 @@
 
 import pandas as pd
 
-from continuum_swr_replay.reported.mpfc import _value_factory, marked_family_values
+from continuum_swr_replay.reported.mpfc import (
+    TAGS,
+    _value_factory,
+    marked_family_values,
+)
 
 
 def test_marked_family_values_quote_peak_sign_gain_and_leakage():
@@ -46,7 +50,7 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
     summary = pd.DataFrame(
         rows, columns=["model", "event_class", "target", "statistic", "value"]
     )
-    make = _value_factory("synthetic", ("4.1",), ("paper",))
+    make = _value_factory("synthetic", TAGS["paper"])
 
     values = {v.key: v.value for v in marked_family_values(summary, make)}
 

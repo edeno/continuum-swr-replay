@@ -8,6 +8,7 @@ from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
 from continuum_swr_replay.reported.mpfc import (
     CHECK_FIRING_RATE_HZ,
     CHECK_KEYS,
+    TAGS,
     _value_factory,
     called_fraction_values,
     rate_cutoff_check_values,
@@ -62,7 +63,7 @@ def _population() -> pd.DataFrame:
 
 def test_the_check_keeps_units_at_or_above_one_hz():
     population = _population()
-    make = _value_factory("synthetic", ("4.1",), ("paper",))
+    make = _value_factory("synthetic", TAGS["paper"])
     values = {v.key: v for v in rate_cutoff_check_values(population, None, make)}
     kept = int((RATES >= CHECK_FIRING_RATE_HZ).sum())
     assert 0 < kept < len(RATES)

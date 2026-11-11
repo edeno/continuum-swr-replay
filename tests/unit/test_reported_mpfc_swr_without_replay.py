@@ -8,6 +8,7 @@ from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.reported.mpfc import (
     SWR_WITHOUT_REPLAY_MIN_EVENTS,
+    TAGS,
     _value_factory,
     swr_without_replay_values,
 )
@@ -67,7 +68,7 @@ def extended():
 
 def test_counts_overlap_and_both_subsets(extended):
     population, curves, sidecars = extended
-    make = _value_factory("synthetic", ("4.1",), ("paper",))
+    make = _value_factory("synthetic", TAGS["paper"])
 
     values = {
         v.key: v.value

@@ -21,10 +21,8 @@ import pytest
 
 from continuum_swr_replay.reported import (
     behavior,
-    detection,
     emit,
     events,
-    survey,
     values,
 )
 from continuum_swr_replay.reported.questions import (
@@ -36,6 +34,7 @@ from continuum_swr_replay.reported.questions import (
     parse_figure_tag,
     tag_problems,
 )
+from continuum_swr_replay.reported.values import Tags
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTED = ROOT / "paper" / "reported"
@@ -163,258 +162,94 @@ def test_an_old_summary_is_read_unchecked_and_its_problems_listed(tmp_path):
 
 # --- the tags the builders write ---------------------------------------------------
 
-
-def _branches(node: ast.expr) -> list[ast.expr]:
-    """Both arms of a conditional expression, recursively; else the node."""
-    if isinstance(node, ast.IfExp):
-        return _branches(node.body) + _branches(node.orelse)
-    return [node]
+_ID = re.compile(r"[0-9][a-d]?\.[0-9]+")
 
 
-def _options(
-    node: ast.expr | None, module, local: dict[str, tuple[str, ...]]
-) -> list[tuple[str, ...]] | None:
-    """The tag tuples an argument can be: each arm of a conditional, a literal, a
-    name the function assigned a literal to, or a module constant; None when it is
-    only known at run time."""
-    if node is None:
-        return None
-    options = []
-    for branch in _branches(node):
-        if isinstance(branch, ast.Name) and branch.id in local:
-            options.append(local[branch.id])
-            continue
-        if isinstance(branch, ast.Name) and isinstance(
-            getattr(module, branch.id, None), tuple
+def _builder(name: str):
+    return importlib.import_module(f"continuum_swr_replay.reported.{name}")
+
+
+def _tags_lookups(tree: ast.AST) -> tuple[set[str], int]:
+    """The keys a module looks up in ``TAGS`` by a literal, and how many lookups
+    it makes by any other expression."""
+    keys, other = set(), 0
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "TAGS"
         ):
-            options.append(getattr(module, branch.id))
-            continue
-        try:
-            options.append(tuple(ast.literal_eval(branch)))
-        except ValueError:
-            return None
-    return options
-
-
-def _tag_sites(name: str, source: str | None = None):
-    """Every (questions, used_in) a builder can give a value, as far as its source
-    says, and the halves it cannot resolve.
-
-    In each function: every ``_value_factory(source, questions, used_in)`` call; every
-    call with a ``questions_`` / ``used_in_`` override, paired with the factory's
-    other half when the function assigned that factory; every ``Value(...)``
-    call. Returns ``(pairs, unresolved)``: pairs are ``(line, function, questions
-    options or None, used_in options or None)``; unresolved are ``(function,
-    which, expression)`` for each half known only at run time."""
-    module = importlib.import_module(f"continuum_swr_replay.reported.{name}")
-    text = (BUILDERS / f"{name}.py").read_text() if source is None else source
-    pairs, unresolved = [], set()
-    for function in ast.walk(ast.parse(text)):
-        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        local = {}
-        for node in ast.walk(function):
-            if (
-                isinstance(node, ast.Assign)
-                and len(node.targets) == 1
-                and isinstance(node.targets[0], ast.Name)
-            ):
-                try:
-                    value = ast.literal_eval(node.value)
-                except ValueError:
-                    continue
-                if isinstance(value, tuple):
-                    local[node.targets[0].id] = value
-
-        def resolve(which, node, function=function, local=local):
-            found = _options(node, module, local)
-            if found is None:
-                expression = "?" if node is None else ast.unparse(node)
-                unresolved.add((function.name, which, expression))
-            return found
-
-        factories = {}
-        assigned = {
-            id(node.value): node.targets[0].id
-            for node in ast.walk(function)
-            if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
-        }
-        for call in ast.walk(function):
-            if not (
-                isinstance(call, ast.Call)
-                and getattr(call.func, "id", None) == "_value_factory"
-            ):
-                continue
-            questions = resolve("questions", call.args[1])
-            used_in = resolve("used_in", call.args[2])
-            pairs.append((call.lineno, function.name, questions, used_in))
-            if id(call) in assigned:
-                factories[assigned[id(call)]] = (questions, used_in)
-        for node in ast.walk(function):
-            if not isinstance(node, ast.Call):
-                continue
-            keywords = {k.arg: k.value for k in node.keywords}
-            name = getattr(node.func, "id", None)
-            if name == "Value":
-                questions = resolve("questions", keywords.get("questions"))
-                used_in = resolve("used_in", keywords.get("used_in"))
-                pairs.append((node.lineno, function.name, questions, used_in))
-            elif {"questions_", "used_in_"} & set(keywords):
-                questions, used_in = factories.get(name, (None, None))
-                for which, half in (
-                    ("questions", "questions_"),
-                    ("used_in", "used_in_"),
-                ):
-                    if half in keywords:
-                        found = resolve(half, keywords[half])
-                    elif name in factories:
-                        continue
-                    else:
-                        found = resolve(which, None)
-                    if which == "questions":
-                        questions = found
-                    else:
-                        used_in = found
-                pairs.append((node.lineno, function.name, questions, used_in))
-    return pairs, unresolved
-
-
-_PASS_THROUGH = {
-    (fn, which, expression)
-    for fn in ("_value_factory", "make")
-    for which, expression in (
-        ("questions", "questions"),
-        ("used_in", "used_in"),
-        ("questions", "questions_ or questions"),
-        ("used_in", "used_in_ or used_in"),
-    )
-}
-"""Each part's factory, which passes its caller's tags on: checked at its callers."""
-
-UNRESOLVED = {
-    "survey": set(),
-    "detection": {s for s in _PASS_THROUGH if s[2] in ("questions", "used_in")},
-    "events": {s for s in _PASS_THROUGH if "or" in s[2]}
-    | {
-        (fn, which, which)
-        for fn in ("property_interval_values", "property_values")
-        for which in ("questions", "used_in")
-    },
-    "behavior": {s for s in _PASS_THROUGH if "or" in s[2]}
-    | {("content_contrast_values", "questions", "questions")},
-    "mpfc": {
-        ("_value_factory", "questions", "questions"),
-        ("_value_factory", "used_in", "used_in_ or used_in"),
-        ("make", "questions", "questions"),
-        ("make", "used_in", "used_in_ or used_in"),
-        ("called_fraction_values", "questions", "?"),
-        ("cohort_values", "questions", "?"),
-        ("followup_values", "questions", "questions"),
-    },
-}
-"""The tag halves the scan cannot resolve, each covered elsewhere: the factories'
-pass-through; the events builder's property loops (``_PROPERTIES``) and the behavior builder's content
-questions (``_CONTENT_QUESTIONS``), checked by :func:`test_every_named_tag_a_builder_writes_is_known`;
-the mpfc builder's functions that take their factory or questions as an
-argument, whose questions are :data:`MPFC_QUESTIONS`. A new unresolved half fails until it is covered here."""
-
-MPFC_QUESTIONS = ("4.1",)
-"""Every questions tuple the mpfc builder writes; its unresolved questions halves are checked as
-these."""
+            if isinstance(node.slice, ast.Constant):
+                keys.add(node.slice.value)
+            else:
+                other += 1
+    return keys, other
 
 
 @pytest.mark.parametrize("name", list(values.SUMMARIES))
-def test_every_tag_pair_a_builder_writes_is_known(name):
-    pairs, _ = _tag_sites(name)
-    assert pairs, f"no tags found in {name}.py"
-    problems = []
-    for line, _, questions, used_in in pairs:
-        if questions is None and name == "mpfc":
-            questions = [MPFC_QUESTIONS]
-        for c in questions or [()]:
-            for u in used_in or [()]:
-                problems += [f"{name}.py:{line}: {p}" for p in tag_problems(c, u)]
-    assert not problems, "\n".join(problems)
+def test_every_tag_group_a_builder_declares_is_known(name):
+    tags = _builder(name).TAGS
+    assert tags and all(isinstance(t, Tags) for t in tags.values())
+    problems = {k: tag_problems(t.questions, t.used_in) for k, t in tags.items()}
+    assert not {k: found for k, found in problems.items() if found}
 
 
 @pytest.mark.parametrize("name", list(values.SUMMARIES))
-def test_the_scan_resolves_every_tag_but_the_listed_ones(name):
-    _, unresolved = _tag_sites(name)
-    assert unresolved == UNRESOLVED[name]
+def test_a_builder_uses_every_tag_group_it_declares_and_no_other(name):
+    tree = ast.parse((BUILDERS / f"{name}.py").read_text())
+    keys, other = _tags_lookups(tree)
+    if name == "behavior":
+        # The content values look their group up by key word (_content_tags).
+        keys |= {key for _, key in behavior._CONTENT_TAGS} | {"anchoring"}
+        assert other == 1
+    else:
+        assert other == 0
+    assert keys == set(_builder(name).TAGS)
 
 
-def test_the_mpfc_builder_writes_only_its_one_question():
-    pairs, _ = _tag_sites("mpfc")
-    questions = {c for _, _, options, _ in pairs if options for c in options}
-    assert questions == {MPFC_QUESTIONS}
-
-
-SYNTHETIC = """
-CONSTANT = ("paper", "figure: 2")
-
-
-def f(source, word, unknown):
-    local = ("2b.4",)
-    make = _value_factory(source, ("2d.2",), ("paper", "figure: 2"))
-    make("a", 1, "count", "count", "d", questions_=local)
-    make("b", 1, "count", "count", "d", used_in_=CONSTANT if word else ("paper",))
-    Value(questions=("2d.5",), used_in=("figure: 3",))
-    make("c", 1, "count", "count", "d", questions_=unknown)
-"""
-
-
-def test_the_scan_follows_overrides_conditionals_and_constants(monkeypatch):
-    module = importlib.import_module("continuum_swr_replay.reported.survey")
-    monkeypatch.setattr(module, "CONSTANT", ("paper", "figure: 2"), raising=False)
-    pairs, unresolved = _tag_sites("survey", source=SYNTHETIC)
-    assert sorted((line, c, u) for line, _, c, u in pairs) == [
-        (7, [("2d.2",)], [("paper", "figure: 2")]),
-        (8, [("2b.4",)], [("paper", "figure: 2")]),
-        (9, [("2d.2",)], [("paper", "figure: 2"), ("paper",)]),
-        (10, [("2d.5",)], [("figure: 3",)]),
-        (11, None, [("paper", "figure: 2")]),
+@pytest.mark.parametrize("name", list(values.SUMMARIES))
+def test_a_builder_writes_question_ids_and_figure_tags_only_in_its_table(name):
+    """Every question id and figure tag in a builder is in its ``TAGS`` table or a
+    constant that table uses, so a value's tags are declared once, as data."""
+    tree = ast.parse((BUILDERS / f"{name}.py").read_text())
+    declared = []
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            target = node.targets[0].id
+            if target == "TAGS" or target in {
+                n.id for n in ast.walk(_table(tree)) if isinstance(n, ast.Name)
+            }:
+                declared.append((node.lineno, node.end_lineno))
+    stray = [
+        (node.lineno, node.value)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and (_ID.fullmatch(node.value) or node.value.startswith("figure: "))
+        and not any(a <= node.lineno <= b for a, b in declared)
     ]
-    assert unresolved == {("f", "questions_", "unknown")}
-    problems = sorted(
-        {
-            p
-            for _, _, c, u in pairs
-            for ci in c or [()]
-            for ui in u
-            for p in tag_problems(ci, ui)
-        }
+    assert not stray
+
+
+def _table(tree: ast.AST) -> ast.AST:
+    return next(
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and isinstance(node.targets[0], ast.Name)
+        and node.targets[0].id == "TAGS"
     )
-    assert problems == [
-        "question 2b.4 does not list figure '2'",
-        "question 2d.2 does not list figure '2'",
-        "question 2d.5 does not list figure '3'",
-    ]
 
 
-def _named_tags() -> list[tuple[str, tuple[str, ...], tuple[str, ...]]]:
-    """Tags the builders hold in module constants: (where, questions, used_in), an
-    empty tuple where the constant gives only one of the two."""
-    found = [("survey.CLAIMS/USED_IN", survey.QUESTIONS_ANSWERED, survey.USED_IN)]
-    found.append(("detection.MEMORYLESS_FIGURE", (), detection.MEMORYLESS_FIGURE))
-    for row in events._PROPERTIES:
-        found.append((f"events._PROPERTIES {row[0]}", row[6], row[7]))
-    for lead, questions in behavior._CONTENT_QUESTIONS:
-        found.append((f"behavior._CONTENT_CLAIMS {lead}", questions, ("supplement",)))
-    found.append(("behavior._content_questions fallback", ("3.1",), ("supplement",)))
-    return found
+def test_the_content_values_find_their_tags_by_key_word():
+    assert (
+        behavior._content_tags("swr_armreward_total")
+        == behavior.TAGS["content_reward_value"]
+    )
+    assert behavior._content_tags("no_such_word") == behavior.TAGS["anchoring"]
 
 
-def test_every_named_tag_a_builder_writes_is_known():
-    problems = [
-        f"{where}: {p}"
-        for where, questions, used_in in _named_tags()
-        for p in tag_problems(questions, used_in)
-    ]
-    assert not problems, "\n".join(problems)
-    assert behavior._content_questions("no_such_word") == ("3.1",)
-
-
-def test_the_remote_groups_spike_evidence_also_answers_question_9():
+def test_the_remote_groups_spike_evidence_also_answers_question_2c_7():
     rng = np.random.default_rng(0)
     groups = ["baseline", "SWR-remote", "nonSWR-remote", "nonSWR-close"]
     rows = list(itertools.product(["a", "b"], ["e1", "e2"], groups, range(3)))
