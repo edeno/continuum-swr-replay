@@ -638,12 +638,6 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 
 `report`, `plot`, `build_parser`, `main`
 
-### `scripts/rate/summarize_per_bin_rate_models.py`
-
-Summarize the per-bin conditional-intensity ladder (Family B) effects.
-
-`all_models_path`, `all_models_input_paths`, `section_baseline`, `section_coef`, `section_kernel`, `section_reward_kernel`, `section_selfhistory`, `section_ladder`, `build_parser`, `main`
-
 ### `scripts/tables/assemble_contfrag_shards.py`
 
 Assemble disjoint per-animal ContFrag shards into one canonical bundle.

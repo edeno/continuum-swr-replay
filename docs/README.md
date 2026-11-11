@@ -484,7 +484,6 @@ Three tiers:
    installs the same GPU environment.
 
 2. **Results**: the reported values (`paper/reported/<summary>.json`, listed in
-   `paper/reported/questions.md`) vs the fits' own printed tables (for example
-   `scripts/rate/summarize_per_bin_rate_models.py`).
+   `paper/reported/questions.md`).
 
 3. **Figures**: `paper/figures/<topic>/` (publication) vs `.claude/research/*_outputs/` (exploratory) — see above.

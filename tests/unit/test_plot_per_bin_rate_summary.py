@@ -102,26 +102,6 @@ def test_kernel_differs_from_reconstructing_median_coefficients():
     assert abs(kernel[0] - from_median_coefs[0]) > 0.05
 
 
-def test_the_summary_panel_and_the_summarizer_agree():
-    """Panel C and ``summarize_per_bin_rate_models.py`` report one number."""
-    spec = importlib.util.spec_from_file_location(
-        "summarize_per_bin_rate_models",
-        Path(__file__).resolve().parents[2]
-        / "scripts"
-        / "rate"
-        / "summarize_per_bin_rate_models.py",
-    )
-    spbrm = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(spbrm)
-    sessions = _two_sessions()
-
-    np.testing.assert_allclose(
-        ppbrs.reward_kernel_rate_ratios(sessions),
-        spbrm.reward_kernel_rate_ratios(sessions),
-        rtol=1e-12,
-    )
-
-
 def test_sessions_missing_the_block_do_not_contribute():
     """A session with no fitted reward block is dropped, not read as zero."""
     sessions = _two_sessions()

@@ -190,7 +190,6 @@ them importable.
   `--mode pooled` stacks each animal's sessions with a session fixed effect, for kernels a session is too sparse
   to measure (`duration_aware_history_pooled.pkl`). Each output has its provenance sidecar.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
-- `summarize_per_bin_rate_models.py` — prints the per-bin ladder's fitted effects as tables; the reported values are read from the same fits into `paper/reported/behavior.json`.
 
 ## `coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers.

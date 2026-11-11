@@ -3,8 +3,7 @@
 > **Fitted Family-B effects** (baseline rates, reward kernel, self-history
 > microstructure, ladder fit) are reported values in `paper/reported/behavior.json`,
 > listed under question 3.3 in
-> [../paper/reported/questions.md](../paper/reported/questions.md);
-> `scripts/rate/summarize_per_bin_rate_models.py` prints them as a table.
+> [../paper/reported/questions.md](../paper/reported/questions.md).
 
 Two model families estimate **how often** non-local / SWR events occur (their
 *rate*), as opposed to **what they represent** (their *content*). They answer

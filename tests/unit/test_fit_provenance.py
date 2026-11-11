@@ -478,11 +478,6 @@ FITTERS = [
 # function that returns the recorded mapping).
 READERS = [
     (
-        RATE / "summarize_per_bin_rate_models.py",
-        "all_models_input_paths",
-        RATE / "fit_per_bin_rate_models.py",
-    ),
-    (
         RATE / "plot_per_bin_rate_models.py",
         "all_models_input_paths",
         RATE / "fit_per_bin_rate_models.py",
@@ -536,7 +531,6 @@ def test_readers_check_the_same_inputs_the_fitter_recorded(
 @pytest.mark.parametrize(
     "reader",
     [
-        "summarize_per_bin_rate_models",
         "plot_per_bin_rate_models",
         "plot_model_checking",
         "plot_per_bin_rate_summary",
@@ -553,7 +547,6 @@ def test_readers_default_to_refusing_a_stale_fit(reader):
 @pytest.mark.parametrize(
     "reader",
     [
-        "summarize_per_bin_rate_models",
         "plot_per_bin_rate_models",
         "plot_model_checking",
         "plot_per_bin_rate_summary",
