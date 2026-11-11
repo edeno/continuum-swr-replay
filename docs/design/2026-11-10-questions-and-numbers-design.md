@@ -69,7 +69,7 @@ Where the build departs from the design below, after two independent reviews:
 - **Question ids follow the outline** (`2d.2`); each keeps its claim number in
   `claim`. Values name their `questions`, not `claims` (schema 5).
 - **The four summaries that need the cluster were migrated, not rebuilt**
-  (`scripts/reported/migrate_summaries.py`): renamed, and their tags mapped to the
+  (a one-time script, `migrate_summaries.py`, in git at `d833fa8b`): renamed, and their tags mapped to the
   question list's decisions, every number unchanged (checked against the files
   before the change). Each records the migration and has no code record until
   rebuilt. The pinned mismatch sets and the "tags not yet rebuilt" marks are gone:

@@ -478,8 +478,6 @@ Every number the project reports is read from a summary file, named for what it 
   (`continuum_swr_replay.reported.<name>`), with a record of the code that built it; refits nothing.
 - `check_release.py` — before a milestone: fails on a summary that is missing, stale, built from
   uncommitted code, or mis-tagged (`make release-check`).
-- `migrate_summaries.py` — one-time: converted the summaries that need the cluster to the named
-  layout without rebuilding them; deleted once they are rebuilt.
 - `emit_reported_values.py` — writes `paper/reported_values.tex` (one LaTeX macro per value) and rewrites the
   number inside every `<!--v:<summary>.key-->…<!--/v-->` marker in the markdown under `paper/` and `docs/`
   (markers in code are left alone). Every number it changes is listed in `paper/reported/changes.md`.

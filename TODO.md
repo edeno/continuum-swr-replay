@@ -40,12 +40,13 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 - [ ] **Rebuild the four migrated summaries on the cluster.** `detection`,
   `events`, `behavior` and `mpfc` were converted from the earlier layout, not
-  rebuilt (`scripts/reported/migrate_summaries.py`): their numbers are the earlier
+  rebuilt (each records its steps in `migrated`; the one-time script,
+  `migrate_summaries.py`, is in git at `d833fa8b`): their numbers are the earlier
   builds', two of them from uncommitted code, and they have no code record
   (`make release-check` names them). Rebuild them from committed code
-  (`make summaries`), run `make reported-values`, read
+  (`make summaries`), run `make reported-values`, and read
   `paper/reported/changes.md` (the numbers of the two built from uncommitted code
-  may move), then delete `scripts/reported/migrate_summaries.py`.
+  may move).
   *When:* at the next session on the cluster, before the Results are drafted.
 
 - [ ] **Held-out test split by SWR (question 2c.3): confirm which script made it.**
