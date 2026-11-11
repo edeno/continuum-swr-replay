@@ -3,7 +3,7 @@
  "part": 0,
  "title": "the surveyed literature",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "f6ac0bb9240d-dirty",
+ "commit": "1577f7209200",
  "inputs": [
   {
    "path": "paper/tables/table_s1_literature_parameters.csv",
