@@ -117,9 +117,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.events import TAGS
-from continuum_swr_replay.reported.formatting import formatted
-from continuum_swr_replay.reported.values import value_factory
+from continuum_swr_replay.reported.formatting import format_number
 from continuum_swr_replay.visualization.figure_panels import (
     compute_triggered_average_curves,
     plot_decoding_error_distribution,
@@ -434,35 +432,16 @@ def event_table_panels(
             "these decode frames before drawing the figure"
         )
     medians = boundary_offset_statistics(events)
-    share = value_factory(event_table_panels, "the event table", TAGS["cohort"])
-    median = value_factory(event_table_panels, "the event table", TAGS["boundaries"])
     return {
         "class_counts": class_counts,
         "class_percents": {
-            cls: formatted(
-                share(
-                    "share",
-                    class_counts[cls] / class_counts["total"],
-                    "fraction",
-                    "pctnum",
-                    "",
-                )
-            )
+            cls: format_number(class_counts[cls] / class_counts["total"], "pctnum")
             for cls in CLASS_ORDER
         },
         "offsets": boundary_offsets(events),
         "offset_medians": {
             f"{bound}_offset_s": _with_plus(
-                formatted(
-                    median(
-                        "median",
-                        1000 * medians[f"{bound}_offset_median_s"],
-                        "quantity",
-                        "int",
-                        "",
-                        "ms",
-                    )
-                )
+                format_number(1000 * medians[f"{bound}_offset_median_s"], "int")
             )
             for bound in ("start", "end")
         },
