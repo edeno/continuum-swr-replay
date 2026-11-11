@@ -14,6 +14,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from continuum_swr_replay.reported import emit, values
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,7 +84,52 @@ def test_emitted_files_hold_the_committed_summaries():
         emit.values_index(summaries)
     ), f"paper/reported/values_index.md {stale}"
     by_key = values.values_by_key(summaries)
-    for doc in emit.marked_docs((PAPER, ROOT / "docs")):
+    docs = emit.marked_docs((PAPER, ROOT / "docs"))
+    assert PAPER / "README.md" in docs
+    for doc in docs:
         text = doc.read_text()
         filled, _ = emit.fill_markers(text, by_key, str(doc.relative_to(ROOT)))
         assert filled == text, f"{doc.relative_to(ROOT)} {stale}"
+
+
+def _value(key: str, value: float, pending: str | None = None) -> values.Value:
+    return values.Value(
+        key=key,
+        value=value,
+        kind="fraction",
+        style="pctnum",
+        unit="",
+        description="d",
+        claims=("c",),
+        used_in=("paper",),
+        source="s",
+        pending=pending,
+    )
+
+
+def test_markers_are_rewritten_outside_code_only():
+    by_key = {"part0.share": _value("share", 0.421)}
+    text = (
+        "Stale <!--v:part0.share-->99<!--/v--> and current "
+        "<!--v:part0.share-->42<!--/v-->; "
+        "an example `<!--v:part0.share-->7<!--/v-->` in code."
+    )
+    filled, changes = emit.fill_markers(text, by_key, "doc.md")
+    assert filled == (
+        "Stale <!--v:part0.share-->42<!--/v--> and current "
+        "<!--v:part0.share-->42<!--/v-->; "
+        "an example `<!--v:part0.share-->7<!--/v-->` in code."
+    )
+    assert changes == [emit.Change("doc.md", "part0.share", "99", "42")]
+
+
+def test_a_marker_naming_no_summary_key_is_an_error():
+    with pytest.raises(KeyError, match="part0.gone"):
+        emit.fill_markers("<!--v:part0.gone-->1<!--/v-->", {}, "doc.md")
+
+
+def test_a_pending_value_is_flagged_in_the_macros_and_the_index():
+    summary = values.Summary(part=0, produced_by="by", commit="c")
+    summary.add(_value("share", 0.5, pending="untracked script"))
+    assert "[PENDING: untracked script]" in emit.tex_file({0: summary})
+    assert "pending: untracked script" in emit.values_index({0: summary})
