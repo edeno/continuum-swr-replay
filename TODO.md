@@ -69,10 +69,6 @@ Work that is deferred on purpose. Each item says when it should be done.
     `rate_fit_statistics.py`, `stop_statistics.py` and `learning.py`.
     `contrast_aggregation.aggregate_contrast` repeats the animal-median and
     sign-count pattern of `session_median_statistics`.
-  - `coefficient_statistics.group_range` and
-    `pfc/population_statistics.lowest_and_highest` both return a lowest and
-    highest value with their groups; `analysis/replay` cannot import
-    `analysis/pfc`, so one copy needs a home below both.
 
   *When:* at each figure's or report's next regeneration.
 
