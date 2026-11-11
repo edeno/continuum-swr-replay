@@ -8,8 +8,9 @@ from that survey, so a correction to it reaches the text.
 A numeric parameter keeps a cell only when it is a bare number. The other forms
 a cell takes are listed in :data:`EXCLUDED_FORMS` -- a missing marker
 (``#N/A``, ``Not reported``), a bound (``>4``), a range (``1.8-1.9``), a share
-(``15% of ensemble``), ``Adaptive`` and a value with a note in parentheses --
-and are left out; a cell of any other form (``4 cm/s``, a blank) is an error.
+(``15% of ensemble``), ``Adaptive`` and the few cells that carry several values
+or a qualifier, each listed in :data:`ANNOTATED_CELLS` -- and are left out; a
+cell of any other form (``4 cm/s``, ``5 (cm/s)``, a blank) is an error.
 Each mode, minimum and maximum is over the papers whose cell is a number. A tie
 for the mode is an error rather than a silent choice. The trigger shares read
 the Detection column as a set of signals, each one of :data:`TRIGGERS`.
@@ -65,6 +66,15 @@ PARAMETER_COLUMNS: tuple[str, ...] = tuple(
 _NUMBER = r"\d+(\.\d+)?"
 _BARE_NUMBER = re.compile(_NUMBER)
 
+ANNOTATED_CELLS: tuple[str, ...] = (
+    "7 x SD (not z-scored)",
+    "20 (track); 80 (arena)",
+    "40-600 (adaptive sequence window)",
+    "5, 6.7, 10 (analysis variants)",
+)
+"""Cells with several values or a qualifier, read and left out one by one. A new
+annotated cell is an error until it is added here, so that it is looked at."""
+
 #: The forms of a parameter cell that are not a bare number and are left out.
 #: Each pattern must match the whole (stripped) cell.
 EXCLUDED_FORMS: dict[str, re.Pattern[str]] = {
@@ -73,16 +83,16 @@ EXCLUDED_FORMS: dict[str, re.Pattern[str]] = {
     ),
     "bound": re.compile(rf"[<>≥≤]\s*{_NUMBER}"),
     "range": re.compile(rf"{_NUMBER}\s*-\s*{_NUMBER}"),
-    "share": re.compile(r".*(%|\d+/\d+ of ).*"),
-    "adaptive": re.compile(r"Adaptive\b.*"),
-    "annotated": re.compile(r"[^()]*\d[^()]*\(.+\)"),
+    "share": re.compile(rf"{_NUMBER}%( of .+)?|\d+/\d+ of .+"),
+    "adaptive": re.compile(r"Adaptive( \(.+\))?"),
+    "annotated": re.compile("|".join(map(re.escape, ANNOTATED_CELLS))),
 }
 
 TRIGGERS = frozenset({"SWR", "MUA", "Decoding"})
 """The signals a Detection cell may name, comma-separated."""
 
-_BAYES = re.compile(r"(?<![\w-])bayes", re.IGNORECASE)
-"""``Bayes`` or ``Bayesian`` as a word of its own; ``non-Bayesian`` does not match."""
+_BAYES = re.compile(r"(?<!\w)(?<!non-)bayes", re.IGNORECASE)
+"""``Bayes`` or ``Bayesian`` as a word (``naive-Bayes`` too); ``non-Bayesian`` does not match."""
 
 
 @dataclass(frozen=True)

@@ -41,8 +41,7 @@ def test_only_bare_numbers_count():
                 "Adaptive (25.6 ms base bins)",
                 "#N/A",
                 "Not reported",
-                "1 (inferred)",
-                "20 (track); 80 (arena)",
+                *part0.ANNOTATED_CELLS,
             ]
         }
     )
@@ -51,7 +50,22 @@ def test_only_bare_numbers_count():
     assert numbers.iloc[2:].isna().all()
 
 
-@pytest.mark.parametrize("cell", ["4 cm/s", "", "inf", "1e2", "2,5", "~3", "three"])
+@pytest.mark.parametrize(
+    "cell",
+    [
+        "4 cm/s",
+        "",
+        "inf",
+        "1e2",
+        "2,5",
+        "~3",
+        "three",
+        "5 (cm/s)",
+        "1 (inferred)",
+        "3%x",
+        "Adaptive 3",
+    ],
+)
 def test_a_cell_of_an_unlisted_form_is_an_error(cell):
     survey = pd.DataFrame({"Animal Speed (cm/s)": ["5", cell]})
     with pytest.raises(ValueError, match="neither a bare number"):
@@ -79,7 +93,15 @@ def test_whole_values_print_whole_and_others_keep_figures():
 def test_trigger_and_decoder_shares():
     survey = pd.DataFrame(
         {
-            "Detection": ["MUA", "MUA", "SWR", "SWR, MUA", "MUA,SWR", "Decoding"],
+            "Detection": [
+                "MUA",
+                "MUA",
+                "SWR",
+                "SWR, MUA",
+                "MUA,SWR",
+                "Decoding",
+                "SWR, MUA, Decoding",
+            ],
             "Decoding": [
                 "Bayes",
                 "UMAP\nBayes",
@@ -87,15 +109,17 @@ def test_trigger_and_decoder_shares():
                 "bayes",
                 "Bayesian decoder",
                 "non-Bayesian state space",
+                "naive-Bayes",
             ],
         }
     )
     shares = {v.key: v.value for v in part0.method_values(survey, "s")}
-    assert shares["papers"] == 6
-    assert shares["mua_only_fraction"] == pytest.approx(2 / 6)
-    assert shares["swr_only_fraction"] == pytest.approx(1 / 6)
-    assert shares["swr_and_mua_fraction"] == pytest.approx(2 / 6)
-    assert shares["bayes_fraction"] == pytest.approx(4 / 6)
+    assert shares["papers"] == 7
+    assert shares["mua_only_fraction"] == pytest.approx(2 / 7)
+    assert shares["swr_only_fraction"] == pytest.approx(1 / 7)
+    # "SWR, MUA, Decoding" names a third signal, so it is in none of the shares.
+    assert shares["swr_and_mua_fraction"] == pytest.approx(2 / 7)
+    assert shares["bayes_fraction"] == pytest.approx(5 / 7)
 
 
 @pytest.mark.parametrize("cell", ["SWR + MUA", "LFP", ""])
@@ -108,7 +132,7 @@ def test_threshold_pools_the_ripple_and_multiunit_columns():
     numbers = pd.DataFrame(
         {
             "SWR Z-score Thresh. (STD)": [3.0, 2.0, float("nan")],
-            "MUA Z-score Thresh. (STD)": [3.0, float("nan"), 4.0],
+            "MUA Z-score Thresh. (STD)": [3.0, float("nan"), 1.0],
             **{
                 column: [1.0, 1.0, 2.0]
                 for column in part0.PARAMETER_COLUMNS
@@ -118,8 +142,8 @@ def test_threshold_pools_the_ripple_and_multiunit_columns():
     )
     pooled = {v.key: v.value for v in part0.parameter_values(numbers, "s")}
     assert pooled["threshold_mode"] == 3.0
-    assert pooled["threshold_min"] == 2.0
-    assert pooled["threshold_max"] == 4.0
+    assert pooled["threshold_min"] == 1.0
+    assert pooled["threshold_max"] == 3.0
     assert pooled["speed_mode"] == 1.0
 
 
@@ -132,16 +156,29 @@ def test_survey_values_checked_by_hand(fresh):
         "threshold_min": 1,
         "threshold_max": 8,
         "band_low_mode": 150,
+        "band_low_min": 80,
+        "band_low_max": 180,
         "band_high_mode": 250,
+        "band_high_min": 200,
+        "band_high_max": 300,
         "speed_mode": 5,
+        "speed_min": 1,
+        "speed_max": 10,
         "cells_mode": 5,
+        "cells_min": 3,
+        "cells_max": 10,
         "shortest_mode": 50,
         "shortest_min": 15,
+        "shortest_max": 100,
         "longest_mode": 500,
         "longest_min": 300,
         "longest_max": 2000,
         "time_bin_mode": 20,
+        "time_bin_min": 2,
+        "time_bin_max": 100,
         "position_bin_mode": 2,
+        "position_bin_min": 1,
+        "position_bin_max": 10,
         "mua_only_fraction": 24 / 57,
         "swr_only_fraction": 16 / 57,
         "swr_and_mua_fraction": 13 / 57,
