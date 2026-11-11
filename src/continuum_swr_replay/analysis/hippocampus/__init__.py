@@ -71,7 +71,7 @@ from typing import TYPE_CHECKING
 _LAZY_EXPORTS = {
     # data_aggregation.
     "compute_swr_nl_event_counts": "data_aggregation",
-    "compute_swr_overlap_class_counts": "data_aggregation",
+    "compute_swr_overlap_class_counts": "event_statistics",
     "get_data_over_time": "data_aggregation",
     "get_event_types": "data_aggregation",
     "load_data_over_time": "data_aggregation",
@@ -133,7 +133,6 @@ __all__ = sorted(_LAZY_EXPORTS)
 if TYPE_CHECKING:  # pragma: no cover - types only
     from .data_aggregation import (  # noqa: F401
         compute_swr_nl_event_counts,
-        compute_swr_overlap_class_counts,
         get_data_over_time,
         get_event_types,
         load_data_over_time,
@@ -142,6 +141,9 @@ if TYPE_CHECKING:  # pragma: no cover - types only
         get_event_durations_ms,
         get_event_start_end_times,
         get_immobile_events,
+    )
+    from .event_statistics import (  # noqa: F401
+        compute_swr_overlap_class_counts,
     )
     from .hpc_raw_stats import (  # noqa: F401
         DISCRETE_STATE_ORDER,

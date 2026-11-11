@@ -24,7 +24,7 @@ from continuum_swr_replay.analysis.events.classified_table import (
 from continuum_swr_replay.analysis.events.nonlocal_detection import (
     classify_swr_overlap,
 )
-from continuum_swr_replay.analysis.hippocampus.data_aggregation import (
+from continuum_swr_replay.analysis.hippocampus.event_statistics import (
     compute_swr_overlap_class_counts,
 )
 

@@ -98,6 +98,21 @@ release check.
   description and question is the same; the events summary's sources now give
   paths relative to the checkout.
 
+## As built: statistics in `analysis/` (2026-11-11, the events summary)
+
+The builders computed the statistics they reported, so a number's computation
+lived beside its description and no figure could share it. For the events
+summary the computation moved to `analysis/hippocampus/event_statistics.py` and
+`analysis/inventory_comparison/nonlocal_comparison.py`: functions that return
+named numbers, with their own tests. `reported/events.py` now only names and
+describes them (and counts the size of an input). All 331 values, with their
+descriptions and sources, are bit-identical before and after.
+
+`compute_swr_overlap_class_counts`, which Figure 2b draws, moved there too, and
+the summary's class counts come from it. Figure 2d still computes its offsets
+itself, from the classified table it rebuilds; `boundary_offsets` is the
+function for it once Figure 2 reads the canonical event table (`TODO.md`).
+
 ## As built: naming (2026-11-11)
 
 - **Summaries are named for what they hold:** `survey`, `detection`, `events`,

@@ -65,7 +65,7 @@ src/continuum_swr_replay/
 │   ├── behavior/          #   behavioral-model covariates (qvals_table)
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
-│   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, SWR inventories, artifact detector
+│   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
 │   ├── replay/            #   replay content/rate tables, model ladders, fitters
@@ -421,6 +421,14 @@ so a macro leads to its code: `\EventsRippleMedianNonSwr` is computed in `brain_
 that function. Whether the manuscript cites a value is not recorded anywhere: it is read from the macros
 `paper/main.tex` uses. `make reported-values` prints how many values are cited, and `make release-check`
 fails when a cited value is pending.
+
+A builder names and describes values; it does not compute them. The statistics are functions in
+`analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
+tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
+number comes from. The events summary is built this way (`analysis/hippocampus/event_statistics.py`,
+`analysis/inventory_comparison/nonlocal_comparison.py`); the detection, behavior and mpfc builders still
+compute their own statistics (`TODO.md`). A builder may count the size of an input it reads (its epochs,
+its animals).
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it

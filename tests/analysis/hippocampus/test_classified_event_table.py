@@ -417,8 +417,10 @@ def test_invalid_saved_nonlocal_probability_fails_loud(dot):
 #     and the inline timing-offset column subtraction. ---
 
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
-    compute_swr_overlap_class_counts,
     get_event_types,
+)
+from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa: E402
+    compute_swr_overlap_class_counts,
 )
 
 

@@ -906,53 +906,6 @@ def get_event_types(
     return result
 
 
-def compute_swr_overlap_class_counts(
-    classified_events: pd.DataFrame,
-) -> dict[str, int]:
-    """Count immobile non-local events by SWR-overlap class.
-
-    Operates on the output of
-    :func:`continuum_swr_replay.analysis.events.classified_table.build_classified_nonlocal_event_table`,
-    restricted to immobile events (``whole_event_speed_eligible``), and
-    tallies the ``overlap_class`` column. The single overlap convention
-    (strict positive-duration overlap, "contained" = some single SWR spans
-    the event) lives in that builder, so this is a thin tally with no
-    classification logic of its own.
-
-    Parameters
-    ----------
-    classified_events : pd.DataFrame
-        Per-non-local-event table with ``overlap_class`` and
-        ``whole_event_speed_eligible`` columns. May be the builder's
-        zero-row empty frame.
-
-    Returns
-    -------
-    dict[str, int]
-        Mapping ``{"swr_contained": n, "swr_partial": n,
-        "non_swr": n, "total": n}``.
-
-    """
-    zero = {"swr_contained": 0, "swr_partial": 0, "non_swr": 0, "total": 0}
-    if classified_events.empty:
-        return zero
-    # ``.loc`` + ``astype(bool)`` so the builder's zero-row empty frame
-    # (where ``whole_event_speed_eligible`` is object-dtype) still indexes
-    # cleanly rather than raising on a non-boolean mask.
-    immobile = classified_events.loc[
-        classified_events["whole_event_speed_eligible"].astype(bool)
-    ]
-    if immobile.empty:
-        return zero
-    counts = immobile["overlap_class"].value_counts().to_dict()
-    return {
-        "swr_contained": int(counts.get("swr_contained", 0)),
-        "swr_partial": int(counts.get("swr_partial", 0)),
-        "non_swr": int(counts.get("non_swr", 0)),
-        "total": int(len(immobile)),
-    }
-
-
 def compute_swr_nl_event_counts(
     data_over_time: pd.DataFrame,
     event_col_a: str = "non_local_event",

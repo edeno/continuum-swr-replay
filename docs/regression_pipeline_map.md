@@ -116,7 +116,7 @@ One class or two: do SWR-coupled and non-SWR non-local events differ by kind or 
 
 Aggregation of analysis results over time.
 
-`theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_overlap_class_counts`, `compute_swr_nl_event_counts`
+`theta_power_zscore`, `validate_required_session_data_keys`, `validate_results_position_time_alignment`, `align_results_to_position`, `validate_dot_event_contract`, `get_data_over_time`, `load_data_over_time`, `get_event_types`, `compute_swr_nl_event_counts`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/decode_masks.py`
 
@@ -135,6 +135,12 @@ What the replay detection runners read from a saved HPC decode and from each oth
 Analysis functions for manipulating and characterizing detected events.
 
 `get_immobile_events`, `get_event_start_end_times`, `get_event_durations_ms`
+
+### `src/continuum_swr_replay/analysis/hippocampus/event_statistics.py`
+
+Summary statistics of the immobile non-local events.
+
+`compute_swr_overlap_class_counts`, `overlap_class_statistics`, `boundary_offsets`, `boundary_offset_statistics`, `reference_medians`, `event_signal_statistics`, `power_change_statistics`, `rest_matched_theta_statistics`, `spike_evidence_statistics`, `peak_ripple_mode_statistics`, `threshold_step_statistics`, `most_steps`, `class_medians`, `content_occupancy_shares`, `n_animals_non_swr_more_at_well`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/gamma_power.py`
 

@@ -1,7 +1,10 @@
 """The events summary: what the events are, and how they compare with SWRs and Widloski events.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted here. The inputs (:class:`EventsInputs`):
+refitted here. This module names and describes the values. The statistics are
+computed in ``analysis.hippocampus.event_statistics`` and
+``analysis.inventory_comparison.nonlocal_comparison``; here only the size of an
+input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 
 - the canonical event table (``replay_content/event_table.parquet``): the
   immobile non-local events, their SWR-overlap class, timing against the
@@ -44,20 +47,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
-from continuum_swr_replay import intervals
+from continuum_swr_replay.analysis.hippocampus import event_statistics
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
-from continuum_swr_replay.analysis.inventory_comparison.features import (
-    STATE_SHARE_COLUMNS,
-)
+from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     event_features_root,
@@ -199,79 +198,77 @@ def _manifest(folder: Path) -> dict:
 def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.2: how many immobile non-local events carry no SWR."""
     make = value_factory(event_cohort_values, source, TAGS["cohort"])
-    if not events["whole_event_speed_eligible"].all():
-        raise ValueError(
-            "the event table holds events that are not whole-event immobile"
-        )
-    classes = events["overlap_class"].value_counts()
-    shares = (
-        events.groupby("animal")["overlap_class"].value_counts(normalize=True).unstack()
-    )
-    non_swr = shares["non_swr"]
-    plurality = (non_swr > shares.drop(columns="non_swr").max(axis=1)).sum()
-    n_epochs = events.groupby(["animal", "session_date", "epoch"]).ngroups
+    stats = event_statistics.overlap_class_statistics(events)
     return [
         make(
             "nonlocal_events",
-            len(events),
+            stats["n_events"],
             "count",
             "count",
             "immobile non-local events in the canonical event table (whole event below 4 cm/s)",
         ),
         make(
             "nonlocal_events_non_swr",
-            classes["non_swr"],
+            stats["n_non_swr"],
             "count",
             "count",
             "of those, events overlapping no SWR (overlap_class non_swr)",
         ),
         make(
             "nonlocal_events_swr_contained",
-            classes["swr_contained"],
+            stats["n_swr_contained"],
             "count",
             "count",
             "events lying inside an SWR (overlap_class swr_contained)",
         ),
         make(
             "nonlocal_events_swr_partial",
-            classes["swr_partial"],
+            stats["n_swr_partial"],
             "count",
             "count",
             "events partly overlapping an SWR (overlap_class swr_partial)",
         ),
         make(
             "non_swr_fraction",
-            classes["non_swr"] / len(events),
+            stats["non_swr_fraction"],
             "fraction",
             "pct",
             "share of immobile non-local events overlapping no SWR, pooled over animals",
         ),
         make(
             "non_swr_fraction_animal_min",
-            non_swr.min(),
+            stats["non_swr_fraction_animal_min"],
             "fraction",
             "pctnum",
             "lowest per-animal share of non-SWR events",
         ),
         make(
             "non_swr_fraction_animal_max",
-            non_swr.max(),
+            stats["non_swr_fraction_animal_max"],
             "fraction",
             "pct",
             "highest per-animal share of non-SWR events",
         ),
-        make("animals", len(shares), "count", "count", "animals in the event table"),
-        make("epochs", n_epochs, "count", "count", "epochs in the event table"),
+        make(
+            "animals",
+            stats["n_animals"],
+            "count",
+            "count",
+            "animals in the event table",
+        ),
+        make(
+            "epochs", stats["n_epochs"], "count", "count", "epochs in the event table"
+        ),
         make(
             "animals_non_swr_plurality",
-            plurality,
+            stats["n_animals_non_swr_plurality"],
             "count",
             "count",
             "animals in which non-SWR is the largest of the three overlap classes",
         ),
         make(
             "animals_non_swr_majority",
-            (non_swr > 0.5).sum(),
+            stats["n_animals_non_swr_majority"],
             "count",
             "count",
             "animals in which more than half the events are non-SWR",
@@ -282,22 +279,18 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
-    overlap = events[events["overlap_class"] != "non_swr"]
-    start_ms = 1000 * (overlap["event_start_s"] - overlap["matched_swr_start"]).dropna()
-    end_ms = 1000 * (overlap["event_end_s"] - overlap["matched_swr_end"]).dropna()
-    if len(start_ms) != len(overlap) or len(end_ms) != len(overlap):
-        raise ValueError("an SWR-overlapping event has no matched SWR bounds")
+    stats = event_statistics.boundary_offset_statistics(events)
     return [
         make(
             "swr_overlapping_events",
-            len(overlap),
+            stats["n_overlapping"],
             "count",
             "count",
             "immobile non-local events overlapping an SWR",
         ),
         make(
             "start_offset_median_ms",
-            start_ms.median(),
+            1000 * stats["start_offset_median_s"],
             "quantity",
             "int",
             "median of event start minus matched SWR start",
@@ -305,55 +298,13 @@ def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "end_offset_median_ms",
-            end_ms.median(),
+            1000 * stats["end_offset_median_s"],
             "quantity",
             "int",
             "median of event end minus matched SWR end",
             "ms",
         ),
     ]
-
-
-def _read_epochs(run_dir: Path, name: str, **kwargs) -> pd.DataFrame:
-    paths = sorted(run_dir.glob(f"*_{name}.parquet"))
-    if not paths:
-        raise FileNotFoundError(f"no {name} tables in {run_dir}")
-    return pd.concat((pd.read_parquet(p, **kwargs) for p in paths), ignore_index=True)
-
-
-def other_detector_events(run_dir: Path) -> pd.DataFrame:
-    """Each other detector's compared events: whether it overlaps a non-local
-    event (``matched``), and its four state shares.
-
-    Only events with a known membership (wholly inside the pair's shared
-    exposure) are kept, as the comparison's ``directional`` table counts them.
-    """
-    keys = ["animal", "day", "epoch", "detector", "event_key"]
-    shares = _read_epochs(run_dir, "state_shares")
-    membership = _read_epochs(
-        run_dir, "pair_membership", filters=[("other_detector", "==", "state_space")]
-    )
-    events = shares.merge(
-        membership[[*keys, "membership"]], on=keys, how="inner", validate="1:1"
-    )
-    events = events[events["membership"].isin(["matched", "unmatched"])]
-    return events.assign(matched=events["membership"] == "matched")
-
-
-def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -> None:
-    """Raise unless the per-event memberships give the comparison's own counts."""
-    mine = events.groupby("detector")["matched"].agg(n_eligible="size", n_matched="sum")
-    theirs = (
-        directional[directional["target_detector"] == "state_space"]
-        .groupby("source_detector")[["n_eligible", "n_matched"]]
-        .sum()
-    )
-    joined = theirs.join(mine, rsuffix="_events", how="outer")
-    if not (
-        (joined["n_eligible"] == joined["n_eligible_events"]).all()
-        and (joined["n_matched"] == joined["n_matched_events"]).all()
-    ):
-        raise ValueError(f"memberships do not give the directional counts:\n{joined}")
 
 
 def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
@@ -365,7 +316,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     probability is above 0.8; "mostly" is more than half the event's rows.
     """
     values: list[Value] = []
-    local, no_spike, non_local, uncertain = STATE_SHARE_COLUMNS
+    statistics = nonlocal_comparison.other_detector_statistics(events)
     for word, detector in DETECTORS.items():
         main = word == MAIN_DETECTOR
         make = value_factory(
@@ -373,31 +324,25 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             source,
             TAGS["other_detectors_main"] if main else TAGS["other_detectors"],
         )
-        mine = events[events["detector"] == detector]
-        alone = mine[~mine["matched"]]
-        overlapping = mine[mine["matched"]]
-        alone_known = alone.dropna(subset=list(STATE_SHARE_COLUMNS))
-        over_known = overlapping.dropna(subset=list(STATE_SHARE_COLUMNS))
-        mostly_local = alone_known[local] > 0.5
-        mostly_no_spike = alone_known[no_spike] > 0.5
+        stats = statistics.loc[detector]
         values += [
             make(
                 f"{word}_events",
-                len(mine),
+                stats["n_events"],
                 "count",
                 "count",
                 f"{detector} events compared with the non-local detector",
             ),
             make(
                 f"{word}_no_nonlocal_fraction",
-                len(alone) / len(mine),
+                stats["no_nonlocal_fraction"],
                 "fraction",
                 "pct",
                 f"share of {detector} events that overlap no non-local event",
             ),
             make(
                 f"{word}_no_nonlocal_mostly_local_fraction",
-                mostly_local.mean(),
+                stats["no_nonlocal_mostly_local_fraction"],
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with Local "
@@ -405,7 +350,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_no_nonlocal_mostly_no_spike_fraction",
-                mostly_no_spike.mean(),
+                stats["no_nonlocal_mostly_no_spike_fraction"],
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with No-Spike "
@@ -413,7 +358,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_no_nonlocal_mixed_fraction",
-                (~mostly_local & ~mostly_no_spike).mean(),
+                stats["no_nonlocal_mixed_fraction"],
                 "fraction",
                 "pct",
                 f"of {detector} events overlapping no non-local event, the share with "
@@ -421,7 +366,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_local_share_median",
-                over_known[local].median(),
+                stats["overlap_local_share_median"],
                 "fraction",
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
@@ -429,7 +374,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_no_spike_share_median",
-                over_known[no_spike].median(),
+                stats["overlap_no_spike_share_median"],
                 "fraction",
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
@@ -437,7 +382,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_nonlocal_share_median",
-                over_known[non_local].median(),
+                stats["overlap_nonlocal_share_median"],
                 "fraction",
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
@@ -445,7 +390,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_uncertain_share_median",
-                over_known[uncertain].median(),
+                stats["overlap_uncertain_share_median"],
                 "fraction",
                 "pct",
                 f"median over {detector} events overlapping a non-local event of the share "
@@ -453,7 +398,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_any_local_fraction",
-                (over_known[local] > 0).mean(),
+                stats["overlap_any_local_fraction"],
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
@@ -461,7 +406,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_any_no_spike_fraction",
-                (over_known[no_spike] > 0).mean(),
+                stats["overlap_any_no_spike_fraction"],
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event that hold at "
@@ -469,7 +414,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_overlap_all_nonlocal_fraction",
-                (over_known[non_local] == 1).mean(),
+                stats["overlap_all_nonlocal_fraction"],
                 "fraction",
                 "pct",
                 f"share of {detector} events overlapping a non-local event whose every row "
@@ -477,18 +422,17 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
         ]
         if main:
-            per_animal = mine.groupby("animal")["matched"].mean()
             values += [
                 make(
                     f"{word}_no_nonlocal_fraction_animal_min",
-                    1 - per_animal.max(),
+                    stats["no_nonlocal_fraction_animal_min"],
                     "fraction",
                     "pctnum",
                     f"lowest per-animal share of {detector} events overlapping no non-local event",
                 ),
                 make(
                     f"{word}_no_nonlocal_fraction_animal_max",
-                    1 - per_animal.min(),
+                    stats["no_nonlocal_fraction_animal_max"],
                     "fraction",
                     "pct",
                     f"highest per-animal share of {detector} events overlapping no non-local event",
@@ -499,51 +443,6 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 # --- what an analysis without the non-local detector leaves out -----------------
 
-#: The other inventories an SWR- or rate-triggered analysis would use.
-SWR_DEFINITIONS = ("kay", "karlsson", "yu", "zugaro", "carey")
-TRIGGERS = (*SWR_DEFINITIONS, "mua")
-
-
-def _intervals(table: pd.DataFrame, detectors: tuple[str, ...]) -> np.ndarray:
-    rows = table[table["detector"].isin(detectors)]
-    return rows[["event_start_s", "event_end_s"]].to_numpy(dtype=np.float64)
-
-
-def left_out_seconds(run_dir: Path) -> dict[str, float]:
-    """Seconds of non-local event time outside each other inventory, summed over epochs.
-
-    Each epoch's compared events (``*_features.parquet``: every inventory's
-    whole-event-immobile events): the non-local detector's event time, and the
-    part of it that no event of Kay, of any of the five SWR definitions, of any
-    trigger (the five and MUA), or of the Widloski detector covers; and the
-    time Kay's SWRs span.
-    """
-    names = (
-        "nonlocal",
-        "kay",
-        "outside_kay",
-        "outside_swr",
-        "outside_trigger",
-        "outside_widloski",
-    )
-    totals = dict.fromkeys(names, 0.0)
-    for path in sorted(run_dir.glob("*_features.parquet")):
-        table = pd.read_parquet(
-            path, columns=["detector", "event_start_s", "event_end_s"]
-        )
-        nonlocal_ = _intervals(table, ("state_space",))
-        totals["nonlocal"] += intervals.total_duration(nonlocal_)
-        totals["kay"] += intervals.total_duration(_intervals(table, ("kay",)))
-        for name, detectors in (
-            ("outside_kay", ("kay",)),
-            ("outside_swr", SWR_DEFINITIONS),
-            ("outside_trigger", TRIGGERS),
-            ("outside_widloski", ("memoryless",)),
-        ):
-            outside = intervals.subtract(nonlocal_, _intervals(table, detectors))
-            totals[name] += intervals.total_duration(outside)
-    return totals
-
 
 def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]:
     """Question 2b.2: how many non-local events, and how much of their time, an
@@ -551,30 +450,11 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
     from the Widloski detector) does not include, in total and per hour of rest.
     """
     make = value_factory(left_out_values, source, TAGS["left_out"])
-    counts = pd.read_csv(report_dir / "counts_by_animal.csv")
-    exposure_s = float(
-        counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
-    )
-    hours = exposure_s / 3600.0
-    cells = pd.read_csv(report_dir / "cells_by_animal.csv")
-    no_trigger = cells[
-        (cells["cell"] == "sequence_matched_by_no_trigger")
-        & (cells["detector"] == "state_space")
-    ][["n_events", "n_unmatched", "n_unknown"]].sum()
-    membership = _read_epochs(
-        run_dir, "pair_membership", filters=[("detector", "==", "state_space")]
-    )
-    known = membership[membership["membership"].isin(["matched", "unmatched"])]
-    unmatched = (
-        known.assign(alone=known["membership"] == "unmatched")
-        .groupby("other_detector")["alone"]
-        .agg(["sum", "size"])
-    )
-    seconds = left_out_seconds(run_dir)
+    stats = nonlocal_comparison.left_out_statistics(run_dir, report_dir)
     values = [
         make(
             "rest_hours",
-            hours,
+            stats["rest_hours"],
             "quantity",
             "sig2",
             "hours of analysed immobility the non-local detector observed (exposure), "
@@ -583,7 +463,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
         ),
         make(
             "nonlocal_time_s",
-            seconds["nonlocal"],
+            stats["nonlocal_time_s"],
             "quantity",
             "int",
             "seconds of non-local event time (compared events), summed over epochs",
@@ -591,7 +471,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
         ),
         make(
             "kay_time_s",
-            seconds["kay"],
+            stats["kay_time_s"],
             "quantity",
             "int",
             "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis "
@@ -599,24 +479,16 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
             "s",
         ),
     ]
-    for word, key, label in (
-        ("kay", "outside_kay", "Kay's SWRs"),
-        ("swr", "outside_swr", "the five SWR definitions together"),
-        (
-            "trigger",
-            "outside_trigger",
-            "the five SWR definitions and MUA together",
-        ),
-        (
-            "widloski",
-            "outside_widloski",
-            "the Widloski detector's events",
-        ),
+    for word, label in (
+        ("kay", "Kay's SWRs"),
+        ("swr", "the five SWR definitions together"),
+        ("trigger", "the five SWR definitions and MUA together"),
+        ("widloski", "the Widloski detector's events"),
     ):
         values += [
             make(
                 f"nonlocal_time_outside_{word}_s",
-                seconds[key],
+                stats[f"nonlocal_time_outside_{word}_s"],
                 "quantity",
                 "int",
                 f"seconds of non-local event time that {label} do not cover",
@@ -624,47 +496,44 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
             ),
             make(
                 f"nonlocal_time_outside_{word}_fraction",
-                seconds[key] / seconds["nonlocal"],
+                stats[f"nonlocal_time_outside_{word}_fraction"],
                 "fraction",
                 "pct",
                 f"share of non-local event time that {label} do not cover",
             ),
         ]
-    for word, other, label in (
-        ("kay", "kay", "no Kay SWR overlaps"),
-        ("widloski", "memoryless", "no Widloski event overlaps"),
+    for word, label in (
+        ("kay", "no Kay SWR overlaps"),
+        ("widloski", "no Widloski event overlaps"),
     ):
-        n, total = int(unmatched.loc[other, "sum"]), int(unmatched.loc[other, "size"])
         values += [
             make(
                 f"nonlocal_events_outside_{word}",
-                n,
+                stats[f"nonlocal_events_outside_{word}"],
                 "count",
                 "count",
                 f"non-local events {label} (detector comparison memberships)",
             ),
             make(
                 f"nonlocal_events_outside_{word}_fraction",
-                n / total,
+                stats[f"nonlocal_events_outside_{word}_fraction"],
                 "fraction",
                 "pct",
                 f"share of the non-local events with a known membership that {label}",
             ),
             make(
                 f"nonlocal_events_outside_{word}_per_hour",
-                n / hours,
+                stats[f"nonlocal_events_outside_{word}_per_hour"],
                 "quantity",
                 "sig2",
                 f"non-local events {label}, per hour of analysed immobility",
                 "per h",
             ),
         ]
-    n_no_trigger = int(no_trigger["n_unmatched"])
-    n_known = int(no_trigger["n_events"] - no_trigger["n_unknown"])
     values += [
         make(
             "nonlocal_events_outside_trigger",
-            n_no_trigger,
+            stats["nonlocal_events_outside_trigger"],
             "count",
             "count",
             "non-local events no SWR definition and no MUA event overlaps "
@@ -672,7 +541,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
         ),
         make(
             "nonlocal_events_outside_trigger_fraction",
-            n_no_trigger / n_known,
+            stats["nonlocal_events_outside_trigger_fraction"],
             "fraction",
             "pct",
             "share of the non-local events with a known membership that no SWR "
@@ -680,7 +549,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
         ),
         make(
             "nonlocal_events_outside_trigger_per_hour",
-            n_no_trigger / hours,
+            stats["nonlocal_events_outside_trigger_per_hour"],
             "quantity",
             "sig2",
             "non-local events no SWR definition and no MUA event overlaps, per hour of "
@@ -722,12 +591,12 @@ def brain_state_values(
     (<4 cm/s, in no event), on the same scale (``brain_state_reference``). An
     event is theta-like when its theta reaches its epoch's running median.
     """
-    keys = ["animal", "session_date", "epoch"]
-    joined = events.merge(reference, on=keys, how="left", validate="m:1")
-    if joined["theta_running_median"].isna().any():
-        raise ValueError("an event's epoch has no running reference")
+    levels = event_statistics.reference_medians(reference, list(_SIGNAL_EVENT_COLUMNS))
+    statistics = event_statistics.event_signal_statistics(
+        events, reference, _SIGNAL_EVENT_COLUMNS
+    )
     values: list[Value] = []
-    for word, column in _SIGNAL_EVENT_COLUMNS.items():
+    for word in _SIGNAL_EVENT_COLUMNS:
         make = value_factory(
             brain_state_values,
             source,
@@ -737,7 +606,7 @@ def brain_state_values(
         values += [
             make(
                 f"{word}_running_reference",
-                reference[f"{word}_running_median"].median(),
+                levels.loc[word, "running"],
                 "quantity",
                 "dec2",
                 f"median over epochs of the epoch's median z-scored {label} while running",
@@ -745,7 +614,7 @@ def brain_state_values(
             ),
             make(
                 f"{word}_rest_reference",
-                reference[f"{word}_rest_median"].median(),
+                levels.loc[word, "rest"],
                 "quantity",
                 "dec2",
                 f"median over epochs of the epoch's median z-scored {label} in quiet rest",
@@ -753,17 +622,12 @@ def brain_state_values(
             ),
         ]
         for group, is_swr in (("non_swr", False), ("swr", True)):
-            rows = joined[joined["is_swr"] == is_swr].dropna(subset=[column])
+            stats = statistics.loc[(word, is_swr)]
             name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
-            per_animal = rows.groupby("animal").agg(
-                event=(column, "median"),
-                running=(f"{word}_running_median", "median"),
-                rest=(f"{word}_rest_median", "median"),
-            )
             values += [
                 make(
                     f"{word}_median_{group}",
-                    rows[column].median(),
+                    stats["median"],
                     "quantity",
                     "dec2",
                     f"median z-scored {label} of immobile {name} non-local events (event mean)",
@@ -771,7 +635,7 @@ def brain_state_values(
                 ),
                 make(
                     f"{word}_animals_below_running_{group}",
-                    (per_animal["event"] < per_animal["running"]).sum(),
+                    stats["n_animals_below_running"],
                     "count",
                     "count",
                     f"animals whose median {name} event {label} is below their median running "
@@ -779,7 +643,7 @@ def brain_state_values(
                 ),
                 make(
                     f"{word}_animals_above_rest_{group}",
-                    (per_animal["event"] > per_animal["rest"]).sum(),
+                    stats["n_animals_above_rest"],
                     "count",
                     "count",
                     f"animals whose median {name} event {label} is above their median "
@@ -790,7 +654,7 @@ def brain_state_values(
                 values.append(
                     make(
                         f"theta_like_fraction_{group}",
-                        (rows[column] >= rows["theta_running_median"]).mean(),
+                        stats["reaches_running_fraction"],
                         "fraction",
                         "pct",
                         f"share of immobile {name} non-local events whose theta power "
@@ -812,22 +676,18 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     0 dB. The z values (``brain_state_values``) stay as they are.
     """
     make = value_factory(gamma_db_values, source, TAGS["brain_state"])
+    bands = ["slow_gamma", "fast_gamma"]
+    statistics = event_statistics.power_change_statistics(reference, bands)
     values: list[Value] = []
-    for word in ("slow_gamma", "fast_gamma"):
+    for word in bands:
         label = _SIGNAL_LABELS[word]
-        for group in ("non_swr", "swr"):
+        for group, is_swr in (("non_swr", False), ("swr", True)):
             name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
-            column = f"{word}_db_{group}"
-            if reference[column].isna().any():
-                raise ValueError(
-                    f"{int(reference[column].isna().sum())} epochs have no {column}"
-                )
-            rows = reference
-            per_animal = rows.groupby("animal")[column].median()
+            stats = statistics.loc[(word, is_swr)]
             values += [
                 make(
                     f"{word}_db_median_{group}",
-                    rows[column].median(),
+                    stats["median"],
                     "quantity",
                     "sig2s",
                     f"median over epochs of the change in {label} during {name} events "
@@ -837,7 +697,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
                 ),
                 make(
                     f"{word}_db_animals_above_rest_{group}",
-                    (per_animal > 0).sum(),
+                    stats["n_animals_above_rest"],
                     "count",
                     "count",
                     f"animals whose median over epochs of that change ({name} events) "
@@ -899,12 +759,10 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             "epochs in the spike-evidence run",
         ),
     ]
-    base = metrics[metrics["group"] == "baseline"]
-    by_epoch_base = base.groupby("epoch_id")["dll_per_spike"].median()
-    by_animal_base = base.groupby("animal")["dll_per_spike"].median()
+    statistics = event_statistics.spike_evidence_statistics(metrics, "baseline")
     groups = {"baseline": "baseline", **_REALITY_GROUPS}
     for word, group in groups.items():
-        rows = metrics[metrics["group"] == group]
+        stats = statistics.loc[group]
         label = "matched quiet windows" if word == "baseline" else f"{group} events"
         remote = word.endswith("remote")
 
@@ -915,7 +773,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
         values += [
             make(
                 f"{word}_scored",
-                len(rows),
+                stats["n_scored"],
                 "count",
                 "count",
                 f"{label} scored",
@@ -923,7 +781,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_spikes_median",
-                rows["n_spikes"].median(),
+                stats["spikes_median"],
                 "quantity",
                 "int",
                 f"median spike count of {label}",
@@ -932,7 +790,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_tetrodes_median",
-                rows["n_tetrodes"].median(),
+                stats["tetrodes_median"],
                 "quantity",
                 "int",
                 f"median number of tetrodes with a spike in {label}",
@@ -941,7 +799,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_dll_per_spike_median",
-                rows["dll_per_spike"].median(),
+                stats["dll_per_spike_median"],
                 "quantity",
                 "dec2",
                 f"median log-likelihood ratio per spike, decoded location against the "
@@ -953,7 +811,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_gpi_distance_median_cm",
-                rows["dist_to_gpi_peak"].median(),
+                stats["gpi_distance_median_cm"],
                 "quantity",
                 "int",
                 f"median track distance from the MAP of {label} to the ground-process "
@@ -964,12 +822,10 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
         ]
         if word == "baseline":
             continue
-        epoch_med = rows.groupby("epoch_id")["dll_per_spike"].median()
-        animal_med = rows.groupby("animal")["dll_per_spike"].median()
         values += [
             make(
                 f"{word}_epochs_above_baseline",
-                (epoch_med > by_epoch_base.reindex(epoch_med.index)).sum(),
+                stats["n_epochs_above_baseline"],
                 "count",
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
@@ -978,7 +834,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_epochs_scored",
-                len(epoch_med),
+                stats["n_epochs_scored"],
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
@@ -986,7 +842,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_animals_above_baseline",
-                (animal_med > by_animal_base.reindex(animal_med.index)).sum(),
+                stats["n_animals_above_baseline"],
                 "count",
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
@@ -1093,13 +949,11 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     analysis's CSV outputs.
     """
     make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
-    peak = distribution[
-        (distribution.animal != "pooled") & (distribution.power == "peak")
-    ]
+    stats = event_statistics.peak_ripple_mode_statistics(distribution)
     return [
         make(
             "ripple_peak_animals_unimodal",
-            (peak.dip_p >= 0.05).sum(),
+            stats["n_animals_unimodal"],
             "count",
             "count",
             "animals in which Hartigan's dip test does not reject one mode of the "
@@ -1107,7 +961,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
         ),
         make(
             "ripple_peak_mode_animal_min",
-            peak.main_mode_z.min(),
+            stats["mode_animal_min"],
             "quantity",
             "dec2",
             "lowest per-animal location of the main KDE mode of the events' peak "
@@ -1116,7 +970,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
         ),
         make(
             "ripple_peak_mode_animal_max",
-            peak.main_mode_z.max(),
+            stats["mode_animal_max"],
             "quantity",
             "dec2",
             "highest per-animal location of that mode",
@@ -1139,29 +993,23 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     duration, the version on the event's own power, the sensitivity settings and
     the simulation checks stay in the CSV outputs.
     """
-    main = steps[
-        (steps.n_knots == STEP_KNOTS)
-        & (steps.power == "criterion")
-        & np.isclose(steps.window_z, STEP_WINDOW_Z)
-        & (steps.covariate == "none")
-    ]
-    by_property = main.groupby("property").has_step.agg(["sum", "size"])
-    if not (by_property["size"] == 5).all():
-        raise ValueError(f"not every property has 5 animals:\n{by_property}")
-    others = by_property.loc[list(_OTHER_STEP_PROPERTIES), "sum"]
-    # the note names the property (or properties) that attain the maximum
-    attained = ", ".join(
-        _OTHER_STEP_PROPERTIES[p] for p in others.index[others == others.max()]
+    statistics = event_statistics.threshold_step_statistics(
+        steps, n_knots=STEP_KNOTS, window_z=STEP_WINDOW_Z, n_animals=5
     )
+    most, attaining = event_statistics.most_steps(
+        statistics, list(_OTHER_STEP_PROPERTIES)
+    )
+    # the note names the property (or properties) that attain the maximum
+    attained = ", ".join(_OTHER_STEP_PROPERTIES[p] for p in attaining)
     make = value_factory(class_step_values, source, TAGS["class_step"])
-    evidence = main[main.property == "evidence"]
+    evidence = statistics.loc["evidence"]
     make_evidence = value_factory(
         class_step_values, source, TAGS["class_step_evidence"]
     )
     return [
         make(
             "step_other_properties_criterion_animals_max",
-            others.max(),
+            most,
             "count",
             "count",
             "the most animals with a step at the threshold in any property but spike "
@@ -1171,7 +1019,7 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
         ),
         make_evidence(
             "step_evidence_criterion_animals",
-            by_property.loc["evidence", "sum"],
+            evidence["n_animals_with_step"],
             "count",
             "count",
             "animals with a step at the threshold in spike evidence per spike (remote "
@@ -1179,7 +1027,7 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
         ),
         make_evidence(
             "step_evidence_criterion_animals_same_sign",
-            (evidence.step_share_overall > 0).sum(),
+            evidence["n_animals_same_sign"],
             "count",
             "count",
             "animals whose jump in spike evidence per spike at the threshold points "
@@ -1187,7 +1035,7 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
         ),
         make_evidence(
             "step_evidence_criterion_share_median",
-            evidence.step_share_overall.median(),
+            evidence["step_share_median"],
             "quantity",
             "sig2s",
             "median over animals of the jump in spike evidence per spike at the "
@@ -1321,19 +1169,12 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     values = []
     for word, column, scale, unit, style, direction, tags in _PROPERTIES:
         make = value_factory(property_values, source, tags)
-        x = events[[column, "is_swr", "animal"]].dropna(subset=[column])
-        x = x.assign(v=x[column] * scale)
-        med = x.groupby("is_swr")["v"].median()
-        by_animal = x.groupby(["animal", "is_swr"])["v"].median().unstack()
-        compare: Callable[[pd.Series, pd.Series], pd.Series] = (
-            pd.Series.lt if direction == "lower" else pd.Series.gt
-        )
-        in_direction = compare(by_animal[False], by_animal[True]).sum()
+        stats = event_statistics.class_medians(events, column, direction)
         name = _PROPERTY_NAMES[word]
         values += [
             make(
                 f"{word}_median_non_swr",
-                med[False],
+                scale * stats["median_non_swr"],
                 "quantity",
                 style,
                 f"median {name} of immobile non-SWR non-local events",
@@ -1341,7 +1182,7 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_median_swr",
-                med[True],
+                scale * stats["median_swr"],
                 "quantity",
                 style,
                 f"median {name} of immobile SWR-overlapping non-local events",
@@ -1349,7 +1190,7 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_animals_in_direction",
-                in_direction,
+                stats["n_animals_in_direction"],
                 "count",
                 "count",
                 f"animals whose non-SWR median {name} is {direction} than their SWR median",
@@ -1454,25 +1295,15 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
     have none, and raises rather than leaving the comparison silently.
     """
     make = value_factory(rest_theta_values, source, TAGS["brain_state"])
-    if (events.rest_windows <= 0).any():
-        raise ValueError(
-            f"{int((events.rest_windows <= 0).sum())} events have no duration-matched "
-            "quiet-rest window"
-        )
-    usable = events.assign(
-        theta_like=events.theta_z >= events.theta_running_median,
-    )
+    statistics = event_statistics.rest_matched_theta_statistics(events)
     values: list[Value] = []
     for group, is_swr in (("non_swr", False), ("swr", True)):
-        rows = usable[usable.is_swr == is_swr]
-        per_animal = rows.groupby("animal").agg(
-            events=("theta_like", "mean"), rest=("rest_theta_like_share", "mean")
-        )
+        stats = statistics.loc[is_swr]
         name = "non-SWR" if group == "non_swr" else "SWR-overlapping"
         values += [
             make(
                 f"theta_like_fraction_rest_matched_{group}",
-                rows.rest_theta_like_share.mean(),
+                stats["rest_theta_like_fraction"],
                 "fraction",
                 "pct",
                 f"share of quiet-rest windows, matched in duration to the {name} events, "
@@ -1480,7 +1311,7 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"theta_like_animals_above_rest_matched_{group}",
-                (per_animal.events > per_animal.rest).sum(),
+                stats["n_animals_above_rest"],
                 "count",
                 "count",
                 f"animals whose share of theta-like {name} events is above that of "
@@ -1501,13 +1332,7 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
     animal off the wells.
     """
     make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
-    occupancy = occupancy.assign(
-        at_well=occupancy["remote_well"] + occupancy["own_well"]
-    )
-
-    def weighted(frame: pd.DataFrame, column: str) -> float:
-        return float((frame[column] * frame["n"]).sum() / frame["n"].sum())
-
+    shares = event_statistics.content_occupancy_shares(occupancy)
     values = [
         make(
             "occupancy_epochs",
@@ -1518,27 +1343,21 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
         ),
     ]
     for word, group in (("non_swr", "nonSWR"), ("swr", "SWR")):
-        rows = occupancy[occupancy["group"] == group]
-        for column in ("remote_well", "own_well", "at_well", "remote_path", "near_off"):
+        for column in event_statistics.OCCUPANCY_PLACES:
             values.append(
                 make(
                     f"{word}_content_{column}_fraction",
-                    weighted(rows, column),
+                    shares.loc[group, column],
                     "fraction",
                     "pct",
                     f"share of {group} non-local time bins whose content is "
                     f"{column.replace('_', ' ')}, weighted by time bins over sessions",
                 )
             )
-    per_animal = (
-        occupancy.groupby(["animal", "group"])
-        .apply(lambda g: weighted(g, "at_well"), include_groups=False)
-        .unstack()
-    )
     values.append(
         make(
             "animals_non_swr_more_at_well",
-            (per_animal["nonSWR"] > per_animal["SWR"]).sum(),
+            event_statistics.n_animals_non_swr_more_at_well(occupancy),
             "count",
             "count",
             "animals whose non-SWR content is at a well more often than their SWR content",
@@ -1674,14 +1493,14 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
     )
 
     run = inputs.event_features_run
-    others = other_detector_events(run)
+    others = nonlocal_comparison.other_detector_events(run)
     directional_path = (
         inventory_comparison_root()
         / _input_run(run, "inventory")
         / "report"
         / "directional_by_animal.csv"
     )
-    check_against_directional(others, pd.read_csv(directional_path))
+    nonlocal_comparison.check_against_directional(others, pd.read_csv(directional_path))
     summary.add(
         *other_detector_values(
             others,
