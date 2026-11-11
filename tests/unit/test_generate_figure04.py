@@ -43,6 +43,47 @@ def test_panel_d_uses_the_canonical_control_draw_count():
         plt.close(fig)
 
 
+def test_panel_d_bars_are_the_called_and_best_model_shares_as_percents():
+    """Four units. SWR: one untested, two of the three tested called.
+    Engagement: three of four called. The other tests: one of four. Best
+    model: one constant, two SWR, one with none, over all four units."""
+    pvalues = {name: [0.01, 0.5, 0.5, 0.5] for name in HELDOUT_P_COLUMNS}
+    pvalues["SWR"] = [0.01, 0.01, 0.5, np.nan]
+    pvalues["engagement"] = [0.01, 0.01, 0.01, 0.5]
+    frame = pd.DataFrame(
+        {HELDOUT_P_COLUMNS[name]: values for name, values in pvalues.items()}
+    )
+    frame["min_heldout_model"] = ["constant", "SWR", "SWR", None]
+
+    fig, (called_ax, best_ax) = plt.subplots(1, 2)
+    try:
+        figure04.plot_significance(frame, called_ax)
+        figure04.plot_best_model_selection(frame, best_ax)
+
+        assert [t.get_text() for t in called_ax.get_xticklabels()] == [
+            "SWR",
+            "Replay",
+            "no-SWR",
+            "Beyond\ncontrol",
+        ]
+        assert [bar.get_height() for bar in called_ax.patches] == pytest.approx(
+            [200 / 3, 25.0, 25.0, 75.0]
+        )
+        assert [t.get_text() for t in called_ax.texts] == ["67%", "25%", "25%", "75%"]
+        assert [t.get_text() for t in best_ax.get_xticklabels()] == [
+            "Const.",
+            "SWR",
+            "Replay",
+            "SWR+\nno-SWR",
+        ]
+        assert [bar.get_height() for bar in best_ax.patches] == pytest.approx(
+            [25.0, 50.0, 0.0, 0.0]
+        )
+        assert [t.get_text() for t in best_ax.texts] == ["25%", "50%"]
+    finally:
+        plt.close(fig)
+
+
 # ---------------------------------------------------------------------------
 # Layout and clipping: drawn at the figure's real size, in the production style
 # ---------------------------------------------------------------------------

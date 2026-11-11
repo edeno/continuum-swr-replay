@@ -81,6 +81,7 @@ from continuum_swr_replay.analysis.pfc import (
     make_design_matrices,
     make_matched_control_times,
     matched_control_seed,
+    population_statistics,
 )
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.canonical_events import (
@@ -94,10 +95,7 @@ from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WIND
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
 from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
-from continuum_swr_replay.analysis.pfc.load_population import (
-    load_population_data,
-    significant_fraction,
-)
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
     REPORT_HALF_WINDOW_S,
@@ -414,20 +412,20 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 
     A unit counts when its plus-one Monte Carlo p-value is below ``alpha``.
     The denominator is the units actually tested for that class: a unit whose
-    session had no events of a class is untested for it, not a negative. This
-    is a descriptive implementation preview, not population inference: units
-    within a session and animal are not independent replicates.
+    session had no events of a class is untested for it, not a negative
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`).
+    This is a descriptive implementation preview, not population inference:
+    units within a session and animal are not independent replicates.
 
     The p-value is ``(r + 1) / (R + 1)`` over ``R`` usable draws, so it cannot
     be zero. Every fraction here inherits that resolution, which is why
     ``n_control_draws`` is drawn on the panel.
     """
-    fractions = significant_fraction(df, alpha=alpha)
+    fractions = population_statistics.called_fractions(df, alpha)["fraction"]
     labels, fracs, colors_list = [], [], []
     for label, name, color in SIGNIFICANCE_BARS:
-        n_significant, n_tested = fractions[name]
         labels.append(label)
-        fracs.append(100 * n_significant / n_tested if n_tested else np.nan)
+        fracs.append(100 * fractions[name])
         colors_list.append(COLORS[color])
 
     bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
@@ -462,14 +460,17 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 
 
 def plot_best_model_selection(df, ax):
-    """Distribution of the best model per unit, by held-out deviance."""
-    n_total = len(df)
+    """Distribution of the best model per unit, by held-out deviance.
+
+    Each bar is a share of every unit
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.best_model_fractions`).
+    """
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
     model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
     model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
 
-    counts = df["min_heldout_model"].value_counts()
-    vals = [100 * counts.get(m, 0) / n_total for m in model_order]
+    fractions = population_statistics.best_model_fractions(df, model_order)
+    vals = [100 * fractions[m] for m in model_order]
 
     bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
     for bar, val in zip(bars, vals, strict=True):
