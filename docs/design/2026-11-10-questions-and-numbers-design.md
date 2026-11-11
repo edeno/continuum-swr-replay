@@ -63,7 +63,9 @@ Where the build departs from the design below, after two independent reviews:
 
 ## As built: tracing a value, and what is cited (2026-11-11, schema 6)
 
-- **Each value records its `function`**, the builder function that computed it.
+- **Each value records its `function`**, the builder function that made it
+  (it computed the value too, until the statistics moved to `analysis/`; see
+  "As built: statistics in `analysis/`").
   About 85 % of the keys are assembled from parts, so a key could not be found in
   its builder by search. The builders make their values through one factory,
   `reported.values.value_factory(function, source, tags)`; a test checks that

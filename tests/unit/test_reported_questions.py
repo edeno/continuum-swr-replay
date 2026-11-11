@@ -1,7 +1,7 @@
 """The question list, and every reported value's tags against it.
 
 Each value names the questions it answers (``questions``), the figures that show
-it (``figures``) and the builder function that computed it (``function``); the
+it (``figures``) and the builder function that made it (``function``); the
 question list (``reported/questions.py``) is the one place questions and figures
 are defined. These tests check the list itself, the tags and functions the
 builders write (read from their source, so no lab data is needed), the tags of
@@ -256,7 +256,7 @@ def _factory_calls(tree: ast.Module) -> list[tuple[int, str, set[str]]]:
 
 
 @pytest.mark.parametrize("name", list(values.SUMMARIES))
-def test_a_value_factory_names_the_function_its_values_are_computed_in(name):
+def test_a_value_factory_names_the_function_its_values_are_made_in(name):
     """A value's ``function`` is where a reader looks for its computation, so each
     factory names the function it is made in, or the one it is handed to."""
     tree = ast.parse((BUILDERS / f"{name}.py").read_text())

@@ -5,8 +5,11 @@ list (`src/continuum_swr_replay/reported/questions.py`) and the summaries
 (`paper/reported/<summary>.json`); do not edit by hand. Cite a value in
 `paper/main.tex` by its macro. A value marked *pending* may not be quoted
 as a finding. A summary file is named for what it holds; a question's part
-is where the paper reports it. *Computed in* names the function that
-computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.
+is where the paper reports it. *Builder function* names the function in
+`src/continuum_swr_replay/reported/<summary>.py` that names and describes
+a value. The statistic is computed by the `analysis/` function it calls,
+or copied from an input file; the builder itself only counts the size of
+an input.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
@@ -26,7 +29,7 @@ Sources:
 
 - the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\SurveyBandHighMax` | 300 | Hz | Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | `survey.parameter_values` |  |
 | `\SurveyBandHighMin` | 200 | Hz | Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | `survey.parameter_values` |  |
@@ -74,7 +77,7 @@ Sources:
 - docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
 - docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
 | `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
@@ -192,7 +195,7 @@ Sources:
 
 - Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | `detection.pilot_stray_window_values` | memoryless_comparison |
 | `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | `detection.pilot_stray_window_values` | memoryless_comparison |
@@ -222,7 +225,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (canonical event table)
 - event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsAnimals` | 5 |  | animals in the event table | `events.event_cohort_values` | 2b |
 | `\EventsAnimalsNonSwrMajority` | 4 |  | animals in which more than half the events are non-SWR | `events.event_cohort_values` | 2b |
@@ -264,7 +267,7 @@ Sources:
 
 - event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsCareyEvents` | 24,084 |  | carey events compared with the non-local detector | `events.other_detector_values` |  |
 | `\EventsCareyNoNonlocalFraction` | 20 % |  | share of carey events that overlap no non-local event | `events.other_detector_values` |  |
@@ -373,7 +376,7 @@ Sources:
 
 - Processed-Data/replay_content/event_table.parquet (canonical event table)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsEndOffsetMedianMs` | −4 | ms | median of event end minus matched SWR end | `events.boundary_offset_values` | 2d |
 | `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start | `events.boundary_offset_values` | 2d |
@@ -388,7 +391,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
 | `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
@@ -428,7 +431,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
 | `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
@@ -493,7 +496,7 @@ Sources:
 
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
 | `\EventsBaselineSpikesMedian` | 11 | spikes | median spike count of matched quiet windows | `events.spike_evidence_values` | 2 |
@@ -523,7 +526,7 @@ Sources:
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
 | `\DetectionHeldoutContinuousImmobileCiHigh` | 7.9 | nats per window | upper bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
@@ -599,7 +602,7 @@ Sources:
 
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsBaselineGpiDistanceMedianCm` | 100 | cm | median track distance from the MAP of matched quiet windows to the ground-process intensity peak | `events.spike_evidence_values` |  |
 | `\EventsNonSwrCloseGpiDistanceMedianCm` | 105 | cm | median track distance from the MAP of nonSWR-close events to the ground-process intensity peak | `events.spike_evidence_values` |  |
@@ -614,7 +617,7 @@ Sources:
 
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | `events.spike_evidence_values` | 2 |
 | `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
@@ -636,7 +639,7 @@ Sources:
 
 - Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
 | `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
@@ -663,7 +666,7 @@ Sources:
 
 - Processed-Data/content_occupancy/content_occupancy_per_session.csv
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
@@ -694,7 +697,7 @@ Sources:
 - Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
@@ -727,7 +730,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median | `events.property_values` | 3c |
 | `\EventsSpeedDifferenceHigh` | +230 | cm/s | upper bound of that interval | `events.property_interval_values` | 3c |
@@ -749,7 +752,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median | `events.property_values` | 3 |
 | `\EventsArmsDifferenceHigh` | +2.0 |  | upper bound of that interval | `events.property_interval_values` | 3 |
@@ -778,7 +781,7 @@ Sources:
 - Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsMaxStepAnimalsInDirection` | 5 |  | animals whose non-SWR median largest step of the decoded position is lower than their SWR median | `events.property_values` | 3 |
 | `\EventsMaxStepDifferenceHigh` | +22 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
@@ -815,7 +818,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsHpdAnimalsInDirection` | 4 |  | animals whose non-SWR median highest-density-region coverage is lower than their SWR median | `events.property_values` |  |
 | `\EventsHpdDifferenceHigh` | +53 | cm | upper bound of that interval | `events.property_interval_values` |  |
@@ -853,7 +856,7 @@ Sources:
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\EventsDurationAnimalsInDirection` | 5 |  | animals whose non-SWR median event duration is lower than their SWR median | `events.property_values` |  |
 | `\EventsDurationDifferenceHigh` | +54 | ms | upper bound of that interval | `events.property_interval_values` |  |
@@ -884,7 +887,7 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_omitted.pkl (audited aggregate)
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_rewarded.pkl (audited aggregate)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorBaseCurrentAll` | +0.73 | log weight | C2_base is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
 | `\BehaviorBaseCurrentAllAnimalsPositive` | 5 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
@@ -1140,7 +1143,7 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited.pkl (audited aggregate)
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl (audited aggregate)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorArmrewardAll` | −0.082 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
 | `\BehaviorArmrewardAllAnimalsPositive` | 2 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
@@ -1197,7 +1200,7 @@ Sources:
 - Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet
 - Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorHistoryCrossEndAnimalsNonSwrFromSwr` | 5 |  | non-SWR rate after SWR-coupled events: animals whose rate ratio at 45 ms has its 95 % interval (posterior mode +- 1.96 posterior SD) above 1, over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets | `behavior.duration_aware_history_values` |  |
 | `\BehaviorHistoryCrossEndAnimalsSwrFromNonSwr` | 5 |  | SWR-coupled rate after non-SWR events: animals whose rate ratio at 45 ms has its 95 % interval (posterior mode +- 1.96 posterior SD) above 1, over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets | `behavior.duration_aware_history_values` |  |
@@ -1676,7 +1679,7 @@ Sources:
 
 - Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorChoiceFull` | +0.054 | log odds | C_full replay_fraction: session median coefficient (gated) | `behavior.choice_values` |  |
 | `\BehaviorChoiceFullAnimalsPositive` | 4 |  | C_full replay_fraction: animals with a positive median | `behavior.choice_values` |  |
@@ -1715,7 +1718,7 @@ Sources:
 
 - Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorStayConvergedAll` | 141 |  | stratum all: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
 | `\BehaviorStayConvergedMua` | 45 |  | stratum mua: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
@@ -1748,7 +1751,7 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl (audited aggregate)
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_rewarded.pkl (audited aggregate)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorDmSwrArmrewardDirect` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
 | `\BehaviorDmSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
@@ -1899,7 +1902,7 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl (audited aggregate)
 - Processed-Data/replay_content/uncertainty_content/horserace_summary.csv (content.uncertainty)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorArmuncertAll` | +0.31 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
 | `\BehaviorArmuncertAllAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
@@ -2075,7 +2078,7 @@ Sources:
 
 - Processed-Data/replay_content/models_per_event_swr_power/swr_power_model.pkl (coupling.ripple_power)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\BehaviorPowerExploration` | −0.073 | SD of power per SD | patch_switch_fraction_last5_completed_trips: median per-session coefficient on ripple_power_z | `behavior.power_values` |  |
 | `\BehaviorPowerExplorationAnimalsPositive` | 0 |  | patch_switch_fraction_last5_completed_trips: animals with a positive median | `behavior.power_values` |  |
@@ -2109,7 +2112,7 @@ Sources:
 - Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)
 - Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (no firing-rate cutoff)
 
-| Macro | Value | Unit | What it is | Computed in | Figures |
+| Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\MpfcAnalysedEpochs` | 242 |  | analysed epochs the PFC cohort is drawn from | `mpfc.cohort_values` |  |
 | `\MpfcAnimals` | 5 |  | animals in the mPFC population | `mpfc.cohort_values` |  |

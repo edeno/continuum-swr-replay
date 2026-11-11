@@ -12,7 +12,7 @@ were read in the code and not measured.
 Each entry was read in the code on 2026-11-11 and says where the choice is made
 (file and function), what the code does, and what a different choice would
 change. To find the values a function reaches, look up the builder function in
-`paper/reported/questions.md` ("Computed in").
+`paper/reported/questions.md` ("Builder function").
 
 When an entry is decided, write the decision here (kept, with the reason; or
 changed, with the commit) and do not delete the entry.

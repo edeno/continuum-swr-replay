@@ -20,7 +20,7 @@ Python nor the lab's data: it uses the committed figures and
 | `references.bib` | The bibliography (BibTeX) |
 | `reported_values.tex` | Generated: one LaTeX macro per reported number, read by `main.tex` |
 | `reported/<summary>.json` | The summary files every reported number is read from, named for what they hold: `survey` (the literature numbers the introduction quotes), `detection`, `events`, `behavior`, `mpfc` |
-| `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source, the function that computed it) and the values by figure |
+| `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source, the builder function that made it) and the values by figure |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
 | `tables/` | `table_s1_literature_parameters.csv`, the <!--v:survey.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
 | `Makefile`, `.latexmkrc` | Build settings |

@@ -180,17 +180,17 @@ def _record_cell(summary: Summary) -> str:
     return "yes, uncommitted" if summary.code["uncommitted"] else "yes"
 
 
-def _computed_in(summary: str, value: Value) -> str:
-    """The function that computed ``value``, as ``<builder module>.<function>``."""
+def _builder_function(summary: str, value: Value) -> str:
+    """The builder function that made ``value``, as ``<builder module>.<function>``."""
     return f"`{summary}.{value.function}`"
 
 
 def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
     """Markdown table rows: the macro to cite, the value as printed, its unit,
-    what it is (with any pending note), the function that computed it and the
-    figures that show it."""
+    what it is (with any pending note), the builder function that made it and
+    the figures that show it."""
     rows = [
-        "| Macro | Value | Unit | What it is | Computed in | Figures |",
+        "| Macro | Value | Unit | What it is | Builder function | Figures |",
         "|---|---|---|---|---|---|",
     ]
     order = {name: i for i, name in enumerate(SUMMARIES)}
@@ -201,7 +201,7 @@ def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
             formatted(value),
             value.unit,
             value.description + notes,
-            _computed_in(name, value),
+            _builder_function(name, value),
             ", ".join(value.figures),
         ]
         rows.append("| " + " | ".join(_cell(c) for c in cells) + " |")
@@ -232,8 +232,11 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         "(`paper/reported/<summary>.json`); do not edit by hand. Cite a value in",
         "`paper/main.tex` by its macro. A value marked *pending* may not be quoted",
         "as a finding. A summary file is named for what it holds; a question's part",
-        "is where the paper reports it. *Computed in* names the function that",
-        "computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.",
+        "is where the paper reports it. *Builder function* names the function in",
+        "`src/continuum_swr_replay/reported/<summary>.py` that names and describes",
+        "a value. The statistic is computed by the `analysis/` function it calls,",
+        "or copied from an input file; the builder itself only counts the size of",
+        "an input.",
         "",
         "| Summary | Built at | Code record | Values | Values with tag problems |",
         "|---|---|---|---|---|",

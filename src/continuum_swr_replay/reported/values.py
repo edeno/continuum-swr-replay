@@ -17,7 +17,7 @@ from continuum_swr_replay.reported.questions import tag_problems
 SCHEMA_VERSION = 6
 """The layout of a summary file. Bump it when a field is added or renamed.
 Version 6: each value records its ``function``, the builder function that
-computed it, and the ``figures`` that show it. Whether the manuscript cites a
+made it, and the ``figures`` that show it. Whether the manuscript cites a
 value is not recorded: it is read from the manuscript
 (:func:`~continuum_swr_replay.reported.emit.cited_macros`)."""
 
@@ -93,8 +93,10 @@ class Value:
     source : str
         The file, run or table it was computed from, and the selection.
     function : str
-        The function that computed it, in its summary's builder module
-        (``event_cohort_values`` of ``reported/events.py``).
+        The function that made it, in its summary's builder module
+        (``event_cohort_values`` of ``reported/events.py``). That function
+        names and describes the value; the statistic is computed by the
+        ``analysis`` function it calls.
     pending : str or None
         Why the value may not be quoted yet (for example a value from an
         untracked script), or None.
@@ -150,8 +152,8 @@ def value_factory(
     Parameters
     ----------
     function : callable
-        The builder function the values are computed in. Its name is recorded
-        as each value's ``function``, so a value can be traced to its code.
+        The builder function the values are made in. Its name is recorded as
+        each value's ``function``, so a value can be traced to its code.
     source : str
         The file, run or table the values are computed from.
     tags : Tags
