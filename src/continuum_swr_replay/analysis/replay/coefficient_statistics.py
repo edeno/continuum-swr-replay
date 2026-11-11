@@ -465,7 +465,8 @@ def group_range(
     Raises
     ------
     ValueError
-        If no group is kept.
+        If no group is kept, or a kept group's number is missing (the lowest
+        and highest would then depend on the order of the groups).
     """
     kept = {
         group: value
@@ -474,6 +475,9 @@ def group_range(
     }
     if not kept:
         raise ValueError("no group is left to take a range over")
+    missing = [group for group, value in kept.items() if np.isnan(value)]
+    if missing:
+        raise ValueError(f"no number to take a range over for {missing}")
     low, high = min(kept, key=kept.__getitem__), max(kept, key=kept.__getitem__)
     return {
         "low": kept[low],

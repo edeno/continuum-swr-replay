@@ -425,6 +425,12 @@ def fitted_time_course(
         at-risk second.
     n_curves : int
         The session curves the median is over.
+
+    Raises
+    ------
+    ValueError
+        If no session is left with a curve: there is no time course to
+        summarize, and its peak would read as the start of the interval.
     """
     require_one_fit_per_session(fits)
     term, column, knots = time_course_spline(time_clock)
@@ -439,6 +445,8 @@ def fitted_time_course(
     with np.errstate(over="ignore"):
         curves = np.exp(intercept[ok, None] + beta[ok] @ basis.T)
     curves = curves[np.isfinite(curves).all(axis=1)]
+    if not len(curves):
+        raise ValueError(f"no session has a usable {time_clock}-clock time course")
     return grid, np.median(curves, axis=0), len(curves)
 
 

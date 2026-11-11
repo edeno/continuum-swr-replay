@@ -463,6 +463,23 @@ def test_the_time_course_leaves_out_separated_and_non_finite_sessions():
     assert n_curves == 3
 
 
+def test_no_usable_session_is_no_time_course():
+    # Every session is separated, has no intercept or overflows: a median over
+    # no curve would put the peak at the start of the interval.
+    separated = _time_fits(
+        STOP_SPLINE, 6, [0.0, NAN, 1e4], separated=[True, False, False]
+    )
+    with pytest.raises(ValueError, match="no session has a usable stop-clock"):
+        stats.fitted_time_course(separated, "stop")
+    flat_arrival = _time_fits(ARRIVAL_SPLINE, 7, np.log([1.0, 2.0]))
+    with pytest.raises(ValueError, match="no session has a usable stop-clock"):
+        stats.clock_shape_statistics(separated, flat_arrival)
+    none_arrival = _time_fits(ARRIVAL_SPLINE, 7, [0.0], separated=[True])
+    flat_stop = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0]))
+    with pytest.raises(ValueError, match="no session has a usable arrival-clock"):
+        stats.clock_shape_statistics(flat_stop, none_arrival)
+
+
 def test_the_time_course_refuses_two_fits_of_one_session():
     fits = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0, 4.0]))
     with pytest.raises(ValueError, match="more than one fit for a session"):

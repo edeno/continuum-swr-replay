@@ -418,3 +418,19 @@ def test_group_range_leaves_out_the_excluded_groups():
     }
     with pytest.raises(ValueError, match="no group"):
         stats.group_range(values, dict.fromkeys(values, True))
+
+
+def test_group_range_refuses_a_missing_number_unless_its_group_is_left_out():
+    # With a missing number first, min and max would both name it; with it
+    # last, neither would.
+    for values in ({"a": NAN, "b": 1.0, "c": 2.0}, {"b": 1.0, "c": 2.0, "a": NAN}):
+        with pytest.raises(ValueError, match=r"no number .* \['a'\]"):
+            stats.group_range(values)
+        excluded = {"a": True, "b": False, "c": False}
+        assert stats.group_range(values, excluded) == {
+            "low": 1.0,
+            "low_group": "b",
+            "high": 2.0,
+            "high_group": "c",
+            "n_excluded": 1,
+        }
