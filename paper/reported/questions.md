@@ -13,7 +13,7 @@ list, and it has no code record until it is rebuilt.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `b895716f9c48` | yes | 32 | 0 |
+| `survey.json` | `397d6fd089b4` | yes | 32 | 0 |
 | `detection.json` | `7fb1dcfa84ad` | migrated, not rebuilt | 132 | 0 |
 | `events.json` | `bfb20f359f8f` | migrated, not rebuilt | 331 | 0 |
 | `behavior.json` | `c96c9133ef6c-dirty` | migrated, not rebuilt | 922 | 0 |
