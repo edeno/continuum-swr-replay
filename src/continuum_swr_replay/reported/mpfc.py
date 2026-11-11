@@ -404,6 +404,20 @@ def marked_family_staleness(
     return _stale_note("the marked-family bundles", stale, len(sidecars))
 
 
+def _finite_adder(
+    values: list[Value], make: Callable[..., Value]
+) -> Callable[..., None]:
+    """An ``add(key, value, ...)`` that appends ``make(key, value, ...)`` to
+    ``values`` when the value is finite. A statistic over an empty set is
+    absent, never invented."""
+
+    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
+        if np.isfinite(float(value)):
+            values.append(make(key, value, *args, **kwargs))
+
+    return add
+
+
 def _uniform(sidecars: list[dict[str, Any]], name: str) -> Any:
     """The one value every sidecar records for ``name``."""
     values = {json.dumps(s.get(name), sort_keys=True) for s in sidecars}
@@ -1182,10 +1196,7 @@ def timing_values(
     """
     values: list[Value] = []
 
-    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
-        # A statistic over an empty set is absent, never invented.
-        if np.isfinite(float(value)):
-            values.append(make(key, value, *args, **kwargs))
+    add = _finite_adder(values, make)
 
     # Resample recording days (NWB files), not epochs: the epochs of one day
     # are recorded on the same tetrodes and need not be independent.
@@ -1664,9 +1675,7 @@ def swr_without_replay_values(
     """
     values: list[Value] = []
 
-    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
-        if np.isfinite(float(value)):
-            values.append(make(key, value, *args, **kwargs))
+    add = _finite_adder(values, make)
 
     # A sidecar without a count gives a missing value, which the statistics refuse.
     sessions = pd.DataFrame(
@@ -1969,9 +1978,7 @@ def marked_family_values(
     """
     values: list[Value] = []
 
-    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
-        if np.isfinite(float(value)):
-            values.append(make(key, value, *args, **kwargs))
+    add = _finite_adder(values, make)
 
     wide = summary[summary["statistic"] != "mark_correlation"].pivot_table(
         index=["model", "event_class", "target"], columns="statistic", values="value"
@@ -2094,9 +2101,7 @@ def stop_context_values(
     """
     values: list[Value] = []
 
-    def add(key: str, value: float, *args: Any, **kwargs: Any) -> None:
-        if np.isfinite(float(value)):
-            values.append(make(key, value, *args, **kwargs))
+    add = _finite_adder(values, make)
 
     rows = results[results["estimator"] == "conditional"]
     classes = {"non_local_SWR": "swr_replay", "non_local_no_SWR": "non_swr_replay"}
