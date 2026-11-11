@@ -48,14 +48,6 @@ Work that is deferred on purpose. Each item says when it should be done.
   trial rebuild on the cluster.
   *When:* before the Results that cite them are drafted.
 
-- [ ] **Figure 4 and three pfc scripts recompute statistics the mpfc summary
-  reports.** `generate_figure04.py` computes the called shares and the
-  best-model shares itself (as percents); `scripts/pfc/compare_pfc_cohorts.py`
-  (cohort totals, prior-binding share) and
-  `scripts/pfc/measure_pfc_null_geometry.py` (the null-geometry numbers) compute
-  theirs. Call `analysis/pfc/population_statistics.py` instead.
-  *When:* at the next regeneration of Figure 4.
-
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
   removed after `cad31719`; it used an older claim numbering, so "D" is its claim
   "our method beats SWR-triggered decoding"). Quoted as it wrote them; confirm

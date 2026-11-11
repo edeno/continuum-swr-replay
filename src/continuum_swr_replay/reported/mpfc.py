@@ -32,8 +32,8 @@ already hold is copied out. The inputs (:class:`MpfcInputs`):
   ``scripts/pfc/run_pfc_stop_context.py``), pending when a bundle, cached
   session table or table they read has changed (:func:`stop_context_staleness`).
 
-The derived values follow the rules of the scripts that first reported them:
-Figure 4 (``scripts/figures/generate_figure04.py``) for the unit fractions,
+The scripts that show these statistics call the same functions: Figure 4
+(``scripts/figures/generate_figure04.py``) for the unit fractions,
 ``scripts/pfc/compare_pfc_cohorts.py`` for the cohort, fit-count and
 prior-binding values, and ``scripts/pfc/measure_pfc_null_geometry.py`` for the
 null's geometry. Unit fractions are descriptive and pooled over sessions and
@@ -421,8 +421,8 @@ def cohort_values(
     """Which sessions, units, bins and events the unit GLM was fit on.
 
     Bins and events are summed over sessions, before and after the at-well
-    stop restriction, as ``compare_pfc_cohorts.session_cohort_table`` totals
-    them.
+    stop restriction; ``compare_pfc_cohorts.session_cohort_table`` shows the
+    same totals.
     """
     if len(sidecars) != cohort["n_pfc_cohort"]:
         raise ValueError(
@@ -690,11 +690,12 @@ def prior_binding_values(
 ) -> list[Value]:
     """How often the prior moves a curve's peak, per curve.
 
-    The rule of ``compare_pfc_cohorts.shrinkage_table``: among the well-posed
+    Among the well-posed
     units of a curve (unpenalised fit converged and no separated column), the
     share whose penalised peak differs from the unpenalised one by more than
     that peak's standard error (the bundle's ``prior_binds``). The values are
-    the lowest and highest share over the five curves.
+    the lowest and highest share over the five curves;
+    ``compare_pfc_cohorts.shrinkage_table`` shows each curve's share.
     """
     shares = population_statistics.lowest_and_highest(
         population_statistics.prior_binding_percent(population, CURVES)
@@ -815,8 +816,8 @@ def null_geometry_values(
     sidecars: list[dict[str, Any]],
     make: Callable[..., Value],
 ) -> list[Value]:
-    """Three caveats on the empirical p-values, by the rules of
-    ``scripts/pfc/measure_pfc_null_geometry.py``.
+    """Three caveats on the empirical p-values, which
+    ``scripts/pfc/measure_pfc_null_geometry.py`` reports per session.
 
     - Units called at raw p < 0.05 whose own observed held-out improvement (on
       the matchable subset) is not positive.

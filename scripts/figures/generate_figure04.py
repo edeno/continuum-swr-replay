@@ -430,7 +430,7 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 
     bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
     for bar, frac in zip(bars, fracs, strict=True):
-        if np.isfinite(frac) and frac > 2:
+        if frac > 2:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
                 frac + 1,
@@ -441,10 +441,7 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 
     ax.axhline(100 * alpha, color="gray", linewidth=0.5, linestyle="--")
     ax.set_ylabel("% units")
-    finite_fractions = np.asarray(fracs, dtype=float)
-    finite_fractions = finite_fractions[np.isfinite(finite_fractions)]
-    observed_max = float(finite_fractions.max()) if finite_fractions.size else 0.0
-    ax.set_ylim(0, max(100 * alpha * 1.2, observed_max * 1.3))
+    ax.set_ylim(0, max(100 * alpha * 1.2, max(fracs) * 1.3))
     ax.tick_params(axis="x", labelsize=5)
     # Say both the raw-p threshold and R on the panel: this is a descriptive
     # preview, and its Monte Carlo resolution is part of what the bars mean.
