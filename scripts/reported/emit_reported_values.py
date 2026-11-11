@@ -11,7 +11,9 @@ changes numbers), so a replaced number is never silent.
 
 A summary written before the question list changed its tags is still emitted; the
 values whose tags the list does not know are printed, and listed in
-``questions.md``, until the summary is rebuilt.
+``questions.md``, until the summary is rebuilt. A summary whose code has changed
+since it was built is named too, but never refused: ``check_release.py`` is the
+check that fails, at a milestone.
 
 Usage::
 
@@ -26,6 +28,7 @@ from datetime import date
 
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.emit import emit, marked_docs, questions_view
+from continuum_swr_replay.reported.release import staleness
 from continuum_swr_replay.reported.values import read_summary, summary_tag_problems
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
@@ -59,6 +62,8 @@ def main(argv: Sequence[str] | None = None) -> None:
                 f"  part{part}.json: {len(problems)} values with tags the question "
                 "list does not know (rebuild the summary)"
             )
+        for reason in staleness(summary, ROOT_DIR):
+            print(f"  part{part}.json: {reason}")
     if changes:
         if not CHANGES_PATH.exists():
             CHANGES_PATH.write_text(

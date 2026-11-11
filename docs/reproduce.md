@@ -10,6 +10,7 @@ There are four levels, each needing more than the one before:
 | Build the PDF | `make manuscript` | LaTeX |
 | Write the reported numbers into the LaTeX macros and the docs | `make reported-values` | the committed summaries; Python |
 | Rebuild the summaries and the main figures | `make summaries`, `make figures` | the lab's processed data |
+| Before a milestone (a draft to the co-authors, submission, a release): check that every summary is current with the code | `make release-check` | the committed summaries; Python |
 | Rebuild everything, from the recordings | [the full rebuild](#the-full-rebuild) | the lab's Spyglass database, the NWB files, GPUs |
 
 There is no public reproduction yet: every analysis reads the lab's data.
@@ -79,6 +80,13 @@ after a change to fitting code only, start at step 6.
 
    `make reported-values` lists every number that changed, on the screen and in
    `paper/reported/changes.md`. Read that list before committing.
+
+   Each summary records the code that built it: the package modules its builder
+   loaded, with their digests, the digest of `uv.lock`, and the diff of those
+   modules if they were not committed. `make reported-values` names a summary whose
+   code has changed since, but never refuses it. `make release-check` fails on a
+   stale summary, one built from uncommitted code, or one whose tags the question
+   list does not know; run it at a milestone, then rebuild only the parts it names.
 
 ## Decoding
 

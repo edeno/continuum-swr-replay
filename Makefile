@@ -5,7 +5,7 @@ RUN = $(UV) run --frozen
 PARTS = 0 1 2 3 4
 
 .DEFAULT_GOAL := help
-.PHONY: help sync sync-dev format check figures summaries reported-values manuscript
+.PHONY: help sync sync-dev format check figures summaries reported-values release-check manuscript
 
 help:
 	@echo "make sync             Install the locked analysis environment"
@@ -15,6 +15,7 @@ help:
 	@echo "make figures          Regenerate the main figures (needs the lab's processed data)"
 	@echo "make summaries        Rebuild paper/reported/part{0..4}.json (parts 1-4 need the lab's processed data)"
 	@echo "make reported-values  Write the summaries' values into the LaTeX macros and the docs"
+	@echo "make release-check    Before a milestone: fail if a summary is stale, uncommitted or mis-tagged"
 	@echo "make manuscript       Build paper/main.pdf from the committed figures and macros"
 
 # --inexact keeps the development tools that sync-dev installed.
@@ -43,6 +44,9 @@ summaries:
 
 reported-values:
 	$(RUN) python scripts/reported/emit_reported_values.py
+
+release-check:
+	$(RUN) python scripts/reported/check_release.py
 
 manuscript:
 	$(MAKE) -C paper

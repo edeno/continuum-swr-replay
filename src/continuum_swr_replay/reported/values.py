@@ -15,8 +15,12 @@ from typing import Any
 
 from continuum_swr_replay.reported.questions import tag_problems
 
-SCHEMA_VERSION = 1
-"""The layout of a summary file. Bump it when a field is added or renamed."""
+SCHEMA_VERSION = 2
+"""The layout of a summary file. Bump it when a field is added or renamed.
+Version 2 added ``code``, the record of the code that built the summary."""
+
+READABLE_SCHEMAS = (1, 2)
+"""The layouts :func:`read_summary` reads. A version-1 summary has no ``code``."""
 
 PARTS = {
     0: "the surveyed literature",
@@ -121,13 +125,17 @@ def _tags_unchecked() -> Iterator[None]:
 
 @dataclass
 class Summary:
-    """One part's values and the provenance of the inputs they were read from."""
+    """One part's values, the provenance of the inputs they were read from, and
+    the code that built them (``code``, a
+    :func:`~continuum_swr_replay.reported.code_record.code_record`; None for a
+    summary built before code records were kept)."""
 
     part: int
     produced_by: str
     commit: str
     inputs: list[dict[str, Any]] = field(default_factory=list)
     values: dict[str, Value] = field(default_factory=dict)
+    code: dict[str, Any] | None = None
 
     def add(self, *values: Value) -> None:
         for value in values:
@@ -142,6 +150,7 @@ class Summary:
             "title": PARTS[self.part],
             "produced_by": self.produced_by,
             "commit": self.commit,
+            "code": self.code,
             "inputs": self.inputs,
             "values": {
                 key: {k: v for k, v in asdict(value).items() if k != "key"}
@@ -171,15 +180,17 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
         still be emitted; :func:`summary_tag_problems` then lists what to fix.
     """
     payload = json.loads(path.read_text())
-    if payload["schema_version"] != SCHEMA_VERSION:
+    if payload["schema_version"] not in READABLE_SCHEMAS:
         raise ValueError(
-            f"{path}: schema {payload['schema_version']}, expected {SCHEMA_VERSION}"
+            f"{path}: schema {payload['schema_version']}, expected one of "
+            f"{READABLE_SCHEMAS}"
         )
     summary = Summary(
         part=payload["part"],
         produced_by=payload["produced_by"],
         commit=payload["commit"],
         inputs=payload["inputs"],
+        code=payload.get("code"),
     )
     for key, fields in payload["values"].items():
         fields = dict(fields)

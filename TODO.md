@@ -25,15 +25,25 @@ Work that is deferred on purpose. Each item says when it should be done.
   table-building steps from Spyglass/NWB as a lab guide, and publish the NWB
   files on DANDI.
   *When:* with the data statement for submission.
-- [ ] **Summary provenance.** Make `scripts/reported/summarize_part.py` refuse
-  a dirty working tree and record input paths relative to the data root, not
-  absolute paths (`part2.json` records `/cumulus/...`; `part3.json` and
-  `part4.json` were built at `-dirty` commits). Add a script that compares a
-  rebuilt summary with the committed one within stated tolerances.
+- [ ] **Summary input paths and rebuild comparison.** Record input paths
+  relative to the data root, not absolute paths (`part2.json` records
+  `/cumulus/...`). Add a script that compares a rebuilt summary with the
+  committed one within stated tolerances. (The code that built each summary is
+  now recorded, uncommitted builds included, and `make release-check` flags a
+  stale one; a dirty tree is no longer refused.)
   *When:* together with Tier 1, or when a number in the paper cannot be traced
   back to a commit.
 
 ## Reported values
+
+- [ ] **Rebuild every summary on the cluster.** No committed summary has a code
+  record yet, and Parts 1–3 still carry the tags from before the question list
+  (`make release-check` lists them). Rebuild all five from committed code
+  (`make summaries`; Parts 1–4 need the processed data), run
+  `make reported-values`, read `paper/reported/changes.md`, then remove each
+  rebuilt part from `AWAITING_REBUILD` in `tests/unit/test_reported_questions.py`.
+  Parts 3 and 4 were built from uncommitted code, so their numbers may move.
+  *When:* at the next session on the cluster, before the Results are drafted.
 
 - [ ] **Held-out test split by SWR (claim 7): confirm which script made it.**
   `part2.json`'s 10 `heldout_*` values are read from

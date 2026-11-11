@@ -337,8 +337,11 @@ always, and blocks only at milestones:
 2. **Report staleness, never fail, during development.**
    - `make reported-values` prints, per part, the loaded modules whose code
      changed since the build.
-   - `questions.md` shows the same line at the top of each part. Whoever drafts
-     the Results sees which numbers lag the code.
+   - `questions.md` shows each summary's build commit, but not live staleness.
+     (Changed while building it: a staleness line there would make the
+     byte-for-byte freshness test fail on every code commit, which is the
+     friction this rule exists to avoid. The emitter's printout and
+     `make release-check` carry it instead.)
 3. **Block only at a milestone.** A `make release-check` fails when any summary
    was built from uncommitted code, or when its loaded modules' code changed
    since. It runs before a draft goes to co-authors, before submission, and in
