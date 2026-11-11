@@ -4,10 +4,11 @@ a release), and never on every commit."""
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 
-from continuum_swr_replay.reported.code_record import code_changes, input_changes
+from continuum_swr_replay.reported.code_record import code_changes
 from continuum_swr_replay.reported.emit import cited_values
 from continuum_swr_replay.reported.values import Summary, summary_tag_problems
 
@@ -36,13 +37,20 @@ def staleness(summary: Summary, repo: Path) -> list[str]:
 
 
 def input_problems(summary: Summary, root: Path) -> tuple[list[str], list[str]]:
-    """What the recorded inputs say: problems (an input changed since the build,
-    or is not on this machine) and notes (sets of files that cannot be re-checked
-    from their records)."""
-    found = input_changes(summary.inputs, root)
-    problems = [f"input changed since the build: {p}" for p in found["changed"]]
-    problems += [f"input not on this machine: {p}" for p in found["missing"]]
-    notes = [f"input file set not re-checked: {p}" for p in found["unchecked"]]
+    """What the recorded inputs say: problems (a single file whose sha256 differs
+    now, or that is not on this machine) and notes (sets of files, records with
+    ``n_files``: they name a label, not the selection the builder made, so they
+    cannot be re-checked without rebuilding)."""
+    problems, notes = [], []
+    for record in summary.inputs:
+        path = record["path"]
+        file = root / path  # an absolute path stays as it is
+        if "n_files" in record:
+            notes.append(f"input file set not re-checked: {path}")
+        elif not file.is_file():
+            problems.append(f"input not on this machine: {path}")
+        elif hashlib.sha256(file.read_bytes()).hexdigest() != record["sha256"]:
+            problems.append(f"input changed since the build: {path}")
     return problems, notes
 
 
@@ -71,7 +79,9 @@ def release_problems(
         if tags:
             noun = "value" if len(tags) == 1 else "values"
             found.append(f"{len(tags)} {noun} with tag problems: {', '.join(tags)}")
-        pending = [key for key in cited[name] if summary.values[key].pending]
+        pending = [
+            key for key in cited[name] if summary.values[key].pending is not None
+        ]
         if pending:
             found.append(f"the manuscript cites pending values: {', '.join(pending)}")
         notes[name] = [

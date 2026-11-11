@@ -14,11 +14,14 @@ fails the LaTeX build rather than redefining anything.
 The text between them is replaced by the value printed in the marker's style
 (after ``@``; not ``|``, which would split a markdown table cell) or the value's own. The prose around the markers stays
 hand-written. A marker naming a key no summary holds is an error, so a renamed
-value cannot leave a stale number behind. Markers inside code (backticks or a
-fenced block) are examples and are left alone.
+value cannot leave a stale number behind. Only text of exactly this form is a
+marker: one with other spacing, or a key that is not lower-case words, is plain
+text and is left as it is. Markers inside code (backticks or a fenced block) are
+examples and are left alone.
 
-**Cited values.** Which values the manuscript cites is read from the manuscript
-(:func:`cited_macros`); no value records it.
+**Cited values.** Which values the manuscript cites is read from the manuscript's
+LaTeX source (:func:`manuscript_source`, :func:`cited_macros`); no value records
+it.
 """
 
 from __future__ import annotations
@@ -75,6 +78,16 @@ _MACRO = re.compile(
     r"\\((?:" + "|".join(name.capitalize() for name in SUMMARIES) + r")[A-Za-z]+)"
 )
 _TEX_COMMENT = re.compile(r"(?<!\\)%.*$", re.MULTILINE)
+
+
+def manuscript_source(manuscript: Path, macro_file: Path) -> str:
+    """The LaTeX source of the paper: ``manuscript`` and every other ``.tex`` file
+    in its folder and below, so that a value cited from a file the manuscript
+    inputs is counted. ``macro_file`` (the generated definitions, which name
+    every macro) is left out. A ``.tex`` file the manuscript does not input is
+    read too: its macros count as cited, which only makes the check stricter."""
+    files = {manuscript, *manuscript.parent.rglob("*.tex")} - {macro_file}
+    return "\n".join(path.read_text() for path in sorted(files))
 
 
 def cited_macros(manuscript: str) -> set[str]:

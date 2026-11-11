@@ -1,18 +1,20 @@
-"""Which code built a summary, whether that code has changed since, and whether
-the summary's inputs still match.
+"""Which files of the checkout built a summary, and whether they have changed since.
 
-A summary records, when it is built, the files the build depended on: every
-package module loaded during the build (the summary's builder and the building
-script's own imports), the script itself, and every non-Python file under the
-package directory (today only ``data_loaders/epoch_register.csv``, the analysed
-cohort), each with two digests. It also records the commit checked out, the digest
-of ``uv.lock``, and which of those files or ``uv.lock`` differ from that commit.
-The rule is that a summary in ``paper/reported/`` is built from committed code:
-``scripts/reported/summarize.py`` refuses to write one there otherwise (a trial
-build goes to another folder), so the commit and the digests are the whole
-record. :func:`code_changes` says later which recorded files no longer match;
-that never refuses anything, and only ``scripts/reported/check_release.py``
-fails on a stale summary, at milestones.
+A summary records, when it is built, the files of the checkout the build
+depended on: every package module loaded during the build (the summary's builder
+and the building script's own imports), the script itself, every non-Python file
+under the package directory that git does not ignore (today only
+``data_loaders/epoch_register.csv``, the analysed cohort), and the input files
+the repository tracks (the literature survey table, the committed sweep
+summaries), each with two digests. It also records the commit checked out, the
+digest of ``uv.lock``, and which of those files or ``uv.lock`` differ from that
+commit. The rule is that a summary in ``paper/reported/`` is built from committed
+files: ``scripts/reported/summarize.py`` refuses to write one there otherwise (a
+trial build goes to another folder), so the commit and the digests are the whole
+record. A file differs from the commit when its content does, whatever git's
+index says of it. :func:`code_changes` says later which recorded files no longer
+match; that never refuses anything, and only
+``scripts/reported/check_release.py`` fails on a stale summary, at milestones.
 
 Each file has two digests: ``sha256``, of its bytes, and ``code_sha256``. For a
 module the second is of its syntax tree with every bare string statement (module,
@@ -28,12 +30,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import platform
-import subprocess
 import sys
 from collections.abc import Iterable
 from pathlib import Path
 from types import ModuleType
-from typing import Any, TypedDict
+from typing import TypedDict
+
+from continuum_swr_replay.runs.provenance import git
 
 PACKAGE = "continuum_swr_replay"
 
@@ -42,7 +45,7 @@ NOT_RECORDED = (
     "continuum_swr_replay.reported.code_record",
 )
 """Modules a build loads that cannot change a value: the question list (its tags
-are checked when each value is built, and reported at every emit) and this
+are checked when a summary is written, and reported at every emit) and this
 record. Left out so that rewording a question does not make every summary stale."""
 
 LOCK = "uv.lock"
@@ -118,9 +121,16 @@ def _python() -> str:
 
 
 def build_files(repo: Path) -> list[Path]:
-    """The files a build depends on, sorted: the package's modules loaded in this
+    """The code a build depends on, sorted: the package's modules loaded in this
     process (other than :data:`NOT_RECORDED`), the running script, and every
-    non-Python file under the package directory. Only files under ``repo``."""
+    non-Python file under the package directory that git does not ignore.
+
+    Raises
+    ------
+    ValueError
+        If a loaded module of the package, or the running script, is outside
+        ``repo``: the record could not vouch for it.
+    """
     files = set()
     for name, module in list(sys.modules.items()):
         file = getattr(module, "__file__", None)
@@ -134,44 +144,56 @@ def build_files(repo: Path) -> list[Path]:
     )
     if main_file:
         files.add(Path(main_file).resolve())
+    root = repo.resolve()
+    outside = sorted(str(f) for f in files if not f.is_relative_to(root))
+    if outside:
+        raise ValueError(f"the build ran code from outside {root}: {outside}")
     package_file = getattr(sys.modules.get(PACKAGE), "__file__", None)
     if package_file:
-        files |= {
-            path.resolve()
-            for path in Path(package_file).parent.rglob("*")
-            if path.is_file()
-            and path.suffix not in (".py", ".pyc")
-            and "__pycache__" not in path.parts
-        }
-    root = repo.resolve()
-    return sorted(f for f in files if f.is_relative_to(root))
-
-
-def _git(repo: Path, *args: str) -> str:
-    """The output of ``git <args>`` in ``repo``; a failure raises, with git's own
-    message."""
-    result = subprocess.run(
-        ["git", "--no-optional-locks", *args],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        raise subprocess.CalledProcessError(
-            result.returncode, result.args, result.stdout, result.stderr
+        listed = git(
+            repo,
+            *("ls-files", "-z", "--cached", "--others", "--exclude-standard", "--"),
+            str(Path(package_file).resolve().parent),
         )
-    return result.stdout
+        files |= {
+            root / path
+            for path in listed.split("\0")
+            if path
+            and Path(path).suffix not in (".py", ".pyc")
+            and (root / path).is_file()
+        }
+    return sorted(files)
+
+
+def _committed_blobs(repo: Path, paths: Iterable[str]) -> dict[str, str]:
+    """The git blob id of each of ``paths`` (relative to ``repo``) in the commit
+    checked out; a path the commit does not hold is absent."""
+    listed = git(repo, "ls-tree", "-r", "-z", "HEAD", "--", *sorted(paths))
+    blobs = {}
+    for entry in listed.split("\0"):
+        if entry:
+            mode_type_blob, path = entry.split("\t", 1)
+            blobs[path] = mode_type_blob.split()[2]
+    return blobs
+
+
+def tracked(repo: Path, paths: Iterable[str]) -> list[str]:
+    """Those of ``paths`` (relative to ``repo``) that the commit checked out holds."""
+    paths = list(paths)
+    committed = _committed_blobs(repo, paths) if paths else {}
+    return [path for path in paths if path in committed]
 
 
 def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
-    """What a summary records about the code that built it.
+    """What a summary records about the files of the checkout that built it.
 
     Parameters
     ----------
     repo : Path
         The git work tree; ``uv.lock`` is read from its root.
     files : iterable of Path
-        The files the build depended on (:func:`build_files`).
+        The files the build depended on: its code (:func:`build_files`) and the
+        inputs the repository tracks.
 
     Returns
     -------
@@ -179,32 +201,33 @@ def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
         - ``head``: the commit checked out (``git rev-parse HEAD``).
         - ``python``: the major.minor version that computed the ``code_sha256``s.
         - ``uv_lock_sha256``: the sha256 of ``uv.lock``.
-        - ``uncommitted``: those of ``files`` and ``uv.lock`` that differ from
-          ``head`` or that git does not track, sorted; empty when the build is
-          the code of ``head``.
+        - ``uncommitted``: those of ``files`` and ``uv.lock`` whose content is
+          not what ``head`` holds for them (changed, or not in the commit),
+          sorted; empty when the build is the files of ``head``. The working
+          file's content is compared, so a file hidden from ``git status``
+          (``assume-unchanged``, ``skip-worktree``) is still found.
         - ``files``: each file, relative to ``repo``, with its ``sha256`` and
           ``code_sha256``.
 
     Raises
     ------
-    OSError, subprocess.CalledProcessError
-        If a file or ``uv.lock`` cannot be read, or git fails.
+    OSError, subprocess.CalledProcessError, ValueError
+        If a file or ``uv.lock`` cannot be read, git fails, or a file is outside
+        ``repo``.
     """
     root = repo.resolve()
     relative = [str(Path(f).resolve().relative_to(root)) for f in files]
-    head = _git(repo, "rev-parse", "HEAD").strip()
-    paths = {*relative, LOCK}
-    tracked = set(_git(repo, "ls-files", "--", *sorted(paths)).splitlines())
-    changed = (
-        _git(repo, "diff", "--name-only", head, "--", *sorted(tracked)).splitlines()
-        if tracked
-        else []
+    head = git(repo, "rev-parse", "HEAD").strip()
+    paths = sorted({*relative, LOCK})
+    committed = _committed_blobs(repo, paths)
+    working = dict(
+        zip(paths, git(repo, "hash-object", "--", *paths).split(), strict=True)
     )
     return {
         "head": head,
         "python": _python(),
         "uv_lock_sha256": hashlib.sha256((repo / LOCK).read_bytes()).hexdigest(),
-        "uncommitted": sorted({*changed, *(paths - tracked)}),
+        "uncommitted": [p for p in paths if committed.get(p) != working[p]],
         "files": {path: _digests(root / path) for path in relative},
     }
 
@@ -237,8 +260,7 @@ def code_changes(record: CodeRecord, repo: Path) -> list[str]:
         now = _digests(file)
         if now["sha256"] == digests["sha256"]:
             continue
-        parses = now["code_sha256"] != now["sha256"]
-        if same_python and parses and now["code_sha256"] == digests["code_sha256"]:
+        if same_python and now["code_sha256"] == digests["code_sha256"]:
             continue
         changed.append(path)
     lock = root / LOCK
@@ -247,29 +269,3 @@ def code_changes(record: CodeRecord, repo: Path) -> list[str]:
     ):
         changed.append(LOCK)
     return changed
-
-
-def input_changes(inputs: Iterable[dict[str, Any]], root: Path) -> dict[str, list[str]]:
-    """Which of a summary's recorded inputs no longer match, by what can be said.
-
-    Returns
-    -------
-    dict
-        - ``changed``: single files whose sha256 differs now.
-        - ``missing``: single files not on this machine.
-        - ``unchecked``: sets of files (records with ``n_files``); their records
-          name a label, not the selection the builder made, so they cannot be
-          re-checked without rebuilding.
-    """
-    found: dict[str, list[str]] = {"changed": [], "missing": [], "unchecked": []}
-    for record in inputs:
-        path = record["path"]
-        if "n_files" in record:
-            found["unchecked"].append(path)
-            continue
-        file = Path(path) if Path(path).is_absolute() else root / path
-        if not file.is_file():
-            found["missing"].append(path)
-        elif hashlib.sha256(file.read_bytes()).hexdigest() != record["sha256"]:
-            found["changed"].append(path)
-    return found

@@ -81,16 +81,19 @@ after a change to fitting code only, start at step 6.
    `make reported-values` lists every number that changed, on the screen and in
    `paper/reported/changes.md`. Read that list before committing.
 
-   Each summary records the code that built it: the package modules and data files
-   the build loaded, with their digests, the commit, and the digest of `uv.lock`.
-   A summary in `paper/reported/` is built from committed code: `summarize.py`
-   writes nothing there when one of those files differs from the commit (commit
-   first; `--output-dir` elsewhere makes a trial build). A docstring or comment
-   edit does not make a summary stale.
+   Each summary records the files of the checkout that built it: the package
+   modules and data files the build loaded and the inputs the repository tracks
+   (the literature table, the committed sweep summaries), with their digests,
+   the commit, and the digest of `uv.lock`. A summary in `paper/reported/` is
+   built from committed files: `summarize.py` writes nothing there when one of
+   those files differs from the commit (commit first; `--output-dir` elsewhere
+   makes a trial build). A docstring or comment edit does not make a summary
+   stale.
    `make reported-values` names a summary whose code has changed since, but never
    refuses it. `make release-check` fails on a missing summary file, a summary with
    no code record, a stale one, one whose single-file inputs changed or are absent,
-   one with tag problems, or a pending value the manuscript cites. Run it at a
+   one with tag problems, a pending value the manuscript cites, or a
+   `paper/reported_values.tex` that is not what the summaries give. Run it at a
    milestone where the processed data is (`make release-check ARGS=--code-only` skips the inputs), then
    rebuild only the summaries it names.
 

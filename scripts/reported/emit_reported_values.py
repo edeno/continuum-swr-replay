@@ -37,6 +37,7 @@ from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.emit import (
     cited_values,
     emit,
+    manuscript_source,
     marked_docs,
     questions_view,
 )
@@ -65,7 +66,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "(listed in questions.md; rebuild the summary)"
             )
         notices += [f"  {name}.json: {r}" for r in staleness(summary, ROOT_DIR)]
-    cited = cited_values(summaries, MANUSCRIPT.read_text())
+    cited = cited_values(summaries, manuscript_source(MANUSCRIPT, TEX_PATH))
     docs = marked_docs(DOC_ROOTS)
     changes = emit(summaries, TEX_PATH, docs, ROOT_DIR)
     if changes:

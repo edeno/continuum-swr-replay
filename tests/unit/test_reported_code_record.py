@@ -1,16 +1,19 @@
 """The record of the code that built a summary, and the release check that reads it.
 
-A summary records the files its build depended on. The record must say when that
-code has really changed since (not when only a docstring or comment did), name the
-files that were uncommitted or untracked when it was built, and round-trip through
-the summary file; and no summary is written among the canonical ones from
-uncommitted code. These run in a throwaway git repository.
+A summary records the files of the checkout its build depended on. The record
+must say when that code has really changed since (not when only a docstring or
+comment did), name the files whose content was not the commit's when it was
+built, and round-trip through the summary file; and no summary is written among
+the canonical ones from uncommitted files. These run in a throwaway git
+repository.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +26,7 @@ from continuum_swr_replay.reported.code_record import (
     code_changes,
     code_digest,
     code_record,
+    tracked,
 )
 from continuum_swr_replay.reported.release import release_problems, staleness
 from continuum_swr_replay.reported.values import file_record
@@ -128,6 +132,36 @@ def test_an_edited_module_an_edited_lock_and_an_untracked_module_are_uncommitted
     assert staleness(_summary(code=record), repo) == [
         "built from uncommitted code: pkg/mod.py, pkg/new.py, uv.lock"
     ]
+
+
+def test_a_file_hidden_from_git_status_is_still_uncommitted(repo):
+    # git's index can be told to overlook a file; the record compares content.
+    module = repo / "pkg" / "mod.py"
+    _git(repo, "update-index", "--assume-unchanged", "pkg/mod.py")
+    module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
+    assert _git(repo, "status", "--porcelain") == ""
+    assert code_record(repo, [module])["uncommitted"] == ["pkg/mod.py"]
+
+
+def test_a_staged_edit_is_uncommitted(repo):
+    module = repo / "pkg" / "mod.py"
+    module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
+    _git(repo, "add", "pkg/mod.py")
+    assert code_record(repo, [module])["uncommitted"] == ["pkg/mod.py"]
+
+
+def test_tracked_names_the_paths_the_commit_holds(repo):
+    (repo / "pkg" / "new.py").write_text("Z = 1\n")
+    paths = ["pkg/new.py", "pkg/mod.py", "Processed-Data/table.parquet"]
+    assert tracked(repo, paths) == ["pkg/mod.py"]
+    assert tracked(repo, []) == []
+
+
+def test_code_run_from_outside_the_checkout_is_refused(repo):
+    # The package under test is loaded from this checkout, not from ``repo``: a
+    # record made for ``repo`` could not vouch for it.
+    with pytest.raises(ValueError, match="code from outside"):
+        build_files(repo)
 
 
 def test_a_file_the_build_did_not_use_may_be_uncommitted(repo):
@@ -324,6 +358,19 @@ def test_the_release_check_counts_cited_values_and_refuses_a_cited_pending_one(r
     assert problems == {"behavior": ["the manuscript cites pending values: share"]}
 
 
+def test_the_manuscript_s_source_is_every_tex_file_but_the_macro_file(tmp_path):
+    main = tmp_path / "main.tex"
+    main.write_text("Share \\EventsShare{}. \\input{tables/s1}\n")
+    (tmp_path / "tables").mkdir()
+    (tmp_path / "tables" / "s1.tex").write_text("\\BehaviorShare\n")
+    macros = tmp_path / "reported_values.tex"
+    macros.write_text("\\newcommand{\\MpfcShare}{1}\n")
+
+    source = emit.manuscript_source(main, macros)
+
+    assert emit.cited_macros(source) == {"EventsShare", "BehaviorShare"}
+
+
 def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo):
     table = repo / "table.csv"
     table.write_text("a\n1\n")
@@ -383,14 +430,24 @@ def test_check_release_exits_0_only_when_every_summary_is_current(
     script = _load_script("check_release")
     summaries = repo / "reported"
     summaries.mkdir()
+    macros = repo / "values.tex"
     monkeypatch.setattr(script, "SUMMARY_DIR", summaries)
     monkeypatch.setattr(script, "ROOT_DIR", repo)
     monkeypatch.setattr(script, "MANUSCRIPT", _manuscript(repo))
+    monkeypatch.setattr(script, "TEX_PATH", macros)
     _write_all(summaries, code=code_record(repo, [repo / "pkg" / "mod.py"]))
+    macros.write_text(emit.tex_file(values.read_summaries(summaries)))
     assert script.main([]) == 0
     out = capsys.readouterr().out
     assert "all 5 summaries are current" in out
     assert "the manuscript cites 1 of 1 values" in out
+
+    current = macros.read_text()
+    macros.write_text(current.replace("{50}", "{99}"))
+    assert current != macros.read_text(), "the test must edit a macro"
+    assert script.main([]) == 1
+    assert "values.tex is not what the summaries give" in capsys.readouterr().out
+    macros.write_text(current)
 
     _write_with_an_old_tag(summaries / "behavior.json")
     assert script.main([]) == 1
@@ -409,20 +466,23 @@ def test_check_release_checks_the_inputs_unless_told_code_only(
     script = _load_script("check_release")
     summaries = repo / "reported"
     summaries.mkdir()
+    macros = repo / "values.tex"
     monkeypatch.setattr(script, "SUMMARY_DIR", summaries)
     monkeypatch.setattr(script, "ROOT_DIR", repo)
     monkeypatch.setattr(script, "MANUSCRIPT", _manuscript(repo))
+    monkeypatch.setattr(script, "TEX_PATH", macros)
     record = code_record(repo, [repo / "pkg" / "mod.py"])
     _write_all(summaries, code=record)
     _summary(code=record, inputs=[{"path": "gone.csv", "sha256": "0"}]).write(
         summaries / "events.json"
     )
+    macros.write_text(emit.tex_file(values.read_summaries(summaries)))
     assert script.main([]) == 1
     assert "input not on this machine: gone.csv" in capsys.readouterr().out
     assert script.main(["--code-only"]) == 0
     out = capsys.readouterr().out
     assert "1 inputs not checked (--code-only)" in out
-    assert "code, tags and citations checked" in out
+    assert "code, tags, citations and macros checked" in out
 
 
 def _manuscript(repo: Path) -> Path:
@@ -547,31 +607,90 @@ def test_summarize_records_only_what_the_survey_s_build_used(tmp_path):
     assert code_changes(summary.code, ROOT) == []
 
 
-def test_summarize_writes_no_canonical_summary_from_uncommitted_code(
-    repo, monkeypatch, capsys
-):
-    """``repo`` stands for the checkout: its ``uv.lock`` is part of every build."""
-    script = _load_script("summarize")
-    canonical = repo / "paper" / "reported"
-    monkeypatch.setattr(script, "ROOT_DIR", repo)
-    monkeypatch.setattr(script, "SUMMARY_DIR", canonical)
-    (repo / "uv.lock").write_text("lock 2\n")
-    with pytest.raises(SystemExit) as refused:
-        script.main(["--summary", "survey"])
-    assert refused.value.code == 1
-    assert "differ from the commit: uv.lock" in capsys.readouterr().err
+@pytest.fixture
+def checkout(tmp_path, monkeypatch):
+    """A git repository holding what a survey build reads from this checkout, as
+    it is in the working tree, committed: the package, the build script, the
+    literature table and the lock file."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    copy = tmp_path / "checkout"
+    for folder in ("src/continuum_swr_replay", "scripts/reported", "paper/tables"):
+        shutil.copytree(
+            ROOT / folder, copy / folder, ignore=shutil.ignore_patterns("__pycache__")
+        )
+    shutil.copy(ROOT / "uv.lock", copy / "uv.lock")
+    (copy / ".gitignore").write_text(".DS_Store\n__pycache__/\n")
+    (copy / "src" / "continuum_swr_replay" / ".DS_Store").write_text("ignored\n")
+    _git(copy, "init", "-q")
+    _git(copy, "add", ".")
+    _git(copy, "commit", "-q", "-m", "start")
+    return copy
+
+
+def _summarize(checkout: Path, *arguments: str, script: Path | None = None):
+    """Run the survey build of ``checkout`` (its own package and script)."""
+    return subprocess.run(
+        [
+            sys.executable,
+            "-P",
+            str(script or checkout / "scripts" / "reported" / "summarize.py"),
+            "--summary",
+            "survey",
+            *arguments,
+        ],
+        cwd=checkout,
+        env={**os.environ, "PYTHONPATH": str(checkout / "src")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+SURVEY_TABLE = "paper/tables/table_s1_literature_parameters.csv"
+
+
+def test_summarize_writes_a_canonical_summary_only_from_committed_files(checkout):
+    canonical = checkout / "paper" / "reported" / "survey.json"
+    head = _git(checkout, "rev-parse", "HEAD").strip()
+
+    built = _summarize(checkout)
+    assert built.returncode == 0, built.stderr
+    summary = values.read_summary(canonical)
+    assert summary.code["uncommitted"] == []
+    assert summary.commit == head[:12]
+    # the record holds the code, the tracked input and no ignored file
+    assert "scripts/reported/summarize.py" in summary.code["files"]
+    assert SURVEY_TABLE in summary.code["files"]
+    assert not [f for f in summary.code["files"] if f.endswith(".DS_Store")]
+    canonical.unlink()
+
+    # an uncommitted edit to a tracked input: refused, and named
+    table = checkout / SURVEY_TABLE
+    table.write_text(table.read_text() + "\n")  # a blank last line: other bytes
+    refused = _summarize(checkout)
+    assert refused.returncode == 1
+    assert f"differ from the commit: {SURVEY_TABLE}" in refused.stderr
     assert not canonical.exists()
 
-    trial = repo / "trial"
-    script.main(["--summary", "survey", "--output-dir", str(trial)])
-    built = values.read_summary(trial / "survey.json")
-    head = _git(repo, "rev-parse", "HEAD").strip()
-    assert built.code["uncommitted"] == ["uv.lock"]
-    assert built.commit == head[:12] + "-dirty"
+    # the same build elsewhere is a trial build, and says what differed
+    trial = _summarize(checkout, "--output-dir", str(checkout / "trial"))
+    assert trial.returncode == 0, trial.stderr
+    summary = values.read_summary(checkout / "trial" / "survey.json")
+    assert summary.code["uncommitted"] == [SURVEY_TABLE]
+    assert summary.commit == head[:12] + "-dirty"
+    assert code_changes(summary.code, checkout) == []
+    _git(checkout, "checkout", "--", SURVEY_TABLE)
+    assert code_changes(summary.code, checkout) == [SURVEY_TABLE]
 
-    _git(repo, "commit", "-q", "-am", "lock 2")
-    (repo / "notes.md").write_text("an uncommitted file no build uses\n")
-    script.main(["--summary", "survey"])
-    built = values.read_summary(canonical / "survey.json")
-    assert built.code["uncommitted"] == []
-    assert built.commit == _git(repo, "rev-parse", "HEAD").strip()[:12]
+
+def test_summarize_refuses_a_build_script_from_outside_the_checkout(checkout, tmp_path):
+    outside = tmp_path / "elsewhere" / "summarize.py"
+    outside.parent.mkdir()
+    shutil.copy(checkout / "scripts" / "reported" / "summarize.py", outside)
+
+    refused = _summarize(checkout, script=outside)
+
+    assert refused.returncode != 0
+    assert "code from outside" in refused.stderr
+    assert not (checkout / "paper" / "reported").exists()

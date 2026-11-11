@@ -420,8 +420,14 @@ so a macro leads to its code in two steps: `\EventsRippleMedianNonSwr` is made i
 `reported/events.py`, which reads it from the `analysis/` function that computes it
 (`event_statistics.event_signal_statistics`). A builder makes its values through
 `reported.values.value_factory`, which is given that function. Whether the manuscript cites a value is not recorded anywhere: it is read from the macros
-`paper/main.tex` uses. `make reported-values` prints how many values are cited, and `make release-check`
-fails when a cited value is pending.
+`paper/main.tex` and the other `.tex` files under `paper/` use. `make reported-values` prints how many
+values are cited, and `make release-check` fails when a cited value is pending.
+
+A summary in `paper/reported/` is built from committed files: `summarize.py` writes nothing there when a
+file of the checkout that the build used (its code, the package's data files, an input the repository
+tracks, `uv.lock`) differs from the commit; `--output-dir` elsewhere makes a trial build. Each summary
+records those files, so `make release-check` can say when one has changed since. It also fails when
+`paper/reported_values.tex` is not what the summaries give.
 
 A builder names and describes values; it does not compute them. The statistics are functions in
 `analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
@@ -444,10 +450,13 @@ still compute a reported statistic themselves are listed in `TODO.md`.
   inline or quote it from memory.
 - In a doc, write a reported number inside a marker, `<!--v:<summary>.key-->…<!--/v-->`, and let the
   emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
-- A value with a `pending` note is not quoted as a finding. A value read from an output made on other
-  tables than the current ones (a stale fit, a stale per-event measure) is kept and marked pending with
-  the reason; no builder refuses to build because an input is stale, and `make release-check` fails when
-  the manuscript cites a pending value.
+- A value with a `pending` note is not quoted as a finding. A value read from an output that records
+  other tables than the current ones (a stale fit, a stale per-event measure) is kept and marked pending
+  with the reason, and `make release-check` fails when the manuscript cites a pending value. A builder
+  refuses to build when an input cannot give the value at all: it does not cover the cohort (an epoch,
+  an event or a unit has no row), it is an older design, or its record cannot be read. Not every input
+  records the tables it was made from; those have no staleness check
+  (`.claude/docs/reviews/2026-11-11-reported-numbers-review.md`, finding K-5).
 - A number quoted from a cited paper (for example, another study's share of replays) is not a result
   of this project and has no summary key: write it as text beside its citation. A number this project
   computes, even from published sources (the survey summary's literature numbers), is a reported number.

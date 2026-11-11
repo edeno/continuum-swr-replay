@@ -11,17 +11,17 @@ Usage::
     uv run --frozen python scripts/reported/summarize.py --summary events
     uv run --frozen python scripts/reported/summarize.py --summary survey --output-dir /tmp/check
 
-The summary records the code that built it (``reported/code_record.py``): every
-package module loaded during the build (the summary's builder and this script's own
-imports), this script, and the package's data files, with their digests; the
-commit; and the digest of ``uv.lock``. Only the requested summary's builder,
-``reported.<name>``, is imported, so other builders' modules are not recorded.
-The commit the summary names is that record's (``code_record.commit_label``).
+The summary records the files of the checkout that built it
+(``reported/code_record.py``): every package module loaded during the build (the
+summary's builder, what it imports, and this script's own imports), this script,
+the package's data files and the inputs the repository tracks, with their
+digests; the commit; and the digest of ``uv.lock``. The commit the summary names
+is that record's (``code_record.commit_label``).
 
-A summary in ``paper/reported/`` is built from committed code: when any of those
-files, or ``uv.lock``, differs from the commit, nothing is written there. Commit
-first, or pass ``--output-dir`` for a trial build, which records the files that
-differ.
+A summary in ``paper/reported/`` is built from committed files: when any of
+those files, or ``uv.lock``, differs from the commit, nothing is written there.
+Commit first, or pass ``--output-dir`` for a trial build, which records the files
+that differ.
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ from continuum_swr_replay.reported.code_record import (
     build_files,
     code_record,
     commit_label,
+    tracked,
 )
 from continuum_swr_replay.reported.values import SUMMARIES
 from continuum_swr_replay.runs.provenance import produced_by
@@ -54,38 +55,54 @@ def main(argv: Sequence[str] | None = None) -> None:
         help="where to write <name>.json (default: paper/reported)",
     )
     args = parser.parse_args(argv)
-    canonical = args.output_dir.resolve() == SUMMARY_DIR.resolve()
+    canonical = args.output_dir.resolve() == SUMMARY_DIR.resolve() or (
+        args.output_dir.exists()
+        and SUMMARY_DIR.exists()
+        and args.output_dir.samefile(SUMMARY_DIR)
+    )
 
-    def recorded() -> CodeRecord:
-        """The record of the code loaded so far; refused for ``paper/reported/``
-        when any of it is uncommitted."""
-        code = code_record(ROOT_DIR, build_files(ROOT_DIR))
+    def committed(code: CodeRecord) -> CodeRecord:
+        """``code``, refused for ``paper/reported/`` when any of it is uncommitted."""
         if canonical and code["uncommitted"]:
             parser.exit(
                 1,
                 f"not written: a summary in {SUMMARY_DIR.relative_to(ROOT_DIR)} is "
-                "built from committed code, and these files differ from the commit: "
+                "built from committed files, and these differ from the commit: "
                 f"{', '.join(code['uncommitted'])}. Commit them, or pass "
                 "--output-dir for a trial build.\n",
             )
         return code
 
     builder = importlib.import_module(f"continuum_swr_replay.reported.{args.summary}")
-    before = recorded()  # before the build, so uncommitted code costs no build
+    # Checked before the build, so uncommitted code costs no build.
+    before = committed(code_record(ROOT_DIR, build_files(ROOT_DIR)))
     summary = builder.summarize(
         builder.default_inputs(), produced_by(__file__), commit_label(before)
     )
-    summary.code = recorded()
-    if commit_label(summary.code) != summary.commit:
+    inputs = tracked(
+        ROOT_DIR,
+        [
+            record["path"]
+            for record in summary.inputs
+            if "n_files" not in record and not Path(record["path"]).is_absolute()
+        ],
+    )
+    summary.code = committed(
+        code_record(ROOT_DIR, [*build_files(ROOT_DIR), *(ROOT_DIR / i for i in inputs)])
+    )
+    if summary.code["head"] != before["head"]:
         parser.exit(
-            1, "not written: the code changed while the summary was built; rebuild\n"
+            1,
+            "not written: the checkout moved to another commit while the summary "
+            "was built; rebuild\n",
         )
+    summary.commit = commit_label(summary.code)
     path = args.output_dir / f"{args.summary}.json"
     summary.write(path)
     n_pending = sum(v.pending is not None for v in summary.values.values())
-    note = f"with a code record of {len(summary.code['files'])} files"
+    note = f"with a record of {len(summary.code['files'])} files"
     if summary.code["uncommitted"]:
-        note += f", from uncommitted code ({', '.join(summary.code['uncommitted'])})"
+        note += f", from uncommitted files ({', '.join(summary.code['uncommitted'])})"
     print(f"wrote {len(summary.values)} values ({n_pending} pending) to {path}, {note}")
 
 
