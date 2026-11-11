@@ -3,16 +3,16 @@
  "summary": "behavior",
  "title": "the events and the task: event rate and represented content",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f8aa188b385f",
+ "commit": "14df6718f6e7",
  "code": {
-  "head": "f8aa188b385fa14033ce602409b0eb10964731f0",
+  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "45a40c6e2abd156f030f1b61ef612f3220c6ebf79b3abe3ea3bb458076ed74e8",
-    "code_sha256": "76142ba35f753fd7b9c66263529e506cbf954df9f94dfab0ec32684a5fb6e7fc"
+    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
+    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -63,12 +63,12 @@
     "code_sha256": "e67897b004c1e389f588c56918a5b2f483977621d069938417960ca3e57b8c50"
    },
    "src/continuum_swr_replay/analysis/hippocampus/__init__.py": {
-    "sha256": "55100362be20a8d77c0f6ddfad6f26b23ce9bcb4ee323c7efe2c9f4360b853c7",
-    "code_sha256": "140e49dce65385f42f2f7bbe30f83ba00aeda9249f880906a50259e7f36e2260"
+    "sha256": "8e0b5ee16dcc2d9ec74d4fa5cbc2bf7df353ffd4c99fa403eae9e745ce81d8b6",
+    "code_sha256": "9dfd31371132808f497c7138273e7e3915f1266b2e26fd4bda37c457c256a084"
    },
    "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
-    "sha256": "7500f5da0b5fa6a93adc4610feca2b4109cab4fa30630205427ba8fbc571b2fb",
-    "code_sha256": "ec71cea7d778e6d5308c73019b7ac2d4719e8dd067a3e1b3c89805a8219d6ddb"
+    "sha256": "18887e1e784dddd19854d815b410ec6a5c17fb95cb29cdedf4c64292e90e3c1d",
+    "code_sha256": "2ffaf918ffe1f4e9b00bb3f4071b9ba83605f39bb39bc84622df1fc74ad7c514"
    },
    "src/continuum_swr_replay/analysis/replay/__init__.py": {
     "sha256": "0b0d18307f7614693f41eb3629365da8f7e49dcf8115ca40a59bf5d77c2e9bd4",
@@ -83,8 +83,8 @@
     "code_sha256": "e91ca3884cbc5ca3151315663601318ed3307f44a304c39cf613a67c5544204c"
    },
    "src/continuum_swr_replay/analysis/replay/coefficient_statistics.py": {
-    "sha256": "f0d9d383c383dcfe9b0d0112db02de3c1d15fee1f5c78c4456297141318b35da",
-    "code_sha256": "f44a098a111dc950c62d9f256dc285832d3cce5e75be7989f0668ac2a1184a0f"
+    "sha256": "5f72c0e93071fc58f4349d81851b8d80a3cc37dbfa6ab19a3377760d6dec97f4",
+    "code_sha256": "4f7832886f86f9b4cbc2113c0f8e649862147eb2f4e1a4571a55905db18f8d59"
    },
    "src/continuum_swr_replay/analysis/replay/cohort_audit.py": {
     "sha256": "e217c7de1f144a0cb78ae0ee162a0766fce11940547c00b9a9630d77f691ff1b",
@@ -95,8 +95,8 @@
     "code_sha256": "d97816573cd8a53e780bb898a4e7e9b4d9ed9036a35edab19d1e4fa13e512b51"
    },
    "src/continuum_swr_replay/analysis/replay/content_statistics.py": {
-    "sha256": "0306776f3504e5d1cdc78120458f3e2a32d714b134d776a4ba31f25b6f5047e7",
-    "code_sha256": "7e702d8fdaae2a5d1bc99fba193393d85bd40efeaae32f974e8b2d517c4dafd2"
+    "sha256": "32acfb573907e215feb131f00f7a4fcc1db09b62c072be1b4c60fa1cf51cfbdb",
+    "code_sha256": "78b531ab19941e59d72ea15680ecb798f8938b9080a642b8eaa867df71969937"
    },
    "src/continuum_swr_replay/analysis/replay/contrast_aggregation.py": {
     "sha256": "da3a6fe12afb2bd55476773fe698f7b1608aae387aa49c79412bbb7a7d879b78",
@@ -167,24 +167,24 @@
     "code_sha256": "748268d0bf528ae7601482d1172aa1f9f23f4ca250401cc09e850b92fdc82503"
    },
    "src/continuum_swr_replay/analysis/replay/history_kernel_statistics.py": {
-    "sha256": "1545ceb0bd02b5ca20191f8b0158d2635deef9fca6e5d819b7ad1c8092fdb7bb",
-    "code_sha256": "b68c0a03bca7ce66aa0b0f90eaf25d567bdc78f3b7c6d7bd2b8cd9ae2ab470cd"
+    "sha256": "3b96c5103a8f867f1b28512c3e7f0add5110b1f5f0079582422d0b01fd3630fe",
+    "code_sha256": "88f42bd68602e4a07e396f87e0b8df5cc5f250763491290974993017da3f55ad"
    },
    "src/continuum_swr_replay/analysis/replay/learning.py": {
-    "sha256": "b58ff90251dd00428dec59346d6a2c7d3452f8941d4fda3f5a2afda82b634cd3",
-    "code_sha256": "00ceddda49bf54659e3c65999699fbac228678a01fffcc4005dae21e55c14e2c"
+    "sha256": "aaf7ec44559412868fbc8f350f1b5caa9b2edf547565e4caa95ed2ba0df553f4",
+    "code_sha256": "355e76631e76df09eaa3fdb83be31842009debb12f47eba62dd9923f8a6d102c"
    },
    "src/continuum_swr_replay/analysis/replay/model_specs.py": {
-    "sha256": "2898ca36bf1fc299d778aaf4fdc8d6894e4166ccb1808599d30a48c428d22e03",
-    "code_sha256": "23daba4e5ed855133fc467136bf7d47e950eed99c1db3aa34710997ce4a8aba9"
+    "sha256": "f3ecbded6eda87a3481a0932b5130d12d729c60e6701604922d0f6d5f714b7b0",
+    "code_sha256": "3709b9ffee0ddb88da41f78b8f2101ebffa4eb5ea6fe470e93c1f83e30ded5c3"
    },
    "src/continuum_swr_replay/analysis/replay/per_bin_design.py": {
     "sha256": "6f5672452c93f97f3267e923c757bbc6a52fcdb41e9c2e6ebdc8016a255642b1",
     "code_sha256": "9c301612c9ea1236d103ecad69f825fd942ba0c7959626838f52de75a752531e"
    },
    "src/continuum_swr_replay/analysis/replay/rate_fit_statistics.py": {
-    "sha256": "5fba183c765b7a4c3f71c9b1f44f7c4fb936623398288ae0d0d996aa7c2bfca7",
-    "code_sha256": "760c2cb6e9150831963facce7958ad030ca9170dd5780a5c7c3f254e7abfbeda"
+    "sha256": "2d34c2b23ccf2891de28591e5a6be099b4511f71e733287363431e7443aef186",
+    "code_sha256": "817aa0e21f2573097d8a97b4a2781c66605b3732afa56bd6ed8d4ad117baa1c8"
    },
    "src/continuum_swr_replay/analysis/replay/retrospective.py": {
     "sha256": "45e6f8c4a0ccc36946d22ab801b1345f20e8e24b91239c8e4d68dd67608fbe4c",
@@ -203,8 +203,8 @@
     "code_sha256": "d7e69ff9e5807718d122651ff3dceb4df754a77c9a104bc197d8d1c9904336c9"
    },
    "src/continuum_swr_replay/analysis/replay/stop_statistics.py": {
-    "sha256": "51434b44d2489fe93ac8afe7966a07d7fe205d373fcce2608539ac4001258174",
-    "code_sha256": "42d22012ef1561badd6f8bc925d6ba63844d46cf2582a181becdeaae47c07a77"
+    "sha256": "37bb3623d6077f43a82f112e70ef32163b07dba115fb8b862eec739fb230a5a7",
+    "code_sha256": "424325bd38ede32b470b7b5b2b8ca9d46dad6fa79cf517d407ea709d272cc0d8"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -251,12 +251,12 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/behavior.py": {
-    "sha256": "64c0d25c4201701995729629c1d2bd6fe19324b92ff49ca1ebc3e0b4cfe8dd76",
-    "code_sha256": "4fe521262bb6c5c3e82ae0a65adc5f3c6560b6d271a8d9b19be5cd3e08bf347c"
+    "sha256": "ad4babe4751c609eadc8e76a3933cc6d9353da21342f6a9ffebf0cb594937929",
+    "code_sha256": "c397b6918e4e962da0e28eb39827d88a1a9af0a8294355b534526adcc5699296"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",
-    "code_sha256": "4a918c780fe663e1881c024c7110c8ff839878f1484938199a06a56054b07449"
+    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
+    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -1769,7 +1769,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "choice_swr_animals_positive": {
    "value": 3,
@@ -1783,7 +1783,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "choice_swr_negative_sessions": {
    "value": 33,
@@ -1797,7 +1797,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "choice_swr_p": {
    "value": 0.6606182588311873,
@@ -1811,7 +1811,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "choice_swr_positive_sessions": {
    "value": 41,
@@ -1825,7 +1825,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "choice_swr_sessions": {
    "value": 74,
@@ -1839,7 +1839,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "choice_swr_significant_fraction": {
    "value": 0.02702702702702703,
@@ -1853,7 +1853,7 @@
    "figures": [],
    "source": "Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)",
    "function": "choice_values",
-   "pending": null
+   "pending": "the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit"
   },
   "current_arm_paired_difference": {
    "value": 0.08789016885188206,
@@ -4322,7 +4322,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "fewest, over the populations, animals whose end-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
+   "description": "fewest, over the populations, animals whose end-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni); 20 of the 20 animal x population fits have a measurable end-locked lag",
    "questions": [
     "3.3"
    ],
@@ -4336,7 +4336,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "highest over the four populations of that end-locked peak",
+   "description": "highest over the four populations of that end-locked peak (20 of the 20 animal x population fits have a measurable end-locked lag)",
    "questions": [
     "3.3"
    ],
@@ -4350,7 +4350,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "longest over the populations of the median end-locked peak lag",
+   "description": "longest over the populations of the median end-locked peak lag (20 of the 20 animal x population fits have a measurable end-locked lag)",
    "questions": [
     "3.3"
    ],
@@ -4364,7 +4364,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "shortest over the populations of the median end-locked peak lag",
+   "description": "shortest over the populations of the median end-locked peak lag (20 of the 20 animal x population fits have a measurable end-locked lag)",
    "questions": [
     "3.3"
    ],
@@ -4378,7 +4378,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "lowest over the four populations of the median (over animals) peak rate ratio of the end-locked self-history (Mself_dur, at-risk design, measurable lags); pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
+   "description": "lowest over the four populations of the median (over the animals with a measurable end-locked lag) peak rate ratio of the end-locked self-history (Mself_dur, at-risk design, measurable lags); 20 of the 20 animal x population fits have a measurable end-locked lag; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
    "questions": [
     "3.3"
    ],
@@ -4406,7 +4406,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "non-local (all): animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
+   "description": "non-local (all): animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
    "questions": [
     "3.3"
    ],
@@ -4420,7 +4420,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "non-local without SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
+   "description": "non-local without SWR: animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
    "questions": [
     "3.3"
    ],
@@ -4434,7 +4434,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "non-local with SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
+   "description": "non-local with SWR: animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
    "questions": [
     "3.3"
    ],
@@ -4448,7 +4448,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "detected SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
+   "description": "detected SWR: animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni)",
    "questions": [
     "3.3"
    ],
@@ -4462,7 +4462,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "non-local (all): median over animals of that onset-locked peak's lag",
+   "description": "non-local (all): median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag",
    "questions": [
     "3.3"
    ],
@@ -4476,7 +4476,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "non-local without SWR: median over animals of that onset-locked peak's lag",
+   "description": "non-local without SWR: median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag",
    "questions": [
     "3.3"
    ],
@@ -4490,7 +4490,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "non-local with SWR: median over animals of that onset-locked peak's lag",
+   "description": "non-local with SWR: median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag",
    "questions": [
     "3.3"
    ],
@@ -4504,7 +4504,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "detected SWR: median over animals of that onset-locked peak's lag",
+   "description": "detected SWR: median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag",
    "questions": [
     "3.3"
    ],
@@ -4518,7 +4518,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "non-local (all): onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
+   "description": "non-local (all): onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
    "questions": [
     "3.3"
    ],
@@ -4532,7 +4532,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "non-local without SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
+   "description": "non-local without SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
    "questions": [
     "3.3"
    ],
@@ -4546,7 +4546,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "non-local with SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
+   "description": "non-local with SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
    "questions": [
     "3.3"
    ],
@@ -4560,7 +4560,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "rate ratio",
-   "description": "detected SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
+   "description": "detected SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms",
    "questions": [
     "3.3"
    ],
@@ -5608,7 +5608,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean",
+   "description": "share of R1 session-fits (all populations) whose cv_ll_per_stop_mean is not missing",
    "questions": [
     "3.3"
    ],
@@ -8548,7 +8548,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "most fits over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "description": "most fits over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1",
    "questions": [
     "3.3"
    ],
@@ -8562,7 +8562,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "fewest fits over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "description": "fewest fits over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1",
    "questions": [
     "3.3"
    ],
@@ -8576,7 +8576,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "most fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "description": "most fits flagging is_swr:reward_history_rcos_1 over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1",
    "questions": [
     "3.3"
    ],
@@ -8590,7 +8590,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "fewest fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "description": "fewest fits flagging is_swr:reward_history_rcos_1 over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1",
    "questions": [
     "3.3"
    ],
@@ -8604,7 +8604,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "most fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "description": "most fits flagged separated over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1",
    "questions": [
     "3.3"
    ],
@@ -8618,7 +8618,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "fewest fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10)",
+   "description": "fewest fits flagged separated over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1",
    "questions": [
     "3.3"
    ],
@@ -8646,7 +8646,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "sessions fit for that term (S3_periswitch)",
+   "description": "sessions with a coefficient for that term, kept and dropped together (S3_periswitch)",
    "questions": [
     "3.3"
    ],
@@ -11908,7 +11908,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "stratum all: session-by-role logistic fits attempted",
+   "description": "stratum all: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included",
    "questions": [
     "3.5"
    ],
@@ -11922,7 +11922,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "stratum mua: session-by-role logistic fits attempted",
+   "description": "stratum mua: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included",
    "questions": [
     "3.5"
    ],
@@ -11936,7 +11936,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "stratum non_swr: session-by-role logistic fits attempted",
+   "description": "stratum non_swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included",
    "questions": [
     "3.5"
    ],
@@ -11950,7 +11950,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "stratum swr: session-by-role logistic fits attempted",
+   "description": "stratum swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included",
    "questions": [
     "3.5"
    ],
@@ -12006,7 +12006,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "s",
-   "description": "well-anchored stops with a rewarded outcome: mean immobility duration",
+   "description": "well-anchored stops with a rewarded outcome: mean analysed immobility (the stop's span less the excluded time inside it)",
    "questions": [
     "3.3"
    ],
@@ -12020,7 +12020,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "s",
-   "description": "well-anchored stops with an omitted outcome: mean immobility duration",
+   "description": "well-anchored stops with an omitted outcome: mean analysed immobility (the stop's span less the excluded time inside it)",
    "questions": [
     "3.3"
    ],
@@ -12048,7 +12048,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "s",
-   "description": "well-anchored stops with a rewarded outcome: median immobility duration",
+   "description": "well-anchored stops with a rewarded outcome: median analysed immobility (the stop's span less the excluded time inside it)",
    "questions": [
     "3.3"
    ],
@@ -12062,7 +12062,7 @@
    "kind": "quantity",
    "style": "sig2",
    "unit": "s",
-   "description": "well-anchored stops with an omitted outcome: median immobility duration",
+   "description": "well-anchored stops with an omitted outcome: median analysed immobility (the stop's span less the excluded time inside it)",
    "questions": [
     "3.3"
    ],
@@ -12072,11 +12072,11 @@
    "pending": null
   },
   "stop_survival_four_s": {
-   "value": 0.14348011970927746,
+   "value": 0.14436725096194955,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of well-anchored stops still immobile at 4 s",
+   "description": "share of well-anchored stops still immobile 4 s after they began (stop_end - stop_start at least 4 s; excluded time inside the stop is not taken out)",
    "questions": [
     "3.3"
    ],
@@ -12086,11 +12086,11 @@
    "pending": null
   },
   "stop_survival_two_s": {
-   "value": 0.24912355707567335,
+   "value": 0.24940145361265498,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of well-anchored stops still immobile at 2 s",
+   "description": "share of well-anchored stops still immobile 2 s after they began (stop_end - stop_start at least 2 s; excluded time inside the stop is not taken out)",
    "questions": [
     "3.3"
    ],
@@ -12188,7 +12188,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "mixed stops (every one without an is_stay)",
+   "description": "mixed stops (0 of them with an is_stay)",
    "questions": [
     "3.5"
    ],
@@ -12216,7 +12216,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary)",
+   "description": "crossing stops whose per-bin reward history can be shifted: no later arrival inside, and a bin at or past the boundary in the stop-level design (before a fitted population's bins inside its ongoing events are dropped, so an upper bound for each fitted population)",
    "questions": [
     "3.3"
    ],

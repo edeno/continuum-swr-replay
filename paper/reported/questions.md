@@ -13,11 +13,11 @@ an input.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `f8aa188b385f` | yes | 32 | 0 |
-| `detection.json` | `f8aa188b385f` | yes | 132 | 0 |
-| `events.json` | `f8aa188b385f` | yes | 331 | 0 |
-| `behavior.json` | `f8aa188b385f` | yes | 922 | 0 |
-| `mpfc.json` | `f8aa188b385f` | yes | 604 | 0 |
+| `survey.json` | `14df6718f6e7` | yes | 32 | 0 |
+| `detection.json` | `14df6718f6e7` | yes | 132 | 0 |
+| `events.json` | `14df6718f6e7` | yes | 331 | 0 |
+| `behavior.json` | `14df6718f6e7` | yes | 922 | 0 |
+| `mpfc.json` | `14df6718f6e7` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -158,22 +158,22 @@ Sources:
 | `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepJumpHalfPassShortestFraction` | 31 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest replays late | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest replays | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest replays early | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest (40 ms) replays late | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest (40 ms) replays | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest (40 ms) replays early | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingNotTheReplayFraction` | 23 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingOnlyBeforeTestReplays` | 5 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations (40 to 500 ms) | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
-| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
 | `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
 
@@ -198,7 +198,7 @@ Sources:
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
 | `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | `detection.pilot_stray_window_values` | memoryless_comparison |
-| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | `detection.pilot_stray_window_values` | memoryless_comparison |
+| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1_HPC | `detection.pilot_stray_window_values` | memoryless_comparison |
 
 ### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
 
@@ -393,10 +393,10 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below their median running level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below their median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
 | `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3b |
 | `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
 | `\EventsRipplePeakAnimalsUnimodal` | 5 |  | animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05) | `events.class_distribution_values` |  |
@@ -433,10 +433,10 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below their median running level | `events.brain_state_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below their median running level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
@@ -445,26 +445,26 @@ Sources:
 | `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.brain_state_values` |  |
 | `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate is below their median running level | `events.brain_state_values` |  |
-| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate is below their median running level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
 | `\EventsMuaMedianNonSwr` | 0.79 | z | median z-scored MUA rate of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | `events.brain_state_values` |  |
 | `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | `events.brain_state_values` |  |
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below their median running level | `events.brain_state_values` | 3b |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below their median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` | 3b |
 | `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3b |
 | `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
 | `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
 | `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
-| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below their median running level | `events.brain_state_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below their median running level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
@@ -473,10 +473,10 @@ Sources:
 | `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
 | `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.brain_state_values` |  |
 | `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsAboveRestNonSwr` | 2 |  | animals whose median non-SWR event theta power is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsAboveRestSwr` | 2 |  | animals whose median SWR-overlapping event theta power is above their median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power is below their median running level | `events.brain_state_values` |  |
-| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power is below their median running level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsAboveRestNonSwr` | 2 |  | animals whose median non-SWR event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsAboveRestSwr` | 2 |  | animals whose median SWR-overlapping event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
 | `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows | `events.rest_theta_values` |  |
 | `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows | `events.rest_theta_values` |  |
 | `\EventsThetaLikeFractionNonSwr` | 13 % |  | share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
@@ -1214,24 +1214,24 @@ Sources:
 | `\BehaviorHistoryEndFirstLagRrHigh` | 4.53 | rate ratio | highest over the four populations of that median rate ratio 15 ms after the previous event's end (19 of 20 fits measurable) | `behavior.duration_aware_history_values` |  |
 | `\BehaviorHistoryEndFirstLagRrLow` | 1.68 | rate ratio | lowest over the four populations of the median (over animals) rate ratio 15 ms after the previous event's end (end-locked part of Mself_dur, at-risk design), over the 19 of 20 animal x population fits whose 15 ms lag is measurable; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
 | `\BehaviorHistoryEndFirstLagSuppressedFits` | 0 |  | animal x population fits whose rate 15 ms after the previous event's end is below 1 with its 95 % CI (suppression after the end), of the history_fits fits where that lag is measurable | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryEndPeakAnimalsMin` | 5 |  | fewest, over the populations, animals whose end-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryEndPeakHigh` | 4.53 | rate ratio | highest over the four populations of that end-locked peak | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryEndPeakLagMsHigh` | 45 | ms | longest over the populations of the median end-locked peak lag | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryEndPeakLagMsLow` | 15 | ms | shortest over the populations of the median end-locked peak lag | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryEndPeakLow` | 2.63 | rate ratio | lowest over the four populations of the median (over animals) peak rate ratio of the end-locked self-history (Mself_dur, at-risk design, measurable lags); pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakAnimalsMin` | 5 |  | fewest, over the populations, animals whose end-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni); 20 of the 20 animal x population fits have a measurable end-locked lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakHigh` | 4.53 | rate ratio | highest over the four populations of that end-locked peak (20 of the 20 animal x population fits have a measurable end-locked lag) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakLagMsHigh` | 45 | ms | longest over the populations of the median end-locked peak lag (20 of the 20 animal x population fits have a measurable end-locked lag) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakLagMsLow` | 15 | ms | shortest over the populations of the median end-locked peak lag (20 of the 20 animal x population fits have a measurable end-locked lag) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakLow` | 2.63 | rate ratio | lowest over the four populations of the median (over the animals with a measurable end-locked lag) peak rate ratio of the end-locked self-history (Mself_dur, at-risk design, measurable lags); 20 of the 20 animal x population fits have a measurable end-locked lag; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
 | `\BehaviorHistoryFits` | 19 |  | animal x population pooled fits (20 converged) whose 15 ms end-locked lag is measurable: the denominator of the raised and suppressed counts | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetAnimalsNonLocal` | 4 |  | non-local (all): animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetAnimalsNonLocalNoSwr` | 2 |  | non-local without SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetAnimalsNonLocalSwr` | 4 |  | non-local with SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetAnimalsSwr` | 5 |  | detected SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakLagMsNonLocal` | 120 | ms | non-local (all): median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakLagMsNonLocalNoSwr` | 150 | ms | non-local without SWR: median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakLagMsNonLocalSwr` | 105 | ms | non-local with SWR: median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakLagMsSwr` | 90 | ms | detected SWR: median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakNonLocal` | 1.59 | rate ratio | non-local (all): onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakNonLocalNoSwr` | 1.34 | rate ratio | non-local without SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakNonLocalSwr` | 1.83 | rate ratio | non-local with SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
-| `\BehaviorHistoryOnsetPeakSwr` | 2.28 | rate ratio | detected SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsNonLocal` | 4 |  | non-local (all): animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsNonLocalNoSwr` | 2 |  | non-local without SWR: animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsNonLocalSwr` | 4 |  | non-local with SWR: animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsSwr` | 5 |  | detected SWR: animals, of the 5 of 5 animals with a measurable onset-locked lag, whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsNonLocal` | 120 | ms | non-local (all): median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsNonLocalNoSwr` | 150 | ms | non-local without SWR: median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsNonLocalSwr` | 105 | ms | non-local with SWR: median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsSwr` | 90 | ms | detected SWR: median over the 5 of 5 animals with a measurable onset-locked lag of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakNonLocal` | 1.59 | rate ratio | non-local (all): onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakNonLocalNoSwr` | 1.34 | rate ratio | non-local without SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakNonLocalSwr` | 1.83 | rate ratio | non-local with SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakSwr` | 2.28 | rate ratio | detected SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over the 5 of 5 animals with a measurable onset-locked lag of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
 | `\BehaviorOnsetMedianSNonLocal` | 2.4 | s | median time of a non-local onset after its stop's speed-threshold crossing | `behavior.stop_table_values` |  |
 | `\BehaviorOnsetsRewardHistoryIncompleteFractionNonLocal` | 0.015 |  | share of non-local onsets in those stops | `behavior.stop_table_values` |  |
 | `\BehaviorOnsetsWithinTmaxFractionMua` | 79 % |  | share of MUA onsets within the first 4 s of their stop (event_onset_table) | `behavior.stop_table_values` |  |
@@ -1252,7 +1252,7 @@ Sources:
 | `\BehaviorPerStopChildBetterFractionNonLocalNoSwr` | 46 % |  | non-local without SWR: share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopChildBetterFractionNonLocalSwr` | 66 % |  | non-local with SWR: share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopChildBetterFractionSwr` | 69 % |  | detected SWR: share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
-| `\BehaviorPerStopCvFiniteFractionFull` | 52 % |  | share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopCvFiniteFractionFull` | 52 % |  | share of R1 session-fits (all populations) whose cv_ll_per_stop_mean is not missing | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopDeltaAicAnimalNonLocal` | −4.3 | AIC | non-local (all): median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopDeltaAicAnimalNonLocalNoSwr` | +0.88 | AIC | non-local without SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
 | `\BehaviorPerStopDeltaAicAnimalNonLocalSwr` | −2.6 | AIC | non-local with SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
@@ -1440,14 +1440,14 @@ Sources:
 | `\BehaviorRateConditionalRewardDeltaAicNonLocalSwr` | +1.8 | AIC | non-local with SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | `behavior.per_bin_values` |  |
 | `\BehaviorRateConditionalRewardDeltaAicSwr` | +1.2 | AIC | detected SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | `behavior.per_bin_values` |  |
 | `\BehaviorRateContrastAuditedRows` | 32 |  | rows the audited is_swr-contrast rate aggregate publishes | `behavior.rate_contrast_audit_values` |  |
-| `\BehaviorRateContrastExpandedFitsHigh` | 242 |  | most fits over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
-| `\BehaviorRateContrastExpandedFitsLow` | 242 |  | fewest fits over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
-| `\BehaviorRateContrastExpandedFlaggedHigh` | 239 |  | most fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
-| `\BehaviorRateContrastExpandedFlaggedLow` | 223 |  | fewest fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
-| `\BehaviorRateContrastExpandedSeparatedHigh` | 239 |  | most fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
-| `\BehaviorRateContrastExpandedSeparatedLow` | 231 |  | fewest fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFitsHigh` | 242 |  | most fits over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1 | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFitsLow` | 242 |  | fewest fits over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1 | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFlaggedHigh` | 239 |  | most fits flagging is_swr:reward_history_rcos_1 over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1 | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFlaggedLow` | 223 |  | fewest fits flagging is_swr:reward_history_rcos_1 over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1 | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedSeparatedHigh` | 239 |  | most fits flagged separated over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1 | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedSeparatedLow` | 231 |  | fewest fits flagged separated over the 9 contrast rungs with a fit carrying is_swr:reward_history_rcos_1 | `behavior.rate_contrast_separation_values` |  |
 | `\BehaviorRateContrastMostDropped` | 31 |  | most sessions a key contrast term loses to the gate (S3_periswitch is_swr:periswitch_index_trials) | `behavior.rate_contrast_audit_values` |  |
-| `\BehaviorRateContrastMostDroppedOf` | 242 |  | sessions fit for that term (S3_periswitch) | `behavior.rate_contrast_audit_values` |  |
+| `\BehaviorRateContrastMostDroppedOf` | 242 |  | sessions with a coefficient for that term, kept and dropped together (S3_periswitch) | `behavior.rate_contrast_audit_values` |  |
 | `\BehaviorRateContrastPlainFits` | 242 |  | S1_rew contrast fits | `behavior.rate_contrast_separation_values` |  |
 | `\BehaviorRateContrastPlainFlagged` | 2 |  | S1_rew contrast fits flagging reward_history_rcos_1 separated | `behavior.rate_contrast_separation_values` |  |
 | `\BehaviorRateContrastSeparatedFractionPostOutcome` | 68 % |  | share of the is_swr-contrast rate ladder's post_outcome contrast fits flagged separated | `behavior.rate_contrast_separation_values` |  |
@@ -1653,17 +1653,17 @@ Sources:
 | `\BehaviorRateTimeSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
 | `\BehaviorRateTimeSessionsSwr` | 242 |  | detected SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
 | `\BehaviorStopDurationMeanRatio` | 3.6 | ratio | ratio of those means | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMeanRewarded` | 2.2 | s | well-anchored stops with a rewarded outcome: mean immobility duration | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMeanUnrewarded` | 0.60 | s | well-anchored stops with an omitted outcome: mean immobility duration | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMeanRewarded` | 2.2 | s | well-anchored stops with a rewarded outcome: mean analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMeanUnrewarded` | 0.60 | s | well-anchored stops with an omitted outcome: mean analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
 | `\BehaviorStopDurationMedianRatio` | 3.6 | ratio | ratio of those medians | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMedianRewarded` | 1.0 | s | well-anchored stops with a rewarded outcome: median immobility duration | `behavior.stop_table_values` |  |
-| `\BehaviorStopDurationMedianUnrewarded` | 0.28 | s | well-anchored stops with an omitted outcome: median immobility duration | `behavior.stop_table_values` |  |
-| `\BehaviorStopSurvivalFourS` | 14 % |  | share of well-anchored stops still immobile at 4 s | `behavior.stop_table_values` |  |
-| `\BehaviorStopSurvivalTwoS` | 25 % |  | share of well-anchored stops still immobile at 2 s | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianRewarded` | 1.0 | s | well-anchored stops with a rewarded outcome: median analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianUnrewarded` | 0.28 | s | well-anchored stops with an omitted outcome: median analysed immobility (the stop's span less the excluded time inside it) | `behavior.stop_table_values` |  |
+| `\BehaviorStopSurvivalFourS` | 14 % |  | share of well-anchored stops still immobile 4 s after they began (stop_end - stop_start at least 4 s; excluded time inside the stop is not taken out) | `behavior.stop_table_values` |  |
+| `\BehaviorStopSurvivalTwoS` | 25 % |  | share of well-anchored stops still immobile 2 s after they began (stop_end - stop_start at least 2 s; excluded time inside the stop is not taken out) | `behavior.stop_table_values` |  |
 | `\BehaviorStopsCrossingOutcome` | 16,353 |  | stops with stop_start < outcome_known_time_s <= stop_end (all stops) | `behavior.stop_table_values` |  |
 | `\BehaviorStopsCrossingOutcomeFraction` | 14 % |  | their share of all stops | `behavior.stop_table_values` |  |
 | `\BehaviorStopsInTransit` | 25,768 |  | in-transit stops in the canonical stop table | `behavior.stop_table_values` |  |
-| `\BehaviorStopsOutcomeShifted` | 16,066 |  | crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary) | `behavior.stop_table_values` |  |
+| `\BehaviorStopsOutcomeShifted` | 16,066 |  | crossing stops whose per-bin reward history can be shifted: no later arrival inside, and a bin at or past the boundary in the stop-level design (before a fitted population's bins inside its ongoing events are dropped, so an upper bound for each fitted population) | `behavior.stop_table_values` |  |
 | `\BehaviorStopsOutcomeShiftedFraction` | 13 % |  | their share of all stops | `behavior.stop_table_values` |  |
 | `\BehaviorStopsRewardHistoryIncompleteFraction` | 0.013 |  | share of stops flagged reward_history_incomplete (fewer than two known outcomes) | `behavior.stop_table_values` |  |
 | `\BehaviorStopsSpanningArrival` | 185 |  | stops containing a later well arrival | `behavior.stop_table_values` |  |
@@ -1702,13 +1702,13 @@ Sources:
 | `\BehaviorChoiceRawPositiveSessions` | 59 |  | C_replay_only replay_fraction: sessions with a positive coefficient | `behavior.choice_values` |  |
 | `\BehaviorChoiceRawSessions` | 192 |  | C_replay_only replay_fraction: sessions kept | `behavior.choice_values` |  |
 | `\BehaviorChoiceRawSignificantFraction` | 17 % |  | C_replay_only replay_fraction: share of sessions individually significant | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwr` | +0.041 | log odds | C_full_swr_split replay_fraction_swr: session median coefficient (gated) | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwrAnimalsPositive` | 3 |  | C_full_swr_split replay_fraction_swr: animals with a positive median | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwrNegativeSessions` | 33 |  | C_full_swr_split replay_fraction_swr: sessions with a negative coefficient | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwrP` | 0.66 |  | C_full_swr_split replay_fraction_swr: signed-rank p across sessions | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwrPositiveSessions` | 41 |  | C_full_swr_split replay_fraction_swr: sessions with a positive coefficient | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwrSessions` | 74 |  | C_full_swr_split replay_fraction_swr: sessions kept | `behavior.choice_values` |  |
-| `\BehaviorChoiceSwrSignificantFraction` | 3 % |  | C_full_swr_split replay_fraction_swr: share of sessions individually significant | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwr` | +0.041 | log odds | C_full_swr_split replay_fraction_swr: session median coefficient (gated) *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrAnimalsPositive` | 3 |  | C_full_swr_split replay_fraction_swr: animals with a positive median *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrNegativeSessions` | 33 |  | C_full_swr_split replay_fraction_swr: sessions with a negative coefficient *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrP` | 0.66 |  | C_full_swr_split replay_fraction_swr: signed-rank p across sessions *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrPositiveSessions` | 41 |  | C_full_swr_split replay_fraction_swr: sessions with a positive coefficient *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrSessions` | 74 |  | C_full_swr_split replay_fraction_swr: sessions kept *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrSignificantFraction` | 3 % |  | C_full_swr_split replay_fraction_swr: share of sessions individually significant *(pending: the per-term session gate refuses replay_fraction_swr: it keeps fewer than 5 sessions, or leaves out more than 20 % of the sessions with a fit)* | `behavior.choice_values` |  |
 
 ### 3.5. Does non-SWR content predict staying or leaving?
 
@@ -1724,16 +1724,16 @@ Sources:
 | `\BehaviorStayConvergedMua` | 45 |  | stratum mua: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
 | `\BehaviorStayConvergedNonSwr` | 78 |  | stratum non_swr: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
 | `\BehaviorStayConvergedSwr` | 38 |  | stratum swr: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
-| `\BehaviorStayFitsAll` | 1,936 |  | stratum all: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
-| `\BehaviorStayFitsMua` | 1,936 |  | stratum mua: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
-| `\BehaviorStayFitsNonSwr` | 1,936 |  | stratum non_swr: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
-| `\BehaviorStayFitsSwr` | 1,936 |  | stratum swr: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsAll` | 1,936 |  | stratum all: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsMua` | 1,936 |  | stratum mua: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsNonSwr` | 1,936 |  | stratum non_swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsSwr` | 1,936 |  | stratum swr: session-by-role rows of the logistic fits, the sessions skipped before fitting (too few stops, a constant stay or outcome) included | `behavior.stay_leave_values` |  |
 | `\BehaviorStayMinQGee` | 0.52 |  | smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all) | `behavior.stay_leave_values` |  |
 | `\BehaviorStayMinQSignrank` | 0.44 |  | smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role last_rewarded, stratum non_swr) | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsAtWellWithStay` | 75,785 |  | at_well stops carrying an is_stay (Stage 6's population) | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsDropped` | 26,760 |  | stops the well-anchored cohort leaves out | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsDroppedWithStay` | 0 |  | of those, stops carrying an is_stay | `behavior.stay_leave_values` |  |
-| `\BehaviorStopsMixed` | 16,061 |  | mixed stops (every one without an is_stay) | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsMixed` | 16,061 |  | mixed stops (0 of them with an is_stay) | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsMixedWithStay` | 0 |  | mixed stops carrying an is_stay | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsTotal` | 120,320 |  | stops in the canonical stop table | `behavior.stay_leave_values` |  |
 | `\BehaviorStopsWellAnchored` | 93,560 |  | stops with occupancy_state at_well or mixed (the shared cohort) | `behavior.stay_leave_values` |  |
@@ -2132,8 +2132,8 @@ Sources:
 | `\MpfcCheckOneHzUnits` | 11,604 |  | check, units at or above 1 Hz on the fitted bins: mPFC units in the population (a usable fit and finite curves) | `mpfc.rate_cutoff_check_values` |  |
 | `\MpfcClassCalledFlatFractionMax` | 8 % |  | highest such share over the four event classes (non_local_no_SWR) | `mpfc.null_geometry_values` |  |
 | `\MpfcClassCalledFlatFractionMin` | 4 |  | lowest such share over the four event classes (non_local_SWR) | `mpfc.null_geometry_values` |  |
-| `\MpfcEffectAbsPeakMedianCalledNonSwrReplay` | 0.85 | log rate | median absolute peak log-rate modulation of the units called for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
-| `\MpfcEffectAbsPeakMedianCalledSwrReplay` | 0.93 | log rate | median absolute peak log-rate modulation of the units called for SWR-coupled replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianCalledNonSwrReplay` | 0.85 | log rate | median absolute peak log-rate modulation of the units called for non-SWR replay, among the units tested for both replay classes | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianCalledSwrReplay` | 0.93 | log rate | median absolute peak log-rate modulation of the units called for SWR-coupled replay, among the units tested for both replay classes | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcEffectAbsPeakMedianMatchedControl` | 0.56 | log rate | median over units of the absolute peak log-rate modulation for matched quiet-rest control windows (the noise floor) | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcEffectAbsPeakMedianNonSwrReplay` | 0.85 | log rate | median over units of the absolute peak log-rate modulation for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
 | `\MpfcEffectAbsPeakMedianSwr` | 0.78 | log rate | median over units of the absolute peak log-rate modulation for SWRs | `mpfc.overlap_and_effect_values` |  |
@@ -2463,7 +2463,7 @@ Sources:
 | `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarShallowSuppressed` | 18 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
 | `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarSuppressed` | 12 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
 | `\MpfcTimingCalibrationWideStopOffsetSize` | 0.20 | log rate | size from zero of the stop-offset scenario's sign-aligned mean curve for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
-| `\MpfcTimingMatchedControlPeakBeforeOnsetFraction` | 50 % |  | share of all units whose matched quiet-rest control curve peaks before the control window's onset (what a peak lag drawn by noise gives) | `mpfc.timing_values` |  |
+| `\MpfcTimingMatchedControlPeakBeforeOnsetFraction` | 50 % |  | share of the units with a matched quiet-rest control curve (finite, and not zero everywhere) whose control curve peaks before the control window's onset (what a peak lag drawn by noise gives) | `mpfc.timing_values` |  |
 | `\MpfcTimingNonSwrLaterFraction` | 37 % |  | share of those units whose non-SWR replay peak is later than their SWR-coupled replay peak | `mpfc.timing_values` |  |
 | `\MpfcTimingOnsetAtEdgeFractionNonSwrReplayEnhanced` | 4 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
 | `\MpfcTimingOnsetAtEdgeFractionNonSwrReplaySuppressed` | 16 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
@@ -2515,12 +2515,12 @@ Sources:
 | `\MpfcTimingPeakLagQuartileLowMsSwrReplayEnhanced` | 32 | ms | 25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
 | `\MpfcTimingPeakLagQuartileLowMsSwrReplaySuppressed` | −62 | ms | 25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
 | `\MpfcTimingPeakLagQuartileLowMsSwrSuppressed` | −76 | ms | 25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplayEnhanced` | 0 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplaySuppressed` | 16 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplayEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplaySuppressed` | 12 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrSuppressed` | 13 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplayEnhanced` | 0 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplaySuppressed` | 16 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplayEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplaySuppressed` | 12 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrSuppressed` | 13 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetAnimalsNegativeNonSwrReplayEnhanced` | 4 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetAnimalsNegativeNonSwrReplaySuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetAnimalsNegativeSwrEnhanced` | 3 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
@@ -2539,12 +2539,12 @@ Sources:
 | `\MpfcTimingPopulationOnsetMsCiHighSwrReplayEnhanced` | 0 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetMsCiHighSwrReplaySuppressed` | −134 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetMsCiHighSwrSuppressed` | −126 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplayEnhanced` | −56 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplaySuppressed` | −200 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrEnhanced` | −52 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrReplayEnhanced` | −44 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrReplaySuppressed` | −188 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrSuppressed` | −200 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplayEnhanced` | −56 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplaySuppressed` | −200 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrEnhanced` | −52 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrReplayEnhanced` | −44 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrReplaySuppressed` | −188 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrSuppressed` | −200 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetMsNonSwrReplayEnhanced` | −38 | ms | onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetMsNonSwrReplaySuppressed` | −192 | ms | onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationOnsetMsSwrEnhanced` | −30 | ms | onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
@@ -2557,24 +2557,24 @@ Sources:
 | `\MpfcTimingPopulationPeakMsCiHighSwrReplayEnhanced` | 104 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsCiHighSwrReplaySuppressed` | 62 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsCiHighSwrSuppressed` | 84 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplayEnhanced` | 74 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplaySuppressed` | 18 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPeakMsCiLowSwrEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPeakMsCiLowSwrReplayEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPeakMsCiLowSwrReplaySuppressed` | 46 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPeakMsCiLowSwrSuppressed` | 52 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplayEnhanced` | 74 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplaySuppressed` | 18 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrReplayEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrReplaySuppressed` | 46 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrSuppressed` | 52 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsNonSwrReplayEnhanced` | 92 | ms | peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsNonSwrReplaySuppressed` | 32 | ms | peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsSwrEnhanced` | 96 | ms | peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsSwrReplayEnhanced` | 92 | ms | peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsSwrReplaySuppressed` | 54 | ms | peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationPeakMsSwrSuppressed` | 64 | ms | peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplayEnhanced` | 3 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplaySuppressed` | 49 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrEnhanced` | 14 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrReplayEnhanced` | 8 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrReplaySuppressed` | 44 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrSuppressed` | 47 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplayEnhanced` | 3 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplaySuppressed` | 49 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrEnhanced` | 14 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrReplayEnhanced` | 8 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrReplaySuppressed` | 44 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrSuppressed` | 47 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetAnimalsNegativeNonSwrReplayEnhanced` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetAnimalsNegativeNonSwrReplaySuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrEnhanced` | 2 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
@@ -2587,12 +2587,12 @@ Sources:
 | `\MpfcTimingPopulationRiseOnsetMsCiHighSwrReplayEnhanced` | 8 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetMsCiHighSwrReplaySuppressed` | −24 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetMsCiHighSwrSuppressed` | −6 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplayEnhanced` | −50 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplaySuppressed` | −62 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrEnhanced` | −32 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplayEnhanced` | −34 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplaySuppressed` | −42 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrSuppressed` | −26 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplayEnhanced` | −50 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplaySuppressed` | −62 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrEnhanced` | −32 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplayEnhanced` | −34 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplaySuppressed` | −42 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrSuppressed` | −26 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhanced` | −36 | ms | rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedChimi` | −46 | ms | rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedJsixteen` | −18 | ms | rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
@@ -2641,12 +2641,12 @@ Sources:
 | `\MpfcTimingPopulationRiseSizeCiLowSwrReplayEnhanced` | 0.42 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseSizeCiLowSwrReplaySuppressed` | 0.31 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationRiseSizeCiLowSwrSuppressed` | 0.21 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseSizeNonSwrReplayEnhanced` | 0.35 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseSizeNonSwrReplaySuppressed` | 0.29 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseSizeSwrEnhanced` | 0.39 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseSizeSwrReplayEnhanced` | 0.52 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseSizeSwrReplaySuppressed` | 0.35 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationRiseSizeSwrSuppressed` | 0.27 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeNonSwrReplayEnhanced` | 0.35 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeNonSwrReplaySuppressed` | 0.29 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrEnhanced` | 0.39 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrReplayEnhanced` | 0.52 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrReplaySuppressed` | 0.35 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrSuppressed` | 0.27 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeCiHighNonSwrReplayEnhanced` | 0.41 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeCiHighNonSwrReplaySuppressed` | 0.63 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeCiHighSwrEnhanced` | 0.51 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
@@ -2659,12 +2659,12 @@ Sources:
 | `\MpfcTimingPopulationSizeCiLowSwrReplayEnhanced` | 0.46 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeCiLowSwrReplaySuppressed` | 0.56 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeCiLowSwrSuppressed` | 0.45 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSizeNonSwrReplayEnhanced` | 0.36 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSizeNonSwrReplaySuppressed` | 0.58 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSizeSwrEnhanced` | 0.45 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSizeSwrReplayEnhanced` | 0.56 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSizeSwrReplaySuppressed` | 0.61 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSizeSwrSuppressed` | 0.51 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeNonSwrReplayEnhanced` | 0.36 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeNonSwrReplaySuppressed` | 0.58 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrEnhanced` | 0.45 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrReplayEnhanced` | 0.56 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrReplaySuppressed` | 0.61 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrSuppressed` | 0.51 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size) | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeVsControlNonSwrReplayEnhanced` | 0.38 | log rate | the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeVsControlNonSwrReplaySuppressed` | 0.51 | log rate | the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSizeVsControlSwrEnhanced` | 0.48 | log rate | the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |

@@ -3,16 +3,16 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f8aa188b385f",
+ "commit": "14df6718f6e7",
  "code": {
-  "head": "f8aa188b385fa14033ce602409b0eb10964731f0",
+  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "45a40c6e2abd156f030f1b61ef612f3220c6ebf79b3abe3ea3bb458076ed74e8",
-    "code_sha256": "76142ba35f753fd7b9c66263529e506cbf954df9f94dfab0ec32684a5fb6e7fc"
+    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
+    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -47,8 +47,8 @@
     "code_sha256": "5aa528c9a2f3461963007fca3df337b58894d3f525e624116457e87b48bb0466"
    },
    "src/continuum_swr_replay/analysis/hippocampus/__init__.py": {
-    "sha256": "55100362be20a8d77c0f6ddfad6f26b23ce9bcb4ee323c7efe2c9f4360b853c7",
-    "code_sha256": "140e49dce65385f42f2f7bbe30f83ba00aeda9249f880906a50259e7f36e2260"
+    "sha256": "8e0b5ee16dcc2d9ec74d4fa5cbc2bf7df353ffd4c99fa403eae9e745ce81d8b6",
+    "code_sha256": "9dfd31371132808f497c7138273e7e3915f1266b2e26fd4bda37c457c256a084"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
     "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
@@ -67,8 +67,8 @@
     "code_sha256": "fbdf70f0c48b81886691bdfa12d66fdf623d55489c9487078165778f7a8b213d"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/event_table.py": {
-    "sha256": "72df949f757279323ef8b76a9eea57a59582ac392a2e963b376ea69e8b20e2c9",
-    "code_sha256": "8ad2b48cb97dd9dd0f8f9fb102aeb502168470ea911728936a588daa8ab5d408"
+    "sha256": "7c0760f44d451e7c41dca3dba02e170140c68e8d65c449063bd729842107d1b3",
+    "code_sha256": "83b3915d68fcbdd1148cdf16c17ae6f2daaa98bd613f3feef12f25124983b15a"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/likelihood.py": {
     "sha256": "bafb5d60658fb9332934c4adfec9ac4813d42ceb3e801212bef99dd1554acd19",
@@ -79,8 +79,8 @@
     "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "eee5ca8b4b351f3b4c1bdc303697e850b253ab5aab7ab42b1a27055c6e056da8",
-    "code_sha256": "0d11d99ba3cbb137beb885a118ed0c552b43031e3bd23dc30f690ed7ee77c083"
+    "sha256": "1fd43efe11b2a9cb549c20f44c7f4095d8643ab76c7fdb7cc0161bdec9cfd7c5",
+    "code_sha256": "9845b7a5dfa4e08cae4d50d49aefa5c4679f4ef41c8666fc5904550bede3183c"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -127,12 +127,12 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "793ea125864d7220e714c398780f9ce30d6c8f11393b6a78df55e920e3f34fa3",
-    "code_sha256": "de70a0d44e70a303cc35c5b2f364e78a2187eff76d90f7952627044b1b9329c9"
+    "sha256": "47b15df018ae1612711de335d2515a9720e2e5cbc770da0e8e37483aec7ca860",
+    "code_sha256": "2b9e47d56821390d2174f5f1d12e46012aa1e55ca8a8f95d2b86d92015cec8a4"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",
-    "code_sha256": "4a918c780fe663e1881c024c7110c8ff839878f1484938199a06a56054b07449"
+    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
+    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -169,6 +169,22 @@
    "src/continuum_swr_replay/tables/versions.py": {
     "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
+   },
+   "docs/design/replay_detection_comparison/memoryless_comparison_recording.json": {
+    "sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09",
+    "code_sha256": "7d4ad5263497e07ebb529319eeef4dac87b29e5fa76dccd4973cb6eb0cb7fe09"
+   },
+   "docs/design/replay_detection_comparison/detection_sweep_summary.csv": {
+    "sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362",
+    "code_sha256": "008e03c479c120ffbb298a7de058f905d6d97500c0b930abfb1071788c5a4362"
+   },
+   "docs/design/replay_detection_comparison/detection_controls_summary.csv": {
+    "sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d",
+    "code_sha256": "b8c16c04c0a365b91a1af61dfb57a0369633db3e68c3414192dd09d0397d5b3d"
+   },
+   "docs/design/replay_detection_comparison/detection_heldout_summary.csv": {
+    "sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4",
+    "code_sha256": "f41a5358c5fa87994538616414f18cde3d0cc2c1f894335b9ab64676e500e2c4"
    }
   }
  },
@@ -1416,7 +1432,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1",
+   "description": "sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1_HPC",
    "questions": [
     "2a.3"
    ],
@@ -1970,7 +1986,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median amount the sliding window ends the shortest replays late",
+   "description": "median amount the sliding window ends the shortest (40 ms) replays late",
    "questions": [
     "1.1"
    ],
@@ -1986,7 +2002,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median duration the sliding window reports for the shortest replays",
+   "description": "median duration the sliding window reports for the shortest (40 ms) replays",
    "questions": [
     "1.1"
    ],
@@ -2002,7 +2018,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "median amount the sliding window starts the shortest replays early",
+   "description": "median amount the sliding window starts the shortest (40 ms) replays early",
    "questions": [
     "1.1"
    ],
@@ -2034,7 +2050,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest median amount the sliding window ends late, over true durations",
+   "description": "largest median amount the sliding window ends late, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2050,7 +2066,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "smallest median amount the sliding window ends late, over true durations",
+   "description": "smallest median amount the sliding window ends late, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2066,7 +2082,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest upper quartile of the sliding window's end error, over true durations",
+   "description": "largest upper quartile of the sliding window's end error, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2162,7 +2178,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest median amount the sliding window starts early, over true durations",
+   "description": "largest median amount the sliding window starts early, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2178,7 +2194,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "smallest median amount the sliding window starts early, over true durations",
+   "description": "smallest median amount the sliding window starts early, over true durations (40 to 500 ms)",
    "questions": [
     "1.1"
    ],
@@ -2210,7 +2226,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported",
+   "description": "largest absolute median start or end error of the state-space detector over true durations (40 to 500 ms), replays both detectors reported",
    "questions": [
     "1.1"
    ],

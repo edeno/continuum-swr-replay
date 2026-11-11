@@ -3,16 +3,16 @@
  "summary": "mpfc",
  "title": "how mPFC units respond to the events",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f8aa188b385f",
+ "commit": "14df6718f6e7",
  "code": {
-  "head": "f8aa188b385fa14033ce602409b0eb10964731f0",
+  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "45a40c6e2abd156f030f1b61ef612f3220c6ebf79b3abe3ea3bb458076ed74e8",
-    "code_sha256": "76142ba35f753fd7b9c66263529e506cbf954df9f94dfab0ec32684a5fb6e7fc"
+    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
+    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -79,12 +79,12 @@
     "code_sha256": "40ae946bcdce07b3de2dc541f13fd4e982ad8cab53ceed202ea0a4ed057a0b38"
    },
    "src/continuum_swr_replay/analysis/pfc/population_statistics.py": {
-    "sha256": "664a1d017c953473156fb3f3c3f4464ea8db38c5b0cddc06af8f05020aa9cee6",
-    "code_sha256": "ff0a016d5d9d331e8e8380e0a86e27c6cf26188056eb40e33d9f4be6b8ab2587"
+    "sha256": "c80390be12c7b89b2c8601b2fd65105865c97c3d638e5d5e03e36fab2d114eda",
+    "code_sha256": "d8c772d1a981e532b4d1110868e4545c04fd483a0de1a6947b22b19fdcb22130"
    },
    "src/continuum_swr_replay/analysis/pfc/timing.py": {
-    "sha256": "4edfd2b203d36a84fab9e4ec68232768b3b4fa92729ec864c9349f438ad7c67f",
-    "code_sha256": "c1968a77f81df0807a6572ab0d12ec4065cdf68801476ec0eb50268fe5172226"
+    "sha256": "bb795a814d07a9b3bd9617dd2a9a8376692ea181f353cf6b72e9a343ca9506cf",
+    "code_sha256": "0756753cd7713e21fb187c4f5ce3d7ea0f61842380b8e6068974c44b4dc3f696"
    },
    "src/continuum_swr_replay/analysis/replay/__init__.py": {
     "sha256": "0b0d18307f7614693f41eb3629365da8f7e49dcf8115ca40a59bf5d77c2e9bd4",
@@ -135,12 +135,12 @@
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/mpfc.py": {
-    "sha256": "3c416486004468b32954632690f166e482499dc820cee6d2bbe7b2df6758df5d",
-    "code_sha256": "3a062e2c6c49391a322c2bf0c3432ae89b2b0b6b7080cde8eb1be40110f391d5"
+    "sha256": "555163dd43e93c2d6bcc0019052ee9708acbba84a1c1286c9d3be3d5bdec022a",
+    "code_sha256": "8a755d34e0256a10945e0759599c68e8d72d3f2666266e9bee877d34a1b4ceed"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",
-    "code_sha256": "4a918c780fe663e1881c024c7110c8ff839878f1484938199a06a56054b07449"
+    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
+    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -493,7 +493,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "median absolute peak log-rate modulation of the units called for non-SWR replay",
+   "description": "median absolute peak log-rate modulation of the units called for non-SWR replay, among the units tested for both replay classes",
    "questions": [
     "4.1"
    ],
@@ -507,7 +507,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "median absolute peak log-rate modulation of the units called for SWR-coupled replay",
+   "description": "median absolute peak log-rate modulation of the units called for SWR-coupled replay, among the units tested for both replay classes",
    "questions": [
     "4.1"
    ],
@@ -5167,7 +5167,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of all units whose matched quiet-rest control curve peaks before the control window's onset (what a peak lag drawn by noise gives)",
+   "description": "share of the units with a matched quiet-rest control curve (finite, and not zero everywhere) whose control curve peaks before the control window's onset (what a peak lag drawn by noise gives)",
    "questions": [
     "4.1"
    ],
@@ -5895,7 +5895,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show",
    "questions": [
     "4.1"
    ],
@@ -5909,7 +5909,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show",
    "questions": [
     "4.1"
    ],
@@ -5923,7 +5923,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show",
    "questions": [
     "4.1"
    ],
@@ -5937,7 +5937,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show",
    "questions": [
     "4.1"
    ],
@@ -5951,7 +5951,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show",
    "questions": [
     "4.1"
    ],
@@ -5965,7 +5965,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
+   "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak, clipped to the range 0 to 1: how much of the event curve's pre-event level quiet-rest windows also show",
    "questions": [
     "4.1"
    ],
@@ -6231,7 +6231,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6245,7 +6245,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6259,7 +6259,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6273,7 +6273,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6287,7 +6287,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6301,7 +6301,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6483,7 +6483,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6497,7 +6497,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6511,7 +6511,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6525,7 +6525,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6539,7 +6539,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6553,7 +6553,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6651,7 +6651,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event",
+   "description": "value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event",
    "questions": [
     "4.1"
    ],
@@ -6665,7 +6665,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event",
+   "description": "value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event",
    "questions": [
     "4.1"
    ],
@@ -6679,7 +6679,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event",
+   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event",
    "questions": [
     "4.1"
    ],
@@ -6693,7 +6693,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event",
+   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event",
    "questions": [
     "4.1"
    ],
@@ -6707,7 +6707,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event",
+   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event",
    "questions": [
     "4.1"
    ],
@@ -6721,7 +6721,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event",
+   "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak, clipped to the range 0 to 1: how far the curve sits from zero before the event",
    "questions": [
     "4.1"
    ],
@@ -6903,7 +6903,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6917,7 +6917,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6931,7 +6931,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6945,7 +6945,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6959,7 +6959,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6973,7 +6973,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7659,7 +7659,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7673,7 +7673,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7687,7 +7687,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7701,7 +7701,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7715,7 +7715,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7729,7 +7729,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7911,7 +7911,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7925,7 +7925,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7939,7 +7939,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7953,7 +7953,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7967,7 +7967,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],
@@ -7981,7 +7981,7 @@
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
+   "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; the peak is the curve's largest absolute value, and each unit's curve is signed by its own peak, so a decrease counts as a positive size)",
    "questions": [
     "4.1"
    ],

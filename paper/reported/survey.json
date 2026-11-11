@@ -3,16 +3,16 @@
  "summary": "survey",
  "title": "the published replay studies the introduction summarizes (Supplementary Table S1)",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "f8aa188b385f",
+ "commit": "14df6718f6e7",
  "code": {
-  "head": "f8aa188b385fa14033ce602409b0eb10964731f0",
+  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "45a40c6e2abd156f030f1b61ef612f3220c6ebf79b3abe3ea3bb458076ed74e8",
-    "code_sha256": "76142ba35f753fd7b9c66263529e506cbf954df9f94dfab0ec32684a5fb6e7fc"
+    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
+    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -47,8 +47,8 @@
     "code_sha256": "40326fce73994676c212398c50d0b576ad15f8114856e26c3b8281a10cb32dbe"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",
-    "code_sha256": "4a918c780fe663e1881c024c7110c8ff839878f1484938199a06a56054b07449"
+    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
+    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -77,6 +77,10 @@
    "src/continuum_swr_replay/tables/versions.py": {
     "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
     "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
+   },
+   "paper/tables/table_s1_literature_parameters.csv": {
+    "sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda",
+    "code_sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda"
    }
   }
  },
