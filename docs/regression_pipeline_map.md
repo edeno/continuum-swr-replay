@@ -382,7 +382,7 @@ _No module-level public symbols._
 
 Model definitions for replay content analysis.
 
-`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`
+`ModelSpec`, `default_content_model_names`, `PerBinTerm`, `time_course_spline`, `PerBinRateModelSpec`, `longest_history_window_s`, `leaf_only_predictors`, `rung_predictors`, `restrict_to_leaf_arms`, `leaf_only_cohort`
 
 ## Fitters
 
@@ -1146,7 +1146,7 @@ Modules under a mapped root that no stage pattern claims. A module landing here 
 
 Across-session summaries of what the per-session fits wrote.
 
-`fit_rows`, `session_median_statistics`, `coefficient_statistics`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
+`fit_rows`, `require_one_fit_per_session`, `session_median_statistics`, `coefficient_statistics`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
 
 ### `src/continuum_swr_replay/analysis/replay/content_statistics.py`
 
