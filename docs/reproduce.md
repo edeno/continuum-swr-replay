@@ -98,20 +98,21 @@ The main analysis workflow is in `scripts/decoding/run_decoding_bandit.py`, whic
 
 ### Key Decoding Parameters
 
-```python
-# Place binning
-place_bin_size = 2.0  # cm for 1D, 3.5 cm for 2D
+| Setting | Value | Defined in |
+| --- | --- | --- |
+| Place bin, linearized track | 2.0 cm | `continuum_swr_replay.parameters.PLACE_BIN_SIZE_1D` |
+| Place bin, 2-D | 3.5 cm | `continuum_swr_replay.parameters.PLACE_BIN_SIZE_2D` |
+| Position standard deviation of the encoding model | √12.5 ≈ 3.54 cm | `continuum_swr_replay.parameters.POSITION_STD` |
+| Waveform-feature standard deviation (clusterless HPC) | 24 µV | `continuum_swr_replay.parameters.WAVEFORM_STD` |
+| Local state's position standard deviation | 2.5 cm | `continuum_swr_replay.parameters.LOCAL_POSITION_STD` |
+| GPU block size | 1024 | `continuum_swr_replay.parameters.BLOCK_SIZE` |
+| Training data | `no_ripple` | `continuum_swr_replay.decoding.identifiers.DEFAULT_TRAINING_TYPE` |
+| Non-local probability threshold for events | 0.8 | `continuum_swr_replay.parameters.DEFAULT_NON_LOCAL_THRESHOLD` |
 
-# Decoding parameters (HPC clusterless)
-position_std = np.sqrt(12.5)  # ~3.5 cm
-waveform_std = 24.0
-block_size = 1024  # for GPU processing
-
-# Training options
-training_type = "no_ripple"  # or "all"
-non_stationary = False  # if True, uses speed as transition covariate
-non_local_threshold = 0.8  # threshold for classifying non-local events
-```
+The discrete transitions are stationary: `--non_stationary` (speed as a transition
+covariate) is refused until non_local_detector can save such a model
+(`continuum_swr_replay.decoding.transitions.NON_STATIONARY_REFUSAL`).
+`tests/unit/test_documented_values.py` checks this table against the code.
 
 ### Command-Line Usage
 
@@ -122,8 +123,8 @@ uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --
 # Decode specific session
 uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --date 20200212 --epoch 02_r1
 
-# With non-stationary model and figurl
-uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --non_stationary --create_figurl
+# With an interactive figurl view of each decode
+uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --create_figurl
 
 # Overwrite existing results
 uv run --frozen python scripts/decoding/run_decoding_bandit.py --animal chimi --overwrite
