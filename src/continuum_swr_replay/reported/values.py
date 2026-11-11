@@ -7,7 +7,7 @@ import json
 import math
 import re
 from collections.abc import Iterable, Mapping
-from dataclasses import InitVar, asdict, dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -94,11 +94,10 @@ class Value:
     pending : str or None
         Why the value may not be quoted yet (for example a value from an
         untracked script), or None.
-    check_tags : bool
-        Refuse ``questions`` or ``used_in`` that do not match the question list
-        (:func:`~continuum_swr_replay.reported.questions.tag_problems`). Only
-        :func:`read_summary` turns it off, to read a summary built before the list
-        changed. Not stored: a value carries no record of whether it was checked.
+
+    Its tags are checked against the question list when its summary is written
+    (:meth:`Summary.write`), not here, so a summary built before the list changed
+    can still be read.
     """
 
     key: str
@@ -111,9 +110,8 @@ class Value:
     used_in: tuple[str, ...]
     source: str
     pending: str | None = None
-    check_tags: InitVar[bool] = True
 
-    def __post_init__(self, check_tags: bool) -> None:
+    def __post_init__(self) -> None:
         if not _KEY.fullmatch(self.key):
             raise ValueError(f"key {self.key!r}: lower-case words and underscores only")
         if self.kind not in KINDS:
@@ -130,10 +128,6 @@ class Value:
             )
         if not self.questions or not self.used_in:
             raise ValueError(f"{self.key}: name its questions and where it is used")
-        if check_tags:
-            problems = tag_problems(self.questions, self.used_in)
-            if problems:
-                raise ValueError(f"{self.key}: {'; '.join(problems)}")
 
 
 @dataclass
@@ -193,24 +187,33 @@ class Summary:
         return json.dumps(payload, indent=1, sort_keys=False, allow_nan=False) + "\n"
 
     def write(self, path: Path) -> None:
+        """Write the summary to ``path``.
+
+        Raises
+        ------
+        ValueError
+            If a value's tags do not match the question list
+            (:func:`summary_tag_problems`); nothing is written.
+        """
+        problems = summary_tag_problems(self)
+        if problems:
+            listed = "; ".join(f"{k}: {', '.join(p)}" for k, p in problems.items())
+            raise ValueError(f"{self.name}: values with tag problems: {listed}")
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(self.to_json())
         tmp.replace(path)
 
 
-def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
-    """A summary file read back, its values as :class:`Value`.
+def read_summary(path: Path) -> Summary:
+    """A summary file read back, its values as :class:`Value`. Its tags are not
+    checked: :func:`summary_tag_problems` lists any that the question list no
+    longer accepts.
 
     Parameters
     ----------
     path : Path
         A summary file, ``<name>.json``.
-    check_tags : bool
-        Check each value's question and figure tags
-        (:func:`~continuum_swr_replay.reported.questions.tag_problems`). False reads a
-        summary built before the question list changed, so that its numbers can
-        still be emitted; :func:`summary_tag_problems` then lists what to fix.
 
     Raises
     ------
@@ -238,11 +241,11 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
         fields = dict(fields)
         fields["questions"] = tuple(fields["questions"])
         fields["used_in"] = tuple(fields["used_in"])
-        summary.add(Value(key=key, check_tags=check_tags, **fields))
+        summary.add(Value(key=key, **fields))
     return summary
 
 
-def read_summaries(directory: Path, *, check_tags: bool = True) -> dict[str, Summary]:
+def read_summaries(directory: Path) -> dict[str, Summary]:
     """Every summary in ``directory``, by name, in the order of :data:`SUMMARIES`:
     exactly one ``<name>.json`` for each, each saying it is that summary.
 
@@ -263,7 +266,7 @@ def read_summaries(directory: Path, *, check_tags: bool = True) -> dict[str, Sum
         )
     summaries = {}
     for file, name in expected.items():
-        summary = read_summary(directory / file, check_tags=check_tags)
+        summary = read_summary(directory / file)
         if summary.name != name:
             raise ValueError(f"{directory / file}: holds summary {summary.name}")
         summaries[name] = summary

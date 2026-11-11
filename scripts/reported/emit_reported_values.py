@@ -47,7 +47,7 @@ DOC_ROOTS = (ROOT_DIR / "paper", ROOT_DIR / "docs")
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.parse_args(argv)
-    summaries = read_summaries(SUMMARY_DIR, check_tags=False)
+    summaries = read_summaries(SUMMARY_DIR)
     view = questions_view(summaries)
     notices = []
     for name, summary in summaries.items():

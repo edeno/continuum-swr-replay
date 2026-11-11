@@ -262,7 +262,6 @@ def _summary(
             questions=questions,
             used_in=("paper",),
             source="s",
-            check_tags=False,
         )
     )
     return summary
@@ -305,6 +304,13 @@ def test_a_summary_file_must_say_whether_it_has_a_code_record_and_a_migration(
 def test_a_summary_has_a_known_name():
     with pytest.raises(ValueError, match="no summary 'part2'"):
         _summary(name="part2")
+
+
+def _write_with_an_old_tag(path: Path) -> None:
+    """A behavior summary as one built before the question list changed: a value
+    tagged with a question id the list no longer has."""
+    _summary(name="behavior").write(path)
+    path.write_text(path.read_text().replace('"2d.2"', '"12"'))
 
 
 def _write_all(directory: Path, code=None) -> None:
@@ -398,7 +404,7 @@ def test_check_release_exits_0_only_when_every_summary_is_current(
     assert script.main([]) == 0
     assert "all 5 summaries are current" in capsys.readouterr().out
 
-    _summary(questions=("12",), name="behavior").write(summaries / "behavior.json")
+    _write_with_an_old_tag(summaries / "behavior.json")
     assert script.main([]) == 1
     out = capsys.readouterr().out
     assert "behavior.json:" in out and "no code record" in out
@@ -428,7 +434,7 @@ def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
     doc = repo / "docs" / "note.md"
     doc.write_text("Share <!--v:events.share-->99 %<!--/v-->.\n")
     _write_all(reported, code=code_record(repo, [repo / "pkg" / "mod.py"]))
-    _summary(questions=("12",), name="behavior").write(reported / "behavior.json")
+    _write_with_an_old_tag(reported / "behavior.json")
     script.main([])
     out = capsys.readouterr().out
     assert "behavior.json: 1 values with tag problems" in out

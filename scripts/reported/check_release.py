@@ -47,7 +47,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        summaries = read_summaries(SUMMARY_DIR, check_tags=False)
+        summaries = read_summaries(SUMMARY_DIR)
     except ValueError as error:
         print(error)
         return 1

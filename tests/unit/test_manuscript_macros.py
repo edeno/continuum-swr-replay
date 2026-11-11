@@ -72,7 +72,7 @@ def test_every_macro_the_manuscript_uses_is_defined():
 
 
 def test_emitted_files_hold_the_committed_summaries():
-    summaries = values.read_summaries(PAPER / "reported", check_tags=False)
+    summaries = values.read_summaries(PAPER / "reported")
     assert list(summaries) == list(values.SUMMARIES)
     stale = "is stale: run `make reported-values`"
     assert (PAPER / "reported_values.tex").read_text() == emit.tex_file(summaries), (

@@ -132,31 +132,27 @@ def _value(**fields) -> values.Value:
     return values.Value(**{**base, **fields})
 
 
-def test_a_value_with_a_bad_tag_is_refused_unless_told_not_to_check():
-    with pytest.raises(ValueError, match="no question '12'"):
-        _value(questions=("12",))
-    with pytest.raises(ValueError, match="unknown use 'figure: main, left out'"):
-        _value(used_in=("figure: main, left out",))
-    assert _value(questions=("12",), check_tags=False).questions == ("12",)
-    with pytest.raises(ValueError, match="no question '12'"):
-        _value(questions=("12",))
+def test_a_summary_with_a_bad_tag_is_not_written(tmp_path):
+    summary = values.Summary(name="events", produced_by="by", commit="c")
+    summary.add(_value(questions=("12",)))
+    summary.add(_value(key="other", used_in=("figure: main, left out",)))
+    path = tmp_path / "events.json"
+    with pytest.raises(ValueError) as refused:
+        summary.write(path)
+    assert "share: no question '12'" in str(refused.value)
+    assert "other: unknown use 'figure: main, left out'" in str(refused.value)
+    assert not path.exists()
 
 
-def test_replacing_a_field_checks_the_tags_again():
-    from dataclasses import replace
-
-    with pytest.raises(ValueError, match="no question 'x'"):
-        replace(_value(), questions=("x",))
-
-
-def test_an_old_summary_is_read_unchecked_and_its_problems_listed(tmp_path):
+def test_a_summary_written_before_the_list_changed_is_read_and_its_problems_listed(
+    tmp_path,
+):
     summary = values.Summary(name="detection", produced_by="by", commit="c")
     summary.add(_value())
     path = tmp_path / "detection.json"
-    path.write_text(summary.to_json().replace('"2d.2"', '"12"'))
-    with pytest.raises(ValueError, match="no question '12'"):
-        values.read_summary(path)
-    old = values.read_summary(path, check_tags=False)
+    summary.write(path)
+    path.write_text(path.read_text().replace('"2d.2"', '"12"'))
+    old = values.read_summary(path)
     assert values.summary_tag_problems(old) == {"share": ["no question '12'"]}
 
 
@@ -273,7 +269,7 @@ def test_the_remote_groups_spike_evidence_also_answers_question_2c_7():
 
 @pytest.fixture(scope="module")
 def committed():
-    return values.read_summaries(REPORTED, check_tags=False)
+    return values.read_summaries(REPORTED)
 
 
 def test_every_committed_summary_matches_the_question_list(committed):
@@ -304,7 +300,7 @@ def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tag
     summary.add(
         _value(key="shared", questions=("2d.3", "2d.4"), used_in=("figure: 3",))
     )
-    summary.add(_value(key="old", questions=("12",), check_tags=False))
+    summary.add(_value(key="old", questions=("12",)))
     view = emit.questions_view({"events": summary})
     extent = view.split("### 2d.3. ")[1].split("### ")[0]
     stillness = view.split("### 2d.4. ")[1].split("### ")[0]

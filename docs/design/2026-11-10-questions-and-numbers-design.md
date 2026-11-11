@@ -26,11 +26,12 @@ Where the build departs from the design below, after two independent reviews:
   list organizes the writing by part. A figure tag names the figure the paper
   places a value in, which may be one whose panels are not designed yet
   (unlettered, `figure: 2`). `ANSWERED` holds the statuses that have values.
-- **Refusal:** `Value` refuses an unknown claim or use, a figure its question does
-  not list, and a question whose status has no values. `read_summary(check_tags=False)`
-  (a flag on `Value`, not hidden state) reads summaries built before the list
-  changed; the emitter and the release check read them so, and list their
-  problems.
+- **Refusal:** `Summary.write` refuses a summary with a value whose tags name an
+  unknown question or use, a figure its question does not list, or a question
+  whose status has no values. Reading never refuses: a summary built before the
+  list changed is read, and the emitter and the release check list its problems.
+  The builders' tags are declared once each, in a `TAGS` table per builder,
+  and checked by tests without lab data.
 - **`figure-pipeline.md`** stays tables, without the Claims columns: which
   questions a figure shows is only in the question list, and in `questions.md`'s
   "Values by figure". Its test checks that each figure's script is named there.
