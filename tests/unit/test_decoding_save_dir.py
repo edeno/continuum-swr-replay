@@ -491,6 +491,9 @@ def test_run_batch_passes_save_dir(monkeypatch, tmp_path, has_cuda, flags):
             local_cluster(
                 n_workers=1,
                 processes=False,
+                # A thread worker measures the whole test process, which can pass
+                # dask's memory limit late in the suite and pause the worker for good.
+                memory_limit=0,
                 dashboard_address=":0",
                 local_directory=kwargs["local_directory"],
             )

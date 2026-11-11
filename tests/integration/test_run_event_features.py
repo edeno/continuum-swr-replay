@@ -359,6 +359,9 @@ def inputs(tmp_path_factory, module_monkeypatch):
             n_workers=1,
             threads_per_worker=1,
             processes=False,
+            # A thread worker measures the whole test process, which can pass
+            # dask's memory limit late in the suite and pause the worker for good.
+            memory_limit=0,
             dashboard_address=":0",
             local_directory=str(tmp_path / "dask-scratch"),
         ),
