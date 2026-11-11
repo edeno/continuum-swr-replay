@@ -1183,7 +1183,7 @@ def timing_values(
     # are recorded on the same tetrodes and need not be independent.
     sessions = population["nwb_file_name"].astype(str).to_numpy()
     animals = population["animal"].to_numpy()
-    rule = (
+    onset_rule = (
         "the half-maximum onset: the earliest lag of the run, ending at the peak, "
         "over which the curve keeps the peak's sign and at least half its size"
     )
@@ -1248,7 +1248,7 @@ def timing_values(
                 stats["onset_median_ms"],
                 "quantity",
                 "int",
-                f"median response onset of {who}; onset is {rule}",
+                f"median response onset of {who}; onset is {onset_rule}",
                 "ms",
             )
             add(
@@ -1318,8 +1318,8 @@ def timing_values(
             )
             for what in ("peak", "onset"):
                 text = (
-                    f"{'peak lag' if what == 'peak' else 'onset (' + rule + ')'} of the "
-                    f"mean curve of {who}, each unit's curve signed by its peak"
+                    f"{'peak lag' if what == 'peak' else 'onset (' + onset_rule + ')'} of "
+                    f"the mean curve of {who}, each unit's curve signed by its peak"
                 )
                 add(
                     f"timing_population_{what}_ms_{stem}",

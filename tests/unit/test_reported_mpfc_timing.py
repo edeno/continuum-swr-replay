@@ -206,3 +206,23 @@ def test_rise_onset_is_measured_from_each_unit_window_start(population_and_curve
                 assert moved[rise] == pytest.approx(plain[onset], abs=4)
                 # measured from zero: the offset widens the half-maximum run
                 assert moved[onset] < plain[onset] - 10
+
+
+def test_every_onset_description_states_the_half_maximum_rule(population_and_curves):
+    """The onset of every class and direction is the half-maximum onset, and its
+    description says so: not the name of another statistic."""
+    population, curves, _ = population_and_curves
+    make = value_factory(timing_values, "synthetic", TAGS["modulation"])
+    values = timing_values(population, curves, LAG_TIME, None, make)
+    onsets = [
+        v
+        for v in values
+        if v.key.startswith(("timing_onset_median_ms_", "timing_population_onset_ms_"))
+        and "_ci_" not in v.key
+    ]
+    assert len({v.key for v in onsets}) > 2
+    for value in onsets:
+        assert "the half-maximum onset: the earliest lag" in value.description, (
+            value.key,
+            value.description,
+        )
