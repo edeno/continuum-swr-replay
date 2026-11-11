@@ -1678,16 +1678,18 @@ def swr_without_replay_values(
         if np.isfinite(float(value)):
             values.append(make(key, value, *args, **kwargs))
 
+    # A sidecar without a count gives a missing value, which the statistics refuse.
     sessions = pd.DataFrame(
         [
             {
-                "nwb_file_name": s["nwb_file_name"],
-                "epoch_name": s["epoch_name"],
-                "n_swr_no_non_local": int(s.get("n_swr_no_non_local") or 0),
-                "n_swr_with_non_local": int(s.get("n_swr_with_non_local") or 0),
-                "n_swr_no_non_local_unknown": int(
-                    s.get("n_swr_no_non_local_unknown") or 0
-                ),
+                name: s.get(name)
+                for name in (
+                    "nwb_file_name",
+                    "epoch_name",
+                    "n_swr_no_non_local",
+                    "n_swr_with_non_local",
+                    "n_swr_no_non_local_unknown",
+                )
             }
             for s in sidecars
         ]

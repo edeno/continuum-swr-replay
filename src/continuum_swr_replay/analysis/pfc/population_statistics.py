@@ -728,17 +728,25 @@ def peak_modulation_statistics(
 # --- SWRs without replay ---------------------------------------------------------------
 
 
-def _session_event_counts(sessions: pd.DataFrame) -> dict[tuple[str, str], int]:
-    """Each session's SWRs without replay, by ``(nwb_file_name, epoch_name)``."""
-    return {
-        (name, epoch): int(n)
-        for name, epoch, n in zip(
-            sessions["nwb_file_name"],
-            sessions["epoch_name"],
-            sessions["n_swr_no_non_local"],
-            strict=True,
+def _session_event_counts(sessions: pd.DataFrame) -> pd.Series:
+    """Each session's SWRs without replay, indexed by ``(nwb_file_name,
+    epoch_name)``.
+
+    Raises
+    ------
+    ValueError
+        If a session is listed more than once, or has no count.
+    """
+    n_events = sessions.set_index(["nwb_file_name", "epoch_name"])["n_swr_no_non_local"]
+    repeated = n_events.index[n_events.index.duplicated()]
+    if len(repeated):
+        raise ValueError(f"sessions listed more than once: {sorted(set(repeated))}")
+    if n_events.isna().any():
+        raise ValueError(
+            "sessions with no count of SWRs without replay: "
+            f"{sorted(n_events.index[n_events.isna()])}"
         )
-    }
+    return n_events
 
 
 def swr_without_replay_event_statistics(
@@ -769,17 +777,28 @@ def swr_without_replay_event_statistics(
           without replay.
         - ``n_sessions_min_events``: sessions with at least ``min_events`` of
           them.
+
+    Raises
+    ------
+    ValueError
+        If a session is listed more than once, or lacks one of the three
+        counts.
     """
     n_events = _session_event_counts(sessions)
-    total = sum(n_events.values())
-    with_replay = sum(int(n) for n in sessions["n_swr_with_non_local"])
-    unknown = sum(int(n) for n in sessions["n_swr_no_non_local_unknown"])
+    others = sessions[["n_swr_with_non_local", "n_swr_no_non_local_unknown"]]
+    if others.isna().any(axis=None):
+        raise ValueError(
+            "a session has no count of its SWRs with replay or of those left out"
+        )
+    total = int(n_events.sum())
+    with_replay = int(others["n_swr_with_non_local"].sum())
+    unknown = int(others["n_swr_no_non_local_unknown"].sum())
     return {
         "n_events": total,
         "events_fraction": total / (total + with_replay + unknown),
         "n_unknown": unknown,
-        "events_session_median": float(np.median(list(n_events.values()))),
-        "n_sessions_min_events": sum(n >= min_events for n in n_events.values()),
+        "events_session_median": float(n_events.median()),
+        "n_sessions_min_events": int((n_events >= min_events).sum()),
     }
 
 
@@ -789,7 +808,7 @@ def _swr_without_replay_subsets(
     """The units of each group of sessions: every session (``"all"``), and the
     sessions with at least ``min_events`` SWRs without replay
     (``"min_events"``). A boolean mask over units for each."""
-    n_events = _session_event_counts(sessions)
+    n_events = _session_event_counts(sessions).to_dict()
     session_events = np.array(
         [
             n_events[(name, epoch)]
@@ -873,6 +892,9 @@ def swr_without_replay_unit_statistics(
     ------
     KeyError
         If a unit's session is not in ``sessions``.
+    ValueError
+        If a session is listed more than once in ``sessions``, or has no count
+        of SWRs without replay.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
     new_tested, new_called = _tested_and_called(

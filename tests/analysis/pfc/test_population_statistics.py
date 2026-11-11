@@ -613,6 +613,40 @@ def test_swr_without_replay_statistics_refuse_a_unit_of_an_unknown_session():
         )
 
 
+def test_swr_without_replay_statistics_refuse_a_session_listed_twice():
+    # session 1 again, with another count: neither row can be the session's
+    twice = pd.concat(
+        [SESSIONS, SESSIONS.iloc[:1].assign(n_swr_no_non_local=50)], ignore_index=True
+    )
+    message = r"sessions listed more than once: \[\('chimi20200212_.nwb', '02_r1'\)\]"
+    with pytest.raises(ValueError, match=message):
+        stats.swr_without_replay_event_statistics(twice, MIN_EVENTS)
+    with pytest.raises(ValueError, match=message):
+        stats.swr_without_replay_unit_statistics(
+            _extended_population(),
+            twice,
+            alpha=ALPHA,
+            min_events=MIN_EVENTS,
+            three_class_model=THREE_CLASS,
+        )
+
+
+@pytest.mark.parametrize(
+    ("column", "message"),
+    [
+        ("n_swr_no_non_local", "sessions with no count of SWRs without replay"),
+        ("n_swr_with_non_local", "a session has no count of its SWRs with replay"),
+        ("n_swr_no_non_local_unknown", "a session has no count of its SWRs with"),
+    ],
+)
+def test_swr_without_replay_event_statistics_refuse_a_missing_count(column, message):
+    # a missing count is not a count of zero
+    sessions = SESSIONS.astype({column: float})
+    sessions.loc[1, column] = NAN
+    with pytest.raises(ValueError, match=message):
+        stats.swr_without_replay_event_statistics(sessions, MIN_EVENTS)
+
+
 def test_swr_without_replay_called_by_animal():
     result = stats.swr_without_replay_called_by_animal(
         _extended_population(), SESSIONS, alpha=ALPHA, min_events=MIN_EVENTS

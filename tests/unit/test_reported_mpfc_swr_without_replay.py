@@ -94,3 +94,15 @@ def test_counts_overlap_and_both_subsets(extended):
     assert values["swr_no_replay_timing_peak_ms_enhanced_all"] == pytest.approx(50)
     for key in values:
         assert not any(ch.isdigit() for ch in key)
+
+
+@pytest.mark.parametrize(
+    "count",
+    ["n_swr_no_non_local", "n_swr_with_non_local", "n_swr_no_non_local_unknown"],
+)
+def test_a_sidecar_without_a_count_is_refused(extended, count):
+    population, curves, sidecars = extended
+    del sidecars[1][count]
+    make = value_factory(swr_without_replay_values, "synthetic", TAGS["modulation"])
+    with pytest.raises(ValueError, match="no count of"):
+        swr_without_replay_values(population, curves, LAG_TIME, sidecars, make)
