@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.pfc import population_statistics, timing
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
+from continuum_swr_replay.analysis.replay.coefficient_statistics import group_range
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     processed_data_dir,
@@ -699,26 +700,29 @@ def prior_binding_values(
     the lowest and highest share over the five curves;
     ``compare_pfc_cohorts.shrinkage_table`` shows each curve's share.
     """
-    shares = population_statistics.lowest_and_highest(
+    # A curve with no well-posed unit has no share and is left out.
+    shares = group_range(
         population_statistics.prior_binding_percent(population, CURVES)
+        .dropna()
+        .to_dict()
     )
     return [
         make(
             "prior_binds_percent_min",
-            shares["min"],
+            shares["low"],
             "quantity",
             "sig2",
             f"lowest per-curve percent of well-posed units the prior binds on "
-            f"({shares['min_label']})",
+            f"({shares['low_group']})",
             "%",
         ),
         make(
             "prior_binds_percent_max",
-            shares["max"],
+            shares["high"],
             "quantity",
             "sig2",
             f"highest per-curve percent of well-posed units the prior binds on "
-            f"({shares['max_label']})",
+            f"({shares['high_group']})",
             "%",
         ),
     ]
@@ -831,9 +835,8 @@ def null_geometry_values(
     """
     flat = population_statistics.called_without_improvement(population, ALPHA)
     engagement = flat.loc["engagement"]
-    class_shares = population_statistics.lowest_and_highest(
-        flat["fraction"].drop("engagement")
-    )
+    # A class with no called unit has no share and is left out.
+    class_shares = group_range(flat["fraction"].drop("engagement").dropna().to_dict())
     overlap = population_statistics.session_value_statistics(
         [s["engagement_null_overlap"]["median"] for s in sidecars]
     )
@@ -870,17 +873,17 @@ def null_geometry_values(
         ),
         make(
             "class_called_flat_fraction_min",
-            class_shares["min"],
+            class_shares["low"],
             "fraction",
             "pctnum",
-            f"lowest such share over the four event classes ({class_shares['min_label']})",
+            f"lowest such share over the four event classes ({class_shares['low_group']})",
         ),
         make(
             "class_called_flat_fraction_max",
-            class_shares["max"],
+            class_shares["high"],
             "fraction",
             "pct",
-            f"highest such share over the four event classes ({class_shares['max_label']})",
+            f"highest such share over the four event classes ({class_shares['high_group']})",
         ),
         make(
             "engagement_null_overlap_median",

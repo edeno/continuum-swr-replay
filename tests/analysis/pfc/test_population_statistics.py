@@ -16,16 +16,6 @@ ALPHA = 0.05
 NAN = np.nan
 
 
-def test_lowest_and_highest_name_the_first_group_with_each():
-    values = pd.Series({"a": 3.0, "b": 1.0, "c": 3.0, "d": NAN})
-    assert stats.lowest_and_highest(values) == {
-        "min": 1.0,
-        "min_label": "b",
-        "max": 3.0,
-        "max_label": "a",
-    }
-
-
 # --- the cohort and its fits ---------------------------------------------------------
 
 

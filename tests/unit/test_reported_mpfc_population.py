@@ -257,6 +257,15 @@ def test_prior_binding_values_are_the_lowest_and_highest_curve(population):
     assert f"({CURVES[-1]})" in values["prior_binds_percent_max"].description
 
 
+def test_prior_binding_values_leave_out_a_curve_with_no_well_posed_unit(population):
+    # the last curve's units all have a separated column: it has no share
+    population[f"{CURVES[-1]}: mle_separated"] = True
+    with np.errstate(invalid="ignore"):
+        values = _values(prior_binding_values, population)
+    assert values["prior_binds_percent_max"].value == pytest.approx(400 / 12)
+    assert f"({CURVES[-2]})" in values["prior_binds_percent_max"].description
+
+
 def test_called_fraction_values_per_class_and_per_animal(population):
     values = _values(called_fraction_values, population)
     expected = {

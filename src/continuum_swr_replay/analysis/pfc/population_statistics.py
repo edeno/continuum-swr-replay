@@ -43,30 +43,6 @@ from continuum_swr_replay.analysis.pfc.timing import (
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
-
-def lowest_and_highest(values: pd.Series) -> dict[str, object]:
-    """The lowest and the highest of a group's values, and which group has each.
-
-    Parameters
-    ----------
-    values : pd.Series, shape (n_groups,)
-        One value per group, indexed by the group's name.
-
-    Returns
-    -------
-    extremes : dict
-        ``min`` and ``max``, the lowest and highest value (a missing value is
-        left out), and ``min_label`` and ``max_label``, the first group that
-        has each.
-    """
-    return {
-        "min": values.min(),
-        "min_label": values.idxmin(),
-        "max": values.max(),
-        "max_label": values.idxmax(),
-    }
-
-
 # --- the cohort and its fits ---------------------------------------------------------
 
 
