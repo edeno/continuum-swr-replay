@@ -33,7 +33,7 @@ HISTORY_MIN_SUPPORT = 3.0
 HISTORY_MAX_SE = 0.5
 """... and its Wald standard error on the log scale is at most this."""
 
-_WALD_Z = 1.96
+_WALD_Z = norm.isf(0.025)
 """The normal quantile of a two-sided 95 % interval."""
 
 
