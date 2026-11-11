@@ -820,19 +820,22 @@ def _swr_without_replay_subsets(
 ) -> dict[str, NDArray]:
     """The units of each group of sessions: every session (``"all"``), and the
     sessions with at least ``min_events`` SWRs without replay
-    (``"min_events"``). A boolean mask over units for each."""
-    n_events = _session_event_counts(sessions).to_dict()
-    session_events = np.array(
-        [
-            n_events[(name, epoch)]
-            for name, epoch in zip(
-                population["nwb_file_name"], population["epoch_name"], strict=True
-            )
-        ]
+    (``"min_events"``). A boolean mask over units for each.
+
+    Raises
+    ------
+    KeyError
+        If a unit's session is not in ``sessions``.
+    """
+    session_events = _session_event_counts(sessions).reindex(
+        pd.MultiIndex.from_frame(population[["nwb_file_name", "epoch_name"]])
     )
+    unknown = session_events.index[session_events.isna()]
+    if len(unknown):
+        raise KeyError(f"units of sessions not in sessions: {sorted(set(unknown))}")
     return {
         "all": np.ones(len(population), dtype=bool),
-        "min_events": session_events >= min_events,
+        "min_events": session_events.to_numpy() >= min_events,
     }
 
 
