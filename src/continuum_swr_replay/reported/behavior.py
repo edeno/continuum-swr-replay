@@ -2299,7 +2299,9 @@ def stay_leave_values(
                 fits["n_fits"],
                 "count",
                 "count",
-                f"stratum {stratum}: session-by-role logistic fits attempted",
+                f"stratum {stratum}: session-by-role rows of the logistic fits, the "
+                "sessions skipped before fitting (too few stops, a constant stay "
+                "or outcome) included",
             ),
         ]
     signrank = smallest_adjusted_p(
@@ -2365,7 +2367,7 @@ def stay_leave_values(
             cohort["n_mixed"],
             "count",
             "count",
-            "mixed stops (every one without an is_stay)",
+            f"mixed stops ({cohort['n_mixed_with_stay']} of them with an is_stay)",
         ),
         make(
             "stops_mixed_with_stay",

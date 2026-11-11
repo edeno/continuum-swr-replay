@@ -749,14 +749,17 @@ def pooled_gee_role_summary(pooled: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        One row per role whose fit converged: ``role`` and ``p_fdr``, its
-        ``p_inter`` Benjamini-Hochberg corrected across those roles. A
-        converged fit without a p-value enters the correction as 1.
+        One row per role whose fit converged (none when no fit did): ``role``
+        and ``p_fdr``, its ``p_inter`` Benjamini-Hochberg corrected across
+        those roles. A converged fit without a p-value enters the correction
+        as 1.
     """
     converged = pooled[pooled["status"] == "ok"]
-    _, p_fdr, _, _ = multipletests(
-        converged["p_inter"].fillna(1.0).to_numpy(), method="fdr_bh"
-    )
+    p_fdr = np.array([])
+    if len(converged):  # the correction divides by the number of tests
+        _, p_fdr, _, _ = multipletests(
+            converged["p_inter"].fillna(1.0).to_numpy(), method="fdr_bh"
+        )
     return pd.DataFrame({"role": converged["role"].to_numpy(), "p_fdr": p_fdr})
 
 
@@ -776,27 +779,40 @@ def smallest_adjusted_p(summaries: Mapping[str, pd.DataFrame]) -> dict[str, obje
         ``p_fdr``, the smallest adjusted p, and the ``stratum`` and ``role``
         that have it (on a tie, the first stratum in alphabetical order, then
         the first role).
+
+    Raises
+    ------
+    ValueError
+        If no role of any stratum has a finite ``p_fdr``.
     """
-    p_fdr, stratum, role = min(
+    candidates = [
         (p, stratum, role)
         for stratum, summary in summaries.items()
         for p, role in zip(summary["p_fdr"], summary["role"], strict=True)
         if np.isfinite(p)
-    )
+    ]
+    if not candidates:
+        raise ValueError("no role of any stratum has a finite adjusted p")
+    p_fdr, stratum, role = min(candidates)
     return {"p_fdr": p_fdr, "stratum": stratum, "role": role}
 
 
 def fit_status_counts(fits: pd.DataFrame) -> dict[str, int]:
-    """How many stay/leave fits were attempted and how many converged.
+    """How many stay/leave fits there are rows for and how many converged.
 
     Parameters
     ----------
     fits : pandas.DataFrame
-        One row per attempted fit, with ``status`` (``"ok"`` when it converged).
+        The per-session fits (:func:`fit_is_stay_logistic_per_session`,
+        concatenated over roles): one row per session and role, with
+        ``status``. It is ``"ok"`` when the fit converged; any other status is
+        a session skipped before fitting (too few stops, a constant target or
+        outcome) or a fit that failed or did not converge.
 
     Returns
     -------
     dict
-        ``n_fits`` and ``n_converged``.
+        ``n_fits``, the rows (sessions by roles, skipped sessions included),
+        and ``n_converged``, the rows whose fit converged.
     """
     return {"n_fits": len(fits), "n_converged": int((fits["status"] == "ok").sum())}
