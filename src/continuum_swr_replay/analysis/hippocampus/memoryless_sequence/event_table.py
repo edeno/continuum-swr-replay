@@ -64,6 +64,7 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.detect import (
     CandidateSequences,
+    _is_above,
 )
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.shuffle import (
     ShuffleResult,
@@ -672,7 +673,14 @@ def outside_window_call_statistics(
     criteria (``is_replay``). It is decided by outside windows when it has at
     least one kept window outside every piece and its pieces' own dispersion
     (``pieces_dispersion_cm``) is not above the threshold: its dispersion
-    clears the threshold only with those windows.
+    clears the threshold only with those windows. "Above" is the detector's
+    own comparison, the one ``is_replay`` was decided with: a dispersion
+    within its relative tolerance of the threshold is equal to it, not above,
+    and neither is a missing (NaN) one, so a call with an outside window and
+    no pieces' dispersion counts as decided by it.
+
+    Every candidate of the table is read, whatever its
+    ``whole_event_speed_eligible`` and ``artifact_drop_reason``.
 
     Parameters
     ----------
@@ -684,6 +692,8 @@ def outside_window_call_statistics(
     Returns
     -------
     statistics : dict
+        Counts of candidates.
+
         - ``n_replay_calls``: the replay calls.
         - ``n_decided_by_outside_window``: of those, the calls decided by
           outside windows.
@@ -694,7 +704,7 @@ def outside_window_call_statistics(
     replay = table[table["is_replay"]]
     decided = replay[
         (replay["n_kept_windows_outside_pieces"] > 0)
-        & ~(replay["pieces_dispersion_cm"] > dispersion_threshold_cm)
+        & ~_is_above(replay["pieces_dispersion_cm"], dispersion_threshold_cm)
     ]
     return {
         "n_replay_calls": len(replay),
