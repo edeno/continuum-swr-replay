@@ -1,9 +1,13 @@
 """The behavior summary: how the events relate to the task, SWR against non-SWR.
 
 Every value is read from an output a fit already wrote; nothing is refitted
-here. A value read from a fit made on other tables than the current ones is
-pending (:func:`fit_staleness`). The inputs (:class:`BehaviorInputs`), with their runs in
-``scripts/qa/run_refits.py``:
+here. This module names and describes the values. The statistics are computed
+in ``analysis.replay`` (``coefficient_statistics``, ``rate_fit_statistics``,
+``history_kernel_statistics``, ``stop_statistics``, ``content_statistics`` and
+``learning``); here only the size of an input is counted and a statistic an
+input already holds is copied. A value read from a fit made on other tables
+than the current ones is pending (:func:`fit_staleness`). The inputs
+(:class:`BehaviorInputs`), with their runs in ``scripts/qa/run_refits.py``:
 
 - the per-bin rate ladder, Family B (``models_per_bin_rate/all_models.pkl``,
   ``rate.per_bin.at_well``; ``all_models_allstops.pkl``,
@@ -35,7 +39,7 @@ pending (:func:`fit_staleness`). The inputs (:class:`BehaviorInputs`), with thei
 
 Each aggregate is computed with the rule the producing script or its audit
 states, named in the value's description. The content-ladder, leaf-ladder and
-choice coefficients this module aggregates itself are read through the shipped
+choice coefficients aggregated for this summary are read through the shipped
 per-term identifiability gate
 (:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`).
 The per-bin rate values pass the same per-term gate: a reward kernel is read
@@ -59,7 +63,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
 
 from continuum_swr_replay.analysis.events.cohort_selection import (
     select_event_cohort,
@@ -67,6 +70,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
 )
 from continuum_swr_replay.analysis.replay import (
     content_statistics,
+    history_kernel_statistics,
     rate_fit_statistics,
     stop_statistics,
 )
@@ -96,7 +100,6 @@ from continuum_swr_replay.analysis.replay.learning import (
     smallest_adjusted_p,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
-    BIN_S,
     PER_BIN_DESIGN,
     PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
@@ -118,9 +121,7 @@ from continuum_swr_replay.reported.values import (
     pend,
     value_factory,
 )
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
-
-SC = list(SESSION_COLUMNS)
+from continuum_swr_replay.tables.session_keys import n_sessions
 
 TAGS = {
     "rate": Tags(("3.3",)),
@@ -2430,10 +2431,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
 
 # --- event history on the duration-aware design -------------------------------
 
-#: A pooled kernel's lag is read when it has this many expected onsets ...
-HISTORY_MIN_SUPPORT = 3.0
-#: ... and its Wald SE on the log scale is at most this.
-HISTORY_MAX_SE = 0.5
 #: The caveat every pooled history value carries.
 UPPER_BOUND = (
     "pooled within animal with a session fixed effect; an upper bound, since rate "
@@ -2448,54 +2445,6 @@ CROSS_LAG_MS = 45
 #: The ridge cross-validated rungs (``analysis/replay/ridge_history_cv.py``).
 RIDGE_SELF_RUNG = "Mself_long_dur"
 RIDGE_CROSS_RUNG = "Mselfcross_long_dur"
-
-
-def _lag_ms(j: int) -> int:
-    """Lag index ``j`` of a history kernel in ms: lag ``j + 1`` bins of ``BIN_S``."""
-    return round((j + 1) * BIN_S * 1e3)
-
-
-def _lag_index(ms: float) -> int:
-    """The history-kernel index of a lag of ``ms`` milliseconds."""
-    return round(ms / (BIN_S * 1e3)) - 1
-
-
-def _pooled_kernel(rec: dict, rung: str, block: str) -> dict | None:
-    """One (animal, population) fit's kernel with its measurable lags.
-
-    None when the rung did not fit, did not converge, or lacks the block.
-    """
-    fit = rec["duration_aware"].get(rung)
-    if (
-        fit is None
-        or not fit["ok"]
-        or not fit["converged"]
-        or block not in fit["kernels"]
-    ):
-        return None
-    k = fit["kernels"][block]
-    log_rr, se = np.asarray(k["log_rr"]), np.asarray(k["se"])
-    ok = (np.asarray(rec["support"][block]) >= HISTORY_MIN_SUPPORT) & (
-        se <= HISTORY_MAX_SE
-    )
-    return {"log_rr": log_rr, "se": se, "ok": ok}
-
-
-def _peak(kernel: dict) -> tuple[float, int, bool] | None:
-    """(rate ratio, lag in ms, CI above 1) at the measurable lag whose rate ratio
-    is largest; None when no lag is measurable.
-
-    The lag is chosen for being the largest, so its own 95 % Wald interval would
-    clear 1 more often than 5 % of the time with no effect at any lag. The
-    interval is therefore widened for the number of measurable lags searched
-    (Bonferroni: two-sided level 0.05 / m).
-    """
-    if not kernel["ok"].any():
-        return None
-    j = int(np.nanargmax(np.where(kernel["ok"], kernel["log_rr"], np.nan)))
-    lr, se = kernel["log_rr"][j], kernel["se"][j]
-    z = norm.isf(0.025 / int(kernel["ok"].sum()))
-    return float(np.exp(lr)), _lag_ms(j), bool(lr - z * se > 0)
 
 
 def duration_aware_history_values(
@@ -2517,46 +2466,23 @@ def duration_aware_history_values(
     converged.
     """
     make = value_factory(duration_aware_history_values, source, TAGS["rate"])
-    by_pop: dict[str, dict[str, dict]] = {}
-    for rec in pooled["results"]:
-        by_pop.setdefault(rec["outcome"], {})[rec["animal"]] = rec
-    _require(
-        set(by_pop) == set(RATE_POPULATIONS),
-        f"pooled populations {sorted(by_pop)} != {sorted(RATE_POPULATIONS)}",
+    by_population = history_kernel_statistics.self_history_statistics(
+        pooled["results"], "Mself_dur"
     )
+    _require(
+        set(by_population.index) == set(RATE_POPULATIONS),
+        f"pooled populations {sorted(by_population.index)} != "
+        f"{sorted(RATE_POPULATIONS)}",
+    )
+    overall = history_kernel_statistics.self_history_range_statistics(by_population)
+    n_fits, n_measured = overall["n_fits"], overall["n_first_lag_measurable"]
     values: list[Value] = []
-    first_lag, end_peaks, end_lags, end_animals = [], [], [], []
-    n_fits = n_measured = n_suppressed = n_raised = 0
-    first_ms = _lag_ms(0)
+    first_ms = history_kernel_statistics.lag_ms(0)
     for word, (outcome, label) in RATE_POPULATIONS.items():
-        ends, onsets, first = [], [], []
-        for rec in by_pop[outcome].values():
-            end = _pooled_kernel(rec, "Mself_dur", "self_offset")
-            onset = _pooled_kernel(rec, "Mself_dur", "self_onset")
-            _require(
-                end is not None,
-                f"{outcome}/{rec['animal']}: Mself_dur failed or did not converge",
-            )
-            n_fits += 1
-            if end["ok"][0]:
-                n_measured += 1
-                lr, se = end["log_rr"][0], end["se"][0]
-                first.append(float(np.exp(lr)))
-                n_suppressed += bool(lr + 1.96 * se < 0)
-                n_raised += bool(lr - 1.96 * se > 0)
-            if (peak := _peak(end)) is not None:
-                ends.append(peak)
-            if onset is not None and (peak := _peak(onset)) is not None:
-                onsets.append(peak)
-        _require(bool(first), f"{outcome}: no animal's {first_ms} ms lag is measurable")
-        first_lag.append(float(np.median(first)))
-        end_peaks.append(np.median([p[0] for p in ends]))
-        end_lags.append(np.median([p[1] for p in ends]))
-        end_animals.append(sum(p[2] for p in ends))
         values += [
             make(
                 f"history_onset_peak_{word}",
-                np.median([p[0] for p in onsets]),
+                by_population.loc[outcome, "onset_peak_rate_ratio_median"],
                 "quantity",
                 "dec2",
                 f"{label}: onset-locked part of the self-history (both-anchor rung "
@@ -2566,7 +2492,7 @@ def duration_aware_history_values(
             ),
             make(
                 f"history_onset_peak_lag_ms_{word}",
-                np.median([p[1] for p in onsets]),
+                by_population.loc[outcome, "onset_peak_lag_ms_median"],
                 "quantity",
                 "int",
                 f"{label}: median over animals of that onset-locked peak's lag",
@@ -2574,7 +2500,7 @@ def duration_aware_history_values(
             ),
             make(
                 f"history_onset_animals_{word}",
-                sum(p[2] for p in onsets),
+                by_population.loc[outcome, "n_onset_peaks_above_one"],
                 "count",
                 "count",
                 f"{label}: animals whose onset-locked peak has its 95 % CI above 1, "
@@ -2584,7 +2510,7 @@ def duration_aware_history_values(
     values += [
         make(
             "history_end_first_lag_rr_low",
-            min(first_lag),
+            overall["first_lag_rate_ratio_low"],
             "quantity",
             "dec2",
             "lowest over the four populations of the median (over animals) rate ratio "
@@ -2595,7 +2521,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_first_lag_rr_high",
-            max(first_lag),
+            overall["first_lag_rate_ratio_high"],
             "quantity",
             "dec2",
             "highest over the four populations of that median rate ratio "
@@ -2605,7 +2531,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_first_lag_suppressed_fits",
-            n_suppressed,
+            overall["n_first_lag_suppressed"],
             "count",
             "count",
             f"animal x population fits whose rate {first_ms} ms after the previous "
@@ -2614,7 +2540,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_first_lag_raised_fits",
-            n_raised,
+            overall["n_first_lag_raised"],
             "count",
             "count",
             f"animal x population fits whose rate {first_ms} ms after the previous "
@@ -2632,7 +2558,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_peak_low",
-            min(end_peaks),
+            overall["end_peak_rate_ratio_low"],
             "quantity",
             "dec2",
             "lowest over the four populations of the median (over animals) peak rate "
@@ -2642,7 +2568,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_peak_high",
-            max(end_peaks),
+            overall["end_peak_rate_ratio_high"],
             "quantity",
             "dec2",
             "highest over the four populations of that end-locked peak",
@@ -2650,7 +2576,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_peak_lag_ms_low",
-            min(end_lags),
+            overall["end_peak_lag_ms_low"],
             "quantity",
             "int",
             "shortest over the populations of the median end-locked peak lag",
@@ -2658,7 +2584,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_peak_lag_ms_high",
-            max(end_lags),
+            overall["end_peak_lag_ms_high"],
             "quantity",
             "int",
             "longest over the populations of the median end-locked peak lag",
@@ -2666,7 +2592,7 @@ def duration_aware_history_values(
         ),
         make(
             "history_end_peak_animals_min",
-            min(end_animals),
+            overall["n_end_peaks_above_one_min"],
             "count",
             "count",
             "fewest, over the populations, animals whose end-locked peak has its 95 % "
@@ -2674,38 +2600,20 @@ def duration_aware_history_values(
             "(Bonferroni)",
         ),
     ]
-    lag = _lag_index(CROSS_LAG_MS)
-    by_cross: dict[str, list[dict]] = {}
-    for rec in ridge["results"]:
-        by_cross.setdefault(rec["outcome"], []).append(rec)
     for word, (outcome, label) in CROSS_DIRECTIONS.items():
-        recs = by_cross.get(outcome, [])
-        _require(bool(recs), f"{outcome}: no ridge cross-history fit")
-        rr, above, gains = [], 0, []
-        for rec in recs:
-            for rung, fit in rec["models"].items():
-                _require(
-                    fit["full_converged"] and fit["cv"]["n_nonconverged"] == 0,
-                    f"{outcome}/{rec['animal']}: ridge {rung} did not converge",
-                )
-            gains.append(rec["gain_per_event"])
-            k = rec["models"][RIDGE_CROSS_RUNG]["kernels"]["cross_offset"]
-            lr, sd = k["log_rr"][lag], k["sd"][lag]
-            if rec["support"]["cross_offset"][lag] < HISTORY_MIN_SUPPORT:
-                continue
-            rr.append(float(np.exp(lr)))
-            above += bool(lr - 1.96 * sd > 0)
-        _require(
-            bool(rr), f"{outcome}: no animal's {CROSS_LAG_MS} ms lag is measurable"
+        cross = history_kernel_statistics.cross_history_statistics(
+            ridge["results"], outcome, RIDGE_CROSS_RUNG, CROSS_LAG_MS
         )
+        n_animals = cross["n_animals"]
         kept = (
-            f"over the {len(rr)} of {len(recs)} animals whose {CROSS_LAG_MS} ms lag "
-            f"has at least {HISTORY_MIN_SUPPORT:g} expected onsets"
+            f"over the {cross['n_measurable']} of {n_animals} animals whose "
+            f"{CROSS_LAG_MS} ms lag has at least "
+            f"{history_kernel_statistics.HISTORY_MIN_SUPPORT:g} expected onsets"
         )
         values += [
             make(
                 f"history_cross_end_rr_{word}",
-                np.median(rr),
+                cross["rate_ratio_median"],
                 "quantity",
                 "dec2",
                 f"{label}: rate ratio {CROSS_LAG_MS} ms after the other stream's event "
@@ -2717,7 +2625,7 @@ def duration_aware_history_values(
             ),
             make(
                 f"history_cross_end_animals_{word}",
-                above,
+                cross["n_animals_above_one"],
                 "count",
                 "count",
                 f"{label}: animals whose rate ratio at {CROSS_LAG_MS} ms has its 95 % "
@@ -2725,10 +2633,10 @@ def duration_aware_history_values(
             ),
             make(
                 f"history_cross_heldout_gain_{word}",
-                np.median(gains),
+                cross["heldout_gain_median"],
                 "quantity",
                 "sig2s",
-                f"{label}: median over the {len(gains)} animals of the held-out "
+                f"{label}: median over the {n_animals} animals of the held-out "
                 f"log-likelihood gain per held-out event of {RIDGE_CROSS_RUNG} over "
                 f"{RIDGE_SELF_RUNG} (five folds of whole stops, each rung's ridge "
                 "strength chosen by inner cross-validation); positive = the cross "
@@ -2737,10 +2645,10 @@ def duration_aware_history_values(
             ),
             make(
                 f"history_cross_heldout_animals_positive_{word}",
-                int(sum(g > 0 for g in gains)),
+                cross["n_animals_gain_positive"],
                 "count",
                 "count",
-                f"{label}: animals, of {len(gains)}, whose held-out cross gain is "
+                f"{label}: animals, of {n_animals}, whose held-out cross gain is "
                 "positive",
             ),
         ]

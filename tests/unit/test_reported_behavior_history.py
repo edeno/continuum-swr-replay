@@ -6,8 +6,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.behavior import (
+from continuum_swr_replay.analysis.replay.history_kernel_statistics import (
     HISTORY_MAX_SE,
+)
+from continuum_swr_replay.reported.behavior import (
     duration_aware_history_values,
     horserace_values,
 )
