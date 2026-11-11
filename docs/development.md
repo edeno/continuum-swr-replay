@@ -196,6 +196,14 @@ This project relies on the Spyglass DataJoint pipeline. Key tables used:
 
 When modifying data loading, respect the DataJoint query patterns and restriction syntax.
 
+**The analyses only read the lab's database.** `load_data`, `get_epoch_info` and the
+other loaders fetch from Spyglass; nothing in `src/` or `scripts/` inserts, populates,
+deletes, creates a schema or exports. Keep it that way. Never write to the lab's
+Spyglass database without the explicit approval, from the person who owns the data, of
+that specific step; a script that must write is a lab operation, documented on its own,
+not part of the analysis. `tests/unit/test_no_database_writes.py` fails when code here
+calls a DataJoint write method.
+
 ### Spike Data Processing
 
 - **HPC**: Uses clusterless thresholding with waveform feature extraction. Automatically detects and removes coincident spikes across tetrodes (likely artifacts).
@@ -373,11 +381,12 @@ macOS arm64, where `jax-cuda12-plugin` has no wheel).
 
 ## Animal and Session Information
 
-The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. The register analyses 242 epochs in 45 NWB files.
+The dataset includes recordings from 5 animals. Each NWB file can contain multiple epochs (e.g., `02_r1`, `04_r2`, `06_r3`). The cohort is the epoch register's analysed epochs (`data_loaders/epoch_register.csv`, read by `analysed_epochs()`); `docs/epoch_register.md` gives each excluded epoch's reason. The register analyses 242 epochs in 45 NWB files; the table counts those, and its dates are
+the recording days of the analysed epochs (`tests/unit/test_documented_values.py` checks both).
 
 | Animal | NWB Files | Epochs | Dates |
 |--------|-----------|--------|-------|
-| chimi | 14 | 46 | Feb-Mar 2020 |
+| chimi | 14 | 46 | Feb 2020 |
 | j16 | 8 | 58 | Jul 2021 |
 | peanut | 6 | 44 | Nov-Dec 2020 |
 | senor | 10 | 49 | Oct-Nov 2020 |
