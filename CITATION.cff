@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite the paper as below."
 # TODO: replace the working title; the author list is tentative (see TODO.md).
-title: "continuum-swr-replay: Source code for 'Non-local hippocampal events outside sharp-wave ripples' (working title)"
+title: "continuum-swr-replay: Source code for 'Non-local hippocampal events outside sharp-wave ripples (working title)'"
 abstract: >-
   Source code, analysis scripts, and figure pipeline for a paper that
   characterizes non-local hippocampal events detected by a switching
