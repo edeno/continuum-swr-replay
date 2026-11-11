@@ -43,3 +43,29 @@ jobs:
 
       - name: Run tests
         run: uv run --frozen --python ${{ matrix.python-version }} pytest -q
+
+  manuscript:
+    # Builds paper/main.pdf from the committed sources, figures and macros, as
+    # `make manuscript` does locally, and fails on an undefined citation or
+    # reference, which LaTeX itself reports only as a warning.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install LaTeX
+        # The TeX Live collections holding the packages paper/main.tex loads
+        # (authblk and pdflscape are in latex-extra; lmodern is its own package).
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            latexmk texlive-latex-base texlive-latex-recommended \
+            texlive-latex-extra texlive-fonts-recommended lmodern
+
+      - name: Build the manuscript
+        run: make manuscript
+
+      - name: Check for undefined citations and references
+        run: |
+          if grep -E "(Citation|Reference) .* undefined" paper/main.log; then
+            exit 1
+          fi
