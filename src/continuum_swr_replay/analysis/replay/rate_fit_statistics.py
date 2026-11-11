@@ -44,6 +44,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
+    reward_kernel_rate_ratios,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
@@ -248,7 +249,7 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
     gated, kernels = _gated_reward_kernels(fits)
     lag_one = pd.Series(kernels[:, 0], index=gated.index)
     lag_one_statistics = session_median_statistics(lag_one, gated["animal"])
-    rate_ratios = np.median(np.exp(kernels), axis=0)
+    rate_ratios = reward_kernel_rate_ratios(gated)
     late = rate_ratios[FIRST_LATE_REWARD_LAG - 1 :]
     n_fitted = int(fits[_REWARD_COEFFICIENTS].notna().all(axis=1).sum())
     return {
