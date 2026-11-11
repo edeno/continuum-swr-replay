@@ -1195,6 +1195,37 @@ def timing_values(
         "the half-maximum onset: the earliest lag of the run, ending at the peak, "
         "over which the curve keeps the peak's sign and at least half its size"
     )
+
+    def add_with_interval(
+        stats: pd.Series, statistic: str, stem: str, description: str
+    ) -> None:
+        """A population lag, in ms, and its interval over the resamples."""
+        add(
+            f"timing_{statistic}_{stem}",
+            stats[statistic],
+            "quantity",
+            "int",
+            description,
+            "ms",
+        )
+        add(
+            f"timing_{statistic}_ci_low_{stem}",
+            stats[f"{statistic}_ci_low"],
+            "quantity",
+            "int",
+            f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
+            f"recording-day resamples (seed {TIMING_BOOTSTRAP_SEED})",
+            "ms",
+        )
+        add(
+            f"timing_{statistic}_ci_high_{stem}",
+            stats[f"{statistic}_ci_high"],
+            "quantity",
+            "int",
+            "97.5th percentile of that over the same resamples",
+            "ms",
+        )
+
     called_by_class = {}
     for word, (name, curve_key) in TIMING_CLASSES.items():
         label = CLASS_LABELS[name]
@@ -1296,62 +1327,24 @@ def timing_values(
                 "of its peak, clipped to the range 0 to 1: how far the curve sits "
                 "from zero before the event",
             )
-            add(
-                f"timing_population_rise_onset_ms_{stem}",
-                stats["population_rise_onset_ms"],
-                "quantity",
-                "int",
-                f"rise onset of the sign-aligned mean curve of {who}: half way from its "
-                "value at -200 ms to its peak",
-                "ms",
-            )
-            add(
-                f"timing_population_rise_onset_ms_ci_low_{stem}",
-                stats["population_rise_onset_ms_ci_low"],
-                "quantity",
-                "int",
-                f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
-                f"recording-day resamples (seed {TIMING_BOOTSTRAP_SEED})",
-                "ms",
-            )
-            add(
-                f"timing_population_rise_onset_ms_ci_high_{stem}",
-                stats["population_rise_onset_ms_ci_high"],
-                "quantity",
-                "int",
-                "97.5th percentile of that over the same resamples",
-                "ms",
-            )
-            for what in ("peak", "onset"):
-                text = (
-                    f"{'peak lag' if what == 'peak' else 'onset (' + onset_rule + ')'} of "
-                    f"the mean curve of {who}, each unit's curve signed by its peak"
-                )
-                add(
-                    f"timing_population_{what}_ms_{stem}",
-                    stats[f"population_{what}_ms"],
-                    "quantity",
-                    "int",
-                    text,
-                    "ms",
-                )
-                add(
-                    f"timing_population_{what}_ms_ci_low_{stem}",
-                    stats[f"population_{what}_ms_ci_low"],
-                    "quantity",
-                    "int",
-                    f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
-                    f"recording-day resamples (seed {TIMING_BOOTSTRAP_SEED})",
-                    "ms",
-                )
-                add(
-                    f"timing_population_{what}_ms_ci_high_{stem}",
-                    stats[f"population_{what}_ms_ci_high"],
-                    "quantity",
-                    "int",
-                    "97.5th percentile of that over the same resamples",
-                    "ms",
-                )
+            for what, text in (
+                (
+                    "rise_onset",
+                    f"rise onset of the sign-aligned mean curve of {who}: half way "
+                    "from its value at -200 ms to its peak",
+                ),
+                (
+                    "peak",
+                    f"peak lag of the mean curve of {who}, each unit's curve signed "
+                    "by its peak",
+                ),
+                (
+                    "onset",
+                    f"onset ({onset_rule}) of the mean curve of {who}, each unit's "
+                    "curve signed by its peak",
+                ),
+            ):
+                add_with_interval(stats, f"population_{what}_ms", stem, text)
             add(
                 f"timing_steepest_median_ms_{stem}",
                 stats["steepest_median_ms"],
@@ -1361,25 +1354,13 @@ def timing_values(
                 "level-free rule: where the curve moves fastest toward its peak)",
                 "ms",
             )
-            add(
-                f"timing_population_steepest_ms_{stem}",
-                stats["population_steepest_ms"],
-                "quantity",
-                "int",
+            add_with_interval(
+                stats,
+                "population_steepest_ms",
+                stem,
                 f"lag of the steepest approach to the peak of the sign-aligned mean "
                 f"curve of {who}",
-                "ms",
             )
-            for bound in ("low", "high"):
-                add(
-                    f"timing_population_steepest_ms_ci_{bound}_{stem}",
-                    stats[f"population_steepest_ms_ci_{bound}"],
-                    "quantity",
-                    "int",
-                    f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that over "
-                    f"{TIMING_BOOTSTRAP_DRAWS:,} recording-day resamples",
-                    "ms",
-                )
             for rule, text in (
                 ("size", "its peak, from zero"),
                 ("rise_size", "its peak less its value at -200 ms"),
