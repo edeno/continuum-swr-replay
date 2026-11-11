@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "3cef11b91eaa",
+ "commit": "f8aa188b385f",
  "code": {
-  "head": "3cef11b91eaacc1a4ad2c6ae48ea17d3f1595c2d",
+  "head": "f8aa188b385fa14033ce602409b0eb10964731f0",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -87,8 +87,8 @@
     "code_sha256": "fbdf70f0c48b81886691bdfa12d66fdf623d55489c9487078165778f7a8b213d"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/event_table.py": {
-    "sha256": "557f7c8e247ca45cdab68a52c8d477dc9f697845b1d14440f749167252979054",
-    "code_sha256": "44426c072e8b557d9f93d8f1c74c11d795a5de4cffbf3412b1661eb4ab8a56a7"
+    "sha256": "72df949f757279323ef8b76a9eea57a59582ac392a2e963b376ea69e8b20e2c9",
+    "code_sha256": "8ad2b48cb97dd9dd0f8f9fb102aeb502168470ea911728936a588daa8ab5d408"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/likelihood.py": {
     "sha256": "bafb5d60658fb9332934c4adfec9ac4813d42ceb3e801212bef99dd1554acd19",
@@ -97,6 +97,10 @@
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/shuffle.py": {
     "sha256": "675b78999797c34950eb28bb52118cf4b5e3bb02e821f6446572796e18f2472a",
     "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
+   },
+   "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/sweep_statistics.py": {
+    "sha256": "eee5ca8b4b351f3b4c1bdc303697e850b253ab5aab7ab42b1a27055c6e056da8",
+    "code_sha256": "0d11d99ba3cbb137beb885a118ed0c552b43031e3bd23dc30f690ed7ee77c083"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -171,20 +175,20 @@
     "code_sha256": "338068b33f6638598496ff6c8b1c83b29f18de54cea9d84833f7dbb7f4e61c77"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "8b97665dec5cf90a2109d94513b790500becbbeea4c19a8387187838bcca11b3",
-    "code_sha256": "7a0036eb8770ba7d1d55d0005fa056bb3376560f3a6820d3dcee12eb7aa85ddd"
+    "sha256": "f1cb76b1cdef9ccc04c58a8a728d1c017db0fe78ef882329accb2d94f769a029",
+    "code_sha256": "668a7a32d226a0855971d2120c241fcc85bae068e76629b45973b80e3bfcfe56"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "f86ce9d1f39a38c308380cb69231ed68ba3d94259947e4f1d52bc4c46ab155a1",
-    "code_sha256": "846c602ddad8247203a36ea80e6a9338144dd869cb6ced5dfe417656d3871156"
+    "sha256": "793ea125864d7220e714c398780f9ce30d6c8f11393b6a78df55e920e3f34fa3",
+    "code_sha256": "de70a0d44e70a303cc35c5b2f364e78a2187eff76d90f7952627044b1b9329c9"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "d60fdd47e079ae9be7250e61efc8dd9cbd807314e9ce7a10d4a020a165383225",
-    "code_sha256": "36b731a186f468b1a15f96b6233122a9efe0bfb242fbc9250954ca387bc207c6"
+    "sha256": "d85e3758dae42b2b7aa0ed8caf091c488738d71ba54d3600154bfaa6ce7aaad1",
+    "code_sha256": "7ea819738b26eae55e73386eef4e49a3bc2302ba02a55ceb0bcbcbb92e077eae"
    },
    "src/continuum_swr_replay/reported/values.py": {
     "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",
@@ -299,7 +303,7 @@
    "sha256": "19a36645f549d0fba071e773ba57f874df53e339b643d99dfd311d14f3094d6d"
   },
   {
-   "path": "paper/figures/reality_all/per_epoch/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
+   "path": "Processed-Data/event_spike_evidence/chimi20200212_02_r1_HPC/event_spike_evidence_metrics.parquet",
    "n_files": 242,
    "sha256": "c985e57fe55be40732bb1b3bc31515d04777bfbc1d5efce334ce149280e2b861"
   },
@@ -312,7 +316,7 @@
    "sha256": "c271a902f07b5eab5ea3cbb1691ae726741f58028f21aac8b9417ccd5d116dcf"
   },
   {
-   "path": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "path": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "sha256": "b0fd39ceeee50b3f1332b411528c442e5b0eed82b9027aa8ca549dc949276872"
   },
   {
@@ -374,7 +378,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -535,7 +539,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -549,7 +553,7 @@
     "2c.4"
    ],
    "figures": [],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -567,7 +571,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -583,7 +587,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -599,7 +603,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -887,7 +891,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -905,7 +909,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2417,7 +2421,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2433,7 +2437,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2449,7 +2453,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2465,7 +2469,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2479,7 +2483,7 @@
     "2c.4"
    ],
    "figures": [],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2497,7 +2501,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2513,7 +2517,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2529,7 +2533,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2546,7 +2550,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -2563,7 +2567,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -2580,7 +2584,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -2597,7 +2601,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -2614,7 +2618,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -2679,7 +2683,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2696,7 +2700,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2713,7 +2717,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2730,7 +2734,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2745,7 +2749,7 @@
     "2c.7"
    ],
    "figures": [],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2764,7 +2768,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2781,7 +2785,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -2798,7 +2802,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -3167,7 +3171,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -4249,7 +4253,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -4266,7 +4270,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -4283,7 +4287,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -4300,7 +4304,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -4317,7 +4321,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+   "source": "Processed-Data/content_occupancy/content_occupancy_per_session.csv",
    "function": "content_occupancy_values",
    "pending": null
   },
@@ -4350,7 +4354,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4367,7 +4371,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4384,7 +4388,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4401,7 +4405,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4416,7 +4420,7 @@
     "2c.7"
    ],
    "figures": [],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4435,7 +4439,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4452,7 +4456,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },
@@ -4469,7 +4473,7 @@
    "figures": [
     "2"
    ],
-   "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
+   "source": "Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "function": "spike_evidence_values",
    "pending": null
   },

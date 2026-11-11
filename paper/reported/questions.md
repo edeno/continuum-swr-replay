@@ -10,11 +10,11 @@ computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `349b586507b6` | yes | 32 | 0 |
-| `detection.json` | `d7e273e84b1b` | yes | 132 | 0 |
-| `events.json` | `3cef11b91eaa` | yes | 331 | 0 |
-| `behavior.json` | `d7e273e84b1b` | yes | 922 | 0 |
-| `mpfc.json` | `68cc378dfb9b` | yes | 604 | 0 |
+| `survey.json` | `f8aa188b385f` | yes | 32 | 0 |
+| `detection.json` | `f8aa188b385f` | yes | 132 | 0 |
+| `events.json` | `f8aa188b385f` | yes | 331 | 0 |
+| `behavior.json` | `f8aa188b385f` | yes | 922 | 0 |
+| `mpfc.json` | `f8aa188b385f` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -491,7 +491,7 @@ Status: computed. Figures: 2. Values: 14.
 
 Sources:
 
-- paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
@@ -520,8 +520,8 @@ Sources:
 
 - Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
 - Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 - Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
-- paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
@@ -597,7 +597,7 @@ Status: computed. Values: 4.
 
 Sources:
 
-- paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
@@ -612,7 +612,7 @@ Status: computed. Figures: 2. Values: 7.
 
 Sources:
 
-- paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
@@ -634,7 +634,7 @@ Status: computed. Figures: 2. Values: 16.
 
 Sources:
 
-- paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
+- Processed-Data/event_spike_evidence/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
@@ -661,7 +661,7 @@ Status: computed. Figures: 2. Values: 12.
 
 Sources:
 
-- paper/figures/content_occupancy/content_occupancy_per_session.csv
+- Processed-Data/content_occupancy/content_occupancy_per_session.csv
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
@@ -690,9 +690,9 @@ Status: partly computed; the own-well share waits for the wider-Local-kernel re-
 
 Sources:
 
+- Processed-Data/content_occupancy/content_occupancy_per_session.csv
 - Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
 - Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- paper/figures/content_occupancy/content_occupancy_per_session.csv
 
 | Macro | Value | Unit | What it is | Computed in | Figures |
 |---|---|---|---|---|---|
