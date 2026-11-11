@@ -76,35 +76,11 @@ Work that is deferred on purpose. Each item says when it should be done.
 
   *When:* at each figure's or report's next regeneration.
 
-- [ ] **Choices seen while the statistics moved (kept as they were; confirm or
-  change each).** The moves kept every value bit for bit, so these are as before:
-  - behavior, lag-1 reward kernel: the session-pooled value is the median of rate
-    ratios, the animal-balanced one is exp of a median of log kernels; the two
-    differ when a median averages two middle values (`rate_fit_statistics.py`).
-  - behavior: `power_sessions` counts every row of the model, while each
-    covariate's statistics are over the sessions that have that coefficient.
-  - behavior: `rate_contrast_term_separated_fraction` is over the fits of every
-    population that carry the term, not only the `contrast` fits its neighbours
-    use.
-  - behavior, history kernels: the first-lag raised and suppressed counts use an
-    unadjusted 1.96 interval, the peak a Bonferroni-widened one; pooled records
-    are keyed by population and animal, so a duplicate record replaces the
-    earlier one silently.
-  - behavior, stay/leave: a converged GEE with a missing p enters the
-    Benjamini-Hochberg correction as p = 1.
-  - detection, held-out sweep: the fold minimum and maximum are order-dependent
-    when a fold's rate is NaN, and the "one rate for shared replays" refusal is
-    then skipped; `no_replay_statistics` reads the first matching row without
-    checking it is the only one; the carving statistics use the first
-    condition's levels for every pooled condition; the builder and the figure
-    script refuse the no-replay block on different conditions.
-  - mpfc: `called_fractions` raises `ZeroDivisionError` when a test has no tested
-    unit (not on the current data); `compare_pfc_cohorts.peak_shrinkage` reads a
-    missing `mle_converged` as True where `prior_binding_percent` reads it as
-    False (they agree on the current data); `--min-firing-rate` still defaults to
-    1 Hz in `measure_pfc_null_geometry.py` and `compare_pfc_cohorts.py`, and the
-    summary uses no cutoff.
-
+- [ ] **Decide the open choices in the reported statistics.**
+  `docs/known_issues/reported_statistics_choices.md` lists them (20 entries:
+  where each is made, what the code does, what is open). The moves of the
+  statistics into `analysis/` kept each as it was. Write each decision in that
+  file.
   *When:* before the Results that cite the value are drafted.
 
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,

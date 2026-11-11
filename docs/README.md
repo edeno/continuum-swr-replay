@@ -169,6 +169,9 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     comparison's per-detector adapters and runner, the Yu detector's project
     wiring, and specs 04–05.
 - [known_issues/](known_issues/) — *reference*: documented data/pipeline issues.
+  - [reported_statistics_choices.md](known_issues/reported_statistics_choices.md) —
+    *open*: choices the reported statistics make that have not been decided (which
+    function, what it does, what is open); write each decision there.
   - [2026-10-12-full-redecode-r11.md](known_issues/2026-10-12-full-redecode-r11.md) — the
     October full re-decode (R11): what changed, the backups, and what stays stale until rerun.
   - [three_sessions_blocked_by_nwb_checksum.md](known_issues/three_sessions_blocked_by_nwb_checksum.md)
