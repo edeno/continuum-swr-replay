@@ -34,14 +34,10 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from continuum_swr_replay.paths import ROOT_DIR
+from continuum_swr_replay.paths import MANUSCRIPT, ROOT_DIR, SUMMARY_DIR, TEX_PATH
 from continuum_swr_replay.reported.emit import manuscript_source, tex_file
 from continuum_swr_replay.reported.release import release_problems
 from continuum_swr_replay.reported.values import read_summaries
-
-SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
-MANUSCRIPT = ROOT_DIR / "paper" / "main.tex"
-TEX_PATH = ROOT_DIR / "paper" / "reported_values.tex"
 
 
 def main(argv: Sequence[str] | None = None) -> int:

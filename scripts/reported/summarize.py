@@ -31,7 +31,7 @@ import importlib
 from collections.abc import Sequence
 from pathlib import Path
 
-from continuum_swr_replay.paths import ROOT_DIR
+from continuum_swr_replay.paths import ROOT_DIR, SUMMARY_DIR
 from continuum_swr_replay.reported.code_record import (
     CodeRecord,
     build_files,

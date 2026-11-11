@@ -33,7 +33,7 @@ import argparse
 from collections.abc import Sequence
 from datetime import date
 
-from continuum_swr_replay.paths import ROOT_DIR
+from continuum_swr_replay.paths import MANUSCRIPT, ROOT_DIR, SUMMARY_DIR, TEX_PATH
 from continuum_swr_replay.reported.emit import (
     cited_values,
     emit,
@@ -44,9 +44,6 @@ from continuum_swr_replay.reported.emit import (
 from continuum_swr_replay.reported.release import staleness
 from continuum_swr_replay.reported.values import read_summaries, summary_tag_problems
 
-SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
-TEX_PATH = ROOT_DIR / "paper" / "reported_values.tex"
-MANUSCRIPT = ROOT_DIR / "paper" / "main.tex"
 CHANGES_PATH = SUMMARY_DIR / "changes.md"
 QUESTIONS_PATH = SUMMARY_DIR / "questions.md"
 DOC_ROOTS = (ROOT_DIR / "paper", ROOT_DIR / "docs")
