@@ -28,7 +28,7 @@ from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported import literature
 from continuum_swr_replay.reported.values import Summary, Value, file_record
 
-CLAIMS = ("introduction",)
+QUESTIONS_ANSWERED = ("0.1",)
 USED_IN = ("paper",)
 
 #: The parameters the introduction quotes: key stem -> (columns pooled, unit, what it is).
@@ -167,7 +167,7 @@ def _quantity(
         style=style,
         unit=unit,
         description=description,
-        claims=CLAIMS,
+        questions=QUESTIONS_ANSWERED,
         used_in=USED_IN,
         source=source,
     )
@@ -287,7 +287,7 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
             style="count",
             unit="",
             description="Papers in the survey",
-            claims=CLAIMS,
+            questions=QUESTIONS_ANSWERED,
             used_in=USED_IN,
             source=source,
         )
@@ -301,7 +301,7 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
                 style="pctnum",
                 unit="",
                 description=f"Share of the {n} surveyed papers {what}",
-                claims=CLAIMS,
+                questions=QUESTIONS_ANSWERED,
                 used_in=USED_IN,
                 source=source,
             )

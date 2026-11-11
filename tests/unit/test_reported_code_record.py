@@ -241,7 +241,7 @@ def test_a_record_of_no_files_is_not_current(repo):
 
 
 def _summary(
-    code=None, claims=("15",), name="events", inputs=(), migrated=None
+    code=None, questions=("2d.2",), name="events", inputs=(), migrated=None
 ) -> values.Summary:
     summary = values.Summary(
         name=name,
@@ -259,7 +259,7 @@ def _summary(
             style="pct",
             unit="",
             description="d",
-            claims=claims,
+            questions=questions,
             used_in=("paper",),
             source="s",
             check_tags=False,
@@ -278,14 +278,14 @@ def test_the_code_record_and_a_migration_round_trip(repo, tmp_path):
     assert values.read_summary(path).migrated == migrated
 
 
-@pytest.mark.parametrize("schema", [3, 5])
+@pytest.mark.parametrize("schema", [4, 6])
 def test_another_schema_is_refused(tmp_path, schema):
     path = tmp_path / "events.json"
     _summary().write(path)
     payload = json.loads(path.read_text())
     payload["schema_version"] = schema
     path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="expected 4"):
+    with pytest.raises(ValueError, match="expected 5"):
         values.read_summary(path)
 
 
@@ -350,7 +350,7 @@ def test_staleness_names_each_reason_and_the_release_check_adds_bad_tags(repo):
     problems, _ = release_problems(
         {
             "events": current,
-            "behavior": _summary(code=current.code, claims=("12",), name="behavior"),
+            "behavior": _summary(code=current.code, questions=("12",), name="behavior"),
         },
         repo,
     )
@@ -398,7 +398,7 @@ def test_check_release_exits_0_only_when_every_summary_is_current(
     assert script.main([]) == 0
     assert "all 5 summaries are current" in capsys.readouterr().out
 
-    _summary(claims=("12",), name="behavior").write(summaries / "behavior.json")
+    _summary(questions=("12",), name="behavior").write(summaries / "behavior.json")
     assert script.main([]) == 1
     out = capsys.readouterr().out
     assert "behavior.json:" in out and "no code record" in out
@@ -428,7 +428,7 @@ def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
     doc = repo / "docs" / "note.md"
     doc.write_text("Share <!--v:events.share-->99 %<!--/v-->.\n")
     _write_all(reported, code=code_record(repo, [repo / "pkg" / "mod.py"]))
-    _summary(claims=("12",), name="behavior").write(reported / "behavior.json")
+    _summary(questions=("12",), name="behavior").write(reported / "behavior.json")
     script.main([])
     out = capsys.readouterr().out
     assert "behavior.json: 1 values with tag problems" in out

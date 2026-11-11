@@ -247,7 +247,7 @@ def default_inputs() -> MpfcInputs:
 
 def _value_factory(
     source: str,
-    claims: tuple[str, ...],
+    questions: tuple[str, ...],
     used_in: tuple[str, ...],
     pending: str | None = None,
 ):
@@ -277,7 +277,7 @@ def _value_factory(
             style=style,
             unit=unit,
             description=description,
-            claims=claims,
+            questions=questions,
             used_in=used_in_ or used_in,
             source=source,
             pending=pending,
@@ -2458,7 +2458,7 @@ def followup_values(
     inputs: MpfcInputs,
     current: dict[str, str],
     n_cohort: int,
-    claims: tuple[str, ...],
+    questions: tuple[str, ...],
 ) -> tuple[list[Value], list[dict[str, Any]]]:
     """The marked-family and stop-context values, each pending when its inputs
     are stale (:func:`marked_family_staleness`, :func:`stop_context_staleness`),
@@ -2473,7 +2473,7 @@ def followup_values(
                 "(scripts/pfc/summarize_pfc_marked_family.py over "
                 "scripts/pfc/run_pfc_marked_model_family.py --model-set followup "
                 "--baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
-                claims,
+                questions,
                 ("paper",),
                 marked_family_staleness(
                     inputs.marked_family_summary, current, n_cohort
@@ -2494,7 +2494,7 @@ def followup_values(
             _value_factory(
                 f"{rel(inputs.stop_context_results)} "
                 "(scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
-                claims,
+                questions,
                 ("paper",),
                 stop_context_staleness(
                     inputs.stop_context_results, inputs.bundle_dir, current, n_cohort
@@ -2520,9 +2520,9 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
         "read by Figure 4's loader (analysis/pfc/load_population.py, no "
         "firing-rate cutoff)"
     )
-    claims = ("20",)
-    make = _value_factory(source, claims, ("paper",), pending)
-    figure = _value_factory(source, claims, ("paper", "figure: 4d"), pending)
+    questions = ("4.1",)
+    make = _value_factory(source, questions, ("paper",), pending)
+    figure = _value_factory(source, questions, ("paper", "figure: 4d"), pending)
     summary.add(*cohort_values(sidecars, population, cohort, make))
     summary.add(*estimator_values(sidecars, make))
     summary.add(*prior_binding_values(population, make))
@@ -2536,7 +2536,9 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
     )
     summary.add(*timing_values(population, curves, lag_time, calibration, make))
     current = table_hashes(inputs.event_table, inputs.stop_table)
-    values, records = followup_values(inputs, current, cohort["n_pfc_cohort"], claims)
+    values, records = followup_values(
+        inputs, current, cohort["n_pfc_cohort"], questions
+    )
     summary.add(*values)
     summary.inputs += records
     extended_dir = inputs.swr_without_replay_dir
@@ -2575,7 +2577,7 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
                     "(scripts/pfc/run_pfc_analysis_bandit.py --event-set "
                     f"with_swr_without_replay), {len(extended_sidecars)} bundles, "
                     "Figure 4's loader (no firing-rate cutoff)",
-                    claims,
+                    questions,
                     ("paper",),
                     extended_pending,
                 ),

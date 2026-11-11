@@ -21,7 +21,7 @@ from continuum_swr_replay.reported.mpfc import (
     table_hashes,
 )
 
-CLAIMS = ("20",)
+QUESTIONS_ANSWERED = ("4.1",)
 SESSIONS = (("j1620210706_.nwb", "02_r1"), ("j1620210706_.nwb", "04_r2"))
 
 
@@ -184,14 +184,16 @@ def test_the_pending_notes_reach_the_followup_values(tmp_path, tables):
         marked_family_summary=_marked(tmp_path, current),
         stop_context_results=_stop_context(tmp_path, current),
     )
-    values, records = followup_values(inputs, current, 2, CLAIMS)
+    values, records = followup_values(inputs, current, 2, QUESTIONS_ANSWERED)
     assert values and all(v.pending is None for v in values)
     assert len(records) == 2
     assert "--slope-permutations 0" in next(
         v.source for v in values if v.key.startswith("marked_")
     )
     stop.write_bytes(b"new stops")
-    values, _ = followup_values(inputs, table_hashes(event, stop), 2, CLAIMS)
+    values, _ = followup_values(
+        inputs, table_hashes(event, stop), 2, QUESTIONS_ANSWERED
+    )
     assert all("stop_table_sha256 differs" in v.pending for v in values)
     marked = [v for v in values if v.key.startswith("marked_")]
     context = [v for v in values if v.key.startswith("stop_context_")]
@@ -200,4 +202,4 @@ def test_the_pending_notes_reach_the_followup_values(tmp_path, tables):
     assert all("stop-context fits" in v.pending for v in context)
     # a fit over fewer sessions than the cohort is refused
     with pytest.raises(ValueError, match="not the 3 of the PFC cohort"):
-        followup_values(inputs, current, 3, CLAIMS)
+        followup_values(inputs, current, 3, QUESTIONS_ANSWERED)

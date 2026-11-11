@@ -1,5 +1,5 @@
 {
- "schema_version": 4,
+ "schema_version": 5,
  "summary": "mpfc",
  "title": "how mPFC units respond to the events",
  "produced_by": "scripts/reported/summarize_part.py",
@@ -11,7 +11,8 @@
   "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
   "by": "scripts/reported/migrate_summaries.py",
   "changes": [
-   "renamed from part4.json to mpfc.json"
+   "renamed from part4.json to mpfc.json",
+   "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5, at 6e81598c43fc764b4431944e33630a31458115c1)"
   ]
  },
  "inputs": [
@@ -72,8 +73,8 @@
    "style": "count",
    "unit": "",
    "description": "analysed epochs the PFC cohort is drawn from",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -87,8 +88,8 @@
    "style": "count",
    "unit": "",
    "description": "animals in the mPFC population",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -102,8 +103,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance is constant",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "figure: 4d"
@@ -117,8 +118,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance is SWR + non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "figure: 4d"
@@ -132,8 +133,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance is non_local",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "figure: 4d"
@@ -147,8 +148,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance is SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "figure: 4d"
@@ -162,8 +163,8 @@
    "style": "count",
    "unit": "",
    "description": "immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, summed over sessions",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -177,8 +178,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of the immobile bins the stop restriction keeps, pooled",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -192,8 +193,8 @@
    "style": "count",
    "unit": "",
    "description": "immobile 2 ms bins before the stop restriction, summed over sessions",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -207,8 +208,8 @@
    "style": "pct",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -222,8 +223,8 @@
    "style": "pct",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -237,8 +238,8 @@
    "style": "sig2",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -252,8 +253,8 @@
    "style": "dec2",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -267,8 +268,8 @@
    "style": "pct",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -282,8 +283,8 @@
    "style": "pct",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -297,8 +298,8 @@
    "style": "count",
    "unit": "",
    "description": "check, units at or above 1 Hz on the fitted bins: mPFC units in the population (a usable fit and finite curves)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -312,8 +313,8 @@
    "style": "pct",
    "unit": "",
    "description": "highest such share over the four event classes (non_local_no_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -327,8 +328,8 @@
    "style": "pctnum",
    "unit": "",
    "description": "lowest such share over the four event classes (non_local_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -342,8 +343,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median absolute peak log-rate modulation of the units called for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -357,8 +358,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median absolute peak log-rate modulation of the units called for SWR-coupled replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -372,8 +373,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for matched quiet-rest control windows (the noise floor)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -387,8 +388,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -402,8 +403,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for SWRs",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -417,8 +418,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for SWR-coupled replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -432,8 +433,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for matched quiet-rest control windows (the noise floor), as a multiplier (up or down)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -447,8 +448,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for non-SWR replay, as a multiplier (up or down)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -462,8 +463,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for SWRs, as a multiplier (up or down)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -477,8 +478,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for SWR-coupled replay, as a multiplier (up or down)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -492,8 +493,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose peak modulation for matched quiet-rest control windows (the noise floor) is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -507,8 +508,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose peak modulation for non-SWR replay is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -522,8 +523,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose peak modulation for SWRs is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -537,8 +538,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose peak modulation for SWR-coupled replay is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -552,8 +553,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -567,8 +568,8 @@
    "style": "count",
    "unit": "",
    "description": "units called by the engagement test with no positive observed improvement",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -582,8 +583,8 @@
    "style": "pct",
    "unit": "",
    "description": "of the units called by the engagement test, the share whose own observed held-out improvement is not positive",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -597,8 +598,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -613,8 +614,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of chimi's tested units at raw empirical p < 0.05 for the engagement test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -629,8 +630,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of j16's tested units at raw empirical p < 0.05 for the engagement test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -645,8 +646,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of peanut's tested units at raw empirical p < 0.05 for the engagement test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -661,8 +662,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of senor's tested units at raw empirical p < 0.05 for the engagement test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -677,8 +678,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of wilbur's tested units at raw empirical p < 0.05 for the engagement test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -693,8 +694,8 @@
    "style": "pct",
    "unit": "",
    "description": "median over sessions of each session's median share of an engagement null draw's windows that land on the shipped matched control",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -708,8 +709,8 @@
    "style": "pct",
    "unit": "",
    "description": "highest session median of that share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -723,8 +724,8 @@
    "style": "pctnum",
    "unit": "",
    "description": "lowest session median of that share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -738,8 +739,8 @@
    "style": "count",
    "unit": "",
    "description": "units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -754,8 +755,8 @@
    "style": "count",
    "unit": "",
    "description": "units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -770,8 +771,8 @@
    "style": "count",
    "unit": "",
    "description": "blocked folds of whole immobility runs the held-out deviance is scored on",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -785,8 +786,8 @@
    "style": "count",
    "unit": "",
    "description": "animals in the marked-family summary",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -800,8 +801,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -815,8 +816,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -830,8 +831,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, current_arm_fraction in model replay_content, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -845,8 +846,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, current_arm_fraction in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -860,8 +861,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -875,8 +876,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -890,8 +891,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -905,8 +906,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, current_arm_fraction in model replay_content, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -920,8 +921,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, current_arm_fraction in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -935,8 +936,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -950,8 +951,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -965,8 +966,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -980,8 +981,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, content_weighted_recent_reward in model replay_content, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -995,8 +996,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_recent_reward in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1010,8 +1011,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1025,8 +1026,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1040,8 +1041,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1055,8 +1056,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, content_weighted_recent_reward in model replay_content, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1070,8 +1071,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_recent_reward in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1085,8 +1086,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1100,8 +1101,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1115,8 +1116,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1130,8 +1131,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1145,8 +1146,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1160,8 +1161,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1175,8 +1176,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1190,8 +1191,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_belief_uncertainty in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1205,8 +1206,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1220,8 +1221,8 @@
    "style": "dec2",
    "unit": "",
    "description": "within-session correlation of ripple power and hippocampal multiunit rate over non_local_no_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1235,8 +1236,8 @@
    "style": "dec2",
    "unit": "",
    "description": "within-session correlation of ripple power and hippocampal multiunit rate over non_local_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1250,8 +1251,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1265,8 +1266,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, ripple_power_z in model ripple_power, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1280,8 +1281,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1295,8 +1296,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1310,8 +1311,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, SWR_no_non_local (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1325,8 +1326,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, ripple_power_z in model ripple_power, SWR_no_non_local",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1340,8 +1341,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, SWR_no_non_local (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1355,8 +1356,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, SWR_no_non_local",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1370,8 +1371,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1385,8 +1386,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, ripple_power_z in model ripple_power, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1400,8 +1401,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1415,8 +1416,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1430,8 +1431,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power_pooled, all classes pooled (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1445,8 +1446,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, ripple_power_z in model ripple_power_pooled, all classes pooled",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1460,8 +1461,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power_pooled, all classes pooled (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1475,8 +1476,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power_pooled, all classes pooled",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1490,8 +1491,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1505,8 +1506,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, log_event_duration_s in model event_strength, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1520,8 +1521,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, log_event_duration_s in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1535,8 +1536,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1550,8 +1551,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1565,8 +1566,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, log_event_duration_s in model event_strength, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1580,8 +1581,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, log_event_duration_s in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1595,8 +1596,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1610,8 +1611,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1625,8 +1626,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1640,8 +1641,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, mua_rate_z in model event_strength, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1655,8 +1656,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, mua_rate_z in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1670,8 +1671,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1685,8 +1686,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1700,8 +1701,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1715,8 +1716,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, mua_rate_z in model event_strength, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1730,8 +1731,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, mua_rate_z in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1745,8 +1746,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1760,8 +1761,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1775,8 +1776,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_no_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1790,8 +1791,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, ripple_power_z in model event_strength, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1805,8 +1806,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1820,8 +1821,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_no_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1835,8 +1836,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1850,8 +1851,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_SWR (unit -> session -> animal)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1865,8 +1866,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of that peak, ripple_power_z in model event_strength, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1880,8 +1881,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1895,8 +1896,8 @@
    "style": "sig2",
    "unit": "log rate",
    "description": "mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1910,8 +1911,8 @@
    "style": "sig2",
    "unit": "",
    "description": "the smallest plus-one empirical p-value, 1/(R + 1)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1925,8 +1926,8 @@
    "style": "count",
    "unit": "",
    "description": "R + 1: the smallest plus-one empirical p-value is one over it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1940,8 +1941,8 @@
    "style": "count",
    "unit": "",
    "description": "neuron x model fits in the bundles",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -1955,8 +1956,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -1971,8 +1972,8 @@
    "style": "count",
    "unit": "",
    "description": "units at raw empirical p < 0.05 for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -1987,8 +1988,8 @@
    "style": "count",
    "unit": "",
    "description": "units with a finite p-value for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -2003,8 +2004,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, fits that ran to maxiter without converging",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2018,8 +2019,8 @@
    "style": "count",
    "unit": "",
    "description": "neurons carrying at least one non-converged fit",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2033,8 +2034,8 @@
    "style": "sig2",
    "unit": "%",
    "description": "non-converged fits as a percent of model fits",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2048,8 +2049,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -2064,8 +2065,8 @@
    "style": "count",
    "unit": "",
    "description": "the session's non-local events before the stop restriction, summed",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2079,8 +2080,8 @@
    "style": "count",
    "unit": "",
    "description": "non-local events whose onset is in a kept stop, summed over sessions",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2094,8 +2095,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of the non-local events the stop restriction keeps, pooled",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2109,8 +2110,8 @@
    "style": "count",
    "unit": "",
    "description": "units at raw empirical p < 0.05 for all non-local events",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -2125,8 +2126,8 @@
    "style": "count",
    "unit": "",
    "description": "units with a finite p-value for all non-local events",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -2141,8 +2142,8 @@
    "style": "count",
    "unit": "",
    "description": "matched-control draws in each unit's null",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2156,8 +2157,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose odds ratio is above 1",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2171,8 +2172,8 @@
    "style": "sig2",
    "unit": "",
    "description": "odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2186,8 +2187,8 @@
    "style": "sig2",
    "unit": "",
    "description": "highest per-animal odds ratio",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2201,8 +2202,8 @@
    "style": "sig2",
    "unit": "",
    "description": "lowest per-animal odds ratio",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2216,8 +2217,8 @@
    "style": "dec2",
    "unit": "",
    "description": "Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2231,8 +2232,8 @@
    "style": "dec2",
    "unit": "",
    "description": "the same over units called for either",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2246,8 +2247,8 @@
    "style": "pct",
    "unit": "",
    "description": "of the units called for both, the share whose two peak modulations have the same sign (both up or both down)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2261,8 +2262,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called (raw p < 0.05) for both",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2276,8 +2277,8 @@
    "style": "int",
    "unit": "units",
    "description": "units called for both expected if the two calls were independent (product of the two called shares times the units tested)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2291,8 +2292,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for neither",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2306,8 +2307,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for non-SWR replay and not for SWR-coupled replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2321,8 +2322,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWR-coupled replay and not for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2336,8 +2337,8 @@
    "style": "count",
    "unit": "",
    "description": "units with a finite p-value for both SWR-coupled and non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2351,8 +2352,8 @@
    "style": "int",
    "unit": "log rate",
    "description": "prior standard deviation of an event-basis coefficient",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2366,8 +2367,8 @@
    "style": "sig2",
    "unit": "%",
    "description": "highest per-curve percent of well-posed units the prior binds on (no_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2381,8 +2382,8 @@
    "style": "sig2",
    "unit": "%",
    "description": "lowest per-curve percent of well-posed units the prior binds on (matched_control)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2396,8 +2397,8 @@
    "style": "sig2",
    "unit": "rate multiplier",
    "description": "upper end of that multiplier",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2411,8 +2412,8 @@
    "style": "sig2",
    "unit": "rate multiplier",
    "description": "lower end of the rate multiplier that per-lag sd allows at 95 %",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2426,8 +2427,8 @@
    "style": "sig2",
    "unit": "rate multiplier",
    "description": "upper end of that multiplier",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2441,8 +2442,8 @@
    "style": "sig2",
    "unit": "rate multiplier",
    "description": "lower end of the rate multiplier that sustained sd allows at 95 %",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2456,8 +2457,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the prior's implied standard deviation of a curve at one lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2471,8 +2472,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the prior's implied standard deviation of a curve sustained over the reported window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2486,8 +2487,8 @@
    "style": "count",
    "unit": "",
    "description": "epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2501,8 +2502,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2516,8 +2517,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2531,8 +2532,8 @@
    "style": "pct",
    "unit": "",
    "description": "of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2546,8 +2547,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2561,8 +2562,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2576,8 +2577,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2591,8 +2592,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2606,8 +2607,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2621,8 +2622,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2636,8 +2637,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, all units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2651,8 +2652,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with an estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2666,8 +2667,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own estimate has the pooled sign, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2681,8 +2682,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2696,8 +2697,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2711,8 +2712,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "largest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2726,8 +2727,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "smallest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2741,8 +2742,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2756,8 +2757,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2771,8 +2772,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2786,8 +2787,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2801,8 +2802,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, all units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2816,8 +2817,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, all units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2831,8 +2832,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, all units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2846,8 +2847,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with an estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2861,8 +2862,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own estimate has the pooled sign, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2876,8 +2877,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2891,8 +2892,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2906,8 +2907,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "largest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2921,8 +2922,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "smallest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2936,8 +2937,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2951,8 +2952,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2966,8 +2967,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2981,8 +2982,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -2996,8 +2997,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with an estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3011,8 +3012,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3026,8 +3027,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3041,8 +3042,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3056,8 +3057,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3071,8 +3072,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3086,8 +3087,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3101,8 +3102,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3116,8 +3117,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3131,8 +3132,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3146,8 +3147,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with an estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3161,8 +3162,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3176,8 +3177,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3191,8 +3192,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3206,8 +3207,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3221,8 +3222,8 @@
    "style": "dec2",
    "unit": "x",
    "description": "smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3236,8 +3237,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -3252,8 +3253,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3267,8 +3268,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when SWRs without replay are added to the replay split (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3282,8 +3283,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose held-out deviance improves when SWRs without replay are added to the replay split (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3297,8 +3298,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3312,8 +3313,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3327,8 +3328,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3342,8 +3343,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for chimi's tested units (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3357,8 +3358,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for j16's tested units (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3372,8 +3373,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for peanut's tested units (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3387,8 +3388,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for senor's tested units (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3402,8 +3403,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for wilbur's tested units (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3417,8 +3418,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3432,8 +3433,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for chimi's tested units (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3447,8 +3448,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for j16's tested units (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3462,8 +3463,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for peanut's tested units (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3477,8 +3478,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for senor's tested units (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3492,8 +3493,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same for wilbur's tested units (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3507,8 +3508,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the same over the units called for SWRs without replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3522,8 +3523,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3537,8 +3538,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the same over the units called for SWRs without replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3552,8 +3553,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3567,8 +3568,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3582,8 +3583,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3597,8 +3598,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3612,8 +3613,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3627,8 +3628,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for SWRs without replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3642,8 +3643,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for SWRs without replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3657,8 +3658,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for SWR-coupled replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3672,8 +3673,8 @@
    "style": "sig2",
    "unit": "x",
    "description": "exp of that median: the median unit's largest rate change for SWR-coupled replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3687,8 +3688,8 @@
    "style": "count",
    "unit": "",
    "description": "Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed over sessions",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3702,8 +3703,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of the kept, cohort Kay SWRs that overlap no non-local event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3717,8 +3718,8 @@
    "style": "int",
    "unit": "events",
    "description": "median per session of those SWRs",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3732,8 +3733,8 @@
    "style": "count",
    "unit": "",
    "description": "kept SWRs left out of the class because they overlap a window the analysed-time rule dropped",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3747,8 +3748,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for both (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3762,8 +3763,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for both (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3777,8 +3778,8 @@
    "style": "int",
    "unit": "units",
    "description": "units called for both expected if the two calls were independent (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3792,8 +3793,8 @@
    "style": "int",
    "unit": "units",
    "description": "units called for both expected if the two calls were independent (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3807,8 +3808,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for neither (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3822,8 +3823,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for neither (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3837,8 +3838,8 @@
    "style": "sig2",
    "unit": "",
    "description": "odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3852,8 +3853,8 @@
    "style": "sig2",
    "unit": "",
    "description": "odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3867,8 +3868,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for SWRs without replay only (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3882,8 +3883,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for SWRs without replay only (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3897,8 +3898,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for SWR-coupled replay only (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3912,8 +3913,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units called for SWR-coupled replay only (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3927,8 +3928,8 @@
    "style": "count",
    "unit": "",
    "description": "units tested for both SWRs without replay and SWR-coupled replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3942,8 +3943,8 @@
    "style": "count",
    "unit": "",
    "description": "units tested for both SWRs without replay and SWR-coupled replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3957,8 +3958,8 @@
    "style": "dec2",
    "unit": "",
    "description": "Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3972,8 +3973,8 @@
    "style": "dec2",
    "unit": "",
    "description": "Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -3987,8 +3988,8 @@
    "style": "pct",
    "unit": "",
    "description": "of the units called for both, the share whose two peaks have the same sign (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4002,8 +4003,8 @@
    "style": "pct",
    "unit": "",
    "description": "of the units called for both, the share whose two peaks have the same sign (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4017,8 +4018,8 @@
    "style": "count",
    "unit": "",
    "description": "sessions in the extended-event-set tree",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4032,8 +4033,8 @@
    "style": "count",
    "unit": "",
    "description": "sessions with at least 10 such SWRs",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4047,8 +4048,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4062,8 +4063,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4077,8 +4078,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4092,8 +4093,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4107,8 +4108,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4122,8 +4123,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4137,8 +4138,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4152,8 +4153,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4167,8 +4168,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4182,8 +4183,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4197,8 +4198,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4212,8 +4213,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4227,8 +4228,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4242,8 +4243,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4257,8 +4258,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4272,8 +4273,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4287,8 +4288,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4302,8 +4303,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4317,8 +4318,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4332,8 +4333,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4347,8 +4348,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWRs without replay whose peak is an increase (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4362,8 +4363,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4377,8 +4378,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWRs without replay whose peak is a decrease (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4392,8 +4393,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4407,8 +4408,8 @@
    "style": "count",
    "unit": "",
    "description": "units in every session (Figure 4's population)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4422,8 +4423,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWRs without replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4437,8 +4438,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWRs without replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4452,8 +4453,8 @@
    "style": "count",
    "unit": "",
    "description": "units in sessions with at least 10 SWRs without replay (Figure 4's population)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4467,8 +4468,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units with a finite p-value for SWRs without replay (every session)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4482,8 +4483,8 @@
    "style": "count",
    "unit": "",
    "description": "of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4497,8 +4498,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -4513,8 +4514,8 @@
    "style": "count",
    "unit": "",
    "description": "units at raw empirical p < 0.05 for SWR-coupled replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -4529,8 +4530,8 @@
    "style": "count",
    "unit": "",
    "description": "units with a finite p-value for SWR-coupled replay",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -4545,8 +4546,8 @@
    "style": "count",
    "unit": "",
    "description": "units at raw empirical p < 0.05 for SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -4561,8 +4562,8 @@
    "style": "count",
    "unit": "",
    "description": "units with a finite p-value for SWR",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -4577,8 +4578,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of the SWRs the stop restriction keeps, pooled",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4592,8 +4593,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4607,8 +4608,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4622,8 +4623,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4637,8 +4638,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4652,8 +4653,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4667,8 +4668,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4682,8 +4683,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4697,8 +4698,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4712,8 +4713,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4727,8 +4728,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4742,8 +4743,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4757,8 +4758,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4772,8 +4773,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4787,8 +4788,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4802,8 +4803,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4817,8 +4818,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4832,8 +4833,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4847,8 +4848,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4862,8 +4863,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4877,8 +4878,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4892,8 +4893,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4907,8 +4908,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4922,8 +4923,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4937,8 +4938,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4952,8 +4953,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4967,8 +4968,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4982,8 +4983,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -4997,8 +4998,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5012,8 +5013,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5027,8 +5028,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5042,8 +5043,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5057,8 +5058,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5072,8 +5073,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5087,8 +5088,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5102,8 +5103,8 @@
    "style": "int",
    "unit": "ms",
    "description": "half-maximum onset from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5117,8 +5118,8 @@
    "style": "int",
    "unit": "ms",
    "description": "steepest approach to the peak of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5132,8 +5133,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5147,8 +5148,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5162,8 +5163,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5177,8 +5178,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5192,8 +5193,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5207,8 +5208,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5222,8 +5223,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5237,8 +5238,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5252,8 +5253,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5267,8 +5268,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5282,8 +5283,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5297,8 +5298,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5312,8 +5313,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size from zero of the stop-offset scenario's sign-aligned mean curve for a kernel fit on +/-1.05 s and read on +/-1.0 s",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5327,8 +5328,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of all units whose matched quiet-rest control curve peaks before the control window's onset (what a peak lag drawn by noise gives)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5342,8 +5343,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of those units whose non-SWR replay peak is later than their SWR-coupled replay peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5357,8 +5358,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5372,8 +5373,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5387,8 +5388,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5402,8 +5403,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5417,8 +5418,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5432,8 +5433,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5447,8 +5448,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose response onset is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5462,8 +5463,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose response onset is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5477,8 +5478,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is an increase whose response onset is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5492,8 +5493,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose response onset is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5507,8 +5508,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose response onset is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5522,8 +5523,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is a decrease whose response onset is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5537,8 +5538,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase; onset is rise_size",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5552,8 +5553,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease; onset is rise_size",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5567,8 +5568,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median response onset of units called for SWR (raw p < 0.05) whose peak is an increase; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5582,8 +5583,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase; onset is rise_size",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5597,8 +5598,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease; onset is rise_size",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5612,8 +5613,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median response onset of units called for SWR (raw p < 0.05) whose peak is a decrease; onset is rise_size",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5627,8 +5628,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for both SWR-coupled and non-SWR replay whose two peaks have the same sign",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5642,8 +5643,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5657,8 +5658,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5672,8 +5673,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5687,8 +5688,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5702,8 +5703,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5717,8 +5718,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5732,8 +5733,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose peak lag is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5747,8 +5748,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5762,8 +5763,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is an increase whose peak lag is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5777,8 +5778,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose peak lag is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5792,8 +5793,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5807,8 +5808,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of units called for SWR (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5822,8 +5823,8 @@
    "style": "int",
    "unit": "ms",
    "description": "over those units, the median of the non-SWR replay peak lag minus the SWR-coupled replay peak lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5837,8 +5838,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median peak lag (largest |modulation| within +/-200 ms of onset) of units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5852,8 +5853,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median peak lag (largest |modulation| within +/-200 ms of onset) of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5867,8 +5868,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median peak lag (largest |modulation| within +/-200 ms of onset) of units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5882,8 +5883,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median peak lag (largest |modulation| within +/-200 ms of onset) of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5897,8 +5898,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median peak lag (largest |modulation| within +/-200 ms of onset) of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5912,8 +5913,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median peak lag (largest |modulation| within +/-200 ms of onset) of units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5927,8 +5928,8 @@
    "style": "int",
    "unit": "ms",
    "description": "75th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5942,8 +5943,8 @@
    "style": "int",
    "unit": "ms",
    "description": "75th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5957,8 +5958,8 @@
    "style": "int",
    "unit": "ms",
    "description": "75th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5972,8 +5973,8 @@
    "style": "int",
    "unit": "ms",
    "description": "75th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -5987,8 +5988,8 @@
    "style": "int",
    "unit": "ms",
    "description": "75th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6002,8 +6003,8 @@
    "style": "int",
    "unit": "ms",
    "description": "75th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6017,8 +6018,8 @@
    "style": "int",
    "unit": "ms",
    "description": "25th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6032,8 +6033,8 @@
    "style": "int",
    "unit": "ms",
    "description": "25th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6047,8 +6048,8 @@
    "style": "int",
    "unit": "ms",
    "description": "25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6062,8 +6063,8 @@
    "style": "int",
    "unit": "ms",
    "description": "25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6077,8 +6078,8 @@
    "style": "int",
    "unit": "ms",
    "description": "25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6092,8 +6093,8 @@
    "style": "int",
    "unit": "ms",
    "description": "25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6107,8 +6108,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6122,8 +6123,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6137,8 +6138,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6152,8 +6153,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6167,8 +6168,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6182,8 +6183,8 @@
    "style": "pct",
    "unit": "",
    "description": "the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6197,8 +6198,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6212,8 +6213,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6227,8 +6228,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6242,8 +6243,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6257,8 +6258,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6272,8 +6273,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6287,8 +6288,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with at least one of the units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6302,8 +6303,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with at least one of the units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6317,8 +6318,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with at least one of the units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6332,8 +6333,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with at least one of the units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6347,8 +6348,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with at least one of the units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6362,8 +6363,8 @@
    "style": "count",
    "unit": "",
    "description": "animals with at least one of the units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6377,8 +6378,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6392,8 +6393,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6407,8 +6408,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6422,8 +6423,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6437,8 +6438,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6452,8 +6453,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6467,8 +6468,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6482,8 +6483,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6497,8 +6498,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6512,8 +6513,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6527,8 +6528,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6542,8 +6543,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6557,8 +6558,8 @@
    "style": "int",
    "unit": "ms",
    "description": "onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6572,8 +6573,8 @@
    "style": "int",
    "unit": "ms",
    "description": "onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6587,8 +6588,8 @@
    "style": "int",
    "unit": "ms",
    "description": "onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6602,8 +6603,8 @@
    "style": "int",
    "unit": "ms",
    "description": "onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6617,8 +6618,8 @@
    "style": "int",
    "unit": "ms",
    "description": "onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6632,8 +6633,8 @@
    "style": "int",
    "unit": "ms",
    "description": "onset (rise_size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6647,8 +6648,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6662,8 +6663,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6677,8 +6678,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6692,8 +6693,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6707,8 +6708,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6722,8 +6723,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6737,8 +6738,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6752,8 +6753,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6767,8 +6768,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6782,8 +6783,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6797,8 +6798,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6812,8 +6813,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6827,8 +6828,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6842,8 +6843,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6857,8 +6858,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6872,8 +6873,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6887,8 +6888,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6902,8 +6903,8 @@
    "style": "int",
    "unit": "ms",
    "description": "peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6917,8 +6918,8 @@
    "style": "pct",
    "unit": "",
    "description": "value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6932,8 +6933,8 @@
    "style": "pct",
    "unit": "",
    "description": "value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6947,8 +6948,8 @@
    "style": "pct",
    "unit": "",
    "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6962,8 +6963,8 @@
    "style": "pct",
    "unit": "",
    "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6977,8 +6978,8 @@
    "style": "pct",
    "unit": "",
    "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -6992,8 +6993,8 @@
    "style": "pct",
    "unit": "",
    "description": "value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7007,8 +7008,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7022,8 +7023,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7037,8 +7038,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7052,8 +7053,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7067,8 +7068,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7082,8 +7083,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7097,8 +7098,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7112,8 +7113,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7127,8 +7128,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7142,8 +7143,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7157,8 +7158,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7172,8 +7173,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over the same resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7187,8 +7188,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7202,8 +7203,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7217,8 +7218,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7232,8 +7233,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7247,8 +7248,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7262,8 +7263,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 session resamples (seed 0)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7277,8 +7278,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7292,8 +7293,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7307,8 +7308,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7322,8 +7323,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of peanut's units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7337,8 +7338,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of senor's units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7352,8 +7353,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of wilbur's units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7367,8 +7368,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7382,8 +7383,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7397,8 +7398,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7412,8 +7413,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of peanut's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7427,8 +7428,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of senor's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7442,8 +7443,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of wilbur's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7457,8 +7458,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7472,8 +7473,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of chimi's units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7487,8 +7488,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of j16's units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7502,8 +7503,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of peanut's units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7517,8 +7518,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of senor's units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7532,8 +7533,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of wilbur's units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7547,8 +7548,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7562,8 +7563,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of chimi's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7577,8 +7578,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of j16's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7592,8 +7593,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of peanut's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7607,8 +7608,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of senor's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7622,8 +7623,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of wilbur's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7637,8 +7638,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7652,8 +7653,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of chimi's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7667,8 +7668,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of j16's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7682,8 +7683,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of peanut's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7697,8 +7698,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of senor's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7712,8 +7713,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of wilbur's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7727,8 +7728,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7742,8 +7743,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of chimi's units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7757,8 +7758,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of j16's units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7772,8 +7773,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of peanut's units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7787,8 +7788,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of senor's units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7802,8 +7803,8 @@
    "style": "int",
    "unit": "ms",
    "description": "rise onset of the sign-aligned mean curve of wilbur's units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7817,8 +7818,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7832,8 +7833,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7847,8 +7848,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7862,8 +7863,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7877,8 +7878,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7892,8 +7893,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7907,8 +7908,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7922,8 +7923,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7937,8 +7938,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7952,8 +7953,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7967,8 +7968,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7982,8 +7983,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -7997,8 +7998,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8012,8 +8013,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8027,8 +8028,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8042,8 +8043,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8057,8 +8058,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8072,8 +8073,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8087,8 +8088,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8102,8 +8103,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8117,8 +8118,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8132,8 +8133,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8147,8 +8148,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8162,8 +8163,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8177,8 +8178,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8192,8 +8193,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8207,8 +8208,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8222,8 +8223,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8237,8 +8238,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8252,8 +8253,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8267,8 +8268,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8282,8 +8283,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8297,8 +8298,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8312,8 +8313,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8327,8 +8328,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8342,8 +8343,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8357,8 +8358,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8372,8 +8373,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8387,8 +8388,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8402,8 +8403,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8417,8 +8418,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8432,8 +8433,8 @@
    "style": "dec2",
    "unit": "log rate",
    "description": "the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8447,8 +8448,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8462,8 +8463,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8477,8 +8478,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8492,8 +8493,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8507,8 +8508,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8522,8 +8523,8 @@
    "style": "count",
    "unit": "",
    "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8537,8 +8538,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8552,8 +8553,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8567,8 +8568,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8582,8 +8583,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8597,8 +8598,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8612,8 +8613,8 @@
    "style": "int",
    "unit": "ms",
    "description": "97.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8627,8 +8628,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8642,8 +8643,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8657,8 +8658,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8672,8 +8673,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8687,8 +8688,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8702,8 +8703,8 @@
    "style": "int",
    "unit": "ms",
    "description": "2.5th percentile of that over 1,000 recording-day resamples",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8717,8 +8718,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8732,8 +8733,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8747,8 +8748,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8762,8 +8763,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8777,8 +8778,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8792,8 +8793,8 @@
    "style": "int",
    "unit": "ms",
    "description": "lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8807,8 +8808,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8822,8 +8823,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8837,8 +8838,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for SWR (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8852,8 +8853,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8867,8 +8868,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8882,8 +8883,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median rise onset of units called for SWR (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8897,8 +8898,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8912,8 +8913,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8927,8 +8928,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8942,8 +8943,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8957,8 +8958,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8972,8 +8973,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -8987,8 +8988,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for non-SWR replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9002,8 +9003,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for non-SWR replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9017,8 +9018,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWR (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9032,8 +9033,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9047,8 +9048,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9062,8 +9063,8 @@
    "style": "count",
    "unit": "",
    "description": "units called for SWR (raw p < 0.05) whose peak is a decrease",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9077,8 +9078,8 @@
    "style": "count",
    "unit": "",
    "description": "mPFC units in the population: every unit with a usable fit (no firing-rate cutoff; a unit with no spike in the fitted bins has none) and finite modulation curves",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper",
@@ -9094,8 +9095,8 @@
    "style": "sig2",
    "unit": "%",
    "description": "highest such percent (non_local_no_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9109,8 +9110,8 @@
    "style": "sig2",
    "unit": "%",
    "description": "lowest percent, over event classes, of a class's events with no legal within-bout control, summed over sessions (non_local_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9124,8 +9125,8 @@
    "style": "count",
    "unit": "",
    "description": "events with no legal control in the worst session and class (j1620210709_10_r5 / non_local_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"
@@ -9139,8 +9140,8 @@
    "style": "count",
    "unit": "",
    "description": "events of that class in that session (j1620210709_10_r5 / non_local_SWR)",
-   "claims": [
-    "20"
+   "questions": [
+    "4.1"
    ],
    "used_in": [
     "paper"

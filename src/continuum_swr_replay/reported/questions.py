@@ -4,14 +4,14 @@ and which figure shows it.
 This module is the one place a question's wording, its part of the paper, its
 status and its figures are written. Each value in a summary
 (:class:`~continuum_swr_replay.reported.values.Value`) names the questions it
-answers in ``claims`` and the figures that show it in ``used_in``;
+answers in ``questions`` and the figures that show it in ``used_in``;
 :func:`tag_problems` checks those names against the lists here, and
 ``scripts/reported/emit_reported_values.py`` writes ``paper/reported/questions.md``,
 every question with its values.
 
-A question is written as a question, not as its answer. The ids keep the claim
-numbers the project has used, except where a claim was split or renamed (12 became
-12a and 12b; the ripple-power model is 19h), so most existing tags stay valid.
+A question is written as a question, not as its answer. Its id is its place in
+the outline (``"2d.2"``: section 2d, the second question there); its ``claim`` is
+the claim number it had before, so older notes still trace.
 
 The list organizes the writing by part. A question need not have a figure; a
 figure tag names the figure the paper places a value in, which may be one whose
@@ -38,6 +38,19 @@ SECTIONS: tuple[tuple[int, str], ...] = (
 )
 """The paper's outline, in order: the part and the section within it. Part 0 is the
 introduction's survey of published replay studies (Supplementary Table S1)."""
+
+SECTION_CODES: dict[tuple[int, str], str] = {
+    (0, "introduction"): "0",
+    (1, "the model"): "1",
+    (2, "it works"): "2a",
+    (2, "it finds events that other methods do not"): "2b",
+    (2, "the events are real"): "2c",
+    (2, "what the events are like"): "2d",
+    (3, "the events relate to behavior"): "3",
+    (4, "the events relate to mPFC"): "4",
+}
+"""Each section's code: a question's id is its section's code and its number there
+(``"2d.2"``)."""
 
 STATUSES = ("computed", "partly computed", "not computed", "no numbers", "dropped")
 """A question's status. ``no numbers``: an example figure or a framing, which no
@@ -125,8 +138,12 @@ class Question:
     Attributes
     ----------
     id : str
-        The claim number (``"15"``, ``"19a"``), or a new id for a question with no
-        claim number.
+        Its place in the outline: the section's code and its number there
+        (``"2d.2"``; :data:`SECTION_CODES`).
+    claim : str
+        The claim number it had before the outline (``"15"``, ``"19a"``), so that
+        older notes and git history still trace; empty for a question that had
+        none.
     part : int
         The part of the paper, the first element of an entry of :data:`SECTIONS`.
     section : str
@@ -146,6 +163,7 @@ class Question:
     """
 
     id: str
+    claim: str
     part: int
     section: str
     text: str
@@ -163,19 +181,23 @@ _BEHAVIOR = (3, "the events relate to behavior")
 _MPFC = (4, "the events relate to mPFC")
 
 
-def _q(where: tuple[int, str], id: str, text: str, **fields) -> Question:
-    return Question(id=id, part=where[0], section=where[1], text=text, **fields)
+def _q(where: tuple[int, str], id: str, claim: str, text: str, **fields) -> Question:
+    return Question(
+        id=id, claim=claim, part=where[0], section=where[1], text=text, **fields
+    )
 
 
 QUESTIONS: tuple[Question, ...] = (
     _q(
         (0, "introduction"),
-        "introduction",
+        "0.1",
+        "",
         "What detection and decoding parameters do published replay studies use?",
     ),
     # Part 2: it works
     _q(
         _WORKS,
+        "2a.1",
         "10",
         "Is the decoder accurate, in sample and on held-out data?",
         status="not computed",
@@ -185,6 +207,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _WORKS,
+        "2a.2",
         "11",
         "Do held-out likelihood and event-label stability favor the four-state "
         "model over the Continuous–Fragmented and reduced models?",
@@ -193,7 +216,8 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _WORKS,
-        "12a",
+        "2a.3",
+        "12",
         "On simulated data, how often does the detector report an event where no "
         "replay was inserted, and how does it compare with the Widloski detector on "
         "replays of known shape?",
@@ -201,7 +225,8 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _WORKS,
-        "12b",
+        "2a.4",
+        "12",
         "How often does the detector report non-local events on shuffled or thinned "
         "real spikes, and in windows where no replay is expected?",
         status="not computed",
@@ -209,6 +234,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _WORKS,
+        "2a.5",
         "3",
         "How do the non-SWR fraction and the close/remote split change across the "
         "non-local and SWR-z thresholds?",
@@ -218,6 +244,7 @@ QUESTIONS: tuple[Question, ...] = (
     # Part 2: it finds events that other methods do not
     _q(
         _FINDS,
+        "2b.1",
         "1",
         "Do non-local events occur without an SWR? (examples)",
         status="no numbers",
@@ -226,12 +253,14 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _FINDS,
+        "2b.2",
         "2",
         "What fraction of immobile non-local events overlaps no SWR?",
         figures=("2", "2b"),
     ),
     _q(
         _FINDS,
+        "2b.3",
         "21",
         "How many detected non-local events overlap no SWR?",
         figures=("2", "2b"),
@@ -240,6 +269,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _FINDS,
+        "2b.4",
         "4",
         "How do SWR detection and non-local detection overlap, in events and in "
         "time points?",
@@ -247,6 +277,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _FINDS,
+        "2b.5",
         "23",
         "For each other detector, what share of its events overlaps no non-local "
         "event, and how do those divide by decoder state; for the ones that do "
@@ -255,12 +286,14 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _FINDS,
+        "2b.6",
         "22",
         "How do non-local event starts and ends differ from those of the matched SWR?",
         figures=("2d",),
     ),
     _q(
         _FINDS,
+        "2b.7",
         "24",
         "How is SWR z-score distributed at immobile Local and Non-Local time points, "
         "and how much of the non-local mass lies below the SWR-detection threshold?",
@@ -268,6 +301,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _FINDS,
+        "2b.8",
         "25",
         "Does the detector target the represented content rather than an LFP proxy?",
         status="no numbers",
@@ -277,6 +311,7 @@ QUESTIONS: tuple[Question, ...] = (
     # Part 2: the events are real
     _q(
         _REAL,
+        "2c.1",
         "5",
         "How do theta z-score and speed compare across SWR events, non-SWR events "
         "and running?",
@@ -284,6 +319,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _REAL,
+        "2c.2",
         "6",
         "How do per-event spike count, MUA z-score and active tetrodes compare "
         "across non-SWR events, SWR events and matched immobile non-event windows?",
@@ -291,6 +327,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _REAL,
+        "2c.3",
         "7",
         "Do an event's spikes favor its decoded location over the animal's "
         "position, against matched windows and on held-out tetrodes?",
@@ -298,18 +335,21 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _REAL,
+        "2c.4",
         "7b",
         "Where do event MAPs sit relative to the GPI peak, against matched quiet "
         "windows?",
     ),
     _q(
         _REAL,
+        "2c.5",
         "7c",
         "What spike evidence do matched immobile non-event windows have?",
         figures=("2",),
     ),
     _q(
         _REAL,
+        "2c.6",
         "8",
         "Are close events produced by the extent of place fields?",
         status="not computed",
@@ -317,12 +357,14 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _REAL,
+        "2c.7",
         "9",
         "Do remote events pass the spike-support tests (6, 7)?",
         figures=("2",),
     ),
     _q(
         _REAL,
+        "2c.8",
         "13",
         "How is the decoded distance from the animal distributed, by SWR status?",
         figures=("2",),
@@ -330,28 +372,32 @@ QUESTIONS: tuple[Question, ...] = (
     # Part 2: what the events are like
     _q(
         _LIKE,
+        "2d.1",
         "14",
         "Where does content sit relative to the animal and to the reward wells, SWR "
         "against non-SWR?",
         status="partly computed",
         reason="the own-well share waits for the wider-Local-kernel re-decode "
-        "(question 8)",
+        "(question 2c.6)",
         figures=("2", "3"),
     ),
     _q(
         _LIKE,
+        "2d.2",
         "15",
         "How does replay speed differ between SWR and non-SWR events?",
         figures=("3c",),
     ),
     _q(
         _LIKE,
+        "2d.3",
         "16",
         "How does spatial extent differ between SWR and non-SWR events?",
         figures=("3",),
     ),
     _q(
         _LIKE,
+        "2d.4",
         "16b",
         "How much does content move within an event (pauses, largest step, "
         "reversals), SWR against non-SWR?",
@@ -359,27 +405,31 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _LIKE,
+        "2d.5",
         "17",
         "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR "
         "against non-SWR?",
     ),
     _q(
         _LIKE,
+        "2d.6",
         "18",
         "How does event duration differ between SWR and non-SWR events?",
     ),
     # Part 3: behavior
     _q(
         _BEHAVIOR,
+        "3.1",
         "19a",
         "Which arms does content over-represent, and does that differ between SWR "
         "and non-SWR events once each kind's arm baseline is accounted for?",
         status="partly computed",
-        reason="the re-decode with a wider Local kernel (question 8) is pending",
+        reason="the re-decode with a wider Local kernel (question 2c.6) is pending",
         figures=("content_estimators", "swr_contrast"),
     ),
     _q(
         _BEHAVIOR,
+        "3.2",
         "19b",
         "Is non-SWR content selective for recently rewarded arms (realized reward "
         "fraction)?",
@@ -387,6 +437,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _BEHAVIOR,
+        "3.3",
         "19c",
         "How does the reward-history kernel of event occurrence (lag 1 and the "
         "slower lags) compare between SWR-coupled and non-SWR events?",
@@ -394,13 +445,15 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _BEHAVIOR,
+        "3.4",
         "19d",
         "Does content correlate with the upcoming choice once behavior is in the "
         "model, with or without SWR?",
     ),
-    _q(_BEHAVIOR, "19e", "Does non-SWR content predict staying or leaving?"),
+    _q(_BEHAVIOR, "3.5", "19e", "Does non-SWR content predict staying or leaving?"),
     _q(
         _BEHAVIOR,
+        "3.6",
         "19f",
         "How does SWR against non-SWR content depend on the arm's reward fraction "
         "(CS4) and, separately, on its value (CS5), as direct (length-adjusted) and "
@@ -414,6 +467,7 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _BEHAVIOR,
+        "3.7",
         "19g",
         "Does content over-represent arms the animal is uncertain about, or arms of "
         "high value?",
@@ -421,13 +475,15 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _BEHAVIOR,
-        "19h",
+        "3.8",
+        "",
         "Does the ripple power of events depend on the recent patch-switch rate, the "
         "previous trial's reward outcome or the post-outcome reward prediction error?",
     ),
     # Part 4: mPFC
     _q(
         _MPFC,
+        "4.1",
         "20",
         "Do non-SWR events modulate mPFC activity, against matched immobile "
         "non-event windows, and how does that compare with SWR events?",
@@ -439,32 +495,36 @@ QUESTIONS: tuple[Question, ...] = (
     # Considered and dropped
     _q(
         _FINDS,
-        "dropped-subthreshold",
+        "2b.9",
+        "",
         "Are non-SWR events something other than sub-threshold SWRs?",
         status="dropped",
         reason="contradicted by the ripple-power bump at non-local onset; reframed "
-        "as question 24",
+        "as question 2b.7",
     ),
     _q(
         _BEHAVIOR,
-        "dropped-recruitment",
+        "3.9",
+        "",
         "Are SWR and non-SWR events recruited differently by behavior?",
         status="dropped",
         reason="not shown as a gross recruitment difference (the peri-switch non-SWR "
-        "profile is a null); superseded by the per-effect questions 19a–19g",
+        "profile is a null); superseded by the per-effect questions 3.1–3.7",
     ),
     _q(
         _BEHAVIOR,
-        "dropped-choice",
+        "3.10",
+        "",
         "Does replay content predict the upcoming choice?",
         status="dropped",
         reason="invalidated by task autocorrelation; the one surviving thread, the "
-        "non-SWR replay_frac term of question 19d, is null over the behavioral "
+        "non-SWR replay_frac term of question 3.4, is null over the behavioral "
         "baseline",
     ),
     _q(
         _LIKE,
-        "dropped-kind",
+        "2d.7",
+        "",
         "Are non-SWR events a different kind of event, with a different function?",
         status="dropped",
         reason="not claimed: the events are characterized, and the SWR contrasts are "
@@ -472,11 +532,12 @@ QUESTIONS: tuple[Question, ...] = (
     ),
     _q(
         _REAL,
-        "dropped-reality-controls",
+        "2c.9",
+        "",
         "Do tetrode holdout and interneuron exclusion, as main-text controls, "
         "show the events are real?",
         status="dropped",
-        reason="folded into the likelihood test (question 7)",
+        reason="folded into the likelihood test (question 2c.3)",
     ),
 )
 """Every question, in the outline's order within each section."""
@@ -502,12 +563,12 @@ def parse_figure_tag(tag: str) -> tuple[str, str] | None:
     return None
 
 
-def tag_problems(claims: Iterable[str], used_in: Iterable[str]) -> list[str]:
+def tag_problems(questions: Iterable[str], used_in: Iterable[str]) -> list[str]:
     """What is wrong with a value's tags: an unknown question id, an unknown use
     or figure, a figure its question does not list, or a question whose status
     says it has no values (:data:`ANSWERED`). Empty when nothing is."""
-    claims, used_in = tuple(claims), tuple(used_in)
-    problems = [f"no question {c!r}" for c in claims if c not in QUESTION_IDS]
+    questions, used_in = tuple(questions), tuple(used_in)
+    problems = [f"no question {q!r}" for q in questions if q not in QUESTION_IDS]
     figures = []
     for tag in used_in:
         if tag in USES:
@@ -517,13 +578,13 @@ def tag_problems(claims: Iterable[str], used_in: Iterable[str]) -> list[str]:
             problems.append(f"unknown use {tag!r}")
         else:
             figures.append("".join(parsed))
-    for claim in claims:
-        question = QUESTION_IDS.get(claim)
+    for qid in questions:
+        question = QUESTION_IDS.get(qid)
         if question is None:
             continue
         if question.status not in ANSWERED:
-            problems.append(f"question {claim} is {question.status}, so has no values")
+            problems.append(f"question {qid} is {question.status}, so has no values")
         for figure in figures:
             if figure not in question.figures:
-                problems.append(f"question {claim} does not list figure {figure!r}")
+                problems.append(f"question {qid} does not list figure {figure!r}")
     return problems

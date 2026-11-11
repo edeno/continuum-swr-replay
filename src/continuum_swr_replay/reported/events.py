@@ -77,7 +77,7 @@ from continuum_swr_replay.reported.values import (
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run the events summary reads (242 epochs, all ``ok``)."""
 
-#: The other detectors of claim 23, by the word their keys use. Kay is the main
+#: The other detectors of question 2b.5, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
 DETECTORS = {
     "kay": "kay",
@@ -131,7 +131,7 @@ def default_inputs() -> EventsInputs:
     )
 
 
-def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...]):
+def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, ...]):
     """A :class:`Value` builder with the shared source, claims and use filled in."""
 
     def make(
@@ -143,7 +143,7 @@ def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...
         unit: str = "",
         *,
         pending: str | None = None,
-        claims_: tuple[str, ...] | None = None,
+        questions_: tuple[str, ...] | None = None,
         used_in_: tuple[str, ...] | None = None,
     ) -> Value:
         if kind == "count" and float(value).is_integer():
@@ -157,7 +157,7 @@ def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...
             style=style,
             unit=unit,
             description=description,
-            claims=claims_ or claims,
+            questions=questions_ or questions,
             used_in=used_in_ or used_in,
             source=source,
             pending=pending,
@@ -213,8 +213,8 @@ def _manifest(folder: Path) -> dict:
 
 
 def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 2: how many immobile non-local events carry no SWR."""
-    make = _value_factory(source, ("2", "21"), ("paper", "figure: 2b"))
+    """Question 2b.2: how many immobile non-local events carry no SWR."""
+    make = _value_factory(source, ("2b.2", "2b.3"), ("paper", "figure: 2b"))
     if not events["whole_event_speed_eligible"].all():
         raise ValueError(
             "the event table holds events that are not whole-event immobile"
@@ -296,8 +296,8 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 22: non-local event bounds against the matched SWR's (Figure 2d)."""
-    make = _value_factory(source, ("22",), ("paper", "figure: 2d"))
+    """Question 2b.6: non-local event bounds against the matched SWR's (Figure 2d)."""
+    make = _value_factory(source, ("2b.6",), ("paper", "figure: 2d"))
     overlap = events[events["overlap_class"] != "non_swr"]
     start_ms = 1000 * (overlap["event_start_s"] - overlap["matched_swr_start"]).dropna()
     end_ms = 1000 * (overlap["event_end_s"] - overlap["matched_swr_end"]).dropna()
@@ -373,7 +373,7 @@ def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -
 
 
 def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 23: the other side of the overlap, for each other detector.
+    """Question 2b.5: the other side of the overlap, for each other detector.
 
     For each detector: the share of its events that overlap no non-local event,
     how those divide by content, and, for the events that do overlap, the
@@ -386,7 +386,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
         main = word == MAIN_DETECTOR
         make = _value_factory(
             source,
-            ("23", "4"),
+            ("2b.5", "2b.4"),
             ("paper", "figure: 2") if main else ("supplement",),
         )
         mine = events[events["detector"] == detector]
@@ -562,11 +562,11 @@ def left_out_seconds(run_dir: Path) -> dict[str, float]:
 
 
 def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]:
-    """Claims 2 and 21: how many non-local events, and how much of their time, an
+    """Questions 2b.2 and 2b.3: how many non-local events, and how much of their time, an
     analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
     from the Widloski detector) does not include, in total and per hour of rest.
     """
-    make = _value_factory(source, ("2", "21"), ("paper", "figure: 2"))
+    make = _value_factory(source, ("2b.2", "2b.3"), ("paper", "figure: 2"))
     counts = pd.read_csv(report_dir / "counts_by_animal.csv")
     exposure_s = float(
         counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
@@ -728,7 +728,7 @@ _SIGNAL_LABELS = {
 def brain_state_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Claims 5 and 24: theta, ripple power, MUA and slow and fast gamma during
+    """Questions 2c.1 and 2b.7: theta, ripple power, MUA and slow and fast gamma during
     events, against running and quiet rest.
 
     Each event's value is its mean over its bins of the epoch's z-scored signal
@@ -746,7 +746,7 @@ def brain_state_values(
     for word, column in _SIGNAL_EVENT_COLUMNS.items():
         make = _value_factory(
             source,
-            ("5", "24") if word == "ripple" else ("5",),
+            ("2c.1", "2b.7") if word == "ripple" else ("2c.1",),
             ("paper", "figure: 3b") if word == "ripple" else ("supplement",),
         )
         label = _SIGNAL_LABELS[word]
@@ -817,7 +817,7 @@ def brain_state_values(
 
 
 def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 5: slow and fast gamma during events, as a change in band power
+    """Question 2c.1: slow and fast gamma during events, as a change in band power
     against the same epoch's quiet rest, in dB.
 
     For each epoch and class: ``10 log10(mean band power over the class's event
@@ -827,7 +827,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     median over epochs, and the animals whose median over their epochs is above
     0 dB. The z values (``brain_state_values``) stay as they are.
     """
-    make = _value_factory(source, ("5",), ("supplement",))
+    make = _value_factory(source, ("2c.1",), ("supplement",))
     values: list[Value] = []
     for word in ("slow_gamma", "fast_gamma"):
         label = _SIGNAL_LABELS[word]
@@ -901,11 +901,11 @@ def reality_metrics(per_epoch_dir: Path) -> pd.DataFrame:
 
 
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
-    """Claims 6, 7, 7b, 7c: each event group's spike evidence against matched
+    """Questions 2c.2, 2c.3, 2c.4, 2c.5: each event group's spike evidence against matched
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
     run scores every event and quiet window (no cap). The remote groups' values
-    also answer question 9, whether remote events pass these tests."""
-    make = _value_factory(source, ("6", "7", "7c"), ("paper", "figure: 2"))
+    also answer question 2c.7, whether remote events pass these tests."""
+    make = _value_factory(source, ("2c.2", "2c.3", "2c.5"), ("paper", "figure: 2"))
     values = [
         make(
             "evidence_epochs",
@@ -937,7 +937,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median spike count of {label}",
                 "spikes",
-                claims_=("6",),
+                questions_=("2c.2",),
             ),
             make(
                 f"{word}_tetrodes_median",
@@ -946,7 +946,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median number of tetrodes with a spike in {label}",
                 "tetrodes",
-                claims_=("6",),
+                questions_=("2c.2",),
             ),
             make(
                 f"{word}_dll_per_spike_median",
@@ -956,7 +956,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median log-likelihood ratio per spike, decoded location against the "
                 f"animal's, of {label}",
                 "nats per spike",
-                claims_=("7", "7c") if word == "baseline" else ("7",),
+                questions_=("2c.3", "2c.5") if word == "baseline" else ("2c.3",),
             ),
             make(
                 f"{word}_gpi_distance_median_cm",
@@ -966,7 +966,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median track distance from the MAP of {label} to the ground-process "
                 "intensity peak",
                 "cm",
-                claims_=("7b",),
+                questions_=("2c.4",),
                 used_in_=("supplement",),
             ),
         ]
@@ -982,7 +982,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
                 "window, per spike",
-                claims_=("7",),
+                questions_=("2c.3",),
             ),
             make(
                 f"{word}_epochs_scored",
@@ -990,7 +990,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
-                claims_=("7",),
+                questions_=("2c.3",),
             ),
             make(
                 f"{word}_animals_above_baseline",
@@ -999,7 +999,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
                 "window, per spike",
-                claims_=("7",),
+                questions_=("2c.3",),
             ),
         ]
     values.append(
@@ -1013,15 +1013,15 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     )
     remote = tuple(f"{word}_" for word in _REALITY_GROUPS if word.endswith("remote"))
     return [
-        replace(v, claims=(*v.claims, "9")) if v.key.startswith(remote) else v
+        replace(v, questions=(*v.questions, "2c.7")) if v.key.startswith(remote) else v
         for v in values
     ]
 
 
 def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 7: the held-out tetrode test of immobile Non-Local Continuous bouts,
+    """Question 2c.3: the held-out tetrode test of immobile Non-Local Continuous bouts,
     split by SWR, per held-out spike against the animal's position."""
-    make = _value_factory(source, ("7",), ("paper", "figure: 2"))
+    make = _value_factory(source, ("2c.3",), ("paper", "figure: 2"))
     rows = stats[
         (stats["regime"] == "immobile") & (stats["metric"] == "runcv_nl_anim_mark_ps")
     ]
@@ -1096,7 +1096,7 @@ STEP_WINDOW_Z = 1.5
 
 
 def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 24, test 1: is the events' peak ripple power unimodal, and where is
+    """Question 2b.7, test 1: is the events' peak ripple power unimodal, and where is
     its mode against the Kay threshold?
 
     Per animal, Hartigan's dip test and the KDE's main mode of the event's peak
@@ -1104,7 +1104,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs.
     """
-    make = _value_factory(source, ("24",), ("supplement",))
+    make = _value_factory(source, ("2b.7",), ("supplement",))
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
@@ -1138,7 +1138,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
 
 
 def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 24 and the property claims, test 2: is there a step at the threshold?
+    """Question 2b.7 and the property questions, test 2: is there a step at the threshold?
 
     A sharp discontinuity design on the Kay criterion around each event (the
     level the ripple it touches sustains for 14 ms): per animal and property,
@@ -1165,9 +1165,9 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     attained = ", ".join(
         _OTHER_STEP_PROPERTIES[p] for p in others.index[others == others.max()]
     )
-    make = _value_factory(source, ("24", "15", "16", "17", "18"), ("paper",))
+    make = _value_factory(source, ("2b.7", "2d.2", "2d.3", "2d.5", "2d.6"), ("paper",))
     evidence = main[main.property == "evidence"]
-    make_evidence = _value_factory(source, ("24", "7"), ("paper",))
+    make_evidence = _value_factory(source, ("2b.7", "2c.3"), ("paper",))
     return [
         make(
             "step_other_properties_criterion_animals_max",
@@ -1218,7 +1218,7 @@ _PROPERTIES = (
         "ms",
         "int",
         "lower",
-        ("18",),
+        ("2d.6",),
         ("supplement",),
     ),
     (
@@ -1228,7 +1228,7 @@ _PROPERTIES = (
         "cm",
         "sig2",
         "lower",
-        ("16",),
+        ("2d.3",),
         ("paper", "figure: 3"),
     ),
     (
@@ -1238,7 +1238,7 @@ _PROPERTIES = (
         "cm/s",
         "sig2",
         "lower",
-        ("15",),
+        ("2d.2",),
         ("paper", "figure: 3c"),
     ),
     (
@@ -1248,10 +1248,10 @@ _PROPERTIES = (
         "",
         "dec2",
         "higher",
-        ("17",),
+        ("2d.5",),
         ("supplement",),
     ),
-    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", ("17",), ("supplement",)),
+    ("hpd", "hpd_coverage_cm", 1.0, "cm", "sig2", "lower", ("2d.5",), ("supplement",)),
     (
         "pause",
         "pause_fraction",
@@ -1259,7 +1259,7 @@ _PROPERTIES = (
         "",
         "dec2",
         "higher",
-        ("16b",),
+        ("2d.4",),
         ("paper", "figure: 3"),
     ),
     (
@@ -1269,7 +1269,7 @@ _PROPERTIES = (
         "cm",
         "sig2",
         "lower",
-        ("16b",),
+        ("2d.4",),
         ("paper", "figure: 3"),
     ),
     (
@@ -1279,7 +1279,7 @@ _PROPERTIES = (
         "",
         "int",
         "lower",
-        ("16b",),
+        ("2d.4",),
         ("paper", "figure: 3"),
     ),
     (
@@ -1289,7 +1289,7 @@ _PROPERTIES = (
         "",
         "dec2",
         "lower",
-        ("17",),
+        ("2d.5",),
         ("supplement",),
     ),
     (
@@ -1299,10 +1299,19 @@ _PROPERTIES = (
         "cm",
         "sig2",
         "lower",
-        ("14",),
+        ("2d.1",),
         ("paper", "figure: 3"),
     ),
-    ("arms", "n_unique_arms", 1.0, "", "int", "lower", ("16",), ("paper", "figure: 3")),
+    (
+        "arms",
+        "n_unique_arms",
+        1.0,
+        "",
+        "int",
+        "lower",
+        ("2d.3",),
+        ("paper", "figure: 3"),
+    ),
 )
 
 
@@ -1324,14 +1333,14 @@ _PROPERTY_NAMES = {
 
 
 def property_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Claims 15–18 and 16b: per-event properties, non-SWR against SWR.
+    """Questions 2d.2–2d.6: per-event properties, non-SWR against SWR.
 
     Plain medians of all events, and the number of animals whose own medians
     differ in the claim's direction. Not duration-controlled.
     """
     values = []
-    for word, column, scale, unit, style, direction, claims, used_in in _PROPERTIES:
-        make = _value_factory(source, claims, used_in)
+    for word, column, scale, unit, style, direction, questions, used_in in _PROPERTIES:
+        make = _value_factory(source, questions, used_in)
         x = events[[column, "is_swr", "animal"]].dropna(subset=[column])
         x = x.assign(v=x[column] * scale)
         med = x.groupby("is_swr")["v"].median()
@@ -1370,7 +1379,7 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 
 def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value]:
-    """Claims 15-18, 14 and 16b: the uncertainty of each property contrast, and
+    """Questions 2d.1–2d.6: the uncertainty of each property contrast, and
     the contrast at matched duration.
 
     A nested bootstrap (animals, then epochs within animal, then events within
@@ -1391,8 +1400,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
     if (share > MAX_NAN_REPLICATE_SHARE).any(axis=None):
         raise ValueError(f"too many bootstrap replicates without estimate:\n{share}")
     values: list[Value] = []
-    for word, _, _, unit, _, _, claims, used_in in _PROPERTIES:
-        make = _value_factory(source, claims, used_in)
+    for word, _, _, unit, _, _, questions, used_in in _PROPERTIES:
+        make = _value_factory(source, questions, used_in)
         row = intervals.loc[word]
         name = _PROPERTY_NAMES[word]
         skipped = (
@@ -1453,7 +1462,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
 
 
 def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 5: the theta-like share of events against duration-matched quiet rest.
+    """Question 2c.1: the theta-like share of events against duration-matched quiet rest.
 
     For each event, ten windows of quiet rest (below 4 cm/s, in no non-local,
     SWR or MUA event, outside excluded time) with as many bins as the event,
@@ -1464,7 +1473,7 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
     windows: an event whose length no rest stretch of its epoch holds would
     have none, and raises rather than leaving the comparison silently.
     """
-    make = _value_factory(source, ("5",), ("paper",))
+    make = _value_factory(source, ("2c.1",), ("paper",))
     if (events.rest_windows <= 0).any():
         raise ValueError(
             f"{int((events.rest_windows <= 0).sum())} events have no duration-matched "
@@ -1505,13 +1514,13 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 
 def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 14: where content sits against the animal and the reward wells.
+    """Question 2d.1: where content sits against the animal and the reward wells.
 
     Time-bin-weighted shares over all sessions (as the analysis prints them):
     at a remote well, at the animal's own well, on a remote path, near the
     animal off the wells.
     """
-    make = _value_factory(source, ("14", "13"), ("paper", "figure: 2"))
+    make = _value_factory(source, ("2d.1", "2c.8"), ("paper", "figure: 2"))
     occupancy = occupancy.assign(
         at_well=occupancy["remote_well"] + occupancy["own_well"]
     )

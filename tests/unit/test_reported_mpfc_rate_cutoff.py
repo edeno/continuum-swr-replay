@@ -62,7 +62,7 @@ def _population() -> pd.DataFrame:
 
 def test_the_check_keeps_units_at_or_above_one_hz():
     population = _population()
-    make = _value_factory("synthetic", ("20",), ("paper",))
+    make = _value_factory("synthetic", ("4.1",), ("paper",))
     values = {v.key: v for v in rate_cutoff_check_values(population, None, make)}
     kept = int((RATES >= CHECK_FIRING_RATE_HZ).sum())
     assert 0 < kept < len(RATES)

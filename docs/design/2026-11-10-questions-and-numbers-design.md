@@ -57,6 +57,21 @@ Where the build departs from the design below, after two independent reviews:
   (`EXPECTED_TAG_PROBLEMS`, `EXPECTED_STATUS_MISMATCHES`), not xfailed; the
   scripts' `main()` paths are tested, Part 0's build in a subprocess.
 
+## As built: naming (2026-11-11)
+
+- **Summaries are named for what they hold:** `survey`, `detection`, `events`,
+  `behavior`, `mpfc` (`paper/reported/<name>.json`, builders `reported/<name>.py`,
+  macros `\<Summary><Key>`, markers `<!--v:<summary>.key-->`). The old part
+  numbering broke when the outline moved "it works" from Part 1 to Part 2.
+- **Question ids follow the outline** (`2d.2`); each keeps its claim number in
+  `claim`. Values name their `questions`, not `claims` (schema 5).
+- **The four summaries that need the cluster were migrated, not rebuilt**
+  (`scripts/reported/migrate_summaries.py`): renamed, and their tags mapped to the
+  question list's decisions, every number unchanged (checked against the files
+  before the change). Each records the migration and has no code record until
+  rebuilt. The pinned mismatch sets and the "tags not yet rebuilt" marks are gone:
+  the committed summaries now match the question list exactly.
+
 ## The problem
 
 The project reports about 2,000 numbers. They are stored once, in

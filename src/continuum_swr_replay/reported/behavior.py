@@ -336,7 +336,7 @@ def default_inputs() -> BehaviorInputs:
     )
 
 
-def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...]):
+def _value_factory(source: str, questions: tuple[str, ...], used_in: tuple[str, ...]):
     """A :class:`Value` builder with the shared source, claims and use filled in."""
 
     def make(
@@ -348,7 +348,7 @@ def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...
         unit: str = "",
         *,
         pending: str | None = None,
-        claims_: tuple[str, ...] | None = None,
+        questions_: tuple[str, ...] | None = None,
         used_in_: tuple[str, ...] | None = None,
     ) -> Value:
         if kind == "count" and float(value).is_integer():
@@ -362,7 +362,7 @@ def _value_factory(source: str, claims: tuple[str, ...], used_in: tuple[str, ...
             style=style,
             unit=unit,
             description=description,
-            claims=claims_ or claims,
+            questions=questions_ or questions,
             used_in=used_in_ or used_in,
             source=source,
             pending=pending,
@@ -575,12 +575,12 @@ def _shape_cdf(grid: np.ndarray, curve: np.ndarray) -> np.ndarray:
 def per_bin_values(
     fits: pd.DataFrame, all_stops: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Claim 19c: the per-bin conditional-intensity ladder (Family B).
+    """Question 3.3: the per-bin conditional-intensity ladder (Family B).
 
     Read on the well-anchored cohort; ``allstops`` keys read the all-stops
     sensitivity fit with the same rules.
     """
-    make = _value_factory(source, ("19c",), ("paper", "supplement"))
+    make = _value_factory(source, ("3.3",), ("paper", "supplement"))
     values: list[Value] = []
     null = fits[fits["model"] == "M0_const"]
     stops = null.groupby("outcome")["n_stops"].sum()
@@ -1102,7 +1102,7 @@ def per_bin_detail_values(
     """The rest of the per-bin ladder's readout, each read with
     ``summarize_per_bin_rate_models.py``'s rule unless the description says
     otherwise."""
-    make = _value_factory(source, ("19c",), ("supplement",))
+    make = _value_factory(source, ("3.3",), ("supplement",))
     values: list[Value] = []
     null = fits[fits["model"] == "M0_const"]
     hist_columns = [f"coef_{c}" for c in PER_BIN_HISTORY_COLUMNS]
@@ -1426,7 +1426,7 @@ def stop_table_values(
     well-anchored cohort, survival past 2 s and 4 s, the outcome-boundary shift
     (``compare_fits.outcome_boundary_shift_cohort``), and the share of onsets
     inside the ``TMAX`` truncation."""
-    make = _value_factory(source, ("19c",), ("supplement",))
+    make = _value_factory(source, ("3.3",), ("supplement",))
     anchored = stops[stops["occupancy_state"].isin(["at_well", "mixed"])]
     known = anchored.dropna(subset=["is_rewarded_outcome"])
     duration = known.groupby("is_rewarded_outcome")["immobility_duration_s"]
@@ -1678,12 +1678,12 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
 
 
 def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 19a: SWR content shifts onto the trunk arms, and which trunk.
+    """Question 3.1: SWR content shifts onto the trunk arms, and which trunk.
 
     Each animal's mean share over its events, SWR and non-SWR; the value is the
     median over animals, with the animals where the SWR share is higher.
     """
-    make = _value_factory(source, ("19a",), ("paper",))
+    make = _value_factory(source, ("3.1",), ("paper",))
     events = trunk_shares(arm)
     per_animal = events.groupby(["animal", "is_swr"])[
         ["trunk", "current_patch_trunk", "other_trunks"]
@@ -1741,14 +1741,14 @@ def trunk_values(arm: pd.DataFrame, source: str) -> list[Value]:
 
 
 def current_arm_paired_values(fits: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 19a: the within-session SWR - non-SWR difference of the separately
+    """Question 3.1: the within-session SWR - non-SWR difference of the separately
     fitted current-arm preference (``C2_base`` ``is_current_arm``).
 
     A session enters when both of its split fits keep the term
     (:func:`gate_term_sessions`); each animal is the median of its sessions'
     differences, and the value is the median over animals.
     """
-    make = _value_factory(source, ("19a",), ("paper",))
+    make = _value_factory(source, ("3.1",), ("paper",))
     term = "is_current_arm"
     coef = {}
     for population in ("SWR", "nonSWR"):
@@ -1850,7 +1850,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
     """How heavily the per-bin ``is_swr``-contrast rate ladder is separated: the
     share of its ``contrast`` fits flagged separated, per cohort, and the share of
     fits carrying ``is_swr:reward_history_rcos_1`` that flag that term."""
-    make = _value_factory(source, ("19c",), ("supplement",))
+    make = _value_factory(source, ("3.3",), ("supplement",))
     contrast = fits[fits["population"] == "contrast"]
     term = "is_swr:reward_history_rcos_1"
     carries = fits[fits[f"coef_{term}"].notna()]
@@ -1930,7 +1930,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
 def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value]:
     """The is_swr-contrast rate ladder's audited aggregate: how many rows it
     publishes, and how many sessions its key contrast terms lose to the gate."""
-    make = _value_factory(source, ("19c",), ("supplement",))
+    make = _value_factory(source, ("3.3",), ("supplement",))
     key = audited[audited["population"] == "contrast"]
     worst = key.loc[key["n_dropped"].idxmax()]
     return [
@@ -1975,7 +1975,7 @@ def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
     ):
         audit = pd.read_csv(path)
         audit = audit[audit["population"] == "non_local"].set_index("model")
-        make = _value_factory(f"{rel(path)} (cohort audit)", ("19c",), ("supplement",))
+        make = _value_factory(f"{rel(path)} (cohort audit)", ("3.3",), ("supplement",))
         first = audit.loc[rows["modeled"]]
         values += [
             make(
@@ -2022,10 +2022,10 @@ def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
 
 
 def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 19c: the per-stop reward step ``R1 - R0`` on the well-anchored
+    """Question 3.3: the per-stop reward step ``R1 - R0`` on the well-anchored
     cohort (``compare_fits.cohort_per_stop_delta_aic_table``): a session counts
     only when both rungs saw the same stops; negative = child better."""
-    make = _value_factory(source, ("19c",), ("supplement",))
+    make = _value_factory(source, ("3.3",), ("supplement",))
     _require(
         set(fits["stop_cohort"]) == {"at_well"}, "per-stop fit is not the at_well one"
     )
@@ -2096,29 +2096,30 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
 
 
 #: The question ids each content key word answers, by its leading words.
-_CONTENT_CLAIMS = (
-    ("swr_armreward", ("19b", "19f")),
-    ("swr_armvalue", ("19f",)),
-    ("swr_prevgoal", ("19f",)),
-    ("swr_armuncert", ("19g",)),
-    ("armreward", ("19b",)),
-    ("armvalue", ("19b", "19g")),
-    ("armuncert", ("19g",)),
-    ("switchrate", ("19f",)),
+_CONTENT_QUESTIONS = (
+    ("swr_armreward", ("3.2", "3.6")),
+    ("swr_armvalue", ("3.6",)),
+    ("swr_prevgoal", ("3.6",)),
+    ("swr_armuncert", ("3.7",)),
+    ("armreward", ("3.2",)),
+    ("armvalue", ("3.2", "3.7")),
+    ("armuncert", ("3.7",)),
+    ("switchrate", ("3.6",)),
 )
 
 
-def _content_claims(word: str) -> tuple[str, ...]:
+def _content_questions(word: str) -> tuple[str, ...]:
     """The claims a content key supports; 19a (content anchoring) otherwise."""
     return next(
-        (claims for lead, claims in _CONTENT_CLAIMS if word.startswith(lead)), ("19a",)
+        (questions for lead, questions in _CONTENT_QUESTIONS if word.startswith(lead)),
+        ("3.1",),
     )
 
 
 def content_contrast_values(
     audited: dict[str, pd.DataFrame], sources: dict[str, str]
 ) -> list[Value]:
-    """Claims 19a, 19b, 19f, 19g: the content ``is_swr``-contrast ladders.
+    """Questions 3.1, 3.2, 3.6, 3.7: the content ``is_swr``-contrast ladders.
 
     Read from each bundle's audited aggregate as the fitting script wrote it:
     the animal-balanced median, the sessions kept by the per-term gate, the
@@ -2136,8 +2137,8 @@ def content_contrast_values(
             len(rows) == 1, f"{word}: {len(rows)} audited rows for {model}/{pop}/{term}"
         )
         row = rows.iloc[0]
-        claims = _content_claims(word.removeprefix("dm_"))
-        make = _value_factory(sources[suffix], claims, ("supplement",))
+        questions = _content_questions(word.removeprefix("dm_"))
+        make = _value_factory(sources[suffix], questions, ("supplement",))
         estimator = "Dirichlet-multinomial" if suffix.startswith("_dm") else "fraction"
         stratum = suffix.removeprefix("_dm").removeprefix("_len").strip("_") or "all"
         what = (
@@ -2217,8 +2218,8 @@ def content_contrast_values(
 def breadth_derived_values(
     values: dict[str, Value], events: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Claim 19a: what the concentration contrast means, and event length."""
-    make = _value_factory(source, ("19a",), ("supplement",))
+    """Question 3.1: what the concentration contrast means, and event length."""
+    make = _value_factory(source, ("3.1",), ("supplement",))
     total = values["dm_breadth"].value
     adjusted = values["dm_breadth_length_adjusted"].value
     bins = events.groupby("is_swr")["n_nonlocal_bins"].median()
@@ -2285,11 +2286,11 @@ def breadth_derived_values(
 def estimator_values(
     summary: pd.DataFrame, bootstrap: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Claims 19a, 19f, 19g: the three-estimator comparison on one shared event
+    """Questions 3.1, 3.6, 3.7: the three-estimator comparison on one shared event
     set. Coefficients are animal-balanced medians as the comparison writes them;
     intervals are its animal bootstrap's 2.5 and 97.5 percentiles."""
     make = _value_factory(
-        source, ("19a", "19f", "19g"), ("supplement", "figure: content_estimators")
+        source, ("3.1", "3.6", "3.7"), ("supplement", "figure: content_estimators")
     )
     values = []
     for word, (rung, term) in ESTIMATOR_TERMS.items():
@@ -2377,7 +2378,7 @@ def estimator_values(
                 f"C2_base log_phi_is_swr, {ESTIMATORS['dm']}: animal bootstrap "
                 f"{'2.5th' if end == 'low' else '97.5th'} percentile",
                 "log concentration",
-                claims_=("19a",),
+                questions_=("3.1",),
             )
         )
     return values
@@ -2409,9 +2410,9 @@ def _session_aggregate(fits: pd.DataFrame, term: str) -> dict[str, float]:
 
 
 def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
-    """Claim 19g: the leaf-only arm ladder's uncertainty and value rungs."""
+    """Question 3.7: the leaf-only arm ladder's uncertainty and value rungs."""
     make = _value_factory(
-        source, ("19g",), ("supplement", "figure: uncertainty_content")
+        source, ("3.7",), ("supplement", "figure: uncertainty_content")
     )
     values = []
     for word, model, term in (
@@ -2497,8 +2498,8 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
 
 
 def choice_values(fits: dict, source: str) -> list[Value]:
-    """Claim 19d: replay fraction in the conditional-logit choice block."""
-    make = _value_factory(source, ("19d",), ("supplement",))
+    """Question 3.4: replay fraction in the conditional-logit choice block."""
+    make = _value_factory(source, ("3.4",), ("supplement",))
     values = []
     for word, block, model, term in (
         (
@@ -2573,13 +2574,13 @@ def stay_leave_values(
     stops: pd.DataFrame,
     source: str,
 ) -> list[Value]:
-    """Claim 19e: stay/leave against content, per stratum.
+    """Question 3.5: stay/leave against content, per stratum.
 
     The per-session Wilcoxon is ``learning.cross_session_role_summary`` (the
     runner's own); the pooled GEE's q is BH across converged roles within a
     stratum, as ``run_stay_leave.py`` logs it.
     """
-    make = _value_factory(source, ("19e",), ("supplement",))
+    make = _value_factory(source, ("3.5",), ("supplement",))
     signrank, gee = [], []
     values = []
     for stratum, (logistic, pooled) in bundles.items():
@@ -2637,7 +2638,7 @@ def stay_leave_values(
             "count",
             "count",
             "stops in the canonical stop table",
-            claims_=("19e", "19c"),
+            questions_=("3.5", "3.3"),
         ),
         make(
             "stops_well_anchored",
@@ -2645,7 +2646,7 @@ def stay_leave_values(
             "count",
             "count",
             "stops with occupancy_state at_well or mixed (the shared cohort)",
-            claims_=("19e", "19c"),
+            questions_=("3.5", "3.3"),
         ),
         make(
             "stops_dropped",
@@ -2693,7 +2694,7 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
     """The SWR-coupling mark: per-session OLS of event ripple power on
     standardized covariates, summarized as the fitting script prints it (median,
     share positive, animals whose median is positive, signed-rank p)."""
-    make = _value_factory(source, ("19h",), ("supplement",))
+    make = _value_factory(source, ("3.8",), ("supplement",))
     values = [
         make(
             "power_sessions",
@@ -2809,7 +2810,7 @@ def _peak(kernel: dict) -> tuple[float, int, bool] | None:
 def duration_aware_history_values(
     ridge: dict, pooled: dict, source: str
 ) -> list[Value]:
-    """Claim 19c: refractoriness, burst and cross-coupling once duration is handled.
+    """Question 3.3: refractoriness, burst and cross-coupling once duration is handled.
 
     ``pooled`` is ``duration_aware_history_pooled.pkl``: per animal and
     population, the rungs fit to the animal's stacked sessions. The kernels are
@@ -2824,7 +2825,7 @@ def duration_aware_history_values(
     five-fold cross-validation over whole stops). Every ridge fit must have
     converged.
     """
-    make = _value_factory(source, ("19c",), ("paper",))
+    make = _value_factory(source, ("3.3",), ("paper",))
     by_pop: dict[str, dict[str, dict]] = {}
     for rec in pooled["results"]:
         by_pop.setdefault(rec["outcome"], {})[rec["animal"]] = rec
@@ -3074,7 +3075,7 @@ HORSERACE_POPULATIONS = {"all": "all", "swr": "SWR", "non_swr": "non_SWR"}
 
 
 def horserace_values(summary: pd.DataFrame, source: str) -> list[Value]:
-    """Claim 19g: are uncertainty, value and visit history separated?
+    """Question 3.7: are uncertainty, value and visit history separated?
 
     ``summary`` is ``horserace_summary.csv`` (``uncertainty_content.
     summarize_horserace``): per population and predictor, the median over
@@ -3082,7 +3083,7 @@ def horserace_values(summary: pd.DataFrame, source: str) -> list[Value]:
     together, arm-demeaned within session; non-current leaf arms), the animals
     whose own median has that sign, and the median design condition number.
     """
-    make = _value_factory(source, ("19g",), ("paper",))
+    make = _value_factory(source, ("3.7",), ("paper",))
     values: list[Value] = []
     for pop_word, pop in HORSERACE_POPULATIONS.items():
         rows = summary[summary["population"] == pop].set_index("predictor")
@@ -3193,7 +3194,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     in_transit = _read_per_bin_fits(inputs.per_bin_in_transit)
     make_transit = _value_factory(
         f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.in_transit)",
-        ("19c",),
+        ("3.3",),
         ("supplement",),
     )
     summary.add(

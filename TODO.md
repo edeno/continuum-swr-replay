@@ -38,17 +38,17 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 ## Reported values
 
-- [ ] **Rebuild Parts 1–4 on the cluster.** They have no code record yet (Part 0
-  was rebuilt with one), and Parts 1–3 still carry the tags from before the
-  question list (`make release-check` lists them). Rebuild them from committed
-  code (`make summaries`), run `make reported-values`, read
-  `paper/reported/changes.md`, then update `EXPECTED_TAG_PROBLEMS` and
-  `EXPECTED_STATUS_MISMATCHES` in `tests/unit/test_reported_questions.py` (both
-  end empty). Parts 3 and 4 were built from uncommitted code, so their numbers may
-  move.
+- [ ] **Rebuild the four migrated summaries on the cluster.** `detection`,
+  `events`, `behavior` and `mpfc` were converted from the earlier layout, not
+  rebuilt (`scripts/reported/migrate_summaries.py`): their numbers are the earlier
+  builds', two of them from uncommitted code, and they have no code record
+  (`make release-check` names them). Rebuild them from committed code
+  (`make summaries`), run `make reported-values`, read
+  `paper/reported/changes.md` (the numbers of the two built from uncommitted code
+  may move), then delete `scripts/reported/migrate_summaries.py`.
   *When:* at the next session on the cluster, before the Results are drafted.
 
-- [ ] **Held-out test split by SWR (claim 7): confirm which script made it.**
+- [ ] **Held-out test split by SWR (question 2c.3): confirm which script made it.**
   `events.json`'s 10 `heldout_*` values are read from
   `Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv`.
   - The Part 2 builder says the tracked
@@ -94,7 +94,7 @@ Work that is deferred on purpose. Each item says when it should be done.
     not been done.
   - The content arm hierarchy has no held-out cross-validation (model comparison
     rests on ΔAIC on the quasi-likelihood scale).
-  - The choice fit (question 19d) has no provenance sidecar.
+  - The choice fit (question 3.4) has no provenance sidecar.
   - Not built: the full marked point process (joint intensity, coupling and
     content); a graded ripple-power content rung.
   - Hypotheses that need a test: a continuum rather than two mechanisms (needs

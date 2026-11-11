@@ -2,7 +2,7 @@
 
 > **Fitted Family-B effects** (baseline rates, reward kernel, self-history
 > microstructure, ladder fit) are reported values in `paper/reported/behavior.json`,
-> listed under question 19c in
+> listed under question 3.3 in
 > [../paper/reported/questions.md](../paper/reported/questions.md);
 > `scripts/rate/summarize_per_bin_rate_models.py` prints them as a table.
 
@@ -55,7 +55,7 @@ one-population null tested against its split.
 > *immediate* component; `_1` spans all ten lags with its peak at lag 3; `_2`
 > spans lags 2–10 and rises to its maximum at lag 10. Interpret them as one
 > outcome-history kernel closed at bout start — read the per-lag effect off the
-> reconstruction (`reward_kernel_basis.png`, and the `rate_kernel_*` values under question 19c in
+> reconstruction (`reward_kernel_basis.png`, and the `rate_kernel_*` values under question 3.3 in
   [../paper/reported/questions.md](../paper/reported/questions.md)),
 > not off a single coefficient — and do not label the immediate component as
 > uniformly consummatory or previous-trial reward.
@@ -239,7 +239,7 @@ offset. Its limitation is exactly that offset — see below.
   here. The self-history block is a control for the
   reward kernel, counted from event ends; its 150 ms window is too short and a
   single session too sparse to read history from it. On the pooled
-  duration-aware fits (claim 19c) there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:behavior.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:behavior.history_end_first_lag_rr_high-->4.53<!--/v-->×), events **cluster right after the previous event ends** (<!--v:behavior.history_end_peak_low-->2.63<!--/v-->–<!--v:behavior.history_end_peak_high-->4.53<!--/v-->× at <!--v:behavior.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:behavior.history_end_peak_lag_ms_high-->45<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains (an animal counts when its peak's interval, widened for the lags searched, stays above 1): detected SWR <!--v:behavior.history_onset_peak_swr-->2.28<!--/v-->× at <!--v:behavior.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:behavior.history_onset_animals_swr-->5<!--/v-->/5 animals), non-local with SWR <!--v:behavior.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:behavior.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms (<!--v:behavior.history_onset_animals_non_local_swr-->4<!--/v-->/5), non-local without SWR <!--v:behavior.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:behavior.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms (<!--v:behavior.history_onset_animals_non_local_no_swr-->2<!--/v-->/5).
+  duration-aware fits (question 3.3) there is **no refractory period beyond the event itself** (15 ms after an event ends the rate ratio is <!--v:behavior.history_end_first_lag_rr_low-->1.68<!--/v-->–<!--v:behavior.history_end_first_lag_rr_high-->4.53<!--/v-->×), events **cluster right after the previous event ends** (<!--v:behavior.history_end_peak_low-->2.63<!--/v-->–<!--v:behavior.history_end_peak_high-->4.53<!--/v-->× at <!--v:behavior.history_end_peak_lag_ms_low-->15<!--/v-->–<!--v:behavior.history_end_peak_lag_ms_high-->45<!--/v--> ms after the end), and a **weaker onset-locked rhythm** remains (an animal counts when its peak's interval, widened for the lags searched, stays above 1): detected SWR <!--v:behavior.history_onset_peak_swr-->2.28<!--/v-->× at <!--v:behavior.history_onset_peak_lag_ms_swr-->90<!--/v--> ms (<!--v:behavior.history_onset_animals_swr-->5<!--/v-->/5 animals), non-local with SWR <!--v:behavior.history_onset_peak_non_local_swr-->1.83<!--/v-->× at <!--v:behavior.history_onset_peak_lag_ms_non_local_swr-->105<!--/v--> ms (<!--v:behavior.history_onset_animals_non_local_swr-->4<!--/v-->/5), non-local without SWR <!--v:behavior.history_onset_peak_non_local_no_swr-->1.34<!--/v-->× at <!--v:behavior.history_onset_peak_lag_ms_non_local_no_swr-->150<!--/v--> ms (<!--v:behavior.history_onset_animals_non_local_no_swr-->2<!--/v-->/5).
 
   **The reward effect is `rr_lag1`, not `rr_immediate`.** `rr_lag1` is the
   reconstructed kernel evaluated **at lag 1** — the blend of the three bumps that
@@ -248,13 +248,13 @@ offset. Its limitation is exactly that offset — see below.
   coefficients are strongly collinear, and a 0 → 1 change in the bump-0 feature with the other two held
   fixed is no reward history that occurs, so it is not the effect of a reward at
   any lag and is not quoted as one (the basis coefficients are listed under
-  question 19c in [../paper/reported/questions.md](../paper/reported/questions.md) for completeness). Say whether a quoted `rr_lag1` is the
+  question 3.3 in [../paper/reported/questions.md](../paper/reported/questions.md) for completeness). Say whether a quoted `rr_lag1` is the
   animal-balanced or the session-pooled summary — it is published
   both ways (session-pooled **<!--v:behavior.rate_kernel_lag_one_swr-->1.39<!--/v--> / <!--v:behavior.rate_kernel_lag_one_non_local-->1.18<!--/v--> / <!--v:behavior.rate_kernel_lag_one_non_local_swr-->1.44<!--/v--> / <!--v:behavior.rate_kernel_lag_one_non_local_no_swr-->1.01<!--/v-->**, animal-balanced
   **<!--v:behavior.rate_kernel_lag_one_animal_swr-->1.41<!--/v--> / <!--v:behavior.rate_kernel_lag_one_animal_non_local-->1.22<!--/v--> / <!--v:behavior.rate_kernel_lag_one_animal_non_local_swr-->1.47<!--/v--> / <!--v:behavior.rate_kernel_lag_one_animal_non_local_no_swr-->1.00<!--/v-->**, in the same row order).
 
   (Everything in this bullet is the well-anchored fit over <!--v:behavior.rate_sessions-->242<!--/v--> sessions — see
-  the `rate_kernel_*` values under question 19c in
+  the `rate_kernel_*` values under question 3.3 in
   [../paper/reported/questions.md](../paper/reported/questions.md) for the full kernel and
   [2026-09-12-rate-cohort-atwell.md](../.claude/docs/reviews/2026-09-12-rate-cohort-atwell.md)
   for what the cohort moved. The smooth reward basis has no per-lag parameter, so the
@@ -545,7 +545,7 @@ carry a finite `cv_ll_per_stop_mean`. Quote the `R1` share, not one pooled with
 `R0` — a rung that is always scored, so pooling flatters it.
 
 What the ladder actually shows (<!--v:behavior.rate_sessions-->242<!--/v--> sessions; the fit numbers below are the
-`outcome = non_local` values under question 19c in
+`outcome = non_local` values under question 3.3 in
 [../paper/reported/questions.md](../paper/reported/questions.md)):
 
 - **The within-stop time course is what calibrates the process.** `M0_const`

@@ -14,12 +14,12 @@ from typing import Any
 from continuum_swr_replay.reported.code_record import CodeRecord, CodeRecordError
 from continuum_swr_replay.reported.questions import tag_problems
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 """The layout of a summary file. Bump it when a field is added or renamed.
-Version 4 names the summary (``summary``, a key of :data:`SUMMARIES`), holds
-``code``, the record of the code that built it
-(:class:`~continuum_swr_replay.reported.code_record.CodeRecord`), and, for a
-summary converted from an earlier layout, ``migrated``."""
+Version 5 names the summary (``summary``, a key of :data:`SUMMARIES`), tags each
+value with the ``questions`` it answers, holds ``code``, the record of the code
+that built it (:class:`~continuum_swr_replay.reported.code_record.CodeRecord`),
+and, for a summary converted from an earlier layout, ``migrated``."""
 
 SUMMARIES = {
     "survey": "the published replay studies the introduction summarizes "
@@ -64,7 +64,7 @@ class Value:
         counts and fractions.
     description : str
         What the number is, precisely enough to recompute it.
-    claims : tuple of str
+    questions : tuple of str
         The ids of the questions it answers
         (:data:`~continuum_swr_replay.reported.questions.QUESTIONS`).
     used_in : tuple of str
@@ -77,7 +77,7 @@ class Value:
         Why the value may not be quoted yet (for example a value from an
         untracked script), or None.
     check_tags : bool
-        Refuse ``claims`` or ``used_in`` that do not match the question list
+        Refuse ``questions`` or ``used_in`` that do not match the question list
         (:func:`~continuum_swr_replay.reported.questions.tag_problems`). Only
         :func:`read_summary` turns it off, to read a summary built before the list
         changed. Not stored: a value carries no record of whether it was checked.
@@ -89,7 +89,7 @@ class Value:
     style: str
     unit: str
     description: str
-    claims: tuple[str, ...]
+    questions: tuple[str, ...]
     used_in: tuple[str, ...]
     source: str
     pending: str | None = None
@@ -110,10 +110,10 @@ class Value:
             raise ValueError(
                 f"{self.key}: a fraction must be in [0, 1], got {self.value}"
             )
-        if not self.claims or not self.used_in:
-            raise ValueError(f"{self.key}: name its claims and where it is used")
+        if not self.questions or not self.used_in:
+            raise ValueError(f"{self.key}: name its questions and where it is used")
         if check_tags:
-            problems = tag_problems(self.claims, self.used_in)
+            problems = tag_problems(self.questions, self.used_in)
             if problems:
                 raise ValueError(f"{self.key}: {'; '.join(problems)}")
 
@@ -218,7 +218,7 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
     )
     for key, fields in payload["values"].items():
         fields = dict(fields)
-        fields["claims"] = tuple(fields["claims"])
+        fields["questions"] = tuple(fields["questions"])
         fields["used_in"] = tuple(fields["used_in"])
         summary.add(Value(key=key, check_tags=check_tags, **fields))
     return summary
@@ -256,7 +256,7 @@ def summary_tag_problems(summary: Summary) -> dict[str, list[str]]:
     """Each value of ``summary`` whose tags do not match the question list, with
     what is wrong (:func:`~continuum_swr_replay.reported.questions.tag_problems`)."""
     problems = {
-        key: tag_problems(value.claims, value.used_in)
+        key: tag_problems(value.questions, value.used_in)
         for key, value in summary.values.items()
     }
     return {key: found for key, found in problems.items() if found}

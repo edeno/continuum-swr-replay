@@ -67,7 +67,7 @@ def extended():
 
 def test_counts_overlap_and_both_subsets(extended):
     population, curves, sidecars = extended
-    make = _value_factory("synthetic", ("20",), ("paper",))
+    make = _value_factory("synthetic", ("4.1",), ("paper",))
 
     values = {
         v.key: v.value

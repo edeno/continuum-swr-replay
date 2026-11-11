@@ -46,7 +46,7 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
     summary = pd.DataFrame(
         rows, columns=["model", "event_class", "target", "statistic", "value"]
     )
-    make = _value_factory("synthetic", ("20",), ("paper",))
+    make = _value_factory("synthetic", ("4.1",), ("paper",))
 
     values = {v.key: v.value for v in marked_family_values(summary, make)}
 

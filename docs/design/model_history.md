@@ -117,7 +117,7 @@ q = 0.378). The rungs remain in the catalog so the refusal is reproducible, but
 no coefficient from `C5_lastrew`, `CS3_lastrew`, `CS5b_valuevsprevgoal`,
 `CP1_lastrew` or `CPS2_lastrew` is citable, and the previously quoted
 −2.45 / −2.43 / −1.03 value-avoidance figures and the −0.79 SWR-by-previous-goal
-interaction are withdrawn. Current wording: question 19f of
+interaction are withdrawn. Current wording: question 3.6 (claim 19f) of
 `src/continuum_swr_replay/reported/questions.py`.
 
 ## Retirements in the per-bin rate ladder (Family B)

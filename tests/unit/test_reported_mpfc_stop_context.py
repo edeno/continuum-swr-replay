@@ -39,7 +39,7 @@ def _rows(n_loao_estimated: int = 5) -> list[dict]:
 
 
 def test_stop_context_values_main_and_check_rows():
-    make = _value_factory("synthetic", ("20",), ("paper",))
+    make = _value_factory("synthetic", ("4.1",), ("paper",))
 
     values = {v.key: v.value for v in stop_context_values(pd.DataFrame(_rows()), make)}
 
@@ -55,6 +55,6 @@ def test_stop_context_values_main_and_check_rows():
 
 
 def test_a_failed_leave_one_out_fit_is_refused():
-    make = _value_factory("synthetic", ("20",), ("paper",))
+    make = _value_factory("synthetic", ("4.1",), ("paper",))
     with pytest.raises(ValueError, match="4 of 5 leave-one-animal-out fits"):
         stop_context_values(pd.DataFrame(_rows(n_loao_estimated=4)), make)

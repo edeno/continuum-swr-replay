@@ -1,5 +1,5 @@
 {
- "schema_version": 4,
+ "schema_version": 5,
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize_part.py",
@@ -11,7 +11,8 @@
   "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
   "by": "scripts/reported/migrate_summaries.py",
   "changes": [
-   "renamed from part2.json to events.json"
+   "renamed from part2.json to events.json",
+   "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5, at 6e81598c43fc764b4431944e33630a31458115c1)"
   ]
  },
  "inputs": [
@@ -121,9 +122,9 @@
    "style": "count",
    "unit": "",
    "description": "animals in the event table",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -138,9 +139,9 @@
    "style": "count",
    "unit": "",
    "description": "animals in which more than half the events are non-SWR",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -155,13 +156,13 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR content is at a well more often than their SWR content",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -172,9 +173,9 @@
    "style": "count",
    "unit": "",
    "description": "animals in which non-SWR is the largest of the three overlap classes",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -189,8 +190,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -205,8 +206,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of that interval",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -221,8 +222,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -237,8 +238,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -253,8 +254,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -269,8 +270,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -285,8 +286,8 @@
    "style": "int",
    "unit": "",
    "description": "median number of arms the decoded position visits of immobile non-SWR non-local events",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -301,8 +302,8 @@
    "style": "int",
    "unit": "",
    "description": "median number of arms the decoded position visits of immobile SWR-overlapping non-local events",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -317,13 +318,13 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows",
-   "claims": [
-    "7",
-    "7c"
+   "questions": [
+    "2c.3",
+    "2c.5"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -334,8 +335,8 @@
    "style": "int",
    "unit": "cm",
    "description": "median track distance from the MAP of matched quiet windows to the ground-process intensity peak",
-   "claims": [
-    "7b"
+   "questions": [
+    "2c.4"
    ],
    "used_in": [
     "supplement"
@@ -349,14 +350,14 @@
    "style": "count",
    "unit": "",
    "description": "matched quiet windows scored",
-   "claims": [
-    "6",
-    "7",
-    "7c"
+   "questions": [
+    "2c.2",
+    "2c.3",
+    "2c.5"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -367,12 +368,12 @@
    "style": "int",
    "unit": "spikes",
    "description": "median spike count of matched quiet windows",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -383,12 +384,12 @@
    "style": "int",
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in matched quiet windows",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -399,9 +400,9 @@
    "style": "count",
    "unit": "",
    "description": "carey events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -415,9 +416,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of carey events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -431,9 +432,9 @@
    "style": "pct",
    "unit": "",
    "description": "of carey events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -447,9 +448,9 @@
    "style": "pct",
    "unit": "",
    "description": "of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -463,9 +464,9 @@
    "style": "pct",
    "unit": "",
    "description": "of carey events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -479,9 +480,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of carey events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -495,9 +496,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of carey events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -511,9 +512,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of carey events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -527,9 +528,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -543,9 +544,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -559,9 +560,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -575,9 +576,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -591,8 +592,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median event duration is lower than their SWR median",
-   "claims": [
-    "18"
+   "questions": [
+    "2d.6"
    ],
    "used_in": [
     "supplement"
@@ -606,8 +607,8 @@
    "style": "sig2s",
    "unit": "ms",
    "description": "upper bound of that interval",
-   "claims": [
-    "18"
+   "questions": [
+    "2d.6"
    ],
    "used_in": [
     "supplement"
@@ -621,8 +622,8 @@
    "style": "sig2s",
    "unit": "ms",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration",
-   "claims": [
-    "18"
+   "questions": [
+    "2d.6"
    ],
    "used_in": [
     "supplement"
@@ -636,8 +637,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median event duration of immobile non-SWR non-local events",
-   "claims": [
-    "18"
+   "questions": [
+    "2d.6"
    ],
    "used_in": [
     "supplement"
@@ -651,8 +652,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median event duration of immobile SWR-overlapping non-local events",
-   "claims": [
-    "18"
+   "questions": [
+    "2d.6"
    ],
    "used_in": [
     "supplement"
@@ -666,8 +667,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median of event end minus matched SWR end",
-   "claims": [
-    "22"
+   "questions": [
+    "2b.6"
    ],
    "used_in": [
     "paper",
@@ -682,9 +683,9 @@
    "style": "count",
    "unit": "",
    "description": "epochs in the event table",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -699,14 +700,14 @@
    "style": "count",
    "unit": "",
    "description": "animals in the spike-evidence run",
-   "claims": [
-    "6",
-    "7",
-    "7c"
+   "questions": [
+    "2c.2",
+    "2c.3",
+    "2c.5"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -717,14 +718,14 @@
    "style": "count",
    "unit": "",
    "description": "epochs in the spike-evidence run",
-   "claims": [
-    "6",
-    "7",
-    "7c"
+   "questions": [
+    "2c.2",
+    "2c.3",
+    "2c.5"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -735,8 +736,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -751,8 +752,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of that interval",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -767,8 +768,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -783,8 +784,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -799,8 +800,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -815,8 +816,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -831,8 +832,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median spatial extent of the decoded content of immobile non-SWR non-local events",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -847,8 +848,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median spatial extent of the decoded content of immobile SWR-overlapping non-local events",
-   "claims": [
-    "16"
+   "questions": [
+    "2d.3"
    ],
    "used_in": [
     "paper",
@@ -863,8 +864,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -878,8 +879,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -893,8 +894,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event fast-gamma power (65-100 Hz) is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -908,8 +909,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -923,8 +924,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median over epochs of that change (non-SWR events) is above 0 dB",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -938,8 +939,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -953,8 +954,8 @@
    "style": "sig2s",
    "unit": "dB",
    "description": "median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -968,8 +969,8 @@
    "style": "sig2s",
    "unit": "dB",
    "description": "median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -983,8 +984,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -998,8 +999,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1013,8 +1014,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1028,8 +1029,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1043,12 +1044,12 @@
    "style": "count",
    "unit": "",
    "description": "animals in that test",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1059,12 +1060,12 @@
    "style": "count",
    "unit": "",
    "description": "animals with a positive mean",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1075,12 +1076,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1091,12 +1092,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "upper bound of its 95 % t-interval over animals",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1107,12 +1108,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "lower bound of its 95 % t-interval over animals",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1123,12 +1124,12 @@
    "style": "count",
    "unit": "",
    "description": "animals in that test",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1139,12 +1140,12 @@
    "style": "count",
    "unit": "",
    "description": "animals with a positive mean",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1155,12 +1156,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1171,12 +1172,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "upper bound of its 95 % t-interval over animals",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1187,12 +1188,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "lower bound of its 95 % t-interval over animals",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv",
    "pending": null
@@ -1203,8 +1204,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median highest-density-region coverage is lower than their SWR median",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1218,8 +1219,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of that interval",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1233,8 +1234,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1248,8 +1249,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "SWR minus non-SWR difference of median highest-density-region coverage at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1263,8 +1264,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1278,8 +1279,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1293,8 +1294,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median highest-density-region coverage of immobile non-SWR non-local events",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1308,8 +1309,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median highest-density-region coverage of immobile SWR-overlapping non-local events",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -1323,9 +1324,9 @@
    "style": "count",
    "unit": "",
    "description": "karlsson events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1339,9 +1340,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of karlsson events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1355,9 +1356,9 @@
    "style": "pct",
    "unit": "",
    "description": "of karlsson events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1371,9 +1372,9 @@
    "style": "pct",
    "unit": "",
    "description": "of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1387,9 +1388,9 @@
    "style": "pct",
    "unit": "",
    "description": "of karlsson events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1403,9 +1404,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of karlsson events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1419,9 +1420,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of karlsson events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1435,9 +1436,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of karlsson events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1451,9 +1452,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1467,9 +1468,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1483,9 +1484,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1499,9 +1500,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1515,13 +1516,13 @@
    "style": "count",
    "unit": "",
    "description": "kay events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1532,13 +1533,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of kay events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1549,13 +1550,13 @@
    "style": "pct",
    "unit": "",
    "description": "highest per-animal share of kay events overlapping no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1566,13 +1567,13 @@
    "style": "pctnum",
    "unit": "",
    "description": "lowest per-animal share of kay events overlapping no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1583,13 +1584,13 @@
    "style": "pct",
    "unit": "",
    "description": "of kay events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1600,13 +1601,13 @@
    "style": "pct",
    "unit": "",
    "description": "of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1617,13 +1618,13 @@
    "style": "pct",
    "unit": "",
    "description": "of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1634,13 +1635,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of kay events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1651,13 +1652,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of kay events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1668,13 +1669,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of kay events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1685,13 +1686,13 @@
    "style": "pct",
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1702,13 +1703,13 @@
    "style": "pct",
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1719,13 +1720,13 @@
    "style": "pct",
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1736,13 +1737,13 @@
    "style": "pct",
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "paper",
-    "figure: main, other side of the overlap"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)",
    "pending": null
@@ -1753,13 +1754,13 @@
    "style": "int",
    "unit": "s",
    "description": "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -1770,8 +1771,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median largest step of the decoded position is lower than their SWR median",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1786,8 +1787,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of that interval",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1802,8 +1803,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1818,8 +1819,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "SWR minus non-SWR difference of median largest step of the decoded position at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1834,8 +1835,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1850,8 +1851,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1866,8 +1867,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median largest step of the decoded position of immobile non-SWR non-local events",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1882,8 +1883,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median largest step of the decoded position of immobile SWR-overlapping non-local events",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -1898,8 +1899,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event MUA rate is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1913,8 +1914,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event MUA rate is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1928,8 +1929,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event MUA rate is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1943,8 +1944,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event MUA rate is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1958,9 +1959,9 @@
    "style": "count",
    "unit": "",
    "description": "mua events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -1974,8 +1975,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored MUA rate of immobile non-SWR non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -1989,8 +1990,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -2004,9 +2005,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of mua events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2020,9 +2021,9 @@
    "style": "pct",
    "unit": "",
    "description": "of mua events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2036,9 +2037,9 @@
    "style": "pct",
    "unit": "",
    "description": "of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2052,9 +2053,9 @@
    "style": "pct",
    "unit": "",
    "description": "of mua events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2068,9 +2069,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of mua events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2084,9 +2085,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of mua events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2100,9 +2101,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of mua events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2116,9 +2117,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2132,9 +2133,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2148,9 +2149,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2164,9 +2165,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -2180,8 +2181,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored MUA rate in quiet rest",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -2195,8 +2196,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored MUA rate while running",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -2210,8 +2211,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2225,8 +2226,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of that interval",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2240,8 +2241,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2255,8 +2256,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "SWR minus non-SWR difference of median multimodal fraction of the posterior at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2270,8 +2271,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2285,8 +2286,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2300,8 +2301,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median multimodal fraction of the posterior of immobile non-SWR non-local events",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2315,8 +2316,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median multimodal fraction of the posterior of immobile SWR-overlapping non-local events",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -2330,12 +2331,12 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median nonSWR-close event scores above their median quiet window, per spike",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2346,12 +2347,12 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2362,12 +2363,12 @@
    "style": "count",
    "unit": "",
    "description": "epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2378,12 +2379,12 @@
    "style": "count",
    "unit": "",
    "description": "epochs with a scored nonSWR-close event",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2394,8 +2395,8 @@
    "style": "int",
    "unit": "cm",
    "description": "median track distance from the MAP of nonSWR-close events to the ground-process intensity peak",
-   "claims": [
-    "7b"
+   "questions": [
+    "2c.4"
    ],
    "used_in": [
     "supplement"
@@ -2409,14 +2410,14 @@
    "style": "count",
    "unit": "",
    "description": "nonSWR-close events scored",
-   "claims": [
-    "6",
-    "7",
-    "7c"
+   "questions": [
+    "2c.2",
+    "2c.3",
+    "2c.5"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2427,12 +2428,12 @@
    "style": "int",
    "unit": "spikes",
    "description": "median spike count of nonSWR-close events",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2443,12 +2444,12 @@
    "style": "int",
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in nonSWR-close events",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2459,13 +2460,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -2476,13 +2477,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -2493,13 +2494,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -2510,13 +2511,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -2527,13 +2528,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -2544,9 +2545,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of immobile non-local events overlapping no SWR, pooled over animals",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2561,9 +2562,9 @@
    "style": "pct",
    "unit": "",
    "description": "highest per-animal share of non-SWR events",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2578,9 +2579,9 @@
    "style": "pctnum",
    "unit": "",
    "description": "lowest per-animal share of non-SWR events",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2595,12 +2596,13 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median nonSWR-remote event scores above their median quiet window, per spike",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2611,12 +2613,13 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2627,12 +2630,13 @@
    "style": "count",
    "unit": "",
    "description": "epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2643,12 +2647,13 @@
    "style": "count",
    "unit": "",
    "description": "epochs with a scored nonSWR-remote event",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2659,8 +2664,9 @@
    "style": "int",
    "unit": "cm",
    "description": "median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak",
-   "claims": [
-    "7b"
+   "questions": [
+    "2c.4",
+    "2c.7"
    ],
    "used_in": [
     "supplement"
@@ -2674,14 +2680,15 @@
    "style": "count",
    "unit": "",
    "description": "nonSWR-remote events scored",
-   "claims": [
-    "6",
-    "7",
-    "7c"
+   "questions": [
+    "2c.2",
+    "2c.3",
+    "2c.5",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2692,12 +2699,13 @@
    "style": "int",
    "unit": "spikes",
    "description": "median spike count of nonSWR-remote events",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2708,12 +2716,13 @@
    "style": "int",
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in nonSWR-remote events",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -2724,9 +2733,9 @@
    "style": "count",
    "unit": "",
    "description": "immobile non-local events in the canonical event table (whole event below 4 cm/s)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2741,9 +2750,9 @@
    "style": "count",
    "unit": "",
    "description": "of those, events overlapping no SWR (overlap_class non_swr)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2758,13 +2767,13 @@
    "style": "count",
    "unit": "",
    "description": "non-local events no Kay SWR overlaps (detector comparison memberships)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2775,13 +2784,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of the non-local events with a known membership that no Kay SWR overlaps",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2792,13 +2801,13 @@
    "style": "sig2",
    "unit": "per h",
    "description": "non-local events no Kay SWR overlaps, per hour of analysed immobility",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2809,13 +2818,13 @@
    "style": "count",
    "unit": "",
    "description": "non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2826,13 +2835,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of the non-local events with a known membership that no SWR definition and no MUA event overlaps",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2843,13 +2852,13 @@
    "style": "sig2",
    "unit": "per h",
    "description": "non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2860,13 +2869,13 @@
    "style": "count",
    "unit": "",
    "description": "non-local events no Widloski event overlaps (detector comparison memberships)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2877,13 +2886,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of the non-local events with a known membership that no Widloski event overlaps",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2894,13 +2903,13 @@
    "style": "sig2",
    "unit": "per h",
    "description": "non-local events no Widloski event overlaps, per hour of analysed immobility",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2911,9 +2920,9 @@
    "style": "count",
    "unit": "",
    "description": "events lying inside an SWR (overlap_class swr_contained)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2928,9 +2937,9 @@
    "style": "count",
    "unit": "",
    "description": "events partly overlapping an SWR (overlap_class swr_partial)",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -2945,13 +2954,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of non-local event time that Kay's SWRs do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2962,13 +2971,13 @@
    "style": "int",
    "unit": "s",
    "description": "seconds of non-local event time that Kay's SWRs do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2979,13 +2988,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of non-local event time that the five SWR definitions together do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -2996,13 +3005,13 @@
    "style": "int",
    "unit": "s",
    "description": "seconds of non-local event time that the five SWR definitions together do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3013,13 +3022,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of non-local event time that the five SWR definitions and MUA together do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3030,13 +3039,13 @@
    "style": "int",
    "unit": "s",
    "description": "seconds of non-local event time that the five SWR definitions and MUA together do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3047,13 +3056,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of non-local event time that the Widloski detector's events do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3064,13 +3073,13 @@
    "style": "int",
    "unit": "s",
    "description": "seconds of non-local event time that the Widloski detector's events do not cover",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3081,13 +3090,13 @@
    "style": "int",
    "unit": "s",
    "description": "seconds of non-local event time (compared events), summed over epochs",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3098,13 +3107,13 @@
    "style": "count",
    "unit": "",
    "description": "epochs in the content-occupancy table",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -3115,8 +3124,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median pause fraction is higher than their SWR median",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3131,8 +3140,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of that interval",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3147,8 +3156,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3163,8 +3172,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "SWR minus non-SWR difference of median pause fraction at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3179,8 +3188,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3195,8 +3204,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3211,8 +3220,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median pause fraction of immobile non-SWR non-local events",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3227,8 +3236,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median pause fraction of immobile SWR-overlapping non-local events",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3243,8 +3252,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3258,8 +3267,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of that interval",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3273,8 +3282,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event)",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3288,8 +3297,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "SWR minus non-SWR difference of median posterior peak (mean over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3303,8 +3312,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3318,8 +3327,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3333,8 +3342,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median posterior peak (mean over the event) of immobile non-SWR non-local events",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3348,8 +3357,8 @@
    "style": "dec2",
    "unit": "",
    "description": "median posterior peak (mean over the event) of immobile SWR-overlapping non-local events",
-   "claims": [
-    "17"
+   "questions": [
+    "2d.5"
    ],
    "used_in": [
     "supplement"
@@ -3363,13 +3372,13 @@
    "style": "sig2",
    "unit": "h",
    "description": "hours of analysed immobility the non-local detector observed (exposure), summed over epochs",
-   "claims": [
-    "2",
-    "21"
+   "questions": [
+    "2b.2",
+    "2b.3"
    ],
    "used_in": [
     "paper",
-    "figure: main, left out"
+    "figure: 2"
    ],
    "source": "event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)",
    "pending": null
@@ -3380,8 +3389,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median number of direction reversals is lower than their SWR median",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3396,8 +3405,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of that interval",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3412,8 +3421,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3428,8 +3437,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "SWR minus non-SWR difference of median number of direction reversals at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3444,8 +3453,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3460,8 +3469,8 @@
    "style": "sig2s",
    "unit": "",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3476,8 +3485,8 @@
    "style": "int",
    "unit": "",
    "description": "median number of direction reversals of immobile non-SWR non-local events",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3492,8 +3501,8 @@
    "style": "int",
    "unit": "",
    "description": "median number of direction reversals of immobile SWR-overlapping non-local events",
-   "claims": [
-    "16b"
+   "questions": [
+    "2d.4"
    ],
    "used_in": [
     "paper",
@@ -3508,9 +3517,9 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event ripple power is above their median quiet-rest level",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3525,9 +3534,9 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event ripple power is above their median quiet-rest level",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3542,9 +3551,9 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event ripple power is below their median running level",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3559,9 +3568,9 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event ripple power is below their median running level",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3576,9 +3585,9 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored ripple power of immobile non-SWR non-local events (event mean)",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3593,9 +3602,9 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored ripple power of immobile SWR-overlapping non-local events (event mean)",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3610,12 +3619,11 @@
    "style": "count",
    "unit": "",
    "description": "animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05)",
-   "claims": [
-    "24"
+   "questions": [
+    "2b.7"
    ],
    "used_in": [
-    "supplement",
-    "figure: one class or two"
+    "supplement"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
@@ -3626,12 +3634,11 @@
    "style": "dec2",
    "unit": "z",
    "description": "highest per-animal location of that mode",
-   "claims": [
-    "24"
+   "questions": [
+    "2b.7"
    ],
    "used_in": [
-    "supplement",
-    "figure: one class or two"
+    "supplement"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
@@ -3642,12 +3649,11 @@
    "style": "dec2",
    "unit": "z",
    "description": "lowest per-animal location of the main KDE mode of the events' peak ripple power",
-   "claims": [
-    "24"
+   "questions": [
+    "2b.7"
    ],
    "used_in": [
-    "supplement",
-    "figure: one class or two"
+    "supplement"
    ],
    "source": "/cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)",
    "pending": null
@@ -3658,9 +3664,9 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored ripple power in quiet rest",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3675,9 +3681,9 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored ripple power while running",
-   "claims": [
-    "5",
-    "24"
+   "questions": [
+    "2c.1",
+    "2b.7"
    ],
    "used_in": [
     "paper",
@@ -3692,8 +3698,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3707,8 +3713,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3722,8 +3728,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event slow-gamma power (25-55 Hz) is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3737,8 +3743,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3752,8 +3758,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median over epochs of that change (non-SWR events) is above 0 dB",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3767,8 +3773,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3782,8 +3788,8 @@
    "style": "sig2s",
    "unit": "dB",
    "description": "median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3797,8 +3803,8 @@
    "style": "sig2s",
    "unit": "dB",
    "description": "median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3812,8 +3818,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3827,8 +3833,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3842,8 +3848,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3857,8 +3863,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -3872,8 +3878,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median replay speed (median over the event) is lower than their SWR median",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3888,8 +3894,8 @@
    "style": "sig2s",
    "unit": "cm/s",
    "description": "upper bound of that interval",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3904,8 +3910,8 @@
    "style": "sig2s",
    "unit": "cm/s",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event)",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3920,8 +3926,8 @@
    "style": "sig2s",
    "unit": "cm/s",
    "description": "SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3936,8 +3942,8 @@
    "style": "sig2s",
    "unit": "cm/s",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3952,8 +3958,8 @@
    "style": "sig2s",
    "unit": "cm/s",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3968,8 +3974,8 @@
    "style": "sig2",
    "unit": "cm/s",
    "description": "median replay speed (median over the event) of immobile non-SWR non-local events",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -3984,8 +3990,8 @@
    "style": "sig2",
    "unit": "cm/s",
    "description": "median replay speed (median over the event) of immobile SWR-overlapping non-local events",
-   "claims": [
-    "15"
+   "questions": [
+    "2d.2"
    ],
    "used_in": [
     "paper",
@@ -4000,8 +4006,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4016,8 +4022,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of that interval",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4032,8 +4038,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position)",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4048,8 +4054,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size)",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4064,8 +4070,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "upper bound of its 95 % nested-bootstrap interval",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4080,8 +4086,8 @@
    "style": "sig2s",
    "unit": "cm",
    "description": "lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4096,8 +4102,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4112,8 +4118,8 @@
    "style": "sig2",
    "unit": "cm",
    "description": "median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events",
-   "claims": [
-    "14"
+   "questions": [
+    "2d.1"
    ],
    "used_in": [
     "paper",
@@ -4128,8 +4134,8 @@
    "style": "int",
    "unit": "ms",
    "description": "median of event start minus matched SWR start",
-   "claims": [
-    "22"
+   "questions": [
+    "2b.6"
    ],
    "used_in": [
     "paper",
@@ -4144,9 +4150,9 @@
    "style": "count",
    "unit": "",
    "description": "animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error",
-   "claims": [
-    "24",
-    "7"
+   "questions": [
+    "2b.7",
+    "2c.3"
    ],
    "used_in": [
     "paper"
@@ -4160,9 +4166,9 @@
    "style": "count",
    "unit": "",
    "description": "animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval",
-   "claims": [
-    "24",
-    "7"
+   "questions": [
+    "2b.7",
+    "2c.3"
    ],
    "used_in": [
     "paper"
@@ -4176,9 +4182,9 @@
    "style": "sig2s",
    "unit": "",
    "description": "median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference",
-   "claims": [
-    "24",
-    "7"
+   "questions": [
+    "2b.7",
+    "2c.3"
    ],
    "used_in": [
     "paper"
@@ -4192,12 +4198,12 @@
    "style": "count",
    "unit": "",
    "description": "the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count",
-   "claims": [
-    "24",
-    "15",
-    "16",
-    "17",
-    "18"
+   "questions": [
+    "2b.7",
+    "2d.2",
+    "2d.3",
+    "2d.5",
+    "2d.6"
    ],
    "used_in": [
     "paper"
@@ -4211,13 +4217,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of SWR non-local time bins whose content is at well, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -4228,13 +4234,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of SWR non-local time bins whose content is near off, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -4245,13 +4251,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of SWR non-local time bins whose content is own well, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -4262,13 +4268,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -4279,13 +4285,13 @@
    "style": "pct",
    "unit": "",
    "description": "share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions",
-   "claims": [
-    "14",
-    "13"
+   "questions": [
+    "2d.1",
+    "2c.8"
    ],
    "used_in": [
     "paper",
-    "figure: 3, content occupancy"
+    "figure: 2"
    ],
    "source": "paper/figures/content_occupancy/content_occupancy_per_session.csv",
    "pending": null
@@ -4296,8 +4302,8 @@
    "style": "count",
    "unit": "",
    "description": "immobile non-local events overlapping an SWR",
-   "claims": [
-    "22"
+   "questions": [
+    "2b.6"
    ],
    "used_in": [
     "paper",
@@ -4312,12 +4318,13 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-remote event scores above their median quiet window, per spike",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4328,12 +4335,13 @@
    "style": "dec2",
    "unit": "nats per spike",
    "description": "median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4344,12 +4352,13 @@
    "style": "count",
    "unit": "",
    "description": "epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4360,12 +4369,13 @@
    "style": "count",
    "unit": "",
    "description": "epochs with a scored SWR-remote event",
-   "claims": [
-    "7"
+   "questions": [
+    "2c.3",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4376,8 +4386,9 @@
    "style": "int",
    "unit": "cm",
    "description": "median track distance from the MAP of SWR-remote events to the ground-process intensity peak",
-   "claims": [
-    "7b"
+   "questions": [
+    "2c.4",
+    "2c.7"
    ],
    "used_in": [
     "supplement"
@@ -4391,14 +4402,15 @@
    "style": "count",
    "unit": "",
    "description": "SWR-remote events scored",
-   "claims": [
-    "6",
-    "7",
-    "7c"
+   "questions": [
+    "2c.2",
+    "2c.3",
+    "2c.5",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4409,12 +4421,13 @@
    "style": "int",
    "unit": "spikes",
    "description": "median spike count of SWR-remote events",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4425,12 +4438,13 @@
    "style": "int",
    "unit": "tetrodes",
    "description": "median number of tetrodes with a spike in SWR-remote events",
-   "claims": [
-    "6"
+   "questions": [
+    "2c.2",
+    "2c.7"
    ],
    "used_in": [
     "paper",
-    "figure: spike support"
+    "figure: 2"
    ],
    "source": "paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)",
    "pending": null
@@ -4441,8 +4455,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event theta power is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4456,8 +4470,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event theta power is above their median quiet-rest level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4471,8 +4485,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median non-SWR event theta power is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4486,8 +4500,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose median SWR-overlapping event theta power is below their median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4501,8 +4515,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "paper"
@@ -4516,8 +4530,8 @@
    "style": "count",
    "unit": "",
    "description": "animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "paper"
@@ -4531,8 +4545,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4546,8 +4560,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "paper"
@@ -4561,8 +4575,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "paper"
@@ -4576,8 +4590,8 @@
    "style": "pct",
    "unit": "",
    "description": "share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4591,8 +4605,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored theta power of immobile non-SWR non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4606,8 +4620,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median z-scored theta power of immobile SWR-overlapping non-local events (event mean)",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4621,8 +4635,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored theta power in quiet rest",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4636,8 +4650,8 @@
    "style": "dec2",
    "unit": "z",
    "description": "median over epochs of the epoch's median z-scored theta power while running",
-   "claims": [
-    "5"
+   "questions": [
+    "2c.1"
    ],
    "used_in": [
     "supplement"
@@ -4651,9 +4665,9 @@
    "style": "count",
    "unit": "",
    "description": "memoryless_criteria events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4667,9 +4681,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless_criteria events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4683,9 +4697,9 @@
    "style": "pct",
    "unit": "",
    "description": "of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4699,9 +4713,9 @@
    "style": "pct",
    "unit": "",
    "description": "of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4715,9 +4729,9 @@
    "style": "pct",
    "unit": "",
    "description": "of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4731,9 +4745,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4747,9 +4761,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4763,9 +4777,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4779,9 +4793,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4795,9 +4809,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4811,9 +4825,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4827,9 +4841,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4843,9 +4857,9 @@
    "style": "count",
    "unit": "",
    "description": "memoryless events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4859,9 +4873,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4875,9 +4889,9 @@
    "style": "pct",
    "unit": "",
    "description": "of memoryless events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4891,9 +4905,9 @@
    "style": "pct",
    "unit": "",
    "description": "of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4907,9 +4921,9 @@
    "style": "pct",
    "unit": "",
    "description": "of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4923,9 +4937,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4939,9 +4953,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4955,9 +4969,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4971,9 +4985,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -4987,9 +5001,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5003,9 +5017,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5019,9 +5033,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5035,9 +5049,9 @@
    "style": "count",
    "unit": "",
    "description": "yu events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5051,9 +5065,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of yu events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5067,9 +5081,9 @@
    "style": "pct",
    "unit": "",
    "description": "of yu events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5083,9 +5097,9 @@
    "style": "pct",
    "unit": "",
    "description": "of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5099,9 +5113,9 @@
    "style": "pct",
    "unit": "",
    "description": "of yu events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5115,9 +5129,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of yu events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5131,9 +5145,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of yu events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5147,9 +5161,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of yu events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5163,9 +5177,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5179,9 +5193,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5195,9 +5209,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5211,9 +5225,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5227,9 +5241,9 @@
    "style": "count",
    "unit": "",
    "description": "zugaro events compared with the non-local detector",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5243,9 +5257,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of zugaro events that overlap no non-local event",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5259,9 +5273,9 @@
    "style": "pct",
    "unit": "",
    "description": "of zugaro events overlapping no non-local event, the share with neither state in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5275,9 +5289,9 @@
    "style": "pct",
    "unit": "",
    "description": "of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5291,9 +5305,9 @@
    "style": "pct",
    "unit": "",
    "description": "of zugaro events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5307,9 +5321,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of zugaro events overlapping a non-local event whose every row is non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5323,9 +5337,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of zugaro events overlapping a non-local event that hold at least one row with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5339,9 +5353,9 @@
    "style": "pct",
    "unit": "",
    "description": "share of zugaro events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5355,9 +5369,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with Local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5371,9 +5385,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5387,9 +5401,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"
@@ -5403,9 +5417,9 @@
    "style": "pct",
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8",
-   "claims": [
-    "23",
-    "4"
+   "questions": [
+    "2b.5",
+    "2b.4"
    ],
    "used_in": [
     "supplement"

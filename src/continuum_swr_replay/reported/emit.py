@@ -145,13 +145,13 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|")
 
 
-_NOT_REBUILT = "*(tags not yet rebuilt)*"
-"""Marks a value whose summary has no code record: built before the question list,
-so its tags may predate the decisions the list encodes (a value a decision moved
-to another question still shows under the old one) until it is rebuilt."""
-
-
-def _record_cell(code) -> str:
+def _record_cell(summary: Summary) -> str:
+    """The summary table's code-record cell: ``migrated`` (converted from an earlier
+    layout, not rebuilt), ``none``, ``error``, or ``yes`` with what the record
+    flags."""
+    code = summary.code
+    if summary.migrated is not None:
+        return "migrated, not rebuilt"
     if not is_record(code):
         return "error" if code else "none"
     notes = []
@@ -162,12 +162,9 @@ def _record_cell(code) -> str:
     return ", ".join(["yes", *notes])
 
 
-def _value_rows(
-    values: Iterable[tuple[str, Value]], not_rebuilt: set[str]
-) -> list[str]:
+def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
     """Markdown table rows: the macro to cite, the value as printed, its unit,
-    what it is (with any pending note, and :data:`_NOT_REBUILT` for a summary in
-    ``not_rebuilt``) and where it is used."""
+    what it is (with any pending note) and where it is used."""
     rows = [
         "| Macro | Value | Unit | What it is | Used in |",
         "|---|---|---|---|---|",
@@ -175,8 +172,6 @@ def _value_rows(
     order = {name: i for i, name in enumerate(SUMMARIES)}
     for name, value in sorted(values, key=lambda nv: (order[nv[0]], nv[1].key)):
         notes = f" *(pending: {value.pending})*" if value.pending else ""
-        if name in not_rebuilt:
-            notes += f" {_NOT_REBUILT}"
         cells = [
             f"`\\{macro_name(name, value.key)}`",
             formatted(value),
@@ -202,9 +197,8 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
     by_question: dict[str, list[tuple[str, Value]]] = {}
     for name, summary in summaries.items():
         for value in summary.values.values():
-            for claim in value.claims:
-                by_question.setdefault(claim, []).append((name, value))
-    not_rebuilt = {name for name, s in summaries.items() if not is_record(s.code)}
+            for qid in value.questions:
+                by_question.setdefault(qid, []).append((name, value))
     lines = [
         "# Questions and their numbers",
         "",
@@ -215,10 +209,9 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         "as a finding. A summary file is named for what it holds; a question's part",
         "is where the paper reports it.",
         "",
-        f"A value marked {_NOT_REBUILT} comes from a summary with no code record:",
-        "built before the question list (or where git could not answer), its tags",
-        "may predate the list's decisions, so it can show under a question it no",
-        "longer answers, until the summary is rebuilt.",
+        "A summary marked *migrated* was converted from an earlier layout, not",
+        "rebuilt: its values are that build's, its tags were mapped to the question",
+        "list, and it has no code record until it is rebuilt.",
         "",
         "| Summary | Built at | Code record | Values | Values with tag problems |",
         "|---|---|---|---|---|",
@@ -226,7 +219,7 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
     for name, summary in summaries.items():
         problems = summary_tag_problems(summary)
         lines.append(
-            f"| `{name}.json` | `{summary.commit}` | {_record_cell(summary.code)} "
+            f"| `{name}.json` | `{summary.commit}` | {_record_cell(summary)} "
             f"| {len(summary.values)} | {len(problems)} |"
         )
     for part, section in SECTIONS:
@@ -242,23 +235,24 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
             figures = (
                 f" Figures: {', '.join(question.figures)}." if question.figures else ""
             )
+            claim = f" Claim {question.claim}." if question.claim else ""
             lines += [
                 "",
                 f"### {question.id}. {question.text}",
                 "",
-                f"Status: {status}.{figures} Values: {len(found)}.",
+                f"Status: {status}.{figures} Values: {len(found)}.{claim}",
             ]
             if question.note:
                 lines += ["", f"*Note:* {question.note}"]
             if found:
                 sources = sorted({value.source for _, value in found})
                 lines += ["", "Sources:", "", *(f"- {s}" for s in sources)]
-                lines += ["", *_value_rows(found, not_rebuilt)]
+                lines += ["", *_value_rows(found)]
     flagged = [
         (name, value)
         for name, summary in summaries.items()
         for value in summary.values.values()
-        if tag_problems(value.claims, value.used_in)
+        if tag_problems(value.questions, value.used_in)
     ]
     if flagged:
         lines += [
@@ -280,9 +274,9 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
                 formatted(value),
                 value.unit,
                 value.description + pending,
-                ", ".join(value.claims),
+                ", ".join(value.questions),
                 ", ".join(value.used_in),
-                "; ".join(tag_problems(value.claims, value.used_in)),
+                "; ".join(tag_problems(value.questions, value.used_in)),
             ]
             lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
     lines += ["", "## Values by figure"]
