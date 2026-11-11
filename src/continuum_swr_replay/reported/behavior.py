@@ -66,6 +66,7 @@ from continuum_swr_replay.analysis.events.cohort_selection import select_event_c
 from continuum_swr_replay.analysis.replay import rate_fit_statistics
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     aic_difference_statistics,
+    audited_drop_statistics,
     coefficient_statistics,
     fit_rows,
     fits_carrying,
@@ -73,6 +74,9 @@ from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     gated_coefficient_statistics,
     gated_exp_median_ratio,
     group_range,
+    known_fraction,
+    rung_separation_range,
+    separated_fraction,
     term_separation_statistics,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
@@ -1669,16 +1673,13 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
     share of its ``contrast`` fits flagged separated, per cohort, and the share of
     fits carrying ``is_swr:reward_history_rcos_1`` that flag that term."""
     make = value_factory(rate_contrast_separation_values, source, TAGS["rate"])
-    contrast = fits[fits["population"] == "contrast"]
+    contrast = fit_rows(fits, population="contrast")
     term = "is_swr:reward_history_rcos_1"
-    carries = fits[fits[f"coef_{term}"].notna()]
-    flagged = carries["separated_terms"].map(
-        lambda v: isinstance(v, str) and term in v.split("|")
-    )
+    carrying = term_separation_statistics(fits_carrying(fits, [term]), [term])
     values = [
         make(
             f"rate_contrast_separated_fraction_{cohort}",
-            (contrast.loc[contrast["cohort"] == cohort, "separated"] == True).mean(),  # noqa: E712
+            separated_fraction(fit_rows(contrast, cohort=cohort)),
             "fraction",
             "pct",
             f"share of the is_swr-contrast rate ladder's {cohort} contrast fits flagged "
@@ -1686,20 +1687,9 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
         )
         for cohort in ("primary", "post_outcome")
     ]
-    expanded = contrast[contrast["model"].str.match(r"S([2-9]|10)_")]
-    per_rung = expanded.groupby("model").agg(
-        fits=("separated", "size"),
-        separated=("separated", lambda x: int((x == True).sum())),  # noqa: E712
-        flagged=(
-            "separated_terms",
-            lambda x: int(
-                x.map(lambda v: isinstance(v, str) and term in v.split("|")).sum()
-            ),
-        ),
-    )
-    plain = contrast[contrast["model"] == "S1_rew"]
-    plain_flag = plain["separated_terms"].map(
-        lambda v: isinstance(v, str) and "reward_history_rcos_1" in v.split("|")
+    expanded = rung_separation_range(contrast, term, r"S([2-9]|10)_")
+    plain = term_separation_statistics(
+        fit_rows(contrast, model="S1_rew"), ["reward_history_rcos_1"]
     )
     for column, what in (
         ("fits", "fits"),
@@ -1710,7 +1700,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
             values.append(
                 make(
                     f"rate_contrast_expanded_{column}_{end}",
-                    getattr(per_rung[column], pick)(),
+                    expanded[f"n_{column}_{pick}"],
                     "count",
                     "count",
                     f"{'fewest' if end == 'low' else 'most'} {what} over the contrast "
@@ -1720,14 +1710,14 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
     values += [
         make(
             "rate_contrast_plain_fits",
-            len(plain),
+            plain["n_fits"],
             "count",
             "count",
             "S1_rew contrast fits",
         ),
         make(
             "rate_contrast_plain_flagged",
-            plain_flag.sum(),
+            plain["n_flagged"],
             "count",
             "count",
             "S1_rew contrast fits flagging reward_history_rcos_1 separated",
@@ -1736,7 +1726,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
     values.append(
         make(
             "rate_contrast_term_separated_fraction",
-            flagged.mean(),
+            carrying["flagged_fraction"],
             "fraction",
             "pct",
             f"share of the fits carrying {term} that flag it separated",
@@ -1749,8 +1739,8 @@ def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value
     """The is_swr-contrast rate ladder's audited aggregate: how many rows it
     publishes, and how many sessions its key contrast terms lose to the gate."""
     make = value_factory(rate_contrast_audit_values, source, TAGS["rate"])
-    key = audited[audited["population"] == "contrast"]
-    worst = key.loc[key["n_dropped"].idxmax()]
+    drops = audited_drop_statistics(fit_rows(audited, population="contrast"))
+    worst = f"{drops['most_dropped_model']} {drops['most_dropped_term']}"
     return [
         make(
             "rate_contrast_audited_rows",
@@ -1761,24 +1751,24 @@ def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value
         ),
         make(
             "rate_contrast_terms_losing_sessions",
-            (key["n_dropped"] > 0).sum(),
+            drops["n_terms_losing_sessions"],
             "count",
             "count",
             "key is_swr contrast terms that lose any session to the per-term gate",
         ),
         make(
             "rate_contrast_most_dropped",
-            worst["n_dropped"],
+            drops["most_dropped"],
             "count",
             "count",
-            f"most sessions a key contrast term loses to the gate ({worst['model']} {worst['term']})",
+            f"most sessions a key contrast term loses to the gate ({worst})",
         ),
         make(
             "rate_contrast_most_dropped_of",
-            worst["n_dropped"] + worst["n_sessions"],
+            drops["most_dropped_of"],
             "count",
             "count",
-            f"sessions fit for that term ({worst['model']})",
+            f"sessions fit for that term ({drops['most_dropped_model']})",
         ),
     ]
 
@@ -1849,31 +1839,26 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
     _require(
         set(fits["stop_cohort"]) == {"at_well"}, "per-stop fit is not the at_well one"
     )
-    r1 = fits[fits["model"] == "R1"]
     values = [
         make(
             "per_stop_cv_finite_fraction_full",
-            r1["cv_ll_per_stop_mean"].notna().mean(),
+            known_fraction(fit_rows(fits, model="R1"), "cv_ll_per_stop_mean"),
             "fraction",
             "pct",
             "share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean",
         ),
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
-        sub = fits[fits["outcome"] == outcome]
-        a = sub.loc[sub["model"] == "R1", SC + ["aic", "n_stops"]]
-        b = sub.loc[sub["model"] == "R0", SC + ["aic", "n_stops"]]
-        merged = a.merge(b, on=SC, suffixes=("_child", "_parent"))
-        paired = merged[merged["n_stops_child"] == merged["n_stops_parent"]]
-        delta = (paired["aic_child"] - paired["aic_parent"]).dropna()
-        per_animal = (
-            paired.assign(d=delta).dropna(subset=["d"]).groupby("animal")["d"].median()
+        step = aic_difference_statistics(
+            fit_rows(fits, model="R1", outcome=outcome),
+            fit_rows(fits, model="R0", outcome=outcome),
+            same=("n_stops",),
         )
-        _require(len(per_animal) == 5, f"{outcome}: {len(per_animal)} animals")
+        _require(step["n_animals"] == 5, f"{outcome}: {step['n_animals']} animals")
         values += [
             make(
                 f"per_stop_delta_aic_animal_{word}",
-                per_animal.median(),
+                step["animal_median"],
                 "quantity",
                 "sig2s",
                 f"{label}: median over animals of the per-animal median AIC(R1) - AIC(R0)",
@@ -1881,7 +1866,7 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"per_stop_delta_aic_session_{word}",
-                delta.median(),
+                step["median"],
                 "quantity",
                 "sig2s",
                 f"{label}: median over sessions of AIC(R1) - AIC(R0)",
@@ -1889,21 +1874,21 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"per_stop_sessions_{word}",
-                len(delta),
+                step["n_sessions"],
                 "count",
                 "count",
                 f"{label}: sessions with both rungs fit on the same stops",
             ),
             make(
                 f"per_stop_child_better_fraction_{word}",
-                (delta < 0).mean(),
+                step["negative_fraction"],
                 "fraction",
                 "pct",
                 f"{label}: share of sessions in which R1 has the lower AIC",
             ),
             make(
                 f"per_stop_animals_child_better_{word}",
-                (per_animal < 0).sum(),
+                step["n_animals_negative"],
                 "count",
                 "count",
                 f"{label}: animals whose median step is negative",

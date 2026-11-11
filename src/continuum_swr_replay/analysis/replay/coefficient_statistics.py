@@ -279,6 +279,12 @@ def separated_fraction(fits: pd.DataFrame) -> float:
     return float((fits["separated"] == True).mean())  # noqa: E712 (NaN must not count)
 
 
+def known_fraction(fits: pd.DataFrame, column: str) -> float:
+    """The share of fits that have a value in ``column`` (a held-out score a
+    fit carries only when its cross-validation ran)."""
+    return float(fits[column].notna().mean())
+
+
 def fits_carrying(fits: pd.DataFrame, terms: Sequence[str]) -> pd.DataFrame:
     """The fits that have a coefficient for every one of ``terms``."""
     return fits.dropna(subset=[f"coef_{term}" for term in terms])

@@ -309,6 +309,11 @@ def test_separated_fraction_counts_only_a_true_flag():
     assert stats.separated_fraction(fits) == 0.5
 
 
+def test_known_fraction_is_the_share_of_fits_with_a_value():
+    fits = pd.DataFrame({"cv": [0.5, NAN, -1.0, NAN, NAN]})
+    assert stats.known_fraction(fits, "cv") == 0.4
+
+
 def test_fits_carrying_need_every_term():
     fits = pd.DataFrame({"coef_x": [1.0, NAN, 2.0], "coef_y": [1.0, 1.0, NAN]})
     assert list(stats.fits_carrying(fits, ["x"]).index) == [0, 2]
