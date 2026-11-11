@@ -10,9 +10,9 @@ read those kernels at their measurable lags and summarize them over animals.
 A lag of a pooled refit's kernel is measurable when it has at least
 :data:`HISTORY_MIN_SUPPORT` expected onsets and its standard error is at most
 :data:`HISTORY_MAX_SE` (:func:`measurable_kernel`). A lag of a ridge fit's cross
-kernel is measurable on the first rule alone: its posterior SD is not compared
-with anything (:func:`cross_history_statistics`). A lag that is not measurable
-is left out, never read as an effect. Lag index ``j`` is ``j + 1`` bins of
+kernel is measurable on the first rule alone, whatever its posterior SD
+(:func:`cross_history_statistics`). A lag that is not measurable is left out,
+never read as an effect. Lag index ``j`` is ``j + 1`` bins of
 ``BIN_S`` after the past event's anchor (its onset or its end). Lags are
 reported in ms, kernels as rate ratios.
 """

@@ -2470,9 +2470,9 @@ def duration_aware_history_values(
     block reaching 1 s, fit with a ridge prior on the history terms; the cross
     values are the self+cross rung's (:data:`RIDGE_CROSS_RUNG`) end-locked
     rate ratio at :data:`CROSS_LAG_MS`, read where that lag has at least
-    ``HISTORY_MIN_SUPPORT`` expected onsets (its posterior SD is not compared
-    with anything), and the rung's held-out gain (outer five-fold
-    cross-validation over whole stops). Every ridge fit must have converged.
+    ``HISTORY_MIN_SUPPORT`` expected onsets, whatever its posterior SD, and
+    the rung's held-out gain (outer five-fold cross-validation over whole
+    stops). Every ridge fit must have converged.
     """
     make = value_factory(duration_aware_history_values, source, TAGS["rate"])
     by_population = history_kernel_statistics.self_history_statistics(
