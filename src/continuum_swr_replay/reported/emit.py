@@ -16,6 +16,9 @@ The text between them is replaced by the value printed in the marker's style
 hand-written. A marker naming a key no summary holds is an error, so a renamed
 value cannot leave a stale number behind. Markers inside code (backticks or a
 fenced block) are examples and are left alone.
+
+**Cited values.** Which values the manuscript cites is read from the manuscript
+(:func:`cited_macros`); no value records it.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ from continuum_swr_replay.reported.questions import (
     FIGURES,
     QUESTIONS,
     SECTIONS,
-    parse_figure_tag,
+    parse_figure,
     tag_problems,
 )
 from continuum_swr_replay.reported.values import (
@@ -67,6 +70,31 @@ def macro_name(summary: str, key: str) -> str:
     capitalized, then the key in CamelCase (``events.speed_median_swr`` is
     ``EventsSpeedMedianSwr``)."""
     return summary.capitalize() + "".join(w.capitalize() for w in key.split("_"))
+
+
+_MACRO = re.compile(
+    r"\\((?:" + "|".join(name.capitalize() for name in SUMMARIES) + r")[A-Za-z]+)"
+)
+_TEX_COMMENT = re.compile(r"(?<!\\)%.*$", re.MULTILINE)
+
+
+def cited_macros(manuscript: str) -> set[str]:
+    r"""The reported-value macros a LaTeX source uses outside its comments,
+    without the backslash (``\EventsSpeedMedianSwr`` is ``EventsSpeedMedianSwr``):
+    every command whose name starts with a summary's name."""
+    return set(_MACRO.findall(_TEX_COMMENT.sub("", manuscript)))
+
+
+def cited_values(
+    summaries: Mapping[str, Summary], manuscript: str
+) -> dict[str, list[str]]:
+    """Each summary's keys that ``manuscript`` cites by their macros
+    (:func:`cited_macros`), sorted."""
+    cited = cited_macros(manuscript)
+    return {
+        name: sorted(key for key in summary.values if macro_name(name, key) in cited)
+        for name, summary in summaries.items()
+    }
 
 
 def tex_file(summaries: Mapping[str, Summary]) -> str:
@@ -162,12 +190,18 @@ def _record_cell(summary: Summary) -> str:
     return ", ".join(["yes", *notes])
 
 
+def _computed_in(summary: str, value: Value) -> str:
+    """The function that computed ``value``, as ``<builder module>.<function>``."""
+    return f"`{summary}.{value.function}`"
+
+
 def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
     """Markdown table rows: the macro to cite, the value as printed, its unit,
-    what it is (with any pending note) and where it is used."""
+    what it is (with any pending note), the function that computed it and the
+    figures that show it."""
     rows = [
-        "| Macro | Value | Unit | What it is | Used in |",
-        "|---|---|---|---|---|",
+        "| Macro | Value | Unit | What it is | Computed in | Figures |",
+        "|---|---|---|---|---|---|",
     ]
     order = {name: i for i, name in enumerate(SUMMARIES)}
     for name, value in sorted(values, key=lambda nv: (order[nv[0]], nv[1].key)):
@@ -177,7 +211,8 @@ def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
             formatted(value),
             value.unit,
             value.description + notes,
-            ", ".join(value.used_in),
+            _computed_in(name, value),
+            ", ".join(value.figures),
         ]
         rows.append("| " + " | ".join(_cell(c) for c in cells) + " |")
     return rows
@@ -207,7 +242,8 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         "(`paper/reported/<summary>.json`); do not edit by hand. Cite a value in",
         "`paper/main.tex` by its macro. A value marked *pending* may not be quoted",
         "as a finding. A summary file is named for what it holds; a question's part",
-        "is where the paper reports it.",
+        "is where the paper reports it. *Computed in* names the function that",
+        "computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.",
         "",
         "A summary marked *migrated* was converted from an earlier layout, not",
         "rebuilt: its values are that build's, its tags were mapped to the question",
@@ -251,18 +287,18 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         (name, value)
         for name, summary in summaries.items()
         for value in summary.values.values()
-        if tag_problems(value.questions, value.used_in)
+        if tag_problems(value.questions, value.figures)
     ]
     if flagged:
         lines += [
             "",
             "## Values with tag problems",
             "",
-            "A tag the question list does not know, a figure its question does not",
-            "list, or a question whose status says it has no values. A summary built",
-            "before the list changed has these until it is rebuilt.",
+            "A question or figure the question list does not know, a figure its",
+            "question does not list, or a question whose status says it has no values.",
+            "A summary built before the list changed has these until it is rebuilt.",
             "",
-            "| Macro | Value | Unit | What it is | Questions | Used in | Problem |",
+            "| Macro | Value | Unit | What it is | Questions | Figures | Problem |",
             "|---|---|---|---|---|---|---|",
         ]
         order = {name: i for i, name in enumerate(SUMMARIES)}
@@ -274,8 +310,8 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
                 value.unit,
                 value.description + pending,
                 ", ".join(value.questions),
-                ", ".join(value.used_in),
-                "; ".join(tag_problems(value.questions, value.used_in)),
+                ", ".join(value.figures),
+                "; ".join(tag_problems(value.questions, value.figures)),
             ]
             lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
     lines += ["", "## Values by figure"]
@@ -283,8 +319,8 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         shown: dict[str, list[str]] = {}
         for summary_name, summary in summaries.items():
             for value in summary.values.values():
-                for tag in value.used_in:
-                    parsed = parse_figure_tag(tag)
+                for shown_in in value.figures:
+                    parsed = parse_figure(shown_in)
                     if parsed and parsed[0] == name:
                         shown.setdefault(parsed[1], []).append(
                             f"`\\{macro_name(summary_name, value.key)}`"
@@ -292,7 +328,7 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         asked = [
             q.id
             for q in QUESTIONS
-            if any(parse_figure_tag(f"figure: {f}")[0] == name for f in q.figures)
+            if any(parse_figure(f)[0] == name for f in q.figures)
         ]
         lines += [
             "",

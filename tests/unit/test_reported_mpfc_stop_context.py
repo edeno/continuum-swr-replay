@@ -5,7 +5,8 @@ import itertools
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.mpfc import TAGS, _value_factory, stop_context_values
+from continuum_swr_replay.reported.mpfc import TAGS, stop_context_values
+from continuum_swr_replay.reported.values import value_factory
 
 
 def _rows(n_loao_estimated: int = 5) -> list[dict]:
@@ -39,7 +40,7 @@ def _rows(n_loao_estimated: int = 5) -> list[dict]:
 
 
 def test_stop_context_values_main_and_check_rows():
-    make = _value_factory("synthetic", TAGS["paper"])
+    make = value_factory(stop_context_values, "synthetic", TAGS["modulation"])
 
     values = {v.key: v.value for v in stop_context_values(pd.DataFrame(_rows()), make)}
 
@@ -55,6 +56,6 @@ def test_stop_context_values_main_and_check_rows():
 
 
 def test_a_failed_leave_one_out_fit_is_refused():
-    make = _value_factory("synthetic", TAGS["paper"])
+    make = value_factory(stop_context_values, "synthetic", TAGS["modulation"])
     with pytest.raises(ValueError, match="4 of 5 leave-one-animal-out fits"):
         stop_context_values(pd.DataFrame(_rows(n_loao_estimated=4)), make)

@@ -26,10 +26,16 @@ import pandas as pd
 
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported import literature
-from continuum_swr_replay.reported.values import Summary, Tags, Value, file_record
+from continuum_swr_replay.reported.values import (
+    Summary,
+    Tags,
+    Value,
+    file_record,
+    value_factory,
+)
 
-TAGS = {"survey": Tags(("0.1",), ("paper",))}
-"""The questions every survey value answers, and where it is used."""
+TAGS = {"survey": Tags(("0.1",))}
+"""The question every survey value answers."""
 
 #: The parameters the introduction quotes: key stem -> (columns pooled, unit, what it is).
 PARAMETERS: dict[str, tuple[tuple[str, ...], str, str]] = {
@@ -155,22 +161,9 @@ def numeric(survey: pd.DataFrame) -> pd.DataFrame:
     return stripped.where(bare).astype(float)
 
 
-def _quantity(
-    key: str, value: float, unit: str, description: str, source: str
-) -> Value:
-    """A parameter value: printed whole when it is whole, else to two figures."""
-    style = "int" if float(value).is_integer() else "sig2"
-    return Value(
-        key=key,
-        value=float(value),
-        kind="quantity",
-        style=style,
-        unit=unit,
-        description=description,
-        questions=TAGS["survey"].questions,
-        used_in=TAGS["survey"].used_in,
-        source=source,
-    )
+def _whole_or_two_figures(value: float) -> str:
+    """The style of a parameter value: whole when it is whole, else two figures."""
+    return "int" if float(value).is_integer() else "sig2"
 
 
 def parameter_values(numeric: pd.DataFrame, source: str) -> list[Value]:
@@ -193,27 +186,28 @@ def parameter_values(numeric: pd.DataFrame, source: str) -> list[Value]:
     ValueError
         If a parameter has no numeric cell, or its mode is tied.
     """
+    make = value_factory(parameter_values, source, TAGS["survey"])
     out: list[Value] = []
     for stem, (columns, unit, what) in PARAMETERS.items():
         pooled = pd.concat([numeric[c] for c in columns]).dropna()
         if pooled.empty:
             raise ValueError(f"{stem}: no numeric cells in {list(columns)}")
         where = f"over the {len(pooled)} numeric cells of {', '.join(columns)}"
-        out += [
-            _quantity(
-                f"{stem}_mode",
-                _mode(pooled, stem),
-                unit,
-                f"Most common {what}, {where}",
-                source,
-            ),
-            _quantity(
-                f"{stem}_min", pooled.min(), unit, f"Smallest {what}, {where}", source
-            ),
-            _quantity(
-                f"{stem}_max", pooled.max(), unit, f"Largest {what}, {where}", source
-            ),
-        ]
+        for word, value, which in (
+            ("mode", _mode(pooled, stem), "Most common"),
+            ("min", pooled.min(), "Smallest"),
+            ("max", pooled.max(), "Largest"),
+        ):
+            out.append(
+                make(
+                    f"{stem}_{word}",
+                    value,
+                    "quantity",
+                    _whole_or_two_figures(value),
+                    f"{which} {what}, {where}",
+                    unit,
+                )
+            )
     return out
 
 
@@ -279,31 +273,16 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
             "(Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)",
         ),
     }
-    out = [
-        Value(
-            key="papers",
-            value=n,
-            kind="count",
-            style="count",
-            unit="",
-            description="Papers in the survey",
-            questions=TAGS["survey"].questions,
-            used_in=TAGS["survey"].used_in,
-            source=source,
-        )
-    ]
+    make = value_factory(method_values, source, TAGS["survey"])
+    out = [make("papers", n, "count", "count", "Papers in the survey")]
     for stem, (mask, what) in shares.items():
         out.append(
-            Value(
-                key=f"{stem}_fraction",
-                value=float(mask.sum()) / n,
-                kind="fraction",
-                style="pctnum",
-                unit="",
-                description=f"Share of the {n} surveyed papers {what}",
-                questions=TAGS["survey"].questions,
-                used_in=TAGS["survey"].used_in,
-                source=source,
+            make(
+                f"{stem}_fraction",
+                float(mask.sum()) / n,
+                "fraction",
+                "pctnum",
+                f"Share of the {n} surveyed papers {what}",
             )
         )
     return out

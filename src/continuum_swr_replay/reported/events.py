@@ -73,39 +73,38 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     files_record,
+    value_factory,
 )
 
-_FIGURE_2 = ("paper", "figure: 2")
 TAGS = {
-    "cohort": Tags(("2b.2",), ("paper", "figure: 2b")),
-    "left_out": Tags(("2b.2",), _FIGURE_2),
-    "other_detectors_main": Tags(("2b.3",), _FIGURE_2),
-    "other_detectors": Tags(("2b.3",), ("supplement",)),
-    "boundaries": Tags(("2b.4",), ("paper", "figure: 2d")),
-    "ripple": Tags(("2c.1", "2b.5"), ("paper", "figure: 3b")),
-    "brain_state": Tags(("2c.1",), ("supplement",)),
-    "rest_theta": Tags(("2c.1",), ("paper",)),
-    "class_distribution": Tags(("2b.5",), ("supplement",)),
-    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("paper",)),
-    "class_step_evidence": Tags(("2b.5", "2c.3"), ("paper",)),
-    "spike": Tags(("2c.2", "2c.3", "2c.5"), _FIGURE_2),
-    "spike_remote": Tags(("2c.2", "2c.3", "2c.5", "2c.7"), _FIGURE_2),
-    "spike_count": Tags(("2c.2",), _FIGURE_2),
-    "spike_count_remote": Tags(("2c.2", "2c.7"), _FIGURE_2),
-    "spike_evidence": Tags(("2c.3",), _FIGURE_2),
-    "spike_evidence_remote": Tags(("2c.3", "2c.7"), _FIGURE_2),
-    "spike_evidence_baseline": Tags(("2c.3", "2c.5"), _FIGURE_2),
-    "spike_gpi": Tags(("2c.4",), ("supplement",)),
-    "spike_gpi_remote": Tags(("2c.4", "2c.7"), ("supplement",)),
-    "content_occupancy": Tags(("2d.1", "2c.8"), _FIGURE_2),
-    "duration": Tags(("2d.6",), ("supplement",)),
-    "extent": Tags(("2d.3",), ("paper", "figure: 3")),
-    "speed": Tags(("2d.2",), ("paper", "figure: 3c")),
-    "certainty": Tags(("2d.5",), ("supplement",)),
-    "stillness": Tags(("2d.4",), ("paper", "figure: 3")),
-    "location": Tags(("2d.1",), ("paper", "figure: 3")),
+    "cohort": Tags(("2b.2",), ("2b",)),
+    "left_out": Tags(("2b.2",), ("2",)),
+    "other_detectors_main": Tags(("2b.3",), ("2",)),
+    "other_detectors": Tags(("2b.3",)),
+    "boundaries": Tags(("2b.4",), ("2d",)),
+    "ripple": Tags(("2c.1", "2b.5"), ("3b",)),
+    "brain_state": Tags(("2c.1",)),
+    "class_distribution": Tags(("2b.5",)),
+    "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
+    "class_step_evidence": Tags(("2b.5", "2c.3")),
+    "spike": Tags(("2c.2", "2c.3", "2c.5"), ("2",)),
+    "spike_remote": Tags(("2c.2", "2c.3", "2c.5", "2c.7"), ("2",)),
+    "spike_count": Tags(("2c.2",), ("2",)),
+    "spike_count_remote": Tags(("2c.2", "2c.7"), ("2",)),
+    "spike_evidence": Tags(("2c.3",), ("2",)),
+    "spike_evidence_remote": Tags(("2c.3", "2c.7"), ("2",)),
+    "spike_evidence_baseline": Tags(("2c.3", "2c.5"), ("2",)),
+    "spike_gpi": Tags(("2c.4",)),
+    "spike_gpi_remote": Tags(("2c.4", "2c.7")),
+    "content_occupancy": Tags(("2d.1", "2c.8"), ("2",)),
+    "duration": Tags(("2d.6",)),
+    "extent": Tags(("2d.3",), ("3",)),
+    "speed": Tags(("2d.2",), ("3c",)),
+    "certainty": Tags(("2d.5",)),
+    "stillness": Tags(("2d.4",), ("3",)),
+    "location": Tags(("2d.1",), ("3",)),
 }
-"""Each group of values: the questions it answers and where it is used. The
+"""Each group of values: the questions it answers and the figures that show it. The
 ``_remote`` groups are the remote events' spike support, which also answers
 question 2c.7."""
 
@@ -166,41 +165,6 @@ def default_inputs() -> EventsInputs:
     )
 
 
-def _value_factory(source: str, tags: Tags):
-    """A :class:`Value` builder with the shared source and tags filled in;
-    ``tags_`` overrides the tags of one value."""
-
-    def make(
-        key: str,
-        value: float | int,
-        kind: str,
-        style: str,
-        description: str,
-        unit: str = "",
-        *,
-        pending: str | None = None,
-        tags_: Tags | None = None,
-    ) -> Value:
-        if kind == "count" and float(value).is_integer():
-            value = int(value)
-        elif kind != "count":
-            value = float(value)
-        return Value(
-            key=key,
-            value=value,
-            kind=kind,
-            style=style,
-            unit=unit,
-            description=description,
-            questions=(tags_ or tags).questions,
-            used_in=(tags_ or tags).used_in,
-            source=source,
-            pending=pending,
-        )
-
-    return make
-
-
 def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str | None:
     """Why an output made from the canonical event table is stale, or None.
 
@@ -249,7 +213,7 @@ def _manifest(folder: Path) -> dict:
 
 def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.2: how many immobile non-local events carry no SWR."""
-    make = _value_factory(source, TAGS["cohort"])
+    make = value_factory(event_cohort_values, source, TAGS["cohort"])
     if not events["whole_event_speed_eligible"].all():
         raise ValueError(
             "the event table holds events that are not whole-event immobile"
@@ -332,7 +296,7 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
-    make = _value_factory(source, TAGS["boundaries"])
+    make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
     overlap = events[events["overlap_class"] != "non_swr"]
     start_ms = 1000 * (overlap["event_start_s"] - overlap["matched_swr_start"]).dropna()
     end_ms = 1000 * (overlap["event_end_s"] - overlap["matched_swr_end"]).dropna()
@@ -419,8 +383,10 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     local, no_spike, non_local, uncertain = STATE_SHARE_COLUMNS
     for word, detector in DETECTORS.items():
         main = word == MAIN_DETECTOR
-        make = _value_factory(
-            source, TAGS["other_detectors_main"] if main else TAGS["other_detectors"]
+        make = value_factory(
+            other_detector_values,
+            source,
+            TAGS["other_detectors_main"] if main else TAGS["other_detectors"],
         )
         mine = events[events["detector"] == detector]
         alone = mine[~mine["matched"]]
@@ -599,7 +565,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
     analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
     from the Widloski detector) does not include, in total and per hour of rest.
     """
-    make = _value_factory(source, TAGS["left_out"])
+    make = value_factory(left_out_values, source, TAGS["left_out"])
     counts = pd.read_csv(report_dir / "counts_by_animal.csv")
     exposure_s = float(
         counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
@@ -777,8 +743,10 @@ def brain_state_values(
         raise ValueError("an event's epoch has no running reference")
     values: list[Value] = []
     for word, column in _SIGNAL_EVENT_COLUMNS.items():
-        make = _value_factory(
-            source, TAGS["ripple"] if word == "ripple" else TAGS["brain_state"]
+        make = value_factory(
+            brain_state_values,
+            source,
+            TAGS["ripple"] if word == "ripple" else TAGS["brain_state"],
         )
         label = _SIGNAL_LABELS[word]
         values += [
@@ -858,7 +826,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     median over epochs, and the animals whose median over their epochs is above
     0 dB. The z values (``brain_state_values``) stay as they are.
     """
-    make = _value_factory(source, TAGS["brain_state"])
+    make = value_factory(gamma_db_values, source, TAGS["brain_state"])
     values: list[Value] = []
     for word in ("slow_gamma", "fast_gamma"):
         label = _SIGNAL_LABELS[word]
@@ -936,7 +904,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
     run scores every event and quiet window (no cap). The remote groups' values
     also answer question 2c.7, whether remote events pass these tests."""
-    make = _value_factory(source, TAGS["spike"])
+    make = value_factory(spike_evidence_values, source, TAGS["spike"])
     values = [
         make(
             "evidence_epochs",
@@ -966,7 +934,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{label} scored",
-                tags_=pick(TAGS["spike"], TAGS["spike_remote"]),
+                tags=pick(TAGS["spike"], TAGS["spike_remote"]),
             ),
             make(
                 f"{word}_spikes_median",
@@ -975,7 +943,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median spike count of {label}",
                 "spikes",
-                tags_=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
+                tags=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
             ),
             make(
                 f"{word}_tetrodes_median",
@@ -984,7 +952,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median number of tetrodes with a spike in {label}",
                 "tetrodes",
-                tags_=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
+                tags=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
             ),
             make(
                 f"{word}_dll_per_spike_median",
@@ -994,7 +962,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median log-likelihood ratio per spike, decoded location against the "
                 f"animal's, of {label}",
                 "nats per spike",
-                tags_=TAGS["spike_evidence_baseline"]
+                tags=TAGS["spike_evidence_baseline"]
                 if word == "baseline"
                 else pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
@@ -1006,7 +974,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median track distance from the MAP of {label} to the ground-process "
                 "intensity peak",
                 "cm",
-                tags_=pick(TAGS["spike_gpi"], TAGS["spike_gpi_remote"]),
+                tags=pick(TAGS["spike_gpi"], TAGS["spike_gpi_remote"]),
             ),
         ]
         if word == "baseline":
@@ -1021,7 +989,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
                 "window, per spike",
-                tags_=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                tags=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
             make(
                 f"{word}_epochs_scored",
@@ -1029,7 +997,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
-                tags_=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                tags=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
             make(
                 f"{word}_animals_above_baseline",
@@ -1038,7 +1006,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
                 "window, per spike",
-                tags_=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                tags=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
             ),
         ]
     values.append(
@@ -1056,7 +1024,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
 def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     """Question 2c.3: the held-out tetrode test of immobile Non-Local Continuous bouts,
     split by SWR, per held-out spike against the animal's position."""
-    make = _value_factory(source, TAGS["spike_evidence"])
+    make = value_factory(heldout_by_swr_values, source, TAGS["spike_evidence"])
     rows = stats[
         (stats["regime"] == "immobile") & (stats["metric"] == "runcv_nl_anim_mark_ps")
     ]
@@ -1139,7 +1107,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs.
     """
-    make = _value_factory(source, TAGS["class_distribution"])
+    make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
@@ -1200,9 +1168,11 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     attained = ", ".join(
         _OTHER_STEP_PROPERTIES[p] for p in others.index[others == others.max()]
     )
-    make = _value_factory(source, TAGS["class_step"])
+    make = value_factory(class_step_values, source, TAGS["class_step"])
     evidence = main[main.property == "evidence"]
-    make_evidence = _value_factory(source, TAGS["class_step_evidence"])
+    make_evidence = value_factory(
+        class_step_values, source, TAGS["class_step_evidence"]
+    )
     return [
         make(
             "step_other_properties_criterion_animals_max",
@@ -1365,7 +1335,7 @@ def property_values(events: pd.DataFrame, source: str) -> list[Value]:
     """
     values = []
     for word, column, scale, unit, style, direction, tags in _PROPERTIES:
-        make = _value_factory(source, tags)
+        make = value_factory(property_values, source, tags)
         x = events[[column, "is_swr", "animal"]].dropna(subset=[column])
         x = x.assign(v=x[column] * scale)
         med = x.groupby("is_swr")["v"].median()
@@ -1426,7 +1396,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
         raise ValueError(f"too many bootstrap replicates without estimate:\n{share}")
     values: list[Value] = []
     for word, _, _, unit, _, _, tags in _PROPERTIES:
-        make = _value_factory(source, tags)
+        make = value_factory(property_interval_values, source, tags)
         row = intervals.loc[word]
         name = _PROPERTY_NAMES[word]
         skipped = (
@@ -1498,7 +1468,7 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
     windows: an event whose length no rest stretch of its epoch holds would
     have none, and raises rather than leaving the comparison silently.
     """
-    make = _value_factory(source, TAGS["rest_theta"])
+    make = value_factory(rest_theta_values, source, TAGS["brain_state"])
     if (events.rest_windows <= 0).any():
         raise ValueError(
             f"{int((events.rest_windows <= 0).sum())} events have no duration-matched "
@@ -1545,7 +1515,7 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
     at a remote well, at the animal's own well, on a remote path, near the
     animal off the wells.
     """
-    make = _value_factory(source, TAGS["content_occupancy"])
+    make = value_factory(content_occupancy_values, source, TAGS["content_occupancy"])
     occupancy = occupancy.assign(
         at_well=occupancy["remote_well"] + occupancy["own_well"]
     )

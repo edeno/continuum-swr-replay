@@ -29,8 +29,9 @@ def _value(key: str, pending: str | None = None) -> Value:
         unit="",
         description="d",
         questions=("2c.1",),
-        used_in=("paper",),
+        figures=(),
         source="s",
+        function="f",
         pending=pending,
     )
 

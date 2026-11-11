@@ -4,7 +4,7 @@ and which figure shows it.
 This module is the one place a question's wording, its place in the paper's
 outline, its status and its figures are written. Each value in a summary
 (:class:`~continuum_swr_replay.reported.values.Value`) names the questions it
-answers in ``questions`` and the figures that show it in ``used_in``;
+answers in ``questions`` and the figures that show it in ``figures``;
 :func:`tag_problems` checks those names against the lists here, and
 ``scripts/reported/emit_reported_values.py`` writes ``paper/reported/questions.md``,
 every question with its values.
@@ -69,11 +69,6 @@ ANSWERED = ("computed", "partly computed")
 """The statuses of a question that has values; a question of any other status has
 none."""
 
-USES = ("paper", "supplement")
-"""The ``used_in`` tags other than a figure."""
-
-FIGURE_PREFIX = "figure: "
-
 
 @dataclass(frozen=True)
 class Figure:
@@ -134,11 +129,10 @@ FIGURES: dict[str, Figure] = {
 }
 """Every figure a value may name, by id: the main figures (``"2"``), with the panel
 letters their scripts draw now, and the supplementary figures by their output
-folder's name (``"memoryless_comparison"``). A value names one as
-``"figure: <id>"`` or, for a lettered panel, ``"figure: <id><letter>"``
-(``"figure: 2b"``). A value placed in a main figure whose panel is not designed
-yet carries the unlettered tag (``"figure: 2"``), whether or not the script draws
-it yet."""
+folder's name (``"memoryless_comparison"``). A value names one by its id or, for
+a lettered panel, its id and the letter (``"2b"``). A value placed in a main
+figure whose panel is not designed yet names the figure without a letter
+(``"2"``), whether or not the script draws it yet."""
 
 
 @dataclass(frozen=True)
@@ -158,7 +152,7 @@ class Question:
     figures : tuple of str
         The figures or panels the paper places it in (``"2b"``,
         ``"memoryless_comparison"``); empty for a question no figure shows. Every
-        figure tag on one of its values must be listed here.
+        figure one of its values names must be listed here.
     note : str
         An editorial note for the lead, if any.
     """
@@ -400,16 +394,13 @@ questions last in theirs."""
 QUESTION_IDS: dict[str, Question] = {q.id: q for q in QUESTIONS}
 
 
-def parse_figure_tag(tag: str) -> tuple[str, str] | None:
-    """The figure id and panel letter a ``used_in`` tag names, or None.
+def parse_figure(name: str) -> tuple[str, str] | None:
+    """The figure id and panel letter ``name`` gives, or None.
 
-    ``"figure: 2b"`` is ``("2", "b")``; ``"figure: 2"`` and
-    ``"figure: memoryless_comparison"`` have no panel (``""``). A tag that is not a
-    figure tag, or names no figure in :data:`FIGURES`, is None.
+    ``"2b"`` is ``("2", "b")``; ``"2"`` and ``"memoryless_comparison"`` have no
+    panel (``""``). A name that is no figure of :data:`FIGURES`, or a panel its
+    figure does not have, is None.
     """
-    if not tag.startswith(FIGURE_PREFIX):
-        return None
-    name = tag[len(FIGURE_PREFIX) :]
     if name in FIGURES:
         return name, ""
     figure, panel = name[:-1], name[-1:]
@@ -418,28 +409,21 @@ def parse_figure_tag(tag: str) -> tuple[str, str] | None:
     return None
 
 
-def tag_problems(questions: Iterable[str], used_in: Iterable[str]) -> list[str]:
-    """What is wrong with a value's tags: an unknown question id, an unknown use
-    or figure, a figure its question does not list, or a question whose status
-    says it has no values (:data:`ANSWERED`). Empty when nothing is."""
-    questions, used_in = tuple(questions), tuple(used_in)
+def tag_problems(questions: Iterable[str], figures: Iterable[str]) -> list[str]:
+    """What is wrong with a value's tags: an unknown question id, an unknown
+    figure, a figure its question does not list, or a question whose status says
+    it has no values (:data:`ANSWERED`). Empty when nothing is."""
+    questions, figures = tuple(questions), tuple(figures)
     problems = [f"no question {q!r}" for q in questions if q not in QUESTION_IDS]
-    figures = []
-    for tag in used_in:
-        if tag in USES:
-            continue
-        parsed = parse_figure_tag(tag)
-        if parsed is None:
-            problems.append(f"unknown use {tag!r}")
-        else:
-            figures.append("".join(parsed))
+    known = [f for f in figures if parse_figure(f) is not None]
+    problems += [f"no figure {f!r}" for f in figures if f not in known]
     for qid in questions:
         question = QUESTION_IDS.get(qid)
         if question is None:
             continue
         if question.status not in ANSWERED:
             problems.append(f"question {qid} is {question.status}, so has no values")
-        for figure in figures:
+        for figure in known:
             if figure not in question.figures:
                 problems.append(f"question {qid} does not list figure {figure!r}")
     return problems

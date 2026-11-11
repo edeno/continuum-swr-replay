@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -14,12 +14,12 @@ from typing import Any
 from continuum_swr_replay.reported.code_record import CodeRecord, CodeRecordError
 from continuum_swr_replay.reported.questions import tag_problems
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 """The layout of a summary file. Bump it when a field is added or renamed.
-Version 5 names the summary (``summary``, a key of :data:`SUMMARIES`), tags each
-value with the ``questions`` it answers, holds ``code``, the record of the code
-that built it (:class:`~continuum_swr_replay.reported.code_record.CodeRecord`),
-and, for a summary converted from an earlier layout, ``migrated``."""
+Version 6: each value records its ``function``, the builder function that
+computed it, and the ``figures`` that show it. Whether the manuscript cites a
+value is not recorded: it is read from the manuscript
+(:func:`~continuum_swr_replay.reported.emit.cited_macros`)."""
 
 SUMMARIES = {
     "survey": "the published replay studies the introduction summarizes "
@@ -46,20 +46,21 @@ _KEY = re.compile(r"[a-z]+(_[a-z]+)*")
 
 @dataclass(frozen=True)
 class Tags:
-    """Which questions a group of values answers, and where they are used: what a
-    builder declares once, in its ``TAGS`` table, for each group of values.
+    """Which questions a group of values answers, and which figures show them:
+    what a builder declares once, in its ``TAGS`` table, for each group of values.
 
     Attributes
     ----------
     questions : tuple of str
         Question ids (:data:`~continuum_swr_replay.reported.questions.QUESTIONS`).
-    used_in : tuple of str
-        "paper", "supplement", or a figure (``"figure: <id>"``,
-        ``"figure: <id><panel>"``).
+    figures : tuple of str
+        Figures or lettered panels (``"2"``, ``"2b"``, ``"memoryless_comparison"``;
+        :data:`~continuum_swr_replay.reported.questions.FIGURES`); empty for
+        values no figure shows.
     """
 
     questions: tuple[str, ...]
-    used_in: tuple[str, ...]
+    figures: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -85,12 +86,15 @@ class Value:
     questions : tuple of str
         The ids of the questions it answers
         (:data:`~continuum_swr_replay.reported.questions.QUESTIONS`).
-    used_in : tuple of str
-        "paper", "supplement", or a figure,
-        ``"figure: <id>"`` or ``"figure: <id><panel>"``
-        (:data:`~continuum_swr_replay.reported.questions.FIGURES`).
+    figures : tuple of str
+        The figures or lettered panels that show it (``"2"``, ``"2b"``;
+        :data:`~continuum_swr_replay.reported.questions.FIGURES`); empty when
+        none does.
     source : str
         The file, run or table it was computed from, and the selection.
+    function : str
+        The function that computed it, in its summary's builder module
+        (``event_cohort_values`` of ``reported/events.py``).
     pending : str or None
         Why the value may not be quoted yet (for example a value from an
         untracked script), or None.
@@ -107,8 +111,9 @@ class Value:
     unit: str
     description: str
     questions: tuple[str, ...]
-    used_in: tuple[str, ...]
+    figures: tuple[str, ...]
     source: str
+    function: str
     pending: str | None = None
 
     def __post_init__(self) -> None:
@@ -126,8 +131,75 @@ class Value:
             raise ValueError(
                 f"{self.key}: a fraction must be in [0, 1], got {self.value}"
             )
-        if not self.questions or not self.used_in:
-            raise ValueError(f"{self.key}: name its questions and where it is used")
+        if not self.questions:
+            raise ValueError(f"{self.key}: name the questions it answers")
+        if not self.function.isidentifier():
+            raise ValueError(
+                f"{self.key}: function {self.function!r} is not a function's name"
+            )
+
+
+def value_factory(
+    function: Callable[..., Any],
+    source: str,
+    tags: Tags,
+    pending: str | None = None,
+) -> Callable[..., Value]:
+    """A maker of the values one builder function computes.
+
+    Parameters
+    ----------
+    function : callable
+        The builder function the values are computed in. Its name is recorded
+        as each value's ``function``, so a value can be traced to its code.
+    source : str
+        The file, run or table the values are computed from.
+    tags : Tags
+        The questions the values answer and the figures that show them.
+    pending : str, optional
+        Why the values may not be quoted yet.
+
+    Returns
+    -------
+    make : callable
+        ``make(key, value, kind, style, description, unit="", *, tags=None,
+        pending=None)``, a :class:`Value`. ``tags`` and ``pending`` replace the
+        shared ones for that value. A whole count is stored as an int, a
+        fraction or a quantity as a float.
+    """
+    shared_tags, shared_pending = tags, pending
+
+    def make(
+        key: str,
+        value: float | int,
+        kind: str,
+        style: str,
+        description: str,
+        unit: str = "",
+        *,
+        tags: Tags | None = None,
+        pending: str | None = None,
+    ) -> Value:
+        if kind != "count":
+            value = float(value)
+        elif float(value).is_integer():
+            value = int(value)
+        chosen = tags or shared_tags
+        return Value(
+            key=key,
+            value=value,
+            kind=kind,
+            style=style,
+            unit=unit,
+            description=description,
+            questions=chosen.questions,
+            figures=chosen.figures,
+            source=source,
+            function=function.__name__,
+            pending=shared_pending if pending is None else pending,
+        )
+
+    return make
 
 
 @dataclass
@@ -240,7 +312,7 @@ def read_summary(path: Path) -> Summary:
     for key, fields in payload["values"].items():
         fields = dict(fields)
         fields["questions"] = tuple(fields["questions"])
-        fields["used_in"] = tuple(fields["used_in"])
+        fields["figures"] = tuple(fields["figures"])
         summary.add(Value(key=key, **fields))
     return summary
 
@@ -277,7 +349,7 @@ def summary_tag_problems(summary: Summary) -> dict[str, list[str]]:
     """Each value of ``summary`` whose tags do not match the question list, with
     what is wrong (:func:`~continuum_swr_replay.reported.questions.tag_problems`)."""
     problems = {
-        key: tag_problems(value.questions, value.used_in)
+        key: tag_problems(value.questions, value.figures)
         for key, value in summary.values.items()
     }
     return {key: found for key, found in problems.items() if found}

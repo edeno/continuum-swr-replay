@@ -9,10 +9,10 @@ from continuum_swr_replay.reported.mpfc import (
     CHECK_FIRING_RATE_HZ,
     CHECK_KEYS,
     TAGS,
-    _value_factory,
     called_fraction_values,
     rate_cutoff_check_values,
 )
+from continuum_swr_replay.reported.values import value_factory
 
 #: Rates on both sides of the cutoff; exactly 1 Hz is kept.
 RATES = np.array([0.05, 0.3, 0.99, 1.0, 1.01, 2.0, 4.0, 9.0, 0.5, 1.5] * 4)
@@ -63,7 +63,7 @@ def _population() -> pd.DataFrame:
 
 def test_the_check_keeps_units_at_or_above_one_hz():
     population = _population()
-    make = _value_factory("synthetic", TAGS["paper"])
+    make = value_factory(rate_cutoff_check_values, "synthetic", TAGS["modulation"])
     values = {v.key: v for v in rate_cutoff_check_values(population, None, make)}
     kept = int((RATES >= CHECK_FIRING_RATE_HZ).sum())
     assert 0 < kept < len(RATES)

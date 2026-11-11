@@ -415,6 +415,13 @@ or figure the list does not know is not written; a summary written before the li
 emitted, and its mis-tagged values are listed in `paper/reported/questions.md` until it is rebuilt. `make reported-values` writes that file: every
 question in the paper's outline, with the values that answer it, their macros, and the values by figure.
 
+Each value records the builder function that computed it (`function`; "Computed in" in `questions.md`),
+so a macro leads to its code: `\EventsRippleMedianNonSwr` is computed in `brain_state_values` of
+`reported/events.py`. A builder makes its values through `reported.values.value_factory`, which is given
+that function. Whether the manuscript cites a value is not recorded anywhere: it is read from the macros
+`paper/main.tex` uses. `make reported-values` prints how many values are cited, and `make release-check`
+fails when a cited value is pending.
+
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it
   inline or quote it from memory.

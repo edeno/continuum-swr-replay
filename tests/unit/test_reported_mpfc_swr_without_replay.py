@@ -9,9 +9,9 @@ from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.reported.mpfc import (
     SWR_WITHOUT_REPLAY_MIN_EVENTS,
     TAGS,
-    _value_factory,
     swr_without_replay_values,
 )
+from continuum_swr_replay.reported.values import value_factory
 
 LAG_TIME = np.arange(-100, 101) / 500.0
 
@@ -68,7 +68,7 @@ def extended():
 
 def test_counts_overlap_and_both_subsets(extended):
     population, curves, sidecars = extended
-    make = _value_factory("synthetic", TAGS["paper"])
+    make = value_factory(swr_without_replay_values, "synthetic", TAGS["modulation"])
 
     values = {
         v.key: v.value

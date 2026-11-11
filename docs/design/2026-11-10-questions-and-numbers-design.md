@@ -61,6 +61,21 @@ Where the build departs from the design below, after two independent reviews:
   a question has values exactly when its status says so; the scripts' `main()`
   paths are tested, the survey build in a subprocess.
 
+## As built: tracing a value, and what is cited (2026-11-11, schema 6)
+
+- **Each value records its `function`**, the builder function that computed it.
+  About 85 % of the keys are assembled from parts, so a key could not be found in
+  its builder by search. The builders make their values through one factory,
+  `reported.values.value_factory(function, source, tags)`; a test checks that
+  each factory names the function it is made in or handed to.
+- **`used_in` is gone; a value names only its `figures`.** The `paper` and
+  `supplement` tags recorded an intention (600 of the 604 mPFC values said
+  `paper`). Whether the manuscript cites a value is read from the macros
+  `paper/main.tex` uses (`reported.emit.cited_macros`): the emitter prints the
+  count, and the release check fails on a cited value that is pending.
+  `questions.md` does not mark cited values, so editing the manuscript never
+  makes a generated file stale.
+
 ## As built: naming (2026-11-11)
 
 - **Summaries are named for what they hold:** `survey`, `detection`, `events`,

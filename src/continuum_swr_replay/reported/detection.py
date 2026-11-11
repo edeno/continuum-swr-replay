@@ -36,7 +36,13 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data_dir
-from continuum_swr_replay.reported.values import Summary, Tags, Value, file_record
+from continuum_swr_replay.reported.values import (
+    Summary,
+    Tags,
+    Value,
+    file_record,
+    value_factory,
+)
 
 STATE_EVIDENCE_RUN = "_refresh_20261016"
 """The held-out tetrode run the detection summary reads (242 epochs, all ``ok``)."""
@@ -49,12 +55,12 @@ MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 SWEEP_DIR = Path("docs/design/replay_detection_comparison")
 
 TAGS = {
-    "state_evidence": Tags(("2c.3",), ("paper", "supplement")),
-    "memoryless": Tags(("1.1",), ("supplement", "figure: memoryless_comparison")),
-    "pilot": Tags(("2a.3",), ("supplement", "figure: memoryless_comparison")),
+    "state_evidence": Tags(("2c.3",)),
+    "memoryless": Tags(("1.1",), ("memoryless_comparison",)),
+    "pilot": Tags(("2a.3",), ("memoryless_comparison",)),
 }
-"""Each group of values: the questions it answers and where it is used. The
-memoryless-comparison values are used in that supplementary figure and its
+"""Each group of values: the questions it answers and the figures that show it.
+The memoryless-comparison values are used in that supplementary figure and its
 caption; the pilot values come from one real epoch, not the simulations."""
 
 
@@ -82,41 +88,6 @@ def default_inputs() -> DetectionInputs:
         pilot_events=pilot / f"{MEMORYLESS_PILOT_EPOCH}_memoryless_events.parquet",
         pilot_manifest=pilot / "manifest.json",
     )
-
-
-def _value_factory(source: str, tags: Tags):
-    """A :class:`Value` builder with the shared source and tags filled in."""
-
-    def make(
-        key: str,
-        value: float | int,
-        kind: str,
-        style: str,
-        description: str,
-        unit: str = "",
-        *,
-        pending: str | None = None,
-    ) -> Value:
-        if kind == "count":
-            if not np.isclose(float(value), round(float(value)), rtol=0, atol=1e-6):
-                raise ValueError(f"{key}: a count must be whole, got {value}")
-            value = int(round(float(value)))
-        else:
-            value = float(value)
-        return Value(
-            key=key,
-            value=value,
-            kind=kind,
-            style=style,
-            unit=unit,
-            description=description,
-            questions=tags.questions,
-            used_in=tags.used_in,
-            source=source,
-            pending=pending,
-        )
-
-    return make
 
 
 # --- the held-out tetrode test per decoder state ------------------------------
@@ -177,7 +148,7 @@ def state_evidence_values(
     counts the animals whose mean is above zero. Bouts are the primary
     (``runcv_``, time-held-out running-only encoding) rows of ``bout_stats``.
     """
-    make = _value_factory(source, TAGS["state_evidence"])
+    make = value_factory(state_evidence_values, source, TAGS["state_evidence"])
     statuses = pd.Series({k: r["status"] for k, r in manifest["epochs"].items()})
     n_animals = int(bouts["n_animals"].max())
     values = [
@@ -280,7 +251,7 @@ def pilot_stray_window_values(
     dispersion clears the threshold only with them: the pieces' own
     dispersion does not.
     """
-    make = _value_factory(source, TAGS["pilot"])
+    make = value_factory(pilot_stray_window_values, source, TAGS["pilot"])
     replay = events[events["is_replay"]]
     decided = replay[
         (replay["n_kept_windows_outside_pieces"] > 0)
@@ -317,7 +288,7 @@ def pilot_stray_window_values(
 def recording_values(numbers: dict, source: str) -> list[Value]:
     """Panels (a-f): what each detector made of the labeled events of one
     simulated recording, as the figure script computed them."""
-    make = _value_factory(source, TAGS["memoryless"])
+    make = value_factory(recording_values, source, TAGS["memoryless"])
     if not numbers["outbound_draws_from_passing"] > 1:
         raise ValueError(
             "the caption says the outbound continuous replay fails the test by "
@@ -465,10 +436,25 @@ def _timing(summary: pd.DataFrame, detector: str, edge: str, statistic: str):
     return rows["duration_s"].to_numpy(), rows["value"].to_numpy()
 
 
+def _whole_count(share: float, n: int) -> int:
+    """The count a share of ``n`` stands for.
+
+    Raises
+    ------
+    ValueError
+        If ``share * n`` is not a whole number to within 1e-6, the rounding error
+        of a share stored as a float.
+    """
+    count = share * n
+    if not np.isclose(count, round(count), rtol=0, atol=1e-6):
+        raise ValueError(f"{share} of {n} is not a whole count")
+    return int(round(count))
+
+
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     """Panels (g-k): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
-    make = _value_factory(source, TAGS["memoryless"])
+    make = value_factory(sweep_values, source, TAGS["memoryless"])
     overall = summary[summary["summary"] == "overall"].set_index("measure")["value"]
     domain = summary[summary["summary"] == "overall_in_domain"].set_index("measure")[
         "value"
@@ -597,7 +583,7 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "sweep_sliding_only_replays",
-            overall["found_by_sliding_window_only"] * n,
+            _whole_count(overall["found_by_sliding_window_only"], n),
             "count",
             "count",
             "swept replays the sliding-window detector reported and the state-space "
@@ -605,7 +591,7 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "sweep_sliding_only_before_test_replays",
-            overall["found_by_sliding_window_only_before_shuffle"] * n,
+            _whole_count(overall["found_by_sliding_window_only_before_shuffle"], n),
             "count",
             "count",
             "the same, counting the sliding window's reports before its test",
@@ -712,7 +698,7 @@ def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     """Panels (l-o): bursts with no clean replay, stretches with no replay, and
     events in two parts."""
-    make = _value_factory(source, TAGS["memoryless"])
+    make = value_factory(controls_values, source, TAGS["memoryless"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
@@ -1046,7 +1032,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     """Panels (p, q): content estimated from discovery cells, scored on held-out
     evaluation cells. Folds A and B tile the track; fold C's evaluation cells
     cover half of it."""
-    make = _value_factory(source, TAGS["memoryless"])
+    make = value_factory(heldout_values, source, TAGS["memoryless"])
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)

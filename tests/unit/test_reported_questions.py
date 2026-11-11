@@ -1,10 +1,11 @@
 """The question list, and every reported value's tags against it.
 
-Each value names the questions it answers (``questions``) and the figures that show
-it (``used_in``); the question list (``reported/questions.py``) is the one place
-those are defined. These tests check the list itself, the tags the builders
-write (read from their source, so no lab data is needed), the tags of the
-committed summaries, and the generated view.
+Each value names the questions it answers (``questions``), the figures that show
+it (``figures``) and the builder function that computed it (``function``); the
+question list (``reported/questions.py``) is the one place questions and figures
+are defined. These tests check the list itself, the tags and functions the
+builders write (read from their source, so no lab data is needed), the tags of
+the committed summaries, and the generated view.
 """
 
 from __future__ import annotations
@@ -31,10 +32,10 @@ from continuum_swr_replay.reported.questions import (
     QUESTIONS,
     SECTIONS,
     STATUSES,
-    parse_figure_tag,
+    parse_figure,
     tag_problems,
 )
-from continuum_swr_replay.reported.values import Tags
+from continuum_swr_replay.reported.values import Tags, value_factory
 
 ROOT = Path(__file__).resolve().parents[2]
 REPORTED = ROOT / "paper" / "reported"
@@ -71,7 +72,7 @@ def test_a_question_is_written_as_a_question():
 def test_every_figure_a_question_lists_exists():
     for q in QUESTIONS:
         for figure in q.figures:
-            assert parse_figure_tag(f"figure: {figure}") is not None, (q.id, figure)
+            assert parse_figure(figure) is not None, (q.id, figure)
 
 
 def test_no_figure_id_reads_as_another_figure_and_a_panel():
@@ -91,28 +92,24 @@ def test_every_figure_script_exists_and_the_figure_pipeline_names_it():
 # --- tag checking ------------------------------------------------------------------
 
 
-def test_figure_tags_name_a_figure_or_a_lettered_panel():
-    assert parse_figure_tag("figure: 2b") == ("2", "b")
-    assert parse_figure_tag("figure: 2") == ("2", "")
-    assert parse_figure_tag("figure: memoryless_comparison") == (
-        "memoryless_comparison",
-        "",
-    )
-    assert parse_figure_tag("figure: 2z") is None
-    assert parse_figure_tag("figure: spike support") is None
-    assert parse_figure_tag("supplement") is None
+def test_a_figure_name_is_a_figure_or_a_lettered_panel():
+    assert parse_figure("2b") == ("2", "b")
+    assert parse_figure("2") == ("2", "")
+    assert parse_figure("memoryless_comparison") == ("memoryless_comparison", "")
+    assert parse_figure("2z") is None
+    assert parse_figure("spike support") is None
+    assert parse_figure("") is None
 
 
 def test_tag_problems_names_each_mismatch():
-    assert tag_problems(("2d.2",), ("paper", "figure: 3c")) == []
-    assert tag_problems(("nope",), ("paper",)) == ["no question 'nope'"]
-    assert tag_problems(("2d.2",), ("docs: somewhere",)) == [
-        "unknown use 'docs: somewhere'"
-    ]
-    assert tag_problems(("2d.2",), ("figure: 2b",)) == [
+    assert tag_problems(("2d.2",), ("3c",)) == []
+    assert tag_problems(("2d.2",), ()) == []
+    assert tag_problems(("nope",), ()) == ["no question 'nope'"]
+    assert tag_problems(("2d.2",), ("supplement",)) == ["no figure 'supplement'"]
+    assert tag_problems(("2d.2",), ("2b",)) == [
         "question 2d.2 does not list figure '2b'"
     ]
-    assert tag_problems(("2c.6",), ("supplement",)) == [
+    assert tag_problems(("2c.6",), ()) == [
         "question 2c.6 is not computed, so has no values"
     ]
 
@@ -126,8 +123,9 @@ def _value(**fields) -> values.Value:
         "unit": "",
         "description": "d",
         "questions": ("2d.2",),
-        "used_in": ("paper",),
+        "figures": (),
         "source": "s",
+        "function": "f",
     }
     return values.Value(**{**base, **fields})
 
@@ -135,12 +133,12 @@ def _value(**fields) -> values.Value:
 def test_a_summary_with_a_bad_tag_is_not_written(tmp_path):
     summary = values.Summary(name="events", produced_by="by", commit="c")
     summary.add(_value(questions=("12",)))
-    summary.add(_value(key="other", used_in=("figure: main, left out",)))
+    summary.add(_value(key="other", figures=("main, left out",)))
     path = tmp_path / "events.json"
     with pytest.raises(ValueError) as refused:
         summary.write(path)
     assert "share: no question '12'" in str(refused.value)
-    assert "other: unknown use 'figure: main, left out'" in str(refused.value)
+    assert "other: no figure 'main, left out'" in str(refused.value)
     assert not path.exists()
 
 
@@ -186,7 +184,7 @@ def _tags_lookups(tree: ast.AST) -> tuple[set[str], int]:
 def test_every_tag_group_a_builder_declares_is_known(name):
     tags = _builder(name).TAGS
     assert tags and all(isinstance(t, Tags) for t in tags.values())
-    problems = {k: tag_problems(t.questions, t.used_in) for k, t in tags.items()}
+    problems = {k: tag_problems(t.questions, t.figures) for k, t in tags.items()}
     assert not {k: found for k, found in problems.items() if found}
 
 
@@ -204,37 +202,94 @@ def test_a_builder_uses_every_tag_group_it_declares_and_no_other(name):
 
 
 @pytest.mark.parametrize("name", list(values.SUMMARIES))
-def test_a_builder_writes_question_ids_and_figure_tags_only_in_its_table(name):
-    """Every question id and figure tag in a builder is in its ``TAGS`` table or a
-    constant that table uses, so a value's tags are declared once, as data."""
+def test_a_builder_declares_its_tags_only_in_its_table(name):
+    """Every ``Tags`` and every question id in a builder is in its ``TAGS`` table,
+    so a value's tags are declared once, as data."""
     tree = ast.parse((BUILDERS / f"{name}.py").read_text())
-    declared = []
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
-            target = node.targets[0].id
-            if target == "TAGS" or target in {
-                n.id for n in ast.walk(_table(tree)) if isinstance(n, ast.Name)
-            }:
-                declared.append((node.lineno, node.end_lineno))
-    stray = [
-        (node.lineno, node.value)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant)
-        and isinstance(node.value, str)
-        and (_ID.fullmatch(node.value) or node.value.startswith("figure: "))
-        and not any(a <= node.lineno <= b for a, b in declared)
-    ]
-    assert not stray
-
-
-def _table(tree: ast.AST) -> ast.AST:
-    return next(
-        node.value
+    table = next(
+        node
         for node in tree.body
         if isinstance(node, ast.Assign)
         and isinstance(node.targets[0], ast.Name)
         and node.targets[0].id == "TAGS"
     )
+    stray = [
+        (node.lineno, ast.unparse(node))
+        for node in ast.walk(tree)
+        if (
+            (isinstance(node, ast.Constant) and isinstance(node.value, str))
+            and _ID.fullmatch(node.value)
+            or (isinstance(node, ast.Call) and ast.unparse(node.func) == "Tags")
+        )
+        and not table.lineno <= node.lineno <= table.end_lineno
+    ]
+    assert not stray
+
+
+def _factory_calls(tree: ast.Module) -> list[tuple[int, str, set[str]]]:
+    """Each value-factory call of a builder: its line, the function it names, and
+    the functions it may name: the module-level function the call is in, and any
+    function it is passed to."""
+    parents = {
+        child: parent
+        for parent in ast.walk(tree)
+        for child in ast.iter_child_nodes(parent)
+    }
+    calls = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "value_factory"
+        ):
+            continue
+        allowed, at = set(), node
+        while at in parents:
+            parent = parents[at]
+            if isinstance(parent, ast.Call) and at in parent.args:
+                allowed.add(ast.unparse(parent.func))
+            if isinstance(parent, ast.FunctionDef) and parents[parent] is tree:
+                allowed.add(parent.name)
+            at = parent
+        calls.append((node.lineno, ast.unparse(node.args[0]), allowed))
+    return calls
+
+
+@pytest.mark.parametrize("name", list(values.SUMMARIES))
+def test_a_value_factory_names_the_function_its_values_are_computed_in(name):
+    """A value's ``function`` is where a reader looks for its computation, so each
+    factory names the function it is made in, or the one it is handed to."""
+    tree = ast.parse((BUILDERS / f"{name}.py").read_text())
+    calls = _factory_calls(tree)
+    assert calls
+    wrong = [(line, named) for line, named, allowed in calls if named not in allowed]
+    assert not wrong
+
+
+def test_a_factory_records_the_function_and_fills_in_what_is_shared():
+    def some_values():
+        pass
+
+    shared = Tags(("2d.2",), ("3c",))
+    make = value_factory(some_values, "a table", shared, pending="rerun it")
+    value = make("n_events", np.int64(3), "count", "count", "events")
+    assert (value.function, value.source) == ("some_values", "a table")
+    assert (value.questions, value.figures) == (("2d.2",), ("3c",))
+    assert value.value == 3 and isinstance(value.value, int)
+    assert value.pending == "rerun it"
+    other = make(
+        "share",
+        np.float32(0.5),
+        "fraction",
+        "pct",
+        "d",
+        tags=Tags(("2d.3",)),
+        pending="p",
+    )
+    assert (other.questions, other.figures, other.pending) == (("2d.3",), (), "p")
+    assert isinstance(other.value, float)
+    with pytest.raises(ValueError, match="a count must be whole"):
+        make("n_half", 2.5, "count", "count", "d")
 
 
 def test_the_content_values_find_their_tags_by_key_word():
@@ -297,14 +352,12 @@ def test_a_question_has_values_exactly_when_its_status_says_so(committed):
 
 def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tags():
     summary = values.Summary(name="events", produced_by="by", commit="c")
-    summary.add(
-        _value(key="shared", questions=("2d.3", "2d.4"), used_in=("figure: 3",))
-    )
+    summary.add(_value(key="shared", questions=("2d.3", "2d.4"), figures=("3",)))
     summary.add(_value(key="old", questions=("12",)))
     view = emit.questions_view({"events": summary})
     extent = view.split("### 2d.3. ")[1].split("### ")[0]
     stillness = view.split("### 2d.4. ")[1].split("### ")[0]
-    assert "`\\EventsShared`" in extent
+    assert "`\\EventsShared`" in extent and "`events.f`" in extent
     assert "`\\EventsShared`" in stillness
     flagged = view.split("## Values with tag problems")[1].split("## Values by")[0]
     assert "`\\EventsOld`" in flagged

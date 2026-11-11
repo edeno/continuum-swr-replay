@@ -7,7 +7,8 @@ number inside every
 ``<!--v:<summary>.key-->...<!--/v-->`` marker in the markdown under ``paper/``
 and ``docs/``. Every number it changes is listed on the screen and in
 ``paper/reported/changes.md`` (a dated section is appended for each emit that
-changes numbers), so a replaced number is never silent.
+changes numbers), so a replaced number is never silent. It also prints how many
+values ``paper/main.tex`` cites, read from the macros the manuscript uses.
 
 Everything that can fail runs before anything is written: the summaries are
 read (exactly one ``<name>.json`` per summary), ``questions.md`` is rendered, each
@@ -33,12 +34,18 @@ from collections.abc import Sequence
 from datetime import date
 
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.emit import emit, marked_docs, questions_view
+from continuum_swr_replay.reported.emit import (
+    cited_values,
+    emit,
+    marked_docs,
+    questions_view,
+)
 from continuum_swr_replay.reported.release import staleness
 from continuum_swr_replay.reported.values import read_summaries, summary_tag_problems
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
 TEX_PATH = ROOT_DIR / "paper" / "reported_values.tex"
+MANUSCRIPT = ROOT_DIR / "paper" / "main.tex"
 CHANGES_PATH = SUMMARY_DIR / "changes.md"
 QUESTIONS_PATH = SUMMARY_DIR / "questions.md"
 DOC_ROOTS = (ROOT_DIR / "paper", ROOT_DIR / "docs")
@@ -58,6 +65,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "(listed in questions.md; rebuild the summary)"
             )
         notices += [f"  {name}.json: {r}" for r in staleness(summary, ROOT_DIR)]
+    cited = cited_values(summaries, MANUSCRIPT.read_text())
     docs = marked_docs(DOC_ROOTS)
     changes = emit(summaries, TEX_PATH, docs, ROOT_DIR)
     if changes:
@@ -82,6 +90,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     print(
         f"wrote {TEX_PATH.relative_to(ROOT_DIR)} and "
         f"{QUESTIONS_PATH.relative_to(ROOT_DIR)}; filled {len(docs)} docs"
+    )
+    print(
+        f"{MANUSCRIPT.relative_to(ROOT_DIR)} cites "
+        f"{sum(map(len, cited.values()))} of "
+        f"{sum(len(s.values) for s in summaries.values())} values"
     )
     for notice in notices:
         print(notice)

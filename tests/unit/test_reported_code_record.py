@@ -247,7 +247,12 @@ def test_a_record_of_no_files_is_not_current(repo):
 
 
 def _summary(
-    code=None, questions=("2d.2",), name="events", inputs=(), migrated=None
+    code=None,
+    questions=("2d.2",),
+    name="events",
+    inputs=(),
+    migrated=None,
+    pending=None,
 ) -> values.Summary:
     summary = values.Summary(
         name=name,
@@ -266,8 +271,10 @@ def _summary(
             unit="",
             description="d",
             questions=questions,
-            used_in=("paper",),
+            figures=(),
             source="s",
+            function="f",
+            pending=pending,
         )
     )
     return summary
@@ -283,14 +290,14 @@ def test_the_code_record_and_a_migration_round_trip(repo, tmp_path):
     assert values.read_summary(path).migrated == migrated
 
 
-@pytest.mark.parametrize("schema", [4, 6])
+@pytest.mark.parametrize("schema", [5, 7])
 def test_another_schema_is_refused(tmp_path, schema):
     path = tmp_path / "events.json"
     _summary().write(path)
     payload = json.loads(path.read_text())
     payload["schema_version"] = schema
     path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="expected 5"):
+    with pytest.raises(ValueError, match="expected 6"):
         values.read_summary(path)
 
 
@@ -365,8 +372,27 @@ def test_staleness_names_each_reason_and_the_release_check_adds_bad_tags(repo):
             "behavior": _summary(code=current.code, questions=("12",), name="behavior"),
         },
         repo,
+        "",
     )
     assert problems == {"behavior": ["1 value with tag problems: share"]}
+
+
+def test_the_release_check_counts_cited_values_and_refuses_a_cited_pending_one(repo):
+    record = code_record(repo, [repo / "pkg" / "mod.py"])
+    summaries = {
+        "events": _summary(code=record),
+        "behavior": _summary(code=record, name="behavior", pending="rerun it"),
+    }
+    problems, notes = release_problems(
+        summaries, repo, "Events \\EventsShare{}.\n% not \\BehaviorShare\n"
+    )
+    assert problems == {}
+    assert notes == {
+        "events": ["the manuscript cites 1 of 1 values"],
+        "behavior": ["the manuscript cites 0 of 1 values"],
+    }
+    problems, _ = release_problems(summaries, repo, "\\EventsShare \\BehaviorShare")
+    assert problems == {"behavior": ["the manuscript cites pending values: share"]}
 
 
 def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo):
@@ -378,15 +404,18 @@ def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo)
         {"path": "runs/*.parquet", "n_files": 3, "sha256": "0"},
     ]
     summary = _summary(code=code_record(repo, [repo / "pkg" / "mod.py"]), inputs=inputs)
-    problems, notes = release_problems({"events": summary}, repo)
+    cited = "the manuscript cites 0 of 1 values"
+    problems, notes = release_problems({"events": summary}, repo, "")
     assert problems == {"events": ["input not on this machine: gone.csv"]}
-    assert notes == {"events": ["input file set not re-checked: runs/*.parquet"]}
+    assert notes == {"events": [cited, "input file set not re-checked: runs/*.parquet"]}
     table.write_text("a\n2\n")
-    problems, _ = release_problems({"events": summary}, repo)
+    problems, _ = release_problems({"events": summary}, repo, "")
     assert "input changed since the build: table.csv" in problems["events"]
-    problems, notes = release_problems({"events": summary}, repo, check_inputs=False)
+    problems, notes = release_problems(
+        {"events": summary}, repo, "", check_inputs=False
+    )
     assert problems == {}
-    assert notes == {"events": ["3 inputs not checked (--code-only)"]}
+    assert notes == {"events": [cited, "3 inputs not checked (--code-only)"]}
 
 
 def _uncommitted_and_modified(repo: Path) -> dict:
@@ -432,9 +461,12 @@ def test_check_release_exits_0_only_when_every_summary_is_current(
     summaries.mkdir()
     monkeypatch.setattr(script, "SUMMARY_DIR", summaries)
     monkeypatch.setattr(script, "ROOT_DIR", repo)
+    monkeypatch.setattr(script, "MANUSCRIPT", _manuscript(repo))
     _write_all(summaries, code=code_record(repo, [repo / "pkg" / "mod.py"]))
     assert script.main([]) == 0
-    assert "all 5 summaries are current" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "all 5 summaries are current" in out
+    assert "the manuscript cites 1 of 1 values" in out
 
     _write_with_an_old_tag(summaries / "behavior.json")
     assert script.main([]) == 1
@@ -455,6 +487,7 @@ def test_check_release_checks_the_inputs_unless_told_code_only(
     summaries.mkdir()
     monkeypatch.setattr(script, "SUMMARY_DIR", summaries)
     monkeypatch.setattr(script, "ROOT_DIR", repo)
+    monkeypatch.setattr(script, "MANUSCRIPT", _manuscript(repo))
     record = code_record(repo, [repo / "pkg" / "mod.py"])
     _write_all(summaries, code=record)
     _summary(code=record, inputs=[{"path": "gone.csv", "sha256": "0"}]).write(
@@ -465,12 +498,19 @@ def test_check_release_checks_the_inputs_unless_told_code_only(
     assert script.main(["--code-only"]) == 0
     out = capsys.readouterr().out
     assert "1 inputs not checked (--code-only)" in out
-    assert "code and tags checked" in out
+    assert "code, tags and citations checked" in out
+
+
+def _manuscript(repo: Path) -> Path:
+    """A manuscript in ``repo`` that cites the events summary's one value."""
+    path = repo / "main.tex"
+    path.write_text("Share \\EventsShare{}.\n")
+    return path
 
 
 def _emitter(repo: Path, monkeypatch):
     """The emitter script, pointed at ``repo``: summaries in ``repo/reported``,
-    docs in ``repo/docs``."""
+    docs in ``repo/docs``, the manuscript ``repo/main.tex``."""
     script = _load_script("emit_reported_values")
     reported = repo / "reported"
     reported.mkdir()
@@ -478,6 +518,7 @@ def _emitter(repo: Path, monkeypatch):
     for name, path in {
         "SUMMARY_DIR": reported,
         "TEX_PATH": repo / "values.tex",
+        "MANUSCRIPT": _manuscript(repo),
         "CHANGES_PATH": reported / "changes.md",
         "QUESTIONS_PATH": reported / "questions.md",
         "DOC_ROOTS": (repo / "docs",),
@@ -500,6 +541,7 @@ def test_the_emitter_names_old_summaries_and_records_changed_numbers(
     out = capsys.readouterr().out
     assert "behavior.json: 1 values with tag problems" in out
     assert "behavior.json: no code record" in out
+    assert "main.tex cites 1 of 5 values" in out
     assert (reported / "questions.md").is_file()
     assert "99 %" not in doc.read_text()
     assert "99 %" in (reported / "changes.md").read_text()

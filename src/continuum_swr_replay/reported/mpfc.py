@@ -77,16 +77,16 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     files_record,
+    value_factory,
 )
 
 TAGS = {
-    "paper": Tags(("4.1",), ("paper",)),
-    "figure_4d": Tags(("4.1",), ("paper", "figure: 4d")),
-    "figure_4d_only": Tags(("4.1",), ("figure: 4d",)),
-    "units": Tags(("4.1",), ("paper", "figure: 4c", "figure: 4d")),
+    "modulation": Tags(("4.1",)),
+    "figure_4d": Tags(("4.1",), ("4d",)),
+    "units": Tags(("4.1",), ("4c", "4d")),
 }
-"""Each group of values: every mPFC value answers question 4.1; they differ in
-where they are used."""
+"""Each group of values: every mPFC value answers question 4.1; the groups
+differ in the panels of Figure 4 that show them."""
 
 STEM = "_mPFC_modulation"
 """The canonical (at-well, sigma 3) bundle name; other cohorts and priors carry
@@ -253,42 +253,6 @@ def default_inputs() -> MpfcInputs:
         marked_family_summary=data / MARKED_FAMILY_SUMMARY,
         stop_context_results=data / STOP_CONTEXT_RESULTS,
     )
-
-
-def _value_factory(source: str, tags: Tags, pending: str | None = None):
-    """A :class:`Value` builder with the shared source, tags and pending note filled
-    in; ``tags_`` overrides the tags of one value."""
-
-    def make(
-        key: str,
-        value: float | int,
-        kind: str,
-        style: str,
-        description: str,
-        unit: str = "",
-        *,
-        tags_: Tags | None = None,
-    ) -> Value:
-        return Value(
-            key=key,
-            value=(
-                int(value)
-                if kind == "count" and float(value).is_integer()
-                else value
-                if kind == "count"
-                else float(value)
-            ),
-            kind=kind,
-            style=style,
-            unit=unit,
-            description=description,
-            questions=(tags_ or tags).questions,
-            used_in=(tags_ or tags).used_in,
-            source=source,
-            pending=pending,
-        )
-
-    return make
 
 
 def _sha256(path: Path) -> str:
@@ -519,7 +483,7 @@ def cohort_values(
             "mPFC units in the population: every unit with a usable fit (no "
             "firing-rate cutoff; a unit with no spike in the fitted bins has none) "
             "and finite modulation curves",
-            tags_=TAGS["units"],
+            tags=TAGS["units"],
         ),
         make(
             "bins_fit",
@@ -845,7 +809,7 @@ def called_fraction_values(
             "plus-one empirical p-values of every tested unit "
             "(scipy.stats.false_discovery_control). For reference only: the units "
             "are not independent, and the p-values sit on a 1/(R + 1) grid",
-            tags_=TAGS["paper"],
+            tags=TAGS["modulation"],
         )
     )
     counts = population["min_heldout_model"].value_counts()
@@ -857,7 +821,7 @@ def called_fraction_values(
                 "fraction",
                 "pct",
                 f"share of units whose best model by held-out deviance is {model}",
-                tags_=TAGS["figure_4d_only"],
+                tags=TAGS["figure_4d"],
             )
         )
     return values
@@ -2472,12 +2436,13 @@ def followup_values(
     if inputs.marked_family_summary.exists():
         values += marked_family_values(
             pd.read_parquet(inputs.marked_family_summary),
-            _value_factory(
+            value_factory(
+                marked_family_values,
                 f"{rel(inputs.marked_family_summary)} "
                 "(scripts/pfc/summarize_pfc_marked_family.py over "
                 "scripts/pfc/run_pfc_marked_model_family.py --model-set followup "
                 "--baseline-penalty-sigma 3 --slope-permutations 0 bundles)",
-                TAGS["paper"],
+                TAGS["modulation"],
                 marked_family_staleness(
                     inputs.marked_family_summary, current, n_cohort
                 ),
@@ -2494,10 +2459,11 @@ def followup_values(
             )
         values += stop_context_values(
             results,
-            _value_factory(
+            value_factory(
+                stop_context_values,
                 f"{rel(inputs.stop_context_results)} "
                 "(scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)",
-                TAGS["paper"],
+                TAGS["modulation"],
                 stop_context_staleness(
                     inputs.stop_context_results, inputs.bundle_dir, current, n_cohort
                 ),
@@ -2522,20 +2488,47 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
         "read by Figure 4's loader (analysis/pfc/load_population.py, no "
         "firing-rate cutoff)"
     )
-    make = _value_factory(source, TAGS["paper"], pending)
-    figure = _value_factory(source, TAGS["figure_4d"], pending)
-    summary.add(*cohort_values(sidecars, population, cohort, make))
-    summary.add(*estimator_values(sidecars, make))
-    summary.add(*prior_binding_values(population, make))
-    summary.add(*called_fraction_values(population, figure))
-    summary.add(*null_geometry_values(population, sidecars, make))
-    summary.add(*overlap_and_effect_values(population, make))
+    main = TAGS["modulation"]
+    summary.add(
+        *cohort_values(
+            sidecars,
+            population,
+            cohort,
+            value_factory(cohort_values, source, main, pending),
+        ),
+        *estimator_values(
+            sidecars, value_factory(estimator_values, source, main, pending)
+        ),
+        *prior_binding_values(
+            population, value_factory(prior_binding_values, source, main, pending)
+        ),
+        *called_fraction_values(
+            population,
+            value_factory(called_fraction_values, source, TAGS["figure_4d"], pending),
+        ),
+        *null_geometry_values(
+            population,
+            sidecars,
+            value_factory(null_geometry_values, source, main, pending),
+        ),
+        *overlap_and_effect_values(
+            population, value_factory(overlap_and_effect_values, source, main, pending)
+        ),
+    )
     calibration = (
         json.loads(inputs.timing_calibration.read_text())
         if inputs.timing_calibration.exists()
         else None
     )
-    summary.add(*timing_values(population, curves, lag_time, calibration, make))
+    summary.add(
+        *timing_values(
+            population,
+            curves,
+            lag_time,
+            calibration,
+            value_factory(timing_values, source, main, pending),
+        )
+    )
     current = table_hashes(inputs.event_table, inputs.stop_table)
     values, records = followup_values(inputs, current, cohort["n_pfc_cohort"])
     summary.add(*values)
@@ -2571,12 +2564,13 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
                 extended_curves,
                 lag_time,
                 extended_sidecars,
-                _value_factory(
+                value_factory(
+                    swr_without_replay_values,
                     f"{rel(extended_dir)}/*{STEM}.pkl and sidecars "
                     "(scripts/pfc/run_pfc_analysis_bandit.py --event-set "
                     f"with_swr_without_replay), {len(extended_sidecars)} bundles, "
                     "Figure 4's loader (no firing-rate cutoff)",
-                    TAGS["paper"],
+                    TAGS["modulation"],
                     extended_pending,
                 ),
             )
@@ -2589,7 +2583,13 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
                 ROOT_DIR,
             ),
         ]
-    summary.add(*rate_cutoff_check_values(population, extended_check, make))
+    summary.add(
+        *rate_cutoff_check_values(
+            population,
+            extended_check,
+            value_factory(rate_cutoff_check_values, source, main, pending),
+        )
+    )
 
     data = inputs.bundle_dir
     summary.inputs += [

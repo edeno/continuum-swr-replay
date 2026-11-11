@@ -87,8 +87,8 @@ def test_a_parameter_with_no_numeric_cell_is_an_error():
 
 
 def test_whole_values_print_whole_and_others_keep_figures():
-    assert builder._quantity("speed_min", 1.0, "cm/s", "d", "s").style == "int"
-    assert builder._quantity("speed_min", 2.5, "cm/s", "d", "s").style == "sig2"
+    assert builder._whole_or_two_figures(1.0) == "int"
+    assert builder._whole_or_two_figures(2.5) == "sig2"
 
 
 def test_trigger_and_decoder_shares():

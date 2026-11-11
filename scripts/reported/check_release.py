@@ -14,10 +14,12 @@ the inputs can be re-checked. Exits 1, naming each summary to rebuild and why, w
 - a recorded single-file input has changed since, or is not on this machine
   (``--code-only`` skips the inputs, and says so);
 - it has values with tag problems (the question list does not know a tag, or the
-  question does not list the figure).
+  question does not list the figure);
+- the manuscript cites one of its values that is pending.
 
-Sets of input files are not re-checked (their records name a label, not the
-builder's selection); they are listed as notes.
+Which values the manuscript cites is read from ``paper/main.tex``, by their
+macros; how many is listed as a note. Sets of input files are not re-checked
+(their records name a label, not the builder's selection); they are noted too.
 
 Usage::
 
@@ -36,6 +38,7 @@ from continuum_swr_replay.reported.release import release_problems
 from continuum_swr_replay.reported.values import read_summaries
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
+MANUSCRIPT = ROOT_DIR / "paper" / "main.tex"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -52,11 +55,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(error)
         return 1
     problems, notes = release_problems(
-        summaries, ROOT_DIR, check_inputs=not args.code_only
+        summaries, ROOT_DIR, MANUSCRIPT.read_text(), check_inputs=not args.code_only
     )
     for name in summaries:
-        if name not in problems and name not in notes:
-            continue
         print(f"{name}.json:")
         for problem in problems.get(name, []):
             print(f"  - {problem}")
@@ -64,11 +65,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"  (note) {note}")
     if problems:
         print(
-            f"{len(problems)} of {len(summaries)} summaries to rebuild "
-            "(scripts/reported/summarize.py), then `make reported-values`"
+            f"{len(problems)} of {len(summaries)} summaries with problems; rebuild a "
+            "stale one with scripts/reported/summarize.py, then `make reported-values`"
         )
         return 1
-    checked = "code and tags" if args.code_only else "code, tags and single-file inputs"
+    checked = (
+        "code, tags and citations"
+        if args.code_only
+        else "code, tags, citations and single-file inputs"
+    )
     print(f"all {len(summaries)} summaries are current: {checked} checked")
     return 0
 

@@ -23,7 +23,6 @@ PAPER = ROOT / "paper"
 
 _NAMES = "|".join(name.capitalize() for name in values.SUMMARIES)
 _DEFINED = re.compile(rf"\\newcommand\{{\\((?:{_NAMES})[A-Za-z]+)\}}")
-_USED = re.compile(rf"\\((?:{_NAMES})[A-Za-z]+)")
 _COMMENT = re.compile(r"(?<!\\)%.*$", re.MULTILINE)
 
 
@@ -32,12 +31,7 @@ def defined_macros(reported_values_tex: str) -> set[str]:
     return set(_DEFINED.findall(reported_values_tex))
 
 
-def used_macros(manuscript_tex: str) -> set[str]:
-    """Names of the reported-value macros a manuscript uses outside comments."""
-    return set(_USED.findall(_COMMENT.sub("", manuscript_tex)))
-
-
-def test_used_and_defined_macros_are_found():
+def test_cited_and_defined_macros_are_found():
     reported = (
         "\\newcommand{\\DetectionSweepReplays}{4,536}  % detection.sweep_replays\n"
         "\\newcommand{\\MpfcUnits}{\\ensuremath{-}0.50}  % mpfc.units\n"
@@ -48,7 +42,7 @@ def test_used_and_defined_macros_are_found():
         "A literal 50\\% stays \\MpfcUnits.\n"
     )
     assert defined_macros(reported) == {"DetectionSweepReplays", "MpfcUnits"}
-    assert used_macros(manuscript) == {
+    assert emit.cited_macros(manuscript) == {
         "DetectionSweepReplays",
         "EventsMissing",
         "MpfcUnits",
@@ -62,7 +56,7 @@ def test_manuscript_reads_the_reported_values():
 
 def test_every_macro_the_manuscript_uses_is_defined():
     defined = defined_macros((PAPER / "reported_values.tex").read_text())
-    used = used_macros((PAPER / "main.tex").read_text())
+    used = emit.cited_macros((PAPER / "main.tex").read_text())
     assert defined, "reported_values.tex defines no reported-value macros"
     missing = sorted(used - defined)
     assert not missing, (
@@ -108,8 +102,9 @@ def _value(key: str, value: float, pending: str | None = None) -> values.Value:
         unit="",
         description="d",
         questions=("2d.2",),
-        used_in=("paper",),
+        figures=(),
         source="s",
+        function="f",
         pending=pending,
     )
 

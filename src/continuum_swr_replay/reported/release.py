@@ -12,6 +12,7 @@ from continuum_swr_replay.reported.code_record import (
     input_changes,
     is_record,
 )
+from continuum_swr_replay.reported.emit import cited_values
 from continuum_swr_replay.reported.values import Summary, summary_tag_problems
 
 
@@ -64,30 +65,44 @@ def input_problems(summary: Summary, root: Path) -> tuple[list[str], list[str]]:
 
 
 def release_problems(
-    summaries: Mapping[str, Summary], repo: Path, *, check_inputs: bool = True
+    summaries: Mapping[str, Summary],
+    repo: Path,
+    manuscript: str,
+    *,
+    check_inputs: bool = True,
 ) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
     """Each summary with something to fix before a release, and each one's notes.
 
     The problems are its staleness (:func:`staleness`), its values with tag
-    problems, and, with ``check_inputs``, its recorded single-file inputs that
-    changed or are absent (:func:`input_problems`). The notes name what could not
-    be checked: the input file sets, or every input when ``check_inputs`` is off.
+    problems, its pending values that ``manuscript`` (the LaTeX source) cites,
+    and, with ``check_inputs``, its recorded single-file inputs that changed or
+    are absent (:func:`input_problems`). The notes give how many of its values
+    the manuscript cites, and name what could not be checked: the input file
+    sets, or every input when ``check_inputs`` is off.
     """
     problems: dict[str, list[str]] = {}
     notes: dict[str, list[str]] = {}
+    cited = cited_values(summaries, manuscript)
     for name, summary in summaries.items():
         found = staleness(summary, repo)
         tags = summary_tag_problems(summary)
         if tags:
             noun = "value" if len(tags) == 1 else "values"
             found.append(f"{len(tags)} {noun} with tag problems: {', '.join(tags)}")
+        pending = [key for key in cited[name] if summary.values[key].pending]
+        if pending:
+            found.append(f"the manuscript cites pending values: {', '.join(pending)}")
+        notes[name] = [
+            f"the manuscript cites {len(cited[name])} of {len(summary.values)} values"
+        ]
         if check_inputs:
             input_found, input_notes = input_problems(summary, repo)
             found += input_found
-            if input_notes:
-                notes[name] = input_notes
+            notes[name] += input_notes
         else:
-            notes[name] = [f"{len(summary.inputs)} inputs not checked (--code-only)"]
+            notes[name].append(
+                f"{len(summary.inputs)} inputs not checked (--code-only)"
+            )
         if found:
             problems[name] = found
     return problems, notes
