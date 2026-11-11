@@ -63,6 +63,13 @@ class Tags:
     questions: tuple[str, ...]
     figures: tuple[str, ...] = ()
 
+    def __or__(self, other: Tags) -> Tags:
+        """The questions and figures of both, in order, each once."""
+        return Tags(
+            tuple(dict.fromkeys((*self.questions, *other.questions))),
+            tuple(dict.fromkeys((*self.figures, *other.figures))),
+        )
+
 
 @dataclass(frozen=True)
 class Value:

@@ -97,14 +97,11 @@ TAGS = {
     "class_step": Tags(("2b.5", "2d.2", "2d.3", "2d.5", "2d.6")),
     "class_step_evidence": Tags(("2b.5", "2c.3")),
     "spike": Tags(("2c.2", "2c.3", "2c.5"), ("2",)),
-    "spike_remote": Tags(("2c.2", "2c.3", "2c.5", "2c.7"), ("2",)),
     "spike_count": Tags(("2c.2",), ("2",)),
-    "spike_count_remote": Tags(("2c.2", "2c.7"), ("2",)),
     "spike_evidence": Tags(("2c.3",), ("2",)),
-    "spike_evidence_remote": Tags(("2c.3", "2c.7"), ("2",)),
     "spike_evidence_baseline": Tags(("2c.3", "2c.5"), ("2",)),
     "spike_gpi": Tags(("2c.4",)),
-    "spike_gpi_remote": Tags(("2c.4", "2c.7")),
+    "spike_remote": Tags(("2c.7",)),
     "content_occupancy": Tags(("2d.1", "2c.8"), ("2",)),
     "duration": Tags(("2d.6",)),
     "extent": Tags(("2d.3",), ("3",)),
@@ -114,8 +111,8 @@ TAGS = {
     "location": Tags(("2d.1",), ("3",)),
 }
 """Each group of values: the questions it answers and the figures that show it. The
-``_remote`` groups are the remote events' spike support, which also answers
-question 2c.7."""
+remote events' spike-support values also answer question 2c.7: their tags are a
+spike group's joined with ``spike_remote``."""
 
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run the events summary reads (242 epochs, all ``ok``). The
@@ -775,6 +772,12 @@ def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:
     return pd.concat(tables, ignore_index=True)
 
 
+def _remote_too(tags: Tags, word: str) -> Tags:
+    """``tags``, joined with ``spike_remote`` when ``word`` names a remote group:
+    the remote groups' values also answer question 2c.7."""
+    return tags | TAGS["spike_remote"] if word.endswith("remote") else tags
+
+
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     """Questions 2c.2, 2c.3, 2c.4 and 2c.5: each event group's spike evidence against matched
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
@@ -795,14 +798,10 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     for word, group in groups.items():
         stats = statistics.loc[group]
         label = "matched quiet windows" if word == "baseline" else f"{group} events"
-        # the remote groups' values also answer question 2c.7: the ``_remote`` tags
-        remote = word.endswith("remote")
-        scored_tags = TAGS["spike_remote"] if remote else TAGS["spike"]
-        count_tags = TAGS["spike_count_remote"] if remote else TAGS["spike_count"]
-        evidence_tags = (
-            TAGS["spike_evidence_remote"] if remote else TAGS["spike_evidence"]
-        )
-        gpi_tags = TAGS["spike_gpi_remote"] if remote else TAGS["spike_gpi"]
+        scored_tags = _remote_too(TAGS["spike"], word)
+        count_tags = _remote_too(TAGS["spike_count"], word)
+        evidence_tags = _remote_too(TAGS["spike_evidence"], word)
+        gpi_tags = _remote_too(TAGS["spike_gpi"], word)
         values += [
             make(
                 f"{word}_scored",

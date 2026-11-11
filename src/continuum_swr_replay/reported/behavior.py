@@ -1879,24 +1879,23 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
 
 #: The tags of each content key word, by its leading words.
 _CONTENT_TAGS = (
-    ("swr_armreward", "content_reward_value"),
-    ("swr_armvalue", "content_value"),
-    ("swr_prevgoal", "content_value"),
-    ("swr_armuncert", "content_uncertainty"),
-    ("armreward", "content_reward"),
-    ("armvalue", "content_reward_uncertainty"),
-    ("armuncert", "content_uncertainty"),
-    ("switchrate", "content_value"),
+    ("swr_armreward", TAGS["content_reward_value"]),
+    ("swr_armvalue", TAGS["content_value"]),
+    ("swr_prevgoal", TAGS["content_value"]),
+    ("swr_armuncert", TAGS["content_uncertainty"]),
+    ("armreward", TAGS["content_reward"]),
+    ("armvalue", TAGS["content_reward_uncertainty"]),
+    ("armuncert", TAGS["content_uncertainty"]),
+    ("switchrate", TAGS["content_value"]),
 )
 
 
 def _content_tags(word: str) -> Tags:
     """The tags of a content key: by its leading words, else content anchoring."""
-    return TAGS[
-        next(
-            (name for lead, name in _CONTENT_TAGS if word.startswith(lead)), "anchoring"
-        )
-    ]
+    return next(
+        (tags for lead, tags in _CONTENT_TAGS if word.startswith(lead)),
+        TAGS["anchoring"],
+    )
 
 
 def content_contrast_values(

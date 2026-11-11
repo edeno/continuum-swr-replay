@@ -192,12 +192,7 @@ def test_every_tag_group_a_builder_declares_is_known(name):
 def test_a_builder_uses_every_tag_group_it_declares_and_no_other(name):
     tree = ast.parse((BUILDERS / f"{name}.py").read_text())
     keys, other = _tags_lookups(tree)
-    if name == "behavior":
-        # The content values look their group up by key word (_content_tags).
-        keys |= {key for _, key in behavior._CONTENT_TAGS} | {"anchoring"}
-        assert other == 1
-    else:
-        assert other == 0
+    assert other == 0
     assert keys == set(_builder(name).TAGS)
 
 
