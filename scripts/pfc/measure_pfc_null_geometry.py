@@ -50,11 +50,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.event_sets import EVENT_CLASSES
 from continuum_swr_replay.analysis.pfc.heldout import (
     _matchable_subset_seed,
     null_draw_seeds,
 )
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_SOURCE_CLASS,
     make_matched_control_times,
@@ -66,30 +68,6 @@ from continuum_swr_replay.paths import processed_data_dir
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from scripts.qa._report import _md  # noqa: E402
-
-#: Column carrying the observed statistic each empirical p-value was read
-#: against, per class. The engagement test is keyed by its pair name.
-OBSERVED_COLUMN = {
-    "SWR": "SWR vs. constant: matched_null_observed_delta_dev",
-    "non_local": "non_local vs. constant: matched_null_observed_delta_dev",
-    "non_local_no_SWR": (
-        "non_local_no_SWR vs. constant: matched_null_observed_delta_dev"
-    ),
-    "non_local_SWR": "non_local_SWR vs. constant: matched_null_observed_delta_dev",
-    "engagement": (
-        "matched_control + non_local_no_SWR vs. matched_control: "
-        "matched_null_observed_delta_dev"
-    ),
-}
-
-#: Column carrying the empirical p-value, per class.
-PVALUE_COLUMN = {
-    "SWR": "SWR: p_heldout",
-    "non_local": "non_local: p_heldout",
-    "non_local_no_SWR": "non_local_no_SWR: p_heldout",
-    "non_local_SWR": "non_local_SWR: p_heldout",
-    "engagement": ("matched_control + non_local_no_SWR vs. matched_control: p_heldout"),
-}
 
 
 def bundle_paths(data_dir: Path) -> list[Path]:
@@ -381,13 +359,14 @@ def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
         )
     table = pd.DataFrame(rows)
     median = table["median_overlap_fraction"]
+    over_sessions = population_statistics.session_value_statistics(median)
     summary = pd.DataFrame(
         [
             {
                 "n_sessions": int(median.notna().sum()),
-                "median_over_sessions": float(median.median()),
-                "min_over_sessions": float(median.min()),
-                "max_over_sessions": float(median.max()),
+                "median_over_sessions": float(over_sessions["median"]),
+                "min_over_sessions": float(over_sessions["min"]),
+                "max_over_sessions": float(over_sessions["max"]),
                 "worst_session": str(table.loc[median.idxmax(), "session"]),
                 "max_single_draw_overlap": float(table["max_overlap_fraction"].max()),
             }
@@ -420,33 +399,28 @@ def non_positive_section(
 
     The population is the one the audit and the figure read -- the same
     firing-rate gate and the same held-out provenance contract -- so the
-    fractions here sit beside the called fractions quoted elsewhere.
+    fractions here sit beside the called fractions quoted elsewhere. The
+    counts are those of
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_without_improvement`
+    and
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`.
     """
-    from continuum_swr_replay.analysis.pfc.load_population import load_population_data
-
     table, _, _ = load_population_data(data_dir, min_firing_rate=min_firing_rate)
-    rows = []
-    for name, pvalue_column in PVALUE_COLUMN.items():
-        observed_column = OBSERVED_COLUMN[name]
-        if pvalue_column not in table or observed_column not in table:
-            continue
-        pvalues = pd.to_numeric(table[pvalue_column], errors="coerce")
-        observed = pd.to_numeric(table[observed_column], errors="coerce")
-        called = pvalues < alpha
-        non_positive = called & (observed <= 0)
-        rows.append(
+    flat = population_statistics.called_without_improvement(table, alpha)
+    tested = population_statistics.called_fractions(table, alpha)["n_tested"]
+    summary = pd.DataFrame(
+        [
             {
                 "class": name,
                 "n_units": int(len(table)),
-                "n_tested": int(pvalues.notna().sum()),
-                "n_called": int(called.sum()),
-                "n_called_with_non_positive_gain": int(non_positive.sum()),
-                "frac_of_called": float(
-                    non_positive.sum() / called.sum() if called.sum() else np.nan
-                ),
+                "n_tested": int(tested[name]),
+                "n_called": int(row["n_called"]),
+                "n_called_with_non_positive_gain": int(row["n_flat"]),
+                "frac_of_called": float(row["fraction"]),
             }
-        )
-    summary = pd.DataFrame(rows)
+            for name, row in flat.iterrows()
+        ]
+    )
     text = (
         "## Units called with no out-of-fold gain\n\n"
         "The empirical p-value is one-sided against the control-draw null, so "
@@ -504,7 +478,16 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
             / frame["n_events_total"]
         )
     )
-    worst = table.loc[table["frac_excluded"].idxmax()]
+    unmatchable = population_statistics.unmatchable_event_statistics(
+        table.rename(
+            columns={
+                "n_events_total": "total",
+                "n_events_excluded_unmatchable": "excluded",
+            }
+        )
+    )
+    worst_excluded = int(unmatchable["worst_excluded"])
+    worst_total = int(unmatchable["worst_total"])
     text = (
         "## Events the matched test could not use\n\n"
         "An event with no legal non-event window inside its own fitted bout "
@@ -514,10 +497,9 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
         "therefore a statement about that subset, not about every event of the "
         "class; the all-event held-out difference remains separately in the "
         "bundle. The worst single session/class here is "
-        f"{worst['session']} / {worst['event_class']}, which excludes "
-        f"{int(worst['n_events_excluded_unmatchable'])} of "
-        f"{int(worst['n_events_total'])} events "
-        f"({100 * worst['frac_excluded']:.1f} %).\n\n"
+        f"{unmatchable['worst_session']} / {unmatchable['worst_event_class']}, "
+        f"which excludes {worst_excluded} of {worst_total} events "
+        f"({100 * (worst_excluded / worst_total):.1f} %).\n\n"
     )
     return text + _md(corpus), table
 
