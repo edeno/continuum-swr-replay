@@ -121,6 +121,18 @@ The mpfc summary followed the same day: `analysis/pfc/population_statistics.py`,
 and the timing statistics in `analysis/pfc/timing.py`. All 604 values are
 bit-identical before and after, on the cluster's data.
 
+The detection and behavior summaries followed, each written by a delegated
+agent in its own checkout and verified by a trial build on the cluster's
+data: detection's statistics are in
+`analysis/hippocampus/memoryless_sequence/sweep_statistics.py` and
+`event_table.py` (all 132 values identical), behavior's in
+`analysis/replay/coefficient_statistics.py`, `rate_fit_statistics.py`,
+`stop_statistics.py`, `content_statistics.py`, `history_kernel_statistics.py`
+and `learning.py` (all 922 values identical). No builder computes a statistic
+now. Figure 4 and three `scripts/pfc/` reports call the mpfc functions: their
+reports are byte-identical on the cluster's data, and two bar heights of Figure
+4d change in the last digit.
+
 ## As built: every events input under the data root (2026-11-11)
 
 Finding 9 below (analysis inputs inside figure folders) is closed. The

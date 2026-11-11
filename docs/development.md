@@ -68,7 +68,7 @@ src/continuum_swr_replay/
 │   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
-│   ├── replay/            #   replay content/rate tables, model ladders, fitters
+│   ├── replay/            #   replay content/rate tables, model ladders, fitters, statistics of the fits
 │   └── constants.py       #   analysis constants and defaults
 ├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
@@ -425,11 +425,18 @@ fails when a cited value is pending.
 A builder names and describes values; it does not compute them. The statistics are functions in
 `analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
 tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
-number comes from. The events and mpfc summaries are built this way
-(`analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
-`analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`); the detection and behavior builders
-still compute their own statistics (`TODO.md`). A builder may count the size of an input it reads (its
-epochs, its animals) and copy a statistic a file already holds.
+number comes from. Each builder's statistics:
+
+- events: `analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
+- mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`;
+- detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py` and `event_table.py`;
+- behavior: `analysis/replay/coefficient_statistics.py` (a per-session fit summarized over sessions and
+  animals; the other modules build on it), `rate_fit_statistics.py`, `stop_statistics.py`,
+  `content_statistics.py`, `history_kernel_statistics.py`, and the stay/leave summaries in `learning.py`.
+
+A builder may count the size of an input it reads (its epochs, its animals) and copy a statistic a file
+already holds. Figure 4 and the `scripts/pfc/` reports call these functions; the scripts and figures that
+still compute a reported statistic themselves are listed in `TODO.md`.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it

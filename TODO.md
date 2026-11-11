@@ -34,19 +34,78 @@ Work that is deferred on purpose. Each item says when it should be done.
   single files). (Each build records the code that built it; a summary in
   `paper/reported/` is written only from committed code, and `make release-check`
   flags a stale one.)
+  The builders read CSV inputs with pandas' default float parser, which is not
+  exact and differs by machine: of the 1,492 float values in
+  `docs/design/replay_detection_comparison/detection_sweep_summary.csv`, 125 on
+  an arm64 laptop differ in the last digit from the exact parse
+  (`float_precision="round_trip"`), and the cluster (x86_64) reads one of the
+  detection summary's values differently from the laptop. So a summary is
+  bit-identical only when rebuilt on the same kind of machine. Reading with the
+  round-trip parser would make it exact everywhere and change those values in
+  their last digit.
   *When:* together with Tier 1, or when a number in the paper cannot be traced
   back to a commit.
 
 ## Reported values
 
-- [ ] **Statistics out of the detection and behavior builders.** The events and
-  mpfc summaries' statistics are functions in `analysis/`
-  (`hippocampus/event_statistics.py`, `inventory_comparison/nonlocal_comparison.py`,
-  `pfc/population_statistics.py`, `pfc/timing.py`) and their builders only name
-  and describe them. The detection and behavior builders still compute what they
-  report. Move each the same way, checking that every value is unchanged by a
-  trial rebuild on the cluster.
-  *When:* before the Results that cite them are drafted.
+- [ ] **Scripts and figures that compute a reported statistic themselves.** Each
+  summary's statistics are functions in `analysis/` (`docs/development.md`,
+  "Reported numbers"), and Figure 4 and the `scripts/pfc/` reports call them.
+  These still hold their own copy; make each call the function, comparing its
+  output before and after on the cluster:
+  - detection: `scripts/figures/generate_memoryless_comparison.py` (the timing by
+    duration, the paired part changes, the carving mean, the held-out rate, the
+    jump-pass shares and the three refusals), against
+    `memoryless_sequence/sweep_statistics.py`.
+  - behavior: `scripts/qa/compare_fits.py` (AIC differences, the lag-1 kernel and
+    its paired test, the clock shapes, separation shares, arrival-window shares,
+    the animal-balanced summaries), `scripts/rate/summarize_per_bin_rate_models.py`,
+    `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`,
+    `plot_model_checking.py` and `fit_per_bin_rate_models.py` (the arrival-window
+    shares), `scripts/behavior/run_stay_leave.py` (the pooled GEE's correction),
+    `scripts/coupling/fit_swr_power_model.py` and
+    `scripts/content/fit_swr_contrast_content.py` (animals positive, signed-rank
+    p), against `analysis/replay/coefficient_statistics.py`,
+    `rate_fit_statistics.py`, `stop_statistics.py` and `learning.py`.
+    `contrast_aggregation.aggregate_contrast` repeats the animal-median and
+    sign-count pattern of `session_median_statistics`.
+  - `coefficient_statistics.group_range` and
+    `pfc/population_statistics.lowest_and_highest` both return a lowest and
+    highest value with their groups; `analysis/replay` cannot import
+    `analysis/pfc`, so one copy needs a home below both.
+
+  *When:* at each figure's or report's next regeneration.
+
+- [ ] **Choices seen while the statistics moved (kept as they were; confirm or
+  change each).** The moves kept every value bit for bit, so these are as before:
+  - behavior, lag-1 reward kernel: the session-pooled value is the median of rate
+    ratios, the animal-balanced one is exp of a median of log kernels; the two
+    differ when a median averages two middle values (`rate_fit_statistics.py`).
+  - behavior: `power_sessions` counts every row of the model, while each
+    covariate's statistics are over the sessions that have that coefficient.
+  - behavior: `rate_contrast_term_separated_fraction` is over the fits of every
+    population that carry the term, not only the `contrast` fits its neighbours
+    use.
+  - behavior, history kernels: the first-lag raised and suppressed counts use an
+    unadjusted 1.96 interval, the peak a Bonferroni-widened one; pooled records
+    are keyed by population and animal, so a duplicate record replaces the
+    earlier one silently.
+  - behavior, stay/leave: a converged GEE with a missing p enters the
+    Benjamini-Hochberg correction as p = 1.
+  - detection, held-out sweep: the fold minimum and maximum are order-dependent
+    when a fold's rate is NaN, and the "one rate for shared replays" refusal is
+    then skipped; `no_replay_statistics` reads the first matching row without
+    checking it is the only one; the carving statistics use the first
+    condition's levels for every pooled condition; the builder and the figure
+    script refuse the no-replay block on different conditions.
+  - mpfc: `called_fractions` raises `ZeroDivisionError` when a test has no tested
+    unit (not on the current data); `compare_pfc_cohorts.peak_shrinkage` reads a
+    missing `mle_converged` as True where `prior_binding_percent` reads it as
+    False (they agree on the current data); `--min-firing-rate` still defaults to
+    1 Hz in `measure_pfc_null_geometry.py` and `compare_pfc_cohorts.py`, and the
+    summary uses no cutoff.
+
+  *When:* before the Results that cite the value are drafted.
 
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
   removed after `cad31719`; it used an older claim numbering, so "D" is its claim
