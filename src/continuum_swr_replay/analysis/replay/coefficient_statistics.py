@@ -107,7 +107,15 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
           median is above and below zero.
         - ``n_animals_same_sign``: animals whose own median has the sign of
           ``median``.
+
+    Raises
+    ------
+    ValueError
+        If ``animal`` is not indexed as ``values`` (a session without an
+        animal would be left out of the animals' medians).
     """
+    if not values.index.equals(animal.index):
+        raise ValueError("values and animal are not indexed alike")
     median = float(values.median())
     per_animal = values.groupby(animal).median()
     return {
@@ -162,6 +170,13 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
 def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, float]:
     """One term's coefficient across the sessions the per-term gate keeps.
 
+    The statistics are returned however many sessions the gate leaves out. The
+    gate's own refusal
+    (:attr:`~continuum_swr_replay.analysis.replay.contrast_aggregation.TermSessionGate.refusal`:
+    too few kept sessions, or too large a share left out), at which the audited
+    aggregates publish no row, is not applied here; ``n_dropped`` and
+    ``n_unidentified`` say how many sessions the kept ones stand for.
+
     Parameters
     ----------
     fits : pd.DataFrame, shape (n_sessions, n_columns)
@@ -177,17 +192,24 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
     statistics : dict
         The names of :func:`coefficient_statistics` over the kept sessions, and:
 
+        - ``n_dropped``: sessions with a coefficient that the gate leaves out
+          as separated or runaway.
+        - ``n_unidentified``: sessions with no coefficient because, by the
+          fit's own record, the session cannot inform the term.
         - ``session_se_median``: the median over sessions of the session's
           standard error of the coefficient (event-clustered where the fit
           wrote one); NaN when the fits carry no standard error.
         - ``significant_fraction``: the share of sessions whose coefficient
           differs from zero at 0.05, two-sided, on that standard error.
     """
-    kept = fits[gate_term_sessions(fits, term).kept]
+    gate = gate_term_sessions(fits, term)
+    kept = fits[gate.kept]
     column = f"coef_{term}"
     se, _ = session_se(kept, term)
     return {
         **coefficient_statistics(kept, column),
+        "n_dropped": gate.n_dropped,
+        "n_unidentified": gate.n_unidentified,
         "session_se_median": float(se.median()) if se is not None else float("nan"),
         "significant_fraction": float(
             pct_significant_sessions(kept[column], se, kept.get(f"pval_{term}"))
@@ -227,6 +249,8 @@ def gated_coefficient_difference_statistics(
     within session.
 
     A session enters when the per-term gate keeps the term in both of its fits.
+    As in :func:`gated_coefficient_statistics`, the gate's refusal is not
+    applied.
 
     Parameters
     ----------
@@ -240,17 +264,30 @@ def gated_coefficient_difference_statistics(
     -------
     statistics : dict
         :func:`session_median_statistics` of the sessions' ``a - b``
-        differences.
+        differences, and for each of the two sets of fits (``a``, ``b``):
+
+        - ``n_dropped_<fits>``: its sessions with a coefficient that the gate
+          leaves out as separated or runaway.
+        - ``n_unidentified_<fits>``: its sessions with no coefficient because,
+          by the fit's own record, the session cannot inform the term.
     """
     column = f"coef_{term}"
     session = list(SESSION_COLUMNS)
-    kept_a, kept_b = (
-        fits.loc[gate_term_sessions(fits, term).kept, [*session, column]]
-        for fits in (fits_a, fits_b)
+    gate_a, gate_b = gate_term_sessions(fits_a, term), gate_term_sessions(fits_b, term)
+    both = fits_a.loc[gate_a.kept, [*session, column]].merge(
+        fits_b.loc[gate_b.kept, [*session, column]],
+        on=session,
+        suffixes=("_a", "_b"),
+        validate="1:1",
     )
-    both = kept_a.merge(kept_b, on=session, suffixes=("_a", "_b"), validate="1:1")
     difference = both[f"{column}_a"] - both[f"{column}_b"]
-    return session_median_statistics(difference, both["animal"])
+    return {
+        **session_median_statistics(difference, both["animal"]),
+        "n_dropped_a": gate_a.n_dropped,
+        "n_unidentified_a": gate_a.n_unidentified,
+        "n_dropped_b": gate_b.n_dropped,
+        "n_unidentified_b": gate_b.n_unidentified,
+    }
 
 
 def aic_difference_statistics(

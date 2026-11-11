@@ -100,6 +100,16 @@ def test_same_sign_follows_a_negative_median():
     assert result["n_animals_same_sign"] == 2
 
 
+def test_the_animals_must_be_indexed_as_the_values():
+    values = pd.Series([1.0, 2.0, -3.0], index=[0, 1, 2])
+    # Animals of other rows: the last session would have no animal, and the
+    # animals' medians would be over two sessions of three.
+    with pytest.raises(ValueError, match="not indexed alike"):
+        stats.session_median_statistics(
+            values, pd.Series(["a", "a", "b"], index=[0, 1, 7])
+        )
+
+
 # --- one coefficient ------------------------------------------------------------------
 
 
@@ -176,6 +186,27 @@ def test_the_gate_leaves_out_separated_runaway_and_missing_sessions():
     assert result["significant_fraction"] == 0.75
     assert result["exp_median"] == pytest.approx(1.6487212707001282)  # e ** 0.5
     assert result["signed_rank_p"] == pytest.approx(0.125)
+    # the separated and the runaway session; the missing one names no reason
+    assert result["n_dropped"] == 2
+    assert result["n_unidentified"] == 0
+
+
+def test_the_gated_statistics_count_what_the_gate_left_out_and_are_still_returned():
+    # Two sessions kept of six: three separated, and one the fit records as
+    # unable to inform the term. The gate would refuse to publish this term
+    # (fewer than five kept, two thirds left out); the statistics are returned
+    # with the counts beside them.
+    fits = _fits(
+        [0.2, 0.6, 1.0, 2.0, 3.0, NAN],
+        ["a", "b", "a", "b", "c", "c"],
+        separated_terms=["", "", "x", "x", "x", ""],
+        unidentified_terms=["", "", "", "", "", "x:no_within_event_variation"],
+    )
+    result = stats.gated_coefficient_statistics(fits, "x")
+    assert result["n_sessions"] == 2
+    assert result["median"] == pytest.approx(0.4)
+    assert result["n_dropped"] == 3
+    assert result["n_unidentified"] == 1
 
 
 def test_significance_is_read_on_the_clustered_standard_error():
@@ -260,8 +291,17 @@ def test_the_difference_drops_a_session_missing_or_gated_in_either_fit():
     assert result["n_sessions"] == 25
     assert result["animal_median"] == pytest.approx(0.2)
 
+    assert result["n_dropped_a"] == result["n_dropped_b"] == 0
+
     b.loc[(b["animal"] == "a") & (b["session_date"] == 1), "separated_terms"] = "x"
-    assert stats.gated_coefficient_difference_statistics(a, b, "x")["n_sessions"] == 24
+    b.loc[(b["animal"] == "b") & (b["session_date"] == 1), "coef_x"] = NAN
+    b["unidentified_terms"] = ""
+    b.loc[b["coef_x"].isna(), "unidentified_terms"] = "x:no_within_event_variation"
+    result = stats.gated_coefficient_difference_statistics(a, b, "x")
+    assert result["n_sessions"] == 23
+    # each count is of its own fits: nothing is left out of a
+    assert result["n_dropped_a"] == 0 and result["n_unidentified_a"] == 0
+    assert result["n_dropped_b"] == 1 and result["n_unidentified_b"] == 1
 
 
 def test_the_difference_refuses_two_fits_of_one_session():
