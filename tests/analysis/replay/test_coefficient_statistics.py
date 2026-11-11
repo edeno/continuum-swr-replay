@@ -395,16 +395,20 @@ def test_term_separation_counts_fits_flagging_any_of_the_terms():
     assert stats.term_separation_statistics(fits, ["y"])["n_flagged"] == 3
 
 
-def test_rung_separation_range_is_over_the_matching_rungs():
+def test_rung_separation_range_is_over_the_rungs_that_carry_the_term():
     fits = pd.DataFrame(
         {
             "model": ["S1_a"] * 4 + ["S2_a"] * 3 + ["S10_b"] * 2 + ["S11_c"],
+            # S1_a and S11_c have no coefficient for t in any fit. One fit of
+            # S2_a lacks it too, and is still a fit of a rung that carries t.
+            "coef_t": [NAN] * 4 + [0.1, NAN, 0.3] + [0.5, 0.6] + [NAN],
             "separated": [True] * 4 + [True, False, False] + [True, True] + [False],
             "separated_terms": ["t"] * 4 + ["t", "t|u", "u"] + ["u", ""] + ["t"],
         }
     )
     # S2_a: 3 fits, 1 separated, 2 flagging t; S10_b: 2 fits, 2 separated, 0 flagging
-    assert stats.rung_separation_range(fits, "t", r"S([2-9]|10)_") == {
+    assert stats.rung_separation_range(fits, "t") == {
+        "n_rungs": 2,
         "n_fits_min": 2,
         "n_fits_max": 3,
         "n_separated_min": 1,

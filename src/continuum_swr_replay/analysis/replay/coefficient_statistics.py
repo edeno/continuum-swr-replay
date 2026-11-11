@@ -416,31 +416,29 @@ def term_separation_statistics(
     }
 
 
-def rung_separation_range(
-    fits: pd.DataFrame, term: str, model_pattern: str
-) -> dict[str, int]:
-    """The fewest and most fits, separated fits and term-flagging fits over a
-    set of rungs.
+def rung_separation_range(fits: pd.DataFrame, term: str) -> dict[str, int]:
+    """The fewest and most fits, separated fits and term-flagging fits over the
+    rungs that carry a term.
 
     Parameters
     ----------
     fits : pd.DataFrame
-        Per-session fits of several rungs, with ``model``, ``separated`` and
-        ``separated_terms``.
+        Per-session fits of several rungs, with ``model``, ``separated``,
+        ``separated_terms`` and ``coef_<term>``.
     term : str
-        The term whose separation flag is counted.
-    model_pattern : str
-        A regular expression; the rungs whose name it matches from the start
-        are the ones compared.
+        The term. A rung carries it when any of its fits has a coefficient
+        for it; every fit of such a rung is counted.
 
     Returns
     -------
     statistics : dict
-        For each of ``n_fits`` (a rung's fits), ``n_separated`` (its fits
-        flagged separated) and ``n_flagged`` (its fits flagging ``term``), the
-        lowest and highest over the rungs: ``<name>_min`` and ``<name>_max``.
+        ``n_rungs``, the rungs that carry the term. For each of ``n_fits`` (a
+        rung's fits), ``n_separated`` (its fits flagged separated) and
+        ``n_flagged`` (its fits flagging ``term``), the lowest and highest
+        over those rungs: ``<name>_min`` and ``<name>_max``.
     """
-    rungs = fits[fits["model"].str.match(model_pattern)]
+    carrying = fits.loc[fits[f"coef_{term}"].notna(), "model"].unique()
+    rungs = fits[fits["model"].isin(carrying)]
     by_rung = rungs["model"]
     per_rung = pd.DataFrame(
         {
@@ -450,9 +448,12 @@ def rung_separation_range(
         }
     )
     return {
-        f"{column}_{end}": int(getattr(per_rung[column], end)())
-        for column in per_rung
-        for end in ("min", "max")
+        "n_rungs": len(per_rung),
+        **{
+            f"{column}_{end}": int(getattr(per_rung[column], end)())
+            for column in per_rung
+            for end in ("min", "max")
+        },
     }
 
 

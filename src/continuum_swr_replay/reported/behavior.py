@@ -936,6 +936,7 @@ def per_bin_detail_values(
     make = value_factory(per_bin_detail_values, source, TAGS["rate"])
     values: list[Value] = []
     ladder = rate_fit_statistics.ladder_fit_statistics(fits)
+    transit_shares: dict[str, float] = {}
     for word, (outcome, label) in RATE_POPULATIONS.items():
         null = fit_rows(fits, model="M0_const", outcome=outcome)
         reward_only = fit_rows(fits, model="M1_rew", outcome=outcome)
@@ -1059,12 +1060,13 @@ def per_bin_detail_values(
             )
         transit = in_transit.attrs["arrival_clock_cohort"].get(outcome)
         if transit and transit["n_event_bins_frozen"]:
+            transit_shares[word] = rate_fit_statistics.arrival_window_statistics(
+                transit
+            )["event_share"]
             values.append(
                 make(
                     f"rate_intransit_arrival_event_share_{word}",
-                    rate_fit_statistics.arrival_window_statistics(transit)[
-                        "event_share"
-                    ],
+                    transit_shares[word],
                     "fraction",
                     "dec2",
                     f"{label}: share of its event bins the arrival window keeps on the in-transit fit",
@@ -1162,13 +1164,7 @@ def per_bin_detail_values(
     )
     cohort = all_stops.attrs["arrival_clock_cohort"]["non_local"]
     window = rate_fit_statistics.arrival_window_statistics(cohort)
-    transit_shares = group_range(
-        {
-            v.key: v.value
-            for v in values
-            if v.key.startswith("rate_intransit_arrival_event_share_")
-        }
-    )
+    transit_range = group_range(transit_shares)
     values += [
         make(
             "rate_allstops_marginal_reward_delta_aic_non_local_no_swr",
@@ -1236,14 +1232,14 @@ def per_bin_detail_values(
         ),
         make(
             "rate_intransit_arrival_event_share_low",
-            transit_shares["low"],
+            transit_range["low"],
             "fraction",
             "dec2",
             "lowest over populations of the in-transit fit's arrival-window event share",
         ),
         make(
             "rate_intransit_arrival_event_share_high",
-            transit_shares["high"],
+            transit_range["high"],
             "fraction",
             "dec2",
             "highest over populations of the in-transit fit's arrival-window event share",
@@ -1620,7 +1616,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
         )
         for cohort in ("primary", "post_outcome")
     ]
-    expanded = rung_separation_range(contrast, term, r"S([2-9]|10)_")
+    expanded = rung_separation_range(contrast, term)
     plain = term_separation_statistics(
         fit_rows(contrast, model="S1_rew"), ["reward_history_rcos_1"]
     )
@@ -1636,8 +1632,8 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
                     expanded[f"n_{column}_{pick}"],
                     "count",
                     "count",
-                    f"{'fewest' if end == 'low' else 'most'} {what} over the contrast "
-                    "rungs carrying an is_swr reward expansion (S2-S10)",
+                    f"{'fewest' if end == 'low' else 'most'} {what} over the "
+                    f"{expanded['n_rungs']} contrast rungs with a fit carrying {term}",
                 )
             )
     values += [
@@ -2448,9 +2444,6 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
             ),
         ]
     return values
-
-
-# --- the summary -------------------------------------------------------------------
 
 
 # --- event history on the duration-aware design -------------------------------
