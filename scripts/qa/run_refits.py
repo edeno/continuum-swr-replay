@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Rerun the CPU model fits and the figures that read them, in dependency order.
 
-Every run belongs to one part of the paper (``QUESTIONS``; the paper's questions
-are in ``src/continuum_swr_replay/reported/questions.py``). A run's name says what it is:
+Every run belongs to one group (``GROUPS``; the paper's questions are in
+``src/continuum_swr_replay/reported/questions.py``). A run's name says what it is:
 ``<group>.<analysis>[.<variant>]``, for example ``rate.swr_contrast.at_well``.
 Each run is one command, the number of CPUs it gets and the runs it needs first.
 Selecting a run also selects every run that depends on it, so
@@ -83,18 +83,17 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
-#: The paper part each group of runs belongs to; keys
-#: are the first part of a run's name. Every group is in Part 3 (behavior):
-#: Parts 1 and 2 (the model, the events) and Part 4 (other brain areas) have no
-#: CPU fit here. ``tables`` belongs to none: it is the opt-in table rebuild
-#: every fit reads.
+#: The groups of runs, by the first part of a run's name, with the title the
+#: listing shows. Every fit here is for Part 3 of the paper (behavior); Parts 1
+#: and 2 (the model, the events) and Part 4 (mPFC) have no CPU fit here.
+#: ``tables`` is the opt-in table rebuild every fit reads.
 TABLES = "tables"
-QUESTIONS = {
+GROUPS = {
     TABLES: "Tables (opt-in, --with-tables): the canonical tables the fits read.",
-    "rate": "Part 3a. How often do non-local events occur, and what drives the rate, for SWR against non-SWR events?",
-    "coupling": "Part 3a. How strongly do events couple to SWRs (ripple power), against the behavioral covariates?",
-    "content": "Part 3b. What do the events represent (arm or patch), what shapes that, and does it differ for SWR events?",
-    "behavior": "Part 3c. Does content relate to what the animal does next?",
+    "rate": "Rate: how often events occur and what drives it, SWR against non-SWR.",
+    "coupling": "Coupling: how strongly events couple to SWRs (ripple power), against the behavioral covariates.",
+    "content": "Content: which arms events represent, what shapes that, and whether it differs for SWR events.",
+    "behavior": "Behavior: whether content relates to what the animal does next.",
 }
 
 
@@ -111,7 +110,7 @@ class Run:
     optional: bool = False
 
     @property
-    def question(self) -> str:
+    def group(self) -> str:
         return self.name.split(".")[0]
 
 
@@ -158,7 +157,7 @@ RUNS: tuple[Run, ...] = (
     _run("tables.timebin", "scripts/tables/build_timebin_tables.py", 1),
     _run(_TCS, f"{_CF} --event-source SWR", 1, [_QV]),
     _run(_TCM, f"{_CF} --event-source MUA", 1, [_QV]),
-    # Part 3a rate. The per-bin conditional intensity (Family B) is the main model; the
+    # Rate. The per-bin conditional intensity (Family B) is the main model; the
     # per-stop Poisson (Family A) is the literature-comparable one.
     _run("rate.per_bin.at_well", f"{_PB} --stop-cohort at_well --workers 16", 16, _RTB),
     _run("rate.per_bin.all_stops", f"{_PB} --stop-cohort all_stops --workers 16", 16, _RTB),
@@ -181,7 +180,7 @@ RUNS: tuple[Run, ...] = (
     _fig("rate.fig.model_checking", "scripts/rate/plot_model_checking.py", ["rate.per_bin.at_well"]),
     _fig("rate.doc.per_bin_results", "scripts/rate/summarize_per_bin_rate_models.py", ["rate.per_bin.at_well"]),
     _fig("rate.fig.uncertainty", "scripts/rate/plot_uncertainty_rate.py", ["rate.uncertainty.at_well"]),
-    # Part 3b content. The arm ladder asks what shapes content; the SWR contrast asks how
+    # Content. The arm ladder asks what shapes content; the SWR contrast asks how
     # SWR content differs (paired within session); the breadth contrast is the
     # Dirichlet-multinomial fit of how widely an event spreads over arms.
     _run(_ARM, _CL, 2, _RT, threads=2),
@@ -210,13 +209,13 @@ RUNS: tuple[Run, ...] = (
     _run("content.event_source.swr_patch", f"{_CL} --event-source SWR --hierarchy patch --brain-area HPC", 2, _CFS, threads=2),
     _run("content.event_source.mua_arm", f"{_CL} --event-source MUA --brain-area HPC", 2, _CFM, threads=2),
     _run("content.event_source.mua_patch", f"{_CL} --event-source MUA --hierarchy patch --brain-area HPC", 2, _CFM, threads=2),
-    # Draws the Part 3a rate contrast and the Part 3b content contrast side by side.
+    # Draws the rate contrast and the content contrast side by side.
     _fig("content.fig.swr_contrast_coefs", "scripts/figures/plot_swr_contrast_coefs.py",
          ["rate.swr_contrast.at_well", "content.swr_contrast.all"]),
     _fig("content.fig.uncertainty", "scripts/figures/generate_uncertainty_content_figure.py", ["content.uncertainty"]),
     _fig("content.fig.ladder", "scripts/content/generate_replay_content_figures.py", [_ARM]),
     _fig("content.fig.pipeline_data_flow", "scripts/figures/generate_supp_pipeline_data_flow.py", [_ARM]),
-    # Part 3c behaviour. One suite per event source: the choice prediction (claim 19d), plus
+    # Behavior. One suite per event source: the choice prediction (question 3.4), plus
     # patch, per-stop rate, patch-switch and switch-aligned blocks on one common cohort.
     _run("behavior.event_source_suite.non_local", f"{_ES} --event-source non_local", 1, _RT),
     _run("behavior.event_source_suite.swr", f"{_ES} --event-source SWR", 1, _CFS),
@@ -257,7 +256,7 @@ def select(
     """The runs named (all when ``names`` is None), in list order.
 
     A name selects the run of that name and every run whose name extends it, so
-    ``content`` selects all of Part 3b and ``content.swr_contrast`` its three strata.
+    ``content`` selects every content run and ``content.swr_contrast`` its three strata.
     With ``with_dependents``, every run that needs a selected run, directly or
     through another, is selected too.
 
@@ -276,7 +275,7 @@ def select(
         chosen = {
             r.name
             for r in RUNS
-            if wanted(r, None) and (with_tables or r.question != TABLES)
+            if wanted(r, None) and (with_tables or r.group != TABLES)
         }
     else:
         chosen = set()
@@ -304,7 +303,7 @@ def select(
             for r in RUNS
             if r.name in chosen
             for d in r.deps
-            if BY_NAME[d].question == TABLES
+            if BY_NAME[d].group == TABLES
         }
 
     for enabled, grow in ((with_dependents, dependents), (with_tables, tables)):
@@ -344,7 +343,7 @@ def missing_prerequisites(runs: list[Run]) -> list[str]:
     only, never the database; imported here so the scheduler loads no package
     code.
     """
-    names = {r.name for r in runs if r.question == TABLES}
+    names = {r.name for r in runs if r.group == TABLES}
     if not names:
         return []
     from continuum_swr_replay.analysis.events import swr_source
@@ -446,7 +445,7 @@ def schedule(
     def record(run: Run, **fields) -> None:
         body = {
             "name": run.name,
-            "question": QUESTIONS.get(run.question, run.question),
+            "group": GROUPS.get(run.group, run.group),
             "argv": [*prefix, *run.argv],
             "threads": run.threads,
             "env": {var: str(run.threads) for var in THREAD_VARS},
@@ -608,7 +607,7 @@ def check_provenance(log_dir: Path, before: dict[str, dict[Path, float]]) -> int
 
 
 def print_plan(runs: list[Run]) -> None:
-    """The prerequisites, then the selected runs grouped under their question.
+    """The prerequisites, then the selected runs grouped under their group's title.
 
     A table run a run needs is shown only when it is selected.
     """
@@ -617,15 +616,13 @@ def print_plan(runs: list[Run]) -> None:
         print(f"  {i}. {step:<54} {makes}")
     print()
     selected = {r.name for r in runs}
-    for key, text in QUESTIONS.items():
-        group = [r for r in runs if r.question == key]
+    for key, text in GROUPS.items():
+        group = [r for r in runs if r.group == key]
         if not group:
             continue
         print(text)
         for r in group:
-            shown = [
-                d for d in r.deps if d in selected or BY_NAME[d].question != TABLES
-            ]
+            shown = [d for d in r.deps if d in selected or BY_NAME[d].group != TABLES]
             deps = f"   after {', '.join(shown)}" if shown else ""
             deps += "   (optional)" if r.optional else ""
             print(f"  {r.name:<46} {r.cores:>2} CPUs  {' '.join(r.argv)}{deps}")
@@ -688,7 +685,7 @@ def main(argv: list[str] | None = None) -> int:
     problems = missing_prerequisites(runs)
     if args.dry_run:
         print_plan(runs)
-        if any(r.question == TABLES for r in runs):
+        if any(r.group == TABLES for r in runs):
             print(f"Preflight: {f'{len(problems)} problems' if problems else 'ok'}")
             for problem in problems:
                 print(f"  {problem}")
