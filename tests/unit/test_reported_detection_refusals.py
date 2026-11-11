@@ -9,6 +9,9 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    sweep_statistics,
+)
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported import detection
 
@@ -136,10 +139,8 @@ def test_detectors_scored_on_as_many_trials_of_other_conditions_are_refused(cont
         detection.controls_values(changed, "source")
 
 
-SHARED_REPLAYS_FOLD_B = {
+SHARED_REPLAYS = {
     "summary": "by_class",
-    "measure": "support_rate",
-    "fold": "B",
     "estimator": "state_space",
     "detector": "state_space",
     "event_class": "shared",
@@ -147,17 +148,47 @@ SHARED_REPLAYS_FOLD_B = {
 }
 
 
-def test_shared_replays_whose_support_differs_between_folds_are_refused(heldout):
-    changed = _with_value(heldout, 0.5, **SHARED_REPLAYS_FOLD_B)
+# the informative shared replays of each fold; all have held-out support
+@pytest.mark.parametrize(("fold", "n_events"), [("A", 139), ("B", 175), ("C", 25)])
+def test_shared_replays_whose_support_differs_between_folds_are_refused(
+    heldout, fold, n_events
+):
+    assert (
+        sweep_statistics.pooled_heldout_rate(
+            heldout, fold, ("shared",), "continuous_replay"
+        )["n_events"]
+        == n_events
+    )
+    changed = _with_value(
+        heldout,
+        (n_events - 1) / n_events,
+        measure="support_rate",
+        fold=fold,
+        **SHARED_REPLAYS,
+    )
+    with pytest.raises(ValueError, match="one held-out support rate"):
+        detection.heldout_values(changed, "source")
+
+
+def test_a_fold_with_no_informative_shared_replay_is_refused(heldout):
+    # with no rate in fold C there is no one rate "the same in every fold"
+    changed = _with_value(
+        _with_value(heldout, 0.0, measure="n_events", fold="C", **SHARED_REPLAYS),
+        float("nan"),
+        measure="support_rate",
+        fold="C",
+        **SHARED_REPLAYS,
+    )
     with pytest.raises(ValueError, match="one held-out support rate"):
         detection.heldout_values(changed, "source")
 
 
 @pytest.mark.parametrize("estimator", ["state_space", "sliding_window"])
 def test_a_placeless_burst_with_heldout_support_is_refused(heldout, estimator):
+    # 1 of fold A's 11 informative place-less events
     changed = _with_value(
         heldout,
-        0.5,
+        1 / 11,
         summary="by_class",
         measure="support_rate",
         fold="A",

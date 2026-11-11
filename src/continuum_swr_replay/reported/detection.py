@@ -911,6 +911,8 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
 # --- the memoryless comparison: held-out evidence (p, q) ----------------------
 
 _FOLDS = ("A", "B", "C")
+_TILING_FOLDS = ("A", "B")
+"""The folds whose evaluation cells tile the track."""
 
 
 def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
@@ -923,7 +925,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         return make(key, x, "fraction", "pctnum", description)
 
     def over_folds(
-        folds: str | tuple[str, ...], classes: tuple[str, ...], truth: str, **which
+        folds: tuple[str, ...], classes: tuple[str, ...], truth: str, **which
     ) -> dict[str, float]:
         return sweep_statistics.heldout_fold_statistics(
             heldout, folds, classes, truth, **which
@@ -935,12 +937,12 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         )["rate"]
 
     either = ("ours_only", "shared")
-    ours = over_folds("AB", ("ours_only",), "continuous_replay")
+    ours = over_folds(_TILING_FOLDS, ("ours_only",), "continuous_replay")
     shared = over_folds(_FOLDS, ("shared",), "continuous_replay")
-    jumping = over_folds("AB", either, "non_local")
+    jumping = over_folds(_TILING_FOLDS, either, "non_local")
     informative = {
         name: over_folds(
-            "AB", classes, "continuous_replay", measure="informative_share"
+            _TILING_FOLDS, classes, "continuous_replay", measure="informative_share"
         )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
@@ -954,10 +956,11 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             "support; the held-out summary disagrees"
         )
     placeless_loose = over_folds(_FOLDS, either, "no_content", suffix="_floor2")
-    if shared["rate_spread"] > 0:
+    if shared["rate_spread"] != 0:
         raise ValueError(
             "the caption states one held-out support rate for shared replays; the "
-            f"folds differ (from {shared['rate_min']} to {shared['rate_max']})"
+            "folds differ, or one has no informative shared replay (from "
+            f"{shared['rate_min']} to {shared['rate_max']})"
         )
     if "comparator_only" in sweep_statistics.heldout_event_classes(heldout):
         raise ValueError(
@@ -983,7 +986,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         ),
         share(
             "heldout_shared_support",
-            in_fold(_FOLDS[0], ("shared",)),
+            shared["rate_min"],
             "replays both detectors reported: share with held-out support, the same "
             "in every fold",
         ),
@@ -997,7 +1000,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "heldout_placeless_loose_supported_events",
-            placeless_loose["n_supported"],
+            placeless_loose["n_counted"],
             "count",
             "count",
             "place-less burst events with held-out support at a floor of 2 expected "

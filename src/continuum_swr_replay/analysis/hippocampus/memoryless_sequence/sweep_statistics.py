@@ -581,23 +581,67 @@ def pooled_heldout_rate(
     Returns
     -------
     statistics : dict
-        - ``rate``: the pooled rate; NaN when no event counts.
-        - ``n_events``: the events the rate rests on.
+        - ``rate``: the pooled rate, a share of ``n_events``; NaN when no event
+          counts (the fold has no event of these classes, or none informative).
+        - ``n_events``: the events the rate rests on, its denominator: the
+          informative events for a support rate, all events for an
+          informative share.
+        - ``n_counted``: of those, the events the rate counts, its numerator:
+          the events with held-out support, or the informative ones.
+
+    Raises
+    ------
+    ValueError
+        If the by-class block has no row of the fold, estimator, truth, a
+        class or a measure read; two rows for one class and measure; a class
+        with no number of events, or with events and no rate; or a class whose
+        rate is not a whole number of its events.
     """
-    rows = heldout[
-        (heldout["summary"] == "by_class")
-        & (heldout["fold"] == fold)
-        & (heldout["estimator"] == estimator)
-        & (heldout["detector"] == "state_space")
-        & heldout["event_class"].isin(classes)
-        & (heldout["truth"] == truth)
-    ].pivot_table(index="event_class", columns="measure", values="value")
+    rate_name = f"{measure}{suffix}"
     weight = "n_events_all" if measure == "informative_share" else f"n_events{suffix}"
-    if rows.empty or weight not in rows or rows[weight].sum() == 0:
-        return {"rate": float("nan"), "n_events": 0}
-    n = rows[weight].fillna(0)
-    rate = float((rows[f"{measure}{suffix}"].fillna(0) * n).sum() / n.sum())
-    return {"rate": rate, "n_events": int(n.sum())}
+    by_class = heldout[heldout["summary"] == "by_class"]
+    for column, wanted in (
+        ("fold", fold),
+        ("estimator", estimator),
+        ("truth", truth),
+        ("measure", rate_name),
+        ("measure", weight),
+        *(("event_class", event_class) for event_class in classes),
+    ):
+        if wanted not in set(by_class[column]):
+            raise ValueError(
+                f"held-out summary: no by-class row with {column} {wanted!r}"
+            )
+    rows = by_class[
+        (by_class["fold"] == fold)
+        & (by_class["estimator"] == estimator)
+        & (by_class["detector"] == "state_space")
+        & by_class["event_class"].isin(classes)
+        & (by_class["truth"] == truth)
+        & by_class["measure"].isin([rate_name, weight])
+    ]
+    where = f"held-out summary, fold {fold}, {estimator}, {truth}"
+    if rows.duplicated(["event_class", "measure"]).any():
+        raise ValueError(f"{where}: several rows for one class and measure")
+    rows = rows.pivot(index="event_class", columns="measure", values="value").reindex(
+        columns=[rate_name, weight]
+    )
+    n, rates = rows[weight], rows[rate_name]
+    counted = n > 0
+    if n.isna().any() or rates[counted].isna().any():
+        raise ValueError(
+            f"{where}: a class has no {weight}, or has events and no {rate_name}"
+        )
+    if not counted.any():
+        return {"rate": float("nan"), "n_events": 0, "n_counted": 0}
+    n, rates = n[counted], rates[counted]
+    return {
+        "rate": float((rates * n).sum() / n.sum()),
+        "n_events": int(n.sum()),
+        "n_counted": sum(
+            _whole_count(rate, events) for rate, events in zip(rates, n, strict=True)
+        ),
+    }
 
 
 def heldout_fold_statistics(
@@ -625,12 +669,12 @@ def heldout_fold_statistics(
     -------
     statistics : dict
         - ``rate_min``, ``rate_max``: the lowest and highest of the folds'
-          rates, when every fold has an event that counts.
+          rates; NaN when a fold has no rate (no event that counts).
         - ``rate_spread``: the highest minus the lowest; NaN when a fold has no
-          event that counts.
-        - ``n_events``: the events the rates rest on, over the folds.
-        - ``n_supported``: of those, the events the rates count (each fold's
-          rate times its events, rounded to a whole number).
+          rate.
+        - ``n_events``: the events the rates rest on, summed over the folds.
+        - ``n_counted``: of those, the events the rates count (with held-out
+          support, or informative), summed over the folds.
         - ``n_folds_with_support``: the folds whose rate is above zero.
     """
     pooled = [
@@ -638,14 +682,13 @@ def heldout_fold_statistics(
         for fold in folds
     ]
     rates = [fold["rate"] for fold in pooled]
-    counted = [fold for fold in pooled if fold["n_events"]]
     return {
-        "rate_min": min(rates),
-        "rate_max": max(rates),
+        "rate_min": float(np.min(rates)),
+        "rate_max": float(np.max(rates)),
         "rate_spread": float(np.ptp(rates)),
         "n_events": sum(fold["n_events"] for fold in pooled),
-        "n_supported": sum(round(fold["rate"] * fold["n_events"]) for fold in counted),
-        "n_folds_with_support": sum(fold["rate"] > 0 for fold in counted),
+        "n_counted": sum(fold["n_counted"] for fold in pooled),
+        "n_folds_with_support": sum(fold["rate"] > 0 for fold in pooled),
     }
 
 
@@ -663,12 +706,21 @@ def lowest_estimator_agreement(heldout: pd.DataFrame) -> float:
     -------
     agreement : float
         The lowest fold's share.
+
+    Raises
+    ------
+    ValueError
+        If the summary holds no fold's agreement, or a fold's is missing.
     """
     agreement = heldout[
         (heldout["summary"] == "agreement")
         & (heldout["measure"] == "estimator_agreement")
     ]["value"]
-    return agreement.min()
+    if agreement.empty or agreement.isna().any():
+        raise ValueError(
+            "held-out summary: no estimator agreement, or a fold without one"
+        )
+    return float(agreement.min())
 
 
 def heldout_event_classes(heldout: pd.DataFrame) -> set[str]:
