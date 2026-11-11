@@ -82,6 +82,47 @@ def require_one_fit_per_session(fits: pd.DataFrame) -> None:
         )
 
 
+def _paired_difference(
+    fits_a: pd.DataFrame,
+    fits_b: pd.DataFrame,
+    column: str,
+    same: Sequence[str] = (),
+) -> tuple[pd.Series, pd.Series]:
+    """One column of two sets of fits, differenced within session.
+
+    Parameters
+    ----------
+    fits_a, fits_b : pd.DataFrame
+        Per-session fits with the session columns, ``column`` and the ``same``
+        columns; at most one row per session.
+    column : str
+        The column differenced.
+    same : sequence of str
+        Columns that must be equal in a session's two fits for it to count.
+
+    Returns
+    -------
+    difference : pd.Series, shape (n_paired_sessions,)
+        ``column`` of ``fits_a`` minus that of ``fits_b``, over the sessions in
+        both (missing where either is missing).
+    animal : pd.Series, shape (n_paired_sessions,)
+        Each of those sessions' animal, indexed as ``difference``.
+
+    Raises
+    ------
+    pandas.errors.MergeError
+        If either set of fits holds two rows for one session.
+    """
+    session = list(SESSION_COLUMNS)
+    columns = [*session, column, *same]
+    both = fits_a[columns].merge(
+        fits_b[columns], on=session, suffixes=("_a", "_b"), validate="1:1"
+    )
+    for name in same:
+        both = both[both[f"{name}_a"] == both[f"{name}_b"]]
+    return both[f"{column}_a"] - both[f"{column}_b"], both["animal"]
+
+
 def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:
     """The median of a per-session number, with the sessions' and animals' signs.
 
@@ -282,18 +323,12 @@ def gated_coefficient_difference_statistics(
 
         and ``gate_refuses``: whether the gate refuses the term in either set.
     """
-    column = f"coef_{term}"
-    session = list(SESSION_COLUMNS)
     gate_a, gate_b = gate_term_sessions(fits_a, term), gate_term_sessions(fits_b, term)
-    both = fits_a.loc[gate_a.kept, [*session, column]].merge(
-        fits_b.loc[gate_b.kept, [*session, column]],
-        on=session,
-        suffixes=("_a", "_b"),
-        validate="1:1",
+    difference, animal = _paired_difference(
+        fits_a[gate_a.kept], fits_b[gate_b.kept], f"coef_{term}"
     )
-    difference = both[f"{column}_a"] - both[f"{column}_b"]
     return {
-        **session_median_statistics(difference, both["animal"]),
+        **session_median_statistics(difference, animal),
         "n_dropped_a": gate_a.n_dropped,
         "n_unidentified_a": gate_a.n_unidentified,
         "n_dropped_b": gate_b.n_dropped,
@@ -327,15 +362,9 @@ def aic_difference_statistics(
         child has the lower AIC and ``n_animals_negative`` the animals whose
         median step favours it.
     """
-    session = list(SESSION_COLUMNS)
-    columns = [*session, "aic", *same]
-    merged = child[columns].merge(
-        parent[columns], on=session, suffixes=("_child", "_parent"), validate="1:1"
-    )
-    for column in same:
-        merged = merged[merged[f"{column}_child"] == merged[f"{column}_parent"]]
-    difference = (merged["aic_child"] - merged["aic_parent"]).dropna()
-    return session_median_statistics(difference, merged.loc[difference.index, "animal"])
+    difference, animal = _paired_difference(child, parent, "aic", same)
+    difference = difference.dropna()
+    return session_median_statistics(difference, animal[difference.index])
 
 
 def separated_fraction(fits: pd.DataFrame) -> float:

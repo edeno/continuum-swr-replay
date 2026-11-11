@@ -27,6 +27,7 @@ from patsy import dmatrix
 from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    _paired_difference,
     require_one_fit_per_session,
     separated_fraction,
     session_median_statistics,
@@ -143,20 +144,14 @@ def baseline_rate_ratio_statistics(
         ``exp`` of the median difference of the log rates (a over b); and
         ``signed_rank_p``, the paired Wilcoxon signed-rank p of the log rates.
     """
-    session = list(SESSION_COLUMNS)
-    columns = [*session, "coef_Intercept"]
-    merged = (
-        null_a[columns]
-        .merge(null_b[columns], on=session, suffixes=("_a", "_b"), validate="1:1")
-        .dropna()
+    known_a, known_b = (
+        null.dropna(subset=["coef_Intercept"]) for null in (null_a, null_b)
     )
-    difference = merged["coef_Intercept_a"] - merged["coef_Intercept_b"]
+    difference, _ = _paired_difference(known_a, known_b, "coef_Intercept")
     return {
-        "n_sessions": len(merged),
+        "n_sessions": len(difference),
         "median_ratio": float(np.exp(difference.median())),
-        "signed_rank_p": float(
-            wilcoxon(merged["coef_Intercept_a"], merged["coef_Intercept_b"]).pvalue
-        ),
+        "signed_rank_p": float(wilcoxon(difference).pvalue),
     }
 
 
@@ -294,23 +289,16 @@ def paired_lag_one_kernel_statistics(
         animals whose median a - b difference is positive; and
         ``signed_rank_p``, the paired Wilcoxon signed-rank p.
     """
-    merged = lag_one_reward_kernels(fits_a).merge(
-        lag_one_reward_kernels(fits_b),
-        on=list(SESSION_COLUMNS),
-        suffixes=("_a", "_b"),
-        validate="1:1",
+    difference, animal = _paired_difference(
+        lag_one_reward_kernels(fits_a), lag_one_reward_kernels(fits_b), "lag_one"
     )
-    difference = session_median_statistics(
-        merged["lag_one_a"] - merged["lag_one_b"], merged["animal"]
-    )
+    statistics = session_median_statistics(difference, animal)
     return {
-        "n_sessions": difference["n_sessions"],
-        "positive_fraction": difference["positive_fraction"],
-        "n_animals": difference["n_animals"],
-        "n_animals_positive": difference["n_animals_positive"],
-        "signed_rank_p": float(
-            wilcoxon(merged["lag_one_a"], merged["lag_one_b"]).pvalue
-        ),
+        "n_sessions": statistics["n_sessions"],
+        "positive_fraction": statistics["positive_fraction"],
+        "n_animals": statistics["n_animals"],
+        "n_animals_positive": statistics["n_animals_positive"],
+        "signed_rank_p": float(wilcoxon(difference).pvalue),
     }
 
 
