@@ -20,7 +20,8 @@ Python nor the lab's data: it uses the committed figures and
 | `references.bib` | The bibliography (BibTeX) |
 | `reported_values.tex` | Generated: one LaTeX macro per reported number, read by `main.tex` |
 | `reported/part{n}.json` | The summary files every reported number is read from: parts 1–4, and part 0 for the literature numbers the introduction quotes |
-| `reported/values_index.md`, `reported/overview.md` | Every reported value with its meaning; the values read question by question |
+| `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source) and the values by figure |
+| `reported/overview.md` | The assistant's reading of the values, question by question, for the lead to check |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
 | `tables/` | `table_s1_literature_parameters.csv`, the <!--v:part0.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
 | `claims_table.md`, `figure_claims_plan.md` | Each claim, the comparison that supports it, and where it goes |
@@ -31,8 +32,8 @@ Python nor the lab's data: it uses the committed figures and
 
 Do not type a result number into `main.tex`. Use the macro that
 `reported_values.tex` defines for it, for example
-`\PartOneSweepReplays{}`; [reported/values_index.md](reported/values_index.md)
-lists every key. The macro for summary key `part1.sweep_replays` is
+`\PartOneSweepReplays{}`; [reported/questions.md](reported/questions.md)
+lists every value under the question it answers, with its macro. The macro for summary key `part1.sweep_replays` is
 `\PartOne` followed by the key in CamelCase.
 
 When a summary changes, regenerate the macros, then rebuild:

@@ -272,3 +272,25 @@ def test_every_question_id_a_committed_value_names_is_a_question_or_awaits_a_reb
         if c not in QUESTION_IDS
     }
     assert {p for p, _ in unknown} <= AWAITING_REBUILD, unknown
+
+
+# --- the generated view -------------------------------------------------------------
+
+
+def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tags():
+    from continuum_swr_replay.reported import emit
+
+    summary = values.Summary(part=2, produced_by="by", commit="c")
+    summary.add(_value(key="shared", claims=("2", "21"), used_in=("figure: 2b",)))
+    with values._tags_unchecked():
+        summary.add(_value(key="old", claims=("12",)))
+    view = emit.questions_view({2: summary})
+    section_2 = view.split("### 2. ")[1].split("### ")[0]
+    section_21 = view.split("### 21. ")[1].split("### ")[0]
+    assert "`\\PartTwoShared`" in section_2
+    assert "`\\PartTwoShared`" in section_21
+    unknown = view.split("## Values whose tags the question list does not know")[1]
+    assert "`\\PartTwoOld`" in unknown.split("## Values by figure")[0]
+    assert "no question '12'" in unknown
+    by_figure = view.split("### Figure 2: ")[1].split("### Figure")[0]
+    assert "Panel b: `\\PartTwoShared`" in by_figure

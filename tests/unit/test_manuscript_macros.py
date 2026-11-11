@@ -2,7 +2,7 @@
 
 ``paper/main.tex`` writes result numbers as macros (``\\PartZeroBandLowMode``)
 that ``paper/reported_values.tex`` defines; the emitter writes that file, the
-values index and the docs' inline values from the part summaries. A macro the
+question view and the docs' inline values from the part summaries. A macro the
 emitter no longer writes -- a renamed or removed summary key -- would only show
 up as a LaTeX error, or not at all in a non-stop build; a summary rebuilt
 without rerunning the emitter would leave the old number in the PDF. These
@@ -83,9 +83,9 @@ def test_emitted_files_hold_the_committed_summaries():
     assert (PAPER / "reported_values.tex").read_text() == emit.tex_file(summaries), (
         f"paper/reported_values.tex {stale}"
     )
-    assert (PAPER / "reported" / "values_index.md").read_text() == (
-        emit.values_index(summaries)
-    ), f"paper/reported/values_index.md {stale}"
+    assert (PAPER / "reported" / "questions.md").read_text() == (
+        emit.questions_view(summaries)
+    ), f"paper/reported/questions.md {stale}"
     by_key = values.values_by_key(summaries)
     docs = emit.marked_docs((PAPER, ROOT / "docs"))
     assert PAPER / "README.md" in docs
@@ -131,8 +131,8 @@ def test_a_marker_naming_no_summary_key_is_an_error():
         emit.fill_markers("<!--v:part0.gone-->1<!--/v-->", {}, "doc.md")
 
 
-def test_a_pending_value_is_flagged_in_the_macros_and_the_index():
+def test_a_pending_value_is_flagged_in_the_macros_and_the_questions():
     summary = values.Summary(part=0, produced_by="by", commit="c")
     summary.add(_value("share", 0.5, pending="untracked script"))
     assert "[PENDING: untracked script]" in emit.tex_file({0: summary})
-    assert "pending: untracked script" in emit.values_index({0: summary})
+    assert "pending: untracked script" in emit.questions_view({0: summary})

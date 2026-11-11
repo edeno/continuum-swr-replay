@@ -161,7 +161,7 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 | Committed | Made by |
 | --- | --- |
 | `paper/reported/part{n}.json` | `make summaries` |
-| `paper/reported_values.tex`, `paper/reported/values_index.md`, the inline values in `docs/` and `paper/` | `make reported-values` |
+| `paper/reported_values.tex`, `paper/reported/questions.md`, the inline values in `docs/` and `paper/` | `make reported-values` |
 | `paper/tables/table_s1_literature.tex` (Supplementary Table S1) | `scripts/figures/generate_supp_literature_table.py`, from the survey CSV beside it, which is edited by hand |
 | `paper/main.pdf` | `make manuscript` |
 | Final figures under `paper/figures/` (each listed in `.gitignore` as an exception) | the figure scripts |

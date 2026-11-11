@@ -1,12 +1,17 @@
 """Write the reported values into paper/reported_values.tex and the docs' inline markers.
 
 Reads every summary file in ``paper/reported/`` (``summarize_part.py`` writes
-them), writes the LaTeX macros and ``paper/reported/values_index.md`` (every
-value, by part and claim), and rewrites the number inside every
+them), writes the LaTeX macros and ``paper/reported/questions.md`` (every question
+of ``reported/questions.py`` with the values that answer it), and rewrites the
+number inside every
 ``<!--v:part{n}.key-->...<!--/v-->`` marker in the markdown under ``paper/``
 and ``docs/``. Every number it changes is listed on the screen and in
 ``paper/reported/changes.md`` (a dated section is appended for each emit that
 changes numbers), so a replaced number is never silent.
+
+A summary written before the question list changed its tags is still emitted; the
+values whose tags the list does not know are printed, and listed in
+``questions.md``, until the summary is rebuilt.
 
 Usage::
 
@@ -20,13 +25,13 @@ from collections.abc import Sequence
 from datetime import date
 
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.emit import emit, marked_docs, values_index
-from continuum_swr_replay.reported.values import read_summary
+from continuum_swr_replay.reported.emit import emit, marked_docs, questions_view
+from continuum_swr_replay.reported.values import read_summary, summary_tag_problems
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
 TEX_PATH = ROOT_DIR / "paper" / "reported_values.tex"
 CHANGES_PATH = SUMMARY_DIR / "changes.md"
-INDEX_PATH = SUMMARY_DIR / "values_index.md"
+QUESTIONS_PATH = SUMMARY_DIR / "questions.md"
 DOC_ROOTS = (ROOT_DIR / "paper", ROOT_DIR / "docs")
 
 
@@ -35,12 +40,25 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.parse_args(argv)
     summaries = {
         s.part: s
-        for s in (read_summary(p) for p in sorted(SUMMARY_DIR.glob("part*.json")))
+        for s in (
+            read_summary(p, check_tags=False)
+            for p in sorted(SUMMARY_DIR.glob("part*.json"))
+        )
     }
     docs = marked_docs(DOC_ROOTS)
     changes = emit(summaries, TEX_PATH, docs, ROOT_DIR)
-    INDEX_PATH.write_text(values_index(summaries))
-    print(f"wrote {TEX_PATH.relative_to(ROOT_DIR)}; filled {len(docs)} docs")
+    QUESTIONS_PATH.write_text(questions_view(summaries))
+    print(
+        f"wrote {TEX_PATH.relative_to(ROOT_DIR)} and "
+        f"{QUESTIONS_PATH.relative_to(ROOT_DIR)}; filled {len(docs)} docs"
+    )
+    for part, summary in sorted(summaries.items()):
+        problems = summary_tag_problems(summary)
+        if problems:
+            print(
+                f"  part{part}.json: {len(problems)} values with tags the question "
+                "list does not know (rebuild the summary)"
+            )
     if changes:
         if not CHANGES_PATH.exists():
             CHANGES_PATH.write_text(

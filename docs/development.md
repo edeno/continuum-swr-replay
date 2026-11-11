@@ -407,6 +407,11 @@ of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_
 literature numbers the introduction quotes, computed from the replay-study survey of Supplementary
 Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
 
+Which question each value answers, and which figure shows it, is written once, in the question list
+(`src/continuum_swr_replay/reported/questions.py`). A value whose question or figure tag the list does
+not know is refused. `make reported-values` writes `paper/reported/questions.md`: every question in the
+paper's outline, with the values that answer it, their macros, and the values by figure.
+
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it
   inline or quote it from memory.
