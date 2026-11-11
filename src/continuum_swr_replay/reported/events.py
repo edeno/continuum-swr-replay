@@ -287,7 +287,9 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
     make = value_factory(boundary_offset_values, source, TAGS["boundaries"])
-    stats = event_statistics.boundary_offset_statistics(events)
+    stats = event_statistics.boundary_offset_statistics(
+        event_statistics.boundary_offsets(events)
+    )
     return [
         make(
             "swr_overlapping_events",

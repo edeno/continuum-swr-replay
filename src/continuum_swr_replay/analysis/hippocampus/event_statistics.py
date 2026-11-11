@@ -177,22 +177,21 @@ def boundary_offsets(events: pd.DataFrame) -> pd.DataFrame:
     return offsets
 
 
-def boundary_offset_statistics(events: pd.DataFrame) -> dict[str, float]:
+def boundary_offset_statistics(offsets: pd.DataFrame) -> dict[str, float]:
     """The typical offset of an SWR-overlapping event's bounds from its SWR's.
 
     Parameters
     ----------
-    events : pd.DataFrame, shape (n_events, n_columns)
-        The canonical event table (:func:`boundary_offsets`).
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        The SWR-overlapping events' :func:`boundary_offsets`.
 
     Returns
     -------
     statistics : dict
         ``n_overlapping``, the events overlapping an SWR, and
         ``start_offset_median_s`` and ``end_offset_median_s``, the medians of
-        their :func:`boundary_offsets`.
+        their offsets.
     """
-    offsets = boundary_offsets(events)
     return {
         "n_overlapping": len(offsets),
         "start_offset_median_s": offsets["start_offset_s"].median(),

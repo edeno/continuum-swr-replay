@@ -105,7 +105,7 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert len(offsets) == 4
     np.testing.assert_allclose(offsets["start_offset_s"], [0.02, 0.01, -0.05, 0.04])
     np.testing.assert_allclose(offsets["end_offset_s"], [-0.02, -0.05, 0.10, 0.20])
-    result = stats.boundary_offset_statistics(EVENTS)
+    result = stats.boundary_offset_statistics(offsets)
     assert result["n_overlapping"] == 4
     assert result["start_offset_median_s"] == pytest.approx(0.015)
     assert result["end_offset_median_s"] == pytest.approx(0.04)

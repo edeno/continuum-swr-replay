@@ -431,14 +431,15 @@ def event_table_panels(
             f"frames {classified_class_counts}); rebuild the canonical tables from "
             "these decode frames before drawing the figure"
         )
-    medians = boundary_offset_statistics(events)
+    offsets = boundary_offsets(events)
+    medians = boundary_offset_statistics(offsets)
     return {
         "class_counts": class_counts,
         "class_percents": {
             cls: format_number(class_counts[cls] / class_counts["total"], "pctnum")
             for cls in CLASS_ORDER
         },
-        "offsets": boundary_offsets(events),
+        "offsets": offsets,
         "offset_medians": {
             f"{bound}_offset_s": _with_plus(
                 format_number(1000 * medians[f"{bound}_offset_median_s"], "int")
