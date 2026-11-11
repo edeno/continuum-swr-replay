@@ -316,11 +316,20 @@ def controls_value(
     )
 
 
-def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
-    """The levels a multi-part condition was run at, lowest first."""
+def _levels(
+    controls: pd.DataFrame,
+    condition: str,
+    block: str = "parts",
+    measure: str | None = None,
+) -> list[float]:
+    """The levels a condition was run at in a block of the summary (a
+    multi-part condition's, by default), lowest first; only those with a row of
+    ``measure`` when it is given."""
     rows = controls[
-        (controls["summary"] == "parts") & (controls["condition"] == condition)
+        (controls["summary"] == block) & (controls["condition"] == condition)
     ]
+    if measure is not None:
+        rows = rows[rows["measure"] == measure]
     return sorted(rows["level"].dropna().unique())
 
 
@@ -408,12 +417,7 @@ def burst_share_range(
         If the summary has no such share at any burst duration, or not exactly
         one of the detector output's at a duration.
     """
-    rows = controls[
-        (controls["summary"] == "bursts")
-        & (controls["measure"] == share)
-        & (controls["condition"] == condition)
-    ]
-    durations = sorted(rows["level"].dropna().unique())
+    durations = _levels(controls, condition, "bursts", share)
     if not durations:
         raise ValueError(
             f"controls summary: no {share} of {condition} at any burst duration"
