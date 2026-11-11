@@ -2,8 +2,8 @@
 
 The reward-history features are strongly collinear, so reconstructing a kernel
 from across-session median coefficients and taking the median of per-session
-reconstructions are different numbers. The summarizer table, the figure and the
-prose in ``docs/per_bin_rate_results.md`` must all report the second one.
+reconstructions are different numbers. The summarizer table and the figure must
+both report the second one.
 """
 
 from __future__ import annotations

@@ -25,8 +25,8 @@ register.
 ## Goals
 
 - Every number reported anywhere in the repository comes from one of four summary files, one per part of the
-  paper. The parts are those of [docs/analysis_map.md](../analysis_map.md) and
-  [paper/claims_table.md](../../paper/claims_table.md):
+  paper. The parts were those of `docs/analysis_map.md` and `paper/claims_table.md`
+  (both retired 2026-11-11; in git history):
   1. the model;
   2. the events;
   3. behavior;

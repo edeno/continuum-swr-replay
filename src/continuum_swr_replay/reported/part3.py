@@ -1099,9 +1099,9 @@ LADDER = {
 def per_bin_detail_values(
     fits: pd.DataFrame, all_stops: pd.DataFrame, in_transit: pd.DataFrame, source: str
 ) -> list[Value]:
-    """The rest of the per-bin ladder's readout (``docs/per_bin_rate_results.md``,
-    ``docs/rate_models.md``), each read with ``summarize_per_bin_rate_models.py``'s
-    rule unless the description says otherwise."""
+    """The rest of the per-bin ladder's readout, each read with
+    ``summarize_per_bin_rate_models.py``'s rule unless the description says
+    otherwise."""
     make = _value_factory(source, ("19c",), ("supplement",))
     values: list[Value] = []
     null = fits[fits["model"] == "M0_const"]

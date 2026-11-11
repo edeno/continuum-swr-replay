@@ -4,7 +4,8 @@
 TEMPORARY / exploratory. Reads the re-fit content-model outputs (arm + patch,
 all/SWR-split) and reports the claim-relevant coefficients (median across
 sessions, FDR Wilcoxon p, %positive, per-animal sign consistency), checked
-against the documented findings in paper/claims_table.md.
+against the findings of the retired claims table (paper/claims_table.md, in git
+history).
 """
 
 from __future__ import annotations

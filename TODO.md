@@ -55,7 +55,8 @@ Work that is deferred on purpose. Each item says when it should be done.
     `scripts/detection/split_state_evidence_by_swr.py` writes that file. The
     script was added in `e78273b5` (2026-10-30).
   - The claims table says an untracked research script made them and that they
-    are pending (`paper/claims_table.md:49`, `:112`, `:119–120`).
+    are pending (`paper/claims_table.md:49`, `:112`, `:119–120` at `c74e56b8`;
+    the claims table is retired).
   - On the cluster, read `nl_bouts_by_swr.provenance.json` beside the CSV: its
     commit and script. Then mark the values pending in
     `reported/part2.py:heldout_by_swr_values`, or correct the claims table.
@@ -73,6 +74,34 @@ Work that is deferred on purpose. Each item says when it should be done.
     controls, or get reframed as 'recent/valued locations'?"
 
   *When:* when Figures 2 and 3 are designed.
+
+- [ ] **Open analyses from the retired notes.** Quoted from
+  `paper/reported/overview.md`, `docs/replay_rate_content_swr_synthesis.md` and
+  `docs/per_bin_rate_results.md` (retired; read them at `c74e56b8`). Confirm each,
+  or close it:
+  - Tests at the recording-day level: a p or q value over sessions treats the
+    epochs of one recording day as independent, which they are not; until then,
+    the animal counts are the level to read a claim at.
+  - Property contrasts (duration, extent, speed, ...) are plain medians unless a
+    value says matched duration; non-SWR events are shorter than SWR events.
+  - The behavioral-state covariates on rate (value, uncertainty, switch rate,
+    block): the `MU_uncertainty` and `is_swr`-contrast rate ladders report fit
+    counts and separation shares, not coefficients; any re-derived coefficient
+    must state its excluded (separated) share.
+  - The `Mvu` conditioning diagnostics were count-response fits; re-derive them on
+    the per-event fraction response.
+  - The per-arm value-update (realized gain) re-run under the beta covariates has
+    not been done.
+  - The content arm hierarchy has no held-out cross-validation (model comparison
+    rests on ΔAIC on the quasi-likelihood scale).
+  - The choice fit (question 19d) has no provenance sidecar.
+  - Not built: the full marked point process (joint intensity, coupling and
+    content); a graded ripple-power content rung.
+  - Hypotheses that need a test: a continuum rather than two mechanisms (needs
+    the peri-onset peak distribution and the joint model); reward shifting SWR
+    coupling continuously; value-gating of with-SWR rate.
+
+  *When:* before the Results are drafted.
 
 ## Checks
 

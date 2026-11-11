@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Rerun the CPU model fits and the figures that read them, in dependency order.
 
-Every run belongs to one part of the paper (``QUESTIONS``; the full map is
-``docs/analysis_map.md``). A run's name says what it is:
+Every run belongs to one part of the paper (``QUESTIONS``; the paper's questions
+are in ``src/continuum_swr_replay/reported/questions.py``). A run's name says what it is:
 ``<group>.<analysis>[.<variant>]``, for example ``rate.swr_contrast.at_well``.
 Each run is one command, the number of CPUs it gets and the runs it needs first.
 Selecting a run also selects every run that depends on it, so
@@ -83,7 +83,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
-#: The paper part each group of runs belongs to (docs/analysis_map.md); keys
+#: The paper part each group of runs belongs to; keys
 #: are the first part of a run's name. Every group is in Part 3 (behavior):
 #: Parts 1 and 2 (the model, the events) and Part 4 (other brain areas) have no
 #: CPU fit here. ``tables`` belongs to none: it is the opt-in table rebuild

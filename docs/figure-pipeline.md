@@ -6,8 +6,7 @@ shows is written once, in the question list
 (`src/continuum_swr_replay/reported/questions.py`), and listed by figure and panel
 at the end of [../paper/reported/questions.md](../paper/reported/questions.md); a
 question placed in a figure whose panels are not designed yet is listed under it
-unlettered. The analyses behind the figures are in
-[analysis_map.md](analysis_map.md).
+unlettered. Each analysis's script is described in [../scripts/README.md](../scripts/README.md).
 
 Run each script from the repository root. Each one writes to its output folder,
 most as a PDF and a PNG; `plot_swr_contrast_coefs.py` and the two example
@@ -52,9 +51,9 @@ panels.
 | SWR against non-SWR coefficients, rate and content (run `content.fig.swr_contrast_coefs`) | `scripts/figures/plot_swr_contrast_coefs.py` | `paper/figures/swr_contrast/` |
 | Content models under three estimators (conditional Poisson on counts, on fractions, Dirichlet-multinomial) on one cohort | `scripts/content/compare_content_estimators.py` | `paper/figures/content_estimators/` |
 
-The Part 3 figures that read the fits are drawn by `scripts/qa/run_refits.py`;
-[analysis_map.md](analysis_map.md) names each by its run (`rate.fig.*`,
-`content.fig.*`).
+The Part 3 figures that read the fits are drawn by `scripts/qa/run_refits.py`,
+which names each by its run (`rate.fig.*`, `content.fig.*`; `--dry-run` lists
+them).
 
 ## Supplementary tables
 

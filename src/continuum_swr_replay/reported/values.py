@@ -30,8 +30,10 @@ PARTS = {
     3: "behavior",
     4: "other brain areas",
 }
-"""The paper's four parts (``docs/analysis_map.md``), and part 0, the published
-replay studies the introduction summarizes (Supplementary Table S1)."""
+"""The summary files, by the analyses they read: part 0, the published replay
+studies the introduction summarizes (Supplementary Table S1), and parts 1 to 4. A
+value's place in the paper's outline is its question's part
+(:mod:`~continuum_swr_replay.reported.questions`), which can differ."""
 
 KINDS = ("count", "fraction", "quantity")
 """A count is exact; a fraction is a share in [0, 1]; a quantity has a unit."""

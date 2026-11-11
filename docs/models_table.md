@@ -11,8 +11,8 @@ narrative (why each rung carries what it does, and what was retired) is
 [design/model_history.md](design/model_history.md).
 
 This is a **catalog**: specifications only. Fitted effects live in the audits
-under [`.claude/docs/reviews/`](../.claude/docs/reviews/), in [per_bin_rate_results.md](per_bin_rate_results.md),
-and in `paper/claims_table.md`.
+under [`.claude/docs/reviews/`](../.claude/docs/reviews/), and in the reported values, listed by
+question in [../paper/reported/questions.md](../paper/reported/questions.md).
 
 ## How to read this file
 

@@ -125,7 +125,7 @@ is **built into `beta_decay`**, not incidental. Empirically
 `corr(reward_belief_variance_candidate_arm_preoutcome, visit_recency_trials) ≈
 +0.54`. Any use of candidate-arm reward-belief variance as an
 "uncertainty" covariate must disentangle this from visit-recency (see
-[`replay_rate_content_swr_synthesis.md`](replay_rate_content_swr_synthesis.md) /
+question 19g in [../paper/reported/questions.md](../paper/reported/questions.md) /
 the content-model uncertainty work).
 
 ## Model 2 — HMM (`default_hmm`)

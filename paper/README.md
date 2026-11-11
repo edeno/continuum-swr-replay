@@ -21,10 +21,8 @@ Python nor the lab's data: it uses the committed figures and
 | `reported_values.tex` | Generated: one LaTeX macro per reported number, read by `main.tex` |
 | `reported/part{n}.json` | The summary files every reported number is read from: parts 1–4, and part 0 for the literature numbers the introduction quotes |
 | `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source) and the values by figure |
-| `reported/overview.md` | The assistant's reading of the values, question by question, for the lead to check |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
 | `tables/` | `table_s1_literature_parameters.csv`, the <!--v:part0.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
-| `claims_table.md` | Each claim, the comparison that supports it, and where it goes (being replaced by the question list, `src/continuum_swr_replay/reported/questions.py`) |
 | `Makefile`, `.latexmkrc` | Build settings |
 | `LICENSE` | CC BY 4.0 for the manuscript text and figures |
 

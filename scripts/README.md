@@ -185,7 +185,7 @@ them importable.
   `--mode pooled` stacks each animal's sessions with a session fixed effect, for kernels a session is too sparse
   to measure (`duration_aware_history_pooled.pkl`). Each output has its provenance sidecar.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
-- `summarize_per_bin_rate_models.py` — generates `docs/per_bin_rate_results.md`.
+- `summarize_per_bin_rate_models.py` — prints the per-bin ladder's fitted effects as tables; the reported values are read from the same fits into `paper/reported/part3.json`.
 
 ## `coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers.
@@ -264,7 +264,7 @@ them importable.
   table, so use it on a data root without one. It does not run the artifact and SWR
   detection or the decodes (`--dry-run` lists them in order as prerequisites, and a
   preflight checks they are on disk before a table run), the Q1 checks or the PFC unit
-  GLM. See `docs/analysis_map.md`.
+  GLM.
 - `check_data_availability.py`, `diagnose_trial_detection.py`, `compute_hpc_raw_stats.py`,
   `run_quality_metrics.py`.
 - `_memoryless_reference.py` — not a script: the Widloski & Foster reference's sorted-cell

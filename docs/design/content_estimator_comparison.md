@@ -45,7 +45,7 @@ axis (identity dashed, colour = animal). `log_phi_by_session.png` plots the DM
 concentration intercept and its `is_swr` shift per session for `C2_base`, with
 the animal-bootstrap band.
 
-Claim 19f in [`paper/claims_table.md`](../../paper/claims_table.md) cites the
+Claim 19f of the claims table (`paper/claims_table.md`, retired; in git history) cited the
 arm-value comparison (§3, §4); the rest of this document is the method record
 behind it.
 

@@ -53,7 +53,7 @@ what each step needs, and gives the full rebuild from the recordings to the PDF.
 | [Reproduction](docs/reproduce.md) | Requirements, the full rebuild in order, and what is committed |
 | [Figure pipeline](docs/figure-pipeline.md) | Each figure's claims, script, inputs, and tests |
 | [Data lineage](docs/data-lineage.md) | Where each stage reads and writes, from the NWB files to the summaries |
-| [Analysis map](docs/analysis_map.md) | The paper's four parts and every analysis under each |
+| [Questions and numbers](paper/reported/questions.md) | Every question of the paper, by part, with the values that answer it |
 | [Development](docs/development.md) | Setup, code layout, and the project's analysis conventions |
 | [Manuscript](paper/README.md) | Building the PDF, and writing numbers and figures into it |
 

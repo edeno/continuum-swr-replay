@@ -634,7 +634,12 @@ Each step is one commit, and the tests pass after each.
    - `make release-check` blocks.
 
    Nothing blocks during development.
-5. **Deferred (lead, 2026-11-10):** retire the interpretation documents only
+5. **Done differently (lead, 2026-11-11):** the five documents were deleted (they
+   stay in git, at `c74e56b8`) without moving their interpretation into the
+   manuscript, which waits until the Results are written. Their open analyses and
+   hypotheses went to `TODO.md`; the considered-and-dropped claims are questions
+   with status `dropped`; links were repointed to the question list. The plan
+   below is kept as written. Deferred (lead, 2026-11-10): retire the interpretation documents only
    once the Results are being written. Until then they stay as they are. One
    commit per retired document: move its content per the tables above, add its
    keys to the carry-over check (test 5), update its links, delete it.
