@@ -1,10 +1,13 @@
 """Summary statistics of the immobile non-local events.
 
 Each function takes a table an analysis wrote (the canonical event table, a
-reference table, a run's per-event metrics) and returns named numbers: a dict,
-or a table with one row per group. They are the statistics the events summary
-reports (``continuum_swr_replay.reported.events`` names and describes them) and
-a figure that shows one of them calls the same function.
+reference table, a run's per-event metrics). Most return named numbers: a dict,
+or a table with one row per group. :func:`boundary_offsets` returns one row per
+event (what a histogram draws), :func:`most_steps` a count with the properties
+that attain it, and :func:`n_animals_non_swr_more_at_well` one count. They are
+the statistics the events summary reports
+(``continuum_swr_replay.reported.events`` names and describes them) and a
+figure that shows one of them calls the same function.
 
 SWR status is the event table's ``is_swr``: strict positive-duration overlap
 with an SWR. "Animals" statistics count the animals whose own value meets the

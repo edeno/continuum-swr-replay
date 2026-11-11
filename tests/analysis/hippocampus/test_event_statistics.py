@@ -107,6 +107,10 @@ def test_boundary_offsets_are_event_bound_minus_swr_bound():
     assert result["n_overlapping"] == 4
     assert result["start_offset_median_s"] == pytest.approx(0.015)
     assert result["end_offset_median_s"] == pytest.approx(0.04)
+    # events none of which overlaps an SWR: no row, and the two columns
+    none = stats.boundary_offsets(EVENTS[EVENTS["overlap_class"] == "non_swr"])
+    assert none.empty
+    assert list(none.columns) == ["start_offset_s", "end_offset_s"]
 
 
 def test_boundary_offsets_refuse_an_overlapping_event_without_its_swr():
