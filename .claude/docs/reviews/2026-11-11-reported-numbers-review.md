@@ -26,6 +26,38 @@ is as its reviewer reported it unless it says it was confirmed afterwards.
 Confirmed afterwards in the code or the summaries: L1 (fixed), M-1, E-1, T-2,
 K-1, K-2, K-3.
 
+## Outcome (same day)
+
+The data owner's direction: correct obvious errors; leave choices that belong to
+unsettled analyses and write them down; remove duplication; do not add
+machinery. Each part was then fixed by one agent (the machinery by the lead
+session), which first measured on the cluster's data whether each silent case
+occurs today, and each fix was verified by a trial build compared field by field
+with the committed summary.
+
+| Part | Findings | Result on the cluster's data |
+|---|---|---|
+| launcher (L1) | fixed `d01ef44b`, `7e785a78` | rerun on a scratch data root reproduced one epoch byte for byte |
+| machinery (K-1 to K-12) | K-1, K-2, K-3, K-6, K-7, K-8, K-10 and the K-12 `.DS_Store` and canonical-folder cases fixed `6ed0a12a`, `9a7aac0f`; K-4 fixed (direct tests of the rounding rules); K-5: the guide now states the rule as the code has it, and a fit record with no inputs is stale (`14df6718`); K-9 docstrings fixed; K-11: two dead branches removed, the input check moved to its only user, one path helper for four (`14df6718`); the rest of K-5, K-11 and K-12 is open (record entry A3, and below) | all five summaries rebuilt |
+| detection (D-1 to D-10) | all fixed (`e2eaee63` to `38049537`) except the event-table tests in two folders | 10 descriptions changed, no value |
+| behavior fits and rates (B-1 to B-10) | all fixed (`c836757b` to `fc91a6a7`); B-1 occurs today and was decided by the data owner: pending (`489a880e`); B-4 and B-8 are record entries | 8 descriptions changed, no value; 7 values pending |
+| behavior stops and content (T-1 to T-11) | all fixed (`3124967c` to `1c164146`); T-4 decided by the data owner: time from the start of the stop | 29 descriptions changed; the two `stop_survival_*` values changed |
+| mpfc and the four scripts (M-1 to M-11, S3 to S10) | all fixed (`c4dbde5d` to `b6da1d2c`); M-1: the clip is kept and stated | 45 descriptions changed, no value; the scripts' reports byte-identical |
+| events and Figure 2 (E-1 to E-12) | all fixed (`89c450a4` to `9bd0b8d4`); E-1: the text was corrected, the rule kept | 20 descriptions changed, no value; Figure 2 not regenerated |
+
+None of the silent cases the reviewers found occurs in the current data, except
+the refusing session gate (B-1). Each now raises, or is a record entry. The
+choices left open, with what was measured, are in
+`docs/known_issues/reported_statistics_choices.md`.
+
+Still open from the machinery review: the release check does not look at the
+recorded commit (a summary still vouches after an amend); a pending value filled
+into a markdown marker carries no flag; `Summary.commit` and `produced_by` are
+passed through every builder; a summary's record lists 40 to 70 files, so a
+change to a shared module makes every summary stale.
+
+The findings below are as the reviewers reported them, before the fixes.
+
 Mutants killed, of those each reviewer ran:
 
 | Part | Killed | Run |

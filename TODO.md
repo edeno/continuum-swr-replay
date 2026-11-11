@@ -50,7 +50,8 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 - [ ] **Scripts and figures that compute a reported statistic themselves.** Each
   summary's statistics are functions in `analysis/` (`docs/development.md`,
-  "Reported numbers"), and Figure 4 and the `scripts/pfc/` reports call them.
+  "Reported numbers"). Figure 2's panels b and d and Figure 4d call them, and the
+  `scripts/pfc/` reports take a statistic whole from them or compute their own.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
   - detection: `scripts/figures/generate_memoryless_comparison.py` (the timing by
@@ -77,10 +78,11 @@ Work that is deferred on purpose. Each item says when it should be done.
   *When:* at each figure's or report's next regeneration.
 
 - [ ] **Decide the open choices in the reported statistics.**
-  `docs/known_issues/reported_statistics_choices.md` lists them (20 entries:
-  where each is made, what the code does, what is open). The moves of the
-  statistics into `analysis/` kept each as it was. Write each decision in that
-  file.
+  `docs/known_issues/reported_statistics_choices.md` lists them: where each is
+  made, what the code does, what is open, and what was measured on the current
+  data. They were found while the statistics moved into `analysis/` and in the
+  review of that code (`.claude/docs/reviews/2026-11-11-reported-numbers-review.md`).
+  Write each decision in that file.
   *When:* before the Results that cite the value are drafted.
 
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
