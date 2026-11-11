@@ -304,30 +304,35 @@ def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseli
     assert np.isnan(result.loc["baseline", "n_epochs_above_baseline"])
 
 
+STEP_COLUMNS = [
+    "property",
+    "animal",
+    "n_knots",
+    "power",
+    "window_z",
+    "covariate",
+    "has_step",
+    "step_share_overall",
+]
+
+
 def _steps() -> pd.DataFrame:
     rows = []
     for prop, with_step, shares in (
-        ("evidence", [True, True, False], [0.5, -0.1, 0.2]),
+        ("evidence", [True, True, False], [0.5, -0.1, 0.3]),
         ("duration", [True, False, False], [0.0, 0.0, 0.0]),
         ("speed", [True, False, False], [0.0, 0.0, 0.0]),
     ):
         for animal, (step, share) in enumerate(zip(with_step, shares, strict=True)):
             rows.append((prop, animal, 8, "criterion", 1.5, "none", step, share))
-    # another setting, which the main statistics leave out
-    rows.append(("evidence", 0, 4, "criterion", 1.5, "none", True, 9.0))
-    return pd.DataFrame(
-        rows,
-        columns=[
-            "property",
-            "animal",
-            "n_knots",
-            "power",
-            "window_z",
-            "covariate",
-            "has_step",
-            "step_share_overall",
-        ],
-    )
+    # other settings, which the main statistics leave out: each would add a step
+    rows += [
+        ("evidence", 2, 4, "criterion", 1.5, "none", True, 9.0),
+        ("evidence", 2, 8, "event", 1.5, "none", True, 9.0),
+        ("evidence", 2, 8, "criterion", 1.0, "none", True, 9.0),
+        ("evidence", 2, 8, "criterion", 1.5, "log_duration", True, 9.0),
+    ]
+    return pd.DataFrame(rows, columns=STEP_COLUMNS)
 
 
 def test_threshold_step_statistics_use_the_main_setting_only():
@@ -336,44 +341,76 @@ def test_threshold_step_statistics_use_the_main_setting_only():
     )
     assert result.loc["evidence", "n_animals_with_step"] == 2
     assert result.loc["evidence", "n_animals_same_sign"] == 2
-    assert result.loc["evidence", "step_share_median"] == pytest.approx(0.2)
+    # the median of 0.5, -0.1 and 0.3 (their mean is 0.23)
+    assert result.loc["evidence", "step_share_median"] == pytest.approx(0.3)
+    assert result.loc["duration", "n_animals_same_sign"] == 0
     assert stats.most_steps(result, ["duration", "speed"]) == (1, ["duration", "speed"])
-    with pytest.raises(ValueError, match="not every property has 5 animals"):
+    assert stats.most_steps(result, ["evidence", "speed"]) == (2, ["evidence"])
+    with pytest.raises(ValueError, match="one fit for each of 5 animals"):
         stats.threshold_step_statistics(_steps(), n_knots=8, window_z=1.5, n_animals=5)
 
 
-def test_peak_ripple_mode_statistics_leave_out_the_pooled_row_and_other_powers():
-    distribution = pd.DataFrame(
+def test_threshold_step_statistics_refuse_an_animal_fitted_twice():
+    steps = _steps()
+    # duration: animal 0 twice and animal 2 not at all, still three fits
+    steps.loc[(steps.property == "duration") & (steps.animal == 2), "animal"] = 0
+    with pytest.raises(ValueError, match="one fit for each of 3 animals"):
+        stats.threshold_step_statistics(steps, n_knots=8, window_z=1.5, n_animals=3)
+
+
+def _distribution() -> pd.DataFrame:
+    return pd.DataFrame(
         {
-            "animal": ["a", "b", "pooled", "a"],
-            "power": ["peak", "peak", "peak", "mean"],
-            "dip_p": [0.5, 0.01, 0.9, 0.9],
-            "main_mode_z": [1.0, 2.0, 9.0, 9.0],
+            "animal": ["a", "b", "c", "pooled", "a"],
+            "power": ["peak", "peak", "peak", "peak", "mean"],
+            "dip_p": [0.5, 0.01, 0.05, 0.9, 0.9],
+            "main_mode_z": [1.0, 2.0, 1.5, 9.0, 0.0],
         }
     )
-    result = stats.peak_ripple_mode_statistics(distribution)
+
+
+def test_peak_ripple_mode_statistics_leave_out_the_pooled_row_and_other_powers():
+    result = stats.peak_ripple_mode_statistics(_distribution(), n_animals=3)
+    # c's p equals the level, which does not reject one mode
     assert result == {
-        "n_animals_unimodal": 1,
+        "n_animals_unimodal": 2,
         "mode_animal_min": 1.0,
         "mode_animal_max": 2.0,
     }
 
 
+def test_peak_ripple_mode_statistics_refuse_a_missing_or_repeated_animal_or_p():
+    with pytest.raises(ValueError, match="one row for each of 4 animals"):
+        stats.peak_ripple_mode_statistics(_distribution(), n_animals=4)
+    repeated = _distribution()
+    repeated.loc[2, "animal"] = "a"
+    with pytest.raises(ValueError, match="one row for each of 3 animals"):
+        stats.peak_ripple_mode_statistics(repeated, n_animals=3)
+    for column in ("dip_p", "main_mode_z"):
+        missing = _distribution()
+        missing.loc[1, column] = np.nan
+        with pytest.raises(ValueError, match=f"no {column}"):
+            stats.peak_ripple_mode_statistics(missing, n_animals=3)
+
+
 def test_class_medians_count_animals_in_the_stated_direction():
     events = pd.DataFrame(
         {
-            "animal": ["a", "a", "a", "b", "b", "b", "c", "c"],
-            "is_swr": [False, False, True, False, True, True, False, True],
-            "extent": [1.0, 3.0, 5.0, 8.0, 4.0, np.nan, 1.0, 9.0],
+            "animal": ["a", "a", "a", "b", "b", "b", "c", "c", "d", "d"],
+            "is_swr": [False, False, True, False, True, True, False, True, False, True],
+            "extent": [1.0, 3.0, 5.0, 8.0, 4.0, np.nan, 1.0, 9.0, 7.0, 7.0],
         }
     )
     lower = stats.class_medians(events, "extent", "lower")
-    assert lower["median_non_swr"] == 2.0
-    assert lower["median_swr"] == 5.0
-    # a: 2 < 5; b: 8 > 4; c: 1 < 9
+    # non-SWR: 1, 1, 3, 7, 8; SWR: 4, 5, 7, 9
+    assert lower["median_non_swr"] == 3.0
+    assert lower["median_swr"] == 6.0
+    # a: 2 < 5; b: 8 > 4; c: 1 < 9; d: 7 against 7, in neither direction
     assert lower["n_animals_in_direction"] == 2
     higher = stats.class_medians(events, "extent", "higher")
     assert higher["n_animals_in_direction"] == 1
+    with pytest.raises(ValueError, match="direction 'above'"):
+        stats.class_medians(events, "extent", "above")
 
 
 def test_content_occupancy_shares_weigh_sessions_by_their_time_bins():
@@ -395,3 +432,23 @@ def test_content_occupancy_shares_weigh_sessions_by_their_time_bins():
     assert list(shares.columns) == list(stats.OCCUPANCY_PLACES)
     # a: non-SWR 0.6 at a well against SWR 0.3; b: 0.2 against 0.5
     assert stats.n_animals_non_swr_more_at_well(occupancy) == 1
+
+
+def test_content_occupancy_shares_refuse_a_session_with_time_bins_and_no_share():
+    occupancy = pd.DataFrame(
+        {
+            "animal": ["a", "a", "a"],
+            "group": ["SWR", "SWR", "SWR"],
+            "n": [10, 30, 0],
+            "remote_well": [0.5, np.nan, np.nan],
+            "own_well": [0.1, 0.1, np.nan],
+            "remote_path": [0.2, 0.4, np.nan],
+            "near_off": [0.2, 0.4, np.nan],
+        }
+    )
+    with pytest.raises(ValueError, match="1 sessions with time bins have no share"):
+        stats.content_occupancy_shares(occupancy)
+    # a session with no time bin has no share to give, and weighs nothing
+    occupancy.loc[1, "remote_well"] = 0.1
+    shares = stats.content_occupancy_shares(occupancy)
+    assert shares.loc["SWR", "remote_well"] == pytest.approx((5 + 3) / 40)

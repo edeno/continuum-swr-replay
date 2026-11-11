@@ -58,6 +58,7 @@ from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
 from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
+from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     content_occupancy_dir,
@@ -951,7 +952,9 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     analysis's CSV outputs.
     """
     make = value_factory(class_distribution_values, source, TAGS["class_distribution"])
-    stats = event_statistics.peak_ripple_mode_statistics(distribution)
+    stats = event_statistics.peak_ripple_mode_statistics(
+        distribution, n_animals=len(analysed_animals())
+    )
     return [
         make(
             "ripple_peak_animals_unimodal",
@@ -996,7 +999,10 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     the simulation checks stay in the CSV outputs.
     """
     statistics = event_statistics.threshold_step_statistics(
-        steps, n_knots=STEP_KNOTS, window_z=STEP_WINDOW_Z, n_animals=5
+        steps,
+        n_knots=STEP_KNOTS,
+        window_z=STEP_WINDOW_Z,
+        n_animals=len(analysed_animals()),
     )
     most, attaining = event_statistics.most_steps(
         statistics, list(_OTHER_STEP_PROPERTIES)

@@ -483,7 +483,7 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
 
 
 def peak_ripple_mode_statistics(
-    distribution: pd.DataFrame, alpha: float = 0.05
+    distribution: pd.DataFrame, n_animals: int, alpha: float = 0.05
 ) -> dict[str, float]:
     """Whether the events' peak ripple power has one mode, and where it is.
 
@@ -494,20 +494,40 @@ def peak_ripple_mode_statistics(
         ``animal`` (an animal, or ``"pooled"``), ``power`` (the power measure),
         ``dip_p`` (Hartigan's dip test) and ``main_mode_z`` (the KDE's main
         mode, z).
+    n_animals : int
+        The animals the peak power must have a test for.
     alpha : float
         The level below which the dip test rejects one mode.
 
     Returns
     -------
     statistics : dict
-        - ``n_animals_unimodal``: animals in which the dip test does not reject
-          one mode of the peak power.
+        - ``n_animals_unimodal``: animals, of ``n_animals``, in which the dip
+          test does not reject one mode of the peak power (``dip_p`` at or
+          above ``alpha``).
         - ``mode_animal_min``, ``mode_animal_max``: the lowest and highest of
           the animals' main modes, z.
+
+    Raises
+    ------
+    ValueError
+        If the peak power does not have one test for each of ``n_animals``
+        animals, or a test has no ``dip_p`` or no ``main_mode_z``.
     """
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
+    if len(peak) != n_animals or peak.animal.nunique() != n_animals:
+        raise ValueError(
+            f"the peak-power tests do not hold one row for each of {n_animals} "
+            f"animals: {sorted(peak.animal)}"
+        )
+    for column in ("dip_p", "main_mode_z"):
+        if peak[column].isna().any():
+            raise ValueError(
+                f"{int(peak[column].isna().sum())} animals' peak-power tests have "
+                f"no {column}"
+            )
     return {
         "n_animals_unimodal": (peak.dip_p >= alpha).sum(),
         "mode_animal_min": peak.main_mode_z.min(),
@@ -533,21 +553,23 @@ def threshold_step_statistics(
     window_z : float
         The half-width of the main setting's window around the threshold, z.
     n_animals : int
-        The animals every property must have a fit for.
+        The animals every property must have one fit for.
 
     Returns
     -------
     statistics : pd.DataFrame, shape (n_properties, 3)
         Indexed by property, for the main setting (the Kay criterion, no
-        covariate): ``n_animals_with_step``; ``n_animals_same_sign``, the
-        animals whose step points the way of their SWR minus non-SWR
-        difference; and ``step_share_median``, the median over animals of the
-        step as a share of that difference.
+        covariate), each of ``n_animals`` animals: ``n_animals_with_step``;
+        ``n_animals_same_sign``, the animals whose step points the way of their
+        SWR minus non-SWR difference (a positive share); and
+        ``step_share_median``, the median over animals of the step as a share
+        of that difference.
 
     Raises
     ------
     ValueError
-        If a property does not have ``n_animals`` fits in the main setting.
+        If a property does not have one fit for each of ``n_animals`` animals
+        in the main setting.
     """
     main = steps[
         (steps.n_knots == n_knots)
@@ -558,14 +580,16 @@ def threshold_step_statistics(
     by_property = main.groupby("property").agg(
         n_animals_with_step=("has_step", "sum"),
         n_fits=("has_step", "size"),
+        n_animals_fitted=("animal", "nunique"),
         n_animals_same_sign=("step_share_overall", lambda share: (share > 0).sum()),
         step_share_median=("step_share_overall", "median"),
     )
-    if not (by_property["n_fits"] == n_animals).all():
+    fits = by_property[["n_fits", "n_animals_fitted"]]
+    if not (fits == n_animals).all(axis=None):
         raise ValueError(
-            f"not every property has {n_animals} animals:\n{by_property['n_fits']}"
+            f"not every property has one fit for each of {n_animals} animals:\n{fits}"
         )
-    return by_property.drop(columns="n_fits")
+    return by_property.drop(columns=fits.columns)
 
 
 def most_steps(
@@ -602,7 +626,14 @@ def class_medians(
     statistics : dict
         ``median_non_swr``, ``median_swr``, and ``n_animals_in_direction``: the
         animals whose own non-SWR median is ``direction`` than their SWR median.
+
+    Raises
+    ------
+    ValueError
+        If ``direction`` is neither ``"lower"`` nor ``"higher"``.
     """
+    if direction not in ("lower", "higher"):
+        raise ValueError(f"direction {direction!r} is neither 'lower' nor 'higher'")
     known = events[[column, "is_swr", "animal"]].dropna(subset=[column])
     median = known.groupby("is_swr")[column].median()
     by_animal = known.groupby(["animal", "is_swr"])[column].median().unstack()
@@ -636,6 +667,11 @@ def content_occupancy_shares(occupancy: pd.DataFrame) -> pd.DataFrame:
     shares : pd.DataFrame, shape (n_groups, 5)
         For each group, the share of its time bins at each of
         :data:`OCCUPANCY_PLACES`, weighted by time bins over sessions.
+
+    Raises
+    ------
+    ValueError
+        If a session with time bins has no share at a place.
     """
     return _weighted_shares(occupancy, ["group"])
 
@@ -650,6 +686,12 @@ def n_animals_non_swr_more_at_well(occupancy: pd.DataFrame) -> int:
 
 def _weighted_shares(occupancy: pd.DataFrame, by: list[str]) -> pd.DataFrame:
     """The share of time bins at each place, weighted by time bins, per ``by``."""
+    places = ["remote_well", "own_well", "remote_path", "near_off"]
+    without = occupancy.loc[occupancy["n"] > 0, places].isna().any(axis=1)
+    if without.any():
+        raise ValueError(
+            f"{int(without.sum())} sessions with time bins have no share at a place"
+        )
     occupancy = occupancy.assign(
         at_well=occupancy["remote_well"] + occupancy["own_well"]
     )
