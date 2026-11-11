@@ -14,6 +14,9 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The suite takes about 45 minutes on the 2-CPU runner; a hung test ends
+    # the job here instead of at GitHub's six-hour limit.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:

@@ -124,6 +124,9 @@ allow_any_generics = true
 # ``PytestConfigWarning: Unknown config option`` because that hook is
 # only honored at the conftest module level, not in the ini config.
 testpaths = ["tests"]
+# A test still running after 10 minutes is hung: print every thread's stack
+# so the log names it (the run continues; CI's timeout-minutes ends it).
+faulthandler_timeout = 600
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
