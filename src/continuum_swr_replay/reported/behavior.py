@@ -416,6 +416,11 @@ def per_bin_values(
     )
     ladder = rate_fit_statistics.ladder_fit_statistics(fits)
     late_lags = f"{rate_fit_statistics.FIRST_LATE_REWARD_LAG}-{REWARD_HISTORY_N_LAGS}"
+    # what each _RANGED value is, without its population
+    ranged_what = {
+        "rate_kernel_late_min": f"lowest median reconstructed kernel over lags {late_lags}",
+        "rate_arrival_separated_fraction": f"share of {ARRIVAL_TIME_RUNG} fits flagged separated",
+    }
     values += [
         make(
             "rate_sessions",
@@ -557,7 +562,7 @@ def per_bin_values(
                 kernel["late_rate_ratio_min"],
                 "quantity",
                 "dec2",
-                f"{label}: lowest median reconstructed kernel over lags {late_lags}",
+                f"{label}: {ranged_what['rate_kernel_late_min']}",
                 "rate ratio",
             ),
             make(
@@ -676,7 +681,7 @@ def per_bin_values(
                 ladder.loc[(ARRIVAL_TIME_RUNG, outcome), "separated_fraction"],
                 "fraction",
                 "pct",
-                f"{label}: share of {ARRIVAL_TIME_RUNG} fits flagged separated",
+                f"{label}: {ranged_what['rate_arrival_separated_fraction']}",
             ),
         ]
         for prefix, frame in (("rate", fits), ("rate_allstops", all_stops)):
@@ -694,14 +699,17 @@ def per_bin_values(
                     f"[{shape[f'{clock}_interval_start_s']:g}, "
                     f"{shape[f'{clock}_interval_end_s']:g}] s"
                 )
+                ranged_what[f"{prefix}_{clock}_peak_s"] = (
+                    f"argmax of the median fitted {rung} time course, read on "
+                    f"{interval}{cohort_label}"
+                )
                 values += [
                     make(
                         f"{prefix}_{clock}_peak_s_{word}",
                         shape[f"{clock}_peak_s"],
                         "quantity",
                         "dec2",
-                        f"{label}: argmax of the median fitted {rung} time course, read on "
-                        f"{interval}{cohort_label}"
+                        f"{label}: {ranged_what[f'{prefix}_{clock}_peak_s']}"
                         + (
                             "; it sits on the interval's edge, so it bounds the peak rather "
                             "than locating it"
@@ -725,15 +733,18 @@ def per_bin_values(
                         f"{label}: unflagged session curves behind that median{cohort_label}",
                     ),
                 ]
+            ranged_what[f"{prefix}_clock_ks"] = (
+                "KS distance between the two clocks' median time courses, each "
+                "normalized over its own supported interval and read on relative "
+                f"position{cohort_label}"
+            )
             values.append(
                 make(
                     f"{prefix}_clock_ks_{word}",
                     shape["clock_ks"],
                     "quantity",
                     "dec2",
-                    f"{label}: KS distance between the two clocks' median time courses, each "
-                    "normalized over its own supported interval and read on relative "
-                    f"position{cohort_label}",
+                    f"{label}: {ranged_what[f'{prefix}_clock_ks']}",
                 )
             )
     no_swr_all = fit_rows(all_stops, model=FULL_RATE_RUNG, outcome="non_local_no_swr")
@@ -939,7 +950,7 @@ def per_bin_values(
                 f"non-local (all): share of {model} fits inside the KS band",
             ),
         ]
-    return values + _population_ranges(values, make)
+    return values + _population_ranges(values, make, ranged_what)
 
 
 _LAG_WORDS = (
@@ -1577,33 +1588,36 @@ def current_arm_paired_values(fits: pd.DataFrame, source: str) -> list[Value]:
     )
 
 
-#: Per-population rate values whose range over the four populations is quoted.
-_RANGED = (
-    "rate_kernel_late_min",
-    "rate_time_peak_s",
-    "rate_arrival_peak_s",
-    "rate_clock_ks",
-    "rate_allstops_time_peak_s",
-    "rate_allstops_arrival_peak_s",
-    "rate_allstops_clock_ks",
-    "rate_arrival_separated_fraction",
-)
+#: Per-population rate values whose range over the four populations is quoted,
+#: each with the stem of its edge flags when it is a time-course peak.
+_RANGED = {
+    "rate_kernel_late_min": None,
+    "rate_time_peak_s": "rate_time_peak_edge",
+    "rate_arrival_peak_s": "rate_arrival_peak_edge",
+    "rate_clock_ks": None,
+    "rate_allstops_time_peak_s": "rate_allstops_time_peak_edge",
+    "rate_allstops_arrival_peak_s": "rate_allstops_arrival_peak_edge",
+    "rate_allstops_clock_ks": None,
+    "rate_arrival_separated_fraction": None,
+}
 
 
-def _population_ranges(values: list[Value], make: Callable[..., Value]) -> list[Value]:
+def _population_ranges(
+    values: list[Value], make: Callable[..., Value], what: Mapping[str, str]
+) -> list[Value]:
     """The lowest and highest of each :data:`_RANGED` value over the populations.
 
     A time-course peak on the edge of its supported interval bounds the peak
     rather than locating it, so the peak ranges are over the located peaks only,
-    with the number of edge peaks beside them.
+    with the number of edge peaks beside them. ``what`` holds, by stem, what
+    the value is without its population.
     """
     by_key = {v.key: v for v in values}
     ranges = []
-    for stem in _RANGED:
+    for stem, edge_stem in _RANGED.items():
         members = {word: by_key[f"{stem}_{word}"] for word in RATE_POPULATIONS}
         on_edge = None
-        if stem.endswith("_peak_s"):
-            edge_stem = stem.replace("_peak_s", "_peak_edge")
+        if edge_stem is not None:
             on_edge = {
                 word: by_key[f"{edge_stem}_{word}"].value for word in RATE_POPULATIONS
             }
@@ -1617,11 +1631,7 @@ def _population_ranges(values: list[Value], make: Callable[..., Value]) -> list[
                     span["n_excluded"],
                     "count",
                     "count",
-                    "populations whose "
-                    + next(iter(members.values()))
-                    .description.split(": ", 1)[1]
-                    .split(";")[0]
-                    + " sits on the interval's edge",
+                    f"populations whose {what[stem]} sits on the interval's edge",
                 )
             )
         for end in ("low", "high"):
@@ -1635,11 +1645,10 @@ def _population_ranges(values: list[Value], make: Callable[..., Value]) -> list[
                     f"{'lowest' if end == 'low' else 'highest'} over the populations"
                     + (
                         " whose peak is located (not on the edge)"
-                        if stem.endswith("_peak_s")
+                        if edge_stem is not None
                         else ""
                     )
-                    + ": "
-                    + chosen.description.split(": ", 1)[1].split(";")[0],
+                    + f": {what[stem]}",
                     chosen.unit,
                     pending=chosen.pending,
                 )
