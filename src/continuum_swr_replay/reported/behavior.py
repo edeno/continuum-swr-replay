@@ -100,11 +100,13 @@ from continuum_swr_replay.analysis.replay.learning import (
     smallest_adjusted_p,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (
+    BIN_S,
     PER_BIN_DESIGN,
     PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     TMAX,
+    TMAX_ARRIVAL,
 )
 from continuum_swr_replay.paths import (
     CANONICAL_TABLE_BASENAMES,
@@ -389,6 +391,7 @@ def per_bin_values(
         fit_rows(fits, model="M0_const")
     )
     ladder = rate_fit_statistics.ladder_fit_statistics(fits)
+    late_lags = f"{rate_fit_statistics.FIRST_LATE_REWARD_LAG}-{REWARD_HISTORY_N_LAGS}"
     values += [
         make(
             "rate_sessions",
@@ -409,16 +412,16 @@ def per_bin_values(
             cohort["n_bins_non_local"],
             "count",
             "count",
-            "15 ms bins at risk in the frozen common cohort, non-local populations "
-            "(the bins inside a non-local event are not at risk)",
+            f"{1000 * BIN_S:g} ms bins at risk in the frozen common cohort, non-local "
+            "populations (the bins inside a non-local event are not at risk)",
         ),
         make(
             "rate_bins_swr",
             cohort["n_bins_swr"],
             "count",
             "count",
-            "15 ms bins at risk in the frozen common cohort, detected SWR (the bins "
-            "inside a Kay SWR are not at risk)",
+            f"{1000 * BIN_S:g} ms bins at risk in the frozen common cohort, detected "
+            "SWR (the bins inside a Kay SWR are not at risk)",
         ),
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
@@ -528,7 +531,7 @@ def per_bin_values(
                 kernel["late_rate_ratio_min"],
                 "quantity",
                 "dec2",
-                f"{label}: lowest median reconstructed kernel over lags 3-10",
+                f"{label}: lowest median reconstructed kernel over lags {late_lags}",
                 "rate ratio",
             ),
             make(
@@ -536,7 +539,7 @@ def per_bin_values(
                 kernel["late_rate_ratio_max"],
                 "quantity",
                 "dec2",
-                f"{label}: highest median reconstructed kernel over lags 3-10",
+                f"{label}: highest median reconstructed kernel over lags {late_lags}",
                 "rate ratio",
             ),
             make(
@@ -544,7 +547,7 @@ def per_bin_values(
                 kernel[f"rate_ratio_lag_{REWARD_HISTORY_N_LAGS}"],
                 "quantity",
                 "dec2",
-                f"{label}: median reconstructed kernel at lag 10",
+                f"{label}: median reconstructed kernel at lag {REWARD_HISTORY_N_LAGS}",
                 "rate ratio",
             ),
             make(
@@ -626,7 +629,8 @@ def per_bin_values(
                 window["event_share"],
                 "fraction",
                 "dec2",
-                f"{label}: share of its event bins the arrival window [0, 8] s keeps",
+                f"{label}: share of its event bins the arrival window "
+                f"[0, {TMAX_ARRIVAL:g}] s keeps",
             ),
             make(
                 f"rate_allstops_arrival_event_share_{word}",
@@ -649,11 +653,15 @@ def per_bin_values(
                 fit_rows(frame, model=ARRIVAL_TIME_RUNG, outcome=outcome),
             )
             cohort_label = "" if prefix == "rate" else ", all-stops fit"
-            for clock, rung, window in (
-                ("time", STOP_TIME_RUNG, "[1, 3] s"),
-                ("arrival", ARRIVAL_TIME_RUNG, "[1, 6] s"),
+            for clock, rung in (
+                ("time", STOP_TIME_RUNG),
+                ("arrival", ARRIVAL_TIME_RUNG),
             ):
                 edge = shape[f"{clock}_peak_edge"]
+                interval = (
+                    f"[{shape[f'{clock}_interval_start_s']:g}, "
+                    f"{shape[f'{clock}_interval_end_s']:g}] s"
+                )
                 values += [
                     make(
                         f"{prefix}_{clock}_peak_s_{word}",
@@ -661,7 +669,7 @@ def per_bin_values(
                         "quantity",
                         "dec2",
                         f"{label}: argmax of the median fitted {rung} time course, read on "
-                        f"{window}{cohort_label}"
+                        f"{interval}{cohort_label}"
                         + (
                             "; it sits on the interval's edge, so it bounds the peak rather "
                             "than locating it"
@@ -675,7 +683,7 @@ def per_bin_values(
                         edge,
                         "count",
                         "count",
-                        f"{label}: 1 if that argmax sits on the edge of {window}{cohort_label}",
+                        f"{label}: 1 if that argmax sits on the edge of {interval}{cohort_label}",
                     ),
                     make(
                         f"{prefix}_{clock}_peak_sessions_{word}",
@@ -916,9 +924,15 @@ LADDER = {
 def per_bin_detail_values(
     fits: pd.DataFrame, all_stops: pd.DataFrame, in_transit: pd.DataFrame, source: str
 ) -> list[Value]:
-    """The rest of the per-bin ladder's readout, each read with
-    ``summarize_per_bin_rate_models.py``'s rule unless the description says
-    otherwise."""
+    """Question 3.3: the rest of the per-bin ladder's readout.
+
+    The quartiles of the baseline rate, the single reward-basis coefficients
+    over the sessions the per-term gate keeps, the reconstructed kernel at the
+    lags between the first and the last, the self-history block's separation,
+    the arrival-clock rungs' fit counts, the within-session baseline rate
+    ratios, each stop-clock rung's fit quality, and what the arrival clock
+    keeps of the all-stops and in-transit fits.
+    """
     make = value_factory(per_bin_detail_values, source, TAGS["rate"])
     values: list[Value] = []
     ladder = rate_fit_statistics.ladder_fit_statistics(fits)
@@ -955,7 +969,8 @@ def per_bin_detail_values(
                 baseline["events_per_bin"],
                 "quantity",
                 "sig2",
-                f"{label}: median M0_const rate times the 15 ms bin, the mean per-bin count",
+                f"{label}: median M0_const rate times the {1000 * BIN_S:g} ms bin, the "
+                "mean per-bin count",
                 "events/bin",
             ),
             make(
@@ -1686,7 +1701,8 @@ def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value
             drops["most_dropped_of"],
             "count",
             "count",
-            f"sessions fit for that term ({drops['most_dropped_model']})",
+            "sessions with a coefficient for that term, kept and dropped together "
+            f"({drops['most_dropped_model']})",
         ),
     ]
 
@@ -1763,7 +1779,8 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
             known_fraction(fit_rows(fits, model="R1"), "cv_ll_per_stop_mean"),
             "fraction",
             "pct",
-            "share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean",
+            "share of R1 session-fits (all populations) whose cv_ll_per_stop_mean is "
+            "not missing",
         ),
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
