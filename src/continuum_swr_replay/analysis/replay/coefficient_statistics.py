@@ -1,0 +1,384 @@
+"""Across-session summaries of what the per-session fits wrote.
+
+Every model ladder is fit one session at a time, so a reported number is a
+summary over sessions of a per-session number: a coefficient, a difference of
+two coefficients, a difference of two rungs' AIC, a separation flag. The
+functions here compute those summaries from a table of per-session fits (one
+row per session, with the session columns of
+:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and return
+named numbers.
+
+:func:`session_median_statistics` is the one summary every other function is
+built on: the median over sessions with the sessions' signs, and the median
+over animals of each animal's own median with the animals' signs. "Animals
+positive" counts the animals whose own median is above zero. A signed-rank p
+treats the sessions as independent, which sessions of one animal are not: it
+describes consistency across sessions and is not a test on the animals.
+
+Which sessions a coefficient is read over is the per-term gate of
+:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+import numpy as np
+import pandas as pd
+from scipy.stats import wilcoxon
+
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    gate_term_sessions,
+    pct_significant_sessions,
+    separated_for_term,
+    session_se,
+)
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+
+
+def fit_rows(fits: pd.DataFrame, **labels: str) -> pd.DataFrame:
+    """The fits that carry the given labels.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_fits, n_columns)
+        Per-session fits of several rungs or populations.
+    **labels : str
+        A label column and the value to keep, for example
+        ``model="M0_const", outcome="swr"``.
+
+    Returns
+    -------
+    rows : pd.DataFrame
+        The rows of ``fits`` whose every named column equals its label, indexed
+        as ``fits``.
+    """
+    keep = pd.Series(True, index=fits.index)
+    for column, label in labels.items():
+        keep &= fits[column] == label
+    return fits[keep]
+
+
+def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:
+    """The median of a per-session number, with the sessions' and animals' signs.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_sessions,)
+        One number per session, none missing.
+    animal : pd.Series, shape (n_sessions,)
+        Each session's animal, indexed as ``values``.
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_sessions``: the sessions.
+        - ``median``: the median over sessions.
+        - ``n_positive``, ``n_negative``: sessions above and below zero.
+        - ``positive_fraction``, ``negative_fraction``: their shares of the
+          sessions.
+        - ``n_animals``: the animals with a session.
+        - ``animal_median``: the median over animals of each animal's median
+          over its sessions.
+        - ``n_animals_positive``, ``n_animals_negative``: animals whose own
+          median is above and below zero.
+        - ``n_animals_same_sign``: animals whose own median has the sign of
+          ``median``.
+    """
+    median = float(values.median())
+    per_animal = values.groupby(animal).median()
+    return {
+        "n_sessions": len(values),
+        "median": median,
+        "n_positive": int((values > 0).sum()),
+        "n_negative": int((values < 0).sum()),
+        "positive_fraction": float((values > 0).mean()),
+        "negative_fraction": float((values < 0).mean()),
+        "n_animals": len(per_animal),
+        "animal_median": float(per_animal.median()),
+        "n_animals_positive": int((per_animal > 0).sum()),
+        "n_animals_negative": int((per_animal < 0).sum()),
+        "n_animals_same_sign": int((np.sign(per_animal) == np.sign(median)).sum()),
+    }
+
+
+def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
+    """One fitted coefficient across the sessions that have it.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_sessions, n_columns)
+        One row per session, with ``animal`` and ``column``. A session whose
+        ``column`` is missing is left out.
+    column : str
+        The coefficient's column.
+
+    Returns
+    -------
+    statistics : dict
+        The names of :func:`session_median_statistics`, and:
+
+        - ``exp_median``: ``exp`` of the median over sessions (a rate ratio for
+          a log-rate coefficient, an odds ratio for a log-odds one).
+        - ``exp_animal_median``: ``exp`` of the median over animals.
+        - ``signed_rank_p``: the Wilcoxon signed-rank p of the sessions'
+          coefficients against zero.
+    """
+    known = fits.dropna(subset=[column])
+    values = known[column]
+    statistics = session_median_statistics(values, known["animal"])
+    return {
+        **statistics,
+        "exp_median": float(np.exp(statistics["median"])),
+        "exp_animal_median": float(np.exp(statistics["animal_median"])),
+        "signed_rank_p": float(wilcoxon(values).pvalue),
+    }
+
+
+def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, float]:
+    """One term's coefficient across the sessions the per-term gate keeps.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_sessions, n_columns)
+        Per-session fits of one rung and population, with ``animal``,
+        ``coef_<term>`` and the columns
+        :func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`
+        reads.
+    term : str
+        The term.
+
+    Returns
+    -------
+    statistics : dict
+        The names of :func:`coefficient_statistics` over the kept sessions, and:
+
+        - ``session_se_median``: the median over sessions of the session's
+          standard error of the coefficient (event-clustered where the fit
+          wrote one); NaN when the fits carry no standard error.
+        - ``significant_fraction``: the share of sessions whose coefficient
+          differs from zero at 0.05, two-sided, on that standard error.
+    """
+    kept = fits[gate_term_sessions(fits, term).kept]
+    column = f"coef_{term}"
+    se, _ = session_se(kept, term)
+    return {
+        **coefficient_statistics(kept, column),
+        "session_se_median": float(se.median()) if se is not None else float("nan"),
+        "significant_fraction": float(
+            pct_significant_sessions(kept[column], se, kept.get(f"pval_{term}"))
+        ),
+    }
+
+
+def gated_exp_median_ratio(
+    fits_a: pd.DataFrame, fits_b: pd.DataFrame, term: str
+) -> float:
+    """``exp`` of one term's median coefficient in one set of fits, over the other's.
+
+    Parameters
+    ----------
+    fits_a, fits_b : pd.DataFrame
+        Per-session fits of one rung, each of one population
+        (:func:`gated_coefficient_statistics`).
+    term : str
+        The term.
+
+    Returns
+    -------
+    ratio : float
+        ``exp_median`` of ``fits_a`` divided by ``exp_median`` of ``fits_b``,
+        each over its own gated sessions.
+    """
+    return (
+        gated_coefficient_statistics(fits_a, term)["exp_median"]
+        / gated_coefficient_statistics(fits_b, term)["exp_median"]
+    )
+
+
+def gated_coefficient_difference_statistics(
+    fits_a: pd.DataFrame, fits_b: pd.DataFrame, term: str
+) -> dict[str, float]:
+    """One term's coefficient in two fits of the same sessions, differenced
+    within session.
+
+    A session enters when the per-term gate keeps the term in both of its fits.
+
+    Parameters
+    ----------
+    fits_a, fits_b : pd.DataFrame
+        Per-session fits of one rung, each of one population, with the session
+        columns and ``coef_<term>``; at most one row per session.
+    term : str
+        The term.
+
+    Returns
+    -------
+    statistics : dict
+        :func:`session_median_statistics` of the sessions' ``a - b``
+        differences.
+    """
+    column = f"coef_{term}"
+    session = list(SESSION_COLUMNS)
+    kept_a, kept_b = (
+        fits.loc[gate_term_sessions(fits, term).kept, [*session, column]]
+        for fits in (fits_a, fits_b)
+    )
+    both = kept_a.merge(kept_b, on=session, suffixes=("_a", "_b"), validate="1:1")
+    difference = both[f"{column}_a"] - both[f"{column}_b"]
+    return session_median_statistics(difference, both["animal"])
+
+
+def aic_difference_statistics(
+    child: pd.DataFrame, parent: pd.DataFrame, same: Sequence[str] = ()
+) -> dict[str, float]:
+    """A child rung's AIC minus its parent's, within session.
+
+    Parameters
+    ----------
+    child, parent : pd.DataFrame
+        Per-session fits of the two rungs for one population, with the session
+        columns, ``aic`` and the ``same`` columns.
+    same : sequence of str
+        Columns that must be equal in a session's two fits for it to count
+        (``n_stops``: both rungs were fit on the same stops).
+
+    Returns
+    -------
+    statistics : dict
+        :func:`session_median_statistics` of ``AIC(child) - AIC(parent)`` over
+        the sessions with both fits and a finite difference. Negative means the
+        child is better, so ``negative_fraction`` is the share of sessions in
+        which the child has the lower AIC and ``n_animals_negative`` the
+        animals whose median step favours it.
+    """
+    session = list(SESSION_COLUMNS)
+    columns = [*session, "aic", *same]
+    merged = child[columns].merge(
+        parent[columns], on=session, suffixes=("_child", "_parent")
+    )
+    for column in same:
+        merged = merged[merged[f"{column}_child"] == merged[f"{column}_parent"]]
+    difference = (merged["aic_child"] - merged["aic_parent"]).dropna()
+    return session_median_statistics(difference, merged.loc[difference.index, "animal"])
+
+
+def separated_fraction(fits: pd.DataFrame) -> float:
+    """The share of fits flagged separated.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits with the fit-level ``separated`` flag.
+
+    Returns
+    -------
+    fraction : float
+        In [0, 1]. A missing flag counts as not separated.
+    """
+    return float((fits["separated"] == True).mean())  # noqa: E712 (NaN must not count)
+
+
+def fits_carrying(fits: pd.DataFrame, terms: Sequence[str]) -> pd.DataFrame:
+    """The fits that have a coefficient for every one of ``terms``."""
+    return fits.dropna(subset=[f"coef_{term}" for term in terms])
+
+
+def term_separation_statistics(
+    fits: pd.DataFrame, terms: Sequence[str]
+) -> dict[str, float]:
+    """How many fits flag any of ``terms`` separated.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits with ``separated_terms``, the ``"|"``-joined names of
+        the terms each fit flags
+        (:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.separated_for_term`).
+    terms : sequence of str
+        The terms.
+
+    Returns
+    -------
+    statistics : dict
+        ``n_fits``, the fits; ``n_flagged``, those flagging at least one of
+        ``terms``; ``flagged_fraction``, their share.
+    """
+    flagged = pd.Series(False, index=fits.index)
+    for term in terms:
+        flagged |= separated_for_term(fits, term)
+    return {
+        "n_fits": len(fits),
+        "n_flagged": int(flagged.sum()),
+        "flagged_fraction": float(flagged.mean()),
+    }
+
+
+def rung_separation_range(
+    fits: pd.DataFrame, term: str, model_pattern: str
+) -> dict[str, int]:
+    """The fewest and most fits, separated fits and term-flagging fits over a
+    set of rungs.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits of several rungs, with ``model``, ``separated`` and
+        ``separated_terms``.
+    term : str
+        The term whose separation flag is counted.
+    model_pattern : str
+        A regular expression; the rungs whose name it matches from the start
+        are the ones compared.
+
+    Returns
+    -------
+    statistics : dict
+        For each of ``n_fits`` (a rung's fits), ``n_separated`` (its fits
+        flagged separated) and ``n_flagged`` (its fits flagging ``term``), the
+        lowest and highest over the rungs: ``<name>_min`` and ``<name>_max``.
+    """
+    rungs = fits[fits["model"].str.match(model_pattern)]
+    by_rung = rungs["model"]
+    per_rung = pd.DataFrame(
+        {
+            "n_fits": rungs.groupby(by_rung).size(),
+            "n_separated": (rungs["separated"] == True).groupby(by_rung).sum(),  # noqa: E712
+            "n_flagged": separated_for_term(rungs, term).groupby(by_rung).sum(),
+        }
+    )
+    return {
+        f"{column}_{end}": int(getattr(per_rung[column], end)())
+        for column in per_rung
+        for end in ("min", "max")
+    }
+
+
+def audited_drop_statistics(audited: pd.DataFrame) -> dict[str, float | str]:
+    """How many sessions the per-term gate cost the rows of an audited aggregate.
+
+    Parameters
+    ----------
+    audited : pd.DataFrame
+        Rows of an audited aggregate
+        (:func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.aggregate_contrast`):
+        one per rung and term, with ``model``, ``term``, ``n_sessions`` (kept)
+        and ``n_dropped`` (left out as separated or runaway).
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_terms_losing_sessions``: rows with at least one dropped session.
+        - ``most_dropped``: the most sessions any row drops.
+        - ``most_dropped_of``: that row's kept and dropped sessions together.
+        - ``most_dropped_model``, ``most_dropped_term``: that row's rung and
+          term (the first such row when several tie).
+    """
+    worst = audited.loc[audited["n_dropped"].idxmax()]
+    return {
+        "n_terms_losing_sessions": int((audited["n_dropped"] > 0).sum()),
+        "most_dropped": int(worst["n_dropped"]),
+        "most_dropped_of": int(worst["n_dropped"] + worst["n_sessions"]),
+        "most_dropped_model": worst["model"],
+        "most_dropped_term": worst["term"],
+    }

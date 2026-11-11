@@ -64,10 +64,14 @@ from scipy.stats import norm, wilcoxon
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    coefficient_statistics,
+    fit_rows,
+    gated_coefficient_difference_statistics,
+    gated_coefficient_statistics,
+)
 from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     gate_term_sessions,
-    pct_significant_sessions,
-    session_se,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
@@ -1104,8 +1108,10 @@ def per_bin_detail_values(
         kernel = reward_kernel_rate_ratios(_reward_gated(full))
         hist_fits = full.dropna(subset=hist_columns)
         flagged = hist_fits["separated_terms"].map(
-            lambda v: isinstance(v, str)
-            and any(t in PER_BIN_HISTORY_COLUMNS for t in v.split("|"))
+            lambda v: (
+                isinstance(v, str)
+                and any(t in PER_BIN_HISTORY_COLUMNS for t in v.split("|"))
+            )
         )
         marginal = _delta_aic(fits, "M1_rew", "M0_const", outcome)
         values += [
@@ -1740,30 +1746,29 @@ def current_arm_paired_values(fits: pd.DataFrame, source: str) -> list[Value]:
     differences, and the value is the median over animals.
     """
     make = value_factory(current_arm_paired_values, source, TAGS["anchoring"])
-    term = "is_current_arm"
-    coef = {}
-    for population in ("SWR", "nonSWR"):
-        rows = fits[(fits["model"] == "C2_base") & (fits["population"] == population)]
-        gate = gate_term_sessions(rows, term)
-        coef[population] = rows.loc[gate.kept].set_index(SC)[f"coef_{term}"]
-    both = pd.concat(coef, axis=1).dropna()
-    _require(len(both) > 0, "no session keeps is_current_arm in both split fits")
-    per_animal = (both["SWR"] - both["nonSWR"]).groupby(level="animal").median()
+    stats = gated_coefficient_difference_statistics(
+        fit_rows(fits, model="C2_base", population="SWR"),
+        fit_rows(fits, model="C2_base", population="nonSWR"),
+        "is_current_arm",
+    )
+    _require(
+        stats["n_sessions"] > 0, "no session keeps is_current_arm in both split fits"
+    )
     return [
         make(
             "current_arm_paired_difference",
-            per_animal.median(),
+            stats["animal_median"],
             "quantity",
             "sig2s",
             "SWR minus non-SWR is_current_arm (C2_base, fitted separately), the "
             "difference taken within each session, median over the session "
-            f"differences per animal, then over the {len(per_animal)} animals "
-            f"({len(both)} sessions with both fits kept)",
+            f"differences per animal, then over the {stats['n_animals']} animals "
+            f"({stats['n_sessions']} sessions with both fits kept)",
             "log weight",
         ),
         make(
             "current_arm_paired_difference_animals_positive",
-            int((per_animal > 0).sum()),
+            stats["n_animals_positive"],
             "count",
             "count",
             "animals whose median within-session difference is positive",
@@ -2378,31 +2383,6 @@ def estimator_values(
     return values
 
 
-def _session_aggregate(fits: pd.DataFrame, term: str) -> dict[str, float]:
-    """Session median of ``coef_<term>`` over the sessions the per-term gate
-    keeps, with the animals positive, the median session SE, the sessions'
-    signs, the share significant and the signed-rank p."""
-    gate = gate_term_sessions(fits, term)
-    kept = fits[gate.kept]
-    coef = kept[f"coef_{term}"]
-    se, _ = session_se(kept, term)
-    per_animal = kept.groupby("animal")[f"coef_{term}"].median()
-    _require(len(per_animal) == 5, f"{term}: {len(per_animal)} animals")
-    return {
-        "median": float(coef.median()),
-        "animal_median": float(per_animal.median()),
-        "sessions": int(len(coef)),
-        "animals_positive": int((per_animal > 0).sum()),
-        "se": float(se.median()) if se is not None else float("nan"),
-        "positive": int((coef > 0).sum()),
-        "negative": int((coef < 0).sum()),
-        "significant": float(
-            pct_significant_sessions(coef, se, kept.get(f"pval_{term}"))
-        ),
-        "p": float(wilcoxon(coef).pvalue),
-    }
-
-
 def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
     """Question 3.7: the leaf-only arm ladder's uncertainty and value rungs."""
     make = value_factory(leaf_values, source, TAGS["leaf_ladder"])
@@ -2411,12 +2391,15 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
         ("leaf_uncertainty", "Mu", "reward_belief_variance_candidate_arm_preoutcome_z"),
         ("leaf_value", "Mv", "reward_belief_mean_candidate_arm_preoutcome"),
     ):
-        agg = _session_aggregate(pd.read_pickle(leaf_dir / f"{model}.pkl"), term)
+        stats = gated_coefficient_statistics(
+            pd.read_pickle(leaf_dir / f"{model}.pkl"), term
+        )
+        _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
         what = f"leaf ladder {model} {term}"
         values += [
             make(
                 word,
-                agg["median"],
+                stats["median"],
                 "quantity",
                 "sig2s",
                 f"{what}: session median coefficient",
@@ -2424,21 +2407,21 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_sessions",
-                agg["sessions"],
+                stats["n_sessions"],
                 "count",
                 "count",
                 f"{what}: sessions kept",
             ),
             make(
                 f"{word}_animals_positive",
-                agg["animals_positive"],
+                stats["n_animals_positive"],
                 "count",
                 "count",
                 f"{what}: animals positive",
             ),
             make(
                 f"{word}_se",
-                agg["se"],
+                stats["session_se_median"],
                 "quantity",
                 "sig2",
                 f"{what}: median event-clustered session SE",
@@ -2504,12 +2487,13 @@ def choice_values(fits: dict, source: str) -> list[Value]:
         ("choice_full", "choice", "C_full", "replay_fraction"),
         ("choice_raw", "choice", "C_replay_only", "replay_fraction"),
     ):
-        agg = _session_aggregate(fits[block][model], term)
+        stats = gated_coefficient_statistics(fits[block][model], term)
+        _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
         what = f"{model} {term}"
         values += [
             make(
                 word,
-                agg["median"],
+                stats["median"],
                 "quantity",
                 "sig2s",
                 f"{what}: session median coefficient (gated)",
@@ -2517,42 +2501,42 @@ def choice_values(fits: dict, source: str) -> list[Value]:
             ),
             make(
                 f"{word}_p",
-                agg["p"],
+                stats["signed_rank_p"],
                 "quantity",
                 "pval",
                 f"{what}: signed-rank p across sessions",
             ),
             make(
                 f"{word}_sessions",
-                agg["sessions"],
+                stats["n_sessions"],
                 "count",
                 "count",
                 f"{what}: sessions kept",
             ),
             make(
                 f"{word}_positive_sessions",
-                agg["positive"],
+                stats["n_positive"],
                 "count",
                 "count",
                 f"{what}: sessions with a positive coefficient",
             ),
             make(
                 f"{word}_negative_sessions",
-                agg["negative"],
+                stats["n_negative"],
                 "count",
                 "count",
                 f"{what}: sessions with a negative coefficient",
             ),
             make(
                 f"{word}_animals_positive",
-                agg["animals_positive"],
+                stats["n_animals_positive"],
                 "count",
                 "count",
                 f"{what}: animals with a positive median",
             ),
             make(
                 f"{word}_significant_fraction",
-                agg["significant"],
+                stats["significant_fraction"],
                 "fraction",
                 "pct",
                 f"{what}: share of sessions individually significant",
@@ -2697,12 +2681,11 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
         )
     ]
     for word, column in POWER_COVARIATES.items():
-        s = coefs[column].dropna()
-        per_animal = coefs.groupby("animal")[column].median()
+        stats = coefficient_statistics(coefs, column)
         values += [
             make(
                 f"power_{word}",
-                s.median(),
+                stats["median"],
                 "quantity",
                 "sig2s",
                 f"{column}: median per-session coefficient on ripple_power_z",
@@ -2710,14 +2693,14 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
             ),
             make(
                 f"power_{word}_animals_positive",
-                (per_animal > 0).sum(),
+                stats["n_animals_positive"],
                 "count",
                 "count",
                 f"{column}: animals with a positive median",
             ),
             make(
                 f"power_{word}_p",
-                wilcoxon(s).pvalue,
+                stats["signed_rank_p"],
                 "quantity",
                 "pval",
                 f"{column}: signed-rank p",
