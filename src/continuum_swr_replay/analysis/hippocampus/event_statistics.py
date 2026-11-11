@@ -412,16 +412,30 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         Indexed by group:
 
         - ``n_scored``: rows scored.
-        - ``spikes_median``, ``tetrodes_median``, ``dll_per_spike_median``,
-          ``gpi_distance_median_cm``: medians over the group's rows.
+        - ``spikes_median`` (spikes), ``tetrodes_median`` (tetrodes),
+          ``dll_per_spike_median`` (nats per spike), ``gpi_distance_median_cm``
+          (cm): medians over the group's rows.
         - ``n_epochs_scored``: epochs with a row of the group.
-        - ``n_epochs_above_baseline``, ``n_animals_above_baseline``: epochs
-          (animals) whose median ``dll_per_spike`` is above that of their own
-          quiet windows. NaN for the baseline itself.
+        - ``n_epochs_above_baseline``, ``n_animals_above_baseline``: of the
+          epochs (animals) with a row of the group, those whose median
+          ``dll_per_spike`` is above that of their own quiet windows. NaN for
+          the baseline itself.
+
+    Raises
+    ------
+    ValueError
+        If an epoch with a scored row has no ``dll_per_spike`` of a quiet
+        window to be compared with.
     """
     base = metrics[metrics["group"] == baseline]
     epoch_base = base.groupby("epoch_id")["dll_per_spike"].median()
     animal_base = base.groupby("animal")["dll_per_spike"].median()
+    without = epoch_base.reindex(metrics["epoch_id"].unique()).isna()
+    if without.any():
+        raise ValueError(
+            f"{int(without.sum())} epochs have no {baseline!r} dll_per_spike to "
+            f"compare with: {sorted(without.index[without])}"
+        )
     rows = {}
     for group, group_rows in metrics.groupby("group"):
         epoch_median = group_rows.groupby("epoch_id")["dll_per_spike"].median()

@@ -225,8 +225,8 @@ def test_rest_matched_theta_statistics_weigh_windows_by_event():
         stats.rest_matched_theta_statistics(events.assign(rest_windows=[10, 0, 10, 10]))
 
 
-def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseline():
-    metrics = pd.DataFrame(
+def _spike_metrics() -> pd.DataFrame:
+    return pd.DataFrame(
         {
             "group": ["baseline"] * 4 + ["remote"] * 4,
             "animal": ["a", "a", "b", "b"] * 2,
@@ -237,6 +237,25 @@ def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseli
             "dist_to_gpi_peak": [5.0, 5.0, 5.0, 5.0, 10.0, 20.0, 30.0, 40.0],
         }
     )
+
+
+def test_spike_evidence_statistics_refuse_an_epoch_without_its_baseline():
+    metrics = _spike_metrics()
+    # epoch a2 has a remote event and no quiet window
+    without = metrics.drop(index=1)
+    with pytest.raises(ValueError, match="1 epochs have no 'baseline' dll_per_spike"):
+        stats.spike_evidence_statistics(without, "baseline")
+    # its only quiet window has no value
+    metrics.loc[1, "dll_per_spike"] = np.nan
+    with pytest.raises(ValueError, match="1 epochs have no 'baseline' dll_per_spike"):
+        stats.spike_evidence_statistics(metrics, "baseline")
+    # a group name the run does not hold
+    with pytest.raises(ValueError, match="3 epochs have no 'quiet' dll_per_spike"):
+        stats.spike_evidence_statistics(_spike_metrics(), "quiet")
+
+
+def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseline():
+    metrics = _spike_metrics()
     result = stats.spike_evidence_statistics(metrics, "baseline")
     remote = result.loc["remote"]
     assert remote["n_scored"] == 4
