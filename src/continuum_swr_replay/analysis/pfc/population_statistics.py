@@ -839,6 +839,22 @@ def _swr_without_replay_subsets(
     }
 
 
+#: :func:`call_overlap_statistics`'s names, as
+#: :func:`swr_without_replay_unit_statistics` gives them (SWRs without replay the
+#: first class, SWR-coupled replay the second).
+_SWR_WITHOUT_REPLAY_OVERLAP = {
+    "n_tested": "n_overlap_tested",
+    "n_both": "n_overlap_both",
+    "n_first_only": "n_overlap_swr_no_replay_only",
+    "n_second_only": "n_overlap_swr_replay_only",
+    "n_neither": "n_overlap_neither",
+    "n_both_expected": "n_overlap_expected",
+    "odds_ratio": "overlap_odds_ratio",
+    "rank_correlation": "rank_correlation",
+    "same_sign_fraction_both": "same_sign_fraction",
+}
+
+
 def swr_without_replay_unit_statistics(
     population: pd.DataFrame,
     sessions: pd.DataFrame,
@@ -894,9 +910,10 @@ def swr_without_replay_unit_statistics(
           ``same_sign_fraction_both``).
         - ``abs_peak_median_swr_no_replay``, ``abs_peak_median_swr_replay``:
           the median of each absolute peak over the group's units with that
-          peak; ``rate_multiplier_median_*``: ``exp`` of it;
-          ``abs_peak_median_called_*``: the same median over the units called
-          for SWRs without replay (for both peaks).
+          peak; ``rate_multiplier_median_*``: ``exp`` of it
+          (:func:`peak_modulation_statistics`); ``abs_peak_median_called_*``:
+          the same median over the units called for SWRs without replay (for
+          both peaks).
         - ``adds_to_split_fraction``: of the units with an improvement of the
           three-class model over the replay split, the share whose
           improvement is positive.
@@ -927,40 +944,22 @@ def swr_without_replay_unit_statistics(
         f"{three_class_model} vs. non_local_SWR + non_local_no_SWR: heldout_delta_dev"
     ].to_numpy(dtype=float)
 
-    columns = [
-        "n_units",
-        "n_tested",
-        "called_fraction",
-        "n_called",
-        "n_overlap_tested",
-        "n_overlap_both",
-        "n_overlap_swr_no_replay_only",
-        "n_overlap_swr_replay_only",
-        "n_overlap_neither",
-        "n_overlap_expected",
-        "overlap_odds_ratio",
-        "rank_correlation",
-        "same_sign_fraction",
-        "abs_peak_median_swr_no_replay",
-        "rate_multiplier_median_swr_no_replay",
-        "abs_peak_median_called_swr_no_replay",
-        "abs_peak_median_swr_replay",
-        "rate_multiplier_median_swr_replay",
-        "abs_peak_median_called_swr_replay",
-        "adds_to_split_fraction",
-        "best_model_fraction",
-    ]
+    peak_curves = {
+        "swr_no_replay": "SWR_no_non_local",
+        "swr_replay": "non_local_SWR_3class",
+    }
     rows = {}
     for subset, keep in subsets.items():
-        row: dict[str, float] = dict.fromkeys(columns, np.nan)
         tested, called = keep & new_tested, keep & new_called
-        row["n_units"] = int(keep.sum())
         n_called, n_tested = significant_fraction(
             population[keep], alpha, SWR_WITHOUT_REPLAY_P_COLUMNS
         )[SWR_WITHOUT_REPLAY]
-        row["n_tested"], row["n_called"] = n_tested, n_called
-        if n_tested:
-            row["called_fraction"] = n_called / n_tested
+        row: dict[str, float] = {
+            "n_units": int(keep.sum()),
+            "n_tested": n_tested,
+            "called_fraction": n_called / n_tested if n_tested else np.nan,
+            "n_called": n_called,
+        }
         both_tested = tested & swr_tested
         overlap = call_overlap_statistics(
             called[both_tested],
@@ -968,39 +967,39 @@ def swr_without_replay_unit_statistics(
             new_peak[both_tested],
             swr_peak[both_tested],
         )
-        row["n_overlap_tested"] = overlap["n_tested"]
-        row["n_overlap_both"] = overlap["n_both"]
-        row["n_overlap_swr_no_replay_only"] = overlap["n_first_only"]
-        row["n_overlap_swr_replay_only"] = overlap["n_second_only"]
-        row["n_overlap_neither"] = overlap["n_neither"]
-        row["n_overlap_expected"] = overlap["n_both_expected"]
-        row["overlap_odds_ratio"] = overlap["odds_ratio"]
-        row["rank_correlation"] = overlap["rank_correlation"]
-        row["same_sign_fraction"] = overlap["same_sign_fraction_both"]
-        for word, peak in (("swr_no_replay", new_peak), ("swr_replay", swr_peak)):
-            finite = keep & np.isfinite(peak)
-            if not finite.any():
-                continue
-            median_abs = float(np.median(np.abs(peak[finite])))
-            row[f"abs_peak_median_{word}"] = median_abs
-            row[f"rate_multiplier_median_{word}"] = float(np.exp(median_abs))
-            called_peak = peak[called & np.isfinite(peak)]
-            if called_peak.size:
-                row[f"abs_peak_median_called_{word}"] = float(
-                    np.median(np.abs(called_peak))
-                )
+        row.update(
+            {
+                _SWR_WITHOUT_REPLAY_OVERLAP[name]: value
+                for name, value in overlap.items()
+            }
+        )
+        effects = peak_modulation_statistics(
+            population[keep], list(peak_curves.values())
+        )
+        called_effects = peak_modulation_statistics(
+            population[called], list(peak_curves.values())
+        )
+        for word, curve in peak_curves.items():
+            row[f"abs_peak_median_{word}"] = effects.loc[curve, "abs_peak_median"]
+            row[f"rate_multiplier_median_{word}"] = effects.loc[
+                curve, "rate_multiplier_median"
+            ]
+            row[f"abs_peak_median_called_{word}"] = called_effects.loc[
+                curve, "abs_peak_median"
+            ]
         improves_finite = keep & np.isfinite(improves)
-        if improves_finite.any():
-            row["adds_to_split_fraction"] = float(
-                (improves[improves_finite] > 0).mean()
-            )
+        row["adds_to_split_fraction"] = (
+            float((improves[improves_finite] > 0).mean())
+            if improves_finite.any()
+            else np.nan
+        )
         row["best_model_fraction"] = best_model_fractions(
             population[keep],
             [three_class_model],
             column="min_heldout_model_three_class",
         )[three_class_model]
         rows[subset] = row
-    return pd.DataFrame.from_dict(rows, orient="index", columns=columns)
+    return pd.DataFrame.from_dict(rows, orient="index")
 
 
 def swr_without_replay_called_by_animal(
