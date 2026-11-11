@@ -359,14 +359,13 @@ def overlap_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
         )
     table = pd.DataFrame(rows)
     median = table["median_overlap_fraction"]
-    over_sessions = population_statistics.session_value_statistics(median)
     summary = pd.DataFrame(
         [
             {
                 "n_sessions": int(median.notna().sum()),
-                "median_over_sessions": float(over_sessions["median"]),
-                "min_over_sessions": float(over_sessions["min"]),
-                "max_over_sessions": float(over_sessions["max"]),
+                "median_over_sessions": float(median.median()),
+                "min_over_sessions": float(median.min()),
+                "max_over_sessions": float(median.max()),
                 "worst_session": str(table.loc[median.idxmax(), "session"]),
                 "max_single_draw_overlap": float(table["max_overlap_fraction"].max()),
             }
@@ -478,16 +477,7 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
             / frame["n_events_total"]
         )
     )
-    unmatchable = population_statistics.unmatchable_event_statistics(
-        table.rename(
-            columns={
-                "n_events_total": "total",
-                "n_events_excluded_unmatchable": "excluded",
-            }
-        )
-    )
-    worst_excluded = int(unmatchable["worst_excluded"])
-    worst_total = int(unmatchable["worst_total"])
+    worst = table.loc[table["frac_excluded"].idxmax()]
     text = (
         "## Events the matched test could not use\n\n"
         "An event with no legal non-event window inside its own fitted bout "
@@ -497,9 +487,10 @@ def excluded_section(data_dir: Path) -> tuple[str, pd.DataFrame]:
         "therefore a statement about that subset, not about every event of the "
         "class; the all-event held-out difference remains separately in the "
         "bundle. The worst single session/class here is "
-        f"{unmatchable['worst_session']} / {unmatchable['worst_event_class']}, "
-        f"which excludes {worst_excluded} of {worst_total} events "
-        f"({100 * (worst_excluded / worst_total):.1f} %).\n\n"
+        f"{worst['session']} / {worst['event_class']}, which excludes "
+        f"{int(worst['n_events_excluded_unmatchable'])} of "
+        f"{int(worst['n_events_total'])} events "
+        f"({100 * worst['frac_excluded']:.1f} %).\n\n"
     )
     return text + _md(corpus), table
 

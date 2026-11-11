@@ -32,12 +32,13 @@ already hold is copied out. The inputs (:class:`MpfcInputs`):
   ``scripts/pfc/run_pfc_stop_context.py``), pending when a bundle, cached
   session table or table they read has changed (:func:`stop_context_staleness`).
 
-The scripts that show these statistics call the same functions: Figure 4
-(``scripts/figures/generate_figure04.py``) for the unit fractions,
-``scripts/pfc/compare_pfc_cohorts.py`` for the cohort, fit-count and
-prior-binding values, and ``scripts/pfc/measure_pfc_null_geometry.py`` for the
-null's geometry. Unit fractions are descriptive and pooled over sessions and
-animals; they are not population inference.
+Figure 4 (``scripts/figures/generate_figure04.py``) draws the unit fractions
+with the same functions. ``scripts/pfc/compare_pfc_cohorts.py`` calls them for
+the called fractions and ``scripts/pfc/measure_pfc_null_geometry.py`` for the
+units called without improvement; the cohort, fit-count, prior-binding and
+other null-geometry numbers those two reports print are computed in the
+scripts. Unit fractions are descriptive and pooled over sessions and animals;
+they are not population inference.
 """
 
 from __future__ import annotations
