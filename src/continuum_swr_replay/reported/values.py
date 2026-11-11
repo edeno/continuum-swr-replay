@@ -6,20 +6,21 @@ import hashlib
 import json
 import math
 import re
-from collections.abc import Iterable, Iterator, Mapping
-from contextlib import contextmanager
-from contextvars import ContextVar
-from dataclasses import asdict, dataclass, field
+from collections.abc import Iterable, Mapping
+from dataclasses import InitVar, asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from continuum_swr_replay.reported.code_record import CodeRecord, CodeRecordError
 from continuum_swr_replay.reported.questions import tag_problems
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 """The layout of a summary file. Bump it when a field is added or renamed.
-Version 2 added ``code``, the record of the code that built the summary."""
+Version 3 holds ``code``, the record of the code that built the summary
+(:class:`~continuum_swr_replay.reported.code_record.CodeRecord`). Version 2, an
+earlier layout of that record, was never used by more than one interim build."""
 
-READABLE_SCHEMAS = (1, 2)
+READABLE_SCHEMAS = (1, 3)
 """The layouts :func:`read_summary` reads. A version-1 summary has no ``code``."""
 
 PARTS = {
@@ -73,6 +74,11 @@ class Value:
     pending : str or None
         Why the value may not be quoted yet (for example a value from an
         untracked script), or None.
+    check_tags : bool
+        Refuse ``claims`` or ``used_in`` that do not match the question list
+        (:func:`~continuum_swr_replay.reported.questions.tag_problems`). Only
+        :func:`read_summary` turns it off, to read a summary built before the list
+        changed. Not stored: a value carries no record of whether it was checked.
     """
 
     key: str
@@ -85,8 +91,9 @@ class Value:
     used_in: tuple[str, ...]
     source: str
     pending: str | None = None
+    check_tags: InitVar[bool] = True
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, check_tags: bool) -> None:
         if not _KEY.fullmatch(self.key):
             raise ValueError(f"key {self.key!r}: lower-case words and underscores only")
         if self.kind not in KINDS:
@@ -103,39 +110,27 @@ class Value:
             )
         if not self.claims or not self.used_in:
             raise ValueError(f"{self.key}: name its claims and where it is used")
-        if _CHECK_TAGS.get():
+        if check_tags:
             problems = tag_problems(self.claims, self.used_in)
             if problems:
                 raise ValueError(f"{self.key}: {'; '.join(problems)}")
 
 
-_CHECK_TAGS: ContextVar[bool] = ContextVar("check_tags", default=True)
-"""Whether a new :class:`Value` checks its tags against the question list. Off only
-while :func:`read_summary` reads a summary written before the tags changed."""
-
-
-@contextmanager
-def _tags_unchecked() -> Iterator[None]:
-    token = _CHECK_TAGS.set(False)
-    try:
-        yield
-    finally:
-        _CHECK_TAGS.reset(token)
-
-
 @dataclass
 class Summary:
     """One part's values, the provenance of the inputs they were read from, and
-    the code that built them (``code``, a
-    :func:`~continuum_swr_replay.reported.code_record.code_record`; None for a
-    summary built before code records were kept)."""
+    the code that built them: ``code`` is a
+    :class:`~continuum_swr_replay.reported.code_record.CodeRecord`, a
+    :class:`~continuum_swr_replay.reported.code_record.CodeRecordError` when git
+    could not answer, or None for a summary built before code records were kept
+    (or one a builder returned before ``summarize_part.py`` stamped it)."""
 
     part: int
     produced_by: str
     commit: str
     inputs: list[dict[str, Any]] = field(default_factory=list)
     values: dict[str, Value] = field(default_factory=dict)
-    code: dict[str, Any] | None = None
+    code: CodeRecord | CodeRecordError | None = None
 
     def add(self, *values: Value) -> None:
         for value in values:
@@ -178,6 +173,12 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
         (:func:`~continuum_swr_replay.reported.questions.tag_problems`). False reads a
         summary built before the question list changed, so that its numbers can
         still be emitted; :func:`summary_tag_problems` then lists what to fix.
+
+    Raises
+    ------
+    ValueError
+        If the schema is not one of :data:`READABLE_SCHEMAS`, or a version-3
+        summary has no ``code``.
     """
     payload = json.loads(path.read_text())
     if payload["schema_version"] not in READABLE_SCHEMAS:
@@ -185,6 +186,8 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
             f"{path}: schema {payload['schema_version']}, expected one of "
             f"{READABLE_SCHEMAS}"
         )
+    if payload["schema_version"] >= 3 and "code" not in payload:
+        raise ValueError(f"{path}: schema 3 but no code record")
     summary = Summary(
         part=payload["part"],
         produced_by=payload["produced_by"],
@@ -196,12 +199,36 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
         fields = dict(fields)
         fields["claims"] = tuple(fields["claims"])
         fields["used_in"] = tuple(fields["used_in"])
-        if check_tags:
-            summary.add(Value(key=key, **fields))
-        else:
-            with _tags_unchecked():
-                summary.add(Value(key=key, **fields))
+        summary.add(Value(key=key, check_tags=check_tags, **fields))
     return summary
+
+
+def read_summaries(directory: Path, *, check_tags: bool = True) -> dict[int, Summary]:
+    """Every part's summary in ``directory``, by part: exactly one
+    ``part{n}.json`` for each part of :data:`PARTS`, each saying it is that part.
+
+    Raises
+    ------
+    ValueError
+        If a part's file is missing, another ``part*.json`` is there, or a file's
+        ``part`` is not the one its name gives.
+    """
+    expected = {f"part{n}.json": n for n in PARTS}
+    found = {path.name for path in directory.glob("part*.json")}
+    if found != set(expected):
+        missing = sorted(set(expected) - found)
+        extra = sorted(found - set(expected))
+        raise ValueError(
+            f"{directory}: summaries missing {missing or 'none'}, "
+            f"unexpected {extra or 'none'}"
+        )
+    summaries = {}
+    for name, part in expected.items():
+        summary = read_summary(directory / name, check_tags=check_tags)
+        if summary.part != part:
+            raise ValueError(f"{directory / name}: holds part {summary.part}")
+        summaries[part] = summary
+    return summaries
 
 
 def summary_tag_problems(summary: Summary) -> dict[str, list[str]]:

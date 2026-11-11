@@ -10,7 +10,12 @@ answers in ``claims`` and the figures that show it in ``used_in``;
 every question with its values.
 
 A question is written as a question, not as its answer. The ids keep the claim
-numbers the project has used, so that the values' existing tags stay valid.
+numbers the project has used, except where a claim was split or renamed (12 became
+12a and 12b; the ripple-power model is 19h), so most existing tags stay valid.
+
+The list organizes the writing by part. A question need not have a figure; a
+figure tag names the figure the paper places a value in, which may be one whose
+panels are not designed yet.
 
 The paper's parts are the outline, not the summary files: ``part1.json`` holds
 values for Part 2's "it works" questions, for example. A summary file is where a
@@ -38,6 +43,10 @@ introduction's survey of published replay studies (Supplementary Table S1)."""
 STATUSES = ("computed", "partly computed", "not computed", "no numbers", "dropped")
 """A question's status. ``no numbers``: an example figure or a framing, which no
 value answers. ``dropped``: considered and dropped, kept so the reason is not lost."""
+
+ANSWERED = ("computed", "partly computed")
+"""The statuses of a question that has values; a question of any other status has
+none."""
 
 USES = ("paper", "supplement")
 """The ``used_in`` tags other than a figure."""
@@ -102,9 +111,12 @@ FIGURES: dict[str, Figure] = {
         "scripts/figures/plot_swr_contrast_coefs.py",
     ),
 }
-"""Every figure a value may name: the main figures as their scripts draw them now,
-and the supplementary figures. A value names one as ``"figure: <id>"`` or, for a
-lettered panel, ``"figure: <id><letter>"`` (``"figure: 2b"``)."""
+"""Every figure a value may name: the main figures, with the panel letters their
+scripts draw now, and the supplementary figures. A value names one as
+``"figure: <id>"`` or, for a lettered panel, ``"figure: <id><letter>"``
+(``"figure: 2b"``). A value placed in a main figure whose panel is not designed yet
+carries the unlettered tag (``"figure: 2"``), whether or not the script draws it
+yet."""
 
 
 @dataclass(frozen=True)
@@ -117,7 +129,7 @@ class Question:
         The claim number (``"15"``, ``"19a"``), or a new id for a question with no
         claim number.
     part : int
-        The part of the paper, a key of :data:`SECTIONS`.
+        The part of the paper, the first element of an entry of :data:`SECTIONS`.
     section : str
         The section within the part, as in :data:`SECTIONS`.
     text : str
@@ -127,8 +139,9 @@ class Question:
     reason : str
         Why the status is not ``computed``; empty when it is.
     figures : tuple of str
-        The figures or panels that show it (``"2b"``, ``"memoryless comparison"``).
-        Every figure tag on one of its values must be listed here.
+        The figures or panels the paper places it in (``"2b"``,
+        ``"memoryless comparison"``); empty for a question no figure shows. Every
+        figure tag on one of its values must be listed here.
     note : str
         An editorial note for the lead, if any.
     """
@@ -260,7 +273,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Does the detector target the represented content rather than an LFP proxy?",
         status="no numbers",
         reason="framing (a candidate claim)",
-        note="Wording written by the assistant from the claim; the draft list had none.",
+        note="Wording written by the assistant from the claim; check it.",
     ),
     # Part 2: the events are real
     _q(
@@ -492,7 +505,8 @@ def parse_figure_tag(tag: str) -> tuple[str, str] | None:
 
 def tag_problems(claims: Iterable[str], used_in: Iterable[str]) -> list[str]:
     """What is wrong with a value's tags: an unknown question id, an unknown use
-    or figure, or a figure its question does not list. Empty when nothing is."""
+    or figure, a figure its question does not list, or a question whose status
+    says it has no values (:data:`ANSWERED`). Empty when nothing is."""
     claims, used_in = tuple(claims), tuple(used_in)
     problems = [f"no question {c!r}" for c in claims if c not in QUESTION_IDS]
     figures = []
@@ -508,7 +522,7 @@ def tag_problems(claims: Iterable[str], used_in: Iterable[str]) -> list[str]:
         question = QUESTION_IDS.get(claim)
         if question is None:
             continue
-        if question.status in ("not computed", "no numbers", "dropped"):
+        if question.status not in ANSWERED:
             problems.append(f"question {claim} is {question.status}, so has no values")
         for figure in figures:
             if figure not in question.figures:

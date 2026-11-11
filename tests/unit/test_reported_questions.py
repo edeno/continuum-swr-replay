@@ -3,8 +3,8 @@
 Each value names the questions it answers (``claims``) and the figures that show
 it (``used_in``); the question list (``reported/questions.py``) is the one place
 those are defined. These tests check the list itself, the tags the part builders
-write (read from their source, so no lab data is needed), and the tags of the
-committed summaries.
+write (read from their source, so no lab data is needed), the tags of the
+committed summaries, and the generated view.
 """
 
 from __future__ import annotations
@@ -19,10 +19,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported import part0, part1, part2, values
+from continuum_swr_replay.reported import emit, part0, part1, part2, part3, values
 from continuum_swr_replay.reported.questions import (
+    ANSWERED,
     FIGURES,
-    QUESTION_IDS,
     QUESTIONS,
     SECTIONS,
     STATUSES,
@@ -34,11 +34,31 @@ ROOT = Path(__file__).resolve().parents[2]
 REPORTED = ROOT / "paper" / "reported"
 BUILDERS = ROOT / "src" / "continuum_swr_replay" / "reported"
 
-AWAITING_REBUILD = {1, 2, 3}
-"""The parts whose committed summary was written before the question list
-changed their tags (question 12 split into 12a and 12b; the Part 2 figure tags; the
-Part 3 values that only a document used). Remove a part once its summary is
-rebuilt; the strict xfail below fails until then."""
+EXPECTED_TAG_PROBLEMS = {
+    1: {"no question '12'"},
+    2: {
+        "unknown use 'figure: 3, content occupancy'",
+        "unknown use 'figure: main, left out'",
+        "unknown use 'figure: main, other side of the overlap'",
+        "unknown use 'figure: one class or two'",
+        "unknown use 'figure: spike support'",
+    },
+    3: {
+        "no question 'synthesis Layer 2'",
+        "unknown use 'docs: rate_models'",
+        "unknown use 'docs: replay_rate_content_swr_synthesis'",
+    },
+}
+"""The tag problems each committed summary holds because it was built before the
+question list changed its tags (12 split into 12a and 12b; the Part 2 figure tags
+that named no figure; the Part 3 values only a document used). Pinned exactly, so
+a new problem fails now. When a part is rebuilt its problems go and the test fails
+until its entry here is removed."""
+
+EXPECTED_STATUS_MISMATCHES = {"12a (computed)", "19h (computed)"}
+"""Questions whose values do not match their status in the committed summaries,
+for the same reason: their values are tagged 12 and "synthesis Layer 2" until
+Parts 1 and 3 are rebuilt. Update it as each part is rebuilt; empty once all are."""
 
 
 # --- the list itself ---------------------------------------------------------------
@@ -58,6 +78,7 @@ def test_a_status_other_than_computed_says_why():
     for q in QUESTIONS:
         assert q.status in STATUSES, q.id
         assert bool(q.reason) == (q.status != "computed"), q.id
+    assert set(ANSWERED) < set(STATUSES)
 
 
 def test_a_question_is_written_as_a_question():
@@ -69,6 +90,11 @@ def test_every_figure_a_question_lists_exists():
     for q in QUESTIONS:
         for figure in q.figures:
             assert parse_figure_tag(f"figure: {figure}") is not None, (q.id, figure)
+
+
+def test_no_figure_id_reads_as_another_figure_and_a_panel():
+    panels = {name + p for name, figure in FIGURES.items() for p in figure.panels}
+    assert not panels & FIGURES.keys()
 
 
 def test_every_figure_script_exists_and_the_figure_pipeline_names_it():
@@ -124,11 +150,21 @@ def _value(**fields) -> values.Value:
     return values.Value(**{**base, **fields})
 
 
-def test_a_value_with_a_bad_tag_is_refused():
+def test_a_value_with_a_bad_tag_is_refused_unless_told_not_to_check():
     with pytest.raises(ValueError, match="no question '12'"):
         _value(claims=("12",))
     with pytest.raises(ValueError, match="unknown use 'figure: main, left out'"):
         _value(used_in=("figure: main, left out",))
+    assert _value(claims=("12",), check_tags=False).claims == ("12",)
+    with pytest.raises(ValueError, match="no question '12'"):
+        _value(claims=("12",))
+
+
+def test_replacing_a_field_checks_the_tags_again():
+    from dataclasses import replace
+
+    with pytest.raises(ValueError, match="no question 'x'"):
+        replace(_value(), claims=("x",))
 
 
 def test_an_old_summary_is_read_unchecked_and_its_problems_listed(tmp_path):
@@ -177,22 +213,20 @@ def _options(
     return options
 
 
-def _tag_pairs(part: int) -> list[tuple[int, tuple[str, ...], tuple[str, ...]]]:
-    """Every (claims, used_in) pair a builder can give a value, as far as its
-    source says: in each function, a factory's defaults, and each ``make(...)``
-    call's ``claims_`` / ``used_in_`` override paired with the other default;
-    and ``Value(...)`` calls. (line, claims, used_in); a half known only at run
-    time is empty, so that half alone is checked."""
+def _tag_sites(part: int, source: str | None = None):
+    """Every (claims, used_in) a builder can give a value, as far as its source
+    says, and the halves it cannot resolve.
+
+    In each function: every ``_value_factory(source, claims, used_in)`` call; every
+    call with a ``claims_`` / ``used_in_`` override, paired with the factory's
+    other half when the function assigned that factory; every ``Value(...)``
+    call. Returns ``(pairs, unresolved)``: pairs are ``(line, function, claims
+    options or None, used_in options or None)``; unresolved are ``(function,
+    which, expression)`` for each half known only at run time."""
     module = importlib.import_module(f"continuum_swr_replay.reported.part{part}")
-    tree = ast.parse((BUILDERS / f"part{part}.py").read_text())
-    pairs = []
-
-    def add(line, claims, used_in):
-        for c in claims or [()]:
-            for u in used_in or [()]:
-                pairs.append((line, c, u))
-
-    for function in ast.walk(tree):
+    text = (BUILDERS / f"part{part}.py").read_text() if source is None else source
+    pairs, unresolved = [], set()
+    for function in ast.walk(ast.parse(text)):
         if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         local = {}
@@ -208,38 +242,167 @@ def _tag_pairs(part: int) -> list[tuple[int, tuple[str, ...], tuple[str, ...]]]:
                     continue
                 if isinstance(value, tuple):
                     local[node.targets[0].id] = value
+
+        def resolve(which, node, function=function, local=local):
+            found = _options(node, module, local)
+            if found is None:
+                expression = "?" if node is None else ast.unparse(node)
+                unresolved.add((function.name, which, expression))
+            return found
+
         factories = {}
-        for node in ast.walk(function):
-            if (
-                isinstance(node, ast.Assign)
-                and isinstance(node.value, ast.Call)
-                and getattr(node.value.func, "id", None) == "_value_factory"
-                and len(node.value.args) >= 3
-                and isinstance(node.targets[0], ast.Name)
+        assigned = {
+            id(node.value): node.targets[0].id
+            for node in ast.walk(function)
+            if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+        }
+        for call in ast.walk(function):
+            if not (
+                isinstance(call, ast.Call)
+                and getattr(call.func, "id", None) == "_value_factory"
             ):
-                claims = _options(node.value.args[1], module, local)
-                used_in = _options(node.value.args[2], module, local)
-                factories[node.targets[0].id] = (claims, used_in)
-                add(node.lineno, claims, used_in)
+                continue
+            claims = resolve("claims", call.args[1])
+            used_in = resolve("used_in", call.args[2])
+            pairs.append((call.lineno, function.name, claims, used_in))
+            if id(call) in assigned:
+                factories[assigned[id(call)]] = (claims, used_in)
         for node in ast.walk(function):
             if not isinstance(node, ast.Call):
                 continue
             keywords = {k.arg: k.value for k in node.keywords}
             name = getattr(node.func, "id", None)
-            if name in factories and ({"claims_", "used_in_"} & set(keywords)):
-                claims, used_in = factories[name]
-                if "claims_" in keywords:
-                    claims = _options(keywords["claims_"], module, local)
-                if "used_in_" in keywords:
-                    used_in = _options(keywords["used_in_"], module, local)
-                add(node.lineno, claims, used_in)
-            elif name == "Value":
-                add(
-                    node.lineno,
-                    _options(keywords.get("claims"), module, local),
-                    _options(keywords.get("used_in"), module, local),
-                )
-    return pairs
+            if name == "Value":
+                claims = resolve("claims", keywords.get("claims"))
+                used_in = resolve("used_in", keywords.get("used_in"))
+                pairs.append((node.lineno, function.name, claims, used_in))
+            elif {"claims_", "used_in_"} & set(keywords):
+                claims, used_in = factories.get(name, (None, None))
+                for which, half in (("claims", "claims_"), ("used_in", "used_in_")):
+                    if half in keywords:
+                        found = resolve(half, keywords[half])
+                    elif name in factories:
+                        continue
+                    else:
+                        found = resolve(which, None)
+                    if which == "claims":
+                        claims = found
+                    else:
+                        used_in = found
+                pairs.append((node.lineno, function.name, claims, used_in))
+    return pairs, unresolved
+
+
+_PASS_THROUGH = {
+    (fn, which, expression)
+    for fn in ("_value_factory", "make")
+    for which, expression in (
+        ("claims", "claims"),
+        ("used_in", "used_in"),
+        ("claims", "claims_ or claims"),
+        ("used_in", "used_in_ or used_in"),
+    )
+}
+"""Each part's factory, which passes its caller's tags on: checked at its callers."""
+
+UNRESOLVED = {
+    0: set(),
+    1: {s for s in _PASS_THROUGH if s[2] in ("claims", "used_in")},
+    2: {s for s in _PASS_THROUGH if "or" in s[2]}
+    | {
+        (fn, which, which)
+        for fn in ("property_interval_values", "property_values")
+        for which in ("claims", "used_in")
+    },
+    3: {s for s in _PASS_THROUGH if "or" in s[2]}
+    | {("content_contrast_values", "claims", "claims")},
+    4: {
+        ("_value_factory", "claims", "claims"),
+        ("_value_factory", "used_in", "used_in_ or used_in"),
+        ("make", "claims", "claims"),
+        ("make", "used_in", "used_in_ or used_in"),
+        ("called_fraction_values", "claims", "?"),
+        ("cohort_values", "claims", "?"),
+        ("followup_values", "claims", "claims"),
+    },
+}
+"""The tag halves the scan cannot resolve, each covered elsewhere: the factories'
+pass-through; Part 2's property loops (``_PROPERTIES``) and Part 3's content
+claims (``_CONTENT_CLAIMS``), checked by :func:`test_every_named_tag_a_builder_writes_is_known`;
+Part 4's functions that take their factory or claims as an argument, whose claims
+are :data:`PART4_CLAIMS`. A new unresolved half fails until it is covered here."""
+
+PART4_CLAIMS = ("20",)
+"""Every claims tuple Part 4 writes; its unresolved claims halves are checked as
+these."""
+
+
+@pytest.mark.parametrize("part", range(5))
+def test_every_tag_pair_a_builder_writes_is_known(part):
+    pairs, _ = _tag_sites(part)
+    assert pairs, f"no tags found in part{part}.py"
+    problems = []
+    for line, _, claims, used_in in pairs:
+        if claims is None and part == 4:
+            claims = [PART4_CLAIMS]
+        for c in claims or [()]:
+            for u in used_in or [()]:
+                problems += [f"part{part}.py:{line}: {p}" for p in tag_problems(c, u)]
+    assert not problems, "\n".join(problems)
+
+
+@pytest.mark.parametrize("part", range(5))
+def test_the_scan_resolves_every_tag_but_the_listed_ones(part):
+    _, unresolved = _tag_sites(part)
+    assert unresolved == UNRESOLVED[part]
+
+
+def test_part4_writes_only_its_one_question():
+    pairs, _ = _tag_sites(4)
+    claims = {c for _, _, options, _ in pairs if options for c in options}
+    assert claims == {PART4_CLAIMS}
+
+
+SYNTHETIC = """
+CONSTANT = ("paper", "figure: 2")
+
+
+def f(source, word, unknown):
+    local = ("22",)
+    make = _value_factory(source, ("15",), ("paper", "figure: 2"))
+    make("a", 1, "count", "count", "d", claims_=local)
+    make("b", 1, "count", "count", "d", used_in_=CONSTANT if word else ("paper",))
+    Value(claims=("17",), used_in=("figure: 3",))
+    make("c", 1, "count", "count", "d", claims_=unknown)
+"""
+
+
+def test_the_scan_follows_overrides_conditionals_and_constants(monkeypatch):
+    module = importlib.import_module("continuum_swr_replay.reported.part0")
+    monkeypatch.setattr(module, "CONSTANT", ("paper", "figure: 2"), raising=False)
+    pairs, unresolved = _tag_sites(0, source=SYNTHETIC)
+    assert sorted((line, c, u) for line, _, c, u in pairs) == [
+        (7, [("15",)], [("paper", "figure: 2")]),
+        (8, [("22",)], [("paper", "figure: 2")]),
+        (9, [("15",)], [("paper", "figure: 2"), ("paper",)]),
+        (10, [("17",)], [("figure: 3",)]),
+        (11, None, [("paper", "figure: 2")]),
+    ]
+    assert unresolved == {("f", "claims_", "unknown")}
+    problems = sorted(
+        {
+            p
+            for _, _, c, u in pairs
+            for ci in c or [()]
+            for ui in u
+            for p in tag_problems(ci, ui)
+        }
+    )
+    assert problems == [
+        "question 15 does not list figure '2'",
+        "question 17 does not list figure '3'",
+        "question 22 does not list figure '2'",
+    ]
 
 
 def _named_tags() -> list[tuple[str, tuple[str, ...], tuple[str, ...]]]:
@@ -249,33 +412,10 @@ def _named_tags() -> list[tuple[str, tuple[str, ...], tuple[str, ...]]]:
     found.append(("part1.MEMORYLESS_FIGURE", (), part1.MEMORYLESS_FIGURE))
     for row in part2._PROPERTIES:
         found.append((f"part2._PROPERTIES {row[0]}", row[6], row[7]))
+    for lead, claims in part3._CONTENT_CLAIMS:
+        found.append((f"part3._CONTENT_CLAIMS {lead}", claims, ("supplement",)))
+    found.append(("part3._content_claims fallback", ("19a",), ("supplement",)))
     return found
-
-
-@pytest.mark.parametrize("part", range(5))
-def test_every_tag_pair_a_builder_writes_is_known(part):
-    pairs = _tag_pairs(part)
-    assert pairs, f"no tags found in part{part}.py"
-    problems = [
-        f"part{part}.py:{line}: {p}"
-        for line, claims, used_in in pairs
-        for p in tag_problems(claims, used_in)
-    ]
-    assert not problems, "\n".join(problems)
-
-
-def test_the_pair_scan_catches_a_figure_its_question_does_not_list(monkeypatch):
-    source = (
-        "def f(source):\n"
-        "    make = _value_factory(source, ('15',), ('paper', 'figure: 2'))\n"
-        "    return make('k', 1, 'count', 'count', 'd', claims_=('22',))\n"
-    )
-    monkeypatch.setattr(Path, "read_text", lambda self: source)
-    problems = [p for _, c, u in _tag_pairs(0) for p in tag_problems(c, u)]
-    assert problems == [
-        "question 15 does not list figure '2'",
-        "question 22 does not list figure '2'",
-    ]
 
 
 def test_every_named_tag_a_builder_writes_is_known():
@@ -285,6 +425,7 @@ def test_every_named_tag_a_builder_writes_is_known():
         for p in tag_problems(claims, used_in)
     ]
     assert not problems, "\n".join(problems)
+    assert part3._content_claims("no_such_word") == ("19a",)
 
 
 def test_the_remote_groups_spike_evidence_also_answers_question_9():
@@ -299,8 +440,9 @@ def test_the_remote_groups_spike_evidence_also_answers_question_9():
         dist_to_gpi_peak=lambda d: rng.uniform(0, 100, len(d)),
     )
     by_key = {v.key: v for v in part2.spike_evidence_values(metrics, "s")}
+    close = [k for k in by_key if k.startswith("non_swr_close_")]
     remote = [k for k in by_key if k.startswith(("swr_remote_", "non_swr_remote_"))]
-    assert len(remote) == 16
+    assert close and len(remote) == 2 * len(close)
     for key, value in by_key.items():
         assert ("9" in value.claims) == (key in remote), key
 
@@ -308,70 +450,78 @@ def test_the_remote_groups_spike_evidence_also_answers_question_9():
 # --- the committed summaries -------------------------------------------------------
 
 
-def _read(part: int) -> values.Summary:
-    return values.read_summary(REPORTED / f"part{part}.json", check_tags=False)
+@pytest.fixture(scope="module")
+def committed():
+    return values.read_summaries(REPORTED, check_tags=False)
 
 
-@pytest.mark.parametrize(
-    "part",
-    [
-        pytest.param(
-            p,
-            marks=pytest.mark.xfail(
-                strict=True, reason="summary built before its tags changed"
-            ),
-        )
-        if p in AWAITING_REBUILD
-        else p
-        for p in range(5)
-    ],
-)
-def test_a_committed_summary_has_only_known_tags(part):
-    problems = values.summary_tag_problems(_read(part))
-    assert not problems, problems
+@pytest.mark.parametrize("part", range(5))
+def test_a_committed_summary_has_only_its_expected_tag_problems(committed, part):
+    found = {
+        p
+        for problems in values.summary_tag_problems(committed[part]).values()
+        for p in problems
+    }
+    assert found == EXPECTED_TAG_PROBLEMS.get(part, set())
 
 
-@pytest.mark.xfail(
-    bool(AWAITING_REBUILD), strict=True, reason="summaries awaiting a rebuild"
-)
-def test_a_question_has_values_exactly_when_its_status_says_so():
-    answered = {c for p in range(5) for v in _read(p).values.values() for c in v.claims}
-    wrong = [
+def test_a_question_has_values_exactly_when_its_status_says_so(committed):
+    answered = {
+        c for s in committed.values() for v in s.values.values() for c in v.claims
+    }
+    wrong = {
         f"{q.id} ({q.status})"
         for q in QUESTIONS
-        if (q.id in answered) != (q.status in ("computed", "partly computed"))
-    ]
-    assert not wrong, wrong
-
-
-def test_every_question_id_a_committed_value_names_is_a_question_or_awaits_a_rebuild():
-    unknown = {
-        (p, c)
-        for p in range(5)
-        for v in _read(p).values.values()
-        for c in v.claims
-        if c not in QUESTION_IDS
+        if (q.id in answered) != (q.status in ANSWERED)
     }
-    assert {p for p, _ in unknown} <= AWAITING_REBUILD, unknown
+    assert wrong == EXPECTED_STATUS_MISMATCHES
 
 
 # --- the generated view -------------------------------------------------------------
 
 
 def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tags():
-    from continuum_swr_replay.reported import emit
-
     summary = values.Summary(part=2, produced_by="by", commit="c")
     summary.add(_value(key="shared", claims=("2", "21"), used_in=("figure: 2b",)))
-    with values._tags_unchecked():
-        summary.add(_value(key="old", claims=("12",)))
+    summary.add(_value(key="old", claims=("12",), check_tags=False))
     view = emit.questions_view({2: summary})
     section_2 = view.split("### 2. ")[1].split("### ")[0]
     section_21 = view.split("### 21. ")[1].split("### ")[0]
     assert "`\\PartTwoShared`" in section_2
     assert "`\\PartTwoShared`" in section_21
-    unknown = view.split("## Values whose tags the question list does not know")[1]
-    assert "`\\PartTwoOld`" in unknown.split("## Values by figure")[0]
-    assert "no question '12'" in unknown
+    flagged = view.split("## Values with tag problems")[1].split("## Values by")[0]
+    assert "`\\PartTwoOld`" in flagged
+    assert "no question '12'" in flagged
     by_figure = view.split("### Figure 2: ")[1].split("### Figure")[0]
     assert "Panel b: `\\PartTwoShared`" in by_figure
+
+
+def test_the_view_marks_values_from_a_summary_with_no_code_record():
+    old = values.Summary(part=1, produced_by="by", commit="c")
+    old.add(_value(key="held", claims=("9",)))
+    record = {
+        "head": "h",
+        "python": "3.11",
+        "uv_lock_sha256": "l",
+        "uncommitted": True,
+        "diff": "d",
+        "untracked": [],
+        "modified_during_build": [],
+        "files": {},
+    }
+    new = values.Summary(part=2, produced_by="by", commit="c", code=record)
+    new.add(_value(key="remote", claims=("9",)))
+    view = emit.questions_view({1: old, 2: new})
+    question_9 = view.split("### 9. ")[1].split("### ")[0]
+    held = next(line for line in question_9.splitlines() if "PartOneHeld" in line)
+    remote = next(line for line in question_9.splitlines() if "PartTwoRemote" in line)
+    assert "tags not yet rebuilt" in held
+    assert "tags not yet rebuilt" not in remote
+    assert "| `part1.json` | `c` | none |" in view
+    assert "| `part2.json` | `c` | yes, uncommitted |" in view
+
+
+def test_a_question_with_no_figure_shows_no_figures_line():
+    view = emit.questions_view({})
+    question_17 = view.split("### 17. ")[1].split("\n\n")[1]
+    assert question_17.startswith("Status: computed.") and "Figures" not in question_17

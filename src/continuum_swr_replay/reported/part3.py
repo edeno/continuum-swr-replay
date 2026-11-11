@@ -2095,7 +2095,7 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
 # --- 3b: content ---------------------------------------------------------------
 
 
-#: The claims-table rows each content key word supports, by its leading words.
+#: The question ids each content key word answers, by its leading words.
 _CONTENT_CLAIMS = (
     ("swr_armreward", ("19b", "19f")),
     ("swr_armvalue", ("19f",)),

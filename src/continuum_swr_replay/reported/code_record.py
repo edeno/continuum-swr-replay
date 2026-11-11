@@ -1,8 +1,12 @@
-"""Which code built a summary, and whether that code has changed since.
+"""Which code built a summary, whether that code has changed since, and whether
+the summary's inputs still match.
 
-A summary records, when it is built, every module of the package its builder
-loaded and the package's data files (with two digests each), the commit checked
-out, the digest of ``uv.lock``, and, when any of those files differs from that
+A summary records, when it is built, the files the build depended on: every
+package module loaded during the build (the part's builder and the building
+script's own imports), the script itself, and every non-Python file under the
+package directory (today only ``data_loaders/epoch_register.csv``, the analysed
+cohort), each with two digests. It also records the commit checked out, the digest
+of ``uv.lock``, and, when any of those files or ``uv.lock`` differs from that
 commit, the diff and the files git does not track. Nothing refuses a build: the
 record makes any build traceable, and :func:`code_changes` says later which
 recorded files no longer match. Only ``scripts/reported/check_release.py`` fails
@@ -12,10 +16,10 @@ commit.
 Each file has two digests: ``sha256``, of its bytes, and ``code_sha256``. For a
 module the second is of its syntax tree with every bare string statement (module,
 class, function and attribute docstrings) removed; comments and layout are not in
-the tree either, so editing them does not make a summary stale. For a data file
-the two are the same. A syntax-tree dump can differ between Python versions, so
-the second digest is compared only under the Python version that recorded it;
-otherwise a changed file counts as changed.
+the tree either, so editing them does not make a summary stale. For a data file,
+or a module that does not parse, the two are the same. A syntax-tree dump can
+differ between Python versions, so the second digest is compared only under the
+Python version that recorded it; otherwise a changed file counts as changed.
 """
 
 from __future__ import annotations
@@ -28,7 +32,7 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, TypedDict
 
 PACKAGE = "continuum_swr_replay"
 
@@ -37,8 +41,35 @@ NOT_RECORDED = (
     "continuum_swr_replay.reported.code_record",
 )
 """Modules a build loads that cannot change a value: the question list (its tags
-are checked on their own, at every emit) and this record. Left out so that
-rewording a question does not make every summary stale."""
+are checked when each value is built, and reported at every emit) and this
+record. Left out so that rewording a question does not make every summary stale."""
+
+LOCK = "uv.lock"
+
+
+class FileDigests(TypedDict):
+    sha256: str
+    code_sha256: str
+
+
+class CodeRecord(TypedDict):
+    """What :func:`code_record` returns; its keys are described there."""
+
+    head: str
+    python: str
+    uv_lock_sha256: str
+    uncommitted: bool
+    diff: str
+    untracked: list[str]
+    modified_during_build: list[str]
+    files: dict[str, FileDigests]
+
+
+class CodeRecordError(TypedDict):
+    """What :func:`try_code_record` returns when no record could be made."""
+
+    error: str
+
 
 _STATEMENT_LISTS = ("body", "orelse", "finalbody")
 
@@ -69,14 +100,24 @@ def code_digest(source: str) -> str:
     Two sources that differ only in comments, docstrings (attribute docstrings
     included) or layout have the same digest; a change to what the code does
     changes it.
+
+    Raises
+    ------
+    SyntaxError
+        If ``source`` does not parse.
     """
     tree = _strip_docstrings(ast.parse(source))
     return hashlib.sha256(ast.dump(tree).encode()).hexdigest()
 
 
-def _digests(file: Path) -> dict[str, str]:
+def _digests(file: Path) -> FileDigests:
     raw = hashlib.sha256(file.read_bytes()).hexdigest()
-    code = code_digest(file.read_text()) if file.suffix == ".py" else raw
+    code = raw
+    if file.suffix == ".py":
+        try:
+            code = code_digest(file.read_text())
+        except SyntaxError:
+            pass
     return {"sha256": raw, "code_sha256": code}
 
 
@@ -86,24 +127,26 @@ def _python() -> str:
 
 def build_files(repo: Path) -> list[Path]:
     """The files a build depends on, sorted: the package's modules loaded in this
-    process (other than :data:`NOT_RECORDED`), the running script, and the
-    package's data files (``data_loaders/epoch_register.csv``, the analysed
-    cohort). Only files under ``repo``."""
-    files = {
-        Path(module.__file__).resolve()
-        for name, module in list(sys.modules.items())
-        if (name == PACKAGE or name.startswith(PACKAGE + "."))
-        and name not in NOT_RECORDED
-        and getattr(module, "__file__", None)
-    }
+    process (other than :data:`NOT_RECORDED`), the running script, and every
+    non-Python file under the package directory. Only files under ``repo``."""
+    files = set()
+    for name, module in list(sys.modules.items()):
+        file = getattr(module, "__file__", None)
+        if (name == PACKAGE or name.startswith(PACKAGE + ".")) and (
+            file and name not in NOT_RECORDED
+        ):
+            files.add(Path(file).resolve())
     main = sys.modules.get("__main__")
-    if isinstance(main, ModuleType) and getattr(main, "__file__", None):
-        files.add(Path(main.__file__).resolve())
-    package = sys.modules.get(PACKAGE)
-    if package is not None and getattr(package, "__file__", None):
+    main_file = (
+        getattr(main, "__file__", None) if isinstance(main, ModuleType) else None
+    )
+    if main_file:
+        files.add(Path(main_file).resolve())
+    package_file = getattr(sys.modules.get(PACKAGE), "__file__", None)
+    if package_file:
         files |= {
             path.resolve()
-            for path in Path(package.__file__).parent.rglob("*")
+            for path in Path(package_file).parent.rglob("*")
             if path.is_file()
             and path.suffix not in (".py", ".pyc")
             and "__pycache__" not in path.parts
@@ -112,21 +155,40 @@ def build_files(repo: Path) -> list[Path]:
     return sorted(f for f in files if f.is_relative_to(root))
 
 
-def _git(repo: Path, *args: str) -> str:
-    """``git <args>`` in ``repo``: its stdout exactly as printed, so a diff keeps
-    its last newline and can be applied."""
-    return subprocess.run(
+_PLAIN_DIFF = (
+    "--no-ext-diff",
+    "--no-textconv",
+    "--no-color",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+)
+"""Options that keep ``git diff`` independent of the user's git configuration (an
+external diff tool, text conversion, colour, prefixes), so its output is a patch
+``git apply`` takes."""
+
+
+def _git(
+    repo: Path, *args: str, ok: tuple[int, ...] = (0,)
+) -> subprocess.CompletedProcess:
+    """``git <args>`` in ``repo``, its stdout kept exactly as printed (so a diff
+    keeps its last newline). An exit code outside ``ok`` raises, with git's own
+    message."""
+    result = subprocess.run(
         ["git", "--no-optional-locks", *args],
         cwd=repo,
-        check=True,
         capture_output=True,
         text=True,
-    ).stdout
+    )
+    if result.returncode not in ok:
+        raise subprocess.CalledProcessError(
+            result.returncode, result.args, result.stdout, result.stderr
+        )
+    return result
 
 
 def code_record(
     repo: Path, files: Iterable[Path], started: float | None = None
-) -> dict[str, Any]:
+) -> CodeRecord:
     """What a summary records about the code that built it.
 
     Parameters
@@ -142,28 +204,45 @@ def code_record(
 
     Returns
     -------
-    dict
+    CodeRecord
         - ``head``: the commit checked out (``git rev-parse HEAD``).
         - ``python``: the major.minor version that computed the ``code_sha256``s.
         - ``uv_lock_sha256``: the sha256 of ``uv.lock``.
-        - ``uncommitted``: whether any of ``files`` differs from ``head`` or is
-          not tracked.
-        - ``diff``: ``git diff <head>`` of the tracked files; empty when they
-          match it. It applies with ``git apply`` on ``head``.
+        - ``uncommitted``: whether ``uv.lock`` or any of ``files`` differs from
+          ``head`` (by ``git diff --quiet``) or is not tracked.
+        - ``diff``: ``git diff <head>`` of ``uv.lock`` and the tracked files;
+          empty when they match it. It applies with ``git apply`` on ``head``.
         - ``untracked``: the files git does not track; their content is in no
           commit and not in ``diff``, only their digests are kept.
         - ``modified_during_build``: the files modified after ``started``.
         - ``files``: each file, relative to ``repo``, with its ``sha256`` and
           ``code_sha256``.
+
+    Raises
+    ------
+    OSError, subprocess.CalledProcessError
+        If a file or ``uv.lock`` cannot be read, or git fails
+        (:func:`try_code_record` turns these into a :class:`CodeRecordError`).
     """
     root = repo.resolve()
     relative = [str(Path(f).resolve().relative_to(root)) for f in files]
-    head = _git(repo, "rev-parse", "HEAD").strip()
-    tracked = (
-        set(_git(repo, "ls-files", "--", *relative).splitlines()) if relative else set()
-    )
+    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    paths = sorted({*relative, LOCK})
+    tracked = set(_git(repo, "ls-files", "--", *paths).stdout.splitlines())
     untracked = sorted(set(relative) - tracked)
-    diff = _git(repo, "diff", head, "--", *sorted(tracked)) if tracked else ""
+    compared = sorted(tracked)
+    differs = (
+        bool(compared)
+        and _git(
+            repo, "diff", "--quiet", *_PLAIN_DIFF, head, "--", *compared, ok=(0, 1)
+        ).returncode
+        == 1
+    )
+    diff = (
+        _git(repo, "diff", *_PLAIN_DIFF, head, "--", *compared).stdout
+        if differs
+        else ""
+    )
     modified = (
         sorted(p for p in relative if (root / p).stat().st_mtime > started)
         if started is not None
@@ -172,8 +251,8 @@ def code_record(
     return {
         "head": head,
         "python": _python(),
-        "uv_lock_sha256": hashlib.sha256((repo / "uv.lock").read_bytes()).hexdigest(),
-        "uncommitted": bool(diff) or bool(untracked),
+        "uv_lock_sha256": hashlib.sha256((repo / LOCK).read_bytes()).hexdigest(),
+        "uncommitted": differs or bool(untracked),
         "diff": diff,
         "untracked": untracked,
         "modified_during_build": modified,
@@ -183,23 +262,41 @@ def code_record(
 
 def try_code_record(
     repo: Path, files: Iterable[Path], started: float | None = None
-) -> dict[str, Any]:
-    """:func:`code_record`, or ``{"error": ...}`` when git cannot say, so that a
-    finished build is still written."""
+) -> CodeRecord | CodeRecordError:
+    """:func:`code_record`, or a :class:`CodeRecordError` naming the cause when a
+    file, ``uv.lock`` or git cannot answer, so that a finished build is still
+    written."""
     try:
         return code_record(repo, files, started)
-    except (OSError, subprocess.CalledProcessError) as error:
-        print(f"warning: no code record ({error})", file=sys.stderr)
+    except subprocess.CalledProcessError as error:
+        message = (error.stderr or "").strip() or str(error)
+        print(f"warning: no code record: git failed: {message}", file=sys.stderr)
+        return {"error": f"git failed: {message}"}
+    except OSError as error:
+        print(f"warning: no code record: {error}", file=sys.stderr)
         return {"error": str(error)}
 
 
-def code_changes(record: dict[str, Any], repo: Path) -> list[str]:
+def is_record(code: CodeRecord | CodeRecordError | None) -> bool:
+    """Whether ``code`` is a real record, not missing and not an error."""
+    return code is not None and "error" not in code
+
+
+def code_changes(record: CodeRecord, repo: Path) -> list[str]:
     """The recorded files that differ from the working tree now, and ``uv.lock``
     if it changed; empty when the summary is current.
 
     A file is unchanged when its bytes match, or, under the recording Python
-    version, when its ``code_sha256`` does. A removed file counts as changed.
+    version, when its ``code_sha256`` does. A removed file, or a module that no
+    longer parses, counts as changed.
+
+    Raises
+    ------
+    ValueError
+        If ``record`` is a :class:`CodeRecordError`, which records no files.
     """
+    if not is_record(record):
+        raise ValueError(f"not a code record: {record}")
     root = repo.resolve()
     same_python = record["python"] == _python()
     changed = []
@@ -208,13 +305,42 @@ def code_changes(record: dict[str, Any], repo: Path) -> list[str]:
         if not file.is_file():
             changed.append(path)
             continue
-        now_digests = _digests(file)
-        if now_digests["sha256"] == digests["sha256"]:
+        now = _digests(file)
+        if now["sha256"] == digests["sha256"]:
             continue
-        if same_python and now_digests["code_sha256"] == digests["code_sha256"]:
+        parses = now["code_sha256"] != now["sha256"]
+        if same_python and parses and now["code_sha256"] == digests["code_sha256"]:
             continue
         changed.append(path)
-    lock = hashlib.sha256((root / "uv.lock").read_bytes()).hexdigest()
-    if lock != record["uv_lock_sha256"]:
-        changed.append("uv.lock")
+    lock = root / LOCK
+    if not lock.is_file() or (
+        hashlib.sha256(lock.read_bytes()).hexdigest() != record["uv_lock_sha256"]
+    ):
+        changed.append(LOCK)
     return changed
+
+
+def input_changes(inputs: Iterable[dict[str, Any]], root: Path) -> dict[str, list[str]]:
+    """Which of a summary's recorded inputs no longer match, by what can be said.
+
+    Returns
+    -------
+    dict
+        - ``changed``: single files whose sha256 differs now.
+        - ``missing``: single files not on this machine.
+        - ``unchecked``: sets of files (records with ``n_files``); their records
+          name a label, not the selection the builder made, so they cannot be
+          re-checked without rebuilding.
+    """
+    found: dict[str, list[str]] = {"changed": [], "missing": [], "unchecked": []}
+    for record in inputs:
+        path = record["path"]
+        if "n_files" in record:
+            found["unchecked"].append(path)
+            continue
+        file = Path(path) if Path(path).is_absolute() else root / path
+        if not file.is_file():
+            found["missing"].append(path)
+        elif hashlib.sha256(file.read_bytes()).hexdigest() != record["sha256"]:
+            found["changed"].append(path)
+    return found

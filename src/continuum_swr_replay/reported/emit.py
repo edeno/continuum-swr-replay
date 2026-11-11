@@ -25,6 +25,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from continuum_swr_replay.reported.code_record import is_record
 from continuum_swr_replay.reported.formatting import formatted
 from continuum_swr_replay.reported.questions import (
     FIGURES,
@@ -143,20 +144,42 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|")
 
 
-def _value_rows(values: Iterable[tuple[int, Value]]) -> list[str]:
+_NOT_REBUILT = "*(tags not yet rebuilt)*"
+"""Marks a value whose summary has no code record: built before the question list,
+so its tags may predate the decisions the list encodes (a value a decision moved
+to another question still shows under the old one) until it is rebuilt."""
+
+
+def _record_cell(code) -> str:
+    if not is_record(code):
+        return "error" if code else "none"
+    notes = []
+    if code["uncommitted"]:
+        notes.append("uncommitted")
+    if code["modified_during_build"]:
+        notes.append("modified during build")
+    return ", ".join(["yes", *notes])
+
+
+def _value_rows(
+    values: Iterable[tuple[int, Value]], not_rebuilt: set[int]
+) -> list[str]:
     """Markdown table rows: the macro to cite, the value as printed, its unit,
-    what it is (with any pending note) and where it is used."""
+    what it is (with any pending note, and :data:`_NOT_REBUILT` for a part in
+    ``not_rebuilt``) and where it is used."""
     rows = [
         "| Macro | Value | Unit | What it is | Used in |",
         "|---|---|---|---|---|",
     ]
     for part, value in sorted(values, key=lambda pv: (pv[0], pv[1].key)):
-        pending = f" *(pending: {value.pending})*" if value.pending else ""
+        notes = f" *(pending: {value.pending})*" if value.pending else ""
+        if part in not_rebuilt:
+            notes += f" {_NOT_REBUILT}"
         cells = [
             f"`\\{macro_name(part, value.key)}`",
             formatted(value),
             value.unit,
-            value.description + pending,
+            value.description + notes,
             ", ".join(value.used_in),
         ]
         rows.append("| " + " | ".join(_cell(c) for c in cells) + " |")
@@ -164,18 +187,22 @@ def _value_rows(values: Iterable[tuple[int, Value]]) -> list[str]:
 
 
 def questions_view(summaries: Mapping[int, Summary]) -> str:
-    """``paper/reported/questions.md``: every question of the question list, in the
-    paper's order, with the values that answer it, then the values that answer no
-    listed question or carry an unknown tag, then the values by figure.
+    """``paper/reported/questions.md``: a table of the summaries (build commit,
+    code record, values, values with tag problems); every question of the question
+    list in the paper's order, with the values that answer it; the values with any
+    tag problem (:func:`~continuum_swr_replay.reported.questions.tag_problems`);
+    and the values by figure.
 
-    A value answering several questions is listed under each. Generated in full on
-    every emit, so it holds no markers.
+    A value answering several questions is listed under each. A question need not
+    have a figure: the parts organize the writing. Generated in full on every emit,
+    so it holds no markers.
     """
     by_question: dict[str, list[tuple[int, Value]]] = {}
     for part, summary in summaries.items():
         for value in summary.values.values():
             for claim in value.claims:
                 by_question.setdefault(claim, []).append((part, value))
+    not_rebuilt = {part for part, s in summaries.items() if not is_record(s.code)}
     lines = [
         "# Questions and their numbers",
         "",
@@ -186,10 +213,10 @@ def questions_view(summaries: Mapping[int, Summary]) -> str:
         "as a finding. A summary file is where a value is stored; a question's part",
         "is where the paper reports it.",
         "",
-        "A summary with no code record was built before records were kept, and so",
-        "before the question list: its tags may predate the lead's decisions (for",
-        "example, values a decision moved to another question can still show under",
-        "the old one) until it is rebuilt.",
+        f"A value marked {_NOT_REBUILT} comes from a summary with no code record:",
+        "built before the question list (or where git could not answer), its tags",
+        "may predate the list's decisions, so it can show under a question it no",
+        "longer answers, until the summary is rebuilt.",
         "",
         "| Summary | Built at | Code record | Values | Values with tag problems |",
         "|---|---|---|---|---|",
@@ -197,9 +224,8 @@ def questions_view(summaries: Mapping[int, Summary]) -> str:
     for part in sorted(summaries):
         summary = summaries[part]
         problems = summary_tag_problems(summary)
-        record = "none" if summary.code is None or "error" in summary.code else "yes"
         lines.append(
-            f"| `part{part}.json` | `{summary.commit}` | {record} "
+            f"| `part{part}.json` | `{summary.commit}` | {_record_cell(summary.code)} "
             f"| {len(summary.values)} | {len(problems)} |"
         )
     for part, section in SECTIONS:
@@ -209,44 +235,49 @@ def questions_view(summaries: Mapping[int, Summary]) -> str:
             lines += ["", "No question in this section has numbers."]
         for question in questions:
             found = by_question.get(question.id, [])
-            figures = ", ".join(question.figures) or "none"
             status = question.status + (
                 f" ({question.reason})" if question.reason else ""
+            )
+            figures = (
+                f" Figures: {', '.join(question.figures)}." if question.figures else ""
             )
             lines += [
                 "",
                 f"### {question.id}. {question.text}",
                 "",
-                f"Status: {status}. Figures: {figures}. Values: {len(found)}.",
+                f"Status: {status}.{figures} Values: {len(found)}.",
             ]
             if question.note:
                 lines += ["", f"*Note:* {question.note}"]
             if found:
                 sources = sorted({value.source for _, value in found})
                 lines += ["", "Sources:", "", *(f"- {s}" for s in sources)]
-                lines += ["", *_value_rows(found)]
-    unknown = [
+                lines += ["", *_value_rows(found, not_rebuilt)]
+    flagged = [
         (part, value)
         for part, summary in summaries.items()
         for value in summary.values.values()
         if tag_problems(value.claims, value.used_in)
     ]
-    if unknown:
+    if flagged:
         lines += [
             "",
-            "## Values whose tags the question list does not know",
+            "## Values with tag problems",
             "",
-            "Written before the question list changed; rebuilding the summary fixes",
-            "them. Each is listed with what is wrong.",
+            "A tag the question list does not know, a figure its question does not",
+            "list, or a question whose status says it has no values. A summary built",
+            "before the list changed has these until it is rebuilt.",
             "",
-            "| Macro | Value | What it is | Claims | Used in | Problem |",
-            "|---|---|---|---|---|---|",
+            "| Macro | Value | Unit | What it is | Claims | Used in | Problem |",
+            "|---|---|---|---|---|---|---|",
         ]
-        for part, value in sorted(unknown, key=lambda pv: (pv[0], pv[1].key)):
+        for part, value in sorted(flagged, key=lambda pv: (pv[0], pv[1].key)):
+            pending = f" *(pending: {value.pending})*" if value.pending else ""
             cells = [
                 f"`\\{macro_name(part, value.key)}`",
                 formatted(value),
-                value.description,
+                value.unit,
+                value.description + pending,
                 ", ".join(value.claims),
                 ", ".join(value.used_in),
                 "; ".join(tag_problems(value.claims, value.used_in)),
@@ -283,14 +314,22 @@ def questions_view(summaries: Mapping[int, Summary]) -> str:
 def emit(
     summaries: Mapping[int, Summary], tex_path: Path, docs: Iterable[Path], repo: Path
 ) -> list[Change]:
-    """Write the macro file and fill every doc's markers; return what changed."""
+    """Write the macro file and fill every doc's markers; return what changed.
+
+    Every doc is filled in memory first, so a marker that names no key (a
+    ``KeyError``) stops the emit before any file is written.
+    """
     values = values_by_key(summaries)
-    tex_path.write_text(tex_file(summaries))
+    tex = tex_file(summaries)
+    filled_docs: list[tuple[Path, str]] = []
     changes: list[Change] = []
     for path in docs:
         text = path.read_text()
         filled, changed = fill_markers(text, values, str(path.relative_to(repo)))
         if filled != text:
-            path.write_text(filled)
+            filled_docs.append((path, filled))
         changes.extend(changed)
+    tex_path.write_text(tex)
+    for path, filled in filled_docs:
+        path.write_text(filled)
     return changes
