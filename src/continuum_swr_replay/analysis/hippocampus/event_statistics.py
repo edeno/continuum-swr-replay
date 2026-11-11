@@ -21,7 +21,7 @@ from collections.abc import Mapping
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
 # --- how the events sit against SWRs ----------------------------------------------
 
@@ -132,7 +132,7 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
         "non_swr_fraction_animal_min": non_swr.min(),
         "non_swr_fraction_animal_max": non_swr.max(),
         "n_animals": len(shares),
-        "n_epochs": events.groupby(list(SESSION_COLUMNS)).ngroups,
+        "n_epochs": n_sessions(events),
         "n_animals_non_swr_plurality": (
             non_swr > shares.drop(columns="non_swr").max(axis=1)
         ).sum(),

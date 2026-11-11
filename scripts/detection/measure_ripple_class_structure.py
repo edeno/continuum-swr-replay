@@ -71,13 +71,13 @@ from continuum_swr_replay.paths import (  # noqa: E402
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN  # noqa: E402
 from continuum_swr_replay.runs.provenance import (  # noqa: E402
     described_commit,
     produced_by,
 )
 from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 
-EVENT_FEATURES_RUN = "30cf1cc432e9"
 REALITY_METRICS = "event_spike_evidence_metrics.parquet"
 OUT_NAME = "ripple_class_structure"
 SEED = 20261027

@@ -58,7 +58,10 @@ from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
 from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
-from continuum_swr_replay.data_loaders.epoch_register import analysed_animals
+from continuum_swr_replay.data_loaders.epoch_register import (
+    analysed_animals,
+    analysed_epoch_ids,
+)
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     content_occupancy_dir,
@@ -79,6 +82,7 @@ from continuum_swr_replay.reported.values import (
     pend,
     value_factory,
 )
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
     "cohort": Tags(("2b.2",), ("2b",)),
@@ -113,7 +117,10 @@ TAGS = {
 question 2c.7."""
 
 EVENT_FEATURES_RUN = "30cf1cc432e9"
-"""The event features run the events summary reads (242 epochs, all ``ok``)."""
+"""The event features run the events summary reads (242 epochs, all ``ok``). The
+scripts that measure the summary's derived inputs from that run
+(``scripts/detection/measure_event_start_and_rest_theta.py``,
+``scripts/detection/measure_ripple_class_structure.py``) read its id here."""
 
 #: The other detectors of question 2b.3, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
@@ -136,7 +143,7 @@ class EventsInputs:
 
     event_table: Path
     event_features_run: Path
-    reality_dir: Path
+    spike_evidence_dir: Path
     heldout_by_swr: Path
     content_occupancy: Path
     brain_state_reference: Path
@@ -151,7 +158,7 @@ def default_inputs() -> EventsInputs:
     return EventsInputs(
         event_table=table_path("event_table", replay_content_dir()),
         event_features_run=event_features_root() / EVENT_FEATURES_RUN,
-        reality_dir=event_spike_evidence_dir(),
+        spike_evidence_dir=event_spike_evidence_dir(),
         heldout_by_swr=processed_data_dir()
         / STATE_EVIDENCE_RUN
         / "state_evidence"
@@ -712,31 +719,37 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
 
 # --- spike support ----------------------------------------------------------
 
-_REALITY_GROUPS = {
+_SPIKE_EVIDENCE_GROUPS = {
     "swr_remote": "SWR-remote",
     "non_swr_remote": "nonSWR-remote",
     "non_swr_close": "nonSWR-close",
 }
 
 
-REALITY_METRICS = "event_spike_evidence_metrics.parquet"
-REALITY_EPOCHS = 242
-"""The spike-evidence run scores every analysed epoch."""
+SPIKE_EVIDENCE_METRICS = "event_spike_evidence_metrics.parquet"
+"""An epoch's table of the spike-evidence run, in the epoch's folder."""
 
 
-def reality_metrics(per_epoch_dir: Path) -> pd.DataFrame:
+def spike_evidence_metrics(per_epoch_dir: Path, n_epochs: int) -> pd.DataFrame:
     """The spike-evidence run's per-event metrics, one table per epoch, concatenated.
+
+    Parameters
+    ----------
+    per_epoch_dir : Path
+        The run's folder, with one folder per epoch.
+    n_epochs : int
+        The epochs the run must hold: it scores every analysed epoch.
 
     Raises
     ------
     ValueError
-        The run does not hold :data:`REALITY_EPOCHS` epochs, or an epoch's
-        table names another epoch.
+        The run does not hold ``n_epochs`` epochs, or an epoch's table names
+        another epoch.
     """
-    paths = sorted(per_epoch_dir.glob(f"*/{REALITY_METRICS}"))
-    if len(paths) != REALITY_EPOCHS:
+    paths = sorted(per_epoch_dir.glob(f"*/{SPIKE_EVIDENCE_METRICS}"))
+    if len(paths) != n_epochs:
         raise ValueError(
-            f"{per_epoch_dir} holds {len(paths)} epochs' metrics, not {REALITY_EPOCHS}"
+            f"{per_epoch_dir} holds {len(paths)} epochs' metrics, not {n_epochs}"
         )
     tables = []
     for path in paths:
@@ -763,16 +776,12 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
         ),
     ]
     statistics = event_statistics.spike_evidence_statistics(metrics, "baseline")
-    groups = {"baseline": "baseline", **_REALITY_GROUPS}
+    groups = {"baseline": "baseline", **_SPIKE_EVIDENCE_GROUPS}
     for word, group in groups.items():
         stats = statistics.loc[group]
         label = "matched quiet windows" if word == "baseline" else f"{group} events"
-        remote = word.endswith("remote")
-
-        def pick(plain: Tags, far: Tags, remote: bool = remote) -> Tags:
-            """The remote groups' values also answer question 2c.7."""
-            return far if remote else plain
-
+        # the remote groups' values also answer question 2c.7: the ``_remote`` tags
+        remote = "_remote" if word.endswith("remote") else ""
         values += [
             make(
                 f"{word}_scored",
@@ -780,7 +789,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{label} scored",
-                tags=pick(TAGS["spike"], TAGS["spike_remote"]),
+                tags=TAGS[f"spike{remote}"],
             ),
             make(
                 f"{word}_spikes_median",
@@ -789,7 +798,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median spike count of {label}",
                 "spikes",
-                tags=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
+                tags=TAGS[f"spike_count{remote}"],
             ),
             make(
                 f"{word}_tetrodes_median",
@@ -798,7 +807,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median number of tetrodes with a spike in {label}",
                 "tetrodes",
-                tags=pick(TAGS["spike_count"], TAGS["spike_count_remote"]),
+                tags=TAGS[f"spike_count{remote}"],
             ),
             make(
                 f"{word}_dll_per_spike_median",
@@ -810,7 +819,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "nats per spike",
                 tags=TAGS["spike_evidence_baseline"]
                 if word == "baseline"
-                else pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                else TAGS[f"spike_evidence{remote}"],
             ),
             make(
                 f"{word}_gpi_distance_median_cm",
@@ -820,7 +829,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median track distance from the MAP of {label} to the ground-process "
                 "intensity peak",
                 "cm",
-                tags=pick(TAGS["spike_gpi"], TAGS["spike_gpi_remote"]),
+                tags=TAGS[f"spike_gpi{remote}"],
             ),
         ]
         if word == "baseline":
@@ -833,7 +842,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
                 "window, per spike",
-                tags=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                tags=TAGS[f"spike_evidence{remote}"],
             ),
             make(
                 f"{word}_epochs_scored",
@@ -841,7 +850,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
-                tags=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                tags=TAGS[f"spike_evidence{remote}"],
             ),
             make(
                 f"{word}_animals_above_baseline",
@@ -850,7 +859,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
                 "window, per spike",
-                tags=pick(TAGS["spike_evidence"], TAGS["spike_evidence_remote"]),
+                tags=TAGS[f"spike_evidence{remote}"],
             ),
         ]
     values.append(
@@ -1383,6 +1392,8 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
 
     events = pd.read_parquet(inputs.event_table)
     current_sha256 = hashlib.sha256(inputs.event_table.read_bytes()).hexdigest()
+    # every per-epoch input must hold the epoch register's analysed epochs
+    n_epochs = len(analysed_epoch_ids())
 
     def stale(folder: Path) -> str | None:
         return event_table_staleness(_manifest(folder), current_sha256, rel(folder))
@@ -1392,9 +1403,10 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
     summary.add(*boundary_offset_values(events, source))
     summary.inputs.append(file_record(inputs.event_table, ROOT_DIR))
     extra_paths = sorted(inputs.event_start_rest_theta.glob("*.parquet"))
-    if len(extra_paths) != REALITY_EPOCHS:
+    if len(extra_paths) != n_epochs:
         raise ValueError(
-            f"{inputs.event_start_rest_theta} holds {len(extra_paths)} epochs"
+            f"{inputs.event_start_rest_theta} holds {len(extra_paths)} epochs, "
+            f"not {n_epochs}"
         )
     extras = pd.concat(map(pd.read_parquet, extra_paths), ignore_index=True)
     events_with_extras = events.merge(
@@ -1441,12 +1453,15 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
     ]
     reference = pd.read_parquet(inputs.brain_state_reference)
     gamma_reference = pd.read_parquet(inputs.event_gamma / "reference.parquet")
-    if len(reference) != REALITY_EPOCHS or len(gamma_reference) != REALITY_EPOCHS:
-        raise ValueError("the brain-state or gamma reference does not hold every epoch")
+    if len(reference) != n_epochs or len(gamma_reference) != n_epochs:
+        raise ValueError(
+            f"the brain-state reference holds {len(reference)} epochs and the gamma "
+            f"reference {len(gamma_reference)}, not {n_epochs}"
+        )
     gamma_columns = [c for c in gamma_reference.columns if "gamma" in c]
     reference = reference.merge(
-        gamma_reference[["animal", "session_date", "epoch", *gamma_columns]],
-        on=["animal", "session_date", "epoch"],
+        gamma_reference[[*SESSION_COLUMNS, *gamma_columns]],
+        on=list(SESSION_COLUMNS),
         how="inner",
         validate="1:1",
     )
@@ -1478,8 +1493,10 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
         file_record(inputs.event_gamma / "manifest.json", ROOT_DIR),
     ]
     gamma_power = pd.read_parquet(inputs.event_gamma_power / "reference.parquet")
-    if len(gamma_power) != REALITY_EPOCHS:
-        raise ValueError(f"{inputs.event_gamma_power} does not hold every epoch")
+    if len(gamma_power) != n_epochs:
+        raise ValueError(
+            f"{inputs.event_gamma_power} holds {len(gamma_power)} epochs, not {n_epochs}"
+        )
     summary.add(
         *pend(
             gamma_db_values(
@@ -1541,16 +1558,19 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
         file_record(directional_path, ROOT_DIR),
     ]
 
-    metrics = reality_metrics(inputs.reality_dir)
+    metrics = spike_evidence_metrics(inputs.spike_evidence_dir, n_epochs)
     summary.add(
         *spike_evidence_values(
             metrics,
-            f"{rel(inputs.reality_dir)}/*/{REALITY_METRICS} (every event, no cap)",
+            f"{rel(inputs.spike_evidence_dir)}/*/{SPIKE_EVIDENCE_METRICS} "
+            "(every event, no cap)",
         )
     )
     summary.inputs.append(
         files_record(
-            REALITY_METRICS, inputs.reality_dir.glob(f"*/{REALITY_METRICS}"), ROOT_DIR
+            SPIKE_EVIDENCE_METRICS,
+            inputs.spike_evidence_dir.glob(f"*/{SPIKE_EVIDENCE_METRICS}"),
+            ROOT_DIR,
         )
     )
 
