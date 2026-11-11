@@ -1,5 +1,8 @@
 .PHONY: all clean view help
 .DEFAULT_GOAL := all
+# A failed build deletes main.pdf, so a rerun cannot pass with the broken PDF
+# that latexmk wrote before it failed (for example, one with an undefined citation).
+.DELETE_ON_ERROR:
 
 # Everything main.tex reads. reported_values.tex is generated
 # (`make reported-values` from the repository root) but not regenerated here.
