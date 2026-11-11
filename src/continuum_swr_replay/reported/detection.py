@@ -2,8 +2,8 @@
 detector against the Widloski & Foster detector on simulated replays.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted or re-decoded here. The statistics of the replay sweep's summary and
-of the pilot's events are computed in
+refitted or re-decoded here. The statistics of the replay sweep's and the
+controls' summaries and of the pilot's events are computed in
 ``analysis.hippocampus.memoryless_sequence`` (``sweep_statistics`` and
 ``event_table``). The inputs (:class:`DetectionInputs`):
 
@@ -633,41 +633,6 @@ _SLIDING = "sliding_published"
 _OURS = "state_space_canonical"
 
 
-def _controls_value(
-    controls: pd.DataFrame,
-    summary: str,
-    measure: str,
-    condition: str,
-    level: float | None,
-    detector: str,
-) -> float:
-    """One value of the controls summary, refusing to guess between several."""
-    rows = controls[
-        (controls["summary"] == summary)
-        & (controls["measure"] == measure)
-        & (controls["condition"] == condition)
-        & (controls["detector"] == detector)
-    ]
-    rows = (
-        rows[rows["level"].isna()]
-        if level is None
-        else rows[np.isclose(rows["level"], level)]
-    )
-    if len(rows) != 1:
-        raise ValueError(
-            f"controls summary: {len(rows)} rows for {summary}, {measure}, "
-            f"{condition}, {level}, {detector}; expected one"
-        )
-    return float(rows["value"].iloc[0])
-
-
-def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
-    rows = controls[
-        (controls["summary"] == "parts") & (controls["condition"] == condition)
-    ]
-    return sorted(rows["level"].dropna().unique())
-
-
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     """Panels (l-o): bursts with no clean replay, stretches with no replay, and
     events in two parts."""
@@ -677,71 +642,26 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         return make(key, x, "fraction", "pctnum", description)
 
     def called(condition: str, detector: str, measure: str = "called_rate") -> float:
-        return _controls_value(controls, "bursts", measure, condition, None, detector)
-
-    def carving(conditions: tuple[str, ...], label: str, detector: str) -> np.ndarray:
-        """Share of trials carved this way at each level, pooled over conditions."""
-        return np.array(
-            [
-                np.mean(
-                    [
-                        _controls_value(
-                            controls,
-                            "parts",
-                            f"segmentation_{label}",
-                            c,
-                            level,
-                            detector,
-                        )
-                        for c in conditions
-                    ]
-                )
-                for level in _levels(controls, conditions[0])
-            ]
+        return sweep_statistics.controls_value(
+            controls, "bursts", measure, condition, None, detector
         )
 
-    def mean_recovery(detector: str, measure: str) -> float:
-        return float(
-            np.mean(
-                [
-                    _controls_value(controls, "parts", measure, c, level, detector)
-                    for c in _MULTIPART
-                    for level in _levels(controls, c)
-                ]
-            )
+    def carving(
+        conditions: tuple[str, ...], label: str, detector: str
+    ) -> dict[str, float]:
+        return sweep_statistics.carving_statistics(
+            controls, conditions, label, detector
         )
 
-    def trials(detector: str, measure: str) -> float:
-        return sum(
-            _controls_value(controls, "parts", measure, c, None, detector)
-            for c in _MULTIPART
-        )
-
-    no_replay = controls[
-        (controls["summary"] == "no_replay") & (controls["measure"] == "n_events")
-    ]
-    if no_replay.empty or (no_replay["value"] != 0).any():
+    no_replay = sweep_statistics.no_replay_statistics(controls)
+    if not no_replay["n_outputs"] or no_replay["n_outputs_with_events"]:
         raise ValueError(
             "the caption says no output reported an event where there was no replay; "
             "the controls summary disagrees"
         )
-    minutes = float(
-        controls[
-            (controls["summary"] == "no_replay")
-            & (controls["measure"] == "immobile_minutes")
-        ]["value"].iloc[0]
+    fragmented = sweep_statistics.burst_share_range(
+        controls, "placeless_burst", "fragmented_share"
     )
-    n_recordings = float(
-        controls[
-            (controls["summary"] == "provenance")
-            & (controls["measure"] == "n_recordings")
-        ]["value"].iloc[0]
-    )
-    fragmented = controls[
-        (controls["summary"] == "bursts")
-        & (controls["measure"] == "fragmented_share")
-        & (controls["condition"] == "placeless_burst")
-    ]["value"]
     jumps = ("jump_120ms", "jump_200ms")
     spanning_ours = carving(jumps, "spanning", _OURS)
     spanning_sliding = carving(jumps, "spanning", _SLIDING)
@@ -752,8 +672,13 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     }
     elsewhere_missing = carving(("chain_elsewhere",), "parts_missing", _SLIDING)
     elsewhere_split = carving(("chain_elsewhere",), "one_per_part", _OURS)
-    n_trials = {d: trials(d, "n_trials") for d in (_SLIDING, _OURS)}
-    if n_trials[_SLIDING] != n_trials[_OURS]:
+    recovery = {
+        detector: sweep_statistics.part_recovery_statistics(
+            controls, _MULTIPART, detector
+        )
+        for detector in (_SLIDING, _OURS)
+    }
+    if recovery[_SLIDING]["n_trials"] != recovery[_OURS]["n_trials"]:
         raise ValueError("the two detectors are scored on different multi-part trials")
 
     return [
@@ -765,13 +690,13 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         ),
         share(
             "controls_placeless_fragmented_share_min",
-            fragmented.min(),
+            fragmented["min"],
             "lowest share of a place-less burst's time in the fragmented state, over "
             "burst durations",
         ),
         share(
             "controls_placeless_fragmented_share_max",
-            fragmented.max(),
+            fragmented["max"],
             "highest share of a place-less burst's time in the fragmented state, over "
             "burst durations",
         ),
@@ -820,7 +745,7 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "controls_no_replay_minutes",
-            minutes,
+            no_replay["minutes"],
             "quantity",
             "sig2",
             "minutes of simulated immobility with no replay; no output reported any "
@@ -829,14 +754,14 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "controls_no_replay_recordings",
-            n_recordings,
+            no_replay["n_recordings"],
             "count",
             "count",
             "simulated recordings the no-replay stretches come from",
         ),
         make(
             "controls_no_replay_rate_bound",
-            3 / minutes,
+            no_replay["rate_bound_per_minute"],
             "quantity",
             "sig2",
             "95 % upper bound on the false event rate with none observed (the rule "
@@ -845,96 +770,96 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         ),
         share(
             "controls_jump_ours_spanning_min",
-            spanning_ours.min(),
+            spanning_ours["min"],
             "lowest share, over jump sizes, of two-part jump trials our detector "
             "reports as one event over both parts (pooled over 120 and 200 ms parts)",
         ),
         share(
             "controls_jump_ours_spanning_max",
-            spanning_ours.max(),
+            spanning_ours["max"],
             "highest such share",
         ),
         share(
             "controls_jump_sliding_spanning_max",
-            spanning_sliding.max(),
+            spanning_sliding["max"],
             "highest share, over jump sizes, of jump trials the sliding window "
             "reports as one event over both parts",
         ),
         share(
             "controls_continuing_sliding_spanning_shortest_fraction",
-            continuing["spanning", _SLIDING][0],
+            continuing["spanning", _SLIDING]["at_lowest_level"],
             "continuing chains at the shortest gap: share of trials the sliding "
             "window reports as one event over both parts",
         ),
         share(
             "controls_continuing_ours_spanning_shortest_fraction",
-            continuing["spanning", _OURS][0],
+            continuing["spanning", _OURS]["at_lowest_level"],
             "the same for our detector",
         ),
         share(
             "controls_continuing_sliding_one_per_part_longest_fraction",
-            continuing["one_per_part", _SLIDING][-1],
+            continuing["one_per_part", _SLIDING]["at_highest_level"],
             "continuing chains at the longest gap: share of trials the sliding window "
             "reports as one event per part",
         ),
         share(
             "controls_continuing_ours_one_per_part_longest_fraction",
-            continuing["one_per_part", _OURS][-1],
+            continuing["one_per_part", _OURS]["at_highest_level"],
             "the same for our detector",
         ),
         share(
             "controls_elsewhere_sliding_missing_min",
-            elsewhere_missing.min(),
+            elsewhere_missing["min"],
             "chains whose parts are far apart: lowest share of trials, over gaps, in "
             "which the sliding window misses a part",
         ),
         share(
             "controls_elsewhere_sliding_missing_max",
-            elsewhere_missing.max(),
+            elsewhere_missing["max"],
             "highest such share",
         ),
         share(
             "controls_elsewhere_ours_one_per_part_shortest_fraction",
-            elsewhere_split[0],
+            elsewhere_split["at_lowest_level"],
             "chains whose parts are far apart, shortest gap: share of trials our "
             "detector reports as one event per part",
         ),
         share(
             "controls_elsewhere_ours_one_per_part_longest_fraction",
-            elsewhere_split[-1],
+            elsewhere_split["at_highest_level"],
             "the same at the longest gap",
         ),
         share(
             "controls_sliding_recovery_in_event_fraction",
-            mean_recovery(_SLIDING, "part_recovery"),
+            recovery[_SLIDING]["recovery_in_event"],
             "share of parts the sliding window recovers inside the event, mean over "
             "jump and chain conditions and levels",
         ),
         share(
             "controls_sliding_recovery_alone_fraction",
-            mean_recovery(_SLIDING, "part_recovery_alone"),
+            recovery[_SLIDING]["recovery_alone"],
             "the same with each part decoded alone",
         ),
         share(
             "controls_ours_recovery_in_event_fraction",
-            mean_recovery(_OURS, "part_recovery"),
+            recovery[_OURS]["recovery_in_event"],
             "share of parts our detector recovers inside the event, the same mean",
         ),
         share(
             "controls_ours_recovery_alone_fraction",
-            mean_recovery(_OURS, "part_recovery_alone"),
+            recovery[_OURS]["recovery_alone"],
             "the same with each part decoded alone",
         ),
         make(
             "controls_multipart_trials",
-            n_trials[_SLIDING],
+            recovery[_SLIDING]["n_trials"],
             "count",
             "count",
             "two-part trials over every jump and chain condition",
         ),
         make(
             "controls_sliding_fewer_in_event_trials",
-            trials(_SLIDING, "n_trials_fewer_in_context"),
+            recovery[_SLIDING]["n_trials_fewer_in_event"],
             "count",
             "count",
             "trials in which the sliding window recovers fewer parts inside the event "
@@ -942,14 +867,14 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "controls_sliding_more_in_event_trials",
-            trials(_SLIDING, "n_trials_more_in_context"),
+            recovery[_SLIDING]["n_trials_more_in_event"],
             "count",
             "count",
             "trials in which it recovers more inside the event than alone",
         ),
         make(
             "controls_ours_fewer_in_event_trials",
-            trials(_OURS, "n_trials_fewer_in_context"),
+            recovery[_OURS]["n_trials_fewer_in_event"],
             "count",
             "count",
             "trials in which our detector recovers fewer parts inside the event than "
@@ -957,7 +882,7 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "controls_ours_more_in_event_trials",
-            trials(_OURS, "n_trials_more_in_context"),
+            recovery[_OURS]["n_trials_more_in_event"],
             "count",
             "count",
             "trials in which it recovers more inside the event than alone",

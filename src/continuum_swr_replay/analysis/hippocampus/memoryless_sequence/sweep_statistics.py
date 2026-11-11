@@ -1,10 +1,11 @@
 """Summary statistics of the memoryless sweeps.
 
-The injected-replay sweep of the two replay detectors on simulated data
-(``scripts/detection/sweep_memoryless_detection.py``) writes a long-format
-summary, one value per row. Each function here takes that summary and returns
-named numbers: a dict, or a series with one value per measure. They are the
-statistics the detection summary reports
+Two sweeps of the two replay detectors on simulated data each write a
+long-format summary, one value per row: the injected-replay sweep
+(``scripts/detection/sweep_memoryless_detection.py``) and its controls
+(``sweep_memoryless_controls.py``). Each function here takes one of those
+summaries and returns named numbers: one value, a dict, or a series with one
+value per measure. They are the statistics the detection summary reports
 (``continuum_swr_replay.reported.detection`` names and describes them).
 
 A share is a fraction in [0, 1]. Durations are in seconds; the replay sweep
@@ -12,10 +13,17 @@ stores its timing errors in milliseconds, and the statistics of them stay in
 milliseconds.
 """
 
+from collections.abc import Sequence
+
 import numpy as np
 import pandas as pd
 
 __all__ = [
+    "burst_share_range",
+    "carving_statistics",
+    "controls_value",
+    "no_replay_statistics",
+    "part_recovery_statistics",
     "sweep_grid_statistics",
     "sweep_jump_pass_statistics",
     "sweep_measures",
@@ -194,4 +202,246 @@ def sweep_timing_statistics(summary: pd.DataFrame) -> dict[str, float]:
         "shortest_start_early_ms": -sliding_start[0],
         "shortest_end_late_ms": sliding_end[0],
         "shortest_reported_duration_ms": 1000 * ratio.index[0] * ratio.iloc[0],
+    }
+
+
+# --- the controls: activity that is not one clean replay -------------------------
+
+
+def controls_value(
+    controls: pd.DataFrame,
+    summary: str,
+    measure: str,
+    condition: str,
+    level: float | None,
+    detector: str,
+) -> float:
+    """One value of the controls summary.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame, shape (n_rows, n_columns)
+        The controls summary, with ``summary`` (the block), ``measure``,
+        ``condition``, ``level`` (a jump in cm, a gap or a burst duration in
+        seconds; missing on a row pooled over levels), ``detector`` and
+        ``value``.
+    summary, measure, condition, detector : str
+        The row's block, measure, injected condition and detector output.
+    level : float or None
+        The row's level; None for the row pooled over levels.
+
+    Returns
+    -------
+    value : float
+
+    Raises
+    ------
+    ValueError
+        If the summary does not hold exactly one such row.
+    """
+    rows = controls[
+        (controls["summary"] == summary)
+        & (controls["measure"] == measure)
+        & (controls["condition"] == condition)
+        & (controls["detector"] == detector)
+    ]
+    rows = (
+        rows[rows["level"].isna()]
+        if level is None
+        else rows[np.isclose(rows["level"], level)]
+    )
+    if len(rows) != 1:
+        raise ValueError(
+            f"controls summary: {len(rows)} rows for {summary}, {measure}, "
+            f"{condition}, {level}, {detector}; expected one"
+        )
+    return float(rows["value"].iloc[0])
+
+
+def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
+    """The levels a multi-part condition was run at, lowest first."""
+    rows = controls[
+        (controls["summary"] == "parts") & (controls["condition"] == condition)
+    ]
+    return sorted(rows["level"].dropna().unique())
+
+
+def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
+    """What the detectors' outputs reported in stretches of rest with no replay.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame, shape (n_rows, n_columns)
+        The controls summary (:func:`controls_value`).
+
+    Returns
+    -------
+    statistics : dict
+        - ``minutes``: the simulated immobility with no replay, in minutes.
+        - ``n_recordings``: the simulated recordings it comes from.
+        - ``n_outputs``: the detector outputs run on it.
+        - ``n_outputs_with_events``: of those, the outputs that reported any
+          event there.
+        - ``rate_bound_per_minute``: the 95 % upper bound on an output's false
+          event rate when it reported none, by the rule of three (3 over the
+          minutes), in events per minute.
+    """
+    n_events = controls[
+        (controls["summary"] == "no_replay") & (controls["measure"] == "n_events")
+    ]["value"]
+    minutes = float(
+        controls[
+            (controls["summary"] == "no_replay")
+            & (controls["measure"] == "immobile_minutes")
+        ]["value"].iloc[0]
+    )
+    n_recordings = float(
+        controls[
+            (controls["summary"] == "provenance")
+            & (controls["measure"] == "n_recordings")
+        ]["value"].iloc[0]
+    )
+    return {
+        "minutes": minutes,
+        "n_recordings": n_recordings,
+        "n_outputs": len(n_events),
+        "n_outputs_with_events": int((n_events != 0).sum()),
+        "rate_bound_per_minute": 3 / minutes,
+    }
+
+
+def burst_share_range(
+    controls: pd.DataFrame, condition: str, share: str
+) -> dict[str, float]:
+    """The range, over burst durations, of the share of a burst's time in a state.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame, shape (n_rows, n_columns)
+        The controls summary (:func:`controls_value`).
+    condition : str
+        A burst condition (``"placeless_burst"`` or ``"jumping_burst"``).
+    share : str
+        ``"fragmented_share"`` or ``"continuous_share"``: the mean share of a
+        burst's time the state-space detector gives that state.
+
+    Returns
+    -------
+    statistics : dict
+        ``min`` and ``max``, the lowest and highest share over burst durations.
+    """
+    values = controls[
+        (controls["summary"] == "bursts")
+        & (controls["measure"] == share)
+        & (controls["condition"] == condition)
+    ]["value"]
+    return {"min": values.min(), "max": values.max()}
+
+
+def carving_statistics(
+    controls: pd.DataFrame, conditions: Sequence[str], label: str, detector: str
+) -> dict[str, float]:
+    """How often a detector carves two-part trials one way, over levels.
+
+    At each level (a jump size or a gap) the share is the mean, over
+    ``conditions``, of the share of trials the detector's events carve as
+    ``label``.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame, shape (n_rows, n_columns)
+        The controls summary (:func:`controls_value`).
+    conditions : sequence of str
+        The two-part conditions pooled; all run at the first one's levels.
+    label : str
+        The carving: ``"spanning"`` (one event over both parts),
+        ``"one_per_part"`` or ``"parts_missing"``.
+    detector : str
+        The detector output.
+
+    Returns
+    -------
+    statistics : dict
+        - ``min``, ``max``: the lowest and highest share over levels.
+        - ``at_lowest_level``, ``at_highest_level``: the share at the lowest
+          and at the highest level.
+    """
+    shares = np.array(
+        [
+            np.mean(
+                [
+                    controls_value(
+                        controls,
+                        "parts",
+                        f"segmentation_{label}",
+                        condition,
+                        level,
+                        detector,
+                    )
+                    for condition in conditions
+                ]
+            )
+            for level in _levels(controls, conditions[0])
+        ]
+    )
+    return {
+        "min": shares.min(),
+        "max": shares.max(),
+        "at_lowest_level": shares[0],
+        "at_highest_level": shares[-1],
+    }
+
+
+def part_recovery_statistics(
+    controls: pd.DataFrame, conditions: Sequence[str], detector: str
+) -> dict[str, float]:
+    """How many parts of two-part trials a detector recovers, inside the event
+    and with each part decoded alone.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame, shape (n_rows, n_columns)
+        The controls summary (:func:`controls_value`).
+    conditions : sequence of str
+        The two-part conditions.
+    detector : str
+        The detector output.
+
+    Returns
+    -------
+    statistics : dict
+        - ``recovery_in_event``: the share of parts recovered inside the event,
+          the mean over every condition and level of that cell's share.
+        - ``recovery_alone``: the same with each part decoded alone.
+        - ``n_trials``: the trials, over the conditions.
+        - ``n_trials_fewer_in_event``, ``n_trials_more_in_event``: the trials
+          in which fewer, or more, parts are recovered inside the event than
+          alone.
+    """
+
+    def mean_over_cells(measure: str) -> float:
+        return float(
+            np.mean(
+                [
+                    controls_value(
+                        controls, "parts", measure, condition, level, detector
+                    )
+                    for condition in conditions
+                    for level in _levels(controls, condition)
+                ]
+            )
+        )
+
+    def total(measure: str) -> float:
+        return sum(
+            controls_value(controls, "parts", measure, condition, None, detector)
+            for condition in conditions
+        )
+
+    return {
+        "recovery_in_event": mean_over_cells("part_recovery"),
+        "recovery_alone": mean_over_cells("part_recovery_alone"),
+        "n_trials": total("n_trials"),
+        "n_trials_fewer_in_event": total("n_trials_fewer_in_context"),
+        "n_trials_more_in_event": total("n_trials_more_in_context"),
     }
