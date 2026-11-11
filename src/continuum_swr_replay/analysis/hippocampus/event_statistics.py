@@ -242,8 +242,7 @@ def event_signal_statistics(
     events : pd.DataFrame, shape (n_events, n_columns)
         One row per event, with ``is_swr``, the session columns
         (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and each
-        signal's column. An event with no value of a signal is left out of that
-        signal's statistics.
+        signal's column.
     reference : pd.DataFrame, shape (n_epochs, n_columns)
         The brain-state reference (:func:`reference_medians`), one row per epoch.
     signals : mapping of str to str
@@ -267,17 +266,26 @@ def event_signal_statistics(
     Raises
     ------
     ValueError
-        If an event's epoch has no running reference.
+        If an event has no value of a signal, or its epoch no running or
+        quiet-rest level of one.
     """
     joined = events.merge(
         reference, on=list(SESSION_COLUMNS), how="left", validate="m:1"
     )
-    if joined["theta_running_median"].isna().any():
-        raise ValueError("an event's epoch has no running reference")
     rows = {}
     for signal, column in signals.items():
+        missing = (
+            joined[[column, f"{signal}_running_median", f"{signal}_rest_median"]]
+            .isna()
+            .sum()
+        )
+        if missing.any():
+            raise ValueError(
+                f"events with no {signal} value, or whose epoch has no running or "
+                f"quiet-rest level of it:\n{missing[missing > 0]}"
+            )
         for is_swr in (False, True):
-            group = joined[joined["is_swr"] == is_swr].dropna(subset=[column])
+            group = joined[joined["is_swr"] == is_swr]
             per_animal = group.groupby("animal").agg(
                 event=(column, "median"),
                 running=(f"{signal}_running_median", "median"),
@@ -359,15 +367,28 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     statistics : pd.DataFrame, shape (2, 2)
-        Indexed by ``is_swr``: ``rest_theta_like_fraction``, and
-        ``n_animals_above_rest``, the animals whose share of theta-like events
-        is above that of their events' windows.
+        Indexed by ``is_swr``: ``rest_theta_like_fraction``, the mean over the
+        class's events of ``rest_theta_like_share``, and
+        ``n_animals_above_rest``, the animals, of those with an event of the
+        class, whose share of theta-like events is above the mean of their
+        events' ``rest_theta_like_share``.
 
     Raises
     ------
     ValueError
-        If an event has no window: no rest stretch of its epoch is as long.
+        If an event has no window (no rest stretch of its epoch is as long), or
+        lacks its theta, its epoch's running theta, its number of windows or
+        their theta-like share.
     """
+    missing = (
+        events[
+            ["theta_z", "theta_running_median", "rest_windows", "rest_theta_like_share"]
+        ]
+        .isna()
+        .sum()
+    )
+    if missing.any():
+        raise ValueError(f"events lack a value:\n{missing[missing > 0]}")
     if (events.rest_windows <= 0).any():
         raise ValueError(
             f"{int((events.rest_windows <= 0).sum())} events have no duration-matched "

@@ -142,7 +142,6 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
         ("a", "e1", True, -0.6),
         ("a", "e2", True, -0.75),
         ("b", "e1", True, 0.0),
-        ("b", "e1", True, np.nan),
     ]
     events = pd.DataFrame(rows, columns=["animal", "epoch", "is_swr", "theta_z"])
     return events.assign(session_date="d1"), reference
@@ -170,7 +169,6 @@ def test_event_signal_statistics_compare_each_event_with_its_own_epoch():
     # 1.2, 1.4 and 5.0 reach their epoch's 1.0; 0.8, -1.0 and 0.0 do not, and
     # 1.3 does not reach e2's 2.0
     assert non_swr["reaches_running_fraction"] == pytest.approx(3 / 7)
-    # the SWR event with no theta value is left out
     swr = result.loc[("theta", True)]
     # -0.8, -0.75, -0.7, -0.6, 0.0
     assert swr["median"] == pytest.approx(-0.7)
@@ -184,8 +182,31 @@ def test_event_signal_statistics_compare_each_event_with_its_own_epoch():
 
 def test_event_signal_statistics_refuse_an_epoch_without_a_reference():
     events, reference = _signal_tables()
-    with pytest.raises(ValueError, match="no running reference"):
-        stats.event_signal_statistics(events, reference.iloc[:2], {"theta": "theta_z"})
+    signals = {"theta": "theta_z", "ripple": "ripple_power_z"}
+    events = events.assign(ripple_power_z=1.0)
+    reference = reference.assign(ripple_running_median=2.0, ripple_rest_median=0.0)
+    assert len(stats.event_signal_statistics(events, reference, signals)) == 4
+    # b's epoch is not in the reference at all: its 4 events have no level
+    with pytest.raises(ValueError, match=r"theta_running_median +4"):
+        stats.event_signal_statistics(events, reference.iloc[:2], signals)
+    # the rest level, and a signal other than theta, are checked as well: the
+    # first epoch holds 6 events
+    for column in (
+        "theta_rest_median",
+        "ripple_running_median",
+        "ripple_rest_median",
+    ):
+        broken = reference.copy()
+        broken.loc[0, column] = np.nan
+        with pytest.raises(ValueError, match=rf"{column} +6"):
+            stats.event_signal_statistics(events, broken, signals)
+
+
+def test_event_signal_statistics_refuse_an_event_without_a_value():
+    events, reference = _signal_tables()
+    events.loc[0, "theta_z"] = np.nan
+    with pytest.raises(ValueError, match=r"theta_z +1"):
+        stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
 
 
 def test_power_change_statistics_count_animals_above_rest():
@@ -205,24 +226,37 @@ def test_power_change_statistics_count_animals_above_rest():
         stats.power_change_statistics(reference, ["slow_gamma"])
 
 
-def test_rest_matched_theta_statistics_weigh_windows_by_event():
+def test_rest_matched_theta_statistics_average_events_not_windows():
     events = pd.DataFrame(
         {
             "animal": ["a", "a", "b", "b"],
             "is_swr": [False, False, False, True],
             "theta_z": [2.0, 0.0, 0.0, 5.0],
             "theta_running_median": 1.0,
-            "rest_windows": 10,
+            "rest_windows": [10, 5, 10, 10],
             "rest_theta_like_share": [0.2, 0.4, 0.1, 0.3],
         }
     )
     result = stats.rest_matched_theta_statistics(events)
+    # the mean of the three events' shares; over their 25 windows it would be 0.2
     assert result.loc[False, "rest_theta_like_fraction"] == pytest.approx(0.7 / 3)
+    assert result.loc[True, "rest_theta_like_fraction"] == pytest.approx(0.3)
     # a: half its events are theta-like against 0.3 of its windows; b: none against 0.1
     assert result.loc[False, "n_animals_above_rest"] == 1
     assert result.loc[True, "n_animals_above_rest"] == 1
     with pytest.raises(ValueError, match="1 events have no duration-matched"):
         stats.rest_matched_theta_statistics(events.assign(rest_windows=[10, 0, 10, 10]))
+    # a missing value is refused, not read as "not theta-like" or left out of a mean
+    for column in (
+        "theta_z",
+        "theta_running_median",
+        "rest_windows",
+        "rest_theta_like_share",
+    ):
+        broken = events.astype({"rest_windows": float})
+        broken.loc[1, column] = np.nan
+        with pytest.raises(ValueError, match=rf"{column} +1"):
+            stats.rest_matched_theta_statistics(broken)
 
 
 def _spike_metrics() -> pd.DataFrame:
