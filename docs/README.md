@@ -102,6 +102,11 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     events at the ports (study C1), the j16 tetrodes that do not ripple with CA1, the rule
     with its effect and blind checks, why the reference veto and the field's noise-channel
     form are not used, the visit-onset numbers, and the limits.
+  - [design/2026-11-10-questions-and-numbers-design.md](design/2026-11-10-questions-and-numbers-design.md)
+    — draft: one question list with each question's numbers, generated from the
+    summaries; interpretation moved into the manuscript's Results; the documents it
+    retires and where each section goes; the inventory's findings and the lead's
+    decisions.
   - [design/content_model_design.md](design/content_model_design.md) — the `is_swr`
     content ladder, parallel to the per-bin rate ladder, on the beta-Bernoulli covariates;
     implemented in `scripts/content/fit_swr_contrast_content.py`.
