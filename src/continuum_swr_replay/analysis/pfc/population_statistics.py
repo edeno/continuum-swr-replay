@@ -646,12 +646,15 @@ def replay_class_overlap_statistics(
     animals = (
         frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]).to_numpy()
     )
-    units = (swr_called, non_called, swr_peak, non_peak)
-    pooled = call_overlap_statistics(*units)
-    by_animal = {
-        animal: call_overlap_statistics(*(of[animals == animal] for of in units))
-        for animal in np.unique(animals)
-    }
+
+    def overlap_of(units: NDArray) -> dict[str, float]:
+        """The overlap statistics of some of the units tested for both."""
+        return call_overlap_statistics(
+            swr_called[units], non_called[units], swr_peak[units], non_peak[units]
+        )
+
+    pooled = overlap_of(np.ones(len(frame), dtype=bool))
+    by_animal = {animal: overlap_of(animals == animal) for animal in np.unique(animals)}
     for what, overlap in [
         ("pooled units", pooled),
         *((f"animal {animal}", overlap) for animal, overlap in by_animal.items()),
@@ -676,9 +679,7 @@ def replay_class_overlap_statistics(
         "odds_ratio_animal_max": max(animal_ratios),
         "n_animals_odds_ratio_above_one": sum(r > 1 for r in animal_ratios),
         "rank_correlation": pooled["rank_correlation"],
-        "rank_correlation_called": call_overlap_statistics(
-            *(of[either] for of in units)
-        )["rank_correlation"],
+        "rank_correlation_called": overlap_of(either)["rank_correlation"],
         "same_sign_fraction_both": pooled["same_sign_fraction_both"],
         "swr_larger_fraction_called": float(
             (np.abs(swr_peak[either]) > np.abs(non_peak[either])).mean()
