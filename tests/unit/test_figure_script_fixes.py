@@ -259,7 +259,8 @@ def test_the_figure02_cache_is_keyed_on_a_version_token(offline, tmp_path):
     assert path.parent == tmp_path / "intermediates"
     assert path.name != v1
     assert f"_v{figure02.FIGURE02_CACHE_VERSION}_" in path.name
-    assert figure02.FIGURE02_CACHE_VERSION >= 2
+    # a cache of version 2 holds no class counts to check the event table against
+    assert figure02.FIGURE02_CACHE_VERSION >= 3
     assert swr_source.swr_source_name() in path.name
 
 
@@ -269,6 +270,158 @@ def _register(path: Path, epochs: list[str]) -> Path:
         columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
     ).to_csv(path, index=False)
     return path
+
+
+def _figure02_events() -> pd.DataFrame:
+    """Eight events whose shares and median offsets fall half-way between two
+    whole numbers: 1 of 8 SWR-contained (12.5 %), 5 of 8 non-SWR (62.5 %); the
+    three overlapping events' median start offset is 2.5 ms and their median
+    end offset -4.5 ms."""
+    nan = np.nan
+    return pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d1",
+            "epoch": "e1",
+            "overlap_class": ["swr_contained", "swr_partial", "swr_partial"]
+            + ["non_swr"] * 5,
+            "whole_event_speed_eligible": True,
+            "event_start_s": [0.0025, -0.25, 1.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+            "event_end_s": [0.25, -0.0045, 2.0, 3.1, 4.1, 5.1, 6.1, 7.1],
+            "matched_swr_start": [0.0, -0.125, 0.5, nan, nan, nan, nan, nan],
+            "matched_swr_end": [0.5, 0.0, 1.5, nan, nan, nan, nan, nan],
+        }
+    )
+
+
+FIGURE02_FRAME_COUNTS = {"swr_contained": 1, "swr_partial": 2, "non_swr": 5, "total": 8}
+
+
+def test_figure02_panels_b_and_d_come_from_the_canonical_event_table(offline):
+    """Panel b's counts and panel d's offsets are computed from the event table
+    the summary cites, and the figure is refused when that table's class counts
+    are not the decode frames', or the table holds an event that is not immobile."""
+    figure02 = offline("scripts.figures.generate_figure02")
+    events = _figure02_events()
+    panels = figure02.event_table_panels(events, FIGURE02_FRAME_COUNTS)
+    assert panels["class_counts"] == FIGURE02_FRAME_COUNTS
+    offsets = panels["offsets"]
+    np.testing.assert_allclose(offsets["start_offset_s"], [0.0025, -0.125, 0.5])
+    np.testing.assert_allclose(offsets["end_offset_s"], [-0.25, -0.0045, 0.5])
+    with pytest.raises(ValueError, match="overlap-class counts are not those"):
+        figure02.event_table_panels(
+            events, {**FIGURE02_FRAME_COUNTS, "non_swr": 6, "total": 9}
+        )
+    moving = events.assign(whole_event_speed_eligible=[True] * 7 + [False])
+    with pytest.raises(ValueError, match="not whole-event immobile"):
+        # the frames' counts are of immobile events, as the table's would be
+        figure02.event_table_panels(
+            moving, {**FIGURE02_FRAME_COUNTS, "non_swr": 4, "total": 7}
+        )
+
+
+def test_figure02_panels_b_and_d_print_the_digits_of_the_events_summary(offline):
+    """The percents and medians written on the panels are rounded by the
+    summary's rule (a half rounds away from zero), not by the plotter's
+    format (a half rounds to the even digit: 12, 62, +2 and -4 here)."""
+    import matplotlib.pyplot as plt
+
+    from continuum_swr_replay.reported.events import (
+        boundary_offset_values,
+        event_cohort_values,
+    )
+    from continuum_swr_replay.reported.formatting import formatted
+    from continuum_swr_replay.visualization.figure_panels import (
+        plot_event_timing_offsets,
+        plot_swr_overlap_class_bar,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    events = _figure02_events()
+    panels = figure02.event_table_panels(events, FIGURE02_FRAME_COUNTS)
+
+    assert panels["class_percents"] == {
+        "swr_contained": "13",
+        "swr_partial": "25",
+        "non_swr": "63",
+    }
+    assert panels["offset_medians"] == {
+        "start_offset_s": "+3",
+        "end_offset_s": "−5",
+    }
+    # the same digits as the summary's values of the same table
+    cohort = {v.key: v for v in event_cohort_values(events, "s")}
+    bounds = {v.key: v for v in boundary_offset_values(events, "s")}
+    assert formatted(cohort["non_swr_fraction"]) == "63 %"
+    assert formatted(bounds["start_offset_median_ms"]) == "3"
+    assert formatted(bounds["end_offset_median_ms"]) == "−5"
+
+    # the plotters write the text they are given
+    fig, (ax_b, ax_start, ax_end) = plt.subplots(1, 3)
+    plot_swr_overlap_class_bar(
+        panels["class_counts"], panels["class_percents"], ax=ax_b
+    )
+    assert [text.get_text() for text in ax_b.texts] == [
+        "13%\nSWR-\ncontained",
+        "25%\nSWR-\npartial",
+        "63%\nnon-SWR",
+    ]
+    plot_event_timing_offsets(
+        panels["offsets"], panels["offset_medians"], axes=[ax_start, ax_end]
+    )
+    assert [text.get_text() for text in ax_start.texts] == ["median +3 ms"]
+    assert [text.get_text() for text in ax_end.texts] == ["median −5 ms"]
+    plt.close(fig)
+
+
+def test_figure02_checks_the_event_table_against_the_cached_frame_counts(
+    offline, tmp_path, monkeypatch
+):
+    """With a cached bundle, panels b and d are still read from the event table
+    in the data folder, and checked against the bundle's class counts."""
+    import joblib
+
+    from continuum_swr_replay.paths import (
+        processed_data_dir,
+        replay_content_dir,
+        table_path,
+    )
+
+    figure02 = offline("scripts.figures.generate_figure02")
+    table = table_path(
+        "event_table", tmp_path / replay_content_dir().relative_to(processed_data_dir())
+    )
+    table.parent.mkdir(parents=True)
+    _figure02_events().to_parquet(table)
+    cache = figure02._figure02_cache_path("wilbur20210329_.nwb", "02_r1", tmp_path)
+    cache.parent.mkdir(parents=True)
+    drawn = {}
+    monkeypatch.setattr(
+        figure02, "_render_figure", lambda inputs, window_sec: drawn.update(inputs)
+    )
+
+    joblib.dump(
+        {"classified_class_counts": FIGURE02_FRAME_COUNTS, "chosen": "cached"}, cache
+    )
+    figure02.generate_figure(data_dir=tmp_path)
+    assert drawn["chosen"] == "cached"
+    assert drawn["class_counts"] == FIGURE02_FRAME_COUNTS
+    assert drawn["class_percents"]["non_swr"] == "63"
+    assert len(drawn["offsets"]) == 3
+
+    # the frames give one more non-SWR event than the table holds
+    joblib.dump(
+        {
+            "classified_class_counts": {
+                **FIGURE02_FRAME_COUNTS,
+                "non_swr": 6,
+                "total": 9,
+            }
+        },
+        cache,
+    )
+    with pytest.raises(ValueError, match="overlap-class counts are not those"):
+        figure02.generate_figure(data_dir=tmp_path)
 
 
 def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(

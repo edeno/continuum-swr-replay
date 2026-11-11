@@ -1,0 +1,41 @@
+{
+  "uniform_allocations": {
+    "fitted_probability_with_uniform_events": 0.7999977315303815,
+    "analytic_optimum_probability": 0.5666666666666668,
+    "original_llf": -12.780637193325155,
+    "llf_with_uniform_events": -12.780637193325155,
+    "original_n_events": 20,
+    "n_events_with_uniform_events": 40,
+    "original_null_llf": -21.972245773362204,
+    "null_llf_with_uniform_events": -43.94449154672439
+  },
+  "canceling_predictor": {
+    "llf_change": 0.0,
+    "aic_change": 2.0,
+    "expected_aic_change_for_identical_model": 0.0,
+    "reported_n_params": 2,
+    "unidentified_terms": "z:no_within_event_variation"
+  },
+  "paired_aic_plot": {
+    "child_model": "M1_rew",
+    "plotted_delta": -9.0,
+    "paired_median_delta": 90.0
+  },
+  "kernel_cohort": {
+    "plot_lag_one": 1.1204458147353522,
+    "summary_lag_one": 1.1022649777668112,
+    "summary_n_sessions": 5,
+    "summary_n_dropped": 1
+  },
+  "gee_convergence": {
+    "backend_converged": false,
+    "reported_status": "ok",
+    "reported_interaction_p": 0.01
+  },
+  "repeated_sessions": {
+    "original_session_p": 0.0625,
+    "p_after_copying_each_animals_value_into_ten_epochs": 6.259681887142859e-10,
+    "original_animals": 5,
+    "animals_after_copying": 5
+  }
+}

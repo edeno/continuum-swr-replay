@@ -61,10 +61,8 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.stats import false_discovery_control
 
-from continuum_swr_replay.analysis.pfc.load_population import (
-    load_population_data,
-    significant_fraction,
-)
+from continuum_swr_replay.analysis.pfc import population_statistics
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -323,7 +321,8 @@ def session_cohort_table(sidecars: pd.DataFrame) -> pd.DataFrame:
 
     ``n_bins_immobile`` is the "before" bin count -- every immobile bin was fit
     before -- and ``n_bins_fit`` the "after"; the event columns carry their own
-    before/after pair.
+    before/after pair. The last row totals the sessions; its kept percents are
+    pooled (summed kept over summed before).
     """
     table = pd.DataFrame(
         {
@@ -1311,7 +1310,8 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     A unit whose unpenalised fit ran away has no peak to difference against,
     so its row is reported -- it is where a prior is supposed to do the work --
     but "the prior binds" is counted only where a maximum-likelihood peak
-    exists to be moved.
+    exists to be moved. ``prior_binds_pct`` is ``n_prior_binds`` as a percent
+    of the row's own units.
     """
     if frame.empty:
         return frame
@@ -1443,17 +1443,19 @@ def empirical_bayes_sigma(
 
 
 def heldout_fraction_table(after: pd.DataFrame, alpha: float) -> pd.DataFrame:
-    """Units beating the control-draw null, per class, overall and per animal."""
+    """Units beating the control-draw null, per class, overall and per animal.
+
+    Each row is
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`
+    of its units, as percents.
+    """
     rows = []
     for scope, frame in [("all", after), *sorted(after.groupby("animal"))]:
         row: dict[str, object] = {"animal": scope, "n_units": len(frame)}
-        for name, (n_significant, n_tested) in significant_fraction(
-            frame, alpha=alpha
-        ).items():
-            row[f"{name}_n_tested"] = n_tested
-            row[f"{name}_pct"] = (
-                round(100.0 * n_significant / n_tested, 1) if n_tested else np.nan
-            )
+        fractions = population_statistics.called_fractions(frame, alpha)
+        for name, called in fractions.iterrows():
+            row[f"{name}_n_tested"] = int(called["n_tested"])
+            row[f"{name}_pct"] = round(float(100.0 * called["fraction"]), 1)
         rows.append(row)
     return pd.DataFrame(rows)
 

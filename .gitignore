@@ -203,10 +203,6 @@ paper/figures/**/*.csv
 paper/figures/**/*.npz
 paper/figures/**/*.parquet
 paper/figures/**/*.svg
-# Data folders linked into a worktree from the main checkout (never tracked:
-# a tracked link replaces the main checkout's folder on checkout).
-paper/figures/reality_all
-paper/figures/content_occupancy
 # --- tracked deliverables (override the ignores above) ---
 !paper/figures/figure01/figure01.pdf
 !paper/figures/figure01/figure01.png

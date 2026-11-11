@@ -469,6 +469,23 @@ def empirical_pvalue(
     return np.where(np.isfinite(observed), pvalue, np.nan)
 
 
+def empirical_pvalue_floor(n_draws: int) -> dict[str, float]:
+    """The smallest p-value :func:`empirical_pvalue` can give from ``n_draws``.
+
+    Parameters
+    ----------
+    n_draws : int
+        Usable null draws, ``R``.
+
+    Returns
+    -------
+    floor : dict
+        ``denominator``, ``R + 1``, and ``min_pvalue``, ``1 / (R + 1)``: the
+        p-value of a unit whose observed statistic no draw reaches.
+    """
+    return {"denominator": n_draws + 1, "min_pvalue": 1 / (n_draws + 1)}
+
+
 def control_design(
     control_times: pd.DataFrame,
     fit_mask: pd.Series,

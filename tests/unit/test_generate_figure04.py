@@ -43,6 +43,63 @@ def test_panel_d_uses_the_canonical_control_draw_count():
         plt.close(fig)
 
 
+def test_panel_d_draws_the_threshold_and_the_draw_count_it_is_given():
+    frame = pd.DataFrame({column: [0.01, 0.5] for column in HELDOUT_P_COLUMNS.values()})
+    fig, ax = plt.subplots()
+    try:
+        figure04.plot_significance(frame, ax, alpha=0.6, n_control_draws=99)
+        # at 0.6 both units are called, at the default 0.05 one of the two
+        assert [bar.get_height() for bar in ax.patches] == [100.0] * 4
+        assert ax.get_title(loc="left") == (
+            "Raw empirical p < 0.6 (descriptive)\nR=99, min p=0.010"
+        )
+        # the dashed line is the threshold, as a percent
+        assert list(ax.lines[0].get_ydata()) == pytest.approx([60.0, 60.0])
+    finally:
+        plt.close(fig)
+
+
+def test_panel_d_bars_are_the_called_and_best_model_shares_as_percents():
+    """Four units. SWR: one untested, two of the three tested called.
+    Engagement: three of four called. The other tests: one of four. Best
+    model: one constant, two SWR, and one unit with none, which is left out."""
+    pvalues = {name: [0.01, 0.5, 0.5, 0.5] for name in HELDOUT_P_COLUMNS}
+    pvalues["SWR"] = [0.01, 0.01, 0.5, np.nan]
+    pvalues["engagement"] = [0.01, 0.01, 0.01, 0.5]
+    frame = pd.DataFrame(
+        {HELDOUT_P_COLUMNS[name]: values for name, values in pvalues.items()}
+    )
+    frame["min_heldout_model"] = ["constant", "SWR", "SWR", None]
+
+    fig, (called_ax, best_ax) = plt.subplots(1, 2)
+    try:
+        figure04.plot_significance(frame, called_ax)
+        figure04.plot_best_model_selection(frame, best_ax)
+
+        assert [t.get_text() for t in called_ax.get_xticklabels()] == [
+            "SWR",
+            "Replay",
+            "no-SWR",
+            "Beyond\ncontrol",
+        ]
+        assert [bar.get_height() for bar in called_ax.patches] == pytest.approx(
+            [200 / 3, 25.0, 25.0, 75.0]
+        )
+        assert [t.get_text() for t in called_ax.texts] == ["67%", "25%", "25%", "75%"]
+        assert [t.get_text() for t in best_ax.get_xticklabels()] == [
+            "Const.",
+            "SWR",
+            "Replay",
+            "SWR+\nno-SWR",
+        ]
+        assert [bar.get_height() for bar in best_ax.patches] == pytest.approx(
+            [100 / 3, 200 / 3, 0.0, 0.0]
+        )
+        assert [t.get_text() for t in best_ax.texts] == ["33%", "67%"]
+    finally:
+        plt.close(fig)
+
+
 # ---------------------------------------------------------------------------
 # Layout and clipping: drawn at the figure's real size, in the production style
 # ---------------------------------------------------------------------------

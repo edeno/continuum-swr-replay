@@ -2,10 +2,12 @@
 # scripts/ and the package in src/; each target only calls them.
 UV ?= uv
 RUN = $(UV) run --frozen
-PARTS = 0 1 2 3 4
+SUMMARIES = survey detection events behavior mpfc
+# Extra arguments for release-check, for example ARGS=--code-only.
+ARGS ?=
 
 .DEFAULT_GOAL := help
-.PHONY: help sync sync-dev format check figures summaries reported-values manuscript
+.PHONY: help sync sync-dev format check figures summaries reported-values release-check manuscript
 
 help:
 	@echo "make sync             Install the locked analysis environment"
@@ -13,8 +15,10 @@ help:
 	@echo "make format           Format and lint-fix src/, scripts/ and tests/"
 	@echo "make check            Run the CI checks: format check, lint, full test suite"
 	@echo "make figures          Regenerate the main figures (needs the lab's processed data)"
-	@echo "make summaries        Rebuild paper/reported/part{0..4}.json (parts 1-4 need the lab's processed data)"
+	@echo "make summaries        Rebuild paper/reported/<summary>.json (all but survey need the lab's processed data)"
 	@echo "make reported-values  Write the summaries' values into the LaTeX macros and the docs"
+	@echo "make release-check    Before a milestone: fail if a summary is stale or mis-tagged, or a cited value is pending"
+	@echo "                       (ARGS=--code-only skips the input files, for a machine without the data)"
 	@echo "make manuscript       Build paper/main.pdf from the committed figures and macros"
 
 # --inexact keeps the development tools that sync-dev installed.
@@ -37,12 +41,15 @@ figures:
 	$(RUN) python scripts/figures/generate_all_figures.py
 
 summaries:
-	for part in $(PARTS); do \
-		$(RUN) python scripts/reported/summarize_part.py --part $$part || exit 1; \
+	for summary in $(SUMMARIES); do \
+		$(RUN) python scripts/reported/summarize.py --summary $$summary || exit 1; \
 	done
 
 reported-values:
 	$(RUN) python scripts/reported/emit_reported_values.py
+
+release-check:
+	$(RUN) python scripts/reported/check_release.py $(ARGS)
 
 manuscript:
 	$(MAKE) -C paper

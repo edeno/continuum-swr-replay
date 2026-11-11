@@ -10,6 +10,6 @@ here. This file holds only what applies to the assistant alone.
   creation, export) without the user's explicit approval of that specific step; the
   analyses only read it (see "Data Integration with Spyglass" in the guide).
 - A result number stated in a chat reply follows the same rule as one in a doc:
-  read it from a summary file, `paper/reported/part{n}.json`, and name the file
+  read it from a summary file, `paper/reported/<summary>.json`, and name the file
   and the key. If no summary holds it, say it is not computed (see "Reported
   numbers" in the guide).

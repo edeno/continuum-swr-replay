@@ -351,6 +351,7 @@ class TestSidecarTables:
         assert chimi.bins_kept_pct == pytest.approx(90.0)
         assert chimi.nonlocal_before == 100
         assert chimi.nonlocal_after == 90
+        assert chimi.nonlocal_kept_pct == pytest.approx(90.0)
         assert chimi.ripple_before == 50
         assert chimi.ripple_after == 48
         assert chimi.align_results_bins_dropped == 8
@@ -363,6 +364,9 @@ class TestSidecarTables:
         assert total.bins_kept_pct == pytest.approx(100 * 1900 / 3000)
         assert total.nonlocal_before == 300
         assert total.nonlocal_after == 240
+        # pooled: 240 of 300 (the sessions' own shares, 90 and 75 %, average 82.5)
+        assert total.nonlocal_kept_pct == pytest.approx(80.0)
+        assert (total.ripple_before, total.ripple_after) == (130, 120)
 
     def test_missing_alignment_block_is_blank_not_zero(self, bundle_trees):
         """A sidecar written before the alignment step must not read as "0 dropped"."""
@@ -551,8 +555,10 @@ class TestReport:
         assert "A note the caller supplied." in report
         assert "Command: `uv run python scripts/pfc/compare_pfc_cohorts.py`" in report
         # The headline restriction, computed from the sidecars.
-        assert "1,900 of 3,000" in report
-        assert "240 of 300" in report
+        assert "**63.3%** of the immobile bins (1,900 of 3,000)" in report
+        assert "**80.0%** of the non-local events (240 of 300)" in report
+        # 48 + 72 of 50 + 80 SWRs are kept
+        assert "92.3% of the SWRs (120 of 130)" in report
 
 
 def test_provenance_marks_no_alignment_block_when_no_sidecar_has_one():
@@ -1055,7 +1061,10 @@ class TestRerunReport:
         assert "## The matched non-event control" in report
         assert "2 of 2 bundle(s) carry a `matched_control_modulation` array" in report
         assert "## Estimator, device and inputs" in report
-        assert "4 of 54 shipped model fits did not converge" in report
+        assert (
+            "Across the corpus 4 of 54 shipped model fits did not converge, over 2 "
+            "neurons"
+        ) in report
 
     def test_a_tree_without_the_estimator_fields_gets_no_rerun_sections(
         self, bundle_trees
@@ -1301,6 +1310,30 @@ class TestPeakShrinkage:
             warning for warning in recwarn if warning.category is RuntimeWarning
         ]
 
+    def test_the_binding_percent_is_over_each_rows_own_units(self):
+        """Five units of one curve: three well posed, of which the prior binds
+        on one; two separated, of which it binds on both."""
+        frame = pd.DataFrame(
+            {
+                "curve": "SWR",
+                "peak_penalised": 1.0,
+                "peak_mle": [1.5, 1.0, 1.0, 30.0, 30.0],
+                "peak_mle_se": 0.1,
+                "mle_converged": True,
+                "mle_separated": [False, False, False, True, True],
+                "prior_binds": [True, False, False, True, True],
+                "animal": "chimi",
+            }
+        )
+        frame["delta"] = frame["peak_penalised"] - frame["peak_mle"]
+
+        table = shrinkage_table(frame).set_index("units")
+
+        assert table.loc["well posed", "n_units"] == 3
+        assert table.loc["well posed", "prior_binds_pct"] == 33.3
+        assert table.loc["separated", "n_units"] == 2
+        assert table.loc["separated", "prior_binds_pct"] == 100.0
+
 
 class TestEstimatorTables:
     def test_the_matched_test_event_population_is_reported(self, estimator_trees):
@@ -1352,17 +1385,28 @@ class TestEstimatorTables:
 
     def test_the_held_out_fraction_is_reported_per_animal(self, estimator_trees):
         _, after = estimator_trees
+        # chimi's session again, with four units that are tested and not called
+        _write_ridge_bundle(
+            after, "chimi20200223_02_r1", n_neurons=4, peak=1.5, p_heldout=0.5
+        )
         population, _, _ = __import__(
             "continuum_swr_replay.analysis.pfc.load_population",
             fromlist=["load_population_data"],
         ).load_population_data(after, min_firing_rate=0.0)
+        # for SWRs, one of them is called and one is not tested
+        chimi = population["animal"] == "chimi"
+        population.loc[chimi, HELDOUT_P_COLUMNS["SWR"]] = [0.001, 0.5, 0.5, np.nan]
 
         table = heldout_fraction_table(population, alpha=0.05)
 
         assert list(table["animal"]) == ["all", "chimi", "j16"]
-        # Every fixture unit is below the raw-p preview threshold.
-        assert (table["SWR_pct"] == 100.0).all()
-        assert (table["engagement_pct"] == 100.0).all()
+        assert list(table["n_units"]) == [6, 4, 2]
+        # j16's two units are called for every test; chimi's for none but SWR,
+        # where one of its three tested units is.
+        assert list(table["SWR_n_tested"]) == [5, 3, 2]
+        assert list(table["SWR_pct"]) == [60.0, 33.3, 100.0]
+        assert list(table["engagement_n_tested"]) == [6, 4, 2]
+        assert list(table["engagement_pct"]) == [33.3, 0.0, 100.0]
 
     def test_one_batch_collapses_to_one_estimator_row(self, estimator_trees):
         _, after = estimator_trees

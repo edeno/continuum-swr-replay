@@ -65,20 +65,19 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (  # noq
     interval_rows,
 )
 from continuum_swr_replay.paths import (  # noqa: E402
-    ROOT_DIR,
     event_features_root,
+    event_spike_evidence_dir,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN  # noqa: E402
 from continuum_swr_replay.runs.provenance import (  # noqa: E402
     described_commit,
     produced_by,
 )
 from continuum_swr_replay.visualization.palettes import COLORS  # noqa: E402
 
-EVENT_FEATURES_RUN = "30cf1cc432e9"
-REALITY_DIR = ROOT_DIR / "paper/figures/reality_all/per_epoch"
 REALITY_METRICS = "event_spike_evidence_metrics.parquet"
 OUT_NAME = "ripple_class_structure"
 SEED = 20261027
@@ -276,7 +275,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
         ),
     }
 
-    metric_paths = sorted(REALITY_DIR.glob(f"*/{REALITY_METRICS}"))
+    metric_paths = sorted(event_spike_evidence_dir().glob(f"*/{REALITY_METRICS}"))
     metrics = pd.concat(map(pd.read_parquet, metric_paths), ignore_index=True)
     metrics = metrics[metrics.group != "baseline"]
     events = events.merge(
@@ -313,7 +312,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
             ),
         },
         "spike_evidence": {
-            "path": str(REALITY_DIR),
+            "path": str(event_spike_evidence_dir()),
             "n_files": len(metric_paths),
             "sha256": files_digest(metric_paths),
         },

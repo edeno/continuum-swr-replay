@@ -14,7 +14,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported import literature, part0
+from continuum_swr_replay.reported import literature
+from continuum_swr_replay.reported import survey as builder
 
 PAPER_TABLES = Path(__file__).resolve().parents[2] / "paper" / "tables"
 
@@ -150,7 +151,7 @@ def test_shown_cells_are_not_blank(survey):
     ],
 )
 def test_survey_lower_bounds_are_below_upper_bounds(survey, low, high):
-    numbers = part0.numeric(survey[[low, high]]).dropna()
+    numbers = builder.numeric(survey[[low, high]]).dropna()
     assert len(numbers) > 0
     swapped = numbers.index[numbers[low] >= numbers[high]]
     papers = survey.loc[swapped, ["First Author", "Year"]]

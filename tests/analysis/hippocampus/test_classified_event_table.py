@@ -414,11 +414,13 @@ def test_invalid_saved_nonlocal_probability_fails_loud(dot):
 
 
 # --- Downstream consumers: parity with get_event_types, table-driven counts,
-#     and the inline timing-offset column subtraction. ---
+#     and the matched-SWR columns the timing offsets are taken from. ---
 
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
-    compute_swr_overlap_class_counts,
     get_event_types,
+)
+from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa: E402
+    compute_swr_overlap_class_counts,
 )
 
 
@@ -436,7 +438,9 @@ def _key_set(frame: pd.DataFrame) -> set:
 
 def test_event_types_matches_classified_overlap(dot):
     """get_event_types' SWR-overlap split must equal the classified table's
-    is_swr split for immobile events (panel c vs panels a/b/d parity)."""
+    is_swr split for immobile events: Figure 2's panel c is drawn from the
+    first, and panel a's examples and the class counts that the canonical event
+    table (panels b and d) is checked against come from the second."""
     classified = build_classified_nonlocal_event_table(dot)
     event_types = get_event_types(dot, event_col="non_local_event")
 
@@ -494,17 +498,6 @@ def test_panel_b_full_swr_intervals_not_clipped_to_nl_rows():
     assert compute_swr_overlap_class_counts(classified)["swr_contained"] == 1
 
 
-def _timing_offsets(classified: pd.DataFrame) -> pd.DataFrame:
-    """Mirror the inline panel-d computation in generate_figure02."""
-    overlap = classified[
-        classified["whole_event_speed_eligible"]
-        & (classified["overlap_class"] != "non_swr")
-    ].copy()
-    overlap["start_diff"] = overlap["event_start"] - overlap["matched_swr_start"]
-    overlap["end_diff"] = overlap["event_end"] - overlap["matched_swr_end"]
-    return overlap[["animal", "day", "epoch", "start_diff", "end_diff"]]
-
-
 def test_timing_offsets_via_columns(dot):
     classified = build_classified_nonlocal_event_table(dot)
     # ev2 [200,220] partial with swr12 [210,230]: NL-minus-SWR offsets.
@@ -513,19 +506,6 @@ def test_timing_offsets_via_columns(dot):
         (200 - 210) * DT
     )
     assert ev2["event_end"] - ev2["matched_swr_end"] == pytest.approx((220 - 230) * DT)
-    # One row per overlapping event (ev1, ev2, ev3, ev8 in session 1), not
-    # one row per (SWR, event) pair.
-    assert len(_timing_offsets(classified)) == 4
-
-
-def test_timing_offsets_empty_session():
-    # Events present, none overlap an SWR -> empty offsets with schema.
-    frame = _blank_session("m", 1, "01_r1", n=200)
-    _label(frame, "non_local_event", {1: (10, 20), 2: (50, 60)})
-    classified = build_classified_nonlocal_event_table(frame)
-    offsets = _timing_offsets(classified)
-    assert offsets.empty
-    assert list(offsets.columns) == ["animal", "day", "epoch", "start_diff", "end_diff"]
 
 
 def test_assert_drawn_matches_label_fires_on_boundary_mismatch():

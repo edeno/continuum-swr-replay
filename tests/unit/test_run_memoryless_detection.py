@@ -63,6 +63,11 @@ from tests.unit._swr_inventory_fixtures import (
 )
 from tests.unit._swr_inventory_fixtures import use_swr_source as _use_inventory
 
+needs_cpu_affinity = pytest.mark.skipif(
+    not hasattr(os, "sched_getaffinity"),
+    reason="the runner counts its CPUs with os.sched_getaffinity, which exists only on Linux",
+)
+
 EPOCH_ID = "sim20200101_02_r1_HPC"
 N_SHUFFLES = 19
 """The fewest draws at which p <= 0.05 is possible."""
@@ -1189,6 +1194,7 @@ class TestMain:
         assert list(epochs) == ["sim20200102_02_r1_HPC"]
         assert epochs["sim20200102_02_r1_HPC"]["status"] == "ok"
 
+    @needs_cpu_affinity
     def test_parallel_run_records_each_epoch_and_a_failure(
         self, parallel, tmp_path, monkeypatch
     ):
@@ -1227,6 +1233,7 @@ class TestMain:
         for epoch_id in PARALLEL_EPOCH_IDS:
             assert (tmp_path / "logs" / f"{epoch_id}_memoryless.log").exists()
 
+    @needs_cpu_affinity
     def test_only_the_main_thread_writes_the_manifest(
         self, parallel, tmp_path, monkeypatch
     ):
@@ -1256,6 +1263,7 @@ class TestMain:
             for record in read_manifest(tmp_path)["epochs"].values()
         )
 
+    @needs_cpu_affinity
     def test_a_parallel_rerun_runs_only_what_is_not_written(
         self, parallel, tmp_path, monkeypatch
     ):
@@ -1620,6 +1628,7 @@ class TestMain:
         assert read_manifest(tmp_path)["settings"]["xla_flags"] == expected
         assert os.environ.get("XLA_FLAGS") == inherited
 
+    @needs_cpu_affinity
     def test_main_raises_the_open_file_limit_before_its_cluster(
         self, parallel, tmp_path, monkeypatch
     ):
@@ -1641,6 +1650,7 @@ class TestMain:
         run_log = (tmp_path / "memoryless" / "cli-run" / "run.log").read_text()
         assert "open-file soft limit 1024 -> 65536" in run_log
 
+    @needs_cpu_affinity
     def test_the_cluster_is_given_the_xla_flags_the_settings_record(
         self, parallel, tmp_path, monkeypatch
     ):
@@ -1789,6 +1799,7 @@ class TestWorkerThreads:
             "OPENBLAS_NUM_THREADS": 1,
         }
 
+    @needs_cpu_affinity
     def test_the_cpus_are_the_ones_this_process_may_run_on(self):
         assert runner.available_cpus() == len(os.sched_getaffinity(0))
 
@@ -1800,6 +1811,7 @@ def _xla_flags() -> str | None:
     return os.environ.get("XLA_FLAGS")
 
 
+@needs_cpu_affinity
 class TestWorkerXlaFlags:
     """Two runs on the GPU differ unless XLA runs deterministically (R12 smoke
     test, 2026-10-10). XLA reads XLA_FLAGS when JAX starts its backend, so the

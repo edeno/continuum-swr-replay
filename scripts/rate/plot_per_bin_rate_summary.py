@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Six-panel summary figure for the per-bin rate ladder (Family B).
 
-The visual companion to ``docs/per_bin_rate_results.md`` — reads
+The visual companion to the per-bin ladder's reported values (question 3.3) — reads
 ``models_per_bin_rate/all_models.pkl`` and renders, per event-type population:
 baseline rate (M0), the recent-reward dissociation on the first reward-history
 basis coefficient (M7), the

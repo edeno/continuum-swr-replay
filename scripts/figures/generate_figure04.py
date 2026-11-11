@@ -81,6 +81,7 @@ from continuum_swr_replay.analysis.pfc import (
     make_design_matrices,
     make_matched_control_times,
     matched_control_seed,
+    population_statistics,
 )
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.canonical_events import (
@@ -93,11 +94,11 @@ from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
-from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
-from continuum_swr_replay.analysis.pfc.load_population import (
-    load_population_data,
-    significant_fraction,
+from continuum_swr_replay.analysis.pfc.heldout import (
+    DEFAULT_CONTROL_DRAWS,
+    empirical_pvalue_floor,
 )
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
     REPORT_HALF_WINDOW_S,
@@ -111,7 +112,7 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.reported.part4 import MIN_FIRING_RATE_HZ
+from continuum_swr_replay.reported.mpfc import MIN_FIRING_RATE_HZ
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")
@@ -414,25 +415,25 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 
     A unit counts when its plus-one Monte Carlo p-value is below ``alpha``.
     The denominator is the units actually tested for that class: a unit whose
-    session had no events of a class is untested for it, not a negative. This
-    is a descriptive implementation preview, not population inference: units
-    within a session and animal are not independent replicates.
+    session had no events of a class is untested for it, not a negative
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`).
+    This is a descriptive implementation preview, not population inference:
+    units within a session and animal are not independent replicates.
 
     The p-value is ``(r + 1) / (R + 1)`` over ``R`` usable draws, so it cannot
     be zero. Every fraction here inherits that resolution, which is why
     ``n_control_draws`` is drawn on the panel.
     """
-    fractions = significant_fraction(df, alpha=alpha)
+    fractions = population_statistics.called_fractions(df, alpha)["fraction"]
     labels, fracs, colors_list = [], [], []
     for label, name, color in SIGNIFICANCE_BARS:
-        n_significant, n_tested = fractions[name]
         labels.append(label)
-        fracs.append(100 * n_significant / n_tested if n_tested else np.nan)
+        fracs.append(100 * fractions[name])
         colors_list.append(COLORS[color])
 
     bars = ax.bar(labels, fracs, color=colors_list, alpha=0.7, edgecolor="none")
     for bar, frac in zip(bars, fracs, strict=True):
-        if np.isfinite(frac) and frac > 2:
+        if frac > 2:
             ax.text(
                 bar.get_x() + bar.get_width() / 2,
                 frac + 1,
@@ -443,33 +444,34 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
 
     ax.axhline(100 * alpha, color="gray", linewidth=0.5, linestyle="--")
     ax.set_ylabel("% units")
-    finite_fractions = np.asarray(fracs, dtype=float)
-    finite_fractions = finite_fractions[np.isfinite(finite_fractions)]
-    observed_max = float(finite_fractions.max()) if finite_fractions.size else 0.0
-    ax.set_ylim(0, max(100 * alpha * 1.2, observed_max * 1.3))
+    ax.set_ylim(0, max(100 * alpha * 1.2, max(fracs) * 1.3))
     ax.tick_params(axis="x", labelsize=5)
     # Say both the raw-p threshold and R on the panel: this is a descriptive
     # preview, and its Monte Carlo resolution is part of what the bars mean.
     # Left-aligned: the title is wider than the axes, and centred it ran under
     # the panel letter.
+    min_pvalue = empirical_pvalue_floor(n_control_draws)["min_pvalue"]
     ax.set_title(
         "Raw empirical p < "
         f"{alpha:g} (descriptive)\n"
-        f"R={n_control_draws}, min p={1 / (n_control_draws + 1):.3f}",
+        f"R={n_control_draws}, min p={min_pvalue:.3f}",
         fontsize=7,
         loc="left",
     )
 
 
 def plot_best_model_selection(df, ax):
-    """Distribution of the best model per unit, by held-out deviance."""
-    n_total = len(df)
+    """Distribution of the best model per unit, by held-out deviance.
+
+    Each bar is a share of the units with a best model
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.best_model_fractions`).
+    """
     model_order = ["constant", "SWR", "non_local", "SWR + non_local_no_SWR"]
     model_labels = ["Const.", "SWR", "Replay", "SWR+\nno-SWR"]
     model_colors = ["gray", COLORS["SWR"], COLORS["Non-Local"], COLORS["Combined"]]
 
-    counts = df["min_heldout_model"].value_counts()
-    vals = [100 * counts.get(m, 0) / n_total for m in model_order]
+    fractions = population_statistics.best_model_fractions(df, model_order)
+    vals = [100 * fractions[m] for m in model_order]
 
     bars = ax.bar(model_labels, vals, color=model_colors, alpha=0.7, edgecolor="none")
     for bar, val in zip(bars, vals, strict=True):

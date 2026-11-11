@@ -45,6 +45,12 @@ returns the unit table and the stacked curves Figure 4 draws;
 ``significant_fraction`` is the descriptive raw-p fraction; and
 ``penalty_sigma_suffix`` names a bundle fit at a non-canonical prior.
 
+Population statistics (``population_statistics``, ``timing``)
+-------------------------------------------------------------
+The summary statistics of the unit table and of the curves' timing: each
+function takes tables or arrays and returns named numbers. The mpfc summary
+(``reported/mpfc.py``) reports them.
+
 See Also
 --------
 continuum_swr_replay.analysis.pfc.session : Per-neuron and per-session GLM fits
@@ -56,6 +62,8 @@ continuum_swr_replay.analysis.pfc.modulation : Deviance and modulation statistic
 continuum_swr_replay.analysis.pfc.event_sets : Fit masks and event sets
 continuum_swr_replay.analysis.pfc.matched_control : Matched non-event controls
 continuum_swr_replay.analysis.pfc.load_population : Population bundles
+continuum_swr_replay.analysis.pfc.population_statistics : Statistics of the unit population
+continuum_swr_replay.analysis.pfc.timing : When a response peaks and starts
 """
 
 from __future__ import annotations

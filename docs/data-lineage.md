@@ -52,13 +52,14 @@ partial rebuild mis-joins silently
 
 | Stage | Output (in the repository) | Written by |
 | --- | --- | --- |
-| Summaries | `paper/reported/part{n}.json` | `scripts/reported/summarize_part.py --part n` (`make summaries`) |
+| Summaries | `paper/reported/<summary>.json` | `scripts/reported/summarize.py --summary <summary>` (`make summaries`) |
 | Macros and inline values | `paper/reported_values.tex`; the `<!--v:…-->` values in `docs/` and `paper/` | `scripts/reported/emit_reported_values.py` (`make reported-values`) |
 | Figures | `paper/figures/<topic>/` | `scripts/figures/` ([figure-pipeline.md](figure-pipeline.md)) |
 | Manuscript | `paper/main.pdf` | `make manuscript` |
 
 Each summary records the commit that built it and the SHA-256 of every file it
 read (its `inputs` list), so a reported number can be traced to the files it
-came from: under the root for parts 1–4, in the repository for part 0. The
-trace is not yet exact: some summaries record absolute paths or were built at a
-`-dirty` commit (see "Summary provenance" in `TODO.md`).
+came from: under the root for the lab-data summaries, in the repository for the
+survey summary. Each also records the code that built it, and is written only
+from committed code. The trace is not yet exact for sets of input files, which
+are recorded under a label (see "Summary input paths" in `TODO.md`).

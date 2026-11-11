@@ -56,9 +56,9 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
-EVENT_FEATURES_RUN = "30cf1cc432e9"
 OUT_NAME = "event_start_rest_theta"
 SEED = 20261028
 

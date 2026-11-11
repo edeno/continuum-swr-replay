@@ -45,8 +45,8 @@ uses the locked versions and does not re-solve them.
 - **pytest** runs the suite in `tests/` (`uv run --frozen pytest`). The full
   suite takes about 8 minutes on an Apple-silicon laptop; run a single file
   while working. On macOS, 15 tests of the CPU-pinning runners
-  (`test_run_memoryless_detection.py`, `test_run_refits.py`) fail because
-  `os.sched_getaffinity` exists only on Linux; CI runs on Linux.
+  (`test_run_memoryless_detection.py`, `test_run_refits.py`) are skipped because
+  `os.sched_getaffinity` exists only on Linux; CI runs on Linux, where they run.
 - **mypy** is configured but does not pass yet, so neither CI nor pre-commit
   runs it (see `TODO.md`).
 
@@ -65,10 +65,10 @@ src/continuum_swr_replay/
 │   ├── behavior/          #   behavioral-model covariates (qvals_table)
 │   ├── contfrag/          #   Continuous-Fragmented classifier analysis
 │   ├── events/            #   analysed-time rule, SWR source, event eligibility, classified event table, cohorts
-│   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, SWR inventories, artifact detector
+│   ├── hippocampus/       #   decode masks and aggregation, posterior/quality metrics, event statistics, SWR inventories, artifact detector
 │   ├── inventory_comparison/ # event inventories from different detectors compared
 │   ├── pfc/               #   mPFC/OFC unit analysis
-│   ├── replay/            #   replay content/rate tables, model ladders, fitters
+│   ├── replay/            #   replay content/rate tables, model ladders, fitters, statistics of the fits
 │   └── constants.py       #   analysis constants and defaults
 ├── decoding/              # decode configs and detector classes, transitions, identifiers and file names, the results.nc reader
 ├── runs/                  # run infrastructure: provenance, CLI, batch loops, BLAS thread pin (threads), JAX device choice (device)
@@ -76,7 +76,7 @@ src/continuum_swr_replay/
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
-├── reported/              # reported numbers: the part{n} summary builders, values, rounding, the macro emitter, Table S1
+├── reported/              # reported numbers: the summary builders (survey, detection, events, behavior, mpfc), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
 ├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
 └── data_types.py          # shared type definitions
@@ -86,7 +86,7 @@ scripts/                   # Analysis scripts, grouped by domain — see scripts
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
-├── reported/              #   part{n}.json summaries every reported number is read from
+├── reported/              #   <summary>.json summaries every reported number is read from
 ├── reported_values.tex    #   generated macros, one per reported number (make reported-values)
 ├── tables/                #   Supplementary Table S1 and the literature survey CSV it is built from
 └── figures/<topic>/       #   Publication figures in topic subdirs (no loose files)
@@ -401,21 +401,65 @@ How to run the decoders, their settings and their outputs are in
 
 ## Reported numbers
 
-Every number the project reports is read from a summary file, `paper/reported/part{n}.json`, one per part
-of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_reported_values.py`; design
-`docs/design/2026-10-26-reported-values-design.md`). All five summaries (parts 0–4) are built. Part 0 holds the
-literature numbers the introduction quotes, computed from the replay-study survey of Supplementary
-Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
+Every number the project reports is read from a summary file, `paper/reported/<summary>.json`, named for
+what it holds: `survey`, `detection`, `events`, `behavior`, `mpfc` (`scripts/reported/summarize.py`, then
+`scripts/reported/emit_reported_values.py`). The survey summary holds the literature numbers the
+introduction quotes, computed from the replay-study survey of Supplementary Table S1
+(`continuum_swr_replay.reported.survey`); it needs no lab data.
+
+Which question each value answers, and which figure shows it, is written once, in the question list
+(`src/continuum_swr_replay/reported/questions.py`). It organizes the writing by part: a question need
+not have a figure. A question's id is its place in the outline (`2d.2`: section 2d, its second question).
+Each builder declares its values' tags in one table (`TAGS`), and a summary whose values name a question
+or figure the list does not know is not written; a summary written before the list changed is still
+emitted, and its mis-tagged values are listed in `paper/reported/questions.md` until it is rebuilt. `make reported-values` writes that file: every
+question in the paper's outline, with the values that answer it, their macros, and the values by figure.
+
+Each value records the builder function that made it (`function`; "Builder function" in `questions.md`),
+so a macro leads to its code in two steps: `\EventsRippleMedianNonSwr` is made in `brain_state_values` of
+`reported/events.py`, which reads it from the `analysis/` function that computes it
+(`event_statistics.event_signal_statistics`). A builder makes its values through
+`reported.values.value_factory`, which is given that function. Whether the manuscript cites a value is not recorded anywhere: it is read from the macros
+`paper/main.tex` and the other `.tex` files under `paper/` use. `make reported-values` prints how many
+values are cited, and `make release-check` fails when a cited value is pending.
+
+A summary in `paper/reported/` is built from committed files: `summarize.py` writes nothing there when a
+file of the checkout that the build used (its code, the package's data files, an input the repository
+tracks, `uv.lock`) differs from the commit; `--output-dir` elsewhere makes a trial build. Each summary
+records those files, so `make release-check` can say when one has changed since. It also fails when
+`paper/reported_values.tex` is not what the summaries give.
+
+A builder names and describes values; it does not compute them. The statistics are functions in
+`analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
+tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
+number comes from. Each builder's statistics:
+
+- events: `analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
+- mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`;
+- detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py` and `event_table.py`;
+- behavior: `analysis/replay/coefficient_statistics.py` (a per-session fit summarized over sessions and
+  animals; the other modules build on it), `rate_fit_statistics.py`, `stop_statistics.py`,
+  `content_statistics.py`, `history_kernel_statistics.py`, and the stay/leave summaries in `learning.py`.
+
+A builder may count the size of an input it reads (its epochs, its animals) and copy a statistic a file
+already holds. Figure 4 and the `scripts/pfc/` reports call these functions; the scripts and figures that
+still compute a reported statistic themselves are listed in `TODO.md`.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it
   inline or quote it from memory.
-- In a doc, write a reported number inside a marker, `<!--v:part{n}.key-->…<!--/v-->`, and let the
+- In a doc, write a reported number inside a marker, `<!--v:<summary>.key-->…<!--/v-->`, and let the
   emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
-- A value with a `pending` note is not quoted as a finding.
+- A value with a `pending` note is not quoted as a finding. A value read from an output that records
+  other tables than the current ones (a stale fit, a stale per-event measure) is kept and marked pending
+  with the reason, and `make release-check` fails when the manuscript cites a pending value. A builder
+  refuses to build when an input cannot give the value at all: it does not cover the cohort (an epoch,
+  an event or a unit has no row), it is an older design, or its record cannot be read. Not every input
+  records the tables it was made from; those have no staleness check
+  (`.claude/docs/reviews/2026-11-11-reported-numbers-review.md`, finding K-5).
 - A number quoted from a cited paper (for example, another study's share of replays) is not a result
   of this project and has no summary key: write it as text beside its citation. A number this project
-  computes, even from published sources (part 0's literature survey), is a reported number.
+  computes, even from published sources (the survey summary's literature numbers), is a reported number.
 
 ## Important Conventions
 

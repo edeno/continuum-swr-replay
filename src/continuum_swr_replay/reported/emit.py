@@ -1,21 +1,27 @@
 r"""Write the reported values where they are read: LaTeX macros and inline doc markers.
 
 **Macros.** ``paper/reported_values.tex`` holds one ``\newcommand`` per value,
-named ``\Part<Word><CamelKey>`` (``part2.kay_no_nonlocal_fraction`` is
-``\PartTwoKayNoNonlocalFraction``), the number only: the prose writes the unit
+named ``\<Summary><CamelKey>`` (``events.kay_no_nonlocal_fraction`` is
+``\EventsKayNoNonlocalFraction``), the number only: the prose writes the unit
 and the percent sign. ``\newcommand`` errors on a name clash, so a collision
 fails the LaTeX build rather than redefining anything.
 
 **Inline markers.** In a markdown doc a value is written between two markers::
 
-    <!--v:part2.kay_no_nonlocal_fraction-->17 %<!--/v-->
-    <!--v:part2.kay_no_nonlocal_fraction@pctnum-->17<!--/v--> %
+    <!--v:events.kay_no_nonlocal_fraction-->17 %<!--/v-->
+    <!--v:events.kay_no_nonlocal_fraction@pctnum-->17<!--/v--> %
 
 The text between them is replaced by the value printed in the marker's style
 (after ``@``; not ``|``, which would split a markdown table cell) or the value's own. The prose around the markers stays
 hand-written. A marker naming a key no summary holds is an error, so a renamed
-value cannot leave a stale number behind. Markers inside code (backticks or a
-fenced block) are examples and are left alone.
+value cannot leave a stale number behind. Only text of exactly this form is a
+marker: one with other spacing, or a key that is not lower-case words, is plain
+text and is left as it is. Markers inside code (backticks or a fenced block) are
+examples and are left alone.
+
+**Cited values.** Which values the manuscript cites is read from the manuscript's
+LaTeX source (:func:`manuscript_source`, :func:`cited_macros`); no value records
+it.
 """
 
 from __future__ import annotations
@@ -26,17 +32,29 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from continuum_swr_replay.reported.formatting import formatted
-from continuum_swr_replay.reported.values import PARTS, Summary, Value, values_by_key
+from continuum_swr_replay.reported.questions import (
+    FIGURES,
+    QUESTIONS,
+    SECTIONS,
+    parse_figure,
+    tag_problems,
+)
+from continuum_swr_replay.reported.values import (
+    SUMMARIES,
+    Summary,
+    Value,
+    summary_tag_problems,
+    values_by_key,
+)
 
 MARKER = re.compile(
-    r"<!--v:(?P<key>part\d\.[a-z_]+)(?:@(?P<style>[a-z0-9]+))?-->"
+    r"<!--v:(?P<key>[a-z]+\.[a-z_]+)(?:@(?P<style>[a-z0-9]+))?-->"
     r"(?P<text>.*?)<!--/v-->",
     re.DOTALL,
 )
 _CODE = re.compile(r"```.*?```|~~~.*?~~~|`[^`\n]*`", re.DOTALL)
 """Fenced code blocks and inline code spans: a marker shown in code is an
 example, not a value."""
-_PART_WORDS = {0: "Zero", 1: "One", 2: "Two", 3: "Three", 4: "Four"}
 
 
 def _outside_code(text: str, replace) -> str:
@@ -49,28 +67,64 @@ def _outside_code(text: str, replace) -> str:
     return "".join(pieces)
 
 
-def macro_name(part: int, key: str) -> str:
-    r"""The LaTeX macro of a value, without the backslash."""
-    return "Part" + _PART_WORDS[part] + "".join(w.capitalize() for w in key.split("_"))
+def macro_name(summary: str, key: str) -> str:
+    r"""The LaTeX macro of a value, without the backslash: the summary's name
+    capitalized, then the key in CamelCase (``events.speed_median_swr`` is
+    ``EventsSpeedMedianSwr``)."""
+    return summary.capitalize() + "".join(w.capitalize() for w in key.split("_"))
 
 
-def tex_file(summaries: Mapping[int, Summary]) -> str:
+_MACRO = re.compile(
+    r"\\((?:" + "|".join(name.capitalize() for name in SUMMARIES) + r")[A-Za-z]+)"
+)
+_TEX_COMMENT = re.compile(r"(?<!\\)%.*$", re.MULTILINE)
+
+
+def manuscript_source(manuscript: Path, macro_file: Path) -> str:
+    """The LaTeX source of the paper: ``manuscript`` and every other ``.tex`` file
+    in its folder and below, so that a value cited from a file the manuscript
+    inputs is counted. ``macro_file`` (the generated definitions, which name
+    every macro) is left out. A ``.tex`` file the manuscript does not input is
+    read too: its macros count as cited, which only makes the check stricter."""
+    files = {manuscript, *manuscript.parent.rglob("*.tex")} - {macro_file}
+    return "\n".join(path.read_text() for path in sorted(files))
+
+
+def cited_macros(manuscript: str) -> set[str]:
+    r"""The reported-value macros a LaTeX source uses outside its comments,
+    without the backslash (``\EventsSpeedMedianSwr`` is ``EventsSpeedMedianSwr``):
+    every command whose name starts with a summary's name."""
+    return set(_MACRO.findall(_TEX_COMMENT.sub("", manuscript)))
+
+
+def cited_values(
+    summaries: Mapping[str, Summary], manuscript: str
+) -> dict[str, list[str]]:
+    """Each summary's keys that ``manuscript`` cites by their macros
+    (:func:`cited_macros`), sorted."""
+    cited = cited_macros(manuscript)
+    return {
+        name: sorted(key for key in summary.values if macro_name(name, key) in cited)
+        for name, summary in summaries.items()
+    }
+
+
+def tex_file(summaries: Mapping[str, Summary]) -> str:
     """The content of ``paper/reported_values.tex``."""
     lines = [
         "% Generated by scripts/reported/emit_reported_values.py --- do not edit by hand.",
-        "% Every value is read from a summary file, paper/reported/part{n}.json;",
+        "% Every value is read from a summary file, paper/reported/<summary>.json;",
         "% each macro's comment names its key and what it is.",
         "",
     ]
-    for part in sorted(summaries):
-        summary = summaries[part]
-        lines.append(f"% --- Part {part} (commit {summary.commit})")
+    for name, summary in summaries.items():
+        lines.append(f"% --- {name} (commit {summary.commit})")
         for key, value in sorted(summary.values.items()):
             pending = f" [PENDING: {value.pending}]" if value.pending else ""
             lines.append(
-                f"\\newcommand{{\\{macro_name(part, key)}}}"
+                f"\\newcommand{{\\{macro_name(name, key)}}}"
                 f"{{{formatted(value, latex=True)}}}"
-                f"  % part{part}.{key}: {value.description}{pending}"
+                f"  % {name}.{key}: {value.description}{pending}"
             )
         lines.append("")
     return "\n".join(lines)
@@ -127,65 +181,188 @@ def marked_docs(roots: Iterable[Path]) -> list[Path]:
     )
 
 
-def _claim_order(claim: str) -> tuple[int, str]:
-    digits = "".join(c for c in claim if c.isdigit())
-    return (int(digits) if digits else 10**6, claim)
+def _cell(text: str) -> str:
+    return text.replace("|", "\\|")
 
 
-def values_index(summaries: Mapping[int, Summary]) -> str:
-    """Every value of every summary as markdown, by part and then by claim.
+def _record_cell(summary: Summary) -> str:
+    """The summary table's code-record cell: ``none``, ``yes``, or
+    ``yes, uncommitted`` for a build from uncommitted code."""
+    if summary.code is None:
+        return "none"
+    return "yes, uncommitted" if summary.code["uncommitted"] else "yes"
 
-    A value supporting several claims is listed under each. Generated in full on
-    every emit, so it holds no markers.
-    """
-    lines = [
-        "# Reported values, by part and claim",
-        "",
-        "Generated by `scripts/reported/emit_reported_values.py` from",
-        "`paper/reported/part{n}.json`; do not edit by hand. Each value's key is",
-        "`part{n}.<key>`; a value marked *pending* may not be quoted as a finding.",
+
+def _builder_function(summary: str, value: Value) -> str:
+    """The builder function that made ``value``, as ``<builder module>.<function>``."""
+    return f"`{summary}.{value.function}`"
+
+
+def _value_rows(values: Iterable[tuple[str, Value]]) -> list[str]:
+    """Markdown table rows: the macro to cite, the value as printed, its unit,
+    what it is (with any pending note), the builder function that made it and
+    the figures that show it."""
+    rows = [
+        "| Macro | Value | Unit | What it is | Builder function | Figures |",
+        "|---|---|---|---|---|---|",
     ]
-    for part in sorted(summaries):
-        summary = summaries[part]
-        lines += ["", f"## Part {part}: {PARTS[part]}", ""]
-        by_claim: dict[str, list[Value]] = {}
+    order = {name: i for i, name in enumerate(SUMMARIES)}
+    for name, value in sorted(values, key=lambda nv: (order[nv[0]], nv[1].key)):
+        notes = f" *(pending: {value.pending})*" if value.pending else ""
+        cells = [
+            f"`\\{macro_name(name, value.key)}`",
+            formatted(value),
+            value.unit,
+            value.description + notes,
+            _builder_function(name, value),
+            ", ".join(value.figures),
+        ]
+        rows.append("| " + " | ".join(_cell(c) for c in cells) + " |")
+    return rows
+
+
+def questions_view(summaries: Mapping[str, Summary]) -> str:
+    """``paper/reported/questions.md``: a table of the summaries (build commit,
+    code record, values, values with tag problems); every question of the question
+    list in the paper's order, with the values that answer it; the values with any
+    tag problem (:func:`~continuum_swr_replay.reported.questions.tag_problems`);
+    and the values by figure.
+
+    A value answering several questions is listed under each. A question need not
+    have a figure: the parts organize the writing. Generated in full on every emit,
+    so it holds no markers.
+    """
+    by_question: dict[str, list[tuple[str, Value]]] = {}
+    for name, summary in summaries.items():
         for value in summary.values.values():
-            for claim in value.claims:
-                by_claim.setdefault(claim, []).append(value)
-        for claim in sorted(by_claim, key=_claim_order):
+            for qid in value.questions:
+                by_question.setdefault(qid, []).append((name, value))
+    lines = [
+        "# Questions and their numbers",
+        "",
+        "Generated by `scripts/reported/emit_reported_values.py` from the question",
+        "list (`src/continuum_swr_replay/reported/questions.py`) and the summaries",
+        "(`paper/reported/<summary>.json`); do not edit by hand. Cite a value in",
+        "`paper/main.tex` by its macro. A value marked *pending* may not be quoted",
+        "as a finding. A summary file is named for what it holds; a question's part",
+        "is where the paper reports it. *Builder function* names the function in",
+        "`src/continuum_swr_replay/reported/<summary>.py` that names and describes",
+        "a value. The statistic is computed by the `analysis/` function it calls,",
+        "or copied from an input file; the builder itself only counts the size of",
+        "an input.",
+        "",
+        "| Summary | Built at | Code record | Values | Values with tag problems |",
+        "|---|---|---|---|---|",
+    ]
+    for name, summary in summaries.items():
+        problems = summary_tag_problems(summary)
+        lines.append(
+            f"| `{name}.json` | `{summary.commit}` | {_record_cell(summary)} "
+            f"| {len(summary.values)} | {len(problems)} |"
+        )
+    for section in SECTIONS:
+        questions = [q for q in QUESTIONS if q.section == section]
+        lines += ["", f"## Part {section.part}: {section.title}"]
+        if not questions:
+            lines += ["", "No question in this section yet."]
+        for question in questions:
+            found = by_question.get(question.id, [])
+            status = question.status + (
+                f"; {question.reason}" if question.reason else ""
+            )
+            figures = (
+                f" Figures: {', '.join(question.figures)}." if question.figures else ""
+            )
             lines += [
-                f"### Claim {claim}" if claim[0].isdigit() else f"### {claim}",
                 "",
-                "| Key | Value | Unit | What it is | Used in |",
-                "|---|---|---|---|---|",
+                f"### {question.id}. {question.text}",
+                "",
+                f"Status: {status}.{figures} Values: {len(found)}.",
             ]
-            for value in sorted(by_claim[claim], key=lambda v: v.key):
-                pending = f" *(pending: {value.pending})*" if value.pending else ""
-                cells = [
-                    f"`{value.key}`",
-                    formatted(value),
-                    value.unit,
-                    value.description + pending,
-                    ", ".join(value.used_in),
-                ]
-                lines.append(
-                    "| " + " | ".join(c.replace("|", "\\|") for c in cells) + " |"
-                )
-            lines.append("")
+            if question.note:
+                lines += ["", f"*Note:* {question.note}"]
+            if found:
+                sources = sorted({value.source for _, value in found})
+                lines += ["", "Sources:", "", *(f"- {s}" for s in sources)]
+                lines += ["", *_value_rows(found)]
+    flagged = [
+        (name, value)
+        for name, summary in summaries.items()
+        for value in summary.values.values()
+        if tag_problems(value.questions, value.figures)
+    ]
+    if flagged:
+        lines += [
+            "",
+            "## Values with tag problems",
+            "",
+            "A question or figure the question list does not know, a figure its",
+            "question does not list, or a question whose status says it has no values.",
+            "A summary built before the list changed has these until it is rebuilt.",
+            "",
+            "| Macro | Value | Unit | What it is | Questions | Figures | Problem |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        order = {name: i for i, name in enumerate(SUMMARIES)}
+        for name, value in sorted(flagged, key=lambda nv: (order[nv[0]], nv[1].key)):
+            pending = f" *(pending: {value.pending})*" if value.pending else ""
+            cells = [
+                f"`\\{macro_name(name, value.key)}`",
+                formatted(value),
+                value.unit,
+                value.description + pending,
+                ", ".join(value.questions),
+                ", ".join(value.figures),
+                "; ".join(tag_problems(value.questions, value.figures)),
+            ]
+            lines.append("| " + " | ".join(_cell(c) for c in cells) + " |")
+    lines += ["", "## Values by figure"]
+    for name, figure in FIGURES.items():
+        shown: dict[str, list[str]] = {}
+        for summary_name, summary in summaries.items():
+            for value in summary.values.values():
+                for shown_in in value.figures:
+                    parsed = parse_figure(shown_in)
+                    if parsed and parsed[0] == name:
+                        shown.setdefault(parsed[1], []).append(
+                            f"`\\{macro_name(summary_name, value.key)}`"
+                        )
+        asked = [
+            q.id
+            for q in QUESTIONS
+            if any(parse_figure(f)[0] == name for f in q.figures)
+        ]
+        lines += [
+            "",
+            f"### Figure {name}: {figure.title}",
+            "",
+            f"Script: `{figure.script}`. Questions: {', '.join(asked) or 'none'}.",
+        ]
+        for panel in sorted(shown):
+            label = f"Panel {panel}" if panel else "Unlettered"
+            lines += ["", f"{label}: {', '.join(sorted(shown[panel]))}"]
     return "\n".join(lines) + "\n"
 
 
 def emit(
-    summaries: Mapping[int, Summary], tex_path: Path, docs: Iterable[Path], repo: Path
+    summaries: Mapping[str, Summary], tex_path: Path, docs: Iterable[Path], repo: Path
 ) -> list[Change]:
-    """Write the macro file and fill every doc's markers; return what changed."""
+    """Write the macro file and fill every doc's markers; return what changed.
+
+    Every doc is filled in memory first, so a marker that names no key (a
+    ``KeyError``) stops the emit before any file is written.
+    """
     values = values_by_key(summaries)
-    tex_path.write_text(tex_file(summaries))
+    tex = tex_file(summaries)
+    filled_docs: list[tuple[Path, str]] = []
     changes: list[Change] = []
     for path in docs:
         text = path.read_text()
         filled, changed = fill_markers(text, values, str(path.relative_to(repo)))
         if filled != text:
-            path.write_text(filled)
+            filled_docs.append((path, filled))
         changes.extend(changed)
+    tex_path.write_text(tex)
+    for path, filled in filled_docs:
+        path.write_text(filled)
     return changes

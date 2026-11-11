@@ -25,8 +25,8 @@ register.
 ## Goals
 
 - Every number reported anywhere in the repository comes from one of four summary files, one per part of the
-  paper. The parts are those of [docs/analysis_map.md](../analysis_map.md) and
-  [paper/claims_table.md](../../paper/claims_table.md):
+  paper. The parts were those of `docs/analysis_map.md` and `paper/claims_table.md`
+  (both retired 2026-11-11; in git history):
   1. the model;
   2. the events;
   3. behavior;
@@ -86,7 +86,7 @@ One command reads the four summaries and writes:
   scheme is the builder's call.
 - **The marked values in the claims table and results docs:** each claim row is one markdown table row, so
   multi-line blocks cannot sit inside its cells. Values are marked inline instead, for example
-  `<!--v:part2.kay_swr_no_nonlocal_pct-->17 %<!--/v-->`: the emitter rewrites only the text between the two
+  `<!--v:events.kay_swr_no_nonlocal_pct-->17 %<!--/v-->`: the emitter rewrites only the text between the two
   markers, and the prose around it stays hand-written. Multi-line generated blocks (the
   `write_epoch_register_doc.py` style) are still used outside tables. *(The assistant's call; the builder may
   change the marker syntax.)*

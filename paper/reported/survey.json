@@ -1,0 +1,543 @@
+{
+ "schema_version": 6,
+ "summary": "survey",
+ "title": "the published replay studies the introduction summarizes (Supplementary Table S1)",
+ "produced_by": "scripts/reported/summarize.py",
+ "commit": "342d9d43da1f",
+ "code": {
+  "head": "342d9d43da1fd033655100ad70d0fc81ea15b793",
+  "python": "3.11",
+  "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
+  "uncommitted": [],
+  "files": {
+   "scripts/reported/summarize.py": {
+    "sha256": "ce9d2c1dae346a7a88211fc8fb00ebf2890a819234148b9e7532eb621da51083",
+    "code_sha256": "ab61ce34f3e1d62d6bbc8a3f9f48bb8dc9cdfc70aa5a23490c1d444ecb3a90cb"
+   },
+   "src/continuum_swr_replay/__init__.py": {
+    "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
+    "code_sha256": "da55fd01482a16ea3f485e7731f53606ebbb1a994b8b2bfe6d6bc2f7dde20d3a"
+   },
+   "src/continuum_swr_replay/data_loaders/__init__.py": {
+    "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
+    "code_sha256": "c3b3d414ebf9ae3bf3b9ac658182312806f76afb2eaaf81f16f61338895323e9"
+   },
+   "src/continuum_swr_replay/data_loaders/constants.py": {
+    "sha256": "17fffe227de0b66078d7952ac98ad4c886cf089d4614bd402e1b7b5a424315ad",
+    "code_sha256": "09c11436725a16c73cd9faf504a3ee37d71aa570917b5802e4d655865d2b295c"
+   },
+   "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
+    "sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1",
+    "code_sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1"
+   },
+   "src/continuum_swr_replay/paths.py": {
+    "sha256": "bb70e9381257b0a341d5676cd41192562cd079ae210304e72c864ee1041f3ee5",
+    "code_sha256": "c618c1c0a792d7431e8a6af680a8b3fff1009892418c36175ea4a22d1a4124c4"
+   },
+   "src/continuum_swr_replay/reported/__init__.py": {
+    "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/reported/literature.py": {
+    "sha256": "a1f97273474493df7b5901540d753996b0fb2a59cfe00d815fecaec59a2d8319",
+    "code_sha256": "6782bca1fb5ad49431635bbc497c7aa5a9f949fc9abfb78de1f2980e502ceb5d"
+   },
+   "src/continuum_swr_replay/reported/survey.py": {
+    "sha256": "5b96577f502b4ccf3a05bc598cd789d92e2da48cdd16f204d1789f735e00bfe4",
+    "code_sha256": "b7cec7413abc020269cd6b6e5c83abd504c4ac66cf255a1489ead2ae33d7aeb7"
+   },
+   "src/continuum_swr_replay/reported/values.py": {
+    "sha256": "253391bf28f9d88cfc9d3375d3dd810f062e0ed9db6ee46b1f9ec2b6937cb8a9",
+    "code_sha256": "a4990a7727203d9f6864f7461b7cb6624f8fc926cd89d5fbeab92ae3eccd5de4"
+   },
+   "src/continuum_swr_replay/runs/__init__.py": {
+    "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/runs/io.py": {
+    "sha256": "3a05e9c1bcdcf85ccae04ea7e29d7eb8ed1ba5b76490ecdc039d92f2d211b935",
+    "code_sha256": "1c55cd094982955de66a26a570df73c22ecfc25660e98985787bd973b893d3f1"
+   },
+   "src/continuum_swr_replay/runs/provenance.py": {
+    "sha256": "0517671a2cd647305bd9f067de18ce9af20c57664d96d3537fface7c19dc38e5",
+    "code_sha256": "f6c4e53307ff637290d1cfb6fce4b099e32d7b7f73f1910dc22b4dd76e2b26c8"
+   },
+   "src/continuum_swr_replay/tables/__init__.py": {
+    "sha256": "99a10dac0b91e90337a0f3cd2c121b3dda7276e32c598dc9a05131fdcb7f4edb",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/tables/covariate_registry.py": {
+    "sha256": "6ede5a02c1b6ccb801755f8cc407776714665f1d1d2118fd58cc6be04f888d3d",
+    "code_sha256": "0d3ccc246085b3b01b07217fa15c92f81e1de167ba5cb67d8d3b559ac3bb619d"
+   },
+   "src/continuum_swr_replay/tables/io.py": {
+    "sha256": "6350b05f312355bc782e4cdb1577b8a69408ffc58e99f76a27d9fabcabef3eb9",
+    "code_sha256": "068f7c9e29e6600614801562847e8e59c86c83e45173b0711a285ed8e516c4c9"
+   },
+   "src/continuum_swr_replay/tables/versions.py": {
+    "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
+    "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
+   },
+   "paper/tables/table_s1_literature_parameters.csv": {
+    "sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda",
+    "code_sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda"
+   }
+  }
+ },
+ "inputs": [
+  {
+   "path": "paper/tables/table_s1_literature_parameters.csv",
+   "sha256": "edea8a94de03b581e0f7dd6a7fa76f35ccb009f395394dfacacbe51fa5b00bda"
+  }
+ ],
+ "values": {
+  "band_high_max": {
+   "value": 300.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "band_high_min": {
+   "value": 200.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "band_high_mode": {
+   "value": 250.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "band_low_max": {
+   "value": 180.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Largest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "band_low_min": {
+   "value": 80.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Smallest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "band_low_mode": {
+   "value": 150.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "Hz",
+   "description": "Most common lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "bayes_fraction": {
+   "value": 0.8070175438596491,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "method_values",
+   "pending": null
+  },
+  "cells_max": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cells",
+   "description": "Largest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "cells_min": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cells",
+   "description": "Smallest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "cells_mode": {
+   "value": 5.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cells",
+   "description": "Most common minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "longest_max": {
+   "value": 2000.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Largest maximum event duration, over the 24 numeric cells of Max Duration (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "longest_min": {
+   "value": 300.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Smallest maximum event duration, over the 24 numeric cells of Max Duration (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "longest_mode": {
+   "value": 500.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Most common maximum event duration, over the 24 numeric cells of Max Duration (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "mua_only_fraction": {
+   "value": 0.42105263157894735,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection names MUA only)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "method_values",
+   "pending": null
+  },
+  "papers": {
+   "value": 57,
+   "kind": "count",
+   "style": "count",
+   "unit": "",
+   "description": "Papers in the survey",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "method_values",
+   "pending": null
+  },
+  "position_bin_max": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "Largest decoding position bin, over the 46 numeric cells of Position bin (cm)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "position_bin_min": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "Smallest decoding position bin, over the 46 numeric cells of Position bin (cm)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "position_bin_mode": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm",
+   "description": "Most common decoding position bin, over the 46 numeric cells of Position bin (cm)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "shortest_max": {
+   "value": 100.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Largest minimum event duration, over the 40 numeric cells of Min. Duration (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "shortest_min": {
+   "value": 15.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Smallest minimum event duration, over the 40 numeric cells of Min. Duration (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "shortest_mode": {
+   "value": 50.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Most common minimum event duration, over the 40 numeric cells of Min. Duration (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "speed_max": {
+   "value": 10.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm/s",
+   "description": "Largest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "speed_min": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm/s",
+   "description": "Smallest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "speed_mode": {
+   "value": 5.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "cm/s",
+   "description": "Most common running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "swr_and_mua_fraction": {
+   "value": 0.22807017543859648,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection names SWR and MUA only)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "method_values",
+   "pending": null
+  },
+  "swr_only_fraction": {
+   "value": 0.2807017543859649,
+   "kind": "fraction",
+   "style": "pctnum",
+   "unit": "",
+   "description": "Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection names SWR only)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "method_values",
+   "pending": null
+  },
+  "threshold_max": {
+   "value": 8.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "SD",
+   "description": "Largest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "threshold_min": {
+   "value": 1.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "SD",
+   "description": "Smallest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "threshold_mode": {
+   "value": 3.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "SD",
+   "description": "Most common candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "time_bin_max": {
+   "value": 100.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Largest decoding time bin, over the 46 numeric cells of Time bin (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "time_bin_min": {
+   "value": 2.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Smallest decoding time bin, over the 46 numeric cells of Time bin (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  },
+  "time_bin_mode": {
+   "value": 20.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "Most common decoding time bin, over the 46 numeric cells of Time bin (ms)",
+   "questions": [
+    "0.1"
+   ],
+   "figures": [],
+   "source": "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)",
+   "function": "parameter_values",
+   "pending": null
+  }
+ }
+}

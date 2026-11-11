@@ -22,8 +22,8 @@ def test_every_script_exists_and_names_are_unique():
     assert len(rr.BY_NAME) == len(rr.RUNS)
 
 
-def test_every_run_answers_a_listed_question():
-    assert {r.question for r in rr.RUNS} <= set(rr.QUESTIONS)
+def test_every_run_is_in_a_listed_group():
+    assert {r.group for r in rr.RUNS} <= set(rr.GROUPS)
 
 
 def test_selecting_the_arm_ladder_adds_only_the_figures_that_read_it():
@@ -49,7 +49,7 @@ def test_no_dependents_selects_only_what_is_named():
 def test_a_prefix_selects_every_run_under_it():
     names = {r.name for r in rr.select(["behavior.retrospective"], False)}
     assert names == {f"behavior.retrospective.{s}" for s in ("all", "swr", "non_swr")}
-    assert {r.question for r in rr.select(["rate"], False)} == {"rate"}
+    assert {r.group for r in rr.select(["rate"], False)} == {"rate"}
 
 
 def test_a_prefix_must_end_at_a_dot():
@@ -68,6 +68,8 @@ def _py(code):
 
 
 def _cpus(n):
+    if not hasattr(os, "sched_getaffinity"):
+        pytest.skip("CPU affinity (os.sched_getaffinity) exists only on Linux")
     cpus = sorted(os.sched_getaffinity(0))
     if len(cpus) < n:
         pytest.skip(f"needs {n} CPUs")
@@ -99,7 +101,7 @@ def test_a_failed_run_blocks_its_dependents_and_nothing_else(tmp_path):
     assert out.read_text() == "2"
     record = json.loads((logs / "rate.b.json").read_text())
     assert record["exit_code"] == 3 and record["argv"][-1] == "raise SystemExit(3)"
-    assert record["question"] == rr.QUESTIONS["rate"]
+    assert record["group"] == rr.GROUPS["rate"]
     assert record["env"]["OMP_NUM_THREADS"] == "1"
     blocked = {n: json.loads((logs / f"rate.{n}.json").read_text()) for n in "ce"}
     assert blocked["c"]["status"] == "blocked" and blocked["c"]["blocked_by"] == [
@@ -186,7 +188,7 @@ TABLE_RUNS = {
 
 
 def test_the_table_runs_come_first_in_the_order_their_code_requires():
-    tables = [r for r in rr.RUNS if r.question == rr.TABLES]
+    tables = [r for r in rr.RUNS if r.group == rr.TABLES]
     assert {r.name: r.deps for r in tables} == TABLE_RUNS
     assert rr.RUNS[: len(tables)] == tuple(tables)
     assert [r.argv[1:] for r in tables[:3]] == [("--stop-only",), ("--write",), ()]
@@ -195,12 +197,12 @@ def test_the_table_runs_come_first_in_the_order_their_code_requires():
 def test_every_run_needs_a_table_run_directly_or_through_another():
     def needs_tables(name):
         return any(
-            rr.BY_NAME[d].question == rr.TABLES or needs_tables(d)
+            rr.BY_NAME[d].group == rr.TABLES or needs_tables(d)
             for d in rr.BY_NAME[name].deps
         )
 
     for run in rr.RUNS:
-        if run.question != rr.TABLES:
+        if run.group != rr.TABLES:
             assert needs_tables(run.name), run.name
 
 

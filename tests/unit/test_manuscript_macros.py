@@ -1,8 +1,8 @@
 """The manuscript's reported-value macros are defined and hold current values.
 
-``paper/main.tex`` writes result numbers as macros (``\\PartZeroBandLowMode``)
+``paper/main.tex`` writes result numbers as macros (``\\SurveyBandLowMode``)
 that ``paper/reported_values.tex`` defines; the emitter writes that file, the
-values index and the docs' inline values from the part summaries. A macro the
+question view and the docs' inline values from the summaries. A macro the
 emitter no longer writes -- a renamed or removed summary key -- would only show
 up as a LaTeX error, or not at all in a non-stop build; a summary rebuilt
 without rerunning the emitter would leave the old number in the PDF. These
@@ -21,8 +21,8 @@ from continuum_swr_replay.reported import emit, values
 ROOT = Path(__file__).resolve().parents[2]
 PAPER = ROOT / "paper"
 
-_DEFINED = re.compile(r"\\newcommand\{\\(Part(?:Zero|One|Two|Three|Four)[A-Za-z]+)\}")
-_USED = re.compile(r"\\(Part(?:Zero|One|Two|Three|Four)[A-Za-z]+)")
+_NAMES = "|".join(name.capitalize() for name in values.SUMMARIES)
+_DEFINED = re.compile(rf"\\newcommand\{{\\((?:{_NAMES})[A-Za-z]+)\}}")
 _COMMENT = re.compile(r"(?<!\\)%.*$", re.MULTILINE)
 
 
@@ -31,26 +31,21 @@ def defined_macros(reported_values_tex: str) -> set[str]:
     return set(_DEFINED.findall(reported_values_tex))
 
 
-def used_macros(manuscript_tex: str) -> set[str]:
-    """Names of the reported-value macros a manuscript uses outside comments."""
-    return set(_USED.findall(_COMMENT.sub("", manuscript_tex)))
-
-
-def test_used_and_defined_macros_are_found():
+def test_cited_and_defined_macros_are_found():
     reported = (
-        "\\newcommand{\\PartOneSweepReplays}{4,536}  % part1.sweep_replays\n"
-        "\\newcommand{\\PartFourUnits}{\\ensuremath{-}0.50}  % part4.units\n"
+        "\\newcommand{\\DetectionSweepReplays}{4,536}  % detection.sweep_replays\n"
+        "\\newcommand{\\MpfcUnits}{\\ensuremath{-}0.50}  % mpfc.units\n"
     )
     manuscript = (
-        "We simulated \\PartOneSweepReplays{} replays and \\PartTwoMissing{}.\n"
-        "% \\PartThreeCommentedOut is in a comment\n"
-        "A literal 50\\% stays \\PartFourUnits.\n"
+        "We simulated \\DetectionSweepReplays{} replays and \\EventsMissing{}.\n"
+        "% \\BehaviorCommentedOut is in a comment\n"
+        "A literal 50\\% stays \\MpfcUnits.\n"
     )
-    assert defined_macros(reported) == {"PartOneSweepReplays", "PartFourUnits"}
-    assert used_macros(manuscript) == {
-        "PartOneSweepReplays",
-        "PartTwoMissing",
-        "PartFourUnits",
+    assert defined_macros(reported) == {"DetectionSweepReplays", "MpfcUnits"}
+    assert emit.cited_macros(manuscript) == {
+        "DetectionSweepReplays",
+        "EventsMissing",
+        "MpfcUnits",
     }
 
 
@@ -61,7 +56,7 @@ def test_manuscript_reads_the_reported_values():
 
 def test_every_macro_the_manuscript_uses_is_defined():
     defined = defined_macros((PAPER / "reported_values.tex").read_text())
-    used = used_macros((PAPER / "main.tex").read_text())
+    used = emit.cited_macros((PAPER / "main.tex").read_text())
     assert defined, "reported_values.tex defines no reported-value macros"
     missing = sorted(used - defined)
     assert not missing, (
@@ -70,19 +65,25 @@ def test_every_macro_the_manuscript_uses_is_defined():
     )
 
 
+def test_the_manuscript_uses_no_macro_of_the_retired_part_names():
+    """Before the summaries were named for what they hold, their macros were
+    ``\\PartZero…`` to ``\\PartFour…``; the check above cannot see those, since
+    it matches only the current summary names."""
+    retired = re.compile(r"\\Part(?:Zero|One|Two|Three|Four)[A-Z][A-Za-z]*")
+    found = retired.findall(_COMMENT.sub("", (PAPER / "main.tex").read_text()))
+    assert not found, f"main.tex uses retired macros: {sorted(set(found))}"
+
+
 def test_emitted_files_hold_the_committed_summaries():
-    summaries = {
-        s.part: s
-        for s in map(values.read_summary, sorted(PAPER.glob("reported/part*.json")))
-    }
-    assert set(summaries) == set(values.PARTS)
+    summaries = values.read_summaries(PAPER / "reported")
+    assert list(summaries) == list(values.SUMMARIES)
     stale = "is stale: run `make reported-values`"
     assert (PAPER / "reported_values.tex").read_text() == emit.tex_file(summaries), (
         f"paper/reported_values.tex {stale}"
     )
-    assert (PAPER / "reported" / "values_index.md").read_text() == (
-        emit.values_index(summaries)
-    ), f"paper/reported/values_index.md {stale}"
+    assert (PAPER / "reported" / "questions.md").read_text() == (
+        emit.questions_view(summaries)
+    ), f"paper/reported/questions.md {stale}"
     by_key = values.values_by_key(summaries)
     docs = emit.marked_docs((PAPER, ROOT / "docs"))
     assert PAPER / "README.md" in docs
@@ -100,36 +101,37 @@ def _value(key: str, value: float, pending: str | None = None) -> values.Value:
         style="pctnum",
         unit="",
         description="d",
-        claims=("c",),
-        used_in=("paper",),
+        questions=("2d.2",),
+        figures=(),
         source="s",
+        function="f",
         pending=pending,
     )
 
 
 def test_markers_are_rewritten_outside_code_only():
-    by_key = {"part0.share": _value("share", 0.421)}
+    by_key = {"survey.share": _value("share", 0.421)}
     text = (
-        "Stale <!--v:part0.share-->99<!--/v--> and current "
-        "<!--v:part0.share-->42<!--/v-->; "
-        "an example `<!--v:part0.share-->7<!--/v-->` in code."
+        "Stale <!--v:survey.share-->99<!--/v--> and current "
+        "<!--v:survey.share-->42<!--/v-->; "
+        "an example `<!--v:survey.share-->7<!--/v-->` in code."
     )
     filled, changes = emit.fill_markers(text, by_key, "doc.md")
     assert filled == (
-        "Stale <!--v:part0.share-->42<!--/v--> and current "
-        "<!--v:part0.share-->42<!--/v-->; "
-        "an example `<!--v:part0.share-->7<!--/v-->` in code."
+        "Stale <!--v:survey.share-->42<!--/v--> and current "
+        "<!--v:survey.share-->42<!--/v-->; "
+        "an example `<!--v:survey.share-->7<!--/v-->` in code."
     )
-    assert changes == [emit.Change("doc.md", "part0.share", "99", "42")]
+    assert changes == [emit.Change("doc.md", "survey.share", "99", "42")]
 
 
 def test_a_marker_naming_no_summary_key_is_an_error():
-    with pytest.raises(KeyError, match="part0.gone"):
-        emit.fill_markers("<!--v:part0.gone-->1<!--/v-->", {}, "doc.md")
+    with pytest.raises(KeyError, match="survey.gone"):
+        emit.fill_markers("<!--v:survey.gone-->1<!--/v-->", {}, "doc.md")
 
 
-def test_a_pending_value_is_flagged_in_the_macros_and_the_index():
-    summary = values.Summary(part=0, produced_by="by", commit="c")
+def test_a_pending_value_is_flagged_in_the_macros_and_the_questions():
+    summary = values.Summary(name="survey", produced_by="by")
     summary.add(_value("share", 0.5, pending="untracked script"))
-    assert "[PENDING: untracked script]" in emit.tex_file({0: summary})
-    assert "pending: untracked script" in emit.values_index({0: summary})
+    assert "[PENDING: untracked script]" in emit.tex_file({"survey": summary})
+    assert "pending: untracked script" in emit.questions_view({"survey": summary})

@@ -69,12 +69,27 @@ def formatted(value: Value, style: str | None = None, *, latex: bool = False) ->
         count, or a count style for a value that is not whole.
     """
     style = style or value.style
-    x = value.value
     if style in ("pct", "pctnum") and value.kind != "fraction":
         raise ValueError(f"{value.key}: {style} prints fractions, not {value.kind}s")
+    return format_number(value.value, style, latex=latex, name=value.key)
+
+
+def format_number(
+    x: float, style: str, *, latex: bool = False, name: str = "number"
+) -> str:
+    """``x`` printed in ``style``, by the same rules as :func:`formatted`, for a
+    number that is not a reported value (a figure's label of a value it draws).
+
+    ``name`` names the number in an error.
+
+    Raises
+    ------
+    ValueError
+        A count style for a number that is not whole, or an unknown style.
+    """
     if style == "count":
         if float(x) != int(x):
-            raise ValueError(f"{value.key}: count style needs a whole number, got {x}")
+            raise ValueError(f"{name}: count style needs a whole number, got {x}")
         text = f"{int(x):,}"
         return text.replace(",", "{,}") if latex else text
     if style in ("pct", "pctnum"):
@@ -103,4 +118,4 @@ def formatted(value: Value, style: str | None = None, *, latex: bool = False) ->
         if latex:
             return f"\\ensuremath{{{mantissa}\\times10^{{{exponent}}}}}"
         return f"{mantissa}e{exponent}"
-    raise ValueError(f"{value.key}: unknown style {style!r}")
+    raise ValueError(f"{name}: unknown style {style!r}")

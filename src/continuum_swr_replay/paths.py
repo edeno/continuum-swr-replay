@@ -31,15 +31,20 @@ __all__ = [
     "BASENAME_TO_TABLE",
     "CANONICAL_TABLES",
     "CANONICAL_TABLE_BASENAMES",
+    "MANUSCRIPT",
     "MODEL_SUBDIRS",
     "PROCESSED_DATA_DIR_ENV",
     "QVALS_STANDARDIZATION_REFERENCE",
     "STANDARDIZATION_REFERENCE",
+    "SUMMARY_DIR",
+    "TEX_PATH",
     "artifact_intervals_root",
     "carey_root",
+    "content_occupancy_dir",
     "contfrag_replay_content_dir",
     "detection_comparison_dir",
     "event_features_root",
+    "event_spike_evidence_dir",
     "figure_dir",
     "inventory_comparison_root",
     "memoryless_root",
@@ -53,6 +58,15 @@ __all__ = [
 ROOT_DIR = Path(__file__).parent.parent.parent
 """The project root (continuum-swr-replay/, not src/); also
 ``parameters.ROOT_DIR``."""
+
+SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
+"""Where the summaries of the reported values live (``<name>.json``)."""
+
+TEX_PATH = ROOT_DIR / "paper" / "reported_values.tex"
+"""The LaTeX macros the summaries' values are emitted to."""
+
+MANUSCRIPT = ROOT_DIR / "paper" / "main.tex"
+"""The manuscript's LaTeX source."""
 
 PROCESSED_DATA_DIR_ENV = "CSR_PROCESSED_DATA_DIR"
 """The environment variable that moves the processed-data root."""
@@ -110,6 +124,16 @@ def event_features_root() -> Path:
 def artifact_intervals_root() -> Path:
     """Where artifact-interval run folders go, one per run id."""
     return processed_data_dir() / "artifact_intervals"
+
+
+def event_spike_evidence_dir() -> Path:
+    """The spike-evidence run that scores every event: one folder per epoch."""
+    return processed_data_dir() / "event_spike_evidence"
+
+
+def content_occupancy_dir() -> Path:
+    """Where the content-occupancy analysis writes its per-session table."""
+    return processed_data_dir() / "content_occupancy"
 
 
 _LEGACY_ROOTS: dict[str, Callable[[], Path]] = {

@@ -10,6 +10,7 @@ There are four levels, each needing more than the one before:
 | Build the PDF | `make manuscript` | LaTeX |
 | Write the reported numbers into the LaTeX macros and the docs | `make reported-values` | the committed summaries; Python |
 | Rebuild the summaries and the main figures | `make summaries`, `make figures` | the lab's processed data |
+| Before a milestone (a draft to the co-authors, submission, a release): check that every summary is current with the code and its inputs | `make release-check` | the committed summaries; Python; the lab's processed data (`make release-check ARGS=--code-only` checks the code alone, without it) |
 | Rebuild everything, from the recordings | [the full rebuild](#the-full-rebuild) | the lab's Spyglass database, the NWB files, GPUs |
 
 There is no public reproduction yet: every analysis reads the lab's data.
@@ -72,13 +73,29 @@ after a change to fitting code only, start at step 6.
    values into the LaTeX macros and the docs, and build the PDF:
 
    ```bash
-   make summaries        # scripts/reported/summarize_part.py --part 0 ... 4
+   make summaries        # scripts/reported/summarize.py --summary <name>, for each summary
    make reported-values  # scripts/reported/emit_reported_values.py
    make manuscript
    ```
 
    `make reported-values` lists every number that changed, on the screen and in
    `paper/reported/changes.md`. Read that list before committing.
+
+   Each summary records the files of the checkout that built it: the package
+   modules and data files the build loaded and the inputs the repository tracks
+   (the literature table, the committed sweep summaries), with their digests,
+   the commit, and the digest of `uv.lock`. A summary in `paper/reported/` is
+   built from committed files: `summarize.py` writes nothing there when one of
+   those files differs from the commit (commit first; `--output-dir` elsewhere
+   makes a trial build). A docstring or comment edit does not make a summary
+   stale.
+   `make reported-values` names a summary whose code has changed since, but never
+   refuses it. `make release-check` fails on a missing summary file, a summary with
+   no code record, a stale one, one whose single-file inputs changed or are absent,
+   one with tag problems, a pending value the manuscript cites, or a
+   `paper/reported_values.tex` that is not what the summaries give. Run it at a
+   milestone where the processed data is (`make release-check ARGS=--code-only` skips the inputs), then
+   rebuild only the summaries it names.
 
 ## Decoding
 
@@ -160,8 +177,8 @@ Logs are written to `logs/{epoch_identifier}.log` with git hash for reproducibil
 
 | Committed | Made by |
 | --- | --- |
-| `paper/reported/part{n}.json` | `make summaries` |
-| `paper/reported_values.tex`, `paper/reported/values_index.md`, the inline values in `docs/` and `paper/` | `make reported-values` |
+| `paper/reported/<summary>.json` | `make summaries` |
+| `paper/reported_values.tex`, `paper/reported/questions.md`, the inline values in `docs/` and `paper/` | `make reported-values` |
 | `paper/tables/table_s1_literature.tex` (Supplementary Table S1) | `scripts/figures/generate_supp_literature_table.py`, from the survey CSV beside it, which is edited by hand |
 | `paper/main.pdf` | `make manuscript` |
 | Final figures under `paper/figures/` (each listed in `.gitignore` as an exception) | the figure scripts |
@@ -170,5 +187,5 @@ Decodes, tables, fits, logs and every other file under the processed-data root
 are not committed. After a change that alters results, commit the summaries,
 the macros, the docs they fill and the rebuilt PDF together.
 
-[Figure pipeline](figure-pipeline.md) traces each figure from its claim to its
-script and inputs.
+[Figure pipeline](figure-pipeline.md) gives each figure's script, inputs and tests;
+the question list gives the questions and values each figure shows.

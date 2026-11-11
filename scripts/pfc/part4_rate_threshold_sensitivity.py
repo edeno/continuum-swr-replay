@@ -2,14 +2,17 @@
 
 Part 4 reads its unit population through Figure 4's loader
 (:func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`)
-with a 1 Hz gate on ``immobility_avg_firing_rate``, the rate over the bins the
-unit GLM was fit on. The bundles themselves hold every curated mPFC unit with at
-least one spike in the epoch: nothing is gated at fit time. So the gate can be
-moved without a refit. This script reloads the population at several gates and
-recomputes Part 4's per-unit values with Part 4's own functions
-(:func:`~continuum_swr_replay.reported.part4.called_fraction_values`,
-:func:`~continuum_swr_replay.reported.part4.overlap_and_effect_values`,
-:func:`~continuum_swr_replay.reported.part4.swr_without_replay_values`). It
+with no gate on ``immobility_avg_firing_rate``, the rate over the bins the unit
+GLM was fit on, and repeats a few values with a 1 Hz gate as a check. The
+bundles themselves hold every curated mPFC unit with at least one spike in the
+epoch: nothing is gated at fit time. So the gate can be moved without a refit.
+This script loads the population once with no gate, keeps the units at or above
+each gate
+(:func:`~continuum_swr_replay.analysis.pfc.population_statistics.units_at_or_above_rate`)
+and recomputes Part 4's per-unit values with Part 4's own functions
+(:func:`~continuum_swr_replay.reported.mpfc.called_fraction_values`,
+:func:`~continuum_swr_replay.reported.mpfc.overlap_and_effect_values`,
+:func:`~continuum_swr_replay.reported.mpfc.swr_without_replay_values`). It
 also counts, per gate, the units the loader drops for another reason (no usable
 fit, a non-finite modulation curve), and gives the called fractions per
 firing-rate band, so a low gate can be checked for units with almost no spikes.
@@ -39,13 +42,14 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
+from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_FIT_COLUMN,
     load_population_data,
     significant_fraction,
 )
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.part4 import (
+from continuum_swr_replay.reported.mpfc import (
     ALPHA,
     STEM,
     SWR_WITHOUT_REPLAY_CURVES,
@@ -153,9 +157,11 @@ def funnel(raw: pd.DataFrame, gate: float, n_kept: int) -> dict[str, float]:
     raw : pandas.DataFrame
         From :func:`raw_units`.
     gate : float
-        Minimum ``immobility_avg_firing_rate`` (Hz), as the loader applies it.
+        Minimum ``immobility_avg_firing_rate`` (Hz); a unit exactly at it
+        passes.
     n_kept : int
-        Units the loader returned at this gate.
+        Units of the loaded population (a usable fit and finite curves) at or
+        above this gate.
 
     Returns
     -------
@@ -183,6 +189,13 @@ def band_rows(
 ) -> list[dict[str, object]]:
     """Called fractions and spike counts per firing-rate band.
 
+    The fractions of the five canonical tests are those of
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`
+    on the band's units. The fraction for SWRs without replay is counted the
+    same way
+    (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`),
+    NaN when no unit of the band is tested.
+
     Parameters
     ----------
     population : pandas.DataFrame
@@ -208,20 +221,19 @@ def band_rows(
             "spikes_fit_median": float(spikes[keep].median()),
             "spikes_fit_min": float(spikes[keep].min()),
         }
-        for name, (n_called, n_tested) in significant_fraction(
-            population[keep], alpha=ALPHA
-        ).items():
-            values[f"{name}_units_tested"] = n_tested
-            values[f"{name}_called_fraction"] = (
-                n_called / n_tested if n_tested else np.nan
-            )
-        p = extended.loc[
-            (ext_rate >= low) & (ext_rate < high), "SWR_no_non_local: p_heldout"
-        ].to_numpy(dtype=float)
-        tested = np.isfinite(p)
-        values["SWR_no_non_local_units_tested"] = int(tested.sum())
+        for name, fraction in population_statistics.called_fractions(
+            population[keep], ALPHA
+        ).iterrows():
+            values[f"{name}_units_tested"] = fraction["n_tested"]
+            values[f"{name}_called_fraction"] = fraction["fraction"]
+        n_called, n_tested = significant_fraction(
+            extended[(ext_rate >= low) & (ext_rate < high)],
+            ALPHA,
+            population_statistics.SWR_WITHOUT_REPLAY_P_COLUMNS,
+        )[population_statistics.SWR_WITHOUT_REPLAY]
+        values["SWR_no_non_local_units_tested"] = n_tested
         values["SWR_no_non_local_called_fraction"] = (
-            float((p[tested] < ALPHA).mean()) if tested.any() else np.nan
+            n_called / n_tested if n_tested else np.nan
         )
         rows += [
             {"selection": selection, "key": k, "value": v} for k, v in values.items()
@@ -238,15 +250,20 @@ def main(argv: list[str] | None = None) -> None:
     extended_dir = inputs.swr_without_replay_dir
     extended_sidecars = read_sidecars(extended_dir)
     raw = raw_units(inputs.bundle_dir)
+    # Every unit is loaded (no gate), whatever gate the summary itself uses.
+    every_unit, _, lag_time = load_population_data(
+        inputs.bundle_dir, min_firing_rate=0.0
+    )
+    every_extended_unit, every_extended_curve, _ = load_population_data(
+        extended_dir, min_firing_rate=0.0, extra_curves=SWR_WITHOUT_REPLAY_CURVES
+    )
 
     wide: dict[str, dict[str, float]] = {}
     long_rows: list[dict[str, object]] = []
     for label, gate in GATES.items():
-        population, _, lag_time = load_population_data(
-            inputs.bundle_dir, min_firing_rate=gate
-        )
-        extended, extended_curves, _ = load_population_data(
-            extended_dir, min_firing_rate=gate, extra_curves=SWR_WITHOUT_REPLAY_CURVES
+        population, _ = population_statistics.units_at_or_above_rate(every_unit, gate)
+        extended, extended_curves = population_statistics.units_at_or_above_rate(
+            every_extended_unit, gate, every_extended_curve
         )
         if len(extended) != len(population):
             raise ValueError(

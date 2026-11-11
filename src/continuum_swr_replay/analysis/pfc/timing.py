@@ -20,7 +20,14 @@ measures it on simulated responses of known onset. Read onsets beside it.
 
 The population curve is the mean over units of each curve multiplied by the
 sign of its own peak (so a suppression counts as a response of the same
-size), with a percentile interval from resampling sessions.
+size), with a percentile interval from resampling the units' groups (their
+sessions, or their recording days).
+
+The timing statistics of the units called for an event class
+(:func:`called_response_timing`, :func:`called_response_timing_by_animal`,
+:func:`population_rise_timing`, :func:`paired_peak_lag_statistics`,
+:func:`peak_before_onset_fraction`) are the ones the mpfc summary reports; the
+lags they return are in ms, where the functions above them return seconds.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 import numpy as np
+import pandas as pd
 from numpy.typing import NDArray
 
 
@@ -245,19 +253,23 @@ class PopulationTiming(NamedTuple):
     curve : NDArray, shape (n_lags,)
         The sign-aligned mean curve.
     peak_lag, onset_lag : float
-        Its peak lag and half-maximum onset, in seconds.
+        Its peak lag (the lag of its largest absolute value) and half-maximum
+        onset, in seconds.
     peak_lag_interval, onset_lag_interval : tuple of float
-        2.5th and 97.5th percentiles over session resamples, in seconds.
+        2.5th and 97.5th percentiles over the resamples of the groups, in
+        seconds.
     steepest_lag : float
         Its steepest approach to the peak (:func:`steepest_approach_lag`), s.
     steepest_lag_interval : tuple of float
     size : float
-        Its peak less the reference level of ``baseline``
-        (:func:`response_size`), log-rate units; positive for both signs,
-        since the curve is signed by each unit's peak.
+        Its value at the peak less the reference level of ``baseline``
+        (:func:`response_size`), log-rate units. Each unit's curve is signed
+        by its own peak, so an increase and a decrease both count as positive;
+        the size is negative only if the mean curve's largest absolute value
+        is on the other side of zero from the units' own peaks.
     size_interval : tuple of float
     n_units, n_groups : int
-        Units and sessions the curve averages.
+        Units and groups the curve averages.
     """
 
     curve: NDArray
@@ -284,12 +296,12 @@ def population_timing(
     fraction: float = 0.5,
     baseline: str | tuple[float, float] = "zero",
 ) -> PopulationTiming:
-    """Timing of the sign-aligned population curve, resampling sessions.
+    """Timing of the sign-aligned population curve, resampling groups of units.
 
-    Each bootstrap draw resamples the sessions (``groups``) with replacement
-    and averages every unit of every drawn session, a session drawn twice
-    counting twice; the aligned mean curve of the draw gives one peak lag and
-    one onset.
+    Each bootstrap draw resamples the groups (``groups``: the units' sessions,
+    or their recording days) with replacement and averages every unit of every
+    drawn group, a group drawn twice counting twice; the aligned mean curve of
+    the draw gives one peak lag and one onset.
 
     Parameters
     ----------
@@ -297,10 +309,10 @@ def population_timing(
     peak : NDArray, shape (n_units,)
         Signed peaks, from :func:`peak_and_onset`.
     groups : NDArray, shape (n_units,)
-        Session label of each unit.
+        The label each unit is resampled by.
     lag_time : NDArray, shape (n_lags,)
     n_boot : int
-        Session resamples.
+        Resamples of the groups.
     seed : int
         Seed of the resampling.
     fraction, baseline
@@ -311,11 +323,9 @@ def population_timing(
     PopulationTiming
     """
     curves = np.asarray(curves, dtype=float)
-    aligned = curves * np.sign(np.asarray(peak, dtype=float))[None, :]
-    labels, group_index = np.unique(np.asarray(groups), return_inverse=True)
-    n_groups = len(labels)
-    nan_pair = (float("nan"), float("nan"))
-    if n_groups == 0:
+    resampled = _resampled_mean_curves(curves, peak, groups, n_boot=n_boot, seed=seed)
+    if resampled is None:
+        nan_pair = (float("nan"), float("nan"))
         empty = np.full(curves.shape[0], np.nan)
         return PopulationTiming(
             empty,
@@ -330,19 +340,54 @@ def population_timing(
             0,
             0,
         )
+    return _mean_curve_timing(
+        *resampled,
+        lag_time,
+        n_units=curves.shape[1],
+        fraction=fraction,
+        baseline=baseline,
+    )
+
+
+def _resampled_mean_curves(
+    curves: NDArray, peak: NDArray, groups: NDArray, *, n_boot: int, seed: int
+) -> tuple[NDArray, NDArray, int] | None:
+    """The sign-aligned mean curve, shape (n_lags,), its ``n_boot`` resamples of
+    the groups, shape (n_boot, n_lags), and the number of groups; None when
+    there is no group."""
+    aligned = curves * np.sign(np.asarray(peak, dtype=float))[None, :]
+    labels, group_index = np.unique(np.asarray(groups), return_inverse=True)
+    n_groups = len(labels)
+    if n_groups == 0:
+        return None
 
     # Per-session sums make every resample one weighted average.
     sums = np.zeros((n_groups, curves.shape[0]))
     np.add.at(sums, group_index, aligned.T)
     sizes = np.bincount(group_index, minlength=n_groups).astype(float)
     curve = sums.sum(axis=0) / sizes.sum()
-    observed = peak_and_onset(curve, lag_time, fraction=fraction, baseline=baseline)
 
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, n_groups, size=(n_boot, n_groups))
     weights = np.zeros((n_boot, n_groups))
     np.add.at(weights, (np.arange(n_boot)[:, None], draws), 1.0)
     boot_curves = (weights @ sums) / (weights @ sizes)[:, None]
+    return curve, boot_curves, n_groups
+
+
+def _mean_curve_timing(
+    curve: NDArray,
+    boot_curves: NDArray,
+    n_groups: int,
+    lag_time: NDArray,
+    *,
+    n_units: int,
+    fraction: float,
+    baseline: str | tuple[float, float],
+) -> PopulationTiming:
+    """:func:`population_timing` of a mean curve and its resamples
+    (:func:`_resampled_mean_curves`)."""
+    observed = peak_and_onset(curve, lag_time, fraction=fraction, baseline=baseline)
     boot = peak_and_onset(boot_curves.T, lag_time, fraction=fraction, baseline=baseline)
 
     observed_steepest = steepest_approach_lag(curve, lag_time)
@@ -364,6 +409,466 @@ def population_timing(
         steepest_lag_interval=interval(boot_steepest),
         size=float(observed_size[0]),
         size_interval=interval(boot_size),
-        n_units=int(curves.shape[1]),
+        n_units=n_units,
         n_groups=n_groups,
     )
+
+
+# --- timing statistics of the units called for an event class ------------------------
+
+#: The sign of a unit's peak, by the word for its direction.
+DIRECTIONS = {"enhanced": 1.0, "suppressed": -1.0}
+
+_MS = 1e3
+
+#: The columns of :func:`called_response_timing`.
+_CALLED_TIMING_COLUMNS = (
+    "n_units",
+    "peak_lag_median_ms",
+    "peak_lag_quartile_low_ms",
+    "peak_lag_quartile_high_ms",
+    "peak_before_onset_fraction",
+    "onset_median_ms",
+    "onset_before_onset_fraction",
+    "onset_at_edge_fraction",
+    "peak_at_edge_fraction",
+    "rise_onset_median_ms",
+    "steepest_median_ms",
+    "population_pre_event_level_fraction",
+    "population_peak_ms",
+    "population_peak_ms_ci_low",
+    "population_peak_ms_ci_high",
+    "population_onset_ms",
+    "population_onset_ms_ci_low",
+    "population_onset_ms_ci_high",
+    "population_rise_onset_ms",
+    "population_rise_onset_ms_ci_low",
+    "population_rise_onset_ms_ci_high",
+    "population_steepest_ms",
+    "population_steepest_ms_ci_low",
+    "population_steepest_ms_ci_high",
+    "population_size",
+    "population_size_ci_low",
+    "population_size_ci_high",
+    "population_rise_size",
+    "population_rise_size_ci_low",
+    "population_rise_size_ci_high",
+    "population_size_vs_control",
+    "population_control_pre_event_level_fraction",
+    "n_animals",
+    "n_animals_onset_before_event",
+    "n_animals_steepest_before_event",
+    "n_animals_rise_onset_before_event",
+)
+
+
+def population_rise_timing(
+    curves: NDArray,
+    peak: NDArray,
+    groups: NDArray,
+    lag_time: NDArray,
+    *,
+    n_boot: int,
+    seed: int,
+) -> dict[str, float]:
+    """When the sign-aligned mean curve of a set of units peaks and starts to rise.
+
+    The timing of the mean curve measured from its value at the first lag
+    (:func:`population_timing` with ``baseline="window_start"``), with 95 %
+    intervals from resampling ``groups``.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags, n_units)
+        Each unit's peri-event curve.
+    peak : NDArray, shape (n_units,)
+        Signed peaks, from :func:`peak_and_onset`.
+    groups : NDArray, shape (n_units,)
+        The label each unit is resampled by.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    n_boot, seed : int
+        Resamples of ``groups`` behind the intervals, and their seed.
+
+    Returns
+    -------
+    statistics : dict
+        - ``peak_ms``: the lag of the mean curve's largest absolute value, in
+          ms.
+        - ``rise_onset_ms``: its rise onset, in ms: the earliest lag of the
+          run, ending at the peak, over which the curve is at least half way
+          from its value at the first lag to the peak.
+        - ``rise_size``: its value at the peak less its value at the first
+          lag, on the log-rate scale.
+        - ``rise_onset_ms_ci_low``, ``rise_onset_ms_ci_high``,
+          ``rise_size_ci_low``, ``rise_size_ci_high``: the 2.5th and 97.5th
+          percentiles of the rise onset and the rise size over the resamples.
+
+        One unit is enough: the mean curve is then that unit's own. With no
+        unit, every statistic is NaN.
+    """
+    return _rise_statistics(
+        population_timing(
+            curves,
+            peak,
+            groups,
+            lag_time,
+            n_boot=n_boot,
+            seed=seed,
+            baseline="window_start",
+        )
+    )
+
+
+def _rise_statistics(rise: PopulationTiming) -> dict[str, float]:
+    """The statistics of :func:`population_rise_timing` from the timing of the
+    mean curve measured from its value at the first lag."""
+    return {
+        "peak_ms": rise.peak_lag * _MS,
+        "rise_onset_ms": rise.onset_lag * _MS,
+        "rise_onset_ms_ci_low": rise.onset_lag_interval[0] * _MS,
+        "rise_onset_ms_ci_high": rise.onset_lag_interval[1] * _MS,
+        "rise_size": rise.size,
+        "rise_size_ci_low": rise.size_interval[0],
+        "rise_size_ci_high": rise.size_interval[1],
+    }
+
+
+def called_response_timing_by_animal(
+    curves: NDArray, lag_time: NDArray, called: NDArray, animals: NDArray
+) -> pd.DataFrame:
+    """When each animal's own mean response starts, by direction of the peak.
+
+    The called units are split by the sign of their peak; within each
+    direction, every animal with such a unit has its own sign-aligned mean
+    curve (:func:`sign_aligned_mean`), whose start is read by three rules.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags, n_units)
+        Each unit's peri-event curve.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    called : NDArray of bool, shape (n_units,)
+        The units called for the event class.
+    animals : NDArray, shape (n_units,)
+        Each unit's animal.
+
+    Returns
+    -------
+    timing : pd.DataFrame, shape (n_direction_animals, 3)
+        Indexed by ``direction`` (a key of :data:`DIRECTIONS`) and ``animal``,
+        animals in sorted order. Each lag is in ms, relative to event onset:
+
+        - ``onset_ms``: the half-maximum onset of the animal's mean curve.
+        - ``rise_onset_ms``: its rise onset, measured from the curve's value
+          at the first lag.
+        - ``steepest_ms``: its steepest approach to the peak
+          (:func:`steepest_approach_lag`); NaN when the mean curve peaks at
+          the first lag.
+    """
+    timing = peak_and_onset(curves, lag_time)
+    directions, names, rows = [], [], []
+    for direction, sign in DIRECTIONS.items():
+        chosen = called & (np.sign(timing.peak) == sign)
+        for animal in np.unique(animals[chosen]):
+            own = chosen & (animals == animal)
+            own_curve = sign_aligned_mean(curves[:, own], timing.peak[own])
+            onset = peak_and_onset(own_curve, lag_time).onset_lag[0]
+            rise = peak_and_onset(own_curve, lag_time, baseline="window_start")
+            steepest = steepest_approach_lag(own_curve, lag_time)[0]
+            directions.append(direction)
+            names.append(animal)
+            rows.append(
+                {
+                    "onset_ms": onset * _MS,
+                    "rise_onset_ms": rise.onset_lag[0] * _MS,
+                    "steepest_ms": steepest * _MS,
+                }
+            )
+    return pd.DataFrame(
+        rows,
+        index=pd.MultiIndex.from_arrays(
+            [directions, names], names=["direction", "animal"]
+        ),
+        columns=["onset_ms", "rise_onset_ms", "steepest_ms"],
+    )
+
+
+def called_response_timing(
+    curves: NDArray,
+    control: NDArray,
+    lag_time: NDArray,
+    called: NDArray,
+    groups: NDArray,
+    animals: NDArray,
+    *,
+    n_boot: int = 1_000,
+    seed: int = 0,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """When the response of the units called for an event class peaks and starts.
+
+    The called units are split by the sign of their peak (:data:`DIRECTIONS`);
+    a called unit whose curve is not finite or is zero everywhere has no peak
+    and is in neither direction. For each direction, the timing is given per
+    unit (medians and shares over units) and for the population: the
+    sign-aligned mean curve of those units (:func:`population_timing`), with
+    95 % intervals from resampling ``groups``. Lags are reported in ms,
+    relative to event onset.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags, n_units)
+        Each unit's peri-event curve for the event class.
+    control : NDArray, shape (n_lags, n_units)
+        Each unit's matched-control curve; a unit's may be NaN.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    called : NDArray of bool, shape (n_units,)
+        The units called for the event class.
+    groups : NDArray, shape (n_units,)
+        The label each unit is resampled by (its recording day).
+    animals : NDArray, shape (n_units,)
+        Each unit's animal.
+    n_boot, seed : int
+        Resamples of ``groups`` behind the intervals, and their seed.
+
+    Returns
+    -------
+    statistics : pd.DataFrame, shape (2, n_statistics)
+        Indexed by direction. Every statistic but ``n_units`` is NaN when the
+        direction has no unit.
+
+        Over units:
+
+        - ``n_units``: the called units of that direction.
+        - ``peak_lag_median_ms``, ``peak_lag_quartile_low_ms``,
+          ``peak_lag_quartile_high_ms``: the median and the 25th and 75th
+          percentiles of the peak lag.
+        - ``peak_before_onset_fraction``: the share whose peak lag is negative.
+        - ``onset_median_ms``: the median half-maximum onset
+          (:func:`peak_and_onset`); ``onset_before_onset_fraction``: the share
+          whose onset is negative; ``onset_at_edge_fraction``: the share whose
+          half-maximum run reaches the first lag.
+        - ``peak_at_edge_fraction``: the share whose peak is at the first or
+          the last lag of ``lag_time``.
+        - ``rise_onset_median_ms``: the median rise onset (the onset measured
+          from the curve's value at the first lag).
+        - ``steepest_median_ms``: the median lag of the steepest approach to
+          the peak (:func:`steepest_approach_lag`), over the units whose peak
+          is not at the first lag (a peak there has no approach).
+
+        For the sign-aligned mean curve (each with ``_ci_low`` and
+        ``_ci_high``, the 2.5th and 97.5th percentiles over the resamples,
+        except the two ``fraction`` statistics and ``size_vs_control``):
+
+        - ``population_peak_ms``, ``population_onset_ms``,
+          ``population_rise_onset_ms``, ``population_steepest_ms``: its peak
+          lag, half-maximum onset, rise onset and steepest approach.
+        - ``population_size``: its peak, from zero; ``population_rise_size``:
+          its peak less its value at the first lag (log-rate scale). The rise
+          onset and the rise size are those of :func:`population_rise_timing`.
+        - ``population_pre_event_level_fraction``: its value at the first lag
+          as a share of its value at its peak (the lag of its largest absolute
+          value, the peak of ``population_peak_ms`` and ``population_size``),
+          clipped to the range 0 to 1: a first-lag value on the other side of
+          zero from the peak is reported as 0.
+        - ``population_size_vs_control``: over the units of that direction
+          with a finite control curve, their sign-aligned mean curve at its
+          peak less, at that lag, the mean of their control curves, each
+          signed by its unit's peak (NaN when no unit has a control curve).
+        - ``population_control_pre_event_level_fraction``: that control mean
+          at the first lag as a share of the same units' mean curve at its
+          peak, clipped to the range 0 to 1.
+
+        Over animals (:func:`called_response_timing_by_animal`):
+
+        - ``n_animals``: animals with a unit of that direction.
+        - ``n_animals_onset_before_event``,
+          ``n_animals_rise_onset_before_event``,
+          ``n_animals_steepest_before_event``: those whose own mean curve has
+          a negative half-maximum onset, rise onset and steepest approach.
+
+    by_animal : pd.DataFrame
+        The per-animal timing those counts are read from
+        (:func:`called_response_timing_by_animal` of the same units).
+    """
+    timing = peak_and_onset(curves, lag_time)
+    by_animal = called_response_timing_by_animal(curves, lag_time, called, animals)
+    rows = {}
+    for direction, sign in DIRECTIONS.items():
+        chosen = called & (np.sign(timing.peak) == sign)
+        row: dict[str, float] = dict.fromkeys(_CALLED_TIMING_COLUMNS, np.nan)
+        row["n_units"] = int(chosen.sum())
+        rows[direction] = row
+        if not chosen.any():
+            continue
+        peak_ms = timing.peak_lag[chosen] * _MS
+        onset_ms = timing.onset_lag[chosen] * _MS
+        row["peak_lag_median_ms"] = np.median(peak_ms)
+        low, high = np.percentile(peak_ms, [25, 75])
+        row["peak_lag_quartile_low_ms"] = low
+        row["peak_lag_quartile_high_ms"] = high
+        row["peak_before_onset_fraction"] = float((peak_ms < 0).mean())
+        row["onset_median_ms"] = np.median(onset_ms)
+        row["onset_before_onset_fraction"] = float((onset_ms < 0).mean())
+        row["onset_at_edge_fraction"] = float(timing.onset_at_edge[chosen].mean())
+        row["peak_at_edge_fraction"] = float(
+            np.isin(timing.peak_lag[chosen], lag_time[[0, -1]]).mean()
+        )
+        rise_ms = (
+            peak_and_onset(
+                curves[:, chosen], lag_time, baseline="window_start"
+            ).onset_lag
+            * _MS
+        )
+        row["rise_onset_median_ms"] = np.nanmedian(rise_ms)
+        steepest_ms = steepest_approach_lag(curves[:, chosen], lag_time) * _MS
+        row["steepest_median_ms"] = np.nanmedian(steepest_ms)
+        # One resampling of the days, read from zero and from the first lag.
+        resampled = _resampled_mean_curves(
+            curves[:, chosen],
+            timing.peak[chosen],
+            groups[chosen],
+            n_boot=n_boot,
+            seed=seed,
+        )
+        population_curve, rise_curve = (
+            _mean_curve_timing(
+                *resampled,
+                lag_time,
+                n_units=int(chosen.sum()),
+                fraction=0.5,
+                baseline=baseline,
+            )
+            for baseline in ("zero", "window_start")
+        )
+        for what, point, (ci_low, ci_high) in (
+            ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
+            ("onset", population_curve.onset_lag, population_curve.onset_lag_interval),
+            (
+                "steepest",
+                population_curve.steepest_lag,
+                population_curve.steepest_lag_interval,
+            ),
+        ):
+            row[f"population_{what}_ms"] = point * _MS
+            row[f"population_{what}_ms_ci_low"] = ci_low * _MS
+            row[f"population_{what}_ms_ci_high"] = ci_high * _MS
+        row["population_size"] = population_curve.size
+        row["population_size_ci_low"] = population_curve.size_interval[0]
+        row["population_size_ci_high"] = population_curve.size_interval[1]
+        rise = _rise_statistics(rise_curve)
+        for name in (
+            "rise_onset_ms",
+            "rise_onset_ms_ci_low",
+            "rise_onset_ms_ci_high",
+            "rise_size",
+            "rise_size_ci_low",
+            "rise_size_ci_high",
+        ):
+            row[f"population_{name}"] = rise[name]
+        mean_curve = population_curve.curve
+        at_peak = int(np.argmax(np.abs(mean_curve)))
+        row["population_pre_event_level_fraction"] = float(
+            np.clip(mean_curve[0] / mean_curve[at_peak], 0.0, 1.0)
+        )
+        with_control = np.isfinite(control[:, chosen]).all(axis=0)
+        if with_control.any():
+            # Both means are over the units with a control curve: the mean
+            # curve itself when every unit has one.
+            own_peak = timing.peak[chosen][with_control]
+            if not with_control.all():
+                mean_curve = sign_aligned_mean(
+                    curves[:, chosen][:, with_control], own_peak
+                )
+                at_peak = int(np.argmax(np.abs(mean_curve)))
+            control_mean = sign_aligned_mean(
+                control[:, chosen][:, with_control], own_peak
+            )
+            row["population_size_vs_control"] = (
+                mean_curve[at_peak] - control_mean[at_peak]
+            )
+            row["population_control_pre_event_level_fraction"] = float(
+                np.clip(control_mean[0] / mean_curve[at_peak], 0.0, 1.0)
+            )
+        own = by_animal.loc[direction]
+        row["n_animals"] = len(own)
+        for rule in ("onset", "steepest", "rise_onset"):
+            row[f"n_animals_{rule}_before_event"] = int((own[f"{rule}_ms"] < 0).sum())
+    statistics = pd.DataFrame.from_dict(
+        rows, orient="index", columns=list(_CALLED_TIMING_COLUMNS)
+    )
+    return statistics, by_animal
+
+
+def paired_peak_lag_statistics(
+    first: NDArray,
+    second: NDArray,
+    lag_time: NDArray,
+    first_called: NDArray,
+    second_called: NDArray,
+) -> dict[str, float]:
+    """Whether units called for two event classes peak later for the second.
+
+    Parameters
+    ----------
+    first, second : NDArray, shape (n_lags, n_units)
+        Each unit's curve for the two classes.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    first_called, second_called : NDArray of bool, shape (n_units,)
+        The units called for each class.
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_paired``: units called for both classes whose two peaks have the
+          same sign.
+        - ``difference_median_ms``: over those units, the median of the second
+          class's peak lag minus the first's, in ms.
+        - ``second_later_fraction``: the share of those units whose second
+          peak is later than their first.
+
+        The last two are NaN when there is no such unit.
+    """
+    first_timing = peak_and_onset(first, lag_time)
+    second_timing = peak_and_onset(second, lag_time)
+    paired = (
+        first_called
+        & second_called
+        & (np.sign(first_timing.peak) == np.sign(second_timing.peak))
+    )
+    difference = (second_timing.peak_lag[paired] - first_timing.peak_lag[paired]) * _MS
+    statistics = {
+        "n_paired": int(paired.sum()),
+        "difference_median_ms": np.nan,
+        "second_later_fraction": np.nan,
+    }
+    if paired.any():
+        statistics["difference_median_ms"] = np.median(difference)
+        statistics["second_later_fraction"] = float((difference > 0).mean())
+    return statistics
+
+
+def peak_before_onset_fraction(curves: NDArray, lag_time: NDArray) -> float:
+    """The share of curves whose peak lag is negative.
+
+    For matched-control curves, which hold no event, this is what a peak lag
+    drawn by noise gives.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags, n_units)
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+
+    Returns
+    -------
+    fraction : float
+        Over the curves with a peak (finite and not identically zero); NaN
+        when there is none.
+    """
+    timing = peak_and_onset(curves, lag_time)
+    usable = np.isfinite(timing.peak_lag)
+    return float((timing.peak_lag[usable] < 0).mean())
