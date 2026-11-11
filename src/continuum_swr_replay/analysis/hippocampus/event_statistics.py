@@ -649,9 +649,14 @@ def class_medians(
 
 # --- where content sits -----------------------------------------------------------
 
+OCCUPANCY_QUADRANTS = ("remote_well", "own_well", "remote_path", "near_off")
+"""The four places a content time bin is in, by its distance to the animal and
+to the nearest well: at a remote well, at the animal's own well, on a remote
+path, or near the animal off the wells."""
+
 OCCUPANCY_PLACES = ("remote_well", "own_well", "at_well", "remote_path", "near_off")
-"""Where content can sit: at a remote well, at the animal's own well, at either,
-on a remote path, or near the animal off the wells."""
+"""Where content can sit: the four :data:`OCCUPANCY_QUADRANTS`, and at either
+well (``at_well``)."""
 
 
 def content_occupancy_shares(occupancy: pd.DataFrame) -> pd.DataFrame:
@@ -688,8 +693,9 @@ def n_animals_non_swr_more_at_well(occupancy: pd.DataFrame) -> int:
 
 def _weighted_shares(occupancy: pd.DataFrame, by: list[str]) -> pd.DataFrame:
     """The share of time bins at each place, weighted by time bins, per ``by``."""
-    places = ["remote_well", "own_well", "remote_path", "near_off"]
-    without = occupancy.loc[occupancy["n"] > 0, places].isna().any(axis=1)
+    without = (
+        occupancy.loc[occupancy["n"] > 0, list(OCCUPANCY_QUADRANTS)].isna().any(axis=1)
+    )
     if without.any():
         raise ValueError(
             f"{int(without.sum())} sessions with time bins have no share at a place"

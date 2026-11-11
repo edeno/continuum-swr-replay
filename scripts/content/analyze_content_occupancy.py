@@ -65,6 +65,11 @@ from continuum_swr_replay.analysis.events.nonlocal_detection import (  # noqa: E
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
+from continuum_swr_replay.analysis.hippocampus.event_statistics import (  # noqa: E402
+    OCCUPANCY_PLACES,
+    OCCUPANCY_QUADRANTS,
+    content_occupancy_shares,
+)
 from continuum_swr_replay.data_loaders.constants import N_LEAF_ARMS  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_decode_files,
@@ -101,7 +106,6 @@ DWE = np.arange(0, 201, 5)  # distance-to-well 1D histogram edges
 
 GROUPS = ("nonSWR", "SWR")
 GROUP_COLORS = {"nonSWR": "#0072B2", "SWR": "#009E73"}
-QUADRANTS = ("remote_well", "own_well", "remote_path", "near_off")
 QUADRANT_LABELS = (
     "remote\nreward well",
     "own well\n(near animal)",
@@ -214,8 +218,9 @@ def quadrant_fractions(d_animal: np.ndarray, d_well: np.ndarray) -> dict[str, fl
     """Fraction of content *timebins* in each (far × at-well) quadrant.
 
     Timebin-weighted (where the decoded content spends its time), not
-    event-weighted; longer events contribute more. Aggregation (`_wavg`) keeps
-    this convention (weights per-session fractions by timebin count).
+    event-weighted; longer events contribute more. Aggregation
+    (:func:`content_occupancy_shares`) keeps this convention (weights
+    per-session fractions by timebin count).
     """
     far = d_animal > FAR_CM
     at_well = d_well < AT_WELL_CM
@@ -294,10 +299,32 @@ def analyze(
     return pd.DataFrame(rows), hist2d, dwell_hist
 
 
-def _wavg(g: pd.DataFrame, col: str) -> float:
-    """Timebin-count-weighted mean of a per-session fraction (NaN if no timebins)."""
-    total = g["n"].sum()
-    return float((g[col] * g["n"]).sum() / total) if total else float("nan")
+def group_shares(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Each group's timebin-weighted share at each place
+    (:func:`content_occupancy_shares`), a row of NaN for a group with no session.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (len(GROUPS), len(OCCUPANCY_PLACES))
+    """
+    return content_occupancy_shares(metrics).reindex(list(GROUPS))
+
+
+def non_swr_shares_by_animal(metrics: pd.DataFrame) -> pd.DataFrame:
+    """Each animal's timebin-weighted non-SWR share at each place: the
+    :func:`content_occupancy_shares` of its own sessions.
+
+    Returns
+    -------
+    shares : pd.DataFrame, shape (n_animals, len(OCCUPANCY_PLACES))
+        Indexed by ``animal``, in sorted order.
+    """
+    non_swr = metrics[metrics.group == "nonSWR"]
+    rows = {
+        animal: content_occupancy_shares(sessions).loc["nonSWR"]
+        for animal, sessions in non_swr.groupby("animal")
+    }
+    return pd.DataFrame(rows, index=list(OCCUPANCY_PLACES)).T.rename_axis("animal")
 
 
 # --- Figures ------------------------------------------------------------------
@@ -314,25 +341,21 @@ def render(
 
     # 1. quadrant histogram (the headline)
     fig, ax = plt.subplots(figsize=(9, 5))
-    x = np.arange(len(QUADRANTS))
+    x = np.arange(len(OCCUPANCY_QUADRANTS))
     width = 0.38
+    shares = group_shares(metrics)
     for i, group in enumerate(GROUPS):
-        g = metrics[metrics.group == group]
         ax.bar(
             x + (i - 0.5) * width,
-            [_wavg(g, q) for q in QUADRANTS],
+            shares.loc[group, list(OCCUPANCY_QUADRANTS)].tolist(),
             width,
             label=group,
             color=GROUP_COLORS[group],
         )
-    for j, q in enumerate(QUADRANTS):  # per-animal non-SWR dots
-        pa = (
-            metrics[metrics.group == "nonSWR"]
-            .groupby("animal")
-            .apply(lambda gg, q=q: _wavg(gg, q))
-        )
+    pa = non_swr_shares_by_animal(metrics)
+    for j, q in enumerate(OCCUPANCY_QUADRANTS):  # per-animal non-SWR dots
         ax.scatter(
-            [x[j] - 0.5 * width] * len(pa), pa.to_numpy(), color="k", s=14, zorder=3
+            [x[j] - 0.5 * width] * len(pa), pa[q].to_numpy(), color="k", s=14, zorder=3
         )
     ax.set_xticks(x)
     ax.set_xticklabels(QUADRANT_LABELS)
@@ -454,15 +477,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         f"\nWrote per-session metrics ({len(metrics)} rows) + 2D histogram + figures to {args.output_dir}"
     )
     print("\nQuadrant fractions (n-weighted):")
+    shares = group_shares(metrics)
     for group in GROUPS:
-        g = metrics[metrics.group == group]
-        print(f"  {group}: " + ", ".join(f"{q}={_wavg(g, q):.2f}" for q in QUADRANTS))
+        print(
+            f"  {group}: "
+            + ", ".join(f"{q}={shares.loc[group, q]:.2f}" for q in OCCUPANCY_QUADRANTS)
+        )
     print("\nPer-animal non-SWR (within-animal):")
-    pa = (
-        metrics[metrics.group == "nonSWR"]
-        .groupby("animal")
-        .apply(lambda gg: pd.Series({q: _wavg(gg, q) for q in QUADRANTS}))
-    )
+    pa = non_swr_shares_by_animal(metrics)[list(OCCUPANCY_QUADRANTS)]
     print(pa.round(2).to_string())
 
 
