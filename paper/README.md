@@ -24,7 +24,7 @@ Python nor the lab's data: it uses the committed figures and
 | `reported/overview.md` | The assistant's reading of the values, question by question, for the lead to check |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
 | `tables/` | `table_s1_literature_parameters.csv`, the <!--v:part0.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
-| `claims_table.md`, `figure_claims_plan.md` | Each claim, the comparison that supports it, and where it goes |
+| `claims_table.md` | Each claim, the comparison that supports it, and where it goes (being replaced by the question list, `src/continuum_swr_replay/reported/questions.py`) |
 | `Makefile`, `.latexmkrc` | Build settings |
 | `LICENSE` | CC BY 4.0 for the manuscript text and figures |
 

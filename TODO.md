@@ -59,6 +59,18 @@ Work that is deferred on purpose. Each item says when it should be done.
 
   *When:* at the next session on the cluster, before the Part 2 rebuild.
 
+- [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
+  removed after `cad31719`; it used an older claim numbering, so "D" is its claim
+  "our method beats SWR-triggered decoding"). Quoted as it wrote them; confirm
+  each is still open, or close it:
+  - "Close vs remote: scope of headline claims (default remote-clean)."
+  - "Whether D needs a literal traditional-pipeline re-implementation or a
+    derived contingency suffices."
+  - "Does Fig 3d's 'reward zones' survive the remote-subset + autocorrelation
+    controls, or get reframed as 'recent/valued locations'?"
+
+  *When:* when Figures 2 and 3 are designed.
+
 ## Checks
 
 - [ ] **Type checking.** `mypy src/` reports about 400 errors in 90 files.
