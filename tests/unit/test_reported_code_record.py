@@ -19,6 +19,7 @@ from continuum_swr_replay.reported.code_record import (
     code_changes,
     code_digest,
     code_record,
+    loaded_modules,
 )
 from continuum_swr_replay.reported.release import release_problems, staleness
 
@@ -38,6 +39,15 @@ def test_the_code_digest_ignores_docstrings_comments_and_layout():
     same = same.replace("return 2 * x", "return (2 *\n        x)")
     assert code_digest(same) == code_digest(SOURCE)
     assert code_digest(SOURCE.replace("2 * x", "3 * x")) != code_digest(SOURCE)
+
+
+def test_the_loaded_modules_leave_out_the_question_list_and_the_record_itself():
+    root = Path(__file__).resolve().parents[2]
+    names = {str(p.relative_to(root)) for p in loaded_modules(root)}
+    reported = "src/continuum_swr_replay/reported"
+    assert f"{reported}/values.py" in names
+    assert f"{reported}/questions.py" not in names
+    assert f"{reported}/code_record.py" not in names
 
 
 def _git(repo: Path, *args: str) -> None:

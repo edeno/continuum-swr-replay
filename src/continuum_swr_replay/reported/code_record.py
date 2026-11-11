@@ -30,6 +30,14 @@ from continuum_swr_replay.runs.provenance import git
 
 PACKAGE = "continuum_swr_replay"
 
+NOT_RECORDED = (
+    "continuum_swr_replay.reported.questions",
+    "continuum_swr_replay.reported.code_record",
+)
+"""Modules a build loads that cannot change a value: the question list (its tags
+are checked on their own, at every emit) and this record. Left out so that
+rewording a question does not make every summary stale."""
+
 
 def _strip_docstrings(tree: ast.AST) -> ast.AST:
     for node in ast.walk(tree):
@@ -63,11 +71,12 @@ def _python() -> str:
 
 def loaded_modules(repo: Path) -> list[Path]:
     """The files under ``repo`` of the package's modules loaded in this process,
-    plus the running script, sorted."""
+    other than :data:`NOT_RECORDED`, plus the running script, sorted."""
     files = {
         Path(module.__file__).resolve()
         for name, module in list(sys.modules.items())
         if (name == PACKAGE or name.startswith(PACKAGE + "."))
+        and name not in NOT_RECORDED
         and getattr(module, "__file__", None)
     }
     main = sys.modules.get("__main__")
