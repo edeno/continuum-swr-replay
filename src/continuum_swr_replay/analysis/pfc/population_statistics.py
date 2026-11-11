@@ -383,6 +383,10 @@ def units_at_or_above_rate(
 ) -> tuple[pd.DataFrame, dict[str, NDArray]]:
     """The units whose firing rate on the fitted bins reaches a cutoff.
 
+    The comparison is the one
+    :func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`
+    makes for its ``min_firing_rate``, applied to a population already loaded.
+
     Parameters
     ----------
     population : pd.DataFrame, shape (n_units, n_columns)
