@@ -361,3 +361,31 @@ def test_audited_drop_statistics_name_the_first_row_with_the_most_drops():
         "most_dropped_model": "m2",
         "most_dropped_term": "t2",
     }
+
+
+# --- a number over groups -------------------------------------------------------------
+
+
+def test_group_range_names_the_first_group_with_each_extreme():
+    values = {"a": 3.0, "b": 1.0, "c": 1.0, "d": 5.0, "e": 5.0}
+    assert stats.group_range(values) == {
+        "low": 1.0,
+        "low_group": "b",
+        "high": 5.0,
+        "high_group": "d",
+        "n_excluded": 0,
+    }
+
+
+def test_group_range_leaves_out_the_excluded_groups():
+    values = {"a": 3.0, "b": 1.0, "c": 2.0, "d": 5.0}
+    excluded = {"a": 0, "b": 1, "c": 0, "d": 1}
+    assert stats.group_range(values, excluded) == {
+        "low": 2.0,
+        "low_group": "c",
+        "high": 3.0,
+        "high_group": "a",
+        "n_excluded": 2,
+    }
+    with pytest.raises(ValueError, match="no group"):
+        stats.group_range(values, dict.fromkeys(values, True))

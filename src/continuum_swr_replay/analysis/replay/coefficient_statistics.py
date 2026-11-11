@@ -21,7 +21,7 @@ Which sessions a coefficient is read over is the per-term gate of
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -381,4 +381,48 @@ def audited_drop_statistics(audited: pd.DataFrame) -> dict[str, float | str]:
         "most_dropped_of": int(worst["n_dropped"] + worst["n_sessions"]),
         "most_dropped_model": worst["model"],
         "most_dropped_term": worst["term"],
+    }
+
+
+def group_range(
+    values: Mapping[str, float], excluded: Mapping[str, bool] | None = None
+) -> dict[str, float | str]:
+    """The lowest and highest of one number over groups, and the groups that
+    hold them.
+
+    Parameters
+    ----------
+    values : mapping of str to float
+        The number, by group (a population, a rung).
+    excluded : mapping of str to bool, optional
+        By group, whether to leave it out of the range (a time-course peak on
+        the edge of its interval bounds the peak rather than locating it).
+
+    Returns
+    -------
+    statistics : dict
+        ``low`` and ``high``, the lowest and highest over the groups kept;
+        ``low_group`` and ``high_group``, the groups that hold them (the first
+        in the order of ``values`` when several tie); ``n_excluded``, the groups
+        left out.
+
+    Raises
+    ------
+    ValueError
+        If no group is kept.
+    """
+    kept = {
+        group: value
+        for group, value in values.items()
+        if not (excluded and excluded[group])
+    }
+    if not kept:
+        raise ValueError("no group is left to take a range over")
+    low, high = min(kept, key=kept.__getitem__), max(kept, key=kept.__getitem__)
+    return {
+        "low": kept[low],
+        "low_group": low,
+        "high": kept[high],
+        "high_group": high,
+        "n_excluded": len(values) - len(kept),
     }

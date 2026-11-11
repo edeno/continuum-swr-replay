@@ -59,19 +59,21 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from patsy import dmatrix
-from scipy.stats import norm, wilcoxon
+from scipy.stats import norm
 from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
+from continuum_swr_replay.analysis.replay import rate_fit_statistics
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    aic_difference_statistics,
     coefficient_statistics,
     fit_rows,
+    fits_carrying,
     gated_coefficient_difference_statistics,
     gated_coefficient_statistics,
-)
-from continuum_swr_replay.analysis.replay.contrast_aggregation import (
-    gate_term_sessions,
+    gated_exp_median_ratio,
+    group_range,
+    term_separation_statistics,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
@@ -79,24 +81,17 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
 )
 from continuum_swr_replay.analysis.replay.learning import cross_session_role_summary
 from continuum_swr_replay.analysis.replay.model_specs import (
-    ARRIVAL_CLOCK_COLUMN,
-    ARRIVAL_SPLINE_KNOTS,
     BIN_S,
     MODEL_PER_BIN_RATE,
     PER_BIN_DESIGN,
     PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
-    REWARD_HISTORY_N_BASIS,
     REWARD_HISTORY_N_LAGS,
-    SPLINE_KNOTS,
     TMAX,
-    TMAX_ARRIVAL,
     longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
     aggregate_to_timebins,
-    reconstruct_reward_kernels,
-    reward_kernel_rate_ratios,
 )
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
@@ -117,7 +112,7 @@ from continuum_swr_replay.reported.values import (
     pend,
     value_factory,
 )
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
+from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
 SC = list(SESSION_COLUMNS)
 
@@ -374,199 +369,6 @@ def _require(condition: bool, message: str) -> None:
 # --- rate, per time bin (Family B) --------------------------------------------
 
 
-def _rung(fits: pd.DataFrame, model: str, outcome: str) -> pd.DataFrame:
-    return fits[(fits["model"] == model) & (fits["outcome"] == outcome)]
-
-
-def _reward_gated(frame: pd.DataFrame) -> pd.DataFrame:
-    """The fits whose three reward-basis coefficients all pass the per-term gate.
-
-    The rule is the content and rate contrasts' (:func:`gate_term_sessions`): a
-    fit is left out when any of the three terms is flagged separated or ran
-    away, since a kernel reconstructed from it inherits that term. Convergence
-    is not part of the gate; the count of kept fits that did not converge is
-    reported beside the kernel values.
-    """
-    kept = np.ones(len(frame), dtype=bool)
-    for term in REWARD_HISTORY_COLUMNS:
-        kept &= gate_term_sessions(frame, term).kept.to_numpy()
-    return frame[kept]
-
-
-def _lag_one_kernels(frame: pd.DataFrame) -> pd.DataFrame:
-    """Per-session reconstructed reward kernel at lag 1 (log rate) of the gated
-    fits: the session columns, ``converged`` and ``lag_one``."""
-    fitted = _reward_gated(frame).dropna(subset=REWARD_COEFS)
-    kernels = reconstruct_reward_kernels(
-        fitted[REWARD_COEFS].to_numpy(dtype=float),
-        REWARD_HISTORY_N_LAGS,
-        REWARD_HISTORY_N_BASIS,
-    )
-    return fitted[SC + ["converged"]].assign(lag_one=kernels[:, 0])
-
-
-def _lag_one_summary(frame: pd.DataFrame) -> dict[str, float]:
-    """The gated per-session lag-1 kernels of one (model, outcome): their count,
-    the fits the gate left out, the kept fits that did not converge, the share
-    above 1, the signed-rank p against 1, and per animal the median and the
-    animals above 1."""
-    kernels = _lag_one_kernels(frame)
-    n_fitted = int(frame[REWARD_COEFS].notna().all(axis=1).sum())
-    per_animal = kernels.groupby("animal")["lag_one"].median()
-    _require(len(per_animal) == 5, f"{len(per_animal)} animals, not 5")
-    return {
-        "n": len(kernels),
-        "n_dropped": n_fitted - len(kernels),
-        "n_nonconverged": int((kernels["converged"] == False).sum()),  # noqa: E712
-        "positive": float((kernels["lag_one"] > 0).mean()),
-        "p": float(wilcoxon(kernels["lag_one"]).pvalue),
-        "rr_animal": float(np.exp(per_animal.median())),
-        "animals_positive": int((per_animal > 0).sum()),
-    }
-
-
-def _paired_lag_one(fits: pd.DataFrame) -> dict[str, float]:
-    """The within-session comparison of the reconstructed lag-1 reward kernel,
-    SWR-coupled against non-SWR non-local, over the sessions in which both
-    streams' fits pass the reward gate."""
-    full = fits[fits["model"] == FULL_RATE_RUNG]
-    a = _lag_one_kernels(full[full["outcome"] == "non_local_swr"])
-    b = _lag_one_kernels(full[full["outcome"] == "non_local_no_swr"])
-    merged = a.merge(b, on=SC, suffixes=("_swr", "_no_swr"))
-    difference = merged["lag_one_swr"] - merged["lag_one_no_swr"]
-    per_animal = merged.assign(d=difference).groupby("animal")["d"].median()
-    _require(
-        len(per_animal) == 5, f"paired test spans {len(per_animal)} animals, not 5"
-    )
-    return {
-        "n": len(merged),
-        "positive": float((difference > 0).mean()),
-        "animals_positive": int((per_animal > 0).sum()),
-        "p": float(wilcoxon(merged["lag_one_swr"], merged["lag_one_no_swr"]).pvalue),
-    }
-
-
-def _coefficient_session(frame: pd.DataFrame, term: str) -> dict[str, float]:
-    """Across-session median of one coefficient over the fits the per-term gate
-    keeps, the share positive, the animals whose median shares its sign, and the
-    signed-rank p (``summarize_per_bin_rate_models._one_sample``)."""
-    column = f"coef_{term}"
-    kept = frame[gate_term_sessions(frame, term).kept]
-    v = kept[column]
-    median = float(v.median())
-    per_animal = kept.groupby("animal")[column].median().dropna()
-    return {
-        "rr": float(np.exp(median)),
-        "positive": float((v > 0).mean()),
-        "animals_same_sign": int((np.sign(per_animal) == np.sign(median)).sum()),
-        "p": float(wilcoxon(v).pvalue),
-        "n": len(v),
-    }
-
-
-def _immediate_session(frame: pd.DataFrame) -> dict[str, float]:
-    """:func:`_coefficient_session` of the first reward basis coefficient."""
-    return _coefficient_session(frame, REWARD_HISTORY_COLUMNS[0])
-
-
-def _immediate_animal(frame: pd.DataFrame) -> tuple[float, int]:
-    """``exp`` of the animal-balanced median of the first reward basis
-    coefficient over the gated fits, and the animals whose own median is
-    positive (``compare_fits._animal_balanced``)."""
-    term = REWARD_HISTORY_COLUMNS[0]
-    kept = frame[gate_term_sessions(frame, term).kept]
-    per_animal = kept.groupby("animal")[f"coef_{term}"].median()
-    _require(len(per_animal) == 5, f"{len(per_animal)} animals, not 5")
-    return float(np.exp(per_animal.median())), int((per_animal > 0).sum())
-
-
-def _delta_aic(fits: pd.DataFrame, child: str, parent: str, outcome: str) -> pd.Series:
-    """Per-session ``AIC(child) - AIC(parent)`` (negative = child better)."""
-    a = _rung(fits, child, outcome)[SC + ["aic"]]
-    b = _rung(fits, parent, outcome)[SC + ["aic"]]
-    merged = a.merge(b, on=SC, suffixes=("_child", "_parent"))
-    return (merged["aic_child"] - merged["aic_parent"]).dropna()
-
-
-def _spline_columns(fits: pd.DataFrame, clock: str) -> list[str]:
-    prefix = f"coef_bs({clock},"
-    cols = [
-        c
-        for c in fits.columns
-        if isinstance(c, str)
-        and c.startswith(prefix)
-        and c.endswith("]")
-        and ":" not in c
-    ]
-    return sorted(cols, key=lambda c: int(c.rsplit("[", 1)[1][:-1]))
-
-
-def _time_course(
-    fits: pd.DataFrame, model: str, outcome: str, clock: str, knots, tmax: float
-) -> tuple[np.ndarray, np.ndarray, int]:
-    """Across-session median fitted rate on the clock's supported interior, the
-    outermost interior knots (``compare_fits._fitted_time_courses``): sessions
-    flagged separated or with a non-finite curve are left out. Also returns the
-    number of session curves the median is over."""
-    grid = np.linspace(float(knots[0]), float(knots[-1]), 401)
-    sub = _rung(fits, model, outcome)
-    columns = _spline_columns(fits, clock)
-    beta = sub[columns].to_numpy(dtype=float)
-    intercept = sub["coef_Intercept"].to_numpy(dtype=float)
-    ok = np.isfinite(beta).all(axis=1) & np.isfinite(intercept)
-    ok &= ~(sub["separated"] == True).to_numpy()  # noqa: E712 (NaN must not count)
-    basis = np.asarray(
-        dmatrix(
-            f"bs(x, knots={tuple(knots)}, lower_bound=0.0, upper_bound={tmax}) - 1",
-            {"x": grid},
-            return_type="dataframe",
-        )
-    )
-    with np.errstate(over="ignore"):
-        curves = np.exp(intercept[ok, None] + beta[ok] @ basis.T)
-    curves = curves[np.isfinite(curves).all(axis=1)]
-    return grid, np.median(curves, axis=0), len(curves)
-
-
-def _clock_shape(fits: pd.DataFrame, outcome: str) -> dict[str, float]:
-    """Where the stop-clock and arrival-clock time courses peak, whether each
-    peak sits on the edge of its supported interval, the session curves behind
-    each, and the KS distance between the two shapes
-    (``compare_fits.arrival_clock_shape_table``; a peak on the edge is starred
-    there by ``_flag_support_edge``: it bounds the burst rather than locating it).
-    """
-    grid, stop_curve, n_stop = _time_course(
-        fits, STOP_TIME_RUNG, outcome, "tc", SPLINE_KNOTS, TMAX
-    )
-    arr_grid, arr_curve, n_arr = _time_course(
-        fits,
-        ARRIVAL_TIME_RUNG,
-        outcome,
-        ARRIVAL_CLOCK_COLUMN,
-        ARRIVAL_SPLINE_KNOTS,
-        TMAX_ARRIVAL,
-    )
-    ks = np.nanmax(
-        np.abs(_shape_cdf(grid, stop_curve) - _shape_cdf(arr_grid, arr_curve))
-    )
-    stop_i, arr_i = int(np.argmax(stop_curve)), int(np.argmax(arr_curve))
-    return {
-        "time_peak_s": float(grid[stop_i]),
-        "time_peak_edge": int(stop_i in (0, len(grid) - 1)),
-        "time_peak_sessions": n_stop,
-        "arrival_peak_s": float(arr_grid[arr_i]),
-        "arrival_peak_edge": int(arr_i in (0, len(arr_grid) - 1)),
-        "arrival_peak_sessions": n_arr,
-        "clock_ks": float(ks),
-    }
-
-
-def _shape_cdf(grid: np.ndarray, curve: np.ndarray) -> np.ndarray:
-    increments = np.diff(grid) * 0.5 * (curve[1:] + curve[:-1])
-    cdf = np.concatenate([[0.0], np.cumsum(increments)])
-    return cdf / cdf[-1]
-
-
 def per_bin_values(
     fits: pd.DataFrame, all_stops: pd.DataFrame, source: str
 ) -> list[Value]:
@@ -577,35 +379,28 @@ def per_bin_values(
     """
     make = value_factory(per_bin_values, source, TAGS["rate"])
     values: list[Value] = []
-    null = fits[fits["model"] == "M0_const"]
-    stops = null.groupby("outcome")["n_stops"].sum()
-    bins = null.groupby("outcome")["n_bins"].sum()
-    # Every population is fit on the same stops. The at-risk bins are the
-    # detector's: the non-local populations share theirs (no bin inside any
-    # non-local event), detected SWR has its own (no bin inside a Kay SWR).
-    non_local_bins = bins.drop("swr")
-    _require(
-        stops.nunique() == 1 and non_local_bins.nunique() == 1,
-        "populations differ in cohort",
+    cohort = rate_fit_statistics.frozen_cohort_statistics(
+        fit_rows(fits, model="M0_const")
     )
+    ladder = rate_fit_statistics.ladder_fit_statistics(fits)
     values += [
         make(
             "rate_sessions",
-            null.groupby(SC).ngroups,
+            cohort["n_sessions"],
             "count",
             "count",
             "sessions in the per-bin rate fit",
         ),
         make(
             "rate_stops",
-            stops.iloc[0],
+            cohort["n_stops"],
             "count",
             "count",
             "stops in the frozen common cohort (M0_const, every population)",
         ),
         make(
             "rate_bins",
-            non_local_bins.iloc[0],
+            cohort["n_bins_non_local"],
             "count",
             "count",
             "15 ms bins at risk in the frozen common cohort, non-local populations "
@@ -613,7 +408,7 @@ def per_bin_values(
         ),
         make(
             "rate_bins_swr",
-            bins["swr"],
+            cohort["n_bins_swr"],
             "count",
             "count",
             "15 ms bins at risk in the frozen common cohort, detected SWR (the bins "
@@ -621,16 +416,23 @@ def per_bin_values(
         ),
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
-        base = _rung(fits, "M0_const", outcome)
-        full = _rung(fits, FULL_RATE_RUNG, outcome)
-        kernel = reward_kernel_rate_ratios(_reward_gated(full))
-        lag_one = _lag_one_summary(full)
-        immediate = _immediate_session(full)
-        rr_animal, animals_pos = _immediate_animal(full)
+        null = fit_rows(fits, model="M0_const", outcome=outcome)
+        full = fit_rows(fits, model=FULL_RATE_RUNG, outcome=outcome)
+        baseline = rate_fit_statistics.baseline_rate_statistics(null)
+        kernel = rate_fit_statistics.reward_kernel_statistics(full)
+        immediate = gated_coefficient_statistics(full, REWARD_HISTORY_COLUMNS[0])
+        for stats in (kernel, immediate):
+            _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
+        marginal = aic_difference_statistics(
+            fit_rows(fits, model="M1_rew", outcome=outcome), null
+        )
+        conditional = aic_difference_statistics(
+            full, fit_rows(fits, model="M6r_time_histcos", outcome=outcome)
+        )
         values += [
             make(
                 f"rate_baseline_{word}",
-                np.exp(base["coef_Intercept"].dropna()).median(),
+                baseline["median"],
                 "quantity",
                 "dec2",
                 f"{label}: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing)",
@@ -638,21 +440,21 @@ def per_bin_values(
             ),
             make(
                 f"rate_full_sessions_{word}",
-                full["coef_Intercept"].notna().sum(),
+                ladder.loc[(FULL_RATE_RUNG, outcome), "n_fitted"],
                 "count",
                 "count",
                 f"{label}: sessions with a fit of {FULL_RATE_RUNG}",
             ),
             make(
                 f"rate_time_sessions_{word}",
-                _rung(fits, STOP_TIME_RUNG, outcome)["coef_Intercept"].notna().sum(),
+                ladder.loc[(STOP_TIME_RUNG, outcome), "n_fitted"],
                 "count",
                 "count",
                 f"{label}: sessions with a fit of {STOP_TIME_RUNG}",
             ),
             make(
                 f"rate_kernel_lag_one_{word}",
-                kernel[0],
+                kernel["rate_ratio_lag_1"],
                 "quantity",
                 "dec2",
                 f"{label}: reward kernel at lag 1, reconstructed per session from the three basis "
@@ -662,7 +464,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_lag_one_animal_{word}",
-                lag_one["rr_animal"],
+                kernel["lag_one_animal_rate_ratio"],
                 "quantity",
                 "dec2",
                 f"{label}: the same lag-1 kernel, median over animals of each animal's median "
@@ -671,21 +473,21 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_lag_one_animals_positive_{word}",
-                lag_one["animals_positive"],
+                kernel["n_animals_lag_one_positive"],
                 "count",
                 "count",
                 f"{label}: animals whose median lag-1 kernel is above 1",
             ),
             make(
                 f"rate_kernel_lag_one_positive_fraction_{word}",
-                lag_one["positive"],
+                kernel["lag_one_positive_fraction"],
                 "fraction",
                 "pct",
                 f"{label}: share of sessions whose lag-1 kernel is above 1",
             ),
             make(
                 f"rate_kernel_lag_one_p_{word}",
-                lag_one["p"],
+                kernel["lag_one_signed_rank_p"],
                 "quantity",
                 "pval",
                 f"{label}: signed-rank p of the log lag-1 kernel against 0 across sessions, "
@@ -693,7 +495,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_sessions_{word}",
-                lag_one["n"],
+                kernel["n_sessions"],
                 "count",
                 "count",
                 f"{label}: sessions whose {FULL_RATE_RUNG} reward terms all pass the "
@@ -701,7 +503,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_dropped_{word}",
-                lag_one["n_dropped"],
+                kernel["n_dropped"],
                 "count",
                 "count",
                 f"{label}: fitted sessions the gate left out because a reward term was "
@@ -709,7 +511,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_nonconverged_{word}",
-                lag_one["n_nonconverged"],
+                kernel["n_nonconverged"],
                 "count",
                 "count",
                 f"{label}: of the kernel values' sessions, fits the optimizer flagged "
@@ -717,7 +519,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_late_min_{word}",
-                kernel[2:].min(),
+                kernel["late_rate_ratio_min"],
                 "quantity",
                 "dec2",
                 f"{label}: lowest median reconstructed kernel over lags 3-10",
@@ -725,7 +527,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_late_max_{word}",
-                kernel[2:].max(),
+                kernel["late_rate_ratio_max"],
                 "quantity",
                 "dec2",
                 f"{label}: highest median reconstructed kernel over lags 3-10",
@@ -733,7 +535,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_kernel_lag_ten_{word}",
-                kernel[-1],
+                kernel[f"rate_ratio_lag_{REWARD_HISTORY_N_LAGS}"],
                 "quantity",
                 "dec2",
                 f"{label}: median reconstructed kernel at lag 10",
@@ -741,7 +543,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_immediate_session_{word}",
-                immediate["rr"],
+                immediate["exp_median"],
                 "quantity",
                 "sig2",
                 f"{label}: exp of the across-session median of the first reward basis "
@@ -750,7 +552,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_immediate_session_positive_fraction_{word}",
-                immediate["positive"],
+                immediate["positive_fraction"],
                 "fraction",
                 "pct",
                 f"{label}: share of sessions whose first reward basis coefficient is "
@@ -758,7 +560,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_immediate_session_animals_{word}",
-                immediate["animals_same_sign"],
+                immediate["n_animals_same_sign"],
                 "count",
                 "count",
                 f"{label}: animals whose median first reward basis coefficient has the "
@@ -766,7 +568,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_immediate_session_p_{word}",
-                immediate["p"],
+                immediate["signed_rank_p"],
                 "quantity",
                 "pval",
                 f"{label}: signed-rank p of the first reward basis coefficient against 0 "
@@ -774,7 +576,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_immediate_animal_{word}",
-                rr_animal,
+                immediate["exp_animal_median"],
                 "quantity",
                 "sig2",
                 f"{label}: exp of the animal-balanced median first reward basis "
@@ -783,14 +585,14 @@ def per_bin_values(
             ),
             make(
                 f"rate_immediate_animals_positive_{word}",
-                animals_pos,
+                immediate["n_animals_positive"],
                 "count",
                 "count",
                 f"{label}: animals whose median first reward basis coefficient is positive",
             ),
             make(
                 f"rate_marginal_reward_delta_aic_{word}",
-                _delta_aic(fits, "M1_rew", "M0_const", outcome).median(),
+                marginal["median"],
                 "quantity",
                 "sig2s",
                 f"{label}: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better",
@@ -798,7 +600,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_conditional_reward_delta_aic_{word}",
-                _delta_aic(fits, FULL_RATE_RUNG, "M6r_time_histcos", outcome).median(),
+                conditional["median"],
                 "quantity",
                 "sig2s",
                 f"{label}: median per-session AIC({FULL_RATE_RUNG}) - AIC(M6r_time_histcos); "
@@ -806,35 +608,40 @@ def per_bin_values(
                 "AIC",
             ),
         ]
-        cohort = fits.attrs["arrival_clock_cohort"][outcome]
-        cohort_all = all_stops.attrs["arrival_clock_cohort"][outcome]
-        arrival_rung = _rung(fits, ARRIVAL_TIME_RUNG, outcome)
+        window = rate_fit_statistics.arrival_window_statistics(
+            fits.attrs["arrival_clock_cohort"][outcome]
+        )
+        window_all = rate_fit_statistics.arrival_window_statistics(
+            all_stops.attrs["arrival_clock_cohort"][outcome]
+        )
         values += [
             make(
                 f"rate_arrival_event_share_{word}",
-                cohort["n_event_bins_arrival_window"] / cohort["n_event_bins_frozen"],
+                window["event_share"],
                 "fraction",
                 "dec2",
                 f"{label}: share of its event bins the arrival window [0, 8] s keeps",
             ),
             make(
                 f"rate_allstops_arrival_event_share_{word}",
-                cohort_all["n_event_bins_arrival_window"]
-                / cohort_all["n_event_bins_frozen"],
+                window_all["event_share"],
                 "fraction",
                 "dec2",
                 f"{label}: the same share on the all-stops fit",
             ),
             make(
                 f"rate_arrival_separated_fraction_{word}",
-                (arrival_rung["separated"] == True).mean(),  # noqa: E712
+                ladder.loc[(ARRIVAL_TIME_RUNG, outcome), "separated_fraction"],
                 "fraction",
                 "pct",
                 f"{label}: share of {ARRIVAL_TIME_RUNG} fits flagged separated",
             ),
         ]
         for prefix, frame in (("rate", fits), ("rate_allstops", all_stops)):
-            shape = _clock_shape(frame, outcome)
+            shape = rate_fit_statistics.clock_shape_statistics(
+                fit_rows(frame, model=STOP_TIME_RUNG, outcome=outcome),
+                fit_rows(frame, model=ARRIVAL_TIME_RUNG, outcome=outcome),
+            )
             cohort_label = "" if prefix == "rate" else ", all-stops fit"
             for clock, rung, window in (
                 ("time", STOP_TIME_RUNG, "[1, 3] s"),
@@ -883,13 +690,21 @@ def per_bin_values(
                     f"position{cohort_label}",
                 )
             )
-    paired = _paired_lag_one(fits)
-    paired_all = _paired_lag_one(all_stops)
-    no_swr_all = _rung(all_stops, FULL_RATE_RUNG, "non_local_no_swr")
-    immediate_all = _immediate_session(no_swr_all)
-    lag_one_all = _lag_one_summary(no_swr_all)
-    swr_session = _immediate_session(_rung(fits, FULL_RATE_RUNG, "non_local_swr"))
-    no_swr_session = _immediate_session(_rung(fits, FULL_RATE_RUNG, "non_local_no_swr"))
+    full_swr = fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_swr")
+    full_no_swr = fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_no_swr")
+    no_swr_all = fit_rows(all_stops, model=FULL_RATE_RUNG, outcome="non_local_no_swr")
+    paired = rate_fit_statistics.paired_lag_one_kernel_statistics(full_swr, full_no_swr)
+    paired_all = rate_fit_statistics.paired_lag_one_kernel_statistics(
+        fit_rows(all_stops, model=FULL_RATE_RUNG, outcome="non_local_swr"), no_swr_all
+    )
+    for stats in (paired, paired_all):
+        _require(
+            stats["n_animals"] == 5,
+            f"paired test spans {stats['n_animals']} animals, not 5",
+        )
+    immediate_all = gated_coefficient_statistics(no_swr_all, REWARD_HISTORY_COLUMNS[0])
+    kernel_all = rate_fit_statistics.reward_kernel_statistics(no_swr_all)
+    _require(kernel_all["n_animals"] == 5, f"{kernel_all['n_animals']} animals, not 5")
     paired_what = (
         "the reconstructed lag-1 reward kernel, SWR-coupled minus non-SWR non-local "
         "events, within session, over the sessions in which both streams' reward "
@@ -898,56 +713,56 @@ def per_bin_values(
     values += [
         make(
             "rate_paired_sessions",
-            paired["n"],
+            paired["n_sessions"],
             "count",
             "count",
             f"sessions in the paired comparison of {paired_what}",
         ),
         make(
             "rate_paired_positive_fraction",
-            paired["positive"],
+            paired["positive_fraction"],
             "fraction",
             "pct",
             f"share of paired sessions in which {paired_what} is positive",
         ),
         make(
             "rate_paired_animals_positive",
-            paired["animals_positive"],
+            paired["n_animals_positive"],
             "count",
             "count",
             "animals whose median paired difference is positive",
         ),
         make(
             "rate_paired_p",
-            paired["p"],
+            paired["signed_rank_p"],
             "quantity",
             "pval",
             "signed-rank p of the paired difference, treating sessions as independent",
         ),
         make(
             "rate_allstops_paired_sessions",
-            paired_all["n"],
+            paired_all["n_sessions"],
             "count",
             "count",
             "the same, all-stops fit: paired sessions",
         ),
         make(
             "rate_allstops_paired_positive_fraction",
-            paired_all["positive"],
+            paired_all["positive_fraction"],
             "fraction",
             "pct",
             "the same, all-stops fit: share positive",
         ),
         make(
             "rate_allstops_paired_p",
-            paired_all["p"],
+            paired_all["signed_rank_p"],
             "quantity",
             "pval",
             "the same, all-stops fit: signed-rank p",
         ),
         make(
             "rate_immediate_ratio_swr_to_no_swr",
-            swr_session["rr"] / no_swr_session["rr"],
+            gated_exp_median_ratio(full_swr, full_no_swr, REWARD_HISTORY_COLUMNS[0]),
             "quantity",
             "sig2",
             "rate_immediate_session_non_local_swr divided by "
@@ -956,7 +771,7 @@ def per_bin_values(
         ),
         make(
             "rate_allstops_immediate_session_no_swr",
-            immediate_all["rr"],
+            immediate_all["exp_median"],
             "quantity",
             "sig2",
             "all-stops fit, non-local without SWR: exp of the across-session median first "
@@ -965,21 +780,21 @@ def per_bin_values(
         ),
         make(
             "rate_allstops_immediate_session_p_no_swr",
-            immediate_all["p"],
+            immediate_all["signed_rank_p"],
             "quantity",
             "pval",
             "its signed-rank p (a basis coefficient, not an effect size)",
         ),
         make(
             "rate_allstops_immediate_session_animals_no_swr",
-            immediate_all["animals_same_sign"],
+            immediate_all["n_animals_same_sign"],
             "count",
             "count",
             "its animals with the median's sign",
         ),
         make(
             "rate_allstops_kernel_lag_one_no_swr",
-            reward_kernel_rate_ratios(_reward_gated(no_swr_all))[0],
+            kernel_all["rate_ratio_lag_1"],
             "quantity",
             "dec2",
             "all-stops fit, non-local without SWR: median reconstructed kernel at lag 1 "
@@ -988,7 +803,7 @@ def per_bin_values(
         ),
         make(
             "rate_allstops_kernel_lag_one_p_no_swr",
-            lag_one_all["p"],
+            kernel_all["lag_one_signed_rank_p"],
             "quantity",
             "pval",
             "all-stops fit, non-local without SWR: signed-rank p of the log lag-1 kernel "
@@ -996,7 +811,7 @@ def per_bin_values(
         ),
         make(
             "rate_allstops_kernel_lag_one_animals_positive_no_swr",
-            lag_one_all["animals_positive"],
+            kernel_all["n_animals_lag_one_positive"],
             "count",
             "count",
             "all-stops fit, non-local without SWR: animals whose median lag-1 kernel is "
@@ -1004,11 +819,15 @@ def per_bin_values(
         ),
     ]
     for word, (outcome, label) in RATE_POPULATIONS.items():
-        rr, pos = _immediate_animal(_rung(all_stops, FULL_RATE_RUNG, outcome))
+        stats = gated_coefficient_statistics(
+            fit_rows(all_stops, model=FULL_RATE_RUNG, outcome=outcome),
+            REWARD_HISTORY_COLUMNS[0],
+        )
+        _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
         values += [
             make(
                 f"rate_allstops_immediate_animal_{word}",
-                rr,
+                stats["exp_animal_median"],
                 "quantity",
                 "sig2",
                 f"all-stops fit, {label}: rr_immediate (animal-balanced); "
@@ -1017,25 +836,22 @@ def per_bin_values(
             ),
             make(
                 f"rate_allstops_immediate_animals_positive_{word}",
-                pos,
+                stats["n_animals_positive"],
                 "count",
                 "count",
                 f"all-stops fit, {label}: animals positive",
             ),
         ]
-    nl = fits[fits["outcome"] == "non_local"]
     for word, model in (
         ("const", "M0_const"),
         ("time", STOP_TIME_RUNG),
         ("full", FULL_RATE_RUNG),
         ("reward_by_time", "M9r_rew_x_time"),
     ):
-        rung = nl[nl["model"] == model]
-        cv = rung["cv_bits_per_event"][np.isfinite(rung["cv_bits_per_event"])]
         values += [
             make(
                 f"rate_ladder_aic_{word}",
-                rung["aic"].median(),
+                ladder.loc[(model, "non_local"), "aic_median"],
                 "quantity",
                 "int",
                 f"non-local (all): median AIC of {model}",
@@ -1043,7 +859,7 @@ def per_bin_values(
             ),
             make(
                 f"rate_ladder_cv_bits_{word}",
-                cv.median(),
+                ladder.loc[(model, "non_local"), "cv_bits_median"],
                 "quantity",
                 "dec2",
                 f"non-local (all): median held-out bits per event of {model}, over sessions with a finite score",
@@ -1051,14 +867,14 @@ def per_bin_values(
             ),
             make(
                 f"rate_ladder_cv_sessions_{word}",
-                len(cv),
+                ladder.loc[(model, "non_local"), "n_cv_finite"],
                 "count",
                 "count",
                 f"non-local (all): sessions with a finite held-out score for {model}",
             ),
             make(
                 f"rate_ladder_ks_band_{word}",
-                rung["ks_within_band"].mean(),
+                ladder.loc[(model, "non_local"), "ks_band_fraction"],
                 "fraction",
                 "dec2",
                 f"non-local (all): share of {model} fits inside the KS band",
@@ -1099,25 +915,22 @@ def per_bin_detail_values(
     otherwise."""
     make = value_factory(per_bin_detail_values, source, TAGS["rate"])
     values: list[Value] = []
-    null = fits[fits["model"] == "M0_const"]
-    hist_columns = [f"coef_{c}" for c in PER_BIN_HISTORY_COLUMNS]
+    ladder = rate_fit_statistics.ladder_fit_statistics(fits)
     for word, (outcome, label) in RATE_POPULATIONS.items():
-        rate = np.exp(_rung(fits, "M0_const", outcome)["coef_Intercept"].dropna())
-        raw = _immediate_session(_rung(fits, "M1_rew", outcome))
-        full = _rung(fits, FULL_RATE_RUNG, outcome)
-        kernel = reward_kernel_rate_ratios(_reward_gated(full))
-        hist_fits = full.dropna(subset=hist_columns)
-        flagged = hist_fits["separated_terms"].map(
-            lambda v: (
-                isinstance(v, str)
-                and any(t in PER_BIN_HISTORY_COLUMNS for t in v.split("|"))
-            )
+        null = fit_rows(fits, model="M0_const", outcome=outcome)
+        reward_only = fit_rows(fits, model="M1_rew", outcome=outcome)
+        full = fit_rows(fits, model=FULL_RATE_RUNG, outcome=outcome)
+        baseline = rate_fit_statistics.baseline_rate_statistics(null)
+        raw = gated_coefficient_statistics(reward_only, REWARD_HISTORY_COLUMNS[0])
+        kernel = rate_fit_statistics.reward_kernel_statistics(full)
+        history = term_separation_statistics(
+            fits_carrying(full, PER_BIN_HISTORY_COLUMNS), PER_BIN_HISTORY_COLUMNS
         )
-        marginal = _delta_aic(fits, "M1_rew", "M0_const", outcome)
+        marginal = aic_difference_statistics(reward_only, null)
         values += [
             make(
                 f"rate_baseline_lower_quartile_{word}",
-                rate.quantile(0.25),
+                baseline["lower_quartile"],
                 "quantity",
                 "dec2",
                 f"{label}: 25th percentile over sessions of the M0_const rate",
@@ -1125,7 +938,7 @@ def per_bin_detail_values(
             ),
             make(
                 f"rate_baseline_upper_quartile_{word}",
-                rate.quantile(0.75),
+                baseline["upper_quartile"],
                 "quantity",
                 "dec2",
                 f"{label}: 75th percentile over sessions of the M0_const rate",
@@ -1133,7 +946,7 @@ def per_bin_detail_values(
             ),
             make(
                 f"rate_bin_count_{word}",
-                rate.median() * BIN_S,
+                baseline["events_per_bin"],
                 "quantity",
                 "sig2",
                 f"{label}: median M0_const rate times the 15 ms bin, the mean per-bin count",
@@ -1141,7 +954,7 @@ def per_bin_detail_values(
             ),
             make(
                 f"rate_raw_immediate_session_{word}",
-                raw["rr"],
+                raw["exp_median"],
                 "quantity",
                 "sig2",
                 f"{label}: exp of the across-session median {IMMEDIATE_COEF} of M1_rew "
@@ -1150,21 +963,21 @@ def per_bin_detail_values(
             ),
             make(
                 f"rate_marginal_reward_child_better_fraction_{word}",
-                (marginal < 0).mean(),
+                marginal["negative_fraction"],
                 "fraction",
                 "pct",
                 f"{label}: share of sessions in which M1_rew has the lower AIC than M0_const",
             ),
             make(
                 f"rate_hist_sessions_{word}",
-                len(hist_fits),
+                history["n_fits"],
                 "count",
                 "count",
                 f"{label}: sessions whose {FULL_RATE_RUNG} fit carries the self-history block",
             ),
             make(
                 f"rate_hist_separated_fraction_{word}",
-                flagged.mean(),
+                history["flagged_fraction"],
                 "fraction",
                 "pct",
                 f"{label}: share of those fits flagging a self-history term "
@@ -1172,11 +985,11 @@ def per_bin_detail_values(
             ),
         ]
         for k, bump in ((1, "one"), (2, "two")):
-            agg = _coefficient_session(full, REWARD_HISTORY_COLUMNS[k])
+            agg = gated_coefficient_statistics(full, REWARD_HISTORY_COLUMNS[k])
             values += [
                 make(
                     f"rate_bump_{bump}_session_{word}",
-                    agg["rr"],
+                    agg["exp_median"],
                     "quantity",
                     "sig2",
                     f"{label}: exp of the across-session median coef_{REWARD_HISTORY_COLUMNS[k]} "
@@ -1185,14 +998,14 @@ def per_bin_detail_values(
                 ),
                 make(
                     f"rate_bump_{bump}_positive_fraction_{word}",
-                    agg["positive"],
+                    agg["positive_fraction"],
                     "fraction",
                     "pct",
                     f"{label}: share of sessions with that coefficient positive",
                 ),
                 make(
                     f"rate_bump_{bump}_animals_{word}",
-                    agg["animals_same_sign"],
+                    agg["n_animals_same_sign"],
                     "count",
                     "count",
                     f"{label}: animals whose median has the across-session median's sign",
@@ -1202,7 +1015,7 @@ def per_bin_detail_values(
             values.append(
                 make(
                     f"rate_kernel_lag_{lag}_{word}",
-                    kernel[i],
+                    kernel[f"rate_ratio_lag_{i + 1}"],
                     "quantity",
                     "dec2",
                     f"{label}: median reconstructed reward kernel at lag {i + 1}",
@@ -1217,7 +1030,7 @@ def per_bin_detail_values(
             values.append(
                 make(
                     f"rate_arrival_{rung_word}_sessions_{word}",
-                    np.isfinite(_rung(fits, rung, outcome)["aic"]).sum(),
+                    ladder.loc[(rung, outcome), "n_finite_aic"],
                     "count",
                     "count",
                     f"{label}: {rung} fits with a finite AIC",
@@ -1228,8 +1041,9 @@ def per_bin_detail_values(
             values.append(
                 make(
                     f"rate_intransit_arrival_event_share_{word}",
-                    transit["n_event_bins_arrival_window"]
-                    / transit["n_event_bins_frozen"],
+                    rate_fit_statistics.arrival_window_statistics(transit)[
+                        "event_share"
+                    ],
                     "fraction",
                     "dec2",
                     f"{label}: share of its event bins the arrival window keeps on the in-transit fit",
@@ -1243,14 +1057,14 @@ def per_bin_detail_values(
         ("swr_coupled_to_non_local", "non_local_swr", "non_local"),
     )
     for word, a, b in pairs:
-        A = null.loc[null["outcome"] == a, SC + ["coef_Intercept"]]
-        B = null.loc[null["outcome"] == b, SC + ["coef_Intercept"]]
-        merged = A.merge(B, on=SC, suffixes=("_a", "_b")).dropna()
-        diff = merged["coef_Intercept_a"] - merged["coef_Intercept_b"]
+        ratio = rate_fit_statistics.baseline_rate_ratio_statistics(
+            fit_rows(fits, model="M0_const", outcome=a),
+            fit_rows(fits, model="M0_const", outcome=b),
+        )
         values += [
             make(
                 f"rate_baseline_ratio_{word}",
-                np.exp(diff.median()),
+                ratio["median_ratio"],
                 "quantity",
                 "dec2",
                 f"median within-session M0_const rate ratio, {a} over {b}",
@@ -1258,30 +1072,27 @@ def per_bin_detail_values(
             ),
             make(
                 f"rate_baseline_ratio_{word}_p",
-                wilcoxon(merged["coef_Intercept_a"], merged["coef_Intercept_b"]).pvalue,
+                ratio["signed_rank_p"],
                 "quantity",
                 "pval",
                 "its paired signed-rank p",
             ),
         ]
-    nl = fits[fits["outcome"] == "non_local"]
     for word, model in LADDER.items():
-        rung = nl[nl["model"] == model]
         values.append(
             make(
                 f"rate_ladder_sessions_{word}",
-                np.isfinite(rung["aic"]).sum(),
+                ladder.loc[(model, "non_local"), "n_finite_aic"],
                 "count",
                 "count",
                 f"non-local (all): sessions with a finite-AIC fit of {model}",
             )
         )
         if word in ("rew", "histcos", "time_histcos"):
-            cv = rung["cv_bits_per_event"][np.isfinite(rung["cv_bits_per_event"])]
             values += [
                 make(
                     f"rate_ladder_aic_{word}",
-                    rung["aic"].median(),
+                    ladder.loc[(model, "non_local"), "aic_median"],
                     "quantity",
                     "int",
                     f"non-local (all): median AIC of {model}",
@@ -1289,7 +1100,7 @@ def per_bin_detail_values(
                 ),
                 make(
                     f"rate_ladder_cv_bits_{word}",
-                    cv.median(),
+                    ladder.loc[(model, "non_local"), "cv_bits_median"],
                     "quantity",
                     "dec2",
                     f"non-local (all): median held-out bits per event of {model}, over sessions with a finite score",
@@ -1297,14 +1108,14 @@ def per_bin_detail_values(
                 ),
                 make(
                     f"rate_ladder_cv_sessions_{word}",
-                    len(cv),
+                    ladder.loc[(model, "non_local"), "n_cv_finite"],
                     "count",
                     "count",
                     f"non-local (all): sessions with a finite held-out score for {model}",
                 ),
                 make(
                     f"rate_ladder_ks_band_{word}",
-                    rung["ks_within_band"].mean(),
+                    ladder.loc[(model, "non_local"), "ks_band_fraction"],
                     "fraction",
                     "dec2",
                     f"non-local (all): share of {model} fits inside the KS band",
@@ -1315,28 +1126,32 @@ def per_bin_detail_values(
         ("full", "M7ra_time_arrival_histcos_rew"),
     ):
         for pop in ("non_local", "non_local_swr"):
-            rung = _rung(fits, model, pop)
             values.append(
                 make(
                     f"rate_arrival_{word}_cv_nan_fraction_{pop}",
-                    (~np.isfinite(rung["cv_bits_per_event"])).mean(),
+                    ladder.loc[(model, pop), "cv_not_finite_fraction"],
                     "fraction",
                     "pct",
                     f"{RATE_POPULATIONS[pop][1]}: share of {model} fits whose held-out score is not finite",
                 )
             )
-    marginal_all = _delta_aic(all_stops, "M1_rew", "M0_const", "non_local_no_swr")
+    marginal_all = aic_difference_statistics(
+        fit_rows(all_stops, model="M1_rew", outcome="non_local_no_swr"),
+        fit_rows(all_stops, model="M0_const", outcome="non_local_no_swr"),
+    )
     cohort = all_stops.attrs["arrival_clock_cohort"]["non_local"]
-    before = cohort["n_bins_frozen"] + cohort["n_bins_dropped_arrival_clock"]
-    transit_shares = [
-        v.value
-        for v in values
-        if v.key.startswith("rate_intransit_arrival_event_share_")
-    ]
+    window = rate_fit_statistics.arrival_window_statistics(cohort)
+    transit_shares = group_range(
+        {
+            v.key: v.value
+            for v in values
+            if v.key.startswith("rate_intransit_arrival_event_share_")
+        }
+    )
     values += [
         make(
             "rate_allstops_marginal_reward_delta_aic_non_local_no_swr",
-            marginal_all.median(),
+            marginal_all["median"],
             "quantity",
             "sig2s",
             "all-stops fit, non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const)",
@@ -1344,7 +1159,7 @@ def per_bin_detail_values(
         ),
         make(
             "rate_allstops_marginal_reward_child_better_fraction_non_local_no_swr",
-            (marginal_all < 0).mean(),
+            marginal_all["negative_fraction"],
             "fraction",
             "pct",
             "all-stops fit, non-local without SWR: share of sessions in which M1_rew has the lower AIC",
@@ -1358,14 +1173,14 @@ def per_bin_detail_values(
         ),
         make(
             "rate_allstops_arrival_bins_before",
-            before,
+            window["n_bins_before"],
             "count",
             "count",
             "all-stops fit: bins before that removal",
         ),
         make(
             "rate_allstops_arrival_bins_dropped_fraction",
-            cohort["n_bins_dropped_arrival_clock"] / before,
+            window["dropped_bin_fraction"],
             "fraction",
             "pct",
             "all-stops fit: share of bins the arrival clock removed",
@@ -1393,21 +1208,21 @@ def per_bin_detail_values(
         ),
         make(
             "rate_allstops_arrival_window_fraction",
-            cohort["n_bins_arrival_window"] / cohort["n_bins_frozen"],
+            window["bin_share"],
             "fraction",
             "pct",
             "all-stops fit: share of frozen-cohort bins inside the arrival window",
         ),
         make(
             "rate_intransit_arrival_event_share_low",
-            min(transit_shares),
+            transit_shares["low"],
             "fraction",
             "dec2",
             "lowest over populations of the in-transit fit's arrival-window event share",
         ),
         make(
             "rate_intransit_arrival_event_share_high",
-            max(transit_shares),
+            transit_shares["high"],
             "fraction",
             "dec2",
             "highest over populations of the in-transit fit's arrival-window event share",
@@ -1799,25 +1614,32 @@ def _population_ranges(values: list[Value], make: Callable[..., Value]) -> list[
     by_key = {v.key: v for v in values}
     ranges = []
     for stem in _RANGED:
-        members = [by_key[f"{stem}_{word}"] for word in RATE_POPULATIONS]
+        members = {word: by_key[f"{stem}_{word}"] for word in RATE_POPULATIONS}
+        on_edge = None
         if stem.endswith("_peak_s"):
             edge_stem = stem.replace("_peak_s", "_peak_edge")
-            edges = [by_key[f"{edge_stem}_{word}"].value for word in RATE_POPULATIONS]
+            on_edge = {
+                word: by_key[f"{edge_stem}_{word}"].value for word in RATE_POPULATIONS
+            }
+        span = group_range(
+            {word: member.value for word, member in members.items()}, on_edge
+        )
+        if on_edge is not None:
             ranges.append(
                 make(
                     f"{edge_stem}_count",
-                    sum(edges),
+                    span["n_excluded"],
                     "count",
                     "count",
                     "populations whose "
-                    + members[0].description.split(": ", 1)[1].split(";")[0]
+                    + next(iter(members.values()))
+                    .description.split(": ", 1)[1]
+                    .split(";")[0]
                     + " sits on the interval's edge",
                 )
             )
-            members = [m for m, e in zip(members, edges, strict=True) if not e]
-            _require(bool(members), f"{stem}: every population's peak is on the edge")
-        for end, pick in (("low", min), ("high", max)):
-            chosen = pick(members, key=lambda v: v.value)
+        for end in ("low", "high"):
+            chosen = members[span[f"{end}_group"]]
             ranges.append(
                 make(
                     f"{stem}_{end}",
@@ -3196,7 +3018,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     summary.add(
         make_transit(
             "rate_intransit_sessions",
-            in_transit.groupby(SC).ngroups,
+            n_sessions(in_transit),
             "count",
             "count",
             "sessions with any per-bin fit on the in-transit stops (the sample gates "
@@ -3205,7 +3027,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
         *(
             make_transit(
                 f"rate_intransit_sessions_{word}",
-                in_transit[in_transit["outcome"] == outcome].groupby(SC).ngroups,
+                n_sessions(fit_rows(in_transit, outcome=outcome)),
                 "count",
                 "count",
                 f"{label}: sessions with a per-bin fit on the in-transit stops",
