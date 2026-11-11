@@ -275,7 +275,7 @@ def pilot_stray_window_values(
             "count",
             "count",
             "sliding-window replay calls (duration and dispersion criteria) on the "
-            "first real-data pilot epoch, chimi20200225_02_r1",
+            f"first real-data pilot epoch, {MEMORYLESS_PILOT_EPOCH}",
         ),
         make(
             "pilot_calls_decided_by_outside_window",
