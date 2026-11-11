@@ -626,13 +626,17 @@ def called_response_timing(
           its peak less its value at the first lag (log-rate scale). The rise
           onset and the rise size are those of :func:`population_rise_timing`.
         - ``population_pre_event_level_fraction``: its value at the first lag
-          as a share of its largest value, clipped to [0, 1].
-        - ``population_size_vs_control``: its largest value less, at that lag,
-          the mean of the same units' control curves signed the same way, over
-          the units with a finite control curve (NaN when there is none).
+          as a share of its value at its peak (the lag of its largest absolute
+          value, the peak of ``population_peak_ms`` and ``population_size``),
+          clipped to the range 0 to 1: a first-lag value on the other side of
+          zero from the peak is reported as 0.
+        - ``population_size_vs_control``: over the units of that direction
+          with a finite control curve, their sign-aligned mean curve at its
+          peak less, at that lag, the mean of their control curves, each
+          signed by its unit's peak (NaN when no unit has a control curve).
         - ``population_control_pre_event_level_fraction``: that control mean
-          at the first lag as a share of the mean curve's largest value,
-          clipped to [0, 1].
+          at the first lag as a share of the same units' mean curve at its
+          peak, clipped to the range 0 to 1.
 
         Over animals (:func:`called_response_timing_by_animal`):
 
@@ -714,25 +718,29 @@ def called_response_timing(
             "rise_size_ci_high",
         ):
             row[f"population_{name}"] = rise[name]
+        mean_curve = population_curve.curve
+        at_peak = int(np.argmax(np.abs(mean_curve)))
         row["population_pre_event_level_fraction"] = float(
-            np.clip(
-                population_curve.curve[0] / np.max(population_curve.curve),
-                0.0,
-                1.0,
-            )
+            np.clip(mean_curve[0] / mean_curve[at_peak], 0.0, 1.0)
         )
-        chosen_control = control[:, chosen]
-        usable = np.isfinite(chosen_control).all(axis=0)
-        if usable.any():
-            at_peak = int(np.argmax(population_curve.curve))
+        with_control = np.isfinite(control[:, chosen]).all(axis=0)
+        if with_control.any():
+            # Both means are over the units with a control curve: the mean
+            # curve itself when every unit has one.
+            own_peak = timing.peak[chosen][with_control]
+            if not with_control.all():
+                mean_curve = sign_aligned_mean(
+                    curves[:, chosen][:, with_control], own_peak
+                )
+                at_peak = int(np.argmax(np.abs(mean_curve)))
             control_mean = sign_aligned_mean(
-                chosen_control[:, usable], timing.peak[chosen][usable]
+                control[:, chosen][:, with_control], own_peak
             )
             row["population_size_vs_control"] = (
-                population_curve.curve[at_peak] - control_mean[at_peak]
+                mean_curve[at_peak] - control_mean[at_peak]
             )
             row["population_control_pre_event_level_fraction"] = float(
-                np.clip(control_mean[0] / np.max(population_curve.curve), 0, 1)
+                np.clip(control_mean[0] / mean_curve[at_peak], 0.0, 1.0)
             )
         own = by_animal.loc[direction]
         row["n_animals"] = len(own)

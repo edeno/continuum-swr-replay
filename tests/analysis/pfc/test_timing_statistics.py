@@ -134,12 +134,14 @@ def test_called_response_timing_reads_the_sign_aligned_mean_curve(statistics):
     assert enhanced["population_pre_event_level_fraction"] == pytest.approx(
         0.25 / 1.275
     )
-    # The control curves of units 0, 1 and 3 (unit 2 has none) average
-    # (0.1 + 0.1 + 0.9) / 3 at the peak, 200 ms, and (0.1 + 0.1 + 0.3) / 3 at
-    # -200 ms.
-    assert enhanced["population_size_vs_control"] == pytest.approx(1.275 - 1.1 / 3)
+    # Unit 2 has no control curve, so the control comparison is over units 0,
+    # 1 and 3 on both sides. Their mean curve peaks at 200 ms, at
+    # (1.0 + 1.1 + 1.4) / 3 (all four units' is 1.275 there); their control
+    # curves average (0.1 + 0.1 + 0.9) / 3 at 200 ms and (0.1 + 0.1 + 0.3) / 3
+    # at -200 ms.
+    assert enhanced["population_size_vs_control"] == pytest.approx(3.5 / 3 - 1.1 / 3)
     assert enhanced["population_control_pre_event_level_fraction"] == pytest.approx(
-        (0.5 / 3) / 1.275
+        0.5 / 3.5
     )
 
     # the one decrease, signed by its peak, is unit 2's curve
@@ -254,6 +256,49 @@ def test_a_peak_at_either_end_of_the_lags_given_is_at_the_edge():
     # the edge is where the given lags end (here +/-100 ms), on both sides
     enhanced = _spike_statistics(["a"] * 4).loc["enhanced"]
     assert enhanced["peak_at_edge_fraction"] == 0.5
+
+
+def test_the_mean_curve_has_one_peak_the_lag_of_its_largest_absolute_value():
+    # Two units, each with its own peak (+1.0) at another lag, and both at
+    # -0.8 at -50 ms and at -0.4 at -200 ms. Their mean is 0.5 at 50 and at
+    # 100 ms and -0.8 at -50 ms: its largest absolute value is the dip. Every
+    # statistic of the mean curve's peak is read there, not at its largest
+    # value (0.5, at 50 ms).
+    dip = _spike(-50, -0.8) + _spike(-200, -0.4)
+    curves = np.column_stack([_spike(50, 1.0) + dip, _spike(100, 1.0) + dip])
+    statistics = called_response_timing(
+        curves,
+        np.full(curves.shape, -0.2),
+        LAG_TIME,
+        np.ones(2, dtype=bool),
+        np.array(["d1", "d1"]),
+        np.array(["a", "a"]),
+        n_boot=10,
+    ).loc["enhanced"]
+    assert statistics["population_peak_ms"] == pytest.approx(-50)
+    assert statistics["population_size"] == pytest.approx(-0.8)
+    assert statistics["population_pre_event_level_fraction"] == pytest.approx(0.5)
+    assert statistics["population_size_vs_control"] == pytest.approx(-0.8 + 0.2)
+    assert statistics["population_control_pre_event_level_fraction"] == (
+        pytest.approx(0.25)
+    )
+
+
+def test_a_pre_event_level_on_the_other_side_of_zero_is_reported_as_zero():
+    # the curve is -0.3 at -200 ms and peaks at +1.0: the share, -0.3, is
+    # clipped to zero; so is the control's, -0.2
+    curves = (_spike(50, 1.0) + _spike(-200, -0.3))[:, None]
+    statistics = called_response_timing(
+        curves,
+        np.full(curves.shape, -0.2),
+        LAG_TIME,
+        np.ones(1, dtype=bool),
+        np.array(["d1"]),
+        np.array(["a"]),
+        n_boot=10,
+    ).loc["enhanced"]
+    assert statistics["population_pre_event_level_fraction"] == 0.0
+    assert statistics["population_control_pre_event_level_fraction"] == 0.0
 
 
 def test_units_without_a_usable_control_curve_have_no_control_comparison():
