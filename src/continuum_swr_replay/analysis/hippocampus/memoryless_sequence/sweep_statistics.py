@@ -1,12 +1,14 @@
 """Summary statistics of the memoryless sweeps.
 
-Two sweeps of the two replay detectors on simulated data each write a
+The three sweeps of the two replay detectors on simulated data each write a
 long-format summary, one value per row: the injected-replay sweep
-(``scripts/detection/sweep_memoryless_detection.py``) and its controls
-(``sweep_memoryless_controls.py``). Each function here takes one of those
+(``scripts/detection/sweep_memoryless_detection.py``), its controls
+(``sweep_memoryless_controls.py``) and the held-out check
+(``sweep_memoryless_heldout.py``). Each function here takes one of those
 summaries and returns named numbers: one value, a dict, or a series with one
-value per measure. They are the statistics the detection summary reports
-(``continuum_swr_replay.reported.detection`` names and describes them).
+value per measure (:func:`heldout_event_classes` returns the names of the
+classes of event instead). They are the statistics the detection summary
+reports (``continuum_swr_replay.reported.detection`` names and describes them).
 
 A share is a fraction in [0, 1]. Durations are in seconds; the replay sweep
 stores its timing errors in milliseconds, and the statistics of them stay in
@@ -22,8 +24,12 @@ __all__ = [
     "burst_share_range",
     "carving_statistics",
     "controls_value",
+    "heldout_event_classes",
+    "heldout_fold_statistics",
+    "lowest_estimator_agreement",
     "no_replay_statistics",
     "part_recovery_statistics",
+    "pooled_heldout_rate",
     "sweep_grid_statistics",
     "sweep_jump_pass_statistics",
     "sweep_measures",
@@ -445,3 +451,156 @@ def part_recovery_statistics(
         "n_trials_fewer_in_event": total("n_trials_fewer_in_context"),
         "n_trials_more_in_event": total("n_trials_more_in_context"),
     }
+
+
+# --- the held-out check ---------------------------------------------------------
+
+
+def pooled_heldout_rate(
+    heldout: pd.DataFrame,
+    fold: str,
+    classes: Sequence[str],
+    truth: str,
+    measure: str = "support_rate",
+    suffix: str = "",
+    estimator: str = "state_space",
+) -> dict[str, float]:
+    """A held-out rate over the state-space detector's events of one fold,
+    pooled over event classes.
+
+    Each event is counted once, as the state-space detector bounds it. A rate
+    over informative events is weighted by how many are informative, a share
+    of all events by how many there are.
+
+    Parameters
+    ----------
+    heldout : pd.DataFrame, shape (n_rows, n_columns)
+        The held-out summary, with ``summary`` (the block), ``measure``,
+        ``fold``, ``estimator``, ``detector``, ``event_class``, ``truth`` and
+        ``value``.
+    fold : str
+        The fold of discovery and evaluation cells.
+    classes : sequence of str
+        The event classes pooled (``"ours_only"``, ``"shared"``).
+    truth : str
+        What the events truly are (``"continuous_replay"``, ``"non_local"``,
+        ``"no_content"``).
+    measure : str, optional
+        ``"support_rate"``, the share of informative events with held-out
+        support, or ``"informative_share"``, the share of all events the
+        evaluation cells can judge.
+    suffix : str, optional
+        The coverage floor of the informative events: ``""`` for the main
+        floor, ``"_floor2"`` for 2 expected spikes.
+    estimator : str, optional
+        The content estimate scored: ``"state_space"`` or ``"sliding_window"``.
+
+    Returns
+    -------
+    statistics : dict
+        - ``rate``: the pooled rate; NaN when no event counts.
+        - ``n_events``: the events the rate rests on.
+    """
+    rows = heldout[
+        (heldout["summary"] == "by_class")
+        & (heldout["fold"] == fold)
+        & (heldout["estimator"] == estimator)
+        & (heldout["detector"] == "state_space")
+        & heldout["event_class"].isin(classes)
+        & (heldout["truth"] == truth)
+    ].pivot_table(index="event_class", columns="measure", values="value")
+    weight = "n_events_all" if measure == "informative_share" else f"n_events{suffix}"
+    if rows.empty or weight not in rows or rows[weight].sum() == 0:
+        return {"rate": float("nan"), "n_events": 0}
+    n = rows[weight].fillna(0)
+    rate = float((rows[f"{measure}{suffix}"].fillna(0) * n).sum() / n.sum())
+    return {"rate": rate, "n_events": int(n.sum())}
+
+
+def heldout_fold_statistics(
+    heldout: pd.DataFrame,
+    folds: Sequence[str],
+    classes: Sequence[str],
+    truth: str,
+    measure: str = "support_rate",
+    suffix: str = "",
+    estimator: str = "state_space",
+) -> dict[str, float]:
+    """A pooled held-out rate over several folds.
+
+    Parameters
+    ----------
+    heldout : pd.DataFrame, shape (n_rows, n_columns)
+        The held-out summary (:func:`pooled_heldout_rate`).
+    folds : sequence of str
+        The folds.
+    classes, truth, measure, suffix, estimator
+        As in :func:`pooled_heldout_rate`, which gives each fold's rate and the
+        events it rests on.
+
+    Returns
+    -------
+    statistics : dict
+        - ``rate_min``, ``rate_max``: the lowest and highest of the folds'
+          rates, when every fold has an event that counts.
+        - ``rate_spread``: the highest minus the lowest; NaN when a fold has no
+          event that counts.
+        - ``n_events``: the events the rates rest on, over the folds.
+        - ``n_supported``: of those, the events the rates count (each fold's
+          rate times its events, rounded to a whole number).
+        - ``n_folds_with_support``: the folds whose rate is above zero.
+    """
+    pooled = [
+        pooled_heldout_rate(heldout, fold, classes, truth, measure, suffix, estimator)
+        for fold in folds
+    ]
+    rates = [fold["rate"] for fold in pooled]
+    counted = [fold for fold in pooled if fold["n_events"]]
+    return {
+        "rate_min": min(rates),
+        "rate_max": max(rates),
+        "rate_spread": float(np.ptp(rates)),
+        "n_events": sum(fold["n_events"] for fold in pooled),
+        "n_supported": sum(round(fold["rate"] * fold["n_events"]) for fold in counted),
+        "n_folds_with_support": sum(fold["rate"] > 0 for fold in counted),
+    }
+
+
+def lowest_estimator_agreement(heldout: pd.DataFrame) -> float:
+    """The lowest agreement of the two content estimates, over folds.
+
+    Parameters
+    ----------
+    heldout : pd.DataFrame, shape (n_rows, n_columns)
+        The held-out summary (:func:`pooled_heldout_rate`). Its ``agreement``
+        block holds, per fold, the share of the events informative under both
+        content estimates on which the two verdicts agree.
+
+    Returns
+    -------
+    agreement : float
+        The lowest fold's share.
+    """
+    agreement = heldout[
+        (heldout["summary"] == "agreement")
+        & (heldout["measure"] == "estimator_agreement")
+    ]["value"]
+    return agreement.min()
+
+
+def heldout_event_classes(heldout: pd.DataFrame) -> set[str]:
+    """The classes of event the held-out summary holds.
+
+    Parameters
+    ----------
+    heldout : pd.DataFrame, shape (n_rows, n_columns)
+        The held-out summary (:func:`pooled_heldout_rate`).
+
+    Returns
+    -------
+    classes : set of str
+        The ``event_class`` of its by-class rows: ``"shared"`` (both detectors
+        reported the event), ``"ours_only"`` or ``"comparator_only"``.
+    """
+    by_class = heldout[heldout["summary"] == "by_class"]
+    return set(by_class["event_class"])

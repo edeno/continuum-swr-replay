@@ -2,10 +2,12 @@
 detector against the Widloski & Foster detector on simulated replays.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted or re-decoded here. The statistics of the replay sweep's and the
-controls' summaries and of the pilot's events are computed in
+refitted or re-decoded here. This module names and describes the values. A
+statistic an input already holds is copied from it; the statistics of the sweeps'
+summaries and of the pilot's events are computed in
 ``analysis.hippocampus.memoryless_sequence`` (``sweep_statistics`` and
-``event_table``). The inputs (:class:`DetectionInputs`):
+``event_table``); here only the size of an input (its epochs, its animals) is
+counted. The inputs (:class:`DetectionInputs`):
 
 - the held-out tetrode test per decoder state
   (``Processed-Data/_refresh_20261016/state_evidence``, from
@@ -35,7 +37,6 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
@@ -895,37 +896,6 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
 _FOLDS = ("A", "B", "C")
 
 
-def _heldout_rate(
-    heldout: pd.DataFrame,
-    fold: str,
-    classes: tuple[str, ...],
-    truth: str,
-    measure: str = "support_rate",
-    suffix: str = "",
-    estimator: str = "state_space",
-) -> tuple[float, int]:
-    """A held-out rate over our detector's events, pooled over event classes.
-
-    Each event is counted once, as our detector bounds it. A rate over
-    informative events is weighted by how many are informative, a share of all
-    events by how many there are. NaN, 0 when no event counts.
-    """
-    rows = heldout[
-        (heldout["summary"] == "by_class")
-        & (heldout["fold"] == fold)
-        & (heldout["estimator"] == estimator)
-        & (heldout["detector"] == "state_space")
-        & heldout["event_class"].isin(classes)
-        & (heldout["truth"] == truth)
-    ].pivot_table(index="event_class", columns="measure", values="value")
-    weight = "n_events_all" if measure == "informative_share" else f"n_events{suffix}"
-    if rows.empty or weight not in rows or rows[weight].sum() == 0:
-        return float("nan"), 0
-    n = rows[weight].fillna(0)
-    rate = float((rows[f"{measure}{suffix}"].fillna(0) * n).sum() / n.sum())
-    return rate, int(n.sum())
-
-
 def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     """Panels (p, q): content estimated from discovery cells, scored on held-out
     evaluation cells. Folds A and B tile the track; fold C's evaluation cells
@@ -935,84 +905,74 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
 
-    ours = [
-        _heldout_rate(heldout, f, ("ours_only",), "continuous_replay")[0] for f in "AB"
-    ]
-    shared = [
-        _heldout_rate(heldout, f, ("shared",), "continuous_replay")[0] for f in _FOLDS
-    ]
-    jumping = [
-        _heldout_rate(heldout, f, ("ours_only", "shared"), "non_local")[0] for f in "AB"
-    ]
+    def over_folds(
+        folds: str | tuple[str, ...], classes: tuple[str, ...], truth: str, **which
+    ) -> dict[str, float]:
+        return sweep_statistics.heldout_fold_statistics(
+            heldout, folds, classes, truth, **which
+        )
+
+    def in_fold(fold: str, classes: tuple[str, ...]) -> float:
+        return sweep_statistics.pooled_heldout_rate(
+            heldout, fold, classes, "continuous_replay"
+        )["rate"]
+
+    either = ("ours_only", "shared")
+    ours = over_folds("AB", ("ours_only",), "continuous_replay")
+    shared = over_folds(_FOLDS, ("shared",), "continuous_replay")
+    jumping = over_folds("AB", either, "non_local")
     informative = {
-        name: [
-            _heldout_rate(
-                heldout, f, classes, "continuous_replay", "informative_share"
-            )[0]
-            for f in "AB"
-        ]
+        name: over_folds(
+            "AB", classes, "continuous_replay", measure="informative_share"
+        )
         for name, classes in (("ours", ("ours_only",)), ("shared", ("shared",)))
     }
-    placeless = [
-        _heldout_rate(heldout, f, ("ours_only", "shared"), "no_content", estimator=e)
-        for f in _FOLDS
-        for e in ("state_space", "sliding_window")
-    ]
-    if any(n and rate > 0 for rate, n in placeless):
+    placeless = {
+        estimator: over_folds(_FOLDS, either, "no_content", estimator=estimator)
+        for estimator in ("state_space", "sliding_window")
+    }
+    if any(stats["n_folds_with_support"] for stats in placeless.values()):
         raise ValueError(
             "the caption says no informative place-less burst event has held-out "
             "support; the held-out summary disagrees"
         )
-    placeless_ours = [
-        _heldout_rate(heldout, f, ("ours_only", "shared"), "no_content") for f in _FOLDS
-    ]
-    placeless_loose = [
-        _heldout_rate(
-            heldout, f, ("ours_only", "shared"), "no_content", suffix="_floor2"
-        )
-        for f in _FOLDS
-    ]
-    if np.ptp(shared) > 0:
+    placeless_loose = over_folds(_FOLDS, either, "no_content", suffix="_floor2")
+    if shared["rate_spread"] > 0:
         raise ValueError(
             "the caption states one held-out support rate for shared replays; the "
-            f"folds differ ({shared})"
+            f"folds differ (from {shared['rate_min']} to {shared['rate_max']})"
         )
-    by_class = heldout[heldout["summary"] == "by_class"]
-    if (by_class["event_class"] == "comparator_only").any():
+    if "comparator_only" in sweep_statistics.heldout_event_classes(heldout):
         raise ValueError(
             "the caption says the sliding window reported no event our detector "
             "missed; the held-out summary holds comparator-only events"
         )
-    agreement = heldout[
-        (heldout["summary"] == "agreement")
-        & (heldout["measure"] == "estimator_agreement")
-    ]["value"]
     return [
         share(
             "heldout_ours_only_support_min",
-            min(ours),
+            ours["rate_min"],
             "replays only our detector reported, informative in the evaluation cells: "
             "lower of folds A and B's share with held-out support",
         ),
         share(
             "heldout_ours_only_support_max",
-            max(ours),
+            ours["rate_max"],
             "the higher of the two",
         ),
         share(
             "heldout_ours_only_support_fold_c",
-            _heldout_rate(heldout, "C", ("ours_only",), "continuous_replay")[0],
+            in_fold("C", ("ours_only",)),
             "the same share in fold C",
         ),
         share(
             "heldout_shared_support",
-            shared[0],
+            in_fold(_FOLDS[0], ("shared",)),
             "replays both detectors reported: share with held-out support, the same "
             "in every fold",
         ),
         make(
             "heldout_placeless_informative_events",
-            sum(n for _, n in placeless_ours),
+            placeless["state_space"]["n_events"],
             "count",
             "count",
             "informative place-less burst events over the three folds (none has "
@@ -1020,7 +980,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "heldout_placeless_loose_supported_events",
-            sum(round(rate * n) for rate, n in placeless_loose if n),
+            placeless_loose["n_supported"],
             "count",
             "count",
             "place-less burst events with held-out support at a floor of 2 expected "
@@ -1028,43 +988,45 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "heldout_placeless_loose_events",
-            sum(n for _, n in placeless_loose),
+            placeless_loose["n_events"],
             "count",
             "count",
             "place-less burst events informative at that floor",
         ),
         share(
             "heldout_jumping_support_min",
-            min(jumping),
+            jumping["rate_min"],
             "jumping bursts: lower of folds A and B's share with held-out support",
         ),
-        share("heldout_jumping_support_max", max(jumping), "the higher of the two"),
+        share(
+            "heldout_jumping_support_max", jumping["rate_max"], "the higher of the two"
+        ),
         share(
             "heldout_estimator_agreement_min",
-            agreement.min(),
+            sweep_statistics.lowest_estimator_agreement(heldout),
             "lowest share over folds of the events informative under both content "
             "estimates on which they agree",
         ),
         share(
             "heldout_ours_only_informative_min",
-            min(informative["ours"]),
+            informative["ours"]["rate_min"],
             "replays only our detector reported: lower of folds A and B's share the "
             "evaluation cells can judge at all",
         ),
         share(
             "heldout_ours_only_informative_max",
-            max(informative["ours"]),
+            informative["ours"]["rate_max"],
             "the higher of the two",
         ),
         share(
             "heldout_shared_informative_min",
-            min(informative["shared"]),
+            informative["shared"]["rate_min"],
             "shared replays: lower of folds A and B's share the evaluation cells can "
             "judge at all",
         ),
         share(
             "heldout_shared_informative_max",
-            max(informative["shared"]),
+            informative["shared"]["rate_max"],
             "the higher of the two",
         ),
     ]

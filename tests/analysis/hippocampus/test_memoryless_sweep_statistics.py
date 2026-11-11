@@ -250,3 +250,266 @@ def test_part_recovery_statistics_average_cells_and_sum_trials():
     assert result["n_trials"] == 60
     assert result["n_trials_fewer_in_event"] == 7
     assert result["n_trials_more_in_event"] == 1
+
+
+# --- the held-out check ---------------------------------------------------------
+
+
+def _heldout(rows: list[tuple]) -> pd.DataFrame:
+    """A held-out summary from (block, measure, fold, estimator, detector,
+    event_class, truth, value) rows."""
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "summary",
+            "measure",
+            "fold",
+            "estimator",
+            "detector",
+            "event_class",
+            "truth",
+            "value",
+        ],
+    )
+
+
+def _by_class(
+    fold: str,
+    event_class: str,
+    truth: str,
+    measures: dict[str, float],
+    estimator: str = "state_space",
+    detector: str = "state_space",
+) -> list[tuple]:
+    return [
+        ("by_class", measure, fold, estimator, detector, event_class, truth, value)
+        for measure, value in measures.items()
+    ]
+
+
+REPLAY = "continuous_replay"
+HELDOUT_ROWS = [
+    # fold A: 2 of 4 informative ours-only replays and 12 of 16 shared ones have
+    # support; 4 of 10 and 16 of 20 are informative
+    *_by_class(
+        "A",
+        "ours_only",
+        REPLAY,
+        {
+            "n_events_all": 10,
+            "informative_share": 0.4,
+            "n_events": 4,
+            "support_rate": 0.5,
+        },
+    ),
+    *_by_class(
+        "A",
+        "shared",
+        REPLAY,
+        {
+            "n_events_all": 20,
+            "informative_share": 0.8,
+            "n_events": 16,
+            "support_rate": 0.75,
+        },
+    ),
+    # fold B: 3 of 5 and 12 of 15; 5 of 10 and 15 of 30 informative
+    *_by_class(
+        "B",
+        "ours_only",
+        REPLAY,
+        {
+            "n_events_all": 10,
+            "informative_share": 0.5,
+            "n_events": 5,
+            "support_rate": 0.6,
+        },
+    ),
+    *_by_class(
+        "B",
+        "shared",
+        REPLAY,
+        {
+            "n_events_all": 30,
+            "informative_share": 0.5,
+            "n_events": 15,
+            "support_rate": 0.8,
+        },
+    ),
+    # fold C: no ours-only replay is informative
+    *_by_class(
+        "C",
+        "ours_only",
+        REPLAY,
+        {
+            "n_events_all": 3,
+            "informative_share": 0.0,
+            "n_events": 0,
+            "support_rate": np.nan,
+        },
+    ),
+    # the sliding window's content of the same events: 1 of 4 and 8 of 16 in
+    # fold A, 2 of 5 and 3 of 15 in fold B
+    *_by_class(
+        "A",
+        "ours_only",
+        REPLAY,
+        {"n_events": 4, "support_rate": 0.25},
+        "sliding_window",
+    ),
+    *_by_class(
+        "A", "shared", REPLAY, {"n_events": 16, "support_rate": 0.5}, "sliding_window"
+    ),
+    *_by_class(
+        "B", "ours_only", REPLAY, {"n_events": 5, "support_rate": 0.4}, "sliding_window"
+    ),
+    *_by_class(
+        "B", "shared", REPLAY, {"n_events": 15, "support_rate": 0.2}, "sliding_window"
+    ),
+    # the shared events as the sliding window bounds them are not counted
+    *_by_class(
+        "A",
+        "shared",
+        REPLAY,
+        {"n_events": 100, "support_rate": 0.1},
+        detector="sliding_window",
+    ),
+    # another truth: place-less bursts, 0 of 3 with support in fold A and 1 of 2
+    # in fold B; at the floor of 2 spikes, 1 of 5 and 2 of 4
+    *_by_class(
+        "A",
+        "ours_only",
+        "no_content",
+        {
+            "n_events": 3,
+            "support_rate": 0.0,
+            "n_events_floor2": 5,
+            "support_rate_floor2": 0.2,
+        },
+    ),
+    *_by_class(
+        "B",
+        "ours_only",
+        "no_content",
+        {
+            "n_events": 2,
+            "support_rate": 0.5,
+            "n_events_floor2": 4,
+            "support_rate_floor2": 0.5,
+        },
+    ),
+    (
+        "error_rates",
+        "false_support_rate",
+        "A",
+        "state_space",
+        "state_space",
+        "all",
+        "",
+        0.0,
+    ),
+    ("agreement", "estimator_agreement", "A", "both", "both", "all", "", 0.99),
+    ("agreement", "estimator_agreement", "B", "both", "both", "all", "", 0.9),
+    ("agreement", "estimator_agreement", "C", "both", "both", "all", "", 1.0),
+    ("agreement", "n_informative_under_both", "A", "both", "both", "all", "", 0.5),
+]
+HELDOUT = _heldout(HELDOUT_ROWS)
+EITHER = ("ours_only", "shared")
+
+
+def test_pooled_heldout_rate_weights_each_class_by_its_informative_events():
+    result = stats.pooled_heldout_rate(HELDOUT, "A", EITHER, REPLAY)
+    # (2 + 12) of (4 + 16), not the mean of 0.5 and 0.75
+    assert result["rate"] == pytest.approx(0.7)
+    assert result["n_events"] == 20
+
+
+def test_pooled_heldout_rate_of_one_class_is_that_class_rate():
+    result = stats.pooled_heldout_rate(HELDOUT, "B", ("shared",), REPLAY)
+    assert result["rate"] == pytest.approx(0.8)
+    assert result["n_events"] == 15
+
+
+def test_pooled_informative_share_weights_each_class_by_all_its_events():
+    result = stats.pooled_heldout_rate(
+        HELDOUT, "A", EITHER, REPLAY, measure="informative_share"
+    )
+    # (4 + 16) of (10 + 20)
+    assert result["rate"] == pytest.approx(2 / 3)
+    assert result["n_events"] == 30
+
+
+def test_pooled_heldout_rate_reads_the_named_estimator_and_floor():
+    sliding = stats.pooled_heldout_rate(
+        HELDOUT, "A", EITHER, REPLAY, estimator="sliding_window"
+    )
+    # (1 + 8) of (4 + 16)
+    assert sliding["rate"] == pytest.approx(0.45)
+    loose = stats.pooled_heldout_rate(
+        HELDOUT, "A", ("ours_only",), "no_content", suffix="_floor2"
+    )
+    assert loose["rate"] == pytest.approx(0.2)
+    assert loose["n_events"] == 5
+
+
+def test_pooled_heldout_rate_is_nan_when_no_event_counts():
+    none_informative = stats.pooled_heldout_rate(HELDOUT, "C", ("ours_only",), REPLAY)
+    assert np.isnan(none_informative["rate"])
+    assert none_informative["n_events"] == 0
+    no_rows = stats.pooled_heldout_rate(HELDOUT, "C", ("shared",), REPLAY)
+    assert np.isnan(no_rows["rate"])
+    assert no_rows["n_events"] == 0
+
+
+def test_heldout_fold_statistics_range_over_folds_and_count_events():
+    result = stats.heldout_fold_statistics(HELDOUT, "AB", EITHER, REPLAY)
+    # fold A: 14 of 20; fold B: 15 of 20
+    assert result["rate_min"] == pytest.approx(0.7)
+    assert result["rate_max"] == pytest.approx(0.75)
+    assert result["rate_spread"] == pytest.approx(0.05)
+    assert result["n_events"] == 40
+    assert result["n_supported"] == 29
+    assert result["n_folds_with_support"] == 2
+
+
+def test_heldout_fold_statistics_find_the_lowest_rate_in_a_later_fold():
+    result = stats.heldout_fold_statistics(
+        HELDOUT, "AB", EITHER, REPLAY, estimator="sliding_window"
+    )
+    # fold A: 9 of 20; fold B: 5 of 20
+    assert result["rate_min"] == pytest.approx(0.25)
+    assert result["rate_max"] == pytest.approx(0.45)
+
+
+def test_heldout_fold_statistics_count_supported_events_and_folds():
+    main = stats.heldout_fold_statistics(HELDOUT, "AB", ("ours_only",), "no_content")
+    assert (main["n_events"], main["n_supported"]) == (5, 1)
+    # fold A's three informative events have no support
+    assert main["n_folds_with_support"] == 1
+    loose = stats.heldout_fold_statistics(
+        HELDOUT, "AB", ("ours_only",), "no_content", suffix="_floor2"
+    )
+    assert (loose["n_events"], loose["n_supported"]) == (9, 3)
+
+
+def test_heldout_fold_statistics_leave_out_a_fold_with_no_counted_event():
+    result = stats.heldout_fold_statistics(HELDOUT, "ABC", ("ours_only",), REPLAY)
+    assert (result["n_events"], result["n_supported"]) == (9, 5)
+    assert result["n_folds_with_support"] == 2
+    assert np.isnan(result["rate_spread"])
+
+
+def test_lowest_estimator_agreement_is_over_folds():
+    assert stats.lowest_estimator_agreement(HELDOUT) == 0.9
+
+
+def test_heldout_event_classes_are_those_of_the_by_class_rows():
+    assert stats.heldout_event_classes(HELDOUT) == {"ours_only", "shared"}
+    with_comparator = _heldout(
+        HELDOUT_ROWS + _by_class("A", "comparator_only", REPLAY, {"n_events_all": 1})
+    )
+    assert stats.heldout_event_classes(with_comparator) == {
+        "ours_only",
+        "shared",
+        "comparator_only",
+    }
