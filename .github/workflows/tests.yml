@@ -14,13 +14,19 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    # The suite takes about 45 minutes on the 2-CPU runner; a hung test ends
-    # the job here instead of at GitHub's six-hour limit.
+    # A hung test ends the job here instead of at GitHub's six-hour limit.
     timeout-minutes: 90
     strategy:
       fail-fast: false
+      # Every push runs the whole suite: the fast tests on both Pythons, and
+      # the slow ones (Monte Carlo and end-to-end, `@pytest.mark.slow`) once,
+      # in parallel, since they take about half the time on the 2-CPU runner.
       matrix:
         python-version: ["3.11", "3.12"]
+        tests: ["not slow"]
+        include:
+          - python-version: "3.11"
+            tests: "slow"
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +51,7 @@ jobs:
         run: uv run --frozen --python ${{ matrix.python-version }} ruff check src scripts tests
 
       - name: Run tests
-        run: uv run --frozen --python ${{ matrix.python-version }} pytest -q
+        run: uv run --frozen --python ${{ matrix.python-version }} pytest -q -m "${{ matrix.tests }}"
 
   manuscript:
     # Builds paper/main.pdf from the committed sources, figures and macros, as
