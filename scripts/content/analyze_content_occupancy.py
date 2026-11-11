@@ -76,7 +76,11 @@ from continuum_swr_replay.decoding.files import (  # noqa: E402
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     parse_epoch_identifier,
 )
-from continuum_swr_replay.paths import processed_data_dir, table_path  # noqa: E402
+from continuum_swr_replay.paths import (  # noqa: E402
+    content_occupancy_dir,
+    processed_data_dir,
+    table_path,
+)
 from continuum_swr_replay.tables.covariate_registry import (  # noqa: E402
     require_covariate_schema,
 )
@@ -95,8 +99,6 @@ XE = np.arange(0, 401, 2)  # 2D histogram edges: content->animal (cm)
 YE = np.arange(0, 201, 2)  # content->nearest well (cm)
 DWE = np.arange(0, 201, 5)  # distance-to-well 1D histogram edges
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_OUTPUT_DIR = _REPO_ROOT / "paper" / "figures" / "content_occupancy"
 GROUPS = ("nonSWR", "SWR")
 GROUP_COLORS = {"nonSWR": "#0072B2", "SWR": "#009E73"}
 QUADRANTS = ("remote_well", "own_well", "remote_path", "near_off")
@@ -402,7 +404,7 @@ def render(
 
 
 # --- CLI ----------------------------------------------------------------------
-def main(argv: Sequence[str] | None = None) -> None:
+def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     g = parser.add_mutually_exclusive_group(required=True)
     g.add_argument(
@@ -410,8 +412,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     g.add_argument("--animal", help="all HPC sessions for this animal")
     g.add_argument("--all", action="store_true", help="every HPC session")
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
-    args = parser.parse_args(argv)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=content_occupancy_dir(),
+        help="default: content_occupancy/ under the processed-data root",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    args = _parse_args(argv)
 
     if args.epoch_identifier:
         sessions = [args.epoch_identifier]

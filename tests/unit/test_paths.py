@@ -33,6 +33,8 @@ ROOT_LITERALS = {
     "inventory_comparison_root": "replay_detection_comparison/inventory",
     "event_features_root": "replay_detection_comparison/event_features",
     "artifact_intervals_root": "artifact_intervals",
+    "event_spike_evidence_dir": "event_spike_evidence",
+    "content_occupancy_dir": "content_occupancy",
 }
 """Each root's accessor -> its spelling under the data root."""
 
@@ -324,6 +326,19 @@ def test_figure_dir_on_the_default_root_is_the_paper_figure_dir(topic, monkeypat
 def test_figure_dir_on_a_staging_root_sits_beside_it():
     root = Path("/staging/Processed-Data")
     assert paths.figure_dir("rate", root) == Path("/staging/paper/figures/rate")
+
+
+def test_content_occupancy_writes_its_table_under_the_data_root(tmp_path, monkeypatch):
+    # The events summary reads the table from the data root, so a default run
+    # must write it there, on whichever root the run is given.
+    from scripts.content import analyze_content_occupancy
+
+    monkeypatch.setenv(paths.PROCESSED_DATA_DIR_ENV, str(tmp_path))
+
+    output_dir = analyze_content_occupancy._parse_args(["--all"]).output_dir
+
+    assert output_dir == tmp_path / "content_occupancy"
+    assert output_dir == paths.content_occupancy_dir()
 
 
 # Each run_refits figure script (and compare_content_estimators, a fit that

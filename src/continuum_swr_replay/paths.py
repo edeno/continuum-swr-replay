@@ -37,9 +37,11 @@ __all__ = [
     "STANDARDIZATION_REFERENCE",
     "artifact_intervals_root",
     "carey_root",
+    "content_occupancy_dir",
     "contfrag_replay_content_dir",
     "detection_comparison_dir",
     "event_features_root",
+    "event_spike_evidence_dir",
     "figure_dir",
     "inventory_comparison_root",
     "memoryless_root",
@@ -110,6 +112,16 @@ def event_features_root() -> Path:
 def artifact_intervals_root() -> Path:
     """Where artifact-interval run folders go, one per run id."""
     return processed_data_dir() / "artifact_intervals"
+
+
+def event_spike_evidence_dir() -> Path:
+    """The spike-evidence run that scores every event: one folder per epoch."""
+    return processed_data_dir() / "event_spike_evidence"
+
+
+def content_occupancy_dir() -> Path:
+    """Where the content-occupancy analysis writes its per-session table."""
+    return processed_data_dir() / "content_occupancy"
 
 
 _LEGACY_ROOTS: dict[str, Callable[[], Path]] = {

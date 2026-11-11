@@ -121,6 +121,20 @@ The mpfc summary followed the same day: `analysis/pfc/population_statistics.py`,
 and the timing statistics in `analysis/pfc/timing.py`. All 604 values are
 bit-identical before and after, on the cluster's data.
 
+## As built: every events input under the data root (2026-11-11)
+
+Finding 9 below (analysis inputs inside figure folders) is closed. The
+spike-evidence run and the content-occupancy table are read from
+`Processed-Data/event_spike_evidence/<epoch>/` and
+`Processed-Data/content_occupancy/` (`paths.event_spike_evidence_dir`,
+`paths.content_occupancy_dir`), so a fresh checkout that has the data root can
+build the events summary. On the cluster the files of the 2026-10-30 run (made
+at commit `bfb20f35`) were copied there; their digests are unchanged, and the
+summary's values are identical, with 43 `source` strings and two input paths
+naming the new folders. `scripts/detection/run_event_spike_evidence.sh` is the
+run's loop: on a scratch data root that lacked one epoch it skipped the other
+241 and wrote that epoch's four files byte for byte as the 2026-10-30 run had.
+
 ## As built: the held-out split's script (2026-11-11)
 
 The held-out test split by SWR (question 2c.3) was made by the tracked

@@ -3,12 +3,16 @@ and nothing is dropped silently from the values behind a quoted number."""
 
 from __future__ import annotations
 
+from dataclasses import fields
+
 import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.paths import processed_data_dir
 from continuum_swr_replay.reported.events import (
     _PROPERTIES,
+    default_inputs,
     event_table_staleness,
     gamma_db_values,
     property_interval_values,
@@ -33,6 +37,20 @@ def _value(key: str, pending: str | None = None) -> Value:
         function="f",
         pending=pending,
     )
+
+
+def test_every_input_is_read_from_the_data_root(processed_data_root):
+    """A fresh checkout holds none of the inputs: all are under the data root."""
+    inputs = default_inputs()
+
+    outside = [
+        field.name
+        for field in fields(inputs)
+        if not getattr(inputs, field.name).is_relative_to(processed_data_dir())
+    ]
+
+    assert processed_data_dir() == processed_data_root
+    assert outside == []
 
 
 @pytest.mark.parametrize(

@@ -151,6 +151,11 @@ them importable.
 - `analyze_event_spike_evidence.py` — the spike-evidence reality check: does each
   non-SWR non-local event's prior-excluded spike likelihood favour its decoded
   location over the animal's, above a matched immobility baseline.
+- `run_event_spike_evidence.sh [NJOBS]` — the run of it that the events summary and
+  `measure_ripple_class_structure.py` read: every event of every analysed epoch
+  (`--n-sample 1000000 --likelihood stored`), one process per epoch, written to
+  `Processed-Data/event_spike_evidence/<epoch>/`. An epoch whose metrics exist is
+  skipped. Run it in tmux.
 - `sweep_memoryless_detection.py` — injects replays of chosen path, duration, rate and
   distance into a simulated recording and scores both detectors by one rule; writes the raw
   table to `Processed-Data/` and the aggregates to
@@ -197,7 +202,10 @@ them importable.
 - `compare_content_estimators.py` — conditional Poisson (counts), conditional Poisson
   (fractions, clustered SE) and Dirichlet-multinomial fit on one shared event set,
   with equalized AIC, an animal bootstrap, and `paper/figures/content_estimators/`.
-- `analyze_content_occupancy.py`, `quantify_swr_overlap_geometry.py`, `generate_replay_content_figures.py`.
+- `analyze_content_occupancy.py` — where content sits relative to the animal and the
+  reward wells, per session; `--all` writes the table the events summary reads,
+  `Processed-Data/content_occupancy/content_occupancy_per_session.csv`.
+- `quantify_swr_overlap_geometry.py`, `generate_replay_content_figures.py`.
 - `analyze_uncertainty_content.py` — trial×well reward-belief uncertainty profiles,
   absolute content rates, response sensitivities, and cohort audit tables.
 

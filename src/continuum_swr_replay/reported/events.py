@@ -13,12 +13,13 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   every compared event of the other detectors, whether it overlaps a non-local
   event (``pair_membership`` against ``state_space``), and its state shares
   (``*_state_shares.parquet``, from ``scripts/detection/add_state_shares.py``);
-- the spike-evidence run that scores every event (``paper/figures/reality_all``, from
-  ``scripts/detection/analyze_event_spike_evidence.py``);
+- the spike-evidence run that scores every event
+  (``Processed-Data/event_spike_evidence``, one folder per epoch, from
+  ``scripts/detection/run_event_spike_evidence.sh``);
 - the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
   the state-evidence run the detection summary reads, from
   ``scripts/detection/split_state_evidence_by_swr.py``);
-- the content-occupancy table (``paper/figures/content_occupancy``, from
+- the content-occupancy table (``Processed-Data/content_occupancy``, from
   ``scripts/content/analyze_content_occupancy.py``);
 - the one-class-or-two tests (``Processed-Data/ripple_class_structure``, from
   ``scripts/detection/measure_ripple_class_structure.py``);
@@ -59,7 +60,9 @@ from continuum_swr_replay.analysis.hippocampus.property_contrast import (
 from continuum_swr_replay.analysis.inventory_comparison import nonlocal_comparison
 from continuum_swr_replay.paths import (
     ROOT_DIR,
+    content_occupancy_dir,
     event_features_root,
+    event_spike_evidence_dir,
     inventory_comparison_root,
     processed_data_dir,
     replay_content_dir,
@@ -147,13 +150,12 @@ def default_inputs() -> EventsInputs:
     return EventsInputs(
         event_table=table_path("event_table", replay_content_dir()),
         event_features_run=event_features_root() / EVENT_FEATURES_RUN,
-        reality_dir=ROOT_DIR / "paper/figures/reality_all/per_epoch",
+        reality_dir=event_spike_evidence_dir(),
         heldout_by_swr=processed_data_dir()
         / STATE_EVIDENCE_RUN
         / "state_evidence"
         / "nl_bouts_by_swr_stats.csv",
-        content_occupancy=ROOT_DIR
-        / "paper/figures/content_occupancy/content_occupancy_per_session.csv",
+        content_occupancy=content_occupancy_dir() / "content_occupancy_per_session.csv",
         brain_state_reference=processed_data_dir()
         / "brain_state_reference"
         / "reference.parquet",
