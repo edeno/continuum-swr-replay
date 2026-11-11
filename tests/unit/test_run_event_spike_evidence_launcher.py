@@ -95,6 +95,7 @@ def test_every_epoch_scored_is_reported_ok_and_the_run_done(checkout):
     assert run.returncode == 0
     assert (out / "a_HPC" / METRICS).read_text() == "metrics\n"
     assert (out / "b_HPC" / METRICS).exists()
+    assert sorted(path.name for path in out.iterdir()) == ["a_HPC", "b_HPC"]
     calls = (checkout.parent / "calls.txt").read_text()
     assert calls.count("--n-sample 1000000 --likelihood stored") == 2
     assert calls.count("--cache-dir /a cache") == 2

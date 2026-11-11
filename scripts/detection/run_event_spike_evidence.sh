@@ -70,6 +70,7 @@ export -f run_one
 
 if printf '%s\n' "$EPOCHS" \
     | xargs -P "$NJOBS" -I {} bash -c 'run_one "$@"' _ {} "$@"; then
+  rmdir "$OUT/.partial" 2> /dev/null
   echo "EVENT_SPIKE_EVIDENCE_DONE"
 else
   echo "EVENT_SPIKE_EVIDENCE_FAILED: see the FAILED lines and logs/event_spike_evidence/" >&2
