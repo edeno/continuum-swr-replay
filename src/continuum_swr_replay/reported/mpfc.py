@@ -1135,7 +1135,8 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
                 "quantity",
                 "dec2",
                 f"median absolute peak log-rate modulation of the units called for "
-                f"{'SWR-coupled' if word == 'swr_replay' else 'non-SWR'} replay",
+                f"{'SWR-coupled' if word == 'swr_replay' else 'non-SWR'} replay, "
+                "among the units tested for both replay classes",
                 "log rate",
             )
         )
@@ -1166,8 +1167,9 @@ def timing_values(
       and the animals
       whose own mean curve has its onset before event onset.
 
-    Beside them: the share of all units whose matched quiet-rest control curve
-    peaks before onset (the floor for a peak lag drawn by noise), units called
+    Beside them: the share of the units with a matched quiet-rest control curve
+    whose curve peaks before onset (the floor for a peak lag drawn by noise),
+    units called
     for both replay classes compared pairwise, and the timing calibration
     (simulated responses of known onset fit by the same estimator), which says
     how the estimator moves an onset and how often noise puts a unit's onset
@@ -1289,7 +1291,8 @@ def timing_values(
                 "fraction",
                 "pct",
                 f"value at -200 ms of the sign-aligned mean curve of {who}, as a share "
-                "of its peak: how far the curve sits from zero before the event",
+                "of its peak, clipped to the range 0 to 1: how far the curve sits "
+                "from zero before the event",
             )
             add(
                 f"timing_population_rise_onset_ms_{stem}",
@@ -1305,8 +1308,8 @@ def timing_values(
                 stats["population_rise_onset_ms_ci_low"],
                 "quantity",
                 "int",
-                f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} session "
-                f"resamples (seed {TIMING_BOOTSTRAP_SEED})",
+                f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
+                f"recording-day resamples (seed {TIMING_BOOTSTRAP_SEED})",
                 "ms",
             )
             add(
@@ -1335,8 +1338,8 @@ def timing_values(
                     stats[f"population_{what}_ms_ci_low"],
                     "quantity",
                     "int",
-                    f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} session "
-                    f"resamples (seed {TIMING_BOOTSTRAP_SEED})",
+                    f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} "
+                    f"recording-day resamples (seed {TIMING_BOOTSTRAP_SEED})",
                     "ms",
                 )
                 add(
@@ -1385,7 +1388,9 @@ def timing_values(
                     "quantity",
                     "dec2",
                     f"size of the sign-aligned mean curve of {who}: {text} (log-rate "
-                    "units; a decrease is counted as a positive size)",
+                    "units; the peak is the curve's largest absolute value, and each "
+                    "unit's curve is signed by its own peak, so a decrease counts as "
+                    "a positive size)",
                     "log rate",
                 )
                 for bound in ("low", "high"):
@@ -1414,8 +1419,9 @@ def timing_values(
                 "fraction",
                 "pct",
                 "the same units' matched-control mean curve at -200 ms, signed by "
-                "the event curve, as a share of the event curve's peak: how much "
-                "of the event curve's pre-event level quiet-rest windows also show",
+                "the event curve, as a share of the event curve's peak, clipped to "
+                "the range 0 to 1: how much of the event curve's pre-event level "
+                "quiet-rest windows also show",
             )
             for animal, own in by_animal.loc[direction].iterrows():
                 add(
@@ -1495,8 +1501,9 @@ def timing_values(
         timing.peak_before_onset_fraction(curves["matched_control"], lag_time),
         "fraction",
         "pct",
-        "share of all units whose matched quiet-rest control curve peaks before the "
-        "control window's onset (what a peak lag drawn by noise gives)",
+        "share of the units with a matched quiet-rest control curve (finite, and "
+        "not zero everywhere) whose control curve peaks before the control "
+        "window's onset (what a peak lag drawn by noise gives)",
     )
 
     if calibration is not None:
@@ -2017,7 +2024,7 @@ def marked_family_values(
             )
             add(
                 f"{stem}_post_onset_mean",
-                row.get("post_onset_mean", np.nan),
+                row["post_onset_mean"],
                 "quantity",
                 "sig2",
                 f"mean of the population slope curve from 0 to +150 ms after onset, {what}",
@@ -2077,7 +2084,7 @@ def marked_family_values(
     return values
 
 
-# --- stop context (Q8) ----------------------------------------------------------------
+# --- stop context ---------------------------------------------------------------------
 
 
 def stop_context_values(

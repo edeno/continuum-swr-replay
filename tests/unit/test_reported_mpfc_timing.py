@@ -226,3 +226,18 @@ def test_every_onset_description_states_the_half_maximum_rule(population_and_cur
             value.key,
             value.description,
         )
+
+
+def test_descriptions_state_the_clip_and_what_is_resampled(population_and_curves):
+    population, curves, _ = population_and_curves
+    make = value_factory(timing_values, "synthetic", TAGS["modulation"])
+    values = {v.key: v for v in timing_values(population, curves, LAG_TIME, None, make)}
+    fractions = [v for key, v in values.items() if "pre_event_level_fraction" in key]
+    assert len(fractions) == 12
+    for value in fractions:
+        assert "clipped to the range 0 to 1" in value.description, value.key
+    # the intervals resample recording days (NWB files), not sessions
+    intervals = [v for key, v in values.items() if "_ci_low_" in key]
+    assert len(intervals) == 36
+    for value in intervals:
+        assert "recording-day resamples" in value.description, value.key

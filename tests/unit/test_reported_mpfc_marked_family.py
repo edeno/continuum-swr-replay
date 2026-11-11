@@ -16,6 +16,7 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
             ("peak_value", -0.03),
             ("peak_lag_ms", 62.0),
             ("animals_same_sign", 5.0),
+            ("post_onset_mean", -0.02),
             ("post_onset_animals_same_sign", 4.0),
             ("frac_pos", 0.35),
             ("n_animals", 5.0),
@@ -55,6 +56,7 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
     values = {v.key: v.value for v in marked_family_values(summary, make)}
 
     assert values["marked_content_current_arm_swr_replay_peak"] == -0.03
+    assert values["marked_content_current_arm_swr_replay_post_onset_mean"] == -0.02
     # The animal count is the fixed 0 to +150 ms window's, not the peak lag's.
     assert (
         values["marked_content_current_arm_non_swr_replay_post_onset_animals_same_sign"]
