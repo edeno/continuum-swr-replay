@@ -26,8 +26,9 @@ Work that is deferred on purpose. Each item says when it should be done.
   files on DANDI.
   *When:* with the data statement for submission.
 - [ ] **Summary input paths and rebuild comparison.** Record input paths
-  relative to the data root, not absolute paths (`events.json` records
-  `/cumulus/...`). Add a script that compares a rebuilt summary with the
+  relative to the data root, not absolute paths (a build whose data root is
+  outside the checkout records `/cumulus/...`; the current summaries were built in
+  a checkout that links `Processed-Data`, so theirs are relative). Add a script that compares a rebuilt summary with the
   committed one within stated tolerances. Record each input file set's glob, not
   a label, so `make release-check` can re-check sets too (today it re-checks only
   single files). (Each build records the code that built it; a summary in
@@ -38,16 +39,15 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 ## Reported values
 
-- [ ] **Rebuild the four migrated summaries on the cluster.** `detection`,
-  `events`, `behavior` and `mpfc` were converted from the earlier layout, not
-  rebuilt (each records its steps in `migrated`; the one-time script,
-  `migrate_summaries.py`, is in git at `d833fa8b`): their numbers are the earlier
-  builds', two of them from uncommitted code, and they have no code record
-  (`make release-check` names them). Rebuild them from committed code
-  (`make summaries`), run `make reported-values`, and read
-  `paper/reported/changes.md` (the numbers of the two built from uncommitted code
-  may move).
-  *When:* at the next session on the cluster, before the Results are drafted.
+- [ ] **The events summary reads two inputs from `paper/figures/`.**
+  `reported/events.py` reads `paper/figures/reality_all/per_epoch/` (the
+  per-epoch spike-evidence metrics) and
+  `paper/figures/content_occupancy/content_occupancy_per_session.csv` from the
+  checkout. Both folders are ignored by git, so a fresh checkout or worktree does
+  not have them and the build fails until they are linked in (the 2026-11-11
+  rebuild linked them from the main cluster checkout). Write them under the
+  processed-data root and read them from there.
+  *When:* with the move of the events statistics out of the builder.
 
 - [ ] **Held-out test split by SWR (question 2c.3): confirm which script made it.**
   `events.json`'s 10 `heldout_*` values are read from

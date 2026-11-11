@@ -92,7 +92,11 @@ release check.
   each file's two digests: the stored diff, the untracked list and the
   modified-during-build list are gone, and a git failure stops the build.
   A docstring or comment edit still does not make a summary stale.
-- **No `migrated` field.** Every summary is rebuilt under schema 6.
+- **No `migrated` field.** Every summary was rebuilt under schema 6 on
+  2026-11-11, the four lab-data ones on the cluster from committed code. Each of
+  their 1,989 values was compared with the migrated file's: every number, unit,
+  description and question is the same; the events summary's sources now give
+  paths relative to the checkout.
 
 ## As built: naming (2026-11-11)
 
