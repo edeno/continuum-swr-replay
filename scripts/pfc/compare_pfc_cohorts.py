@@ -61,10 +61,8 @@ import pandas as pd
 from numpy.typing import NDArray
 from scipy.stats import false_discovery_control
 
-from continuum_swr_replay.analysis.pfc.load_population import (
-    load_population_data,
-    significant_fraction,
-)
+from continuum_swr_replay.analysis.pfc import population_statistics
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -323,7 +321,9 @@ def session_cohort_table(sidecars: pd.DataFrame) -> pd.DataFrame:
 
     ``n_bins_immobile`` is the "before" bin count -- every immobile bin was fit
     before -- and ``n_bins_fit`` the "after"; the event columns carry their own
-    before/after pair.
+    before/after pair. The last row totals the sessions: its bins, non-local
+    events and kept shares are those of
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.cohort_count_statistics`.
     """
     table = pd.DataFrame(
         {
@@ -350,18 +350,15 @@ def session_cohort_table(sidecars: pd.DataFrame) -> pd.DataFrame:
             ),
         }
     )
+    pooled = population_statistics.cohort_count_statistics(sidecars)
     total = {
         "session": f"ALL ({len(table)} sessions)",
-        "bins_immobile_before": table["bins_immobile_before"].sum(),
-        "bins_fit_after": table["bins_fit_after"].sum(),
-        "bins_kept_pct": 100.0
-        * table["bins_fit_after"].sum()
-        / table["bins_immobile_before"].sum(),
-        "nonlocal_before": table["nonlocal_before"].sum(),
-        "nonlocal_after": table["nonlocal_after"].sum(),
-        "nonlocal_kept_pct": 100.0
-        * table["nonlocal_after"].sum()
-        / table["nonlocal_before"].sum(),
+        "bins_immobile_before": pooled["n_bins_immobile"],
+        "bins_fit_after": pooled["n_bins_fit"],
+        "bins_kept_pct": 100.0 * pooled["bins_fit_fraction"],
+        "nonlocal_before": pooled["n_nonlocal_before"],
+        "nonlocal_after": pooled["n_nonlocal_kept"],
+        "nonlocal_kept_pct": 100.0 * pooled["nonlocal_kept_fraction"],
         "ripple_before": table["ripple_before"].sum(),
         "ripple_after": table["ripple_after"].sum(),
         "nonlocal_swr_after": table["nonlocal_swr_after"].sum(),
@@ -484,8 +481,8 @@ def gate_counts(
     )
     counts = {
         "n_neurons_with_fit": int(len(frame)),
-        "n_passing_fit_bin_rate": int(
-            (frame[FIT_RATE_COLUMN] >= min_firing_rate).sum()
+        "n_passing_fit_bin_rate": len(
+            population_statistics.units_at_or_above_rate(frame, min_firing_rate)[0]
         ),
     }
     if ALL_IMMOBILE_RATE_COLUMN in frame.columns:
@@ -1311,7 +1308,9 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
     A unit whose unpenalised fit ran away has no peak to difference against,
     so its row is reported -- it is where a prior is supposed to do the work --
     but "the prior binds" is counted only where a maximum-likelihood peak
-    exists to be moved.
+    exists to be moved. A well-posed row's ``prior_binds_pct`` is
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.prior_binding_percent`
+    of its curve; the other rows' is a share of their own units.
     """
     if frame.empty:
         return frame
@@ -1356,9 +1355,20 @@ def shrinkage_table(frame: pd.DataFrame) -> pd.DataFrame:
         median_peak_mle_se=("peak_mle_se", lambda s: finite_statistic(s, np.median)),
         n_prior_binds=("prior_binds", lambda s: int(s.fillna(False).sum())),
     ).reset_index()
-    summary["prior_binds_pct"] = (
-        100.0 * summary["n_prior_binds"] / summary["n_units"]
-    ).round(1)
+
+    def well_posed_percent(curve: str) -> float:
+        """The curve's prior-binding percent, from its units' three flags."""
+        flags = table.loc[
+            table["curve"] == curve, ["mle_converged", "mle_separated", "prior_binds"]
+        ].add_prefix(f"{curve}: ")
+        return population_statistics.prior_binding_percent(flags, [curve])[curve]
+
+    percent = 100.0 * summary["n_prior_binds"] / summary["n_units"]
+    well_posed = summary["units"] == "well posed"
+    percent[well_posed] = [
+        well_posed_percent(curve) for curve in summary.loc[well_posed, "curve"]
+    ]
+    summary["prior_binds_pct"] = percent.round(1)
     return summary
 
 
@@ -1443,17 +1453,26 @@ def empirical_bayes_sigma(
 
 
 def heldout_fraction_table(after: pd.DataFrame, alpha: float) -> pd.DataFrame:
-    """Units beating the control-draw null, per class, overall and per animal."""
+    """Units beating the control-draw null, per class, overall and per animal.
+
+    The pooled row is
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`
+    and an animal's row
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fraction_by_animal`,
+    as percents.
+    """
+    pooled = population_statistics.called_fractions(after, alpha)
+    by_animal = {
+        name: population_statistics.called_fraction_by_animal(after, name, alpha)
+        for name in pooled.index
+    }
     rows = []
     for scope, frame in [("all", after), *sorted(after.groupby("animal"))]:
         row: dict[str, object] = {"animal": scope, "n_units": len(frame)}
-        for name, (n_significant, n_tested) in significant_fraction(
-            frame, alpha=alpha
-        ).items():
-            row[f"{name}_n_tested"] = n_tested
-            row[f"{name}_pct"] = (
-                round(100.0 * n_significant / n_tested, 1) if n_tested else np.nan
-            )
+        for name in pooled.index:
+            called = pooled.loc[name] if scope == "all" else by_animal[name].loc[scope]
+            row[f"{name}_n_tested"] = int(called["n_tested"])
+            row[f"{name}_pct"] = round(float(100.0 * called["fraction"]), 1)
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -1924,10 +1943,19 @@ def rerun_sections(
             )
         )
         worst = after_sidecars.loc[_numeric(nonconverged).idxmax()]
+        fits = population_statistics.fit_count_statistics(
+            pd.DataFrame(
+                {
+                    "n_model_fits": _numeric(after_sidecars["n_model_fits"]),
+                    "n_nonconverged_model_fits": _numeric(nonconverged),
+                    "n_neurons_with_nonconverged_model": neurons,
+                }
+            )
+        )
         add(
-            f"Across the corpus {int(_numeric(nonconverged).sum()):,} of "
-            f"{int(_numeric(after_sidecars['n_model_fits']).sum()):,} shipped "
-            f"model fits did not converge, over {int(neurons.sum()):,} "
+            f"Across the corpus {int(fits['n_nonconverged_model_fits']):,} of "
+            f"{int(fits['n_model_fits']):,} shipped model fits did not "
+            f"converge, over {int(fits['n_neurons_with_nonconverged_model']):,} "
             f"neurons; the worst single session is `{worst['session']}` with "
             f"{int(worst['n_nonconverged_model_fits'])}.\n"
         )
@@ -2056,6 +2084,9 @@ def build_report(
     add("## Bins and events, before and after\n")
     table = session_cohort_table(sidecars)
     total = table.iloc[-1]
+    swrs_kept_fraction = population_statistics.cohort_count_statistics(sidecars)[
+        "swrs_kept_fraction"
+    ]
     add(
         f"Across {len(sidecars)} sessions the cohort keeps "
         f"**{total['bins_kept_pct']:.1f}%** of the immobile bins "
@@ -2064,7 +2095,7 @@ def build_report(
         f"**{total['nonlocal_kept_pct']:.1f}%** of the non-local events "
         f"({int(total['nonlocal_after']):,} of "
         f"{int(total['nonlocal_before']):,}) and "
-        f"{100.0 * total['ripple_after'] / total['ripple_before']:.1f}% of the "
+        f"{100.0 * swrs_kept_fraction:.1f}% of the "
         f"SWRs ({int(total['ripple_after']):,} of "
         f"{int(total['ripple_before']):,}). The kept non-local events split "
         f"{int(total['nonlocal_swr_after']):,} SWR-coupled / "

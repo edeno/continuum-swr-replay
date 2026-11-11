@@ -1301,6 +1301,30 @@ class TestPeakShrinkage:
             warning for warning in recwarn if warning.category is RuntimeWarning
         ]
 
+    def test_the_binding_percent_is_over_each_rows_own_units(self):
+        """Five units of one curve: three well posed, of which the prior binds
+        on one; two separated, of which it binds on both."""
+        frame = pd.DataFrame(
+            {
+                "curve": "SWR",
+                "peak_penalised": 1.0,
+                "peak_mle": [1.5, 1.0, 1.0, 30.0, 30.0],
+                "peak_mle_se": 0.1,
+                "mle_converged": True,
+                "mle_separated": [False, False, False, True, True],
+                "prior_binds": [True, False, False, True, True],
+                "animal": "chimi",
+            }
+        )
+        frame["delta"] = frame["peak_penalised"] - frame["peak_mle"]
+
+        table = shrinkage_table(frame).set_index("units")
+
+        assert table.loc["well posed", "n_units"] == 3
+        assert table.loc["well posed", "prior_binds_pct"] == 33.3
+        assert table.loc["separated", "n_units"] == 2
+        assert table.loc["separated", "prior_binds_pct"] == 100.0
+
 
 class TestEstimatorTables:
     def test_the_matched_test_event_population_is_reported(self, estimator_trees):
