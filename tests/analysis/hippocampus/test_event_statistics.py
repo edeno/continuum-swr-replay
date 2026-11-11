@@ -68,6 +68,30 @@ def test_overlap_class_statistics_count_events_animals_and_epochs():
     assert result["n_animals_non_swr_majority"] == 1
 
 
+def test_overlap_class_statistics_count_an_absent_class_as_a_share_of_zero():
+    # animal c has SWR-contained events only: its non-SWR share is 0, the lowest
+    only_swr = _events(
+        [
+            ("c", "e1", "swr_contained", 0.02, 0.08, 0.0, 0.1),
+            ("c", "e1", "swr_contained", 1.02, 1.08, 1.0, 1.1),
+        ]
+    )
+    result = stats.overlap_class_statistics(pd.concat([EVENTS, only_swr]))
+    assert result["non_swr_fraction_animal_min"] == 0.0
+    assert result["non_swr_fraction_animal_max"] == pytest.approx(3 / 4)
+    assert result["n_animals"] == 3
+    assert result["n_animals_non_swr_plurality"] == 1
+    assert result["n_animals_non_swr_majority"] == 1
+
+
+@pytest.mark.parametrize("overlap_class", [None, "swr"])
+def test_overlap_class_statistics_refuse_an_event_of_no_class(overlap_class):
+    unclassed = EVENTS.copy()
+    unclassed.loc[0, "overlap_class"] = overlap_class
+    with pytest.raises(ValueError, match="1 events have an overlap_class that is"):
+        stats.overlap_class_statistics(unclassed)
+
+
 def test_overlap_class_statistics_refuse_an_event_that_is_not_immobile():
     moving = EVENTS.assign(whole_event_speed_eligible=[False] + [True] * 8)
     with pytest.raises(ValueError, match="not whole-event immobile"):

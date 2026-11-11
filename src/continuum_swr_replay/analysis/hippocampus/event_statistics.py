@@ -89,7 +89,8 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
           each class.
         - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
-          lowest and highest of the animals' own shares.
+          lowest and highest of the animals' own shares; an animal with no
+          event of a class has a share of 0 in it.
         - ``n_animals``, ``n_epochs``: animals and epochs with an event.
         - ``n_animals_non_swr_plurality``: animals in which non-SWR is the
           largest of the three classes.
@@ -99,15 +100,24 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
     Raises
     ------
     ValueError
-        If an event is not immobile as a whole.
+        If an event is not immobile as a whole, or its class is none of the
+        three.
     """
     if not events["whole_event_speed_eligible"].all():
         raise ValueError(
             "the event table holds events that are not whole-event immobile"
         )
     counts = compute_swr_overlap_class_counts(events)
+    n_classed = counts["non_swr"] + counts["swr_contained"] + counts["swr_partial"]
+    if n_classed != counts["total"]:
+        raise ValueError(
+            f"{counts['total'] - n_classed} events have an overlap_class that is "
+            "none of non_swr, swr_contained and swr_partial"
+        )
     shares = (
-        events.groupby("animal")["overlap_class"].value_counts(normalize=True).unstack()
+        events.groupby("animal")["overlap_class"]
+        .value_counts(normalize=True)
+        .unstack(fill_value=0.0)
     )
     non_swr = shares["non_swr"]
     return {
