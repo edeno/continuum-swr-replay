@@ -1,7 +1,7 @@
-"""Part 2's reported values: what the events are, and how they compare with SWRs and Widloski events.
+"""The events summary: what the events are, and how they compare with SWRs and Widloski events.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted here. The inputs (:class:`Part2Inputs`):
+refitted here. The inputs (:class:`EventsInputs`):
 
 - the canonical event table (``replay_content/event_table.parquet``): the
   immobile non-local events, their SWR-overlap class, timing against the
@@ -13,7 +13,7 @@ refitted here. The inputs (:class:`Part2Inputs`):
 - the spike-evidence run that scores every event (``paper/figures/reality_all``, from
   ``scripts/detection/analyze_event_spike_evidence.py``);
 - the held-out tetrode test split by SWR (``nl_bouts_by_swr_stats.csv`` beside
-  the state-evidence run Part 1 reads, from
+  the state-evidence run the detection summary reads, from
   ``scripts/detection/split_state_evidence_by_swr.py``);
 - the content-occupancy table (``paper/figures/content_occupancy``, from
   ``scripts/content/analyze_content_occupancy.py``);
@@ -66,7 +66,7 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.reported.part1 import STATE_EVIDENCE_RUN
+from continuum_swr_replay.reported.detection import STATE_EVIDENCE_RUN
 from continuum_swr_replay.reported.values import (
     Summary,
     Value,
@@ -75,7 +75,7 @@ from continuum_swr_replay.reported.values import (
 )
 
 EVENT_FEATURES_RUN = "30cf1cc432e9"
-"""The event features run Part 2 reads (242 epochs, all ``ok``)."""
+"""The event features run the events summary reads (242 epochs, all ``ok``)."""
 
 #: The other detectors of claim 23, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
@@ -93,8 +93,8 @@ MAIN_DETECTOR = "kay"
 
 
 @dataclass(frozen=True)
-class Part2Inputs:
-    """The files Part 2 reads."""
+class EventsInputs:
+    """The files the events summary reads."""
 
     event_table: Path
     event_features_run: Path
@@ -109,8 +109,8 @@ class Part2Inputs:
     event_gamma_power: Path
 
 
-def default_inputs() -> Part2Inputs:
-    return Part2Inputs(
+def default_inputs() -> EventsInputs:
+    return EventsInputs(
         event_table=table_path("event_table", replay_content_dir()),
         event_features_run=event_features_root() / EVENT_FEATURES_RUN,
         reality_dir=ROOT_DIR / "paper/figures/reality_all/per_epoch",
@@ -1382,7 +1382,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
     """
     if set(intervals.index) != {p[0] for p in _PROPERTIES}:
         raise ValueError(
-            f"the bootstrap holds {sorted(intervals.index)}, not Part 2's properties"
+            f"the bootstrap holds {sorted(intervals.index)}, not the events summary's properties"
         )
     nan_columns = [c for c in intervals.columns if c.endswith("_nan_replicates")]
     if not nan_columns:
@@ -1561,9 +1561,9 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
 # --- the summary ---------------------------------------------------------------
 
 
-def summarize(inputs: Part2Inputs, produced_by: str, commit: str) -> Summary:
-    """Part 2's summary from ``inputs``."""
-    summary = Summary(part=2, produced_by=produced_by, commit=commit)
+def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
+    """The events summary from ``inputs``."""
+    summary = Summary(name="events", produced_by=produced_by, commit=commit)
 
     events = pd.read_parquet(inputs.event_table)
     current_sha256 = hashlib.sha256(inputs.event_table.read_bytes()).hexdigest()

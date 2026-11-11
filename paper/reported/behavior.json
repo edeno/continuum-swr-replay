@@ -1,9 +1,19 @@
 {
- "schema_version": 1,
- "part": 3,
- "title": "behavior",
+ "schema_version": 4,
+ "summary": "behavior",
+ "title": "the events and the task: event rate and represented content",
  "produced_by": "scripts/reported/summarize_part.py",
  "commit": "c96c9133ef6c-dirty",
+ "code": null,
+ "migrated": {
+  "from": "paper/reported/part3.json",
+  "schema_version": 1,
+  "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
+  "by": "scripts/reported/migrate_summaries.py",
+  "changes": [
+   "renamed from part3.json to behavior.json"
+  ]
+ },
  "inputs": [
   {
    "path": "Processed-Data/replay_content/models_per_bin_rate/swr_contrast_rate_audited.pkl",

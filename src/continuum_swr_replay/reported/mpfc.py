@@ -1,7 +1,7 @@
-"""Part 4's reported values: how mPFC units respond to SWR and non-SWR non-local events.
+"""The mpfc summary: how mPFC units respond to SWR and non-SWR non-local events.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted here. The inputs (:class:`Part4Inputs`):
+refitted here. The inputs (:class:`MpfcInputs`):
 
 - the at-well mPFC unit bundles (``Processed-Data/{epoch}_mPFC_modulation.pkl``
   and their ``*.provenance.json`` sidecars, from
@@ -161,7 +161,7 @@ MARKED_FAMILY_SUMMARY = (
 of the follow-up models fit with the per-stop baseline prior and the
 ``well_unknown`` baseline column (bundle contract 3)."""
 
-#: Joint follow-up models and targets quoted in Part 4, by key word.
+#: Joint follow-up models and targets the mpfc summary quotes, by key word.
 MARKED_MODELS = {
     "content": "replay_content",
     "strength": "event_strength",
@@ -218,8 +218,8 @@ TIMING_BOOTSTRAP_SEED = 0
 
 
 @dataclass(frozen=True)
-class Part4Inputs:
-    """The files Part 4 reads."""
+class MpfcInputs:
+    """The files the mpfc summary reads."""
 
     bundle_dir: Path
     pfc_cohort: Path
@@ -231,9 +231,9 @@ class Part4Inputs:
     stop_context_results: Path
 
 
-def default_inputs() -> Part4Inputs:
+def default_inputs() -> MpfcInputs:
     data = processed_data_dir()
-    return Part4Inputs(
+    return MpfcInputs(
         bundle_dir=data,
         pfc_cohort=data / "pfc_cohort_mPFC.json",
         event_table=table_path("event_table", replay_content_dir()),
@@ -2455,7 +2455,7 @@ def rate_cutoff_check_values(
 
 
 def followup_values(
-    inputs: Part4Inputs,
+    inputs: MpfcInputs,
     current: dict[str, str],
     n_cohort: int,
     claims: tuple[str, ...],
@@ -2505,9 +2505,9 @@ def followup_values(
     return values, records
 
 
-def summarize(inputs: Part4Inputs, produced_by: str, commit: str) -> Summary:
-    """Part 4's summary from ``inputs``."""
-    summary = Summary(part=4, produced_by=produced_by, commit=commit)
+def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
+    """The mpfc summary from ``inputs``."""
+    summary = Summary(name="mpfc", produced_by=produced_by, commit=commit)
     sidecars = read_sidecars(inputs.bundle_dir)
     pending = staleness(sidecars, inputs.event_table, inputs.stop_table)
     population, curves, lag_time = load_population_data(

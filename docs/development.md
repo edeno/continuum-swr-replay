@@ -76,7 +76,7 @@ src/continuum_swr_replay/
 ├── visualization/         # Plotting utilities; palettes.py holds COLORS
 ├── figure_utilities.py    # publication-figure helpers
 ├── intervals.py           # interval algebra: overlap conventions, masks, spike binning
-├── reported/              # reported numbers: the part{n} summary builders, values, rounding, the macro emitter, Table S1
+├── reported/              # reported numbers: the summary builders (survey, detection, events, behavior, mpfc), the question list, values, the code record, rounding, the macro emitter, Table S1
 ├── parameters.py          # global parameters
 ├── paths.py               # data roots, read at call time from $CSR_PROCESSED_DATA_DIR (processed_data_dir(), ...), canonical table names, table_path()
 └── data_types.py          # shared type definitions
@@ -86,7 +86,7 @@ scripts/                   # Analysis scripts, grouped by domain — see scripts
 └── exploratory/           #   unsupported one-offs (_*.py)
 paper/                     # The manuscript — see paper/README.md
 ├── main.tex  main.pdf     #   LaTeX source and the built PDF (make manuscript)
-├── reported/              #   part{n}.json summaries every reported number is read from
+├── reported/              #   <summary>.json summaries every reported number is read from
 ├── reported_values.tex    #   generated macros, one per reported number (make reported-values)
 ├── tables/                #   Supplementary Table S1 and the literature survey CSV it is built from
 └── figures/<topic>/       #   Publication figures in topic subdirs (no loose files)
@@ -401,11 +401,11 @@ How to run the decoders, their settings and their outputs are in
 
 ## Reported numbers
 
-Every number the project reports is read from a summary file, `paper/reported/part{n}.json`, one per part
-of the paper (`scripts/reported/summarize_part.py`, then `scripts/reported/emit_reported_values.py`; design
-`docs/design/2026-10-26-reported-values-design.md`). All five summaries (parts 0–4) are built. Part 0 holds the
-literature numbers the introduction quotes, computed from the replay-study survey of Supplementary
-Table S1 (`continuum_swr_replay.reported.part0`); it needs no lab data.
+Every number the project reports is read from a summary file, `paper/reported/<summary>.json`, named for
+what it holds: `survey`, `detection`, `events`, `behavior`, `mpfc` (`scripts/reported/summarize.py`, then
+`scripts/reported/emit_reported_values.py`). The survey summary holds the literature numbers the
+introduction quotes, computed from the replay-study survey of Supplementary Table S1
+(`continuum_swr_replay.reported.survey`); it needs no lab data.
 
 Which question each value answers, and which figure shows it, is written once, in the question list
 (`src/continuum_swr_replay/reported/questions.py`). It organizes the writing by part: a question need
@@ -417,12 +417,12 @@ question in the paper's outline, with the values that answer it, their macros, a
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it
   inline or quote it from memory.
-- In a doc, write a reported number inside a marker, `<!--v:part{n}.key-->…<!--/v-->`, and let the
+- In a doc, write a reported number inside a marker, `<!--v:<summary>.key-->…<!--/v-->`, and let the
   emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
 - A value with a `pending` note is not quoted as a finding.
 - A number quoted from a cited paper (for example, another study's share of replays) is not a result
   of this project and has no summary key: write it as text beside its citation. A number this project
-  computes, even from published sources (part 0's literature survey), is a reported number.
+  computes, even from published sources (the survey summary's literature numbers), is a reported number.
 
 ## Important Conventions
 

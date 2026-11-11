@@ -5,7 +5,7 @@ import itertools
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.part4 import _value_factory, stop_context_values
+from continuum_swr_replay.reported.mpfc import _value_factory, stop_context_values
 
 
 def _rows(n_loao_estimated: int = 5) -> list[dict]:

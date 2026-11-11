@@ -59,7 +59,7 @@ them).
 
 | Table | Script | Reads | Output | Tests |
 | --- | --- | --- | --- | --- |
-| S1. Detection and decoding parameters in <!--v:part0.papers-->57<!--/v--> replay studies | `scripts/figures/generate_supp_literature_table.py` | `paper/tables/table_s1_literature_parameters.csv`, the survey (Supplementary Data 1), via `continuum_swr_replay.reported.literature` | `paper/tables/table_s1_literature.tex` | `tests/unit/test_literature_table.py` |
+| S1. Detection and decoding parameters in <!--v:survey.papers-->57<!--/v--> replay studies | `scripts/figures/generate_supp_literature_table.py` | `paper/tables/table_s1_literature_parameters.csv`, the survey (Supplementary Data 1), via `continuum_swr_replay.reported.literature` | `paper/tables/table_s1_literature.tex` | `tests/unit/test_literature_table.py` |
 
 Table S1 needs no lab data. Its values are corrected in the survey CSV ([paper/README.md](../paper/README.md#supplementary-tables)).
 
@@ -67,7 +67,7 @@ Table S1 needs no lab data. Its values are corrected in the survey CSV ([paper/R
 
 A caption draft sits beside its figure as `<topic>_caption.md` (for example
 `paper/figures/memoryless_comparison/memoryless_comparison_caption.md`). A number
-in a caption is written as an inline value marker, `<!--v:part{n}.key-->…<!--/v-->`,
+in a caption is written as an inline value marker, `<!--v:<summary>.key-->…<!--/v-->`,
 which `make reported-values` fills, never typed by hand. When a caption moves into
 `paper/main.tex`, its numbers become the matching macros
 ([paper/README.md](../paper/README.md#numbers)).

@@ -1,16 +1,16 @@
 """Write the reported values into paper/reported_values.tex and the docs' inline markers.
 
-Reads every summary file in ``paper/reported/`` (``summarize_part.py`` writes
+Reads every summary file in ``paper/reported/`` (``summarize.py`` writes
 them), writes the LaTeX macros and ``paper/reported/questions.md`` (every question
 of ``reported/questions.py`` with the values that answer it), and rewrites the
 number inside every
-``<!--v:part{n}.key-->...<!--/v-->`` marker in the markdown under ``paper/``
+``<!--v:<summary>.key-->...<!--/v-->`` marker in the markdown under ``paper/``
 and ``docs/``. Every number it changes is listed on the screen and in
 ``paper/reported/changes.md`` (a dated section is appended for each emit that
 changes numbers), so a replaced number is never silent.
 
 Everything that can fail runs before anything is written: the summaries are
-read (exactly ``part0.json`` to ``part4.json``), ``questions.md`` is rendered, each
+read (exactly one ``<name>.json`` per summary), ``questions.md`` is rendered, each
 summary's staleness is worked out and every doc's markers are filled in memory.
 Only then are the files written and the changes logged, so a replaced number is
 never left unlisted by a crash.
@@ -50,14 +50,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     summaries = read_summaries(SUMMARY_DIR, check_tags=False)
     view = questions_view(summaries)
     notices = []
-    for part, summary in sorted(summaries.items()):
+    for name, summary in summaries.items():
         problems = summary_tag_problems(summary)
         if problems:
             notices.append(
-                f"  part{part}.json: {len(problems)} values with tag problems "
+                f"  {name}.json: {len(problems)} values with tag problems "
                 "(listed in questions.md; rebuild the summary)"
             )
-        notices += [f"  part{part}.json: {r}" for r in staleness(summary, ROOT_DIR)]
+        notices += [f"  {name}.json: {r}" for r in staleness(summary, ROOT_DIR)]
     docs = marked_docs(DOC_ROOTS)
     changes = emit(summaries, TEX_PATH, docs, ROOT_DIR)
     if changes:

@@ -12,7 +12,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     REWARD_HISTORY_N_LAGS,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import reward_kernel_weights
-from continuum_swr_replay.reported import part3
+from continuum_swr_replay.reported import behavior
 
 ANIMALS = ("a", "b", "c", "d", "e")
 
@@ -26,7 +26,7 @@ def _fits(outcome: str, coefs, separated=None, converged=None) -> pd.DataFrame:
             "animal": [ANIMALS[i % 5] for i in range(n)],
             "session_date": [f"d{i}" for i in range(n)],
             "epoch": ["02_r1"] * n,
-            "model": part3.FULL_RATE_RUNG,
+            "model": behavior.FULL_RATE_RUNG,
             "outcome": outcome,
             "separated_terms": separated if separated is not None else [""] * n,
             "converged": converged if converged is not None else [True] * n,
@@ -53,11 +53,11 @@ def test_the_reward_gate_leaves_out_a_fit_with_any_separated_reward_term():
     separated[4] = "hist_rcos_0"
     fits = _fits("non_local_swr", coefs, separated)
 
-    kept = part3._reward_gated(fits)
+    kept = behavior._reward_gated(fits)
 
     assert len(kept) == 9
     assert fits.index[3] not in kept.index
-    summary = part3._lag_one_summary(fits)
+    summary = behavior._lag_one_summary(fits)
     assert summary["n"] == 9 and summary["n_dropped"] == 1
 
 
@@ -69,7 +69,7 @@ def test_the_lag_one_summary_reports_the_kernel_not_the_first_coefficient():
     coefs = np.tile([c0, c1, 0.0], (10, 1))
     fits = _fits("non_local_swr", coefs, converged=[True] * 9 + [False])
 
-    summary = part3._lag_one_summary(fits)
+    summary = behavior._lag_one_summary(fits)
 
     assert summary["rr_animal"] == pytest.approx(np.exp(_lag_one([c0, c1, 0.0])))
     assert summary["rr_animal"] < 1
@@ -93,7 +93,7 @@ def test_the_paired_test_compares_lag_one_kernels_within_session():
         ignore_index=True,
     )
 
-    paired = part3._paired_lag_one(fits)
+    paired = behavior._paired_lag_one(fits)
 
     assert paired["n"] == n
     assert paired["positive"] == 1.0
@@ -112,7 +112,7 @@ def test_the_paired_test_drops_a_session_gated_in_either_stream():
         ignore_index=True,
     )
 
-    assert part3._paired_lag_one(fits)["n"] == 9
+    assert behavior._paired_lag_one(fits)["n"] == 9
 
 
 def _kernel(log_rr, se, ok):
@@ -131,12 +131,12 @@ def test_the_history_peak_interval_is_widened_for_the_lags_searched():
     many = _kernel(log_rr, se, [True] * 8 + [False] * 2)
     one = _kernel(log_rr, se, [True] + [False] * 9)
 
-    assert part3._peak(many)[2] is False
-    assert part3._peak(one)[2] is True
+    assert behavior._peak(many)[2] is False
+    assert behavior._peak(one)[2] is True
     # A large peak still clears the widened interval.
-    assert part3._peak(_kernel(np.r_[0.5, np.zeros(9)], se, [True] * 8 + [False] * 2))[
-        2
-    ]
+    assert behavior._peak(
+        _kernel(np.r_[0.5, np.zeros(9)], se, [True] * 8 + [False] * 2)
+    )[2]
 
 
 def test_fits_from_the_old_all_bins_design_are_refused(tmp_path):
@@ -144,9 +144,9 @@ def test_fits_from_the_old_all_bins_design_are_refused(tmp_path):
     path = tmp_path / "all_models.pkl"
     _fits("non_local_swr", [[0.3, 0.1, 0.0]]).to_pickle(path)
     with pytest.raises(ValueError, match="refit"):
-        part3._read_per_bin_fits(path)
+        behavior._read_per_bin_fits(path)
 
     _fits("non_local_swr", [[0.3, 0.1, 0.0]]).assign(
         per_bin_design=PER_BIN_DESIGN
     ).to_pickle(path)
-    assert len(part3._read_per_bin_fits(path)) == 1
+    assert len(behavior._read_per_bin_fits(path)) == 1

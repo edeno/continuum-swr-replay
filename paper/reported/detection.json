@@ -1,9 +1,19 @@
 {
- "schema_version": 1,
- "part": 1,
- "title": "the model",
+ "schema_version": 4,
+ "summary": "detection",
+ "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize_part.py",
  "commit": "7fb1dcfa84ad",
+ "code": null,
+ "migrated": {
+  "from": "paper/reported/part1.json",
+  "schema_version": 1,
+  "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
+  "by": "scripts/reported/migrate_summaries.py",
+  "changes": [
+   "renamed from part1.json to detection.json"
+  ]
+ },
  "inputs": [
   {
    "path": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv",

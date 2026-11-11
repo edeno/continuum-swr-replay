@@ -185,7 +185,7 @@ them importable.
   `--mode pooled` stacks each animal's sessions with a session fixed effect, for kernels a session is too sparse
   to measure (`duration_aware_history_pooled.pkl`). Each output has its provenance sidecar.
 - `plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`, `plot_model_checking.py`, `plot_uncertainty_rate.py` — rate figures.
-- `summarize_per_bin_rate_models.py` — prints the per-bin ladder's fitted effects as tables; the reported values are read from the same fits into `paper/reported/part3.json`.
+- `summarize_per_bin_rate_models.py` — prints the per-bin ladder's fitted effects as tables; the reported values are read from the same fits into `paper/reported/behavior.json`.
 
 ## `coupling/` — SWR-coupling strength of the events
 - `fit_swr_power_model.py` — each non-local event's ripple power (`ripple_power_z`) against the behavioral covariates: how strongly an event is SWR-coupled, beside the rate (how often) and content (what) layers.
@@ -443,7 +443,7 @@ them importable.
   two-scenario check.
 - `part4_rate_threshold_sensitivity.py` — recomputes Part 4's per-unit mPFC values
   (called fractions, overlap, split, effect sizes, SWRs without replay) with
-  `reported/part4.py`'s own functions at firing-rate gates of none (> 0 Hz on the fitted
+  `reported/mpfc.py`'s own functions at firing-rate gates of none (> 0 Hz on the fitted
   bins), 0.1, 0.5 and 1 Hz — the bundles hold every unit, so no refit — with the
   loader's drop counts per gate and the called fractions per rate band. Writes
   `part4_rate_threshold_sensitivity{,_long}.csv` under
@@ -472,12 +472,16 @@ them importable.
 
 ## `reported/` — the reported values
 
-Every number the project reports is read from a summary file, one per part of the paper
-(`paper/reported/part{n}.json`); design `docs/design/2026-10-26-reported-values-design.md`.
-- `summarize_part.py --part N` — writes part N's summary from outputs the analyses already wrote
-  (`continuum_swr_replay.reported`); refits nothing. Parts 1–4.
+Every number the project reports is read from a summary file, named for what it holds
+(`paper/reported/<summary>.json`: survey, detection, events, behavior, mpfc).
+- `summarize.py --summary NAME` — writes that summary from outputs the analyses already wrote
+  (`continuum_swr_replay.reported.<name>`), with a record of the code that built it; refits nothing.
+- `check_release.py` — before a milestone: fails on a summary that is missing, stale, built from
+  uncommitted code, or mis-tagged (`make release-check`).
+- `migrate_summaries.py` — one-time: converted the summaries that need the cluster to the named
+  layout without rebuilding them; deleted once they are rebuilt.
 - `emit_reported_values.py` — writes `paper/reported_values.tex` (one LaTeX macro per value) and rewrites the
-  number inside every `<!--v:part{n}.key-->…<!--/v-->` marker in the markdown under `paper/` and `docs/`
+  number inside every `<!--v:<summary>.key-->…<!--/v-->` marker in the markdown under `paper/` and `docs/`
   (markers in code are left alone). Every number it changes is listed in `paper/reported/changes.md`.
 
 ## `exploratory/` — unsupported one-offs

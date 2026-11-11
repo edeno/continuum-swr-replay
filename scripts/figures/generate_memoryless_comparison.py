@@ -15,7 +15,7 @@ to change them.
 
 The caption, `paper/figures/memoryless_comparison/memoryless_comparison_caption.md`,
 is prose this script does not write. Its numbers are reported values
-(`continuum_swr_replay.reported.part1`): the sweep's from the sweeps' CSVs, the
+(`continuum_swr_replay.reported.detection`): the sweep's from the sweeps' CSVs, the
 labeled recording's (a-f) from the JSON this script writes
 (:data:`RECORDING_NUMBERS_PATH`), filled into the caption by
 `scripts/reported/emit_reported_values.py`. Where the prose commits to a verdict
@@ -1646,7 +1646,7 @@ def recording_numbers(decoded: dict) -> dict[str, float | int]:
     """The numbers the caption states about the one labeled recording (a-f).
 
     The caption no longer interpolates them: they go to
-    :data:`RECORDING_NUMBERS_PATH`, ``continuum_swr_replay.reported.part1``
+    :data:`RECORDING_NUMBERS_PATH`, ``continuum_swr_replay.reported.detection``
     reads them into Part 1's summary, and the emitter writes them into the
     caption's markers. Durations in ms, distances in cm, shares in [0, 1].
     """

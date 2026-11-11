@@ -86,7 +86,7 @@ One command reads the four summaries and writes:
   scheme is the builder's call.
 - **The marked values in the claims table and results docs:** each claim row is one markdown table row, so
   multi-line blocks cannot sit inside its cells. Values are marked inline instead, for example
-  `<!--v:part2.kay_swr_no_nonlocal_pct-->17 %<!--/v-->`: the emitter rewrites only the text between the two
+  `<!--v:events.kay_swr_no_nonlocal_pct-->17 %<!--/v-->`: the emitter rewrites only the text between the two
   markers, and the prose around it stays hand-written. Multi-line generated blocks (the
   `write_epoch_register_doc.py` style) are still used outside tables. *(The assistant's call; the builder may
   change the marker syntax.)*

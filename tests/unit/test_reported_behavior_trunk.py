@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.part3 import (
+from continuum_swr_replay.reported.behavior import (
     current_arm_paired_values,
     trunk_shares,
     trunk_values,

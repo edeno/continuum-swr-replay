@@ -6,7 +6,7 @@ import pytest
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
 from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
-from continuum_swr_replay.reported.part4 import (
+from continuum_swr_replay.reported.mpfc import (
     SWR_WITHOUT_REPLAY_MIN_EVENTS,
     _value_factory,
     swr_without_replay_values,

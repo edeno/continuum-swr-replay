@@ -19,10 +19,10 @@ Python nor the lab's data: it uses the committed figures and
 | `main.tex` | The manuscript and its preamble |
 | `references.bib` | The bibliography (BibTeX) |
 | `reported_values.tex` | Generated: one LaTeX macro per reported number, read by `main.tex` |
-| `reported/part{n}.json` | The summary files every reported number is read from: parts 1–4, and part 0 for the literature numbers the introduction quotes |
+| `reported/<summary>.json` | The summary files every reported number is read from, named for what they hold: `survey` (the literature numbers the introduction quotes), `detection`, `events`, `behavior`, `mpfc` |
 | `reported/questions.md` | Generated: every question of the paper, in its outline, with the values that answer it (macro, value, meaning, source) and the values by figure |
 | `figures/<topic>/` | Figures, one folder per figure, with their caption drafts |
-| `tables/` | `table_s1_literature_parameters.csv`, the <!--v:part0.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
+| `tables/` | `table_s1_literature_parameters.csv`, the <!--v:survey.papers-->57<!--/v-->-paper survey (Supplementary Data 1, edited by hand), and `table_s1_literature.tex`, Supplementary Table S1 generated from it |
 | `Makefile`, `.latexmkrc` | Build settings |
 | `LICENSE` | CC BY 4.0 for the manuscript text and figures |
 
@@ -30,15 +30,15 @@ Python nor the lab's data: it uses the committed figures and
 
 Do not type a result number into `main.tex`. Use the macro that
 `reported_values.tex` defines for it, for example
-`\PartOneSweepReplays{}`; [reported/questions.md](reported/questions.md)
+`\DetectionSweepReplays{}`; [reported/questions.md](reported/questions.md)
 lists every value under the question it answers, with its macro (or, until its
 summary is rebuilt, among the values with tag problems). The macro for summary key `part1.sweep_replays` is
-`\PartOne` followed by the key in CamelCase.
+the summary's name capitalized (`Detection`) followed by the key in CamelCase.
 
 When a summary changes, regenerate the macros, then rebuild:
 
 ```bash
-make summaries        # rebuild reported/part{n}.json (parts 1-4 need the lab's processed data)
+make summaries        # rebuild reported/<summary>.json (all but survey need the lab's processed data)
 make reported-values  # write the macros and the docs' inline values
 make manuscript
 ```
@@ -62,7 +62,7 @@ Figure 1 has, and commit it with the rebuilt `main.pdf`.
 ## Supplementary tables
 
 Supplementary Table S1 is the survey of replay-detection and decoding parameters
-in <!--v:part0.papers-->57<!--/v--> published studies. `tables/table_s1_literature_parameters.csv` is the
+in <!--v:survey.papers-->57<!--/v--> published studies. `tables/table_s1_literature_parameters.csv` is the
 paper's one copy of the survey, and it is published as Supplementary Data 1.
 Each value was checked against the study's methods, supplement or released code
 (first here on 2026-09-21, then in the `ripple_detection` repository through
@@ -74,10 +74,10 @@ uv run --frozen python scripts/figures/generate_supp_literature_table.py
 ```
 
 The introduction's literature numbers (modes, ranges and shares) are computed
-from the same survey into `reported/part0.json`; after regenerating the table, run
-`uv run --frozen python scripts/reported/summarize_part.py --part 0` and
+from the same survey into `reported/survey.json`; after regenerating the table, run
+`uv run --frozen python scripts/reported/summarize.py --summary survey` and
 `make reported-values`. `tests/unit/test_literature_table.py` and
-`tests/unit/test_reported_part0.py` fail when the committed table or summary no
+`tests/unit/test_reported_survey.py` fail when the committed table or summary no
 longer matches the CSV.
 
 The lab's shared Google Sheet (`12mMgiYWO7tKRhs5qhMXMZ5RggGi1J24wxIkcs4knTUI`)

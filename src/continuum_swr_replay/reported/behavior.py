@@ -1,7 +1,7 @@
-"""Part 3's reported values: how the events relate to the task, SWR against non-SWR.
+"""The behavior summary: how the events relate to the task, SWR against non-SWR.
 
 Every value is read from an output a fit already wrote; nothing is refitted
-here. The inputs (:class:`Part3Inputs`), with their runs in
+here. The inputs (:class:`BehaviorInputs`), with their runs in
 ``scripts/qa/run_refits.py``:
 
 - the per-bin rate ladder, Family B (``models_per_bin_rate/all_models.pkl``,
@@ -240,7 +240,7 @@ def _content_specs() -> dict[str, tuple[str, str, str, str]]:
 
 
 CONTENT_SPECS = _content_specs()
-"""Every content-contrast aggregate Part 3 reports."""
+"""Every content-contrast aggregate the behavior summary reports."""
 
 #: Estimator-comparison terms: key word -> (rung, term).
 ESTIMATOR_TERMS = {
@@ -268,7 +268,7 @@ LEAF_STEPS = {"uncertainty": ("M4", "Mu"), "value": ("M4", "Mv"), "both": ("Mu",
 #: Stay/leave content strata, by the file suffix their bundles carry.
 STAY_STRATA = {"all": "", "swr": "_swr", "non_swr": "_non_swr", "mua": "_mua"}
 
-#: The SWR-power model's covariates Part 3 reports: key word -> column.
+#: The SWR-power model's covariates the behavior summary reports: key word -> column.
 POWER_COVARIATES = {
     "reward": "known_reward_outcome_lag_1",
     "rpe": "rpe_postoutcome",
@@ -277,8 +277,8 @@ POWER_COVARIATES = {
 
 
 @dataclass(frozen=True)
-class Part3Inputs:
-    """The files Part 3 reads."""
+class BehaviorInputs:
+    """The files the behavior summary reads."""
 
     per_bin: Path
     per_bin_all_stops: Path
@@ -303,10 +303,10 @@ class Part3Inputs:
     horserace_summary: Path
 
 
-def default_inputs() -> Part3Inputs:
+def default_inputs() -> BehaviorInputs:
     rc = replay_content_dir()
     estimators = rc / "content_estimator_comparison"
-    return Part3Inputs(
+    return BehaviorInputs(
         per_bin=model_dir("per_bin_rate") / "all_models.pkl",
         per_bin_all_stops=model_dir("per_bin_rate") / "all_models_allstops.pkl",
         per_bin_in_transit=model_dir("per_bin_rate") / "all_models_intransit.pkl",
@@ -1965,7 +1965,7 @@ def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value
     ]
 
 
-def cohort_audit_values(inputs: Part3Inputs) -> list[Value]:
+def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
     """What the rate families' common-cohort freeze cost, as their runners'
     cohort audits record it (population non-local; every population shares it)."""
     values = []
@@ -3159,9 +3159,9 @@ def rel(path: Path) -> str:
     )
 
 
-def summarize(inputs: Part3Inputs, produced_by: str, commit: str) -> Summary:
-    """Part 3's summary from ``inputs``."""
-    summary = Summary(part=3, produced_by=produced_by, commit=commit)
+def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
+    """The behavior summary from ``inputs``."""
+    summary = Summary(name="behavior", produced_by=produced_by, commit=commit)
 
     def record(*paths: Path) -> None:
         summary.inputs.extend(file_record(p, ROOT_DIR) for p in paths)

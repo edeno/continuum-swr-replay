@@ -17,9 +17,8 @@ The list organizes the writing by part. A question need not have a figure; a
 figure tag names the figure the paper places a value in, which may be one whose
 panels are not designed yet.
 
-The paper's parts are the outline, not the summary files: ``part1.json`` holds
-values for Part 2's "it works" questions, for example. A summary file is where a
-value is stored; a question's part is where it is reported.
+A summary file is named for what it holds, not for a part of the paper: a
+question's part is where its values are reported.
 """
 
 from __future__ import annotations

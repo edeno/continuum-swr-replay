@@ -1,7 +1,8 @@
-"""Part 1's reported values: the model, how it works and what it captures.
+"""The detection summary: the held-out tetrode test of each decoder state, and the
+detector against the Widloski & Foster detector on simulated replays.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted or re-decoded here. The inputs (:class:`Part1Inputs`):
+refitted or re-decoded here. The inputs (:class:`DetectionInputs`):
 
 - the held-out tetrode test per decoder state
   (``Processed-Data/_refresh_20261016/state_evidence``, from
@@ -38,7 +39,7 @@ from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data
 from continuum_swr_replay.reported.values import Summary, Value, file_record
 
 STATE_EVIDENCE_RUN = "_refresh_20261016"
-"""The held-out tetrode run Part 1 reads (242 epochs, all ``ok``)."""
+"""The held-out tetrode run the detection summary reads (242 epochs, all ``ok``)."""
 
 MEMORYLESS_PILOT_RUN = "0c2548cacf2d-seed20260922"
 """The sliding-window detector's first real-data pilot (chimi20200225_02_r1)."""
@@ -52,8 +53,8 @@ MEMORYLESS_FIGURE = ("supplement", "figure: memoryless comparison")
 
 
 @dataclass(frozen=True)
-class Part1Inputs:
-    """The files Part 1 reads."""
+class DetectionInputs:
+    """The files the detection summary reads."""
 
     state_evidence_dir: Path
     sweep_summary: Path
@@ -64,9 +65,9 @@ class Part1Inputs:
     pilot_manifest: Path
 
 
-def default_inputs() -> Part1Inputs:
+def default_inputs() -> DetectionInputs:
     pilot = memoryless_root() / MEMORYLESS_PILOT_RUN
-    return Part1Inputs(
+    return DetectionInputs(
         state_evidence_dir=processed_data_dir() / STATE_EVIDENCE_RUN / "state_evidence",
         sweep_summary=ROOT_DIR / SWEEP_DIR / "detection_sweep_summary.csv",
         controls_summary=ROOT_DIR / SWEEP_DIR / "detection_controls_summary.csv",
@@ -163,7 +164,7 @@ def _k_of(text: str) -> tuple[int, int]:
 def state_evidence_values(
     bouts: pd.DataFrame, manifest: dict, source: str
 ) -> list[Value]:
-    """Held-out tetrodes support each decoder state (analysis map, Part 1).
+    """Held-out tetrodes support each decoder state.
 
     Half the tetrodes choose the location, the other half score it; each
     animal's value is the mean of its epochs' medians, and "animals positive"
@@ -1182,9 +1183,9 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
 # --- the summary ---------------------------------------------------------------
 
 
-def summarize(inputs: Part1Inputs, produced_by: str, commit: str) -> Summary:
-    """Part 1's summary from ``inputs``."""
-    summary = Summary(part=1, produced_by=produced_by, commit=commit)
+def summarize(inputs: DetectionInputs, produced_by: str, commit: str) -> Summary:
+    """The detection summary from ``inputs``."""
+    summary = Summary(name="detection", produced_by=produced_by, commit=commit)
 
     bouts_path = inputs.state_evidence_dir / "bout_stats.csv"
     manifest_path = inputs.state_evidence_dir / "manifest.json"

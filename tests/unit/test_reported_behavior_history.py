@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.part3 import (
+from continuum_swr_replay.reported.behavior import (
     HISTORY_MAX_SE,
     duration_aware_history_values,
     horserace_values,

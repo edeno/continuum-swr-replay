@@ -12,8 +12,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.part4 import (
-    Part4Inputs,
+from continuum_swr_replay.reported.mpfc import (
+    MpfcInputs,
     followup_values,
     marked_family_staleness,
     staleness,
@@ -174,7 +174,7 @@ def test_marked_family_staleness(tmp_path, tables):
 def test_the_pending_notes_reach_the_followup_values(tmp_path, tables):
     event, stop = tables
     current = table_hashes(event, stop)
-    inputs = Part4Inputs(
+    inputs = MpfcInputs(
         bundle_dir=tmp_path,
         pfc_cohort=tmp_path / "cohort.json",
         event_table=event,

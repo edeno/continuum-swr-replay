@@ -3,11 +3,11 @@
 Run at a milestone (a draft going to the co-authors, submission, a release), not on
 every commit: during development a summary may lag the code, and
 ``emit_reported_values.py`` only reports it. Run it where the processed data is, so
-the inputs can be re-checked. Exits 1, naming each part to rebuild and why, when:
+the inputs can be re-checked. Exits 1, naming each summary to rebuild and why, when:
 
-- a part's ``part{n}.json`` is missing, or another ``part*.json`` is there;
-- a summary has no code record (built before records were kept, or git could not
-  answer);
+- a summary's ``<name>.json`` is missing, or another ``.json`` is there;
+- a summary has no code record (migrated from an earlier layout instead of
+  rebuilt, or git could not answer);
 - it was built from uncommitted or untracked code, or its files changed while it
   was built;
 - its recorded code, or ``uv.lock``, has changed since;
@@ -54,16 +54,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     problems, notes = release_problems(
         summaries, ROOT_DIR, check_inputs=not args.code_only
     )
-    for part in sorted(set(problems) | set(notes)):
-        print(f"part{part}.json:")
-        for problem in problems.get(part, []):
+    for name in summaries:
+        if name not in problems and name not in notes:
+            continue
+        print(f"{name}.json:")
+        for problem in problems.get(name, []):
             print(f"  - {problem}")
-        for note in notes.get(part, []):
+        for note in notes.get(name, []):
             print(f"  (note) {note}")
     if problems:
         print(
             f"{len(problems)} of {len(summaries)} summaries to rebuild "
-            "(scripts/reported/summarize_part.py), then `make reported-values`"
+            "(scripts/reported/summarize.py), then `make reported-values`"
         )
         return 1
     checked = "code and tags" if args.code_only else "code, tags and single-file inputs"

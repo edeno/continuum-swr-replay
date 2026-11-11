@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.reported.part2 import (
+from continuum_swr_replay.reported.events import (
     _PROPERTIES,
     event_table_staleness,
     gamma_db_values,

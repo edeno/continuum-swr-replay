@@ -1,4 +1,4 @@
-"""Part 0's summary: the surveyed literature the introduction describes.
+"""The survey summary: the surveyed literature the introduction describes.
 
 The introduction summarizes how published replay studies detect candidate
 events and decode them, from the survey in Supplementary Table S1
@@ -96,15 +96,15 @@ _BAYES = re.compile(r"(?<!\w)(?<!non-)bayes", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
-class Part0Inputs:
+class SurveyInputs:
     """The survey file the summary reads."""
 
     survey: Path
 
 
-def default_inputs() -> Part0Inputs:
+def default_inputs() -> SurveyInputs:
     """The survey of Supplementary Table S1."""
-    return Part0Inputs(survey=literature.SURVEY_PATH)
+    return SurveyInputs(survey=literature.SURVEY_PATH)
 
 
 def _mode(values: pd.Series, what: str) -> float:
@@ -309,12 +309,12 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
     return out
 
 
-def summarize(inputs: Part0Inputs, produced_by: str, commit: str) -> Summary:
-    """Part 0's summary: the survey's parameter values and method shares.
+def summarize(inputs: SurveyInputs, produced_by: str, commit: str) -> Summary:
+    """The survey summary: the survey's parameter values and method shares.
 
     Parameters
     ----------
-    inputs : Part0Inputs
+    inputs : SurveyInputs
         The survey to read.
     produced_by : str
         The command that builds the summary, for its record.
@@ -326,7 +326,7 @@ def summarize(inputs: Part0Inputs, produced_by: str, commit: str) -> Summary:
     summary : Summary
         Every part-0 value, with the survey's path and checksum as its input.
     """
-    summary = Summary(part=0, produced_by=produced_by, commit=commit)
+    summary = Summary(name="survey", produced_by=produced_by, commit=commit)
     source = "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)"
     survey = literature.load_survey(inputs.survey)
     summary.add(*parameter_values(numeric(survey[list(PARAMETER_COLUMNS)]), source))

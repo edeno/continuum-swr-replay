@@ -111,7 +111,7 @@ from continuum_swr_replay.figure_utilities import (
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
-from continuum_swr_replay.reported.part4 import MIN_FIRING_RATE_HZ
+from continuum_swr_replay.reported.mpfc import MIN_FIRING_RATE_HZ
 from continuum_swr_replay.visualization.palettes import COLORS
 
 figure_utilities.set_figure_defaults(context="paper")

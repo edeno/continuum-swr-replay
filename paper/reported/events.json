@@ -1,9 +1,19 @@
 {
- "schema_version": 1,
- "part": 2,
- "title": "the events",
+ "schema_version": 4,
+ "summary": "events",
+ "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize_part.py",
  "commit": "bfb20f359f8f",
+ "code": null,
+ "migrated": {
+  "from": "paper/reported/part2.json",
+  "schema_version": 1,
+  "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
+  "by": "scripts/reported/migrate_summaries.py",
+  "changes": [
+   "renamed from part2.json to events.json"
+  ]
+ },
  "inputs": [
   {
    "path": "/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet",

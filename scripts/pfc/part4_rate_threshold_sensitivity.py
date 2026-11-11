@@ -7,9 +7,9 @@ unit GLM was fit on. The bundles themselves hold every curated mPFC unit with at
 least one spike in the epoch: nothing is gated at fit time. So the gate can be
 moved without a refit. This script reloads the population at several gates and
 recomputes Part 4's per-unit values with Part 4's own functions
-(:func:`~continuum_swr_replay.reported.part4.called_fraction_values`,
-:func:`~continuum_swr_replay.reported.part4.overlap_and_effect_values`,
-:func:`~continuum_swr_replay.reported.part4.swr_without_replay_values`). It
+(:func:`~continuum_swr_replay.reported.mpfc.called_fraction_values`,
+:func:`~continuum_swr_replay.reported.mpfc.overlap_and_effect_values`,
+:func:`~continuum_swr_replay.reported.mpfc.swr_without_replay_values`). It
 also counts, per gate, the units the loader drops for another reason (no usable
 fit, a non-finite modulation curve), and gives the called fractions per
 firing-rate band, so a low gate can be checked for units with almost no spikes.
@@ -45,7 +45,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.part4 import (
+from continuum_swr_replay.reported.mpfc import (
     ALPHA,
     STEM,
     SWR_WITHOUT_REPLAY_CURVES,

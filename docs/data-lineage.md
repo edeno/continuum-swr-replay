@@ -52,7 +52,7 @@ partial rebuild mis-joins silently
 
 | Stage | Output (in the repository) | Written by |
 | --- | --- | --- |
-| Summaries | `paper/reported/part{n}.json` | `scripts/reported/summarize_part.py --part n` (`make summaries`) |
+| Summaries | `paper/reported/<summary>.json` | `scripts/reported/summarize.py --summary <summary>` (`make summaries`) |
 | Macros and inline values | `paper/reported_values.tex`; the `<!--v:…-->` values in `docs/` and `paper/` | `scripts/reported/emit_reported_values.py` (`make reported-values`) |
 | Figures | `paper/figures/<topic>/` | `scripts/figures/` ([figure-pipeline.md](figure-pipeline.md)) |
 | Manuscript | `paper/main.pdf` | `make manuscript` |

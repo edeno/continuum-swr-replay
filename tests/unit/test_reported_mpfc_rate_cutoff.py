@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
-from continuum_swr_replay.reported.part4 import (
+from continuum_swr_replay.reported.mpfc import (
     CHECK_FIRING_RATE_HZ,
     CHECK_KEYS,
     _value_factory,

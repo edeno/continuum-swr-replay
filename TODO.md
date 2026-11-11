@@ -15,7 +15,7 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 - [ ] **Public reproduction from archived tables (Tier 1).** Archive the
   canonical tables and per-epoch derived files that the part summaries read
-  (`paper/reported/part{n}.json`, `inputs`) on Zenodo, with a download script
+  (`paper/reported/<summary>.json`, `inputs`) on Zenodo, with a download script
   that checks each file's SHA-256, so the figures and summaries can be rebuilt
   without the lab's data. Fitted-model pickles are not archival inputs: the
   public path should refit the models from the tables.
@@ -26,7 +26,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   files on DANDI.
   *When:* with the data statement for submission.
 - [ ] **Summary input paths and rebuild comparison.** Record input paths
-  relative to the data root, not absolute paths (`part2.json` records
+  relative to the data root, not absolute paths (`events.json` records
   `/cumulus/...`). Add a script that compares a rebuilt summary with the
   committed one within stated tolerances. Record each input file set's glob, not
   a label, so `make release-check` can re-check sets too (today it re-checks only
@@ -49,7 +49,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   *When:* at the next session on the cluster, before the Results are drafted.
 
 - [ ] **Held-out test split by SWR (claim 7): confirm which script made it.**
-  `part2.json`'s 10 `heldout_*` values are read from
+  `events.json`'s 10 `heldout_*` values are read from
   `Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv`.
   - The Part 2 builder says the tracked
     `scripts/detection/split_state_evidence_by_swr.py` writes that file. The
@@ -59,7 +59,7 @@ Work that is deferred on purpose. Each item says when it should be done.
     the claims table is retired).
   - On the cluster, read `nl_bouts_by_swr.provenance.json` beside the CSV: its
     commit and script. Then mark the values pending in
-    `reported/part2.py:heldout_by_swr_values`, or correct the claims table.
+    `reported/events.py:heldout_by_swr_values`, or correct the claims table.
 
   *When:* at the next session on the cluster, before the Part 2 rebuild.
 

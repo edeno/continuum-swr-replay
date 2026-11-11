@@ -240,9 +240,16 @@ def test_a_record_of_no_files_is_not_current(repo):
     ]
 
 
-def _summary(code=None, claims=("15",), part=2, inputs=()) -> values.Summary:
+def _summary(
+    code=None, claims=("15",), name="events", inputs=(), migrated=None
+) -> values.Summary:
     summary = values.Summary(
-        part=part, produced_by="by", commit="c", code=code, inputs=list(inputs)
+        name=name,
+        produced_by="by",
+        commit="c",
+        code=code,
+        inputs=list(inputs),
+        migrated=migrated,
     )
     summary.add(
         values.Value(
@@ -261,65 +268,72 @@ def _summary(code=None, claims=("15",), part=2, inputs=()) -> values.Summary:
     return summary
 
 
-def test_the_code_record_round_trips_and_an_old_summary_has_none(repo, tmp_path):
+def test_the_code_record_and_a_migration_round_trip(repo, tmp_path):
     record = code_record(repo, [repo / "pkg" / "mod.py"])
-    path = tmp_path / "part2.json"
+    path = tmp_path / "events.json"
     _summary(code=record).write(path)
     assert values.read_summary(path).code == record
-
-    payload = json.loads(path.read_text())
-    payload["schema_version"] = 1
-    del payload["code"]
-    path.write_text(json.dumps(payload))
-    assert values.read_summary(path).code is None
+    migrated = {"from": "paper/reported/part2.json", "changes": ["renamed"]}
+    _summary(migrated=migrated).write(path)
+    assert values.read_summary(path).migrated == migrated
 
 
-@pytest.mark.parametrize("schema", [2, 4])
-def test_an_unknown_schema_is_refused(tmp_path, schema):
-    path = tmp_path / "part2.json"
+@pytest.mark.parametrize("schema", [3, 5])
+def test_another_schema_is_refused(tmp_path, schema):
+    path = tmp_path / "events.json"
     _summary().write(path)
     payload = json.loads(path.read_text())
     payload["schema_version"] = schema
     path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="expected one of"):
+    with pytest.raises(ValueError, match="expected 4"):
         values.read_summary(path)
 
 
-def test_a_current_schema_summary_must_carry_its_code_record(tmp_path):
-    path = tmp_path / "part2.json"
+@pytest.mark.parametrize("field", ["code", "migrated"])
+def test_a_summary_file_must_say_whether_it_has_a_code_record_and_a_migration(
+    tmp_path, field
+):
+    path = tmp_path / "events.json"
     _summary().write(path)
     payload = json.loads(path.read_text())
-    del payload["code"]
+    del payload[field]
     path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match="no code record"):
+    with pytest.raises(ValueError, match=f"no {field}"):
         values.read_summary(path)
 
 
-def _write_all(directory: Path, code=None, **changes) -> None:
-    for part in values.PARTS:
-        changes.get(part, _summary(code=code, part=part)).write(
-            directory / f"part{part}.json"
-        )
+def test_a_summary_has_a_known_name():
+    with pytest.raises(ValueError, match="no summary 'part2'"):
+        _summary(name="part2")
 
 
-def test_the_summaries_are_exactly_one_file_per_part(tmp_path):
+def _write_all(directory: Path, code=None) -> None:
+    for name in values.SUMMARIES:
+        _summary(code=code, name=name).write(directory / f"{name}.json")
+
+
+def test_the_summaries_are_exactly_one_file_each(tmp_path):
     _write_all(tmp_path)
-    assert sorted(values.read_summaries(tmp_path)) == sorted(values.PARTS)
-    (tmp_path / "part2_old.json").write_text((tmp_path / "part2.json").read_text())
-    with pytest.raises(ValueError, match="unexpected \\['part2_old.json'\\]"):
+    assert list(values.read_summaries(tmp_path)) == list(values.SUMMARIES)
+    (tmp_path / "events_old.json").write_text((tmp_path / "events.json").read_text())
+    with pytest.raises(ValueError, match="unexpected \\['events_old.json'\\]"):
         values.read_summaries(tmp_path)
-    (tmp_path / "part2_old.json").unlink()
-    (tmp_path / "part4.json").unlink()
-    with pytest.raises(ValueError, match="missing \\['part4.json'\\]"):
+    (tmp_path / "events_old.json").unlink()
+    (tmp_path / "mpfc.json").unlink()
+    with pytest.raises(ValueError, match="missing \\['mpfc.json'\\]"):
         values.read_summaries(tmp_path)
-    _summary(part=3).write(tmp_path / "part4.json")
-    with pytest.raises(ValueError, match="holds part 3"):
+    _summary(name="behavior").write(tmp_path / "mpfc.json")
+    with pytest.raises(ValueError, match="holds summary behavior"):
         values.read_summaries(tmp_path)
 
 
 def test_staleness_names_each_reason_and_the_release_check_adds_bad_tags(repo):
     module = repo / "pkg" / "mod.py"
     assert staleness(_summary(), repo) == ["no code record"]
+    migrated = _summary(migrated={"from": "paper/reported/part2.json"})
+    assert staleness(migrated, repo) == [
+        "migrated from paper/reported/part2.json, not rebuilt: no code record"
+    ]
     current = _summary(code=code_record(repo, [module]))
     assert staleness(current, repo) == []
     module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
@@ -334,9 +348,13 @@ def test_staleness_names_each_reason_and_the_release_check_adds_bad_tags(repo):
         "code changed since the build: pkg/mod.py",
     ]
     problems, _ = release_problems(
-        {2: current, 3: _summary(code=current.code, claims=("12",), part=3)}, repo
+        {
+            "events": current,
+            "behavior": _summary(code=current.code, claims=("12",), name="behavior"),
+        },
+        repo,
     )
-    assert problems == {3: ["1 value with tag problems: share"]}
+    assert problems == {"behavior": ["1 value with tag problems: share"]}
 
 
 def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo):
@@ -348,15 +366,15 @@ def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo)
         {"path": "runs/*.parquet", "n_files": 3, "sha256": "0"},
     ]
     summary = _summary(code=code_record(repo, [repo / "pkg" / "mod.py"]), inputs=inputs)
-    problems, notes = release_problems({2: summary}, repo)
-    assert problems == {2: ["input not on this machine: gone.csv"]}
-    assert notes == {2: ["input file set not re-checked: runs/*.parquet"]}
+    problems, notes = release_problems({"events": summary}, repo)
+    assert problems == {"events": ["input not on this machine: gone.csv"]}
+    assert notes == {"events": ["input file set not re-checked: runs/*.parquet"]}
     table.write_text("a\n2\n")
-    problems, _ = release_problems({2: summary}, repo)
-    assert "input changed since the build: table.csv" in problems[2]
-    problems, notes = release_problems({2: summary}, repo, check_inputs=False)
+    problems, _ = release_problems({"events": summary}, repo)
+    assert "input changed since the build: table.csv" in problems["events"]
+    problems, notes = release_problems({"events": summary}, repo, check_inputs=False)
     assert problems == {}
-    assert notes == {2: ["3 inputs not checked (--code-only)"]}
+    assert notes == {"events": ["3 inputs not checked (--code-only)"]}
 
 
 def _load_script(name: str):
@@ -380,15 +398,15 @@ def test_check_release_exits_0_only_when_every_summary_is_current(
     assert script.main([]) == 0
     assert "all 5 summaries are current" in capsys.readouterr().out
 
-    _summary(claims=("12",), part=3).write(summaries / "part3.json")
+    _summary(claims=("12",), name="behavior").write(summaries / "behavior.json")
     assert script.main([]) == 1
     out = capsys.readouterr().out
-    assert "part3.json:" in out and "no code record" in out
+    assert "behavior.json:" in out and "no code record" in out
     assert "1 value with tag problems: share" in out
 
-    (summaries / "part4.json").unlink()
+    (summaries / "mpfc.json").unlink()
     assert script.main([]) == 1
-    assert "missing ['part4.json']" in capsys.readouterr().out
+    assert "missing ['mpfc.json']" in capsys.readouterr().out
 
 
 def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
@@ -408,33 +426,35 @@ def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
         monkeypatch.setattr(script, name, path)
     (repo / "docs").mkdir()
     doc = repo / "docs" / "note.md"
-    doc.write_text("Share <!--v:part2.share-->99 %<!--/v-->.\n")
+    doc.write_text("Share <!--v:events.share-->99 %<!--/v-->.\n")
     _write_all(reported, code=code_record(repo, [repo / "pkg" / "mod.py"]))
-    _summary(claims=("12",), part=3).write(reported / "part3.json")
+    _summary(claims=("12",), name="behavior").write(reported / "behavior.json")
     script.main([])
     out = capsys.readouterr().out
-    assert "part3.json: 1 values with tag problems" in out
-    assert "part3.json: no code record" in out
+    assert "behavior.json: 1 values with tag problems" in out
+    assert "behavior.json: no code record" in out
     assert (reported / "questions.md").is_file()
     assert "99 %" not in doc.read_text()
     assert "99 %" in (reported / "changes.md").read_text()
 
-    doc.write_text("<!--v:part2.share-->50 %<!--/v--> <!--v:part2.gone-->1<!--/v-->\n")
+    doc.write_text(
+        "<!--v:events.share-->50 %<!--/v--> <!--v:events.gone-->1<!--/v-->\n"
+    )
     before = (repo / "values.tex").read_text()
-    with pytest.raises(KeyError, match="part2.gone"):
+    with pytest.raises(KeyError, match="events.gone"):
         script.main([])
     assert "50 %" in doc.read_text()
     assert (repo / "values.tex").read_text() == before
 
 
-def test_summarize_part_records_only_what_part0_s_build_used(tmp_path):
+def test_summarize_records_only_what_the_survey_s_build_used(tmp_path):
     subprocess.run(
         [
             sys.executable,
             "-P",
-            str(ROOT / "scripts" / "reported" / "summarize_part.py"),
-            "--part",
-            "0",
+            str(ROOT / "scripts" / "reported" / "summarize.py"),
+            "--summary",
+            "survey",
             "--output-dir",
             str(tmp_path),
         ],
@@ -443,13 +463,14 @@ def test_summarize_part_records_only_what_part0_s_build_used(tmp_path):
         capture_output=True,
         text=True,
     )
-    summary = values.read_summary(tmp_path / "part0.json")
+    summary = values.read_summary(tmp_path / "survey.json")
     files = set(summary.code["files"])
     package = "src/continuum_swr_replay"
-    assert "scripts/reported/summarize_part.py" in files
-    assert f"{package}/reported/part0.py" in files
+    assert "scripts/reported/summarize.py" in files
+    assert f"{package}/reported/survey.py" in files
     assert f"{package}/data_loaders/epoch_register.csv" in files
-    assert not {f"{package}/reported/part{n}.py" for n in (1, 2, 3, 4)} & files
+    others = {name for name in values.SUMMARIES if name != "survey"}
+    assert not {f"{package}/reported/{name}.py" for name in others} & files
     assert (
         not {
             f"{package}/reported/questions.py",

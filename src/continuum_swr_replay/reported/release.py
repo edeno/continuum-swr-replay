@@ -24,6 +24,10 @@ def staleness(summary: Summary, repo: Path) -> list[str]:
     files (or ``uv.lock``) that changed since.
     """
     code = summary.code
+    if summary.migrated is not None:
+        return [
+            f"migrated from {summary.migrated['from']}, not rebuilt: no code record"
+        ]
     if code is None:
         return ["no code record"]
     if not is_record(code):
@@ -60,18 +64,18 @@ def input_problems(summary: Summary, root: Path) -> tuple[list[str], list[str]]:
 
 
 def release_problems(
-    summaries: Mapping[int, Summary], repo: Path, *, check_inputs: bool = True
-) -> tuple[dict[int, list[str]], dict[int, list[str]]]:
-    """Each part with something to fix before a release, and each part's notes.
+    summaries: Mapping[str, Summary], repo: Path, *, check_inputs: bool = True
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Each summary with something to fix before a release, and each one's notes.
 
     The problems are its staleness (:func:`staleness`), its values with tag
     problems, and, with ``check_inputs``, its recorded single-file inputs that
     changed or are absent (:func:`input_problems`). The notes name what could not
     be checked: the input file sets, or every input when ``check_inputs`` is off.
     """
-    problems: dict[int, list[str]] = {}
-    notes: dict[int, list[str]] = {}
-    for part, summary in sorted(summaries.items()):
+    problems: dict[str, list[str]] = {}
+    notes: dict[str, list[str]] = {}
+    for name, summary in summaries.items():
         found = staleness(summary, repo)
         tags = summary_tag_problems(summary)
         if tags:
@@ -81,9 +85,9 @@ def release_problems(
             input_found, input_notes = input_problems(summary, repo)
             found += input_found
             if input_notes:
-                notes[part] = input_notes
+                notes[name] = input_notes
         else:
-            notes[part] = [f"{len(summary.inputs)} inputs not checked (--code-only)"]
+            notes[name] = [f"{len(summary.inputs)} inputs not checked (--code-only)"]
         if found:
-            problems[part] = found
+            problems[name] = found
     return problems, notes

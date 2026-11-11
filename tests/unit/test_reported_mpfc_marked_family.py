@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from continuum_swr_replay.reported.part4 import _value_factory, marked_family_values
+from continuum_swr_replay.reported.mpfc import _value_factory, marked_family_values
 
 
 def test_marked_family_values_quote_peak_sign_gain_and_leakage():
@@ -87,7 +87,7 @@ def test_marked_family_values_quote_peak_sign_gain_and_leakage():
 def test_odds_ratio_refuses_an_empty_one_class_cell():
     import pytest
 
-    from continuum_swr_replay.reported.part4 import odds_ratio
+    from continuum_swr_replay.reported.mpfc import odds_ratio
 
     assert odds_ratio(4, 2, 2, 8) == 8.0
     assert odds_ratio(0, 2, 2, 8) == 0.0

@@ -14,26 +14,26 @@ from typing import Any
 from continuum_swr_replay.reported.code_record import CodeRecord, CodeRecordError
 from continuum_swr_replay.reported.questions import tag_problems
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 """The layout of a summary file. Bump it when a field is added or renamed.
-Version 3 holds ``code``, the record of the code that built the summary
-(:class:`~continuum_swr_replay.reported.code_record.CodeRecord`). Version 2, an
-earlier layout of that record, was never used by more than one interim build."""
+Version 4 names the summary (``summary``, a key of :data:`SUMMARIES`), holds
+``code``, the record of the code that built it
+(:class:`~continuum_swr_replay.reported.code_record.CodeRecord`), and, for a
+summary converted from an earlier layout, ``migrated``."""
 
-READABLE_SCHEMAS = (1, 3)
-"""The layouts :func:`read_summary` reads. A version-1 summary has no ``code``."""
-
-PARTS = {
-    0: "the surveyed literature",
-    1: "the model",
-    2: "the events",
-    3: "behavior",
-    4: "other brain areas",
+SUMMARIES = {
+    "survey": "the published replay studies the introduction summarizes "
+    "(Supplementary Table S1)",
+    "detection": "the detector: the held-out tetrode test of each decoder state, "
+    "and the comparison with the Widloski & Foster detector on simulated replays",
+    "events": "the events: their overlap with SWRs and the other detectors, their "
+    "spike support, and their properties",
+    "behavior": "the events and the task: event rate and represented content",
+    "mpfc": "how mPFC units respond to the events",
 }
-"""The summary files, by the analyses they read: part 0, the published replay
-studies the introduction summarizes (Supplementary Table S1), and parts 1 to 4. A
-value's place in the paper's outline is its question's part
-(:mod:`~continuum_swr_replay.reported.questions`), which can differ."""
+"""Every summary file, ``paper/reported/<name>.json``, by name, in order. A summary
+is named for what it holds, not for a part of the paper: a value's part is its
+question's (:mod:`~continuum_swr_replay.reported.questions`)."""
 
 KINDS = ("count", "fraction", "quantity")
 """A count is exact; a fraction is a share in [0, 1]; a quantity has a unit."""
@@ -120,34 +120,52 @@ class Value:
 
 @dataclass
 class Summary:
-    """One part's values, the provenance of the inputs they were read from, and
-    the code that built them: ``code`` is a
-    :class:`~continuum_swr_replay.reported.code_record.CodeRecord`, a
-    :class:`~continuum_swr_replay.reported.code_record.CodeRecordError` when git
-    could not answer, or None for a summary built before code records were kept
-    (or one a builder returned before ``summarize_part.py`` stamped it)."""
+    """One summary's values, the provenance of the inputs they were read from, and
+    the code that built them.
 
-    part: int
+    Attributes
+    ----------
+    name : str
+        A key of :data:`SUMMARIES`.
+    code : CodeRecord, CodeRecordError or None
+        The record of the code that built it
+        (:class:`~continuum_swr_replay.reported.code_record.CodeRecord`); a
+        :class:`~continuum_swr_replay.reported.code_record.CodeRecordError` when
+        git could not answer; None when no build recorded it (a summary that was
+        migrated, or one a builder returned before ``summarize.py`` stamped it).
+    migrated : dict or None
+        For a summary converted from an earlier layout instead of rebuilt: what it
+        was converted from, at which commit, by what, and what changed. A rebuild
+        replaces it with a summary that has none.
+    """
+
+    name: str
     produced_by: str
     commit: str
     inputs: list[dict[str, Any]] = field(default_factory=list)
     values: dict[str, Value] = field(default_factory=dict)
     code: CodeRecord | CodeRecordError | None = None
+    migrated: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        if self.name not in SUMMARIES:
+            raise ValueError(f"no summary {self.name!r}; one of {list(SUMMARIES)}")
 
     def add(self, *values: Value) -> None:
         for value in values:
             if value.key in self.values:
-                raise ValueError(f"part {self.part}: duplicate key {value.key}")
+                raise ValueError(f"{self.name}: duplicate key {value.key}")
             self.values[value.key] = value
 
     def to_json(self) -> str:
         payload = {
             "schema_version": SCHEMA_VERSION,
-            "part": self.part,
-            "title": PARTS[self.part],
+            "summary": self.name,
+            "title": SUMMARIES[self.name],
             "produced_by": self.produced_by,
             "commit": self.commit,
             "code": self.code,
+            "migrated": self.migrated,
             "inputs": self.inputs,
             "values": {
                 key: {k: v for k, v in asdict(value).items() if k != "key"}
@@ -169,7 +187,7 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
     Parameters
     ----------
     path : Path
-        A ``part{n}.json``.
+        A summary file, ``<name>.json``.
     check_tags : bool
         Check each value's question and figure tags
         (:func:`~continuum_swr_replay.reported.questions.tag_problems`). False reads a
@@ -179,23 +197,24 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
     Raises
     ------
     ValueError
-        If the schema is not one of :data:`READABLE_SCHEMAS`, or a version-3
-        summary has no ``code``.
+        If the schema is not :data:`SCHEMA_VERSION`, or the file lacks ``code``
+        or ``migrated``.
     """
     payload = json.loads(path.read_text())
-    if payload["schema_version"] not in READABLE_SCHEMAS:
+    if payload["schema_version"] != SCHEMA_VERSION:
         raise ValueError(
-            f"{path}: schema {payload['schema_version']}, expected one of "
-            f"{READABLE_SCHEMAS}"
+            f"{path}: schema {payload['schema_version']}, expected {SCHEMA_VERSION}"
         )
-    if payload["schema_version"] >= 3 and "code" not in payload:
-        raise ValueError(f"{path}: schema 3 but no code record")
+    missing = {"code", "migrated"} - set(payload)
+    if missing:
+        raise ValueError(f"{path}: no {', '.join(sorted(missing))}")
     summary = Summary(
-        part=payload["part"],
+        name=payload["summary"],
         produced_by=payload["produced_by"],
         commit=payload["commit"],
         inputs=payload["inputs"],
-        code=payload.get("code"),
+        code=payload["code"],
+        migrated=payload["migrated"],
     )
     for key, fields in payload["values"].items():
         fields = dict(fields)
@@ -205,18 +224,18 @@ def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
     return summary
 
 
-def read_summaries(directory: Path, *, check_tags: bool = True) -> dict[int, Summary]:
-    """Every part's summary in ``directory``, by part: exactly one
-    ``part{n}.json`` for each part of :data:`PARTS`, each saying it is that part.
+def read_summaries(directory: Path, *, check_tags: bool = True) -> dict[str, Summary]:
+    """Every summary in ``directory``, by name, in the order of :data:`SUMMARIES`:
+    exactly one ``<name>.json`` for each, each saying it is that summary.
 
     Raises
     ------
     ValueError
-        If a part's file is missing, another ``part*.json`` is there, or a file's
-        ``part`` is not the one its name gives.
+        If a summary's file is missing, another ``.json`` is there, or a file's
+        ``summary`` is not the one its name gives.
     """
-    expected = {f"part{n}.json": n for n in PARTS}
-    found = {path.name for path in directory.glob("part*.json")}
+    expected = {f"{name}.json": name for name in SUMMARIES}
+    found = {path.name for path in directory.glob("*.json")}
     if found != set(expected):
         missing = sorted(set(expected) - found)
         extra = sorted(found - set(expected))
@@ -225,11 +244,11 @@ def read_summaries(directory: Path, *, check_tags: bool = True) -> dict[int, Sum
             f"unexpected {extra or 'none'}"
         )
     summaries = {}
-    for name, part in expected.items():
-        summary = read_summary(directory / name, check_tags=check_tags)
-        if summary.part != part:
-            raise ValueError(f"{directory / name}: holds part {summary.part}")
-        summaries[part] = summary
+    for file, name in expected.items():
+        summary = read_summary(directory / file, check_tags=check_tags)
+        if summary.name != name:
+            raise ValueError(f"{directory / file}: holds summary {summary.name}")
+        summaries[name] = summary
     return summaries
 
 
@@ -282,10 +301,10 @@ def files_record(
     return record
 
 
-def values_by_key(summaries: Mapping[int, Summary]) -> dict[str, Value]:
-    """Every value of every summary, keyed ``part{n}.{key}``."""
+def values_by_key(summaries: Mapping[str, Summary]) -> dict[str, Value]:
+    """Every value of every summary, keyed ``<summary>.<key>``."""
     return {
-        f"part{part}.{key}": value
-        for part, summary in summaries.items()
+        f"{name}.{key}": value
+        for name, summary in summaries.items()
         for key, value in summary.values.items()
     }
