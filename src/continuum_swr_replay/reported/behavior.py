@@ -83,6 +83,7 @@ from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     fits_carrying,
     gated_coefficient_difference_statistics,
     gated_coefficient_statistics,
+    gated_exp_median_ratio,
     group_range,
     known_fraction,
     rung_separation_range,
@@ -410,7 +411,6 @@ def per_bin_values(
     """
     make = value_factory(per_bin_values, source, TAGS["rate"])
     values: list[Value] = []
-    immediate_by_outcome = {}
     cohort = rate_fit_statistics.frozen_cohort_statistics(
         fit_rows(fits, model="M0_const")
     )
@@ -459,7 +459,6 @@ def per_bin_values(
         baseline = rate_fit_statistics.baseline_rate_statistics(null)
         kernel = rate_fit_statistics.reward_kernel_statistics(full)
         immediate = gated_coefficient_statistics(full, REWARD_HISTORY_COLUMNS[0])
-        immediate_by_outcome[outcome] = immediate
         immediate_note = _gate_note(immediate, REWARD_HISTORY_COLUMNS[0])
         for stats in (kernel, immediate):
             _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
@@ -828,8 +827,11 @@ def per_bin_values(
         ),
         make(
             "rate_immediate_ratio_swr_to_no_swr",
-            immediate_by_outcome["non_local_swr"]["exp_median"]
-            / immediate_by_outcome["non_local_no_swr"]["exp_median"],
+            gated_exp_median_ratio(
+                fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_swr"),
+                fit_rows(fits, model=FULL_RATE_RUNG, outcome="non_local_no_swr"),
+                REWARD_HISTORY_COLUMNS[0],
+            ),
             "quantity",
             "sig2",
             "rate_immediate_session_non_local_swr divided by "
