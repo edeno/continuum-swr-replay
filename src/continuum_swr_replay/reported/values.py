@@ -139,6 +139,12 @@ class Value:
             raise ValueError(
                 f"{self.key}: function {self.function!r} is not a function's name"
             )
+        if self.pending is not None and not self.pending.strip():
+            raise ValueError(f"{self.key}: a pending note must say why")
+        if "\n" in self.description + (self.pending or ""):
+            raise ValueError(
+                f"{self.key}: its description and pending note are single lines"
+            )
 
 
 def value_factory(
@@ -147,7 +153,7 @@ def value_factory(
     tags: Tags,
     pending: str | None = None,
 ) -> Callable[..., Value]:
-    """A maker of the values one builder function computes.
+    """A maker of the values one builder function names and describes.
 
     Parameters
     ----------
@@ -213,8 +219,18 @@ class Summary:
     ----------
     name : str
         A key of :data:`SUMMARIES`.
+    produced_by : str
+        The script that built it, relative to the repository.
+    commit : str
+        The commit it was built at
+        (:func:`~continuum_swr_replay.reported.code_record.commit_label`).
+    inputs : list of dict
+        One record per input file (:func:`file_record`) or set of files
+        (:func:`files_record`).
+    values : dict of str to Value
+        The values, by key.
     code : CodeRecord or None
-        The record of the code that built it
+        The record of the files of the checkout that built it
         (:class:`~continuum_swr_replay.reported.code_record.CodeRecord`); None
         for a summary a builder returned, before ``summarize.py`` records it.
     """
