@@ -7,12 +7,23 @@
  "code": null,
  "migrated": {
   "from": "paper/reported/part4.json",
-  "schema_version": 1,
-  "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
   "by": "scripts/reported/migrate_summaries.py",
-  "changes": [
-   "renamed from part4.json to mpfc.json",
-   "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5, at 6e81598c43fc764b4431944e33630a31458115c1)"
+  "steps": [
+   {
+    "change": "renamed from part4.json to mpfc.json (schema 1 to 4)",
+    "script_commit": "6e81598c43fc764b4431944e33630a31458115c1",
+    "ran_at": "eb1f98092c89ee24a7a40ca72238a6d3e307003e, from an uncommitted copy"
+   },
+   {
+    "change": "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5)",
+    "script_commit": "b895716f9c48565db933f90417484b88710d4742",
+    "ran_at": "6e81598c43fc764b4431944e33630a31458115c1, from an uncommitted copy"
+   },
+   {
+    "change": "questions merged and renumbered, the pilot values moved to 2a.4, figure ids named for their folders",
+    "script_commit": "d833fa8bcc00141bf739f139b11b16c2f061912b",
+    "ran_at": "d833fa8bcc00141bf739f139b11b16c2f061912b"
+   }
   ]
  },
  "inputs": [

@@ -2119,7 +2119,7 @@ def _content_questions(word: str) -> tuple[str, ...]:
 def content_contrast_values(
     audited: dict[str, pd.DataFrame], sources: dict[str, str]
 ) -> list[Value]:
-    """Questions 3.1, 3.2, 3.6, 3.7: the content ``is_swr``-contrast ladders.
+    """Questions 3.1, 3.2, 3.6 and 3.7: the content ``is_swr``-contrast ladders.
 
     Read from each bundle's audited aggregate as the fitting script wrote it:
     the animal-balanced median, the sessions kept by the per-term gate, the
@@ -2286,7 +2286,7 @@ def breadth_derived_values(
 def estimator_values(
     summary: pd.DataFrame, bootstrap: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Questions 3.1, 3.6, 3.7: the three-estimator comparison on one shared event
+    """Questions 3.1, 3.6 and 3.7: the three-estimator comparison on one shared event
     set. Coefficients are animal-balanced medians as the comparison writes them;
     intervals are its animal bootstrap's 2.5 and 97.5 percentiles."""
     make = _value_factory(

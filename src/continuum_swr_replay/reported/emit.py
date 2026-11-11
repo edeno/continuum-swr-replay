@@ -222,25 +222,24 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
             f"| `{name}.json` | `{summary.commit}` | {_record_cell(summary)} "
             f"| {len(summary.values)} | {len(problems)} |"
         )
-    for part, section in SECTIONS:
-        questions = [q for q in QUESTIONS if (q.part, q.section) == (part, section)]
-        lines += ["", f"## Part {part}: {section}"]
+    for section in SECTIONS:
+        questions = [q for q in QUESTIONS if q.section == section]
+        lines += ["", f"## Part {section.part}: {section.title}"]
         if not questions:
-            lines += ["", "No question in this section has numbers."]
+            lines += ["", "No question in this section yet."]
         for question in questions:
             found = by_question.get(question.id, [])
             status = question.status + (
-                f" ({question.reason})" if question.reason else ""
+                f"; {question.reason}" if question.reason else ""
             )
             figures = (
                 f" Figures: {', '.join(question.figures)}." if question.figures else ""
             )
-            claim = f" Claim {question.claim}." if question.claim else ""
             lines += [
                 "",
                 f"### {question.id}. {question.text}",
                 "",
-                f"Status: {status}.{figures} Values: {len(found)}.{claim}",
+                f"Status: {status}.{figures} Values: {len(found)}.",
             ]
             if question.note:
                 lines += ["", f"*Note:* {question.note}"]

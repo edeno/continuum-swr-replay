@@ -77,7 +77,7 @@ from continuum_swr_replay.reported.values import (
 EVENT_FEATURES_RUN = "30cf1cc432e9"
 """The event features run the events summary reads (242 epochs, all ``ok``)."""
 
-#: The other detectors of question 2b.5, by the word their keys use. Kay is the main
+#: The other detectors of question 2b.3, by the word their keys use. Kay is the main
 #: figure's; the rest go to the supplement.
 DETECTORS = {
     "kay": "kay",
@@ -214,7 +214,7 @@ def _manifest(folder: Path) -> dict:
 
 def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
     """Question 2b.2: how many immobile non-local events carry no SWR."""
-    make = _value_factory(source, ("2b.2", "2b.3"), ("paper", "figure: 2b"))
+    make = _value_factory(source, ("2b.2",), ("paper", "figure: 2b"))
     if not events["whole_event_speed_eligible"].all():
         raise ValueError(
             "the event table holds events that are not whole-event immobile"
@@ -296,8 +296,8 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
 
 
 def boundary_offset_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.6: non-local event bounds against the matched SWR's (Figure 2d)."""
-    make = _value_factory(source, ("2b.6",), ("paper", "figure: 2d"))
+    """Question 2b.4: non-local event bounds against the matched SWR's (Figure 2d)."""
+    make = _value_factory(source, ("2b.4",), ("paper", "figure: 2d"))
     overlap = events[events["overlap_class"] != "non_swr"]
     start_ms = 1000 * (overlap["event_start_s"] - overlap["matched_swr_start"]).dropna()
     end_ms = 1000 * (overlap["event_end_s"] - overlap["matched_swr_end"]).dropna()
@@ -373,7 +373,7 @@ def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -
 
 
 def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.5: the other side of the overlap, for each other detector.
+    """Question 2b.3: the other side of the overlap, for each other detector.
 
     For each detector: the share of its events that overlap no non-local event,
     how those divide by content, and, for the events that do overlap, the
@@ -386,7 +386,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
         main = word == MAIN_DETECTOR
         make = _value_factory(
             source,
-            ("2b.5", "2b.4"),
+            ("2b.3",),
             ("paper", "figure: 2") if main else ("supplement",),
         )
         mine = events[events["detector"] == detector]
@@ -562,11 +562,11 @@ def left_out_seconds(run_dir: Path) -> dict[str, float]:
 
 
 def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]:
-    """Questions 2b.2 and 2b.3: how many non-local events, and how much of their time, an
+    """Question 2b.2: how many non-local events, and how much of their time, an
     analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
     from the Widloski detector) does not include, in total and per hour of rest.
     """
-    make = _value_factory(source, ("2b.2", "2b.3"), ("paper", "figure: 2"))
+    make = _value_factory(source, ("2b.2",), ("paper", "figure: 2"))
     counts = pd.read_csv(report_dir / "counts_by_animal.csv")
     exposure_s = float(
         counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
@@ -728,7 +728,7 @@ _SIGNAL_LABELS = {
 def brain_state_values(
     events: pd.DataFrame, reference: pd.DataFrame, source: str
 ) -> list[Value]:
-    """Questions 2c.1 and 2b.7: theta, ripple power, MUA and slow and fast gamma during
+    """Questions 2c.1 and 2b.5: theta, ripple power, MUA and slow and fast gamma during
     events, against running and quiet rest.
 
     Each event's value is its mean over its bins of the epoch's z-scored signal
@@ -746,7 +746,7 @@ def brain_state_values(
     for word, column in _SIGNAL_EVENT_COLUMNS.items():
         make = _value_factory(
             source,
-            ("2c.1", "2b.7") if word == "ripple" else ("2c.1",),
+            ("2c.1", "2b.5") if word == "ripple" else ("2c.1",),
             ("paper", "figure: 3b") if word == "ripple" else ("supplement",),
         )
         label = _SIGNAL_LABELS[word]
@@ -901,7 +901,7 @@ def reality_metrics(per_epoch_dir: Path) -> pd.DataFrame:
 
 
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
-    """Questions 2c.2, 2c.3, 2c.4, 2c.5: each event group's spike evidence against matched
+    """Questions 2c.2, 2c.3, 2c.4 and 2c.5: each event group's spike evidence against matched
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
     run scores every event and quiet window (no cap). The remote groups' values
     also answer question 2c.7, whether remote events pass these tests."""
@@ -1096,7 +1096,7 @@ STEP_WINDOW_Z = 1.5
 
 
 def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.7, test 1: is the events' peak ripple power unimodal, and where is
+    """Question 2b.5, test 1: is the events' peak ripple power unimodal, and where is
     its mode against the Kay threshold?
 
     Per animal, Hartigan's dip test and the KDE's main mode of the event's peak
@@ -1104,7 +1104,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs.
     """
-    make = _value_factory(source, ("2b.7",), ("supplement",))
+    make = _value_factory(source, ("2b.5",), ("supplement",))
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
@@ -1138,7 +1138,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
 
 
 def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
-    """Question 2b.7 and the property questions, test 2: is there a step at the threshold?
+    """Question 2b.5 and the property questions, test 2: is there a step at the threshold?
 
     A sharp discontinuity design on the Kay criterion around each event (the
     level the ripple it touches sustains for 14 ms): per animal and property,
@@ -1165,9 +1165,9 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     attained = ", ".join(
         _OTHER_STEP_PROPERTIES[p] for p in others.index[others == others.max()]
     )
-    make = _value_factory(source, ("2b.7", "2d.2", "2d.3", "2d.5", "2d.6"), ("paper",))
+    make = _value_factory(source, ("2b.5", "2d.2", "2d.3", "2d.5", "2d.6"), ("paper",))
     evidence = main[main.property == "evidence"]
-    make_evidence = _value_factory(source, ("2b.7", "2c.3"), ("paper",))
+    make_evidence = _value_factory(source, ("2b.5", "2c.3"), ("paper",))
     return [
         make(
             "step_other_properties_criterion_animals_max",
@@ -1333,7 +1333,7 @@ _PROPERTY_NAMES = {
 
 
 def property_values(events: pd.DataFrame, source: str) -> list[Value]:
-    """Questions 2d.2–2d.6: per-event properties, non-SWR against SWR.
+    """Questions 2d.1–2d.6: per-event properties, non-SWR against SWR.
 
     Plain medians of all events, and the number of animals whose own medians
     differ in the claim's direction. Not duration-controlled.

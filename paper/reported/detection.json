@@ -7,12 +7,23 @@
  "code": null,
  "migrated": {
   "from": "paper/reported/part1.json",
-  "schema_version": 1,
-  "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
   "by": "scripts/reported/migrate_summaries.py",
-  "changes": [
-   "renamed from part1.json to detection.json",
-   "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5, at 6e81598c43fc764b4431944e33630a31458115c1)"
+  "steps": [
+   {
+    "change": "renamed from part1.json to detection.json (schema 1 to 4)",
+    "script_commit": "6e81598c43fc764b4431944e33630a31458115c1",
+    "ran_at": "eb1f98092c89ee24a7a40ca72238a6d3e307003e, from an uncommitted copy"
+   },
+   {
+    "change": "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5)",
+    "script_commit": "b895716f9c48565db933f90417484b88710d4742",
+    "ran_at": "6e81598c43fc764b4431944e33630a31458115c1, from an uncommitted copy"
+   },
+   {
+    "change": "questions merged and renumbered, the pilot values moved to 2a.4, figure ids named for their folders",
+    "script_commit": "d833fa8bcc00141bf739f139b11b16c2f061912b",
+    "ran_at": "d833fa8bcc00141bf739f139b11b16c2f061912b"
+   }
   ]
  },
  "inputs": [
@@ -61,7 +72,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -77,7 +88,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -93,7 +104,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -109,7 +120,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -125,7 +136,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -141,7 +152,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -157,7 +168,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -173,7 +184,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -189,7 +200,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -205,7 +216,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -221,7 +232,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -237,7 +248,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -253,7 +264,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -269,7 +280,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -285,7 +296,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -301,7 +312,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -317,7 +328,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -333,7 +344,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -349,7 +360,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -365,7 +376,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -381,7 +392,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -397,7 +408,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -413,7 +424,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -429,7 +440,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -445,7 +456,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -461,7 +472,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -477,7 +488,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -493,7 +504,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -509,7 +520,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -525,7 +536,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -541,7 +552,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -557,7 +568,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -573,7 +584,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -589,7 +600,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
    "pending": null
@@ -797,7 +808,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -909,7 +920,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -925,7 +936,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1133,7 +1144,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1149,7 +1160,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1165,7 +1176,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1181,7 +1192,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1197,7 +1208,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1213,7 +1224,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1229,7 +1240,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1245,7 +1256,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1261,7 +1272,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1277,7 +1288,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1293,7 +1304,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
    "pending": null
@@ -1305,11 +1316,11 @@
    "unit": "",
    "description": "of those, calls whose dispersion clears the threshold only with kept windows outside every piece",
    "questions": [
-    "2a.3"
+    "2a.4"
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
    "pending": null
@@ -1321,11 +1332,11 @@
    "unit": "",
    "description": "sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1",
    "questions": [
-    "2a.3"
+    "2a.4"
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
    "pending": null
@@ -1341,7 +1352,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1357,7 +1368,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1373,7 +1384,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1389,7 +1400,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1405,7 +1416,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1421,7 +1432,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1437,7 +1448,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1453,7 +1464,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1469,7 +1480,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1485,7 +1496,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1501,7 +1512,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1517,7 +1528,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1533,7 +1544,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1549,7 +1560,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1565,7 +1576,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1581,7 +1592,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1597,7 +1608,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1613,7 +1624,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1629,7 +1640,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1645,7 +1656,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1661,7 +1672,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
    "pending": null
@@ -1725,7 +1736,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1741,7 +1752,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1757,7 +1768,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1773,7 +1784,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1789,7 +1800,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1805,7 +1816,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1821,7 +1832,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1837,7 +1848,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1853,7 +1864,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1869,7 +1880,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1885,7 +1896,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1901,7 +1912,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1917,7 +1928,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1933,7 +1944,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1949,7 +1960,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1965,7 +1976,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1981,7 +1992,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -1997,7 +2008,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2013,7 +2024,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2029,7 +2040,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2045,7 +2056,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2061,7 +2072,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2077,7 +2088,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2093,7 +2104,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2109,7 +2120,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2125,7 +2136,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2141,7 +2152,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null
@@ -2157,7 +2168,7 @@
    ],
    "used_in": [
     "supplement",
-    "figure: memoryless comparison"
+    "figure: memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
    "pending": null

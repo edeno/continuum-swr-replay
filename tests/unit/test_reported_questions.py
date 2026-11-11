@@ -31,7 +31,6 @@ from continuum_swr_replay.reported.questions import (
     ANSWERED,
     FIGURES,
     QUESTIONS,
-    SECTION_CODES,
     SECTIONS,
     STATUSES,
     parse_figure_tag,
@@ -50,16 +49,12 @@ def test_question_ids_are_unique():
     assert len(ids) == len(set(ids))
 
 
-def test_every_question_sits_in_the_outline():
-    for q in QUESTIONS:
-        assert (q.part, q.section) in SECTIONS, q.id
-
-
-def test_a_question_s_id_is_its_section_code_and_number():
-    assert set(SECTION_CODES) == set(SECTIONS)
+def test_a_question_s_id_is_a_section_code_and_a_number():
+    codes = {s.code for s in SECTIONS}
+    assert len(codes) == len(SECTIONS)
     for q in QUESTIONS:
         code, number = q.id.rsplit(".", 1)
-        assert code == SECTION_CODES[(q.part, q.section)] and number.isdigit(), q.id
+        assert code in codes and number.isdigit() and int(number) > 0, q.id
 
 
 def test_a_status_other_than_computed_says_why():
@@ -100,8 +95,8 @@ def test_every_figure_script_exists_and_the_figure_pipeline_names_it():
 def test_figure_tags_name_a_figure_or_a_lettered_panel():
     assert parse_figure_tag("figure: 2b") == ("2", "b")
     assert parse_figure_tag("figure: 2") == ("2", "")
-    assert parse_figure_tag("figure: memoryless comparison") == (
-        "memoryless comparison",
+    assert parse_figure_tag("figure: memoryless_comparison") == (
+        "memoryless_comparison",
         "",
     )
     assert parse_figure_tag("figure: 2z") is None
@@ -359,7 +354,7 @@ CONSTANT = ("paper", "figure: 2")
 
 
 def f(source, word, unknown):
-    local = ("2b.6",)
+    local = ("2b.4",)
     make = _value_factory(source, ("2d.2",), ("paper", "figure: 2"))
     make("a", 1, "count", "count", "d", questions_=local)
     make("b", 1, "count", "count", "d", used_in_=CONSTANT if word else ("paper",))
@@ -374,7 +369,7 @@ def test_the_scan_follows_overrides_conditionals_and_constants(monkeypatch):
     pairs, unresolved = _tag_sites("survey", source=SYNTHETIC)
     assert sorted((line, c, u) for line, _, c, u in pairs) == [
         (7, [("2d.2",)], [("paper", "figure: 2")]),
-        (8, [("2b.6",)], [("paper", "figure: 2")]),
+        (8, [("2b.4",)], [("paper", "figure: 2")]),
         (9, [("2d.2",)], [("paper", "figure: 2"), ("paper",)]),
         (10, [("2d.5",)], [("figure: 3",)]),
         (11, None, [("paper", "figure: 2")]),
@@ -390,7 +385,7 @@ def test_the_scan_follows_overrides_conditionals_and_constants(monkeypatch):
         }
     )
     assert problems == [
-        "question 2b.6 does not list figure '2'",
+        "question 2b.4 does not list figure '2'",
         "question 2d.2 does not list figure '2'",
         "question 2d.5 does not list figure '3'",
     ]
@@ -472,19 +467,19 @@ def test_a_question_has_values_exactly_when_its_status_says_so(committed):
 def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tags():
     summary = values.Summary(name="events", produced_by="by", commit="c")
     summary.add(
-        _value(key="shared", questions=("2b.2", "2b.3"), used_in=("figure: 2b",))
+        _value(key="shared", questions=("2d.3", "2d.4"), used_in=("figure: 3",))
     )
     summary.add(_value(key="old", questions=("12",), check_tags=False))
     view = emit.questions_view({"events": summary})
-    section_2 = view.split("### 2b.2. ")[1].split("### ")[0]
-    section_21 = view.split("### 2b.3. ")[1].split("### ")[0]
-    assert "`\\EventsShared`" in section_2
-    assert "`\\EventsShared`" in section_21
+    extent = view.split("### 2d.3. ")[1].split("### ")[0]
+    stillness = view.split("### 2d.4. ")[1].split("### ")[0]
+    assert "`\\EventsShared`" in extent
+    assert "`\\EventsShared`" in stillness
     flagged = view.split("## Values with tag problems")[1].split("## Values by")[0]
     assert "`\\EventsOld`" in flagged
     assert "no question '12'" in flagged
-    by_figure = view.split("### Figure 2: ")[1].split("### Figure")[0]
-    assert "Panel b: `\\EventsShared`" in by_figure
+    by_figure = view.split("### Figure 3: ")[1].split("### Figure")[0]
+    assert "Unlettered: `\\EventsShared`" in by_figure
 
 
 def test_a_question_with_no_figure_shows_no_figures_line():

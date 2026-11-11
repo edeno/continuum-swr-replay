@@ -48,7 +48,7 @@ MEMORYLESS_PILOT_EPOCH = "chimi20200225_02_r1_HPC"
 
 SWEEP_DIR = Path("docs/design/replay_detection_comparison")
 
-MEMORYLESS_FIGURE = ("supplement", "figure: memoryless comparison")
+MEMORYLESS_FIGURE = ("supplement", "figure: memoryless_comparison")
 """Where the sweep values are used: the supplemental figure and its caption."""
 
 
@@ -274,7 +274,7 @@ def pilot_stray_window_values(
     dispersion clears the threshold only with them: the pieces' own
     dispersion does not.
     """
-    make = _value_factory(source, ("2a.3",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, ("2a.4",), MEMORYLESS_FIGURE)
     replay = events[events["is_replay"]]
     decided = replay[
         (replay["n_kept_windows_outside_pieces"] > 0)

@@ -66,25 +66,24 @@ Sources:
 
 ## Part 1: the model
 
-No question in this section has numbers.
+No question in this section yet.
 
 ## Part 2: it works
 
 ### 2a.1. Is the decoder accurate, in sample and on held-out data?
 
-Status: not computed (no summary value; Figure 2e and the decoder-validation supplement plot the in-sample decoding error). Figures: 2e, decoder validation. Values: 0. Claim 10.
+Status: not computed; no summary value; Figure 2e and the decoder-validation supplement plot the in-sample decoding error. Figures: 2e, decoder_validation. Values: 0.
 
 ### 2a.2. Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?
 
-Status: not computed (no script (held-out model selection)). Values: 0. Claim 11.
+Status: not computed; no script (held-out model selection). Values: 0.
 
 ### 2a.3. On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?
 
-Status: computed. Figures: memoryless comparison. Values: 99. Claim 12.
+Status: computed. Figures: memoryless_comparison. Values: 97.
 
 Sources:
 
-- Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)
 - docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)
 - docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)
 - docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
@@ -92,166 +91,134 @@ Sources:
 
 | Macro | Value | Unit | What it is | Used in |
 |---|---|---|---|---|
-| `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | supplement, figure: memoryless comparison |
-| `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | supplement, figure: memoryless comparison |
-| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 54 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | supplement, figure: memoryless comparison |
-| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 71 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | supplement, figure: memoryless comparison |
-| `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 83 |  | the same at the longest gap | supplement, figure: memoryless comparison |
-| `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 17 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | supplement, figure: memoryless comparison |
-| `\DetectionControlsElsewhereSlidingMissingMax` | 58 |  | highest such share | supplement, figure: memoryless comparison |
-| `\DetectionControlsElsewhereSlidingMissingMin` | 38 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpOursSpanningMax` | 85 |  | highest such share | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpOursSpanningMin` | 73 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpSlidingSpanningMax` | 79 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpingContinuousFraction` | 50 |  | share of jumping bursts our continuous state alone covers | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpingNonlocalFraction` | 97 |  | share of jumping bursts our detector's non-local events cover | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 13 |  | the same before its significance test | supplement, figure: memoryless comparison |
-| `\DetectionControlsJumpingSlidingFraction` | 7 |  | share of jumping bursts the sliding window reports under the published definition | supplement, figure: memoryless comparison |
-| `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | supplement, figure: memoryless comparison |
-| `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | supplement, figure: memoryless comparison |
-| `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | supplement, figure: memoryless comparison |
-| `\DetectionControlsNoReplayRecordings` | 8 |  | simulated recordings the no-replay stretches come from | supplement, figure: memoryless comparison |
-| `\DetectionControlsOursFewerInEventTrials` | 2 |  | trials in which our detector recovers fewer parts inside the event than alone | supplement, figure: memoryless comparison |
-| `\DetectionControlsOursMoreInEventTrials` | 22 |  | trials in which it recovers more inside the event than alone | supplement, figure: memoryless comparison |
-| `\DetectionControlsOursRecoveryAloneFraction` | 86 |  | the same with each part decoded alone | supplement, figure: memoryless comparison |
-| `\DetectionControlsOursRecoveryInEventFraction` | 89 |  | share of parts our detector recovers inside the event, the same mean | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessContinuousFraction` | 1 |  | share of place-less bursts our continuous state alone covers | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessFragmentedShareMax` | 80 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessFragmentedShareMin` | 59 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessNonlocalFraction` | 90 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 75 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 15 |  | the same before its significance test | supplement, figure: memoryless comparison |
-| `\DetectionControlsPlacelessSlidingFraction` | 8 |  | share of place-less bursts the sliding window reports under the published definition | supplement, figure: memoryless comparison |
-| `\DetectionControlsSlidingFewerInEventTrials` | 15 |  | trials in which the sliding window recovers fewer parts inside the event than alone | supplement, figure: memoryless comparison |
-| `\DetectionControlsSlidingMoreInEventTrials` | 95 |  | trials in which it recovers more inside the event than alone | supplement, figure: memoryless comparison |
-| `\DetectionControlsSlidingRecoveryAloneFraction` | 61 |  | the same with each part decoded alone | supplement, figure: memoryless comparison |
-| `\DetectionControlsSlidingRecoveryInEventFraction` | 72 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutEstimatorAgreementMin` | 99 |  | lowest share over folds of the events informative under both content estimates on which they agree | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutJumpingSupportMax` | 63 |  | the higher of the two | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping bursts: lower of folds A and B's share with held-out support | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutOursOnlyInformativeMax` | 7 |  | the higher of the two | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutOursOnlyInformativeMin` | 6 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutOursOnlySupportFoldC` | 87 |  | the same share in fold C | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutOursOnlySupportMax` | 97 |  | the higher of the two | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutOursOnlySupportMin` | 93 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutPlacelessInformativeEvents` | 19 |  | informative place-less burst events over the three folds (none has held-out support) | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutPlacelessLooseEvents` | 75 |  | place-less burst events informative at that floor | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 4 |  | place-less burst events with held-out support at a floor of 2 expected spikes | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutSharedInformativeMax` | 23 |  | the higher of the two | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutSharedInformativeMin` | 16 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | supplement, figure: memoryless comparison |
-| `\DetectionHeldoutSharedSupport` | 100 |  | replays both detectors reported: share with held-out support, the same in every fold | supplement, figure: memoryless comparison |
-| `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | supplement, figure: memoryless comparison |
-| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | supplement, figure: memoryless comparison |
-| `\DetectionRecordingInboundPJump` | 0.020 |  | significance test of the inbound replay: jump half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingInboundPSpread` | 0.0099 |  | significance test of the inbound replay: spread half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingOutboundDrawsFromPassing` | 3 |  | how many more shuffle draws below the observed value than a pass allows | supplement, figure: memoryless comparison |
-| `\DetectionRecordingOutboundDurationRatio` | 5.8 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | supplement, figure: memoryless comparison |
-| `\DetectionRecordingOutboundLocalFraction` | 81 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | supplement, figure: memoryless comparison |
-| `\DetectionRecordingOutboundPJump` | 0.079 |  | significance test of the outbound replay: jump half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingOutboundPSpread` | 0.0099 |  | significance test of the outbound replay: spread half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingRemoteStationaryDispersionCm` | 0 | cm | largest dispersion of a candidate over the remote stationary event | supplement, figure: memoryless comparison |
-| `\DetectionRecordingShortPathDispersionCm` | 6 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | supplement, figure: memoryless comparison |
-| `\DetectionRecordingShortReplayDurationRatio` | 1.6 |  | the sliding window's reported duration of the 80 ms replay over its true duration | supplement, figure: memoryless comparison |
-| `\DetectionRecordingShortReplayLocalFraction` | 0 |  | share of that reported event's kept windows decoding the animal's own place | supplement, figure: memoryless comparison |
-| `\DetectionRecordingShortReplayPJump` | 0.030 |  | significance test of the 80 ms replay: jump half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStateSpaceBoundErrorMs` | 42 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowDispersionCm` | 14 | cm | its dispersion with the window outside every piece | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowDistanceCm` | 149 | cm | distance from the animal of the far cell whose two spikes fill the stray window | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowDurationMs` | 396 | ms | the stray-window event's reported duration | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowLocalFraction` | 99 |  | share of the stray-window event's kept windows decoding within 15 cm of the animal | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowPJump` | 0.32 |  | significance test of the stray-window event: jump half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowPSpread` | 0.41 |  | significance test of the stray-window event: spread half | supplement, figure: memoryless comparison |
-| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.53 | cm | its dispersion without that window | supplement, figure: memoryless comparison |
-| `\DetectionSweepDomainFraction` | 25 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | supplement, figure: memoryless comparison |
-| `\DetectionSweepDomainSlidingBeforeTestFraction` | 68 |  | on the shared target, share the sliding-window detector reports before its significance test | supplement, figure: memoryless comparison |
-| `\DetectionSweepDomainSlidingFraction` | 63 |  | on the shared target, share the sliding-window detector reports after its significance test | supplement, figure: memoryless comparison |
-| `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | supplement, figure: memoryless comparison |
-| `\DetectionSweepDomainStateSpacePublishedFraction` | 68 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | supplement, figure: memoryless comparison |
-| `\DetectionSweepFailedTestFraction` | 4 |  | share the sliding-window detector reported and then failed on its significance test | supplement, figure: memoryless comparison |
-| `\DetectionSweepJumpHalfPassFraction` | 87 |  | of the replays the sliding window reported before its test, share passing the test's jump half | supplement, figure: memoryless comparison |
-| `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | supplement, figure: memoryless comparison |
-| `\DetectionSweepJumpHalfPassShortestFraction` | 31 |  | share of the shortest (40 ms) replays passing the jump half | supplement, figure: memoryless comparison |
-| `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | supplement, figure: memoryless comparison |
-| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest replays late | supplement, figure: memoryless comparison |
-| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest replays | supplement, figure: memoryless comparison |
-| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest replays early | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingNotTheReplayFraction` | 23 |  | share of the sliding-window detector's accepted events that are not the replay put in | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 5 |  | the same, counting the sliding window's reports before its test | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations | supplement, figure: memoryless comparison |
-| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations | supplement, figure: memoryless comparison |
-| `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | supplement, figure: memoryless comparison |
-| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported | supplement, figure: memoryless comparison |
-| `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | supplement, figure: memoryless comparison |
-| `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | supplement, figure: memoryless comparison |
+| `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | supplement, figure: memoryless_comparison |
+| `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | supplement, figure: memoryless_comparison |
+| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 54 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | supplement, figure: memoryless_comparison |
+| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 71 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | supplement, figure: memoryless_comparison |
+| `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 83 |  | the same at the longest gap | supplement, figure: memoryless_comparison |
+| `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 17 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | supplement, figure: memoryless_comparison |
+| `\DetectionControlsElsewhereSlidingMissingMax` | 58 |  | highest such share | supplement, figure: memoryless_comparison |
+| `\DetectionControlsElsewhereSlidingMissingMin` | 38 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpOursSpanningMax` | 85 |  | highest such share | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpOursSpanningMin` | 73 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpSlidingSpanningMax` | 79 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpingContinuousFraction` | 50 |  | share of jumping bursts our continuous state alone covers | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpingNonlocalFraction` | 97 |  | share of jumping bursts our detector's non-local events cover | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 13 |  | the same before its significance test | supplement, figure: memoryless_comparison |
+| `\DetectionControlsJumpingSlidingFraction` | 7 |  | share of jumping bursts the sliding window reports under the published definition | supplement, figure: memoryless_comparison |
+| `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | supplement, figure: memoryless_comparison |
+| `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | supplement, figure: memoryless_comparison |
+| `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | supplement, figure: memoryless_comparison |
+| `\DetectionControlsNoReplayRecordings` | 8 |  | simulated recordings the no-replay stretches come from | supplement, figure: memoryless_comparison |
+| `\DetectionControlsOursFewerInEventTrials` | 2 |  | trials in which our detector recovers fewer parts inside the event than alone | supplement, figure: memoryless_comparison |
+| `\DetectionControlsOursMoreInEventTrials` | 22 |  | trials in which it recovers more inside the event than alone | supplement, figure: memoryless_comparison |
+| `\DetectionControlsOursRecoveryAloneFraction` | 86 |  | the same with each part decoded alone | supplement, figure: memoryless_comparison |
+| `\DetectionControlsOursRecoveryInEventFraction` | 89 |  | share of parts our detector recovers inside the event, the same mean | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessContinuousFraction` | 1 |  | share of place-less bursts our continuous state alone covers | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessFragmentedShareMax` | 80 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessFragmentedShareMin` | 59 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessNonlocalFraction` | 90 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 75 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 15 |  | the same before its significance test | supplement, figure: memoryless_comparison |
+| `\DetectionControlsPlacelessSlidingFraction` | 8 |  | share of place-less bursts the sliding window reports under the published definition | supplement, figure: memoryless_comparison |
+| `\DetectionControlsSlidingFewerInEventTrials` | 15 |  | trials in which the sliding window recovers fewer parts inside the event than alone | supplement, figure: memoryless_comparison |
+| `\DetectionControlsSlidingMoreInEventTrials` | 95 |  | trials in which it recovers more inside the event than alone | supplement, figure: memoryless_comparison |
+| `\DetectionControlsSlidingRecoveryAloneFraction` | 61 |  | the same with each part decoded alone | supplement, figure: memoryless_comparison |
+| `\DetectionControlsSlidingRecoveryInEventFraction` | 72 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutEstimatorAgreementMin` | 99 |  | lowest share over folds of the events informative under both content estimates on which they agree | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutJumpingSupportMax` | 63 |  | the higher of the two | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping bursts: lower of folds A and B's share with held-out support | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutOursOnlyInformativeMax` | 7 |  | the higher of the two | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutOursOnlyInformativeMin` | 6 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportFoldC` | 87 |  | the same share in fold C | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportMax` | 97 |  | the higher of the two | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportMin` | 93 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutPlacelessInformativeEvents` | 19 |  | informative place-less burst events over the three folds (none has held-out support) | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutPlacelessLooseEvents` | 75 |  | place-less burst events informative at that floor | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 4 |  | place-less burst events with held-out support at a floor of 2 expected spikes | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutSharedInformativeMax` | 23 |  | the higher of the two | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutSharedInformativeMin` | 16 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | supplement, figure: memoryless_comparison |
+| `\DetectionHeldoutSharedSupport` | 100 |  | replays both detectors reported: share with held-out support, the same in every fold | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingInboundPJump` | 0.020 |  | significance test of the inbound replay: jump half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingInboundPSpread` | 0.0099 |  | significance test of the inbound replay: spread half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingOutboundDrawsFromPassing` | 3 |  | how many more shuffle draws below the observed value than a pass allows | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingOutboundDurationRatio` | 5.8 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingOutboundLocalFraction` | 81 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingOutboundPJump` | 0.079 |  | significance test of the outbound replay: jump half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingOutboundPSpread` | 0.0099 |  | significance test of the outbound replay: spread half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingRemoteStationaryDispersionCm` | 0 | cm | largest dispersion of a candidate over the remote stationary event | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingShortPathDispersionCm` | 6 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingShortReplayDurationRatio` | 1.6 |  | the sliding window's reported duration of the 80 ms replay over its true duration | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingShortReplayLocalFraction` | 0 |  | share of that reported event's kept windows decoding the animal's own place | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingShortReplayPJump` | 0.030 |  | significance test of the 80 ms replay: jump half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStateSpaceBoundErrorMs` | 42 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowDispersionCm` | 14 | cm | its dispersion with the window outside every piece | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowDistanceCm` | 149 | cm | distance from the animal of the far cell whose two spikes fill the stray window | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowDurationMs` | 396 | ms | the stray-window event's reported duration | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowLocalFraction` | 99 |  | share of the stray-window event's kept windows decoding within 15 cm of the animal | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowPJump` | 0.32 |  | significance test of the stray-window event: jump half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowPSpread` | 0.41 |  | significance test of the stray-window event: spread half | supplement, figure: memoryless_comparison |
+| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.53 | cm | its dispersion without that window | supplement, figure: memoryless_comparison |
+| `\DetectionSweepDomainFraction` | 25 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | supplement, figure: memoryless_comparison |
+| `\DetectionSweepDomainSlidingBeforeTestFraction` | 68 |  | on the shared target, share the sliding-window detector reports before its significance test | supplement, figure: memoryless_comparison |
+| `\DetectionSweepDomainSlidingFraction` | 63 |  | on the shared target, share the sliding-window detector reports after its significance test | supplement, figure: memoryless_comparison |
+| `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | supplement, figure: memoryless_comparison |
+| `\DetectionSweepDomainStateSpacePublishedFraction` | 68 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | supplement, figure: memoryless_comparison |
+| `\DetectionSweepFailedTestFraction` | 4 |  | share the sliding-window detector reported and then failed on its significance test | supplement, figure: memoryless_comparison |
+| `\DetectionSweepJumpHalfPassFraction` | 87 |  | of the replays the sliding window reported before its test, share passing the test's jump half | supplement, figure: memoryless_comparison |
+| `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | supplement, figure: memoryless_comparison |
+| `\DetectionSweepJumpHalfPassShortestFraction` | 31 |  | share of the shortest (40 ms) replays passing the jump half | supplement, figure: memoryless_comparison |
+| `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | supplement, figure: memoryless_comparison |
+| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest replays late | supplement, figure: memoryless_comparison |
+| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest replays | supplement, figure: memoryless_comparison |
+| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest replays early | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingNotTheReplayFraction` | 23 |  | share of the sliding-window detector's accepted events that are not the replay put in | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 5 |  | the same, counting the sliding window's reports before its test | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations | supplement, figure: memoryless_comparison |
+| `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | supplement, figure: memoryless_comparison |
+| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported | supplement, figure: memoryless_comparison |
+| `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | supplement, figure: memoryless_comparison |
+| `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | supplement, figure: memoryless_comparison |
 
-### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
+### 2a.4. On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?
 
-Status: not computed (no script (the false-positive rate on real data)). Values: 0. Claim 12.
+Status: computed. Figures: memoryless_comparison. Values: 2.
 
-### 2a.5. How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?
+Sources:
 
-Status: not computed (no script (the threshold sweep)). Values: 0. Claim 3.
+- Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)
+
+| Macro | Value | Unit | What it is | Used in |
+|---|---|---|---|---|
+| `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | supplement, figure: memoryless_comparison |
+| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | supplement, figure: memoryless_comparison |
+
+### 2a.5. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
+
+Status: not computed; no script (the false-positive rate on real data). Values: 0.
+
+### 2a.6. How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?
+
+Status: not computed; no script (the threshold sweep). Values: 0.
 
 ## Part 2: it finds events that other methods do not
 
 ### 2b.1. Do non-local events occur without an SWR? (examples)
 
-Status: no numbers (example events, one per overlap class). Figures: 2a. Values: 0. Claim 1.
+Status: no numbers; example events, one per overlap class. Figures: 2a. Values: 0.
 
-### 2b.2. What fraction of immobile non-local events overlaps no SWR?
+### 2b.2. How many immobile non-local events overlap no SWR, and what fraction of them is that?
 
-Status: computed. Figures: 2, 2b. Values: 31. Claim 2.
-
-Sources:
-
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)
-- event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)
-
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsAnimals` | 5 |  | animals in the event table | paper, figure: 2b |
-| `\EventsAnimalsNonSwrMajority` | 4 |  | animals in which more than half the events are non-SWR | paper, figure: 2b |
-| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals in which non-SWR is the largest of the three overlap classes | paper, figure: 2b |
-| `\EventsEpochs` | 242 |  | epochs in the event table | paper, figure: 2b |
-| `\EventsKayTimeS` | 4127 | s | seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines | paper, figure: 2 |
-| `\EventsNonSwrFraction` | 57 % |  | share of immobile non-local events overlapping no SWR, pooled over animals | paper, figure: 2b |
-| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events | paper, figure: 2b |
-| `\EventsNonSwrFractionAnimalMin` | 47 |  | lowest per-animal share of non-SWR events | paper, figure: 2b |
-| `\EventsNonlocalEvents` | 75,675 |  | immobile non-local events in the canonical event table (whole event below 4 cm/s) | paper, figure: 2b |
-| `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | paper, figure: 2b |
-| `\EventsNonlocalEventsOutsideKay` | 42,962 |  | non-local events no Kay SWR overlaps (detector comparison memberships) | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideKayFraction` | 57 % |  | share of the non-local events with a known membership that no Kay SWR overlaps | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideKayPerHour` | 1100 | per h | non-local events no Kay SWR overlaps, per hour of analysed immobility | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideTrigger` | 19,221 |  | non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger) | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideTriggerFraction` | 25 % |  | share of the non-local events with a known membership that no SWR definition and no MUA event overlaps | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideTriggerPerHour` | 480 | per h | non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideWidloski` | 71,498 |  | non-local events no Widloski event overlaps (detector comparison memberships) | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideWidloskiFraction` | 94 % |  | share of the non-local events with a known membership that no Widloski event overlaps | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analysed immobility | paper, figure: 2 |
-| `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | paper, figure: 2b |
-| `\EventsNonlocalEventsSwrPartial` | 16,664 |  | events partly overlapping an SWR (overlap_class swr_partial) | paper, figure: 2b |
-| `\EventsNonlocalTimeOutsideKayFraction` | 53 % |  | share of non-local event time that Kay's SWRs do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideKayS` | 3485 | s | seconds of non-local event time that Kay's SWRs do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideSwrFraction` | 31 % |  | share of non-local event time that the five SWR definitions together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideSwrS` | 2004 | s | seconds of non-local event time that the five SWR definitions together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideTriggerFraction` | 28 % |  | share of non-local event time that the five SWR definitions and MUA together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideTriggerS` | 1821 | s | seconds of non-local event time that the five SWR definitions and MUA together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideWidloskiFraction` | 93 % |  | share of non-local event time that the Widloski detector's events do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideWidloskiS` | 6098 | s | seconds of non-local event time that the Widloski detector's events do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | paper, figure: 2 |
-| `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | paper, figure: 2 |
-
-### 2b.3. How many detected non-local events overlap no SWR?
-
-Status: computed. Figures: 2, 2b. Values: 31. Claim 21.
+Status: computed. Figures: 2, 2b. Values: 31.
 
 *Note:* The claims table reads these as the events SWR-triggered detection misses; that reading belongs in the Results.
 
@@ -294,118 +261,9 @@ Sources:
 | `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | paper, figure: 2 |
 | `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | paper, figure: 2 |
 
-### 2b.4. How do SWR detection and non-local detection overlap, in events and in time points?
+### 2b.3. How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?
 
-Status: computed. Figures: 2. Values: 98. Claim 4.
-
-Sources:
-
-- event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)
-
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsCareyEvents` | 24,084 |  | carey events compared with the non-local detector | supplement |
-| `\EventsCareyNoNonlocalFraction` | 20 % |  | share of carey events that overlap no non-local event | supplement |
-| `\EventsCareyNoNonlocalMixedFraction` | 18 % |  | of carey events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsCareyNoNonlocalMostlyLocalFraction` | 82 % |  | of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsCareyNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of carey events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsCareyOverlapAllNonlocalFraction` | 12 % |  | share of carey events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsCareyOverlapAnyLocalFraction` | 35 % |  | share of carey events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsCareyOverlapAnyNoSpikeFraction` | 15 % |  | share of carey events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsCareyOverlapLocalShareMedian` | 0 % |  | median over carey events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsCareyOverlapNoSpikeShareMedian` | 0 % |  | median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsCareyOverlapNonlocalShareMedian` | 87 % |  | median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsCareyOverlapUncertainShareMedian` | 9 % |  | median over carey events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsKarlssonEvents` | 60,472 |  | karlsson events compared with the non-local detector | supplement |
-| `\EventsKarlssonNoNonlocalFraction` | 38 % |  | share of karlsson events that overlap no non-local event | supplement |
-| `\EventsKarlssonNoNonlocalMixedFraction` | 18 % |  | of karlsson events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsKarlssonNoNonlocalMostlyLocalFraction` | 81 % |  | of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsKarlssonNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of karlsson events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsKarlssonOverlapAllNonlocalFraction` | 11 % |  | share of karlsson events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsKarlssonOverlapAnyLocalFraction` | 48 % |  | share of karlsson events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsKarlssonOverlapAnyNoSpikeFraction` | 22 % |  | share of karlsson events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsKarlssonOverlapLocalShareMedian` | 0 % |  | median over karlsson events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsKarlssonOverlapNoSpikeShareMedian` | 0 % |  | median over karlsson events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsKarlssonOverlapNonlocalShareMedian` | 77 % |  | median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsKarlssonOverlapUncertainShareMedian` | 13 % |  | median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsKayEvents` | 41,151 |  | kay events compared with the non-local detector | paper, figure: 2 |
-| `\EventsKayNoNonlocalFraction` | 17 % |  | share of kay events that overlap no non-local event | paper, figure: 2 |
-| `\EventsKayNoNonlocalFractionAnimalMax` | 28 % |  | highest per-animal share of kay events overlapping no non-local event | paper, figure: 2 |
-| `\EventsKayNoNonlocalFractionAnimalMin` | 8 |  | lowest per-animal share of kay events overlapping no non-local event | paper, figure: 2 |
-| `\EventsKayNoNonlocalMixedFraction` | 26 % |  | of kay events overlapping no non-local event, the share with neither state in more than half their rows | paper, figure: 2 |
-| `\EventsKayNoNonlocalMostlyLocalFraction` | 74 % |  | of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | paper, figure: 2 |
-| `\EventsKayNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | paper, figure: 2 |
-| `\EventsKayOverlapAllNonlocalFraction` | 17 % |  | share of kay events overlapping a non-local event whose every row is non-local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapAnyLocalFraction` | 32 % |  | share of kay events overlapping a non-local event that hold at least one row with Local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapAnyNoSpikeFraction` | 9 % |  | share of kay events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapLocalShareMedian` | 0 % |  | median over kay events overlapping a non-local event of the share of their rows with Local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapNoSpikeShareMedian` | 0 % |  | median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapNonlocalShareMedian` | 88 % |  | median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapUncertainShareMedian` | 9 % |  | median over kay events overlapping a non-local event of the share of their rows with no state above 0.8 | paper, figure: 2 |
-| `\EventsMuaEvents` | 40,732 |  | mua events compared with the non-local detector | supplement |
-| `\EventsMuaNoNonlocalFraction` | 15 % |  | share of mua events that overlap no non-local event | supplement |
-| `\EventsMuaNoNonlocalMixedFraction` | 22 % |  | of mua events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsMuaNoNonlocalMostlyLocalFraction` | 78 % |  | of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsMuaNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of mua events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsMuaOverlapAllNonlocalFraction` | 4 % |  | share of mua events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsMuaOverlapAnyLocalFraction` | 51 % |  | share of mua events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsMuaOverlapAnyNoSpikeFraction` | 11 % |  | share of mua events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsMuaOverlapLocalShareMedian` | 1 % |  | median over mua events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsMuaOverlapNoSpikeShareMedian` | 0 % |  | median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsMuaOverlapNonlocalShareMedian` | 81 % |  | median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsMuaOverlapUncertainShareMedian` | 13 % |  | median over mua events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsWidloskiCriteriaEvents` | 4,388 |  | memoryless_criteria events compared with the non-local detector | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalFraction` | 4 % |  | share of memoryless_criteria events that overlap no non-local event | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalMixedFraction` | 48 % |  | of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiCriteriaOverlapAllNonlocalFraction` | 11 % |  | share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapAnyLocalFraction` | 58 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapAnyNoSpikeFraction` | 27 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapLocalShareMedian` | 5 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapNonlocalShareMedian` | 80 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapUncertainShareMedian` | 8 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsWidloskiEvents` | 4,092 |  | memoryless events compared with the non-local detector | supplement |
-| `\EventsWidloskiNoNonlocalFraction` | 3 % |  | share of memoryless events that overlap no non-local event | supplement |
-| `\EventsWidloskiNoNonlocalMixedFraction` | 49 % |  | of memoryless events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsWidloskiNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiOverlapAllNonlocalFraction` | 10 % |  | share of memoryless events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsWidloskiOverlapAnyLocalFraction` | 59 % |  | share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsWidloskiOverlapAnyNoSpikeFraction` | 28 % |  | share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiOverlapLocalShareMedian` | 6 % |  | median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsWidloskiOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiOverlapNonlocalShareMedian` | 79 % |  | median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsWidloskiOverlapUncertainShareMedian` | 8 % |  | median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsYuEvents` | 125,423 |  | yu events compared with the non-local detector | supplement |
-| `\EventsYuNoNonlocalFraction` | 56 % |  | share of yu events that overlap no non-local event | supplement |
-| `\EventsYuNoNonlocalMixedFraction` | 17 % |  | of yu events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsYuNoNonlocalMostlyLocalFraction` | 82 % |  | of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsYuNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of yu events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsYuOverlapAllNonlocalFraction` | 12 % |  | share of yu events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsYuOverlapAnyLocalFraction` | 43 % |  | share of yu events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsYuOverlapAnyNoSpikeFraction` | 14 % |  | share of yu events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsYuOverlapLocalShareMedian` | 0 % |  | median over yu events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsYuOverlapNoSpikeShareMedian` | 0 % |  | median over yu events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsYuOverlapNonlocalShareMedian` | 79 % |  | median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsYuOverlapUncertainShareMedian` | 13 % |  | median over yu events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsZugaroEvents` | 23,934 |  | zugaro events compared with the non-local detector | supplement |
-| `\EventsZugaroNoNonlocalFraction` | 35 % |  | share of zugaro events that overlap no non-local event | supplement |
-| `\EventsZugaroNoNonlocalMixedFraction` | 18 % |  | of zugaro events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsZugaroNoNonlocalMostlyLocalFraction` | 81 % |  | of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsZugaroNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of zugaro events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsZugaroOverlapAllNonlocalFraction` | 74 % |  | share of zugaro events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsZugaroOverlapAnyLocalFraction` | 6 % |  | share of zugaro events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsZugaroOverlapAnyNoSpikeFraction` | 1 % |  | share of zugaro events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsZugaroOverlapLocalShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsZugaroOverlapNoSpikeShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsZugaroOverlapNonlocalShareMedian` | 100 % |  | median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsZugaroOverlapUncertainShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-
-### 2b.5. For each other detector, what share of its events overlaps no non-local event, and how do those divide by decoder state; for the ones that do overlap, what share of their time bins does each state take?
-
-Status: computed. Figures: 2. Values: 98. Claim 23.
+Status: computed. Figures: 2. Values: 98.
 
 Sources:
 
@@ -512,9 +370,9 @@ Sources:
 | `\EventsZugaroOverlapNonlocalShareMedian` | 100 % |  | median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
 | `\EventsZugaroOverlapUncertainShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
 
-### 2b.6. How do non-local event starts and ends differ from those of the matched SWR?
+### 2b.4. How do non-local event starts and ends differ from those of the matched SWR?
 
-Status: computed. Figures: 2d. Values: 3. Claim 22.
+Status: computed. Figures: 2d. Values: 3.
 
 Sources:
 
@@ -526,9 +384,9 @@ Sources:
 | `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start | paper, figure: 2d |
 | `\EventsSwrOverlappingEvents` | 32,701 |  | immobile non-local events overlapping an SWR | paper, figure: 2d |
 
-### 2b.7. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
+### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
-Status: computed. Figures: 3b. Values: 15. Claim 24.
+Status: computed. Figures: 3b. Values: 15.
 
 Sources:
 
@@ -553,21 +411,21 @@ Sources:
 | `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | paper |
 | `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | paper |
 
-### 2b.8. Does the detector target the represented content rather than an LFP proxy?
+### 2b.6. Does the detector target the represented content rather than an LFP proxy?
 
-Status: no numbers (framing (a candidate claim)). Values: 0. Claim 25.
+Status: no numbers; framing (a candidate claim). Values: 0.
 
 *Note:* Wording written by the assistant from the claim; check it.
 
-### 2b.9. Are non-SWR events something other than sub-threshold SWRs?
+### 2b.7. Are non-SWR events something other than sub-threshold SWRs?
 
-Status: dropped (contradicted by the ripple-power bump at non-local onset; reframed as question 2b.7). Values: 0.
+Status: dropped; contradicted by the ripple-power bump at non-local onset; reframed as question 2b.5. Values: 0.
 
 ## Part 2: the events are real
 
 ### 2c.1. How do theta z-score and speed compare across SWR events, non-SWR events and running?
 
-Status: computed. Figures: 3b, decoder validation. Values: 54. Claim 5.
+Status: computed. Figures: 3b, decoder_validation. Values: 54.
 
 Sources:
 
@@ -634,7 +492,7 @@ Sources:
 
 ### 2c.2. How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?
 
-Status: computed. Figures: 2. Values: 14. Claim 6.
+Status: computed. Figures: 2. Values: 14.
 
 Sources:
 
@@ -659,7 +517,7 @@ Sources:
 
 ### 2c.3. Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?
 
-Status: computed. Figures: 2. Values: 65. Claim 7.
+Status: computed. Figures: 2. Values: 65.
 
 Sources:
 
@@ -738,7 +596,7 @@ Sources:
 
 ### 2c.4. Where do event MAPs sit relative to the GPI peak, against matched quiet windows?
 
-Status: computed. Values: 4. Claim 7b.
+Status: computed. Values: 4.
 
 Sources:
 
@@ -753,7 +611,7 @@ Sources:
 
 ### 2c.5. What spike evidence do matched immobile non-event windows have?
 
-Status: computed. Figures: 2. Values: 7. Claim 7c.
+Status: computed. Figures: 2. Values: 7.
 
 Sources:
 
@@ -771,11 +629,11 @@ Sources:
 
 ### 2c.6. Are close events produced by the extent of place fields?
 
-Status: not computed (needs a re-decode with a wider Local kernel (a GPU subset)). Values: 0. Claim 8.
+Status: not computed; needs a re-decode with a wider Local kernel (a GPU subset). Values: 0.
 
-### 2c.7. Do remote events pass the spike-support tests (6, 7)?
+### 2c.7. Do remote events pass the spike-support tests (questions 2c.2, 2c.3)?
 
-Status: computed. Figures: 2. Values: 16. Claim 9.
+Status: computed. Figures: 2. Values: 16.
 
 Sources:
 
@@ -802,7 +660,7 @@ Sources:
 
 ### 2c.8. How is the decoded distance from the animal distributed, by SWR status?
 
-Status: computed. Figures: 2. Values: 12. Claim 13.
+Status: computed. Figures: 2. Values: 12.
 
 Sources:
 
@@ -825,13 +683,13 @@ Sources:
 
 ### 2c.9. Do tetrode holdout and interneuron exclusion, as main-text controls, show the events are real?
 
-Status: dropped (folded into the likelihood test (question 2c.3)). Values: 0.
+Status: dropped; folded into the likelihood test (question 2c.3). Values: 0.
 
 ## Part 2: what the events are like
 
 ### 2d.1. Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?
 
-Status: partly computed (the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)). Figures: 2, 3. Values: 20. Claim 14.
+Status: partly computed; the own-well share waits for the wider-Local-kernel re-decode (question 2c.6). Figures: 2, 3. Values: 20.
 
 Sources:
 
@@ -864,7 +722,7 @@ Sources:
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
-Status: computed. Figures: 3c. Values: 9. Claim 15.
+Status: computed. Figures: 3c. Values: 9.
 
 Sources:
 
@@ -886,7 +744,7 @@ Sources:
 
 ### 2d.3. How does spatial extent differ between SWR and non-SWR events?
 
-Status: computed. Figures: 3. Values: 17. Claim 16.
+Status: computed. Figures: 3. Values: 17.
 
 Sources:
 
@@ -916,7 +774,7 @@ Sources:
 
 ### 2d.4. How much does content move within an event (pauses, largest step, reversals), SWR against non-SWR?
 
-Status: computed. Figures: 3. Values: 24. Claim 16b.
+Status: computed. Figures: 3. Values: 24.
 
 Sources:
 
@@ -952,7 +810,7 @@ Sources:
 
 ### 2d.5. How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?
 
-Status: computed. Values: 25. Claim 17.
+Status: computed. Values: 25.
 
 Sources:
 
@@ -990,7 +848,7 @@ Sources:
 
 ### 2d.6. How does event duration differ between SWR and non-SWR events?
 
-Status: computed. Values: 6. Claim 18.
+Status: computed. Values: 6.
 
 Sources:
 
@@ -1009,13 +867,13 @@ Sources:
 
 ### 2d.7. Are non-SWR events a different kind of event, with a different function?
 
-Status: dropped (not claimed: the events are characterized, and the SWR contrasts are descriptive, not categorical). Values: 0.
+Status: dropped; not claimed: the events are characterized, and the SWR contrasts are descriptive, not categorical. Values: 0.
 
 ## Part 3: the events relate to behavior
 
 ### 3.1. Which arms does content over-represent, and does that differ between SWR and non-SWR events once each kind's arm baseline is accounted for?
 
-Status: partly computed (the re-decode with a wider Local kernel (question 2c.6) is pending). Figures: content_estimators, swr_contrast. Values: 244. Claim 19a.
+Status: partly computed; the re-decode with a wider Local kernel (question 2c.6) is pending. Figures: content_estimators, swr_contrast. Values: 244.
 
 Sources:
 
@@ -1278,7 +1136,7 @@ Sources:
 
 ### 3.2. Is non-SWR content selective for recently rewarded arms (realized reward fraction)?
 
-Status: computed. Figures: swr_contrast. Values: 36. Claim 19b.
+Status: computed. Figures: swr_contrast. Values: 36.
 
 Sources:
 
@@ -1326,7 +1184,7 @@ Sources:
 
 ### 3.3. How does the reward-history kernel of event occurrence (lag 1 and the slower lags) compare between SWR-coupled and non-SWR events?
 
-Status: computed. Figures: swr_contrast. Values: 468. Claim 19c.
+Status: computed. Figures: swr_contrast. Values: 468.
 
 Sources:
 
@@ -1815,7 +1673,7 @@ Sources:
 
 ### 3.4. Does content correlate with the upcoming choice once behavior is in the model, with or without SWR?
 
-Status: computed. Values: 28. Claim 19d.
+Status: computed. Values: 28.
 
 Sources:
 
@@ -1854,7 +1712,7 @@ Sources:
 
 ### 3.5. Does non-SWR content predict staying or leaving?
 
-Status: computed. Values: 17. Claim 19e.
+Status: computed. Values: 17.
 
 Sources:
 
@@ -1882,7 +1740,7 @@ Sources:
 
 ### 3.6. How does SWR against non-SWR content depend on the arm's reward fraction (CS4) and, separately, on its value (CS5), as direct (length-adjusted) and total effects?
 
-Status: partly computed (an interaction-block refit is pending). Figures: content_estimators, swr_contrast. Values: 136. Claim 19f.
+Status: partly computed; an interaction-block refit is pending. Figures: content_estimators, swr_contrast. Values: 136.
 
 *Note:* The claim's "high-value" covers both; the claims table's dropped list calls the CS4 total effect avoidance of recently rewarded arms. Keep the two apart or merge them.
 
@@ -2034,7 +1892,7 @@ Sources:
 
 ### 3.7. Does content over-represent arms the animal is uncertain about, or arms of high value?
 
-Status: computed. Figures: content_estimators, uncertainty_content, swr_contrast. Values: 165. Claim 19g.
+Status: computed. Figures: content_estimators, uncertainty_content, swr_contrast. Values: 165.
 
 Sources:
 
@@ -2235,17 +2093,17 @@ Sources:
 
 ### 3.9. Are SWR and non-SWR events recruited differently by behavior?
 
-Status: dropped (not shown as a gross recruitment difference (the peri-switch non-SWR profile is a null); superseded by the per-effect questions 3.1–3.7). Values: 0.
+Status: dropped; not shown as a gross recruitment difference (the peri-switch non-SWR profile is a null); superseded by the per-effect questions 3.1–3.7. Values: 0.
 
 ### 3.10. Does replay content predict the upcoming choice?
 
-Status: dropped (invalidated by task autocorrelation; the one surviving thread, the non-SWR replay_frac term of question 3.4, is null over the behavioral baseline). Values: 0.
+Status: dropped; invalidated by task autocorrelation; the one surviving thread, the non-SWR replay_frac term of question 3.4, is null over the behavioral baseline. Values: 0.
 
 ## Part 4: the events relate to mPFC
 
 ### 4.1. Do non-SWR events modulate mPFC activity, against matched immobile non-event windows, and how does that compare with SWR events?
 
-Status: partly computed (population inference and the SWR-controlled rung are pending, and equivalence is untested). Figures: 4, 4a, 4b, 4c, 4d. Values: 604. Claim 20.
+Status: partly computed; population inference and the SWR-controlled rung are pending, and equivalence is untested. Figures: 4, 4a, 4b, 4c, 4d. Values: 604.
 
 Sources:
 
@@ -2869,7 +2727,7 @@ Script: `scripts/figures/generate_figure01.py`. Questions: none.
 
 ### Figure 2: Non-local events and SWRs
 
-Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2b.1, 2b.2, 2b.3, 2b.4, 2b.5, 2b.6, 2c.2, 2c.3, 2c.5, 2c.7, 2c.8, 2d.1.
+Script: `scripts/figures/generate_figure02.py`. Questions: 2a.1, 2b.1, 2b.2, 2b.3, 2b.4, 2c.2, 2c.3, 2c.5, 2c.7, 2c.8, 2d.1.
 
 Unlettered: `\EventsAnimalsNonSwrMoreAtWell`, `\EventsBaselineDllPerSpikeMedian`, `\EventsBaselineScored`, `\EventsBaselineSpikesMedian`, `\EventsBaselineTetrodesMedian`, `\EventsEvidenceAnimals`, `\EventsEvidenceEpochs`, `\EventsHeldoutNonSwrAnimalsPositive`, `\EventsHeldoutNonSwrAnimals`, `\EventsHeldoutNonSwrPerSpikeCiHigh`, `\EventsHeldoutNonSwrPerSpikeCiLow`, `\EventsHeldoutNonSwrPerSpike`, `\EventsHeldoutSwrAnimalsPositive`, `\EventsHeldoutSwrAnimals`, `\EventsHeldoutSwrPerSpikeCiHigh`, `\EventsHeldoutSwrPerSpikeCiLow`, `\EventsHeldoutSwrPerSpike`, `\EventsKayEvents`, `\EventsKayNoNonlocalFractionAnimalMax`, `\EventsKayNoNonlocalFractionAnimalMin`, `\EventsKayNoNonlocalFraction`, `\EventsKayNoNonlocalMixedFraction`, `\EventsKayNoNonlocalMostlyLocalFraction`, `\EventsKayNoNonlocalMostlyNoSpikeFraction`, `\EventsKayOverlapAllNonlocalFraction`, `\EventsKayOverlapAnyLocalFraction`, `\EventsKayOverlapAnyNoSpikeFraction`, `\EventsKayOverlapLocalShareMedian`, `\EventsKayOverlapNoSpikeShareMedian`, `\EventsKayOverlapNonlocalShareMedian`, `\EventsKayOverlapUncertainShareMedian`, `\EventsKayTimeS`, `\EventsNonSwrCloseAnimalsAboveBaseline`, `\EventsNonSwrCloseDllPerSpikeMedian`, `\EventsNonSwrCloseEpochsAboveBaseline`, `\EventsNonSwrCloseEpochsScored`, `\EventsNonSwrCloseScored`, `\EventsNonSwrCloseSpikesMedian`, `\EventsNonSwrCloseTetrodesMedian`, `\EventsNonSwrContentAtWellFraction`, `\EventsNonSwrContentNearOffFraction`, `\EventsNonSwrContentOwnWellFraction`, `\EventsNonSwrContentRemotePathFraction`, `\EventsNonSwrContentRemoteWellFraction`, `\EventsNonSwrRemoteAnimalsAboveBaseline`, `\EventsNonSwrRemoteDllPerSpikeMedian`, `\EventsNonSwrRemoteEpochsAboveBaseline`, `\EventsNonSwrRemoteEpochsScored`, `\EventsNonSwrRemoteScored`, `\EventsNonSwrRemoteSpikesMedian`, `\EventsNonSwrRemoteTetrodesMedian`, `\EventsNonlocalEventsOutsideKayFraction`, `\EventsNonlocalEventsOutsideKayPerHour`, `\EventsNonlocalEventsOutsideKay`, `\EventsNonlocalEventsOutsideTriggerFraction`, `\EventsNonlocalEventsOutsideTriggerPerHour`, `\EventsNonlocalEventsOutsideTrigger`, `\EventsNonlocalEventsOutsideWidloskiFraction`, `\EventsNonlocalEventsOutsideWidloskiPerHour`, `\EventsNonlocalEventsOutsideWidloski`, `\EventsNonlocalTimeOutsideKayFraction`, `\EventsNonlocalTimeOutsideKayS`, `\EventsNonlocalTimeOutsideSwrFraction`, `\EventsNonlocalTimeOutsideSwrS`, `\EventsNonlocalTimeOutsideTriggerFraction`, `\EventsNonlocalTimeOutsideTriggerS`, `\EventsNonlocalTimeOutsideWidloskiFraction`, `\EventsNonlocalTimeOutsideWidloskiS`, `\EventsNonlocalTimeS`, `\EventsOccupancyEpochs`, `\EventsRestHours`, `\EventsSwrContentAtWellFraction`, `\EventsSwrContentNearOffFraction`, `\EventsSwrContentOwnWellFraction`, `\EventsSwrContentRemotePathFraction`, `\EventsSwrContentRemoteWellFraction`, `\EventsSwrRemoteAnimalsAboveBaseline`, `\EventsSwrRemoteDllPerSpikeMedian`, `\EventsSwrRemoteEpochsAboveBaseline`, `\EventsSwrRemoteEpochsScored`, `\EventsSwrRemoteScored`, `\EventsSwrRemoteSpikesMedian`, `\EventsSwrRemoteTetrodesMedian`
 
@@ -2879,7 +2737,7 @@ Panel d: `\EventsEndOffsetMedianMs`, `\EventsStartOffsetMedianMs`, `\EventsSwrOv
 
 ### Figure 3: Non-local events outside SWRs
 
-Script: `scripts/figures/generate_figure03.py`. Questions: 2b.7, 2c.1, 2d.1, 2d.2, 2d.3, 2d.4.
+Script: `scripts/figures/generate_figure03.py`. Questions: 2b.5, 2c.1, 2d.1, 2d.2, 2d.3, 2d.4.
 
 Unlettered: `\EventsArmsAnimalsInDirection`, `\EventsArmsDifferenceHigh`, `\EventsArmsDifferenceLow`, `\EventsArmsMatchedDifferenceHigh`, `\EventsArmsMatchedDifferenceLow`, `\EventsArmsMatchedDifference`, `\EventsArmsMedianNonSwr`, `\EventsArmsMedianSwr`, `\EventsExtentAnimalsInDirection`, `\EventsExtentDifferenceHigh`, `\EventsExtentDifferenceLow`, `\EventsExtentMatchedDifferenceHigh`, `\EventsExtentMatchedDifferenceLow`, `\EventsExtentMatchedDifference`, `\EventsExtentMedianNonSwr`, `\EventsExtentMedianSwr`, `\EventsMaxStepAnimalsInDirection`, `\EventsMaxStepDifferenceHigh`, `\EventsMaxStepDifferenceLow`, `\EventsMaxStepMatchedDifferenceHigh`, `\EventsMaxStepMatchedDifferenceLow`, `\EventsMaxStepMatchedDifference`, `\EventsMaxStepMedianNonSwr`, `\EventsMaxStepMedianSwr`, `\EventsPauseAnimalsInDirection`, `\EventsPauseDifferenceHigh`, `\EventsPauseDifferenceLow`, `\EventsPauseMatchedDifferenceHigh`, `\EventsPauseMatchedDifferenceLow`, `\EventsPauseMatchedDifference`, `\EventsPauseMedianNonSwr`, `\EventsPauseMedianSwr`, `\EventsReversalsAnimalsInDirection`, `\EventsReversalsDifferenceHigh`, `\EventsReversalsDifferenceLow`, `\EventsReversalsMatchedDifferenceHigh`, `\EventsReversalsMatchedDifferenceLow`, `\EventsReversalsMatchedDifference`, `\EventsReversalsMedianNonSwr`, `\EventsReversalsMedianSwr`, `\EventsStartDistanceAnimalsInDirection`, `\EventsStartDistanceDifferenceHigh`, `\EventsStartDistanceDifferenceLow`, `\EventsStartDistanceMatchedDifferenceHigh`, `\EventsStartDistanceMatchedDifferenceLow`, `\EventsStartDistanceMatchedDifference`, `\EventsStartDistanceMedianNonSwr`, `\EventsStartDistanceMedianSwr`
 
@@ -2895,13 +2753,13 @@ Panel c: `\MpfcUnits`
 
 Panel d: `\MpfcBestModelConstantFraction`, `\MpfcBestModelJointFraction`, `\MpfcBestModelNonlocalFraction`, `\MpfcBestModelSwrFraction`, `\MpfcEngagementCalledFractionChimi`, `\MpfcEngagementCalledFractionJsixteen`, `\MpfcEngagementCalledFractionPeanut`, `\MpfcEngagementCalledFractionSenor`, `\MpfcEngagementCalledFractionWilbur`, `\MpfcEngagementCalledFraction`, `\MpfcEngagementUnitsCalled`, `\MpfcEngagementUnitsTested`, `\MpfcNonSwrReplayCalledFraction`, `\MpfcNonSwrReplayUnitsCalled`, `\MpfcNonSwrReplayUnitsTested`, `\MpfcNonlocalCalledFraction`, `\MpfcNonlocalUnitsCalled`, `\MpfcNonlocalUnitsTested`, `\MpfcSwrCalledFraction`, `\MpfcSwrReplayCalledFraction`, `\MpfcSwrReplayUnitsCalled`, `\MpfcSwrReplayUnitsTested`, `\MpfcSwrUnitsCalled`, `\MpfcSwrUnitsTested`, `\MpfcUnits`
 
-### Figure decoder validation: Decoder validation
+### Figure decoder_validation: Decoder validation
 
 Script: `scripts/figures/generate_supp_decoder_validation.py`. Questions: 2a.1, 2c.1.
 
-### Figure memoryless comparison: Our detector and the Widloski & Foster detector on simulated replays
+### Figure memoryless_comparison: Our detector and the Widloski & Foster detector on simulated replays
 
-Script: `scripts/figures/generate_memoryless_comparison.py`. Questions: 2a.3.
+Script: `scripts/figures/generate_memoryless_comparison.py`. Questions: 2a.3, 2a.4.
 
 Unlettered: `\DetectionControlsContinuingOursOnePerPartLongestFraction`, `\DetectionControlsContinuingOursSpanningShortestFraction`, `\DetectionControlsContinuingSlidingOnePerPartLongestFraction`, `\DetectionControlsContinuingSlidingSpanningShortestFraction`, `\DetectionControlsElsewhereOursOnePerPartLongestFraction`, `\DetectionControlsElsewhereOursOnePerPartShortestFraction`, `\DetectionControlsElsewhereSlidingMissingMax`, `\DetectionControlsElsewhereSlidingMissingMin`, `\DetectionControlsJumpOursSpanningMax`, `\DetectionControlsJumpOursSpanningMin`, `\DetectionControlsJumpSlidingSpanningMax`, `\DetectionControlsJumpingContinuousFraction`, `\DetectionControlsJumpingNonlocalFraction`, `\DetectionControlsJumpingSlidingBeforeTestFraction`, `\DetectionControlsJumpingSlidingFraction`, `\DetectionControlsMultipartTrials`, `\DetectionControlsNoReplayMinutes`, `\DetectionControlsNoReplayRateBound`, `\DetectionControlsNoReplayRecordings`, `\DetectionControlsOursFewerInEventTrials`, `\DetectionControlsOursMoreInEventTrials`, `\DetectionControlsOursRecoveryAloneFraction`, `\DetectionControlsOursRecoveryInEventFraction`, `\DetectionControlsPlacelessContinuousFraction`, `\DetectionControlsPlacelessFragmentedShareMax`, `\DetectionControlsPlacelessFragmentedShareMin`, `\DetectionControlsPlacelessNonlocalFraction`, `\DetectionControlsPlacelessNonlocalLowestRateFraction`, `\DetectionControlsPlacelessSlidingBeforeTestFraction`, `\DetectionControlsPlacelessSlidingFraction`, `\DetectionControlsSlidingFewerInEventTrials`, `\DetectionControlsSlidingMoreInEventTrials`, `\DetectionControlsSlidingRecoveryAloneFraction`, `\DetectionControlsSlidingRecoveryInEventFraction`, `\DetectionHeldoutEstimatorAgreementMin`, `\DetectionHeldoutJumpingSupportMax`, `\DetectionHeldoutJumpingSupportMin`, `\DetectionHeldoutOursOnlyInformativeMax`, `\DetectionHeldoutOursOnlyInformativeMin`, `\DetectionHeldoutOursOnlySupportFoldC`, `\DetectionHeldoutOursOnlySupportMax`, `\DetectionHeldoutOursOnlySupportMin`, `\DetectionHeldoutPlacelessInformativeEvents`, `\DetectionHeldoutPlacelessLooseEvents`, `\DetectionHeldoutPlacelessLooseSupportedEvents`, `\DetectionHeldoutSharedInformativeMax`, `\DetectionHeldoutSharedInformativeMin`, `\DetectionHeldoutSharedSupport`, `\DetectionPilotCallsDecidedByOutsideWindow`, `\DetectionPilotReplayCalls`, `\DetectionRecordingInboundPJump`, `\DetectionRecordingInboundPSpread`, `\DetectionRecordingOutboundDrawsFromPassing`, `\DetectionRecordingOutboundDurationRatio`, `\DetectionRecordingOutboundLocalFraction`, `\DetectionRecordingOutboundPJump`, `\DetectionRecordingOutboundPSpread`, `\DetectionRecordingRemoteStationaryDispersionCm`, `\DetectionRecordingShortPathDispersionCm`, `\DetectionRecordingShortReplayDurationRatio`, `\DetectionRecordingShortReplayLocalFraction`, `\DetectionRecordingShortReplayPJump`, `\DetectionRecordingShortReplayPSpread`, `\DetectionRecordingStateSpaceBoundErrorMs`, `\DetectionRecordingStrayWindowDispersionCm`, `\DetectionRecordingStrayWindowDistanceCm`, `\DetectionRecordingStrayWindowDurationMs`, `\DetectionRecordingStrayWindowLocalFraction`, `\DetectionRecordingStrayWindowPJump`, `\DetectionRecordingStrayWindowPSpread`, `\DetectionRecordingStrayWindowPiecesDispersionCm`, `\DetectionSweepDomainFraction`, `\DetectionSweepDomainSlidingBeforeTestFraction`, `\DetectionSweepDomainSlidingFraction`, `\DetectionSweepDomainStateSpaceFraction`, `\DetectionSweepDomainStateSpacePublishedFraction`, `\DetectionSweepFailedTestFraction`, `\DetectionSweepJumpHalfPassFraction`, `\DetectionSweepJumpHalfPassLongestFraction`, `\DetectionSweepJumpHalfPassShortestFraction`, `\DetectionSweepReplays`, `\DetectionSweepShortestEndLateMs`, `\DetectionSweepShortestReportedDurationMs`, `\DetectionSweepShortestStartEarlyMs`, `\DetectionSweepSlidingBeforeTestFraction`, `\DetectionSweepSlidingEndLateMaxMs`, `\DetectionSweepSlidingEndLateMinMs`, `\DetectionSweepSlidingEndLateUpperQuartileMaxMs`, `\DetectionSweepSlidingFraction`, `\DetectionSweepSlidingNotTheReplayFraction`, `\DetectionSweepSlidingOnlyBeforeTestReplays`, `\DetectionSweepSlidingOnlyReplays`, `\DetectionSweepSlidingSpreadOnlyFraction`, `\DetectionSweepSlidingStartEarlyMaxMs`, `\DetectionSweepSlidingStartEarlyMinMs`, `\DetectionSweepSpreadHalfPassFraction`, `\DetectionSweepStateSpaceEdgeErrorMaxMs`, `\DetectionSweepStateSpaceFraction`, `\DetectionSweepStateSpaceOnlyFraction`
 

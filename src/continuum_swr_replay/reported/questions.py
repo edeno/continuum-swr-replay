@@ -1,8 +1,8 @@
 """The paper's questions and figures: which question each reported value answers,
 and which figure shows it.
 
-This module is the one place a question's wording, its part of the paper, its
-status and its figures are written. Each value in a summary
+This module is the one place a question's wording, its place in the paper's
+outline, its status and its figures are written. Each value in a summary
 (:class:`~continuum_swr_replay.reported.values.Value`) names the questions it
 answers in ``questions`` and the figures that show it in ``used_in``;
 :func:`tag_problems` checks those names against the lists here, and
@@ -10,8 +10,8 @@ answers in ``questions`` and the figures that show it in ``used_in``;
 every question with its values.
 
 A question is written as a question, not as its answer. Its id is its place in
-the outline (``"2d.2"``: section 2d, the second question there); its ``claim`` is
-the claim number it had before, so older notes still trace.
+the outline: its section's code and its number there (``"2d.2"``, section 2d's
+second question).
 
 The list organizes the writing by part. A question need not have a figure; a
 figure tag names the figure the paper places a value in, which may be one whose
@@ -26,31 +26,40 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-SECTIONS: tuple[tuple[int, str], ...] = (
-    (0, "introduction"),
-    (1, "the model"),
-    (2, "it works"),
-    (2, "it finds events that other methods do not"),
-    (2, "the events are real"),
-    (2, "what the events are like"),
-    (3, "the events relate to behavior"),
-    (4, "the events relate to mPFC"),
-)
-"""The paper's outline, in order: the part and the section within it. Part 0 is the
-introduction's survey of published replay studies (Supplementary Table S1)."""
 
-SECTION_CODES: dict[tuple[int, str], str] = {
-    (0, "introduction"): "0",
-    (1, "the model"): "1",
-    (2, "it works"): "2a",
-    (2, "it finds events that other methods do not"): "2b",
-    (2, "the events are real"): "2c",
-    (2, "what the events are like"): "2d",
-    (3, "the events relate to behavior"): "3",
-    (4, "the events relate to mPFC"): "4",
-}
-"""Each section's code: a question's id is its section's code and its number there
-(``"2d.2"``)."""
+@dataclass(frozen=True)
+class Section:
+    """A section of the paper's outline.
+
+    Attributes
+    ----------
+    code : str
+        The prefix of its questions' ids (``"2d"``).
+    part : int
+        The part of the paper it belongs to.
+    title : str
+        What the section shows.
+    """
+
+    code: str
+    part: int
+    title: str
+
+
+SECTIONS: tuple[Section, ...] = (
+    Section("0", 0, "introduction"),
+    Section("1", 1, "the model"),
+    Section("2a", 2, "it works"),
+    Section("2b", 2, "it finds events that other methods do not"),
+    Section("2c", 2, "the events are real"),
+    Section("2d", 2, "what the events are like"),
+    Section("3", 3, "the events relate to behavior"),
+    Section("4", 4, "the events relate to mPFC"),
+)
+"""The paper's outline, in order. Part 0 is the introduction's survey of published
+replay studies (Supplementary Table S1)."""
+
+SECTION_BY_CODE: dict[str, Section] = {s.code: s for s in SECTIONS}
 
 STATUSES = ("computed", "partly computed", "not computed", "no numbers", "dropped")
 """A question's status. ``no numbers``: an example figure or a framing, which no
@@ -103,10 +112,10 @@ FIGURES: dict[str, Figure] = {
         "scripts/figures/generate_figure04.py",
         "abcd",
     ),
-    "decoder validation": Figure(
+    "decoder_validation": Figure(
         "Decoder validation", "scripts/figures/generate_supp_decoder_validation.py"
     ),
-    "memoryless comparison": Figure(
+    "memoryless_comparison": Figure(
         "Our detector and the Widloski & Foster detector on simulated replays",
         "scripts/figures/generate_memoryless_comparison.py",
     ),
@@ -123,12 +132,13 @@ FIGURES: dict[str, Figure] = {
         "scripts/figures/plot_swr_contrast_coefs.py",
     ),
 }
-"""Every figure a value may name: the main figures, with the panel letters their
-scripts draw now, and the supplementary figures. A value names one as
+"""Every figure a value may name, by id: the main figures (``"2"``), with the panel
+letters their scripts draw now, and the supplementary figures by their output
+folder's name (``"memoryless_comparison"``). A value names one as
 ``"figure: <id>"`` or, for a lettered panel, ``"figure: <id><letter>"``
-(``"figure: 2b"``). A value placed in a main figure whose panel is not designed yet
-carries the unlettered tag (``"figure: 2"``), whether or not the script draws it
-yet."""
+(``"figure: 2b"``). A value placed in a main figure whose panel is not designed
+yet carries the unlettered tag (``"figure: 2"``), whether or not the script draws
+it yet."""
 
 
 @dataclass(frozen=True)
@@ -138,16 +148,7 @@ class Question:
     Attributes
     ----------
     id : str
-        Its place in the outline: the section's code and its number there
-        (``"2d.2"``; :data:`SECTION_CODES`).
-    claim : str
-        The claim number it had before the outline (``"15"``, ``"19a"``), so that
-        older notes and git history still trace; empty for a question that had
-        none.
-    part : int
-        The part of the paper, the first element of an entry of :data:`SECTIONS`.
-    section : str
-        The section within the part, as in :data:`SECTIONS`.
+        Its section's code and its number in the section (``"2d.2"``).
     text : str
         The question.
     status : str
@@ -156,391 +157,245 @@ class Question:
         Why the status is not ``computed``; empty when it is.
     figures : tuple of str
         The figures or panels the paper places it in (``"2b"``,
-        ``"memoryless comparison"``); empty for a question no figure shows. Every
+        ``"memoryless_comparison"``); empty for a question no figure shows. Every
         figure tag on one of its values must be listed here.
     note : str
         An editorial note for the lead, if any.
     """
 
     id: str
-    claim: str
-    part: int
-    section: str
     text: str
     status: str = "computed"
     reason: str = ""
     figures: tuple[str, ...] = ()
     note: str = ""
 
-
-_WORKS = (2, "it works")
-_FINDS = (2, "it finds events that other methods do not")
-_REAL = (2, "the events are real")
-_LIKE = (2, "what the events are like")
-_BEHAVIOR = (3, "the events relate to behavior")
-_MPFC = (4, "the events relate to mPFC")
-
-
-def _q(where: tuple[int, str], id: str, claim: str, text: str, **fields) -> Question:
-    return Question(
-        id=id, claim=claim, part=where[0], section=where[1], text=text, **fields
-    )
+    @property
+    def section(self) -> Section:
+        """The section of the outline its id names."""
+        return SECTION_BY_CODE[self.id.rsplit(".", 1)[0]]
 
 
 QUESTIONS: tuple[Question, ...] = (
-    _q(
-        (0, "introduction"),
-        "0.1",
-        "",
-        "What detection and decoding parameters do published replay studies use?",
+    Question(
+        "0.1", "What detection and decoding parameters do published replay studies use?"
     ),
-    # Part 2: it works
-    _q(
-        _WORKS,
+    Question(
         "2a.1",
-        "10",
         "Is the decoder accurate, in sample and on held-out data?",
         status="not computed",
-        reason="no summary value; Figure 2e and the decoder-validation supplement "
-        "plot the in-sample decoding error",
-        figures=("2e", "decoder validation"),
+        reason="no summary value; Figure 2e and the decoder-validation supplement plot the in-sample decoding error",
+        figures=("2e", "decoder_validation"),
     ),
-    _q(
-        _WORKS,
+    Question(
         "2a.2",
-        "11",
-        "Do held-out likelihood and event-label stability favor the four-state "
-        "model over the Continuous–Fragmented and reduced models?",
+        "Do held-out likelihood and event-label stability favor the four-state model over the Continuous–Fragmented and reduced models?",
         status="not computed",
         reason="no script (held-out model selection)",
     ),
-    _q(
-        _WORKS,
+    Question(
         "2a.3",
-        "12",
-        "On simulated data, how often does the detector report an event where no "
-        "replay was inserted, and how does it compare with the Widloski detector on "
-        "replays of known shape?",
-        figures=("memoryless comparison",),
+        "On simulated data, how often does the detector report an event where no replay was inserted, and how does it compare with the Widloski detector on replays of known shape?",
+        figures=("memoryless_comparison",),
     ),
-    _q(
-        _WORKS,
+    Question(
         "2a.4",
-        "12",
-        "How often does the detector report non-local events on shuffled or thinned "
-        "real spikes, and in windows where no replay is expected?",
+        "On one real epoch, how many replays does the Widloski & Foster sliding-window detector call, and how many of those calls are decided by kept windows outside every piece?",
+        figures=("memoryless_comparison",),
+    ),
+    Question(
+        "2a.5",
+        "How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?",
         status="not computed",
         reason="no script (the false-positive rate on real data)",
     ),
-    _q(
-        _WORKS,
-        "2a.5",
-        "3",
-        "How do the non-SWR fraction and the close/remote split change across the "
-        "non-local and SWR-z thresholds?",
+    Question(
+        "2a.6",
+        "How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?",
         status="not computed",
         reason="no script (the threshold sweep)",
     ),
-    # Part 2: it finds events that other methods do not
-    _q(
-        _FINDS,
+    Question(
         "2b.1",
-        "1",
         "Do non-local events occur without an SWR? (examples)",
         status="no numbers",
         reason="example events, one per overlap class",
         figures=("2a",),
     ),
-    _q(
-        _FINDS,
+    Question(
         "2b.2",
-        "2",
-        "What fraction of immobile non-local events overlaps no SWR?",
+        "How many immobile non-local events overlap no SWR, and what fraction of them is that?",
         figures=("2", "2b"),
+        note="The claims table reads these as the events SWR-triggered detection misses; that reading belongs in the Results.",
     ),
-    _q(
-        _FINDS,
+    Question(
         "2b.3",
-        "21",
-        "How many detected non-local events overlap no SWR?",
-        figures=("2", "2b"),
-        note="The claims table reads these as the events SWR-triggered detection "
-        "misses; that reading belongs in the Results.",
+        "How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?",
+        figures=("2",),
     ),
-    _q(
-        _FINDS,
+    Question(
         "2b.4",
-        "4",
-        "How do SWR detection and non-local detection overlap, in events and in "
-        "time points?",
-        figures=("2",),
-    ),
-    _q(
-        _FINDS,
-        "2b.5",
-        "23",
-        "For each other detector, what share of its events overlaps no non-local "
-        "event, and how do those divide by decoder state; for the ones that do "
-        "overlap, what share of their time bins does each state take?",
-        figures=("2",),
-    ),
-    _q(
-        _FINDS,
-        "2b.6",
-        "22",
         "How do non-local event starts and ends differ from those of the matched SWR?",
         figures=("2d",),
     ),
-    _q(
-        _FINDS,
-        "2b.7",
-        "24",
-        "How is SWR z-score distributed at immobile Local and Non-Local time points, "
-        "and how much of the non-local mass lies below the SWR-detection threshold?",
+    Question(
+        "2b.5",
+        "How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?",
         figures=("3b",),
     ),
-    _q(
-        _FINDS,
-        "2b.8",
-        "25",
+    Question(
+        "2b.6",
         "Does the detector target the represented content rather than an LFP proxy?",
         status="no numbers",
         reason="framing (a candidate claim)",
         note="Wording written by the assistant from the claim; check it.",
     ),
-    # Part 2: the events are real
-    _q(
-        _REAL,
+    Question(
         "2c.1",
-        "5",
-        "How do theta z-score and speed compare across SWR events, non-SWR events "
-        "and running?",
-        figures=("3b", "decoder validation"),
+        "How do theta z-score and speed compare across SWR events, non-SWR events and running?",
+        figures=("3b", "decoder_validation"),
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.2",
-        "6",
-        "How do per-event spike count, MUA z-score and active tetrodes compare "
-        "across non-SWR events, SWR events and matched immobile non-event windows?",
+        "How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?",
         figures=("2",),
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.3",
-        "7",
-        "Do an event's spikes favor its decoded location over the animal's "
-        "position, against matched windows and on held-out tetrodes?",
+        "Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?",
         figures=("2",),
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.4",
-        "7b",
-        "Where do event MAPs sit relative to the GPI peak, against matched quiet "
-        "windows?",
+        "Where do event MAPs sit relative to the GPI peak, against matched quiet windows?",
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.5",
-        "7c",
         "What spike evidence do matched immobile non-event windows have?",
         figures=("2",),
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.6",
-        "8",
         "Are close events produced by the extent of place fields?",
         status="not computed",
         reason="needs a re-decode with a wider Local kernel (a GPU subset)",
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.7",
-        "9",
-        "Do remote events pass the spike-support tests (6, 7)?",
+        "Do remote events pass the spike-support tests (questions 2c.2, 2c.3)?",
         figures=("2",),
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.8",
-        "13",
         "How is the decoded distance from the animal distributed, by SWR status?",
         figures=("2",),
     ),
-    # Part 2: what the events are like
-    _q(
-        _LIKE,
+    Question(
         "2d.1",
-        "14",
-        "Where does content sit relative to the animal and to the reward wells, SWR "
-        "against non-SWR?",
+        "Where does content sit relative to the animal and to the reward wells, SWR against non-SWR?",
         status="partly computed",
-        reason="the own-well share waits for the wider-Local-kernel re-decode "
-        "(question 2c.6)",
+        reason="the own-well share waits for the wider-Local-kernel re-decode (question 2c.6)",
         figures=("2", "3"),
     ),
-    _q(
-        _LIKE,
+    Question(
         "2d.2",
-        "15",
         "How does replay speed differ between SWR and non-SWR events?",
         figures=("3c",),
     ),
-    _q(
-        _LIKE,
+    Question(
         "2d.3",
-        "16",
         "How does spatial extent differ between SWR and non-SWR events?",
         figures=("3",),
     ),
-    _q(
-        _LIKE,
+    Question(
         "2d.4",
-        "16b",
-        "How much does content move within an event (pauses, largest step, "
-        "reversals), SWR against non-SWR?",
+        "How much does content move within an event (pauses, largest step, reversals), SWR against non-SWR?",
         figures=("3",),
     ),
-    _q(
-        _LIKE,
+    Question(
         "2d.5",
-        "17",
-        "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR "
-        "against non-SWR?",
+        "How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?",
     ),
-    _q(
-        _LIKE,
-        "2d.6",
-        "18",
-        "How does event duration differ between SWR and non-SWR events?",
-    ),
-    # Part 3: behavior
-    _q(
-        _BEHAVIOR,
+    Question("2d.6", "How does event duration differ between SWR and non-SWR events?"),
+    Question(
         "3.1",
-        "19a",
-        "Which arms does content over-represent, and does that differ between SWR "
-        "and non-SWR events once each kind's arm baseline is accounted for?",
+        "Which arms does content over-represent, and does that differ between SWR and non-SWR events once each kind's arm baseline is accounted for?",
         status="partly computed",
         reason="the re-decode with a wider Local kernel (question 2c.6) is pending",
         figures=("content_estimators", "swr_contrast"),
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.2",
-        "19b",
-        "Is non-SWR content selective for recently rewarded arms (realized reward "
-        "fraction)?",
+        "Is non-SWR content selective for recently rewarded arms (realized reward fraction)?",
         figures=("swr_contrast",),
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.3",
-        "19c",
-        "How does the reward-history kernel of event occurrence (lag 1 and the "
-        "slower lags) compare between SWR-coupled and non-SWR events?",
+        "How does the reward-history kernel of event occurrence (lag 1 and the slower lags) compare between SWR-coupled and non-SWR events?",
         figures=("swr_contrast",),
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.4",
-        "19d",
-        "Does content correlate with the upcoming choice once behavior is in the "
-        "model, with or without SWR?",
+        "Does content correlate with the upcoming choice once behavior is in the model, with or without SWR?",
     ),
-    _q(_BEHAVIOR, "3.5", "19e", "Does non-SWR content predict staying or leaving?"),
-    _q(
-        _BEHAVIOR,
+    Question("3.5", "Does non-SWR content predict staying or leaving?"),
+    Question(
         "3.6",
-        "19f",
-        "How does SWR against non-SWR content depend on the arm's reward fraction "
-        "(CS4) and, separately, on its value (CS5), as direct (length-adjusted) and "
-        "total effects?",
+        "How does SWR against non-SWR content depend on the arm's reward fraction (CS4) and, separately, on its value (CS5), as direct (length-adjusted) and total effects?",
         status="partly computed",
         reason="an interaction-block refit is pending",
         figures=("content_estimators", "swr_contrast"),
-        note="The claim's \"high-value\" covers both; the claims table's dropped list "
-        "calls the CS4 total effect avoidance of recently rewarded arms. Keep the two "
-        "apart or merge them.",
+        note="The claim's \"high-value\" covers both; the claims table's dropped list calls the CS4 total effect avoidance of recently rewarded arms. Keep the two apart or merge them.",
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.7",
-        "19g",
-        "Does content over-represent arms the animal is uncertain about, or arms of "
-        "high value?",
+        "Does content over-represent arms the animal is uncertain about, or arms of high value?",
         figures=("content_estimators", "uncertainty_content", "swr_contrast"),
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.8",
-        "",
-        "Does the ripple power of events depend on the recent patch-switch rate, the "
-        "previous trial's reward outcome or the post-outcome reward prediction error?",
+        "Does the ripple power of events depend on the recent patch-switch rate, the previous trial's reward outcome or the post-outcome reward prediction error?",
     ),
-    # Part 4: mPFC
-    _q(
-        _MPFC,
+    Question(
         "4.1",
-        "20",
-        "Do non-SWR events modulate mPFC activity, against matched immobile "
-        "non-event windows, and how does that compare with SWR events?",
+        "Do non-SWR events modulate mPFC activity, against matched immobile non-event windows, and how does that compare with SWR events?",
         status="partly computed",
-        reason="population inference and the SWR-controlled rung are pending, and "
-        "equivalence is untested",
+        reason="population inference and the SWR-controlled rung are pending, and equivalence is untested",
         figures=("4", "4a", "4b", "4c", "4d"),
     ),
-    # Considered and dropped
-    _q(
-        _FINDS,
-        "2b.9",
-        "",
+    Question(
+        "2b.7",
         "Are non-SWR events something other than sub-threshold SWRs?",
         status="dropped",
-        reason="contradicted by the ripple-power bump at non-local onset; reframed "
-        "as question 2b.7",
+        reason="contradicted by the ripple-power bump at non-local onset; reframed as question 2b.5",
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.9",
-        "",
         "Are SWR and non-SWR events recruited differently by behavior?",
         status="dropped",
-        reason="not shown as a gross recruitment difference (the peri-switch non-SWR "
-        "profile is a null); superseded by the per-effect questions 3.1–3.7",
+        reason="not shown as a gross recruitment difference (the peri-switch non-SWR profile is a null); superseded by the per-effect questions 3.1–3.7",
     ),
-    _q(
-        _BEHAVIOR,
+    Question(
         "3.10",
-        "",
         "Does replay content predict the upcoming choice?",
         status="dropped",
-        reason="invalidated by task autocorrelation; the one surviving thread, the "
-        "non-SWR replay_frac term of question 3.4, is null over the behavioral "
-        "baseline",
+        reason="invalidated by task autocorrelation; the one surviving thread, the non-SWR replay_frac term of question 3.4, is null over the behavioral baseline",
     ),
-    _q(
-        _LIKE,
+    Question(
         "2d.7",
-        "",
         "Are non-SWR events a different kind of event, with a different function?",
         status="dropped",
-        reason="not claimed: the events are characterized, and the SWR contrasts are "
-        "descriptive, not categorical",
+        reason="not claimed: the events are characterized, and the SWR contrasts are descriptive, not categorical",
     ),
-    _q(
-        _REAL,
+    Question(
         "2c.9",
-        "",
-        "Do tetrode holdout and interneuron exclusion, as main-text controls, "
-        "show the events are real?",
+        "Do tetrode holdout and interneuron exclusion, as main-text controls, show the events are real?",
         status="dropped",
         reason="folded into the likelihood test (question 2c.3)",
     ),
 )
-"""Every question, in the outline's order within each section."""
+"""Every question, in the outline's order within each section; the dropped
+questions last in theirs."""
 
 QUESTION_IDS: dict[str, Question] = {q.id: q for q in QUESTIONS}
 
@@ -549,7 +404,7 @@ def parse_figure_tag(tag: str) -> tuple[str, str] | None:
     """The figure id and panel letter a ``used_in`` tag names, or None.
 
     ``"figure: 2b"`` is ``("2", "b")``; ``"figure: 2"`` and
-    ``"figure: memoryless comparison"`` have no panel (``""``). A tag that is not a
+    ``"figure: memoryless_comparison"`` have no panel (``""``). A tag that is not a
     figure tag, or names no figure in :data:`FIGURES`, is None.
     """
     if not tag.startswith(FIGURE_PREFIX):

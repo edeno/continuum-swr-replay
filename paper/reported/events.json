@@ -7,12 +7,23 @@
  "code": null,
  "migrated": {
   "from": "paper/reported/part2.json",
-  "schema_version": 1,
-  "commit": "eb1f98092c89ee24a7a40ca72238a6d3e307003e",
   "by": "scripts/reported/migrate_summaries.py",
-  "changes": [
-   "renamed from part2.json to events.json",
-   "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5, at 6e81598c43fc764b4431944e33630a31458115c1)"
+  "steps": [
+   {
+    "change": "renamed from part2.json to events.json (schema 1 to 4)",
+    "script_commit": "6e81598c43fc764b4431944e33630a31458115c1",
+    "ran_at": "eb1f98092c89ee24a7a40ca72238a6d3e307003e, from an uncommitted copy"
+   },
+   {
+    "change": "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5)",
+    "script_commit": "b895716f9c48565db933f90417484b88710d4742",
+    "ran_at": "6e81598c43fc764b4431944e33630a31458115c1, from an uncommitted copy"
+   },
+   {
+    "change": "questions merged and renumbered, the pilot values moved to 2a.4, figure ids named for their folders",
+    "script_commit": "d833fa8bcc00141bf739f139b11b16c2f061912b",
+    "ran_at": "d833fa8bcc00141bf739f139b11b16c2f061912b"
+   }
   ]
  },
  "inputs": [
@@ -123,8 +134,7 @@
    "unit": "",
    "description": "animals in the event table",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -140,8 +150,7 @@
    "unit": "",
    "description": "animals in which more than half the events are non-SWR",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -174,8 +183,7 @@
    "unit": "",
    "description": "animals in which non-SWR is the largest of the three overlap classes",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -401,8 +409,7 @@
    "unit": "",
    "description": "carey events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -417,8 +424,7 @@
    "unit": "",
    "description": "share of carey events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -433,8 +439,7 @@
    "unit": "",
    "description": "of carey events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -449,8 +454,7 @@
    "unit": "",
    "description": "of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -465,8 +469,7 @@
    "unit": "",
    "description": "of carey events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -481,8 +484,7 @@
    "unit": "",
    "description": "share of carey events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -497,8 +499,7 @@
    "unit": "",
    "description": "share of carey events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -513,8 +514,7 @@
    "unit": "",
    "description": "share of carey events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -529,8 +529,7 @@
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -545,8 +544,7 @@
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -561,8 +559,7 @@
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -577,8 +574,7 @@
    "unit": "",
    "description": "median over carey events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -668,7 +664,7 @@
    "unit": "ms",
    "description": "median of event end minus matched SWR end",
    "questions": [
-    "2b.6"
+    "2b.4"
    ],
    "used_in": [
     "paper",
@@ -684,8 +680,7 @@
    "unit": "",
    "description": "epochs in the event table",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -1325,8 +1320,7 @@
    "unit": "",
    "description": "karlsson events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1341,8 +1335,7 @@
    "unit": "",
    "description": "share of karlsson events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1357,8 +1350,7 @@
    "unit": "",
    "description": "of karlsson events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1373,8 +1365,7 @@
    "unit": "",
    "description": "of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1389,8 +1380,7 @@
    "unit": "",
    "description": "of karlsson events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1405,8 +1395,7 @@
    "unit": "",
    "description": "share of karlsson events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1421,8 +1410,7 @@
    "unit": "",
    "description": "share of karlsson events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1437,8 +1425,7 @@
    "unit": "",
    "description": "share of karlsson events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1453,8 +1440,7 @@
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1469,8 +1455,7 @@
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1485,8 +1470,7 @@
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1501,8 +1485,7 @@
    "unit": "",
    "description": "median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -1517,8 +1500,7 @@
    "unit": "",
    "description": "kay events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1534,8 +1516,7 @@
    "unit": "",
    "description": "share of kay events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1551,8 +1532,7 @@
    "unit": "",
    "description": "highest per-animal share of kay events overlapping no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1568,8 +1548,7 @@
    "unit": "",
    "description": "lowest per-animal share of kay events overlapping no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1585,8 +1564,7 @@
    "unit": "",
    "description": "of kay events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1602,8 +1580,7 @@
    "unit": "",
    "description": "of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1619,8 +1596,7 @@
    "unit": "",
    "description": "of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1636,8 +1612,7 @@
    "unit": "",
    "description": "share of kay events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1653,8 +1628,7 @@
    "unit": "",
    "description": "share of kay events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1670,8 +1644,7 @@
    "unit": "",
    "description": "share of kay events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1687,8 +1660,7 @@
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1704,8 +1676,7 @@
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1721,8 +1692,7 @@
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1738,8 +1708,7 @@
    "unit": "",
    "description": "median over kay events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "paper",
@@ -1755,8 +1724,7 @@
    "unit": "s",
    "description": "seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -1960,8 +1928,7 @@
    "unit": "",
    "description": "mua events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2006,8 +1973,7 @@
    "unit": "",
    "description": "share of mua events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2022,8 +1988,7 @@
    "unit": "",
    "description": "of mua events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2038,8 +2003,7 @@
    "unit": "",
    "description": "of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2054,8 +2018,7 @@
    "unit": "",
    "description": "of mua events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2070,8 +2033,7 @@
    "unit": "",
    "description": "share of mua events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2086,8 +2048,7 @@
    "unit": "",
    "description": "share of mua events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2102,8 +2063,7 @@
    "unit": "",
    "description": "share of mua events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2118,8 +2078,7 @@
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2134,8 +2093,7 @@
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2150,8 +2108,7 @@
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2166,8 +2123,7 @@
    "unit": "",
    "description": "median over mua events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -2546,8 +2502,7 @@
    "unit": "",
    "description": "share of immobile non-local events overlapping no SWR, pooled over animals",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2563,8 +2518,7 @@
    "unit": "",
    "description": "highest per-animal share of non-SWR events",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2580,8 +2534,7 @@
    "unit": "",
    "description": "lowest per-animal share of non-SWR events",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2734,8 +2687,7 @@
    "unit": "",
    "description": "immobile non-local events in the canonical event table (whole event below 4 cm/s)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2751,8 +2703,7 @@
    "unit": "",
    "description": "of those, events overlapping no SWR (overlap_class non_swr)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2768,8 +2719,7 @@
    "unit": "",
    "description": "non-local events no Kay SWR overlaps (detector comparison memberships)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2785,8 +2735,7 @@
    "unit": "",
    "description": "share of the non-local events with a known membership that no Kay SWR overlaps",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2802,8 +2751,7 @@
    "unit": "per h",
    "description": "non-local events no Kay SWR overlaps, per hour of analysed immobility",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2819,8 +2767,7 @@
    "unit": "",
    "description": "non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2836,8 +2783,7 @@
    "unit": "",
    "description": "share of the non-local events with a known membership that no SWR definition and no MUA event overlaps",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2853,8 +2799,7 @@
    "unit": "per h",
    "description": "non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2870,8 +2815,7 @@
    "unit": "",
    "description": "non-local events no Widloski event overlaps (detector comparison memberships)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2887,8 +2831,7 @@
    "unit": "",
    "description": "share of the non-local events with a known membership that no Widloski event overlaps",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2904,8 +2847,7 @@
    "unit": "per h",
    "description": "non-local events no Widloski event overlaps, per hour of analysed immobility",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2921,8 +2863,7 @@
    "unit": "",
    "description": "events lying inside an SWR (overlap_class swr_contained)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2938,8 +2879,7 @@
    "unit": "",
    "description": "events partly overlapping an SWR (overlap_class swr_partial)",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2955,8 +2895,7 @@
    "unit": "",
    "description": "share of non-local event time that Kay's SWRs do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2972,8 +2911,7 @@
    "unit": "s",
    "description": "seconds of non-local event time that Kay's SWRs do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -2989,8 +2927,7 @@
    "unit": "",
    "description": "share of non-local event time that the five SWR definitions together do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3006,8 +2943,7 @@
    "unit": "s",
    "description": "seconds of non-local event time that the five SWR definitions together do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3023,8 +2959,7 @@
    "unit": "",
    "description": "share of non-local event time that the five SWR definitions and MUA together do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3040,8 +2975,7 @@
    "unit": "s",
    "description": "seconds of non-local event time that the five SWR definitions and MUA together do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3057,8 +2991,7 @@
    "unit": "",
    "description": "share of non-local event time that the Widloski detector's events do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3074,8 +3007,7 @@
    "unit": "s",
    "description": "seconds of non-local event time that the Widloski detector's events do not cover",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3091,8 +3023,7 @@
    "unit": "s",
    "description": "seconds of non-local event time (compared events), summed over epochs",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3373,8 +3304,7 @@
    "unit": "h",
    "description": "hours of analysed immobility the non-local detector observed (exposure), summed over epochs",
    "questions": [
-    "2b.2",
-    "2b.3"
+    "2b.2"
    ],
    "used_in": [
     "paper",
@@ -3519,7 +3449,7 @@
    "description": "animals whose median non-SWR event ripple power is above their median quiet-rest level",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3536,7 +3466,7 @@
    "description": "animals whose median SWR-overlapping event ripple power is above their median quiet-rest level",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3553,7 +3483,7 @@
    "description": "animals whose median non-SWR event ripple power is below their median running level",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3570,7 +3500,7 @@
    "description": "animals whose median SWR-overlapping event ripple power is below their median running level",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3587,7 +3517,7 @@
    "description": "median z-scored ripple power of immobile non-SWR non-local events (event mean)",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3604,7 +3534,7 @@
    "description": "median z-scored ripple power of immobile SWR-overlapping non-local events (event mean)",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3620,7 +3550,7 @@
    "unit": "",
    "description": "animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05)",
    "questions": [
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "supplement"
@@ -3635,7 +3565,7 @@
    "unit": "z",
    "description": "highest per-animal location of that mode",
    "questions": [
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "supplement"
@@ -3650,7 +3580,7 @@
    "unit": "z",
    "description": "lowest per-animal location of the main KDE mode of the events' peak ripple power",
    "questions": [
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "supplement"
@@ -3666,7 +3596,7 @@
    "description": "median over epochs of the epoch's median z-scored ripple power in quiet rest",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -3683,7 +3613,7 @@
    "description": "median over epochs of the epoch's median z-scored ripple power while running",
    "questions": [
     "2c.1",
-    "2b.7"
+    "2b.5"
    ],
    "used_in": [
     "paper",
@@ -4135,7 +4065,7 @@
    "unit": "ms",
    "description": "median of event start minus matched SWR start",
    "questions": [
-    "2b.6"
+    "2b.4"
    ],
    "used_in": [
     "paper",
@@ -4151,7 +4081,7 @@
    "unit": "",
    "description": "animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error",
    "questions": [
-    "2b.7",
+    "2b.5",
     "2c.3"
    ],
    "used_in": [
@@ -4167,7 +4097,7 @@
    "unit": "",
    "description": "animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval",
    "questions": [
-    "2b.7",
+    "2b.5",
     "2c.3"
    ],
    "used_in": [
@@ -4183,7 +4113,7 @@
    "unit": "",
    "description": "median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference",
    "questions": [
-    "2b.7",
+    "2b.5",
     "2c.3"
    ],
    "used_in": [
@@ -4199,7 +4129,7 @@
    "unit": "",
    "description": "the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count",
    "questions": [
-    "2b.7",
+    "2b.5",
     "2d.2",
     "2d.3",
     "2d.5",
@@ -4303,7 +4233,7 @@
    "unit": "",
    "description": "immobile non-local events overlapping an SWR",
    "questions": [
-    "2b.6"
+    "2b.4"
    ],
    "used_in": [
     "paper",
@@ -4666,8 +4596,7 @@
    "unit": "",
    "description": "memoryless_criteria events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4682,8 +4611,7 @@
    "unit": "",
    "description": "share of memoryless_criteria events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4698,8 +4626,7 @@
    "unit": "",
    "description": "of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4714,8 +4641,7 @@
    "unit": "",
    "description": "of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4730,8 +4656,7 @@
    "unit": "",
    "description": "of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4746,8 +4671,7 @@
    "unit": "",
    "description": "share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4762,8 +4686,7 @@
    "unit": "",
    "description": "share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4778,8 +4701,7 @@
    "unit": "",
    "description": "share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4794,8 +4716,7 @@
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4810,8 +4731,7 @@
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4826,8 +4746,7 @@
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4842,8 +4761,7 @@
    "unit": "",
    "description": "median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4858,8 +4776,7 @@
    "unit": "",
    "description": "memoryless events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4874,8 +4791,7 @@
    "unit": "",
    "description": "share of memoryless events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4890,8 +4806,7 @@
    "unit": "",
    "description": "of memoryless events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4906,8 +4821,7 @@
    "unit": "",
    "description": "of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4922,8 +4836,7 @@
    "unit": "",
    "description": "of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4938,8 +4851,7 @@
    "unit": "",
    "description": "share of memoryless events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4954,8 +4866,7 @@
    "unit": "",
    "description": "share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4970,8 +4881,7 @@
    "unit": "",
    "description": "share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -4986,8 +4896,7 @@
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5002,8 +4911,7 @@
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5018,8 +4926,7 @@
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5034,8 +4941,7 @@
    "unit": "",
    "description": "median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5050,8 +4956,7 @@
    "unit": "",
    "description": "yu events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5066,8 +4971,7 @@
    "unit": "",
    "description": "share of yu events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5082,8 +4986,7 @@
    "unit": "",
    "description": "of yu events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5098,8 +5001,7 @@
    "unit": "",
    "description": "of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5114,8 +5016,7 @@
    "unit": "",
    "description": "of yu events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5130,8 +5031,7 @@
    "unit": "",
    "description": "share of yu events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5146,8 +5046,7 @@
    "unit": "",
    "description": "share of yu events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5162,8 +5061,7 @@
    "unit": "",
    "description": "share of yu events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5178,8 +5076,7 @@
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5194,8 +5091,7 @@
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5210,8 +5106,7 @@
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5226,8 +5121,7 @@
    "unit": "",
    "description": "median over yu events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5242,8 +5136,7 @@
    "unit": "",
    "description": "zugaro events compared with the non-local detector",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5258,8 +5151,7 @@
    "unit": "",
    "description": "share of zugaro events that overlap no non-local event",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5274,8 +5166,7 @@
    "unit": "",
    "description": "of zugaro events overlapping no non-local event, the share with neither state in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5290,8 +5181,7 @@
    "unit": "",
    "description": "of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5306,8 +5196,7 @@
    "unit": "",
    "description": "of zugaro events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5322,8 +5211,7 @@
    "unit": "",
    "description": "share of zugaro events overlapping a non-local event whose every row is non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5338,8 +5226,7 @@
    "unit": "",
    "description": "share of zugaro events overlapping a non-local event that hold at least one row with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5354,8 +5241,7 @@
    "unit": "",
    "description": "share of zugaro events overlapping a non-local event that hold at least one row with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5370,8 +5256,7 @@
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with Local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5386,8 +5271,7 @@
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5402,8 +5286,7 @@
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
@@ -5418,8 +5301,7 @@
    "unit": "",
    "description": "median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8",
    "questions": [
-    "2b.5",
-    "2b.4"
+    "2b.3"
    ],
    "used_in": [
     "supplement"
