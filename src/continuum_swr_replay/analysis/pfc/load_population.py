@@ -507,7 +507,7 @@ def load_population_data(
         has_fit = df[primary_fit_col].notna().values
     else:
         has_fit = np.zeros(len(df), dtype=bool)
-    has_fr = (df["immobility_avg_firing_rate"] >= min_firing_rate).values
+    has_fr = at_or_above_rate(df, min_firing_rate)
     no_nan_mod = (
         ~np.any(np.isnan(swr_all), axis=0)
         & ~np.any(np.isnan(no_swr_all), axis=0)
@@ -560,6 +560,23 @@ def load_population_data(
     }
 
     return df, modulations, lag_time
+
+
+def at_or_above_rate(population: pd.DataFrame, min_firing_rate: float) -> np.ndarray:
+    """Which units' firing rate on the fitted bins reaches a cutoff.
+
+    Parameters
+    ----------
+    population : pandas.DataFrame, shape (n_units, n_columns)
+        The unit table, with ``immobility_avg_firing_rate`` in Hz.
+    min_firing_rate : float
+        The cutoff, in Hz. A unit exactly at it reaches it.
+
+    Returns
+    -------
+    numpy.ndarray of bool, shape (n_units,)
+    """
+    return (population["immobility_avg_firing_rate"] >= min_firing_rate).to_numpy()
 
 
 def tested_and_called(pvalue: pd.Series, alpha: float) -> tuple[np.ndarray, np.ndarray]:

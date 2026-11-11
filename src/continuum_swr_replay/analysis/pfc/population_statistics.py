@@ -37,6 +37,7 @@ from scipy.stats import false_discovery_control
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
+    at_or_above_rate,
     significant_fraction,
     tested_and_called,
 )
@@ -365,7 +366,9 @@ def units_at_or_above_rate(
 
     The comparison is the one
     :func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`
-    makes for its ``min_firing_rate``, applied to a population already loaded.
+    makes for its ``min_firing_rate``
+    (:func:`~continuum_swr_replay.analysis.pfc.load_population.at_or_above_rate`),
+    applied to a population already loaded.
 
     Parameters
     ----------
@@ -383,8 +386,7 @@ def units_at_or_above_rate(
     kept_curves : dict of str to NDArray, each shape (n_lags, n_kept)
         The kept units' columns of each curve; empty when no curves are given.
     """
-    rate = population["immobility_avg_firing_rate"].to_numpy(dtype=float)
-    keep = rate >= min_firing_rate
+    keep = at_or_above_rate(population, min_firing_rate)
     kept_curves = {name: values[:, keep] for name, values in (curves or {}).items()}
     return population[keep].reset_index(drop=True), kept_curves
 
