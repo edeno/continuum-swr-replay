@@ -1850,9 +1850,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
     """How heavily the per-bin ``is_swr``-contrast rate ladder is separated: the
     share of its ``contrast`` fits flagged separated, per cohort, and the share of
     fits carrying ``is_swr:reward_history_rcos_1`` that flag that term."""
-    make = _value_factory(
-        source, ("19c",), ("docs: replay_rate_content_swr_synthesis",)
-    )
+    make = _value_factory(source, ("19c",), ("supplement",))
     contrast = fits[fits["population"] == "contrast"]
     term = "is_swr:reward_history_rcos_1"
     carries = fits[fits[f"coef_{term}"].notna()]
@@ -1932,7 +1930,7 @@ def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Val
 def rate_contrast_audit_values(audited: pd.DataFrame, source: str) -> list[Value]:
     """The is_swr-contrast rate ladder's audited aggregate: how many rows it
     publishes, and how many sessions its key contrast terms lose to the gate."""
-    make = _value_factory(source, ("19c",), ("docs: rate_models",))
+    make = _value_factory(source, ("19c",), ("supplement",))
     key = audited[audited["population"] == "contrast"]
     worst = key.loc[key["n_dropped"].idxmax()]
     return [
@@ -2695,9 +2693,7 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
     """The SWR-coupling mark: per-session OLS of event ripple power on
     standardized covariates, summarized as the fitting script prints it (median,
     share positive, animals whose median is positive, signed-rank p)."""
-    make = _value_factory(
-        source, ("synthesis Layer 2",), ("docs: replay_rate_content_swr_synthesis",)
-    )
+    make = _value_factory(source, ("19h",), ("supplement",))
     values = [
         make(
             "power_sessions",

@@ -387,9 +387,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
         make = _value_factory(
             source,
             ("23", "4"),
-            ("paper", "figure: main, other side of the overlap")
-            if main
-            else ("supplement",),
+            ("paper", "figure: 2") if main else ("supplement",),
         )
         mine = events[events["detector"] == detector]
         alone = mine[~mine["matched"]]
@@ -568,7 +566,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
     analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
     from the Widloski detector) does not include, in total and per hour of rest.
     """
-    make = _value_factory(source, ("2", "21"), ("paper", "figure: main, left out"))
+    make = _value_factory(source, ("2", "21"), ("paper", "figure: 2"))
     counts = pd.read_csv(report_dir / "counts_by_animal.csv")
     exposure_s = float(
         counts.loc[counts["detector"] == "state_space", "exposure_s"].sum()
@@ -905,8 +903,9 @@ def reality_metrics(per_epoch_dir: Path) -> pd.DataFrame:
 def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
     """Claims 6, 7, 7b, 7c: each event group's spike evidence against matched
     quiet windows (``baseline``). Event-level medians, pooled over epochs; the
-    run scores every event and quiet window (no cap)."""
-    make = _value_factory(source, ("6", "7", "7c"), ("paper", "figure: spike support"))
+    run scores every event and quiet window (no cap). The remote groups' values
+    also answer question 9, whether remote events pass these tests."""
+    make = _value_factory(source, ("6", "7", "7c"), ("paper", "figure: 2"))
     values = [
         make(
             "evidence_epochs",
@@ -1012,13 +1011,17 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
             "animals in the spike-evidence run",
         )
     )
-    return values
+    remote = tuple(f"{word}_" for word in _REALITY_GROUPS if word.endswith("remote"))
+    return [
+        replace(v, claims=(*v.claims, "9")) if v.key.startswith(remote) else v
+        for v in values
+    ]
 
 
 def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     """Claim 7: the held-out tetrode test of immobile Non-Local Continuous bouts,
     split by SWR, per held-out spike against the animal's position."""
-    make = _value_factory(source, ("7",), ("paper", "figure: spike support"))
+    make = _value_factory(source, ("7",), ("paper", "figure: 2"))
     rows = stats[
         (stats["regime"] == "immobile") & (stats["metric"] == "runcv_nl_anim_mark_ps")
     ]
@@ -1101,7 +1104,7 @@ def class_distribution_values(distribution: pd.DataFrame, source: str) -> list[V
     p-values, the other power measures and the simulation checks stay in the
     analysis's CSV outputs.
     """
-    make = _value_factory(source, ("24",), ("supplement", "figure: one class or two"))
+    make = _value_factory(source, ("24",), ("supplement",))
     peak = distribution[
         (distribution.animal != "pooled") & (distribution.power == "peak")
     ]
@@ -1508,9 +1511,7 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
     at a remote well, at the animal's own well, on a remote path, near the
     animal off the wells.
     """
-    make = _value_factory(
-        source, ("14", "13"), ("paper", "figure: 3, content occupancy")
-    )
+    make = _value_factory(source, ("14", "13"), ("paper", "figure: 2"))
     occupancy = occupancy.assign(
         at_well=occupancy["remote_well"] + occupancy["own_well"]
     )

@@ -6,10 +6,14 @@ import hashlib
 import json
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from continuum_swr_replay.reported.questions import tag_problems
 
 SCHEMA_VERSION = 1
 """The layout of a summary file. Bump it when a field is added or renamed."""
@@ -54,9 +58,12 @@ class Value:
     description : str
         What the number is, precisely enough to recompute it.
     claims : tuple of str
-        The claims-table rows it supports.
+        The ids of the questions it answers
+        (:data:`~continuum_swr_replay.reported.questions.QUESTIONS`).
     used_in : tuple of str
-        "paper", "supplement", or "figure: <name>".
+        "paper", "supplement", or a figure,
+        ``"figure: <id>"`` or ``"figure: <id><panel>"``
+        (:data:`~continuum_swr_replay.reported.questions.FIGURES`).
     source : str
         The file, run or table it was computed from, and the selection.
     pending : str or None
@@ -92,6 +99,24 @@ class Value:
             )
         if not self.claims or not self.used_in:
             raise ValueError(f"{self.key}: name its claims and where it is used")
+        if _CHECK_TAGS.get():
+            problems = tag_problems(self.claims, self.used_in)
+            if problems:
+                raise ValueError(f"{self.key}: {'; '.join(problems)}")
+
+
+_CHECK_TAGS: ContextVar[bool] = ContextVar("check_tags", default=True)
+"""Whether a new :class:`Value` checks its tags against the question list. Off only
+while :func:`read_summary` reads a summary written before the tags changed."""
+
+
+@contextmanager
+def _tags_unchecked() -> Iterator[None]:
+    token = _CHECK_TAGS.set(False)
+    try:
+        yield
+    finally:
+        _CHECK_TAGS.reset(token)
 
 
 @dataclass
@@ -132,8 +157,19 @@ class Summary:
         tmp.replace(path)
 
 
-def read_summary(path: Path) -> Summary:
-    """A summary file read back, its values as :class:`Value`."""
+def read_summary(path: Path, *, check_tags: bool = True) -> Summary:
+    """A summary file read back, its values as :class:`Value`.
+
+    Parameters
+    ----------
+    path : Path
+        A ``part{n}.json``.
+    check_tags : bool
+        Check each value's question and figure tags
+        (:func:`~continuum_swr_replay.reported.questions.tag_problems`). False reads a
+        summary built before the question list changed, so that its numbers can
+        still be emitted; :func:`summary_tag_problems` then lists what to fix.
+    """
     payload = json.loads(path.read_text())
     if payload["schema_version"] != SCHEMA_VERSION:
         raise ValueError(
@@ -149,8 +185,22 @@ def read_summary(path: Path) -> Summary:
         fields = dict(fields)
         fields["claims"] = tuple(fields["claims"])
         fields["used_in"] = tuple(fields["used_in"])
-        summary.add(Value(key=key, **fields))
+        if check_tags:
+            summary.add(Value(key=key, **fields))
+        else:
+            with _tags_unchecked():
+                summary.add(Value(key=key, **fields))
     return summary
+
+
+def summary_tag_problems(summary: Summary) -> dict[str, list[str]]:
+    """Each value of ``summary`` whose tags do not match the question list, with
+    what is wrong (:func:`~continuum_swr_replay.reported.questions.tag_problems`)."""
+    problems = {
+        key: tag_problems(value.claims, value.used_in)
+        for key, value in summary.values.items()
+    }
+    return {key: found for key, found in problems.items() if found}
 
 
 def _shown(path: Path, root: Path) -> str:

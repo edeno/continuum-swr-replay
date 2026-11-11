@@ -73,7 +73,10 @@ def test_every_macro_the_manuscript_uses_is_defined():
 def test_emitted_files_hold_the_committed_summaries():
     summaries = {
         s.part: s
-        for s in map(values.read_summary, sorted(PAPER.glob("reported/part*.json")))
+        for s in (
+            values.read_summary(path, check_tags=False)
+            for path in sorted(PAPER.glob("reported/part*.json"))
+        )
     }
     assert set(summaries) == set(values.PARTS)
     stale = "is stale: run `make reported-values`"
@@ -100,7 +103,7 @@ def _value(key: str, value: float, pending: str | None = None) -> values.Value:
         style="pctnum",
         unit="",
         description="d",
-        claims=("c",),
+        claims=("15",),
         used_in=("paper",),
         source="s",
         pending=pending,

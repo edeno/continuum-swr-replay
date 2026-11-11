@@ -170,7 +170,7 @@ def state_evidence_values(
     counts the animals whose mean is above zero. Bouts are the primary
     (``runcv_``, time-held-out running-only encoding) rows of ``bout_stats``.
     """
-    make = _value_factory(source, ("7", "9"), ("paper", "supplement"))
+    make = _value_factory(source, ("7",), ("paper", "supplement"))
     statuses = pd.Series({k: r["status"] for k, r in manifest["epochs"].items()})
     n_animals = int(bouts["n_animals"].max())
     values = [
@@ -273,7 +273,7 @@ def pilot_stray_window_values(
     dispersion clears the threshold only with them: the pieces' own
     dispersion does not.
     """
-    make = _value_factory(source, ("12",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, ("12a",), MEMORYLESS_FIGURE)
     replay = events[events["is_replay"]]
     decided = replay[
         (replay["n_kept_windows_outside_pieces"] > 0)
@@ -310,7 +310,7 @@ def pilot_stray_window_values(
 def recording_values(numbers: dict, source: str) -> list[Value]:
     """Panels (a-f): what each detector made of the labeled events of one
     simulated recording, as the figure script computed them."""
-    make = _value_factory(source, ("12",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, ("12a",), MEMORYLESS_FIGURE)
     if not numbers["outbound_draws_from_passing"] > 1:
         raise ValueError(
             "the caption says the outbound continuous replay fails the test by "
@@ -461,7 +461,7 @@ def _timing(summary: pd.DataFrame, detector: str, edge: str, statistic: str):
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     """Panels (g-k): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
-    make = _value_factory(source, ("12",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, ("12a",), MEMORYLESS_FIGURE)
     overall = summary[summary["summary"] == "overall"].set_index("measure")["value"]
     domain = summary[summary["summary"] == "overall_in_domain"].set_index("measure")[
         "value"
@@ -705,7 +705,7 @@ def _levels(controls: pd.DataFrame, condition: str) -> list[float]:
 def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
     """Panels (l-o): bursts with no clean replay, stretches with no replay, and
     events in two parts."""
-    make = _value_factory(source, ("12",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, ("12a",), MEMORYLESS_FIGURE)
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
@@ -1039,7 +1039,7 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
     """Panels (p, q): content estimated from discovery cells, scored on held-out
     evaluation cells. Folds A and B tile the track; fold C's evaluation cells
     cover half of it."""
-    make = _value_factory(source, ("12",), MEMORYLESS_FIGURE)
+    make = _value_factory(source, ("12a",), MEMORYLESS_FIGURE)
 
     def share(key: str, x: float, description: str) -> Value:
         return make(key, x, "fraction", "pctnum", description)
