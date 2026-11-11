@@ -568,11 +568,13 @@ def called_response_timing(
 ) -> pd.DataFrame:
     """When the response of the units called for an event class peaks and starts.
 
-    The called units are split by the sign of their peak (:data:`DIRECTIONS`).
-    For each direction, the timing is given per unit (medians and shares over
-    units) and for the population: the sign-aligned mean curve of those units
-    (:func:`population_timing`), with 95 % intervals from resampling
-    ``groups``. Lags are reported in ms, relative to event onset.
+    The called units are split by the sign of their peak (:data:`DIRECTIONS`);
+    a called unit whose curve is not finite or is zero everywhere has no peak
+    and is in neither direction. For each direction, the timing is given per
+    unit (medians and shares over units) and for the population: the
+    sign-aligned mean curve of those units (:func:`population_timing`), with
+    95 % intervals from resampling ``groups``. Lags are reported in ms,
+    relative to event onset.
 
     Parameters
     ----------
@@ -613,7 +615,8 @@ def called_response_timing(
         - ``rise_onset_median_ms``: the median rise onset (the onset measured
           from the curve's value at the first lag).
         - ``steepest_median_ms``: the median lag of the steepest approach to
-          the peak (:func:`steepest_approach_lag`).
+          the peak (:func:`steepest_approach_lag`), over the units whose peak
+          is not at the first lag (a peak there has no approach).
 
         For the sign-aligned mean curve (each with ``_ci_low`` and
         ``_ci_high``, the 2.5th and 97.5th percentiles over the resamples,

@@ -1,12 +1,16 @@
 """Summary statistics of the mPFC unit population.
 
-Each function takes a table an analysis wrote (the unit table of
+Each statistic takes a table an analysis wrote (the unit table of
 :func:`~continuum_swr_replay.analysis.pfc.load_population.load_population_data`,
 or a table of what the bundles' provenance records per session) and returns
 named numbers: a dict, or a table with one row per group. They are the
 statistics the mpfc summary reports (``continuum_swr_replay.reported.mpfc``
-names and describes them). The timing statistics of the peri-event curves are in
-:mod:`~continuum_swr_replay.analysis.pfc.timing`.
+names and describes them). Two functions select units instead:
+:func:`called_units` returns a mask and :func:`units_at_or_above_rate` the
+rows of the units at or above a firing rate. The timing statistics of the
+peri-event curves are in :mod:`~continuum_swr_replay.analysis.pfc.timing`;
+:func:`swr_without_replay_timing_statistics` applies one of them to the units
+called for SWRs without replay.
 
 A unit is *tested* for an event class when its plus-one empirical p-value
 (:data:`~continuum_swr_replay.analysis.pfc.load_population.HELDOUT_P_COLUMNS`)
@@ -83,24 +87,30 @@ def cohort_count_statistics(counts: pd.DataFrame) -> dict[str, float]:
     -------
     statistics : dict
         - ``n_bins_fit``, ``n_bins_immobile``, ``n_nonlocal_kept``,
-          ``n_nonlocal_before``: each count summed over sessions.
+          ``n_nonlocal_before``: each count summed over sessions. A session's
+          missing count is left out of that sum.
         - ``bins_fit_fraction``, ``nonlocal_kept_fraction``,
           ``swrs_kept_fraction``: the share of the immobile bins, non-local
           events and SWRs the restriction keeps, pooled (summed kept over
           summed before).
         - ``swr_coupled_share_session_median``: the median over sessions of
           the share of a session's kept non-local events that are SWR-coupled.
+          A session with no kept non-local event has no share and is left out
+          of the median.
     """
-    totals = counts[
-        [
+    # Each column is summed by itself, so that a column made fractional by a
+    # missing count leaves the other totals whole.
+    totals = {
+        name: counts[name].sum()
+        for name in (
             "n_bins_fit",
             "n_bins_immobile",
             "n_nonlocal_after",
             "n_nonlocal_before",
             "n_ripple_after",
             "n_ripple_before",
-        ]
-    ].sum()
+        )
+    }
     swr_share = counts["n_nonlocal_swr"] / counts["n_nonlocal_after"]
     return {
         "n_bins_fit": totals["n_bins_fit"],
@@ -130,17 +140,19 @@ def fit_count_statistics(fits: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        The three counts summed over sessions, under their column names, and
+        The three counts summed over sessions, under their column names (a
+        session's missing count is left out of that sum), and
         ``nonconverged_percent``: the non-converged fits as a percent of the
         fits.
     """
-    totals = fits[
-        [
+    totals = {
+        name: fits[name].sum()
+        for name in (
             "n_model_fits",
             "n_nonconverged_model_fits",
             "n_neurons_with_nonconverged_model",
-        ]
-    ].sum()
+        )
+    }
     return {
         "n_model_fits": totals["n_model_fits"],
         "n_nonconverged_model_fits": totals["n_nonconverged_model_fits"],
@@ -173,14 +185,16 @@ def prior_binding_percent(population: pd.DataFrame, curves: Sequence[str]) -> pd
     -------
     percent : pd.Series, shape (n_curves,)
         By curve: the well-posed units the prior binds on, as a percent of the
-        well-posed units.
+        well-posed units. NaN, with a NumPy warning, for a curve with no
+        well-posed unit.
     """
     shares = {}
     for curve in curves:
-        converged = population[f"{curve}: mle_converged"].fillna(False).astype(bool)
-        separated = population[f"{curve}: mle_separated"].fillna(False).astype(bool)
+        # ``== True`` reads a missing flag as False.
+        converged = population[f"{curve}: mle_converged"].eq(True)
+        separated = population[f"{curve}: mle_separated"].eq(True)
         well_posed = converged & ~separated
-        binds = population[f"{curve}: prior_binds"].fillna(False).astype(bool)
+        binds = population[f"{curve}: prior_binds"].eq(True)
         shares[curve] = 100 * (binds & well_posed).sum() / well_posed.sum()
     return pd.Series(shares)
 
@@ -239,6 +253,11 @@ def called_fractions(population: pd.DataFrame, alpha: float) -> pd.DataFrame:
         ``n_called``, ``n_tested`` and ``fraction``, the called units as a
         share of the tested ones
         (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`).
+
+    Raises
+    ------
+    ZeroDivisionError
+        If no unit is tested for one of the tests.
     """
     rows = {}
     for name, (n_called, n_tested) in significant_fraction(
@@ -272,6 +291,11 @@ def called_fraction_by_animal(
     fractions : pd.DataFrame, shape (n_animals, 3)
         Indexed by animal, in sorted order: ``n_called``, ``n_tested`` and
         ``fraction`` as in :func:`called_fractions`, over the animal's units.
+
+    Raises
+    ------
+    ZeroDivisionError
+        If an animal has no unit tested for ``name``.
     """
     rows = {}
     for animal, frame in population.groupby("animal"):
@@ -303,7 +327,8 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
     Returns
     -------
     fraction : float
-        Units with q below ``alpha``, as a share of the tested units.
+        Units with q below ``alpha``, as a share of the tested units. NaN, with
+        a NumPy warning, when no unit is tested.
 
     Raises
     ------
@@ -405,8 +430,10 @@ def called_without_improvement(population: pd.DataFrame, alpha: float) -> pd.Dat
         Indexed by the keys of
         :data:`~continuum_swr_replay.analysis.pfc.load_population.HELDOUT_P_COLUMNS`:
         ``n_called``, the units called; ``n_flat``, those of them whose
-        observed improvement is at most zero; and ``fraction``, ``n_flat`` as
-        a share of ``n_called`` (NaN when no unit is called).
+        observed improvement is at most zero (a called unit with no observed
+        improvement recorded is not counted); and ``fraction``, ``n_flat`` as
+        a share of ``n_called`` (NaN, with a NumPy warning, when no unit is
+        called).
     """
     rows = {}
     for name, column in HELDOUT_P_COLUMNS.items():

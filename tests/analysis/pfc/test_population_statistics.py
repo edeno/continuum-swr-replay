@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -54,6 +52,29 @@ def test_cohort_count_statistics_pool_the_counts_and_take_the_session_median():
     assert result["swr_coupled_share_session_median"] == pytest.approx(0.5)
 
 
+def test_cohort_count_statistics_keep_whole_totals_beside_a_missing_count():
+    counts = pd.DataFrame(
+        {
+            "n_bins_fit": [100, 300],
+            "n_bins_immobile": [200, 600],
+            "n_nonlocal_after": [10, 30],
+            "n_nonlocal_before": [20, 80],
+            # one session has no count of its kept SWRs
+            "n_ripple_after": [5, NAN],
+            "n_ripple_before": [10, 70],
+            "n_nonlocal_swr": [5, 6],
+        }
+    )
+    result = stats.cohort_count_statistics(counts)
+    # the other totals stay whole numbers: 400, not 400.0
+    for name, total in (("n_bins_fit", 400), ("n_bins_immobile", 800)):
+        assert isinstance(result[name], np.integer), name
+        assert result[name] == total
+    assert isinstance(result["n_nonlocal_kept"], np.integer)
+    # the missing count is left out of its sum: 5 of 80
+    assert result["swrs_kept_fraction"] == pytest.approx(5 / 80)
+
+
 def test_fit_count_statistics_sum_sessions():
     fits = pd.DataFrame(
         {
@@ -84,10 +105,7 @@ def test_prior_binding_percent_is_over_the_well_posed_units():
             "no_SWR: prior_binds": [NAN, False, False, True, False, False],
         }
     )
-    with warnings.catch_warnings():
-        # pandas warns that filling a missing flag in an object column will change
-        warnings.simplefilter("ignore", FutureWarning)
-        percent = stats.prior_binding_percent(population, ["SWR", "no_SWR"])
+    percent = stats.prior_binding_percent(population, ["SWR", "no_SWR"])
     # SWR: the prior binds on units 0 and 3 of the three well-posed ones
     assert percent["SWR"] == pytest.approx(100 * 2 / 3)
     assert percent["no_SWR"] == pytest.approx(100 * 1 / 6)
@@ -145,11 +163,13 @@ def test_called_fraction_by_animal_uses_each_animals_own_tested_units():
 
 
 def test_bh_called_fraction_adjusts_the_tested_units_p_values():
-    population = _units(5, engagement=[0.001, 0.03, 0.04, 0.9, NAN])
+    population = _units(5, engagement=[0.001, 0.02, 0.04, 0.9, NAN])
     # Three of the four tested units have raw p < 0.05. Benjamini-Hochberg over
-    # the four: 0.9 stays 0.9; 0.04 * 4/3 = 0.053; 0.03 * 4/2 = 0.06, lowered
-    # to 0.053; 0.001 * 4 = 0.004. Only the last is below 0.05.
-    assert stats.bh_called_fraction(population, "engagement", ALPHA) == 0.25
+    # the four: 0.9 stays 0.9; 0.04 * 4/3 = 0.053; 0.02 * 4/2 = 0.04;
+    # 0.001 * 4 = 0.004. Two are below 0.05. (Bonferroni, times 4, leaves one:
+    # 0.004, 0.08, 0.16. So does Benjamini-Yekutieli, which multiplies the
+    # Benjamini-Hochberg values by 1 + 1/2 + 1/3 + 1/4.)
+    assert stats.bh_called_fraction(population, "engagement", ALPHA) == 0.5
 
 
 def test_best_model_fractions_are_shares_of_the_units_with_a_best_model():
