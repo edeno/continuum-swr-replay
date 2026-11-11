@@ -1,5 +1,8 @@
 # Questions and their numbers: one list, one map, interpretation in the Results
 
+File paths and line numbers in the findings below are at `3bcca2e7`, before the
+summaries and builders were renamed (see "As built: naming").
+
 **Status:** steps 1–4 of the order of work are built (branch `questions-and-numbers`, 2026-11-11); see "As built" for where the build departs from the design below. Every
 count and every finding in this document was read from the files named beside it,
 at commit `3bcca2e7`. The inventory script is
@@ -151,7 +154,7 @@ at the end.
    `c96c9133ef6c-dirty` and `part4.json` records `5609943e9472-dirty`: both were
    built from uncommitted changes.
    - `part0.json` (commit `1577f7209200`) predates two later commits to
-     `reported/part0.py` (`d4d42542`, `882033bf`).
+     `reported/survey.py` (then named part0.py; `d4d42542`, `882033bf`).
    - Part 0 needs no lab data, so it was rebuilt in memory at `3bcca2e7`. Its 32
      values and its inputs are identical to `part0.json`.
 5. **Tags with no claim or figure.**
@@ -563,7 +566,7 @@ confirms that every marker key arrives somewhere.
 The prose at lines 1–56 goes to `docs/rate_models.md`, and section 5 (lines
 217–236, no values) goes to `TODO.md` if it is still pending. Its inbound links
 include `scripts/rate/plot_per_bin_rate_summary.py`,
-`src/continuum_swr_replay/reported/part3.py` and
+`src/continuum_swr_replay/reported/behavior.py` (then named part3.py) and
 `tests/unit/test_summarize_per_bin_rate_models.py`. These are code, so each is
 checked before the file is removed.
 
@@ -597,7 +600,7 @@ and `tests/unit/test_manuscript_macros.py` are updated.
   `scripts/exploratory/_verify_content_models.py`;
 - `src/continuum_swr_replay/analysis/replay/model_specs.py`,
   `src/continuum_swr_replay/reported/__init__.py`, `src/continuum_swr_replay/reported/values.py`;
-- `src/continuum_swr_replay/reported/part3.py`. Its `docs: replay_rate_content_swr_synthesis`
+- `src/continuum_swr_replay/reported/behavior.py` (then named part3.py). Its `docs: replay_rate_content_swr_synthesis`
   tags (`:1854`, `:2699`) are replaced per decision 4;
 - the design documents under `docs/design/`.
 
