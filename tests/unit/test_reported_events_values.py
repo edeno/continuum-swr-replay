@@ -499,30 +499,31 @@ def test_rest_theta_values_name_each_class():
 def test_content_occupancy_values_name_each_group_and_place():
     occupancy = pd.DataFrame(
         {
-            "epoch_id": ["e1", "e2", "e1", "e3", "e3"],
-            "animal": ["a", "a", "a", "b", "b"],
-            "group": ["SWR", "SWR", "nonSWR", "SWR", "nonSWR"],
-            "n": [10, 30, 20, 10, 10],
-            "remote_well": [0.5, 0.1, 0.4, 0.2, 0.1],
-            "own_well": [0.1, 0.1, 0.2, 0.3, 0.1],
-            "remote_path": [0.2, 0.4, 0.2, 0.3, 0.4],
-            "near_off": [0.2, 0.4, 0.2, 0.2, 0.4],
+            "epoch_id": ["e1", "e2", "e1", "e3", "e3", "e4", "e4"],
+            "animal": ["a", "a", "a", "b", "b", "c", "c"],
+            "group": ["SWR", "SWR", "nonSWR", "SWR", "nonSWR", "SWR", "nonSWR"],
+            "n": [10, 30, 20, 10, 10, 10, 10],
+            "remote_well": [0.5, 0.1, 0.4, 0.2, 0.1, 0.1, 0.5],
+            "own_well": [0.1, 0.1, 0.2, 0.3, 0.1, 0.1, 0.2],
+            "remote_path": [0.2, 0.4, 0.2, 0.3, 0.4, 0.4, 0.2],
+            "near_off": [0.2, 0.4, 0.2, 0.2, 0.4, 0.4, 0.1],
         }
     )
     assert _numbers(builder.content_occupancy_values(occupancy, "s")) == {
-        "occupancy_epochs": 3,
-        "swr_content_remote_well_fraction": pytest.approx(10 / 50),
-        "swr_content_own_well_fraction": pytest.approx(7 / 50),
-        "swr_content_at_well_fraction": pytest.approx(17 / 50),
-        "swr_content_remote_path_fraction": pytest.approx(17 / 50),
-        "swr_content_near_off_fraction": pytest.approx(16 / 50),
-        "non_swr_content_remote_well_fraction": pytest.approx(9 / 30),
-        "non_swr_content_own_well_fraction": pytest.approx(5 / 30),
-        "non_swr_content_at_well_fraction": pytest.approx(14 / 30),
-        "non_swr_content_remote_path_fraction": pytest.approx(8 / 30),
-        "non_swr_content_near_off_fraction": pytest.approx(8 / 30),
-        # a: non-SWR 0.6 at a well against SWR 0.3; b: 0.2 against 0.5
-        "animals_non_swr_more_at_well": 1,
+        "occupancy_epochs": 4,
+        "swr_content_remote_well_fraction": pytest.approx(11 / 60),
+        "swr_content_own_well_fraction": pytest.approx(8 / 60),
+        "swr_content_at_well_fraction": pytest.approx(19 / 60),
+        "swr_content_remote_path_fraction": pytest.approx(21 / 60),
+        "swr_content_near_off_fraction": pytest.approx(20 / 60),
+        "non_swr_content_remote_well_fraction": pytest.approx(14 / 40),
+        "non_swr_content_own_well_fraction": pytest.approx(7 / 40),
+        "non_swr_content_at_well_fraction": pytest.approx(21 / 40),
+        "non_swr_content_remote_path_fraction": pytest.approx(10 / 40),
+        "non_swr_content_near_off_fraction": pytest.approx(9 / 40),
+        # a: non-SWR 0.6 at a well against SWR 0.3; b: 0.2 against 0.5; c: 0.7
+        # against 0.2
+        "animals_non_swr_more_at_well": 2,
     }
 
 
