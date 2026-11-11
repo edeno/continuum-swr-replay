@@ -1,28 +1,29 @@
 """Convert the summaries that need the cluster to rebuild into the current layout, without rebuilding them.
 
-Run once, then deleted when those summaries are rebuilt (``TODO.md``). The survey
-summary needs no lab data, so it is rebuilt (``summarize.py --summary survey``),
-not migrated.
+Run once, then deleted: the summaries it converts are replaced when they are
+rebuilt on the cluster (``TODO.md``), and git keeps the script. The survey summary
+needs no lab data, so it is rebuilt, not migrated.
 
-The four summaries were first renamed from ``part1.json``-``part4.json`` (the
-layout keyed by part number; schema 4). This converts them to schema 5: each value
-names the ``questions`` it answers by their ids in the outline, and its tags follow
-the decisions the builders already encode:
+This step follows the question list's merges and renumbering:
 
-- every claim number becomes its question's id (:data:`IDS`);
-- the detection summary's held-out values no longer answer question 2c.7 (remote
-  events), and the events summary's remote-group spike-support values do;
-- the figure tags that named no figure point at Figure 2 or the supplement, and
-  the values only a document used are tagged ``supplement``.
+- questions 2b.3 and 2b.5 merged into 2b.2 and 2b.3, and the later ids in sections
+  2a and 2b renumbered (:data:`IDS`);
+- the detection summary's two pilot values, from one real epoch, answer the new
+  question 2a.4 instead of 2a.3 (which is about simulated data);
+- the supplementary figures' ids are their output folders' names
+  (``figure: memoryless_comparison``).
+
+It also corrects each summary's ``migrated`` record into one entry per step, each
+naming the commit that holds the version of this script that ran. The earlier two
+steps ran from an uncommitted copy of the script; their entries say so.
 
 Every value's number, kind, style, unit, description, source and pending note is
-copied unchanged, and checked to be unchanged before anything is written. Each
-value is built with its tags checked, so a tag the question list does not accept
-stops the conversion. The summary's ``migrated`` record says what was done.
+copied unchanged, and checked to be unchanged before anything is written; each
+value is built with its tags checked against the question list.
 
 Usage::
 
-    uv run python scripts/reported/migrate_summaries.py
+    uv run --frozen python scripts/reported/migrate_summaries.py
 """
 
 from __future__ import annotations
@@ -32,61 +33,75 @@ import json
 from collections.abc import Sequence
 
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.questions import QUESTIONS
-from continuum_swr_replay.reported.values import SCHEMA_VERSION, Summary, Value
-from continuum_swr_replay.runs.provenance import git_commit
+from continuum_swr_replay.reported.values import Summary, Value
+from continuum_swr_replay.runs.provenance import git, git_commit
 
 SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
-
+SCRIPT = "scripts/reported/migrate_summaries.py"
 MIGRATED = ("detection", "events", "behavior", "mpfc")
 
-IDS = {q.claim: q.id for q in QUESTIONS if q.claim and q.claim != "12"}
-"""Each claim number to its question's id."""
-IDS |= {"12": "2a.3", "synthesis Layer 2": "3.8"}
-
-USES = {
-    "figure: main, left out": "figure: 2",
-    "figure: main, other side of the overlap": "figure: 2",
-    "figure: spike support": "figure: 2",
-    "figure: 3, content occupancy": "figure: 2",
-    "figure: one class or two": None,
-    "docs: replay_rate_content_swr_synthesis": "supplement",
-    "docs: rate_models": "supplement",
+IDS = {
+    "2a.4": "2a.5",
+    "2a.5": "2a.6",
+    "2b.3": "2b.2",
+    "2b.4": "2b.3",
+    "2b.5": "2b.3",
+    "2b.6": "2b.4",
+    "2b.7": "2b.5",
+    "2b.8": "2b.6",
+    "2b.9": "2b.7",
 }
-"""The ``used_in`` tags that change, and what each becomes (None: dropped)."""
+"""The question ids that change; every other id stays."""
 
-REMOTE = ("swr_remote_", "non_swr_remote_")
-"""The events summary's remote-group keys, which also answer question 2c.7."""
+PILOT = ("pilot_",)
+"""The detection summary's keys from the one real pilot epoch: question 2a.4."""
+
+USES = {"figure: memoryless comparison": "figure: memoryless_comparison"}
+"""The ``used_in`` tags that change."""
+
+EARLIER_STEPS = [
+    {
+        "change": "renamed from part{n}.json to {name}.json (schema 1 to 4)",
+        "script_commit": "6e81598c43fc764b4431944e33630a31458115c1",
+        "ran_at": "eb1f98092c89ee24a7a40ca72238a6d3e307003e, from an uncommitted copy",
+    },
+    {
+        "change": "claim numbers mapped to question ids, and tags to the question "
+        "list's decisions (schema 4 to 5)",
+        "script_commit": "b895716f9c48565db933f90417484b88710d4742",
+        "ran_at": "6e81598c43fc764b4431944e33630a31458115c1, from an uncommitted copy",
+    },
+]
+"""The two steps before this one, with the commits that hold the script that ran."""
 
 _KEPT = ("value", "kind", "style", "unit", "description", "source", "pending")
 
 
-def _questions(name: str, key: str, claims: list[str]) -> tuple[str, ...]:
-    ids = [IDS[c] for c in claims]
-    if name == "detection":
-        ids = [q for q in ids if q != "2c.7"]
-    if name == "events" and key.startswith(REMOTE) and "2c.7" not in ids:
-        ids.append("2c.7")
-    return tuple(ids)
-
-
-def _uses(used_in: list[str]) -> tuple[str, ...]:
+def _questions(name: str, key: str, questions: list[str]) -> tuple[str, ...]:
+    if name == "detection" and key.startswith(PILOT):
+        return tuple("2a.4" if q == "2a.3" else q for q in questions)
     out: list[str] = []
-    for tag in used_in:
-        new = USES.get(tag, tag)
-        if new is not None and new not in out:
+    for q in questions:
+        new = IDS.get(q, q)
+        if new not in out:
             out.append(new)
     return tuple(out)
 
 
-def migrate(name: str, commit: str) -> Summary:
-    """Summary ``name`` in the current layout, its values unchanged."""
+def migrate(name: str, number: int, script_commit: str) -> Summary:
+    """Summary ``name`` with the current question ids, its values unchanged."""
     payload = json.loads((SUMMARY_DIR / f"{name}.json").read_text())
-    assert payload["schema_version"] == 4, (name, payload["schema_version"])
-    migrated = payload["migrated"]
-    migrated["changes"].append(
-        "claim numbers mapped to question ids, and tags to the question list's "
-        f"decisions (schema 4 to 5, at {commit})"
+    steps = [
+        {**step, "change": step["change"].format(n=number, name=name)}
+        for step in EARLIER_STEPS
+    ]
+    steps.append(
+        {
+            "change": "questions merged and renumbered, the pilot values moved to "
+            "2a.4, figure ids named for their folders",
+            "script_commit": script_commit,
+            "ran_at": script_commit,
+        }
     )
     summary = Summary(
         name=name,
@@ -94,19 +109,22 @@ def migrate(name: str, commit: str) -> Summary:
         commit=payload["commit"],
         inputs=payload["inputs"],
         code=None,
-        migrated=migrated,
+        migrated={
+            "from": payload["migrated"]["from"],
+            "by": SCRIPT,
+            "steps": steps,
+        },
     )
     for key, fields in payload["values"].items():
         summary.add(
             Value(
                 key=key,
-                questions=_questions(name, key, fields["claims"]),
-                used_in=_uses(fields["used_in"]),
+                questions=_questions(name, key, fields["questions"]),
+                used_in=tuple(USES.get(u, u) for u in fields["used_in"]),
                 **{field: fields[field] for field in _KEPT},
             )
         )
     written = json.loads(summary.to_json())
-    assert written["schema_version"] == SCHEMA_VERSION
     for key, fields in payload["values"].items():
         assert all(written["values"][key][f] == fields[f] for f in _KEPT), key
     return summary
@@ -115,8 +133,12 @@ def migrate(name: str, commit: str) -> Summary:
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.parse_args(argv)
-    commit = git_commit(ROOT_DIR)
-    summaries = {name: migrate(name, commit) for name in MIGRATED}
+    if git(ROOT_DIR, "status", "--porcelain", "--", SCRIPT):
+        raise SystemExit(f"{SCRIPT} has uncommitted changes; commit it first")
+    script_commit = git(ROOT_DIR, "log", "-1", "--format=%H", "--", SCRIPT)
+    assert git_commit(ROOT_DIR)
+    numbers = {"detection": 1, "events": 2, "behavior": 3, "mpfc": 4}
+    summaries = {name: migrate(name, numbers[name], script_commit) for name in MIGRATED}
     for name, summary in summaries.items():
         summary.write(SUMMARY_DIR / f"{name}.json")
         print(f"{name}.json: {len(summary.values)} values")
