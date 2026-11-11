@@ -7,9 +7,12 @@ block's kernel: the log rate ratio of one past event at each lag, with its
 standard error, and the expected onsets behind each lag. The functions here
 read those kernels at their measurable lags and summarize them over animals.
 
-A lag is measurable when it has at least :data:`HISTORY_MIN_SUPPORT` expected
-onsets and its standard error is at most :data:`HISTORY_MAX_SE`; a lag that is
-not is left out, never read as an effect. Lag index ``j`` is ``j + 1`` bins of
+A lag of a pooled refit's kernel is measurable when it has at least
+:data:`HISTORY_MIN_SUPPORT` expected onsets and its standard error is at most
+:data:`HISTORY_MAX_SE` (:func:`measurable_kernel`). A lag of a ridge fit's cross
+kernel is measurable on the first rule alone: its posterior SD is not compared
+with anything (:func:`cross_history_statistics`). A lag that is not measurable
+is left out, never read as an effect. Lag index ``j`` is ``j + 1`` bins of
 ``BIN_S`` after the past event's anchor (its onset or its end). Lags are
 reported in ms, kernels as rate ratios.
 """
@@ -62,8 +65,18 @@ def lag_index(ms: float) -> int:
     -------
     index : int
         Its position in a kernel's per-lag arrays, from 0.
+
+    Raises
+    ------
+    ValueError
+        If ``ms`` is not one bin or a whole number of bins.
     """
-    return round(ms / (BIN_S * 1e3)) - 1
+    bins = ms / (BIN_S * 1e3)
+    if round(bins) < 1 or not np.isclose(bins, round(bins)):
+        raise ValueError(
+            f"{ms} ms is not a positive whole number of {BIN_S * 1e3:g} ms bins"
+        )
+    return round(bins) - 1
 
 
 def measurable_kernel(record: dict, rung: str, block: str) -> dict | None:
@@ -84,9 +97,9 @@ def measurable_kernel(record: dict, rung: str, block: str) -> dict | None:
     Returns
     -------
     kernel : dict or None
-        ``log_rr`` and ``se``, shape (n_lags,), and ``ok``, whether each lag is
-        measurable. None when the rung did not fit, did not converge, or lacks
-        the block.
+        ``log_rr`` and ``se``, shape (n_lags,), and ``measurable``, whether
+        each lag is measurable. None when the rung did not fit, did not
+        converge, or lacks the block.
     """
     fit = record["duration_aware"].get(rung)
     if (
@@ -98,10 +111,10 @@ def measurable_kernel(record: dict, rung: str, block: str) -> dict | None:
         return None
     k = fit["kernels"][block]
     log_rr, se = np.asarray(k["log_rr"]), np.asarray(k["se"])
-    ok = (np.asarray(record["support"][block]) >= HISTORY_MIN_SUPPORT) & (
+    measurable = (np.asarray(record["support"][block]) >= HISTORY_MIN_SUPPORT) & (
         se <= HISTORY_MAX_SE
     )
-    return {"log_rr": log_rr, "se": se, "ok": ok}
+    return {"log_rr": log_rr, "se": se, "measurable": measurable}
 
 
 def kernel_peak(kernel: dict) -> dict | None:
@@ -124,11 +137,12 @@ def kernel_peak(kernel: dict) -> dict | None:
         ``lag_ms``, its lag; and ``above_one``, whether its widened interval
         lies above a rate ratio of 1. None when no lag is measurable.
     """
-    if not kernel["ok"].any():
+    measurable = kernel["measurable"]
+    if not measurable.any():
         return None
-    j = int(np.nanargmax(np.where(kernel["ok"], kernel["log_rr"], np.nan)))
+    j = int(np.nanargmax(np.where(measurable, kernel["log_rr"], np.nan)))
     lr, se = kernel["log_rr"][j], kernel["se"][j]
-    z = norm.isf(0.025 / int(kernel["ok"].sum()))
+    z = norm.isf(0.025 / int(measurable.sum()))
     return {
         "rate_ratio": float(np.exp(lr)),
         "lag_ms": lag_ms(j),
@@ -140,9 +154,10 @@ def self_history_statistics(records: Sequence[dict], rung: str) -> pd.DataFrame:
     """Each population's self-history kernels, over its animals' pooled fits.
 
     The end-locked kernel (``self_offset``) is read at its first lag and at its
-    peak; the onset-locked kernel (``self_onset``), where the rung carries one,
-    at its peak. An animal whose lag is not measurable is left out of that
-    lag's statistics.
+    peak; the onset-locked kernel (``self_onset``) at its peak. An animal whose
+    first lag is not measurable is left out of the first-lag statistics, and an
+    animal whose kernel has no measurable lag (or, for the onset-locked kernel,
+    whose fit has none) out of that kernel's peak statistics.
 
     Parameters
     ----------
@@ -165,20 +180,23 @@ def self_history_statistics(records: Sequence[dict], rung: str) -> pd.DataFrame:
         - ``n_first_lag_suppressed``, ``n_first_lag_raised``: of those, fits
           whose 95 % Wald interval at that lag lies below, and above, a rate
           ratio of 1.
+        - ``n_end_peaks``: fits whose end-locked kernel has a peak, that is, a
+          measurable lag (:func:`kernel_peak`).
         - ``end_peak_rate_ratio_median``, ``end_peak_lag_ms_median``: the
-          median over animals of the end-locked kernel's peak rate ratio and
-          of its lag (:func:`kernel_peak`).
-        - ``n_end_peaks_above_one``: animals whose end-locked peak has its
-          widened interval above 1.
-        - ``onset_peak_rate_ratio_median``, ``onset_peak_lag_ms_median``,
-          ``n_onset_peaks_above_one``: the same of the onset-locked kernel.
+          median over those of the end-locked kernel's peak rate ratio and of
+          its lag, in ms.
+        - ``n_end_peaks_above_one``: of those, fits whose end-locked peak has
+          its widened interval above 1.
+        - ``n_onset_peaks``, ``onset_peak_rate_ratio_median``,
+          ``onset_peak_lag_ms_median``, ``n_onset_peaks_above_one``: the same
+          of the onset-locked kernel.
 
     Raises
     ------
     ValueError
         If an animal's fit of ``rung`` failed, did not converge or has no
         end-locked kernel, or no animal of a population has a measurable first
-        lag.
+        end-locked lag, or none has a measurable onset-locked lag.
     """
     by_population: dict[str, dict[str, dict]] = {}
     for record in records:
@@ -194,7 +212,7 @@ def self_history_statistics(records: Sequence[dict], rung: str) -> pd.DataFrame:
                 raise ValueError(
                     f"{outcome}/{record['animal']}: {rung} failed or did not converge"
                 )
-            if end["ok"][0]:
+            if end["measurable"][0]:
                 lr, se = end["log_rr"][0], end["se"][0]
                 first.append(float(np.exp(lr)))
                 n_suppressed += bool(lr + _WALD_Z * se < 0)
@@ -203,17 +221,22 @@ def self_history_statistics(records: Sequence[dict], rung: str) -> pd.DataFrame:
                 ends.append(peak)
             if onset is not None and (peak := kernel_peak(onset)) is not None:
                 onsets.append(peak)
+        # an animal with a measurable first lag has an end-locked peak
         if not first:
             raise ValueError(f"{outcome}: no animal's {lag_ms(0)} ms lag is measurable")
+        if not onsets:
+            raise ValueError(f"{outcome}: no animal has a measurable onset-locked lag")
         rows[outcome] = {
             "n_fits": len(by_animal),
             "n_first_lag_measurable": len(first),
             "first_lag_rate_ratio_median": float(np.median(first)),
             "n_first_lag_suppressed": n_suppressed,
             "n_first_lag_raised": n_raised,
+            "n_end_peaks": len(ends),
             "end_peak_rate_ratio_median": np.median([p["rate_ratio"] for p in ends]),
             "end_peak_lag_ms_median": np.median([p["lag_ms"] for p in ends]),
             "n_end_peaks_above_one": sum(p["above_one"] for p in ends),
+            "n_onset_peaks": len(onsets),
             "onset_peak_rate_ratio_median": np.median(
                 [p["rate_ratio"] for p in onsets]
             ),
@@ -235,7 +258,8 @@ def self_history_range_statistics(by_population: pd.DataFrame) -> dict[str, floa
     -------
     statistics : dict
         - ``n_fits``, ``n_first_lag_measurable``, ``n_first_lag_suppressed``,
-          ``n_first_lag_raised``: the fits of every population, summed.
+          ``n_first_lag_raised``, ``n_end_peaks``: the fits of every
+          population, summed.
         - ``first_lag_rate_ratio_low``, ``first_lag_rate_ratio_high``: the
           lowest and highest over the populations of the median first-lag rate
           ratio.
@@ -253,6 +277,7 @@ def self_history_range_statistics(by_population: pd.DataFrame) -> dict[str, floa
             "n_first_lag_measurable",
             "n_first_lag_suppressed",
             "n_first_lag_raised",
+            "n_end_peaks",
         )
     }
     for name, column in (
@@ -309,7 +334,8 @@ def cross_history_statistics(
     ------
     ValueError
         If the population has no record, a ridge fit of it did not converge,
-        or no animal's lag is measurable.
+        no animal's lag is measurable, or ``at_ms`` is not a whole number of
+        bins (:func:`lag_index`).
     """
     lag = lag_index(at_ms)
     records = [record for record in records if record["outcome"] == outcome]

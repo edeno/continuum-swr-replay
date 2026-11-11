@@ -18,6 +18,13 @@ def test_a_lag_index_is_one_bin_less_than_its_lag():
     assert stats.lag_ms(6) == 105
     assert stats.lag_index(15) == 0
     assert stats.lag_index(45) == 2
+    assert stats.lag_index(stats.lag_ms(66)) == 66
+
+
+@pytest.mark.parametrize("ms", [0, 5, 40, -15])
+def test_a_lag_that_is_not_a_whole_number_of_bins_is_refused(ms):
+    with pytest.raises(ValueError, match="not a positive whole number of 15 ms bins"):
+        stats.lag_index(ms)
 
 
 def _record(animal, outcome, end, onset=None, *, ok=True, converged=True):
@@ -50,7 +57,7 @@ def test_a_lag_is_measurable_with_enough_support_and_a_small_enough_se():
         ([2.0, 2.0, 2.0, 2.0], [0.1, 0.1, 0.5, 0.6], [2.0, 3.0, 10.0, 10.0]),
     )
     kernel = stats.measurable_kernel(record, RUNG, "self_offset")
-    assert list(kernel["ok"]) == [False, True, True, False]
+    assert list(kernel["measurable"]) == [False, True, True, False]
     np.testing.assert_allclose(kernel["log_rr"], LOG(2.0))
     assert list(kernel["se"]) == [0.1, 0.1, 0.5, 0.6]
 
@@ -67,11 +74,11 @@ def test_a_kernel_of_a_failed_or_missing_fit_is_not_read():
         assert stats.measurable_kernel(record, RUNG, "self_offset") is None
 
 
-def _kernel(log_rr, se, ok):
+def _kernel(log_rr, se, measurable):
     return {
         "log_rr": np.asarray(log_rr, dtype=float),
         "se": np.asarray(se, dtype=float),
-        "ok": np.asarray(ok, dtype=bool),
+        "measurable": np.asarray(measurable, dtype=bool),
     }
 
 
@@ -89,6 +96,25 @@ def test_the_history_peak_interval_is_widened_for_the_lags_searched():
     assert stats.kernel_peak(
         _kernel(np.r_[0.5, np.zeros(9)], se, [True] * 8 + [False] * 2)
     )["above_one"]
+
+
+def test_the_history_peak_interval_is_two_sided():
+    se = np.full(10, 0.1)
+    # One lag searched: the 95 % interval is +- 1.96 SE, so z = 1.8 is not
+    # clear of 1 (it would be with the one-sided 1.645).
+    one = _kernel(np.r_[0.18, np.zeros(9)], se, [True] + [False] * 9)
+    assert stats.kernel_peak(one)["above_one"] is False
+    # Eight lags searched: the threshold is 2.73 (2.50 one-sided); z = 2.6
+    # is below it and z = 2.8 above.
+    eight = [True] * 8 + [False] * 2
+    assert (
+        stats.kernel_peak(_kernel(np.r_[0.26, np.zeros(9)], se, eight))["above_one"]
+        is False
+    )
+    assert (
+        stats.kernel_peak(_kernel(np.r_[0.28, np.zeros(9)], se, eight))["above_one"]
+        is True
+    )
 
 
 def test_the_peak_is_the_largest_measurable_lag():
@@ -117,10 +143,12 @@ def _pooled_records() -> list[dict]:
     no support at the first lag (peak 1.5 at 30 ms, clear of 1); b 1, 1.1, 1
     (peak 1.1 at 30 ms, not clear of 1); c has none.
 
-    non_local, end-locked: a 2, 1, 1 (raised, peak 2 at 15 ms); b 0.9, 1.05, 1
-    and c 1.1, 1, 1, whose first lags are below and above 1 with intervals that
-    hold 1 (neither suppressed nor raised; peaks 1.05 at 30 ms and 1.1 at
-    15 ms, not clear of 1). Onset-locked: a 1.5, 1, 1; b and c have none.
+    non_local, end-locked: a 2, 1, 1 (raised, peak 2 at 15 ms); b 0.84, 1.05, 1
+    and c 1.19, 1, 1, whose first lags are 1.74 SE below and above 1, inside
+    the 95 % interval's 1.96 (neither suppressed nor raised; peaks 1.05 at
+    30 ms and 1.19 at 15 ms, not clear of 1); d 50, 50, 50, too imprecise at
+    every lag to be read at all. Onset-locked: a 1.5, 1, 1; the others have
+    none.
     """
     return [
         _record(
@@ -142,8 +170,9 @@ def _pooled_records() -> list[dict]:
             ([2.0, 1.0, 1.0], PRECISE, SUPPORTED),
             ([1.5, 1.0, 1.0], PRECISE, SUPPORTED),
         ),
-        _record("b", "non_local", ([0.9, 1.05, 1.0], PRECISE, SUPPORTED)),
-        _record("c", "non_local", ([1.1, 1.0, 1.0], PRECISE, SUPPORTED)),
+        _record("b", "non_local", ([0.84, 1.05, 1.0], PRECISE, SUPPORTED)),
+        _record("c", "non_local", ([1.19, 1.0, 1.0], PRECISE, SUPPORTED)),
+        _record("d", "non_local", ([50.0, 50.0, 50.0], [0.6, 0.6, 0.6], SUPPORTED)),
     ]
 
 
@@ -157,22 +186,26 @@ def test_self_history_statistics_have_one_row_per_population():
         "first_lag_rate_ratio_median": pytest.approx(1.75),  # of 0.5 and 3
         "n_first_lag_suppressed": 1,
         "n_first_lag_raised": 1,
+        "n_end_peaks": 3,
         "end_peak_rate_ratio_median": pytest.approx(4.0),  # of 4, 3 and 6
         "end_peak_lag_ms_median": 30.0,  # of 45, 15 and 30
         "n_end_peaks_above_one": 3,
+        "n_onset_peaks": 2,
         "onset_peak_rate_ratio_median": pytest.approx(1.3),  # of 1.5 and 1.1
         "onset_peak_lag_ms_median": 30.0,
         "n_onset_peaks_above_one": 1,
     }
     assert table.loc["non_local"].to_dict() == {
-        "n_fits": 3,
+        "n_fits": 4,
         "n_first_lag_measurable": 3,
-        "first_lag_rate_ratio_median": pytest.approx(1.1),  # of 2, 0.9 and 1.1
+        "first_lag_rate_ratio_median": pytest.approx(1.19),  # of 2, 0.84 and 1.19
         "n_first_lag_suppressed": 0,
         "n_first_lag_raised": 1,
-        "end_peak_rate_ratio_median": pytest.approx(1.1),  # of 2, 1.05 and 1.1
+        "n_end_peaks": 3,
+        "end_peak_rate_ratio_median": pytest.approx(1.19),  # of 2, 1.05 and 1.19
         "end_peak_lag_ms_median": 15.0,  # of 15, 30 and 15
         "n_end_peaks_above_one": 1,
+        "n_onset_peaks": 1,
         "onset_peak_rate_ratio_median": pytest.approx(1.5),
         "onset_peak_lag_ms_median": 15.0,
         "n_onset_peaks_above_one": 1,
@@ -182,13 +215,14 @@ def test_self_history_statistics_have_one_row_per_population():
 def test_the_self_history_ranges_are_over_the_populations():
     table = stats.self_history_statistics(_pooled_records(), RUNG)
     assert stats.self_history_range_statistics(table) == {
-        "n_fits": 6,
+        "n_fits": 7,
         "n_first_lag_measurable": 5,
         "n_first_lag_suppressed": 1,
         "n_first_lag_raised": 2,
-        "first_lag_rate_ratio_low": pytest.approx(1.1),
+        "n_end_peaks": 6,
+        "first_lag_rate_ratio_low": pytest.approx(1.19),
         "first_lag_rate_ratio_high": pytest.approx(1.75),
-        "end_peak_rate_ratio_low": pytest.approx(1.1),
+        "end_peak_rate_ratio_low": pytest.approx(1.19),
         "end_peak_rate_ratio_high": pytest.approx(4.0),
         "end_peak_lag_ms_low": 15.0,
         "end_peak_lag_ms_high": 30.0,
@@ -208,6 +242,15 @@ def test_self_history_refuses_an_unconverged_end_locked_fit():
 def test_self_history_refuses_a_population_with_no_measurable_first_lag():
     records = [_record("c", "swr", ([1.1, 6.0, 2.0], [0.6, 0.1, 0.1], SUPPORTED))]
     with pytest.raises(ValueError, match="swr: no animal's 15 ms lag is measurable"):
+        stats.self_history_statistics(records, RUNG)
+
+
+def test_self_history_refuses_a_population_with_no_onset_locked_peak():
+    # non_local without animal a: no fit carries an onset-locked kernel
+    records = _pooled_records()[4:]
+    with pytest.raises(
+        ValueError, match="non_local: no animal has a measurable onset-locked lag"
+    ):
         stats.self_history_statistics(records, RUNG)
 
 
@@ -240,8 +283,8 @@ def _ridge_record(
 def _ridge_records() -> list[dict]:
     return [
         _ridge_record("a", "non_local_swr", 2.0, 0.1, 20.0, 0.01),
-        # a wide posterior: 3 is not clear of 1
-        _ridge_record("b", "non_local_swr", 3.0, 1.0, 20.0, 0.02),
+        # a wide posterior: 3 is 1.83 SD above 1, inside the interval's 1.96
+        _ridge_record("b", "non_local_swr", 3.0, 0.6, 20.0, 0.02),
         _ridge_record("c", "non_local_swr", 0.5, 0.1, 20.0, -0.03),
         # exactly the least support that is read
         _ridge_record("d", "non_local_swr", 4.0, 0.1, 3.0, 0.04),

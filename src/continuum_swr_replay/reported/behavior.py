@@ -2458,32 +2458,43 @@ def duration_aware_history_values(
     """Question 3.3: refractoriness, burst and cross-coupling once duration is handled.
 
     ``pooled`` is ``duration_aware_history_pooled.pkl``: per animal and
-    population, the rungs fit to the animal's stacked sessions. The kernels are
-    the both-anchor rung's (``Mself_dur``; ``Mselfcross_dur`` for cross), read
-    at measurable lags only (expected onsets >= ``HISTORY_MIN_SUPPORT``, Wald
+    population, the rungs fit to the animal's stacked sessions. The
+    self-history kernels are the both-anchor rung's (``Mself_dur``), read at
+    measurable lags only (expected onsets >= ``HISTORY_MIN_SUPPORT``, Wald
     SE <= ``HISTORY_MAX_SE``) of converged fits; an animal whose lag is not
     measurable is left out of that lag's values, and the description says how
     many were kept. ``ridge`` is ``cross_history_ridge_cv.pkl``: per animal
     and non-local stream, the self-only and self+cross rungs with the cross
     block reaching 1 s, fit with a ridge prior on the history terms; the cross
-    values are its 45 ms end-locked rate ratio and its held-out gain (outer
-    five-fold cross-validation over whole stops). Every ridge fit must have
-    converged.
+    values are the self+cross rung's (:data:`RIDGE_CROSS_RUNG`) end-locked
+    rate ratio at :data:`CROSS_LAG_MS`, read where that lag has at least
+    ``HISTORY_MIN_SUPPORT`` expected onsets (its posterior SD is not compared
+    with anything), and the rung's held-out gain (outer five-fold
+    cross-validation over whole stops). Every ridge fit must have converged.
     """
     make = value_factory(duration_aware_history_values, source, TAGS["rate"])
     by_population = history_kernel_statistics.self_history_statistics(
         pooled["results"], "Mself_dur"
     )
+    outcomes = {outcome for outcome, _ in RATE_POPULATIONS.values()}
     _require(
-        set(by_population.index) == set(RATE_POPULATIONS),
-        f"pooled populations {sorted(by_population.index)} != "
-        f"{sorted(RATE_POPULATIONS)}",
+        set(by_population.index) == outcomes,
+        f"pooled populations {sorted(by_population.index)} != {sorted(outcomes)}",
     )
     overall = history_kernel_statistics.self_history_range_statistics(by_population)
     n_fits, n_measured = overall["n_fits"], overall["n_first_lag_measurable"]
+    end_peaks = (
+        f"{overall['n_end_peaks']} of the {n_fits} animal x population fits have a "
+        "measurable end-locked lag"
+    )
     values: list[Value] = []
     first_ms = history_kernel_statistics.lag_ms(0)
     for word, (outcome, label) in RATE_POPULATIONS.items():
+        with_peak = (
+            f"the {by_population.loc[outcome, 'n_onset_peaks']} of "
+            f"{by_population.loc[outcome, 'n_fits']} animals with a measurable "
+            "onset-locked lag"
+        )
         values += [
             make(
                 f"history_onset_peak_{word}",
@@ -2491,8 +2502,8 @@ def duration_aware_history_values(
                 "quantity",
                 "dec2",
                 f"{label}: onset-locked part of the self-history (both-anchor rung "
-                "Mself_dur, at-risk design): median over animals of each animal's "
-                f"peak rate ratio over its measurable lags; {UPPER_BOUND}",
+                f"Mself_dur, at-risk design): median over {with_peak} of each "
+                f"animal's peak rate ratio over its measurable lags; {UPPER_BOUND}",
                 "rate ratio",
             ),
             make(
@@ -2500,7 +2511,7 @@ def duration_aware_history_values(
                 by_population.loc[outcome, "onset_peak_lag_ms_median"],
                 "quantity",
                 "int",
-                f"{label}: median over animals of that onset-locked peak's lag",
+                f"{label}: median over {with_peak} of that onset-locked peak's lag",
                 "ms",
             ),
             make(
@@ -2508,8 +2519,9 @@ def duration_aware_history_values(
                 by_population.loc[outcome, "n_onset_peaks_above_one"],
                 "count",
                 "count",
-                f"{label}: animals whose onset-locked peak has its 95 % CI above 1, "
-                "the interval widened for the measurable lags searched (Bonferroni)",
+                f"{label}: animals, of {with_peak}, whose onset-locked peak has its "
+                "95 % CI above 1, the interval widened for the measurable lags "
+                "searched (Bonferroni)",
             ),
         ]
     values += [
@@ -2566,9 +2578,10 @@ def duration_aware_history_values(
             overall["end_peak_rate_ratio_low"],
             "quantity",
             "dec2",
-            "lowest over the four populations of the median (over animals) peak rate "
-            "ratio of the end-locked self-history (Mself_dur, at-risk design, "
-            f"measurable lags); {UPPER_BOUND}",
+            "lowest over the four populations of the median (over the animals with "
+            "a measurable end-locked lag) peak rate ratio of the end-locked "
+            "self-history (Mself_dur, at-risk design, measurable lags); "
+            f"{end_peaks}; {UPPER_BOUND}",
             "rate ratio",
         ),
         make(
@@ -2576,7 +2589,7 @@ def duration_aware_history_values(
             overall["end_peak_rate_ratio_high"],
             "quantity",
             "dec2",
-            "highest over the four populations of that end-locked peak",
+            f"highest over the four populations of that end-locked peak ({end_peaks})",
             "rate ratio",
         ),
         make(
@@ -2584,7 +2597,8 @@ def duration_aware_history_values(
             overall["end_peak_lag_ms_low"],
             "quantity",
             "int",
-            "shortest over the populations of the median end-locked peak lag",
+            "shortest over the populations of the median end-locked peak lag "
+            f"({end_peaks})",
             "ms",
         ),
         make(
@@ -2592,7 +2606,8 @@ def duration_aware_history_values(
             overall["end_peak_lag_ms_high"],
             "quantity",
             "int",
-            "longest over the populations of the median end-locked peak lag",
+            "longest over the populations of the median end-locked peak lag "
+            f"({end_peaks})",
             "ms",
         ),
         make(
@@ -2602,7 +2617,7 @@ def duration_aware_history_values(
             "count",
             "fewest, over the populations, animals whose end-locked peak has its 95 % "
             "CI above 1, the interval widened for the measurable lags searched "
-            "(Bonferroni)",
+            f"(Bonferroni); {end_peaks}",
         ),
     ]
     for word, (outcome, label) in CROSS_DIRECTIONS.items():
