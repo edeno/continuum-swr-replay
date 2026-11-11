@@ -67,6 +67,16 @@ Work that is deferred on purpose. Each item says when it should be done.
   not have them and the build fails until they are linked in (the 2026-11-11
   rebuild linked them from the main cluster checkout). Write them under the
   processed-data root and read them from there.
+  No script in the repository makes the per-epoch layout the builder reads. The
+  current spike-evidence run was launched on the cluster on 2026-10-30, at commit
+  `bfb20f35`, by `logs/reality_stored_20261030/run_one.sh` (in the main cluster
+  checkout's `logs/`, not in git): for each analysed epoch,
+  `scripts/detection/analyze_event_spike_evidence.py --epoch-identifiers <epoch>
+  --n-sample 1000000 --likelihood stored --cache-dir
+  logs/f1_reality_marks_cache_20261016 --output-dir
+  paper/figures/reality_all/per_epoch/<epoch>`, with
+  `$CSR_PROCESSED_DATA_DIR` set to the main checkout's `Processed-Data`. Put that
+  loop in the repository when the run moves.
   *When:* with the move of the events statistics out of the builder.
 
 - [ ] **Held-out test split by SWR (question 2c.3): confirm which script made it.**
