@@ -338,7 +338,7 @@ def test_ladder_fit_statistics_have_one_row_per_rung_and_population():
             "aic": [10.0, 20.0, NAN, np.inf, 7.0, 9.0],
             "separated": [True, False, False, None, False, False],
             "cv_bits_per_event": [0.5, NAN, 1.5, -np.inf, 0.25, 0.75],
-            "ks_within_band": [True, True, False, True, False, False],
+            "ks_within_band": [True, True, False, None, False, False],
         }
     )
     table = stats.ladder_fit_statistics(fits)
@@ -348,11 +348,12 @@ def test_ladder_fit_statistics_have_one_row_per_rung_and_population():
         "n_fitted": 3,
         "n_finite_aic": 2,
         "aic_median": 20.0,  # of 10, 20 and an infinite one
-        "separated_fraction": 0.25,
+        "separated_fraction": 0.25,  # one of all four fits
         "n_cv_finite": 2,
         "cv_bits_median": 1.0,
-        "cv_not_finite_fraction": 0.5,
-        "ks_band_fraction": 0.75,
+        "cv_not_finite_fraction": 0.5,  # two of all four fits
+        # two of the three fits that carry the flag, not of all four
+        "ks_band_fraction": pytest.approx(2 / 3),
     }
     assert table.loc[("M0", "non_local")].to_dict() == {
         "n_fitted": 2,
@@ -504,6 +505,12 @@ def test_a_peak_inside_the_interval_is_located_and_one_at_its_end_is_not():
     assert result["arrival_peak_s"] == 1.0
     assert result["arrival_peak_edge"] == 1
     assert result["arrival_peak_sessions"] == 4
+    # each clock's interval runs between its own outermost interior knots
+    assert (result["time_interval_start_s"], result["time_interval_end_s"]) == (1, 3)
+    assert (result["arrival_interval_start_s"], result["arrival_interval_end_s"]) == (
+        1,
+        6,
+    )
 
     result = stats.clock_shape_statistics(rising, flat_arrival)
     assert result["time_peak_s"] == 3.0

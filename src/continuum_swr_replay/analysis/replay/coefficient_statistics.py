@@ -153,7 +153,9 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
           a log-rate coefficient, an odds ratio for a log-odds one).
         - ``exp_animal_median``: ``exp`` of the median over animals.
         - ``signed_rank_p``: the Wilcoxon signed-rank p of the sessions'
-          coefficients against zero.
+          coefficients against zero. It is computed for any number of
+          sessions, with no minimum (one session gives 1.0); a coefficient of
+          exactly zero is left out of the test.
     """
     require_one_fit_per_session(fits)
     known = fits.dropna(subset=[column])
@@ -199,8 +201,12 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
         - ``session_se_median``: the median over sessions of the session's
           standard error of the coefficient (event-clustered where the fit
           wrote one); NaN when the fits carry no standard error.
-        - ``significant_fraction``: the share of sessions whose coefficient
-          differs from zero at 0.05, two-sided, on that standard error.
+        - ``significant_fraction``: of the kept sessions with a usable standard
+          error (a finite ratio of coefficient to standard error), the share
+          whose coefficient differs from zero at 0.05, two-sided, on that
+          standard error. When no kept session has one, the share of all kept
+          sessions whose own p-value (``pval_<term>``) is below 0.05; NaN when
+          the fits carry neither.
     """
     gate = gate_term_sessions(fits, term)
     kept = fits[gate.kept]
@@ -308,10 +314,12 @@ def aic_difference_statistics(
     -------
     statistics : dict
         :func:`session_median_statistics` of ``AIC(child) - AIC(parent)`` over
-        the sessions with both fits and a finite difference. Negative means the
-        child is better, so ``negative_fraction`` is the share of sessions in
-        which the child has the lower AIC and ``n_animals_negative`` the
-        animals whose median step favours it.
+        the sessions with both fits and a difference that is not missing. An
+        infinite AIC is not missing: its session is kept, with an infinite
+        difference, unless both AICs are infinite. Negative means the child is
+        better, so ``negative_fraction`` is the share of sessions in which the
+        child has the lower AIC and ``n_animals_negative`` the animals whose
+        median step favours it.
     """
     session = list(SESSION_COLUMNS)
     columns = [*session, "aic", *same]
@@ -354,7 +362,8 @@ def known_fraction(fits: pd.DataFrame, column: str) -> float:
     Returns
     -------
     fraction : float
-        In [0, 1].
+        In [0, 1]: the fits whose value is not missing, over all the fits. An
+        infinite value is a value.
     """
     return float(fits[column].notna().mean())
 
@@ -463,7 +472,9 @@ def audited_drop_statistics(audited: pd.DataFrame) -> dict[str, float | str]:
     statistics : dict
         - ``n_terms_losing_sessions``: rows with at least one dropped session.
         - ``most_dropped``: the most sessions any row drops.
-        - ``most_dropped_of``: that row's kept and dropped sessions together.
+        - ``most_dropped_of``: that row's kept and dropped sessions together,
+          the sessions with a coefficient for the term (a session the fit
+          records as unable to inform it has none and is not counted).
         - ``most_dropped_model``, ``most_dropped_term``: that row's rung and
           term (the first such row when several tie).
     """

@@ -81,7 +81,9 @@ def frozen_cohort_statistics(null_fits: pd.DataFrame) -> dict[str, int]:
     Raises
     ------
     ValueError
-        If the populations differ in stops, or the non-local ones in bins.
+        If the populations' stops, summed over sessions, differ, or the
+        non-local populations' summed bins. The totals are compared, not each
+        session's counts.
     """
     stops = null_fits.groupby("outcome")["n_stops"].sum()
     bins = null_fits.groupby("outcome")["n_bins"].sum()
@@ -333,13 +335,16 @@ def ladder_fit_statistics(fits: pd.DataFrame) -> pd.DataFrame:
 
         - ``n_fitted``: sessions with a fit (an intercept).
         - ``n_finite_aic``: sessions with a finite AIC.
-        - ``aic_median``: the median AIC over sessions.
-        - ``separated_fraction``: the share of fits flagged separated.
+        - ``aic_median``: the median AIC over the sessions whose AIC is not
+          missing; an infinite AIC is one of them.
+        - ``separated_fraction``: the share of all the fits flagged separated.
         - ``n_cv_finite``: sessions with a finite held-out score.
         - ``cv_bits_median``: the median held-out bits per event over those.
-        - ``cv_not_finite_fraction``: the share of fits whose held-out score is
-          not finite.
-        - ``ks_band_fraction``: the share of fits inside the KS band.
+        - ``cv_not_finite_fraction``: the share of all the fits whose held-out
+          score is not finite.
+        - ``ks_band_fraction``: of the fits that carry the KS flag, the share
+          inside the band. A fit without the flag is left out of this share,
+          though it counts in the two shares above.
     """
     rows = {}
     for rung, rung_fits in fits.groupby(["model", "outcome"]):
@@ -480,6 +485,9 @@ def clock_shape_statistics(
         - ``<clock>_peak_edge``: 1 if that time is an end of the supported
           interval (the peak is then bounded, not located), else 0.
         - ``<clock>_peak_sessions``: the session curves behind the median.
+        - ``<clock>_interval_start_s``, ``<clock>_interval_end_s``: the ends
+          of the supported interval the time course is read on, in seconds on
+          that clock.
 
         And ``clock_ks``: the largest distance between the two time courses'
         cumulative shapes, each normalized over its own supported interval and
@@ -495,8 +503,12 @@ def clock_shape_statistics(
         "time_peak_s": float(grid[stop_i]),
         "time_peak_edge": int(stop_i in (0, len(grid) - 1)),
         "time_peak_sessions": n_stop,
+        "time_interval_start_s": float(grid[0]),
+        "time_interval_end_s": float(grid[-1]),
         "arrival_peak_s": float(arrival_grid[arrival_i]),
         "arrival_peak_edge": int(arrival_i in (0, len(arrival_grid) - 1)),
         "arrival_peak_sessions": n_arrival,
+        "arrival_interval_start_s": float(arrival_grid[0]),
+        "arrival_interval_end_s": float(arrival_grid[-1]),
         "clock_ks": float(ks),
     }
