@@ -46,7 +46,6 @@ counts the animals whose own value points the way the claim states.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -1449,7 +1448,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     summary = Summary(name="events", produced_by=produced_by)
 
     events = pd.read_parquet(inputs.event_table)
-    current_sha256 = hashlib.sha256(inputs.event_table.read_bytes()).hexdigest()
+    event_table_record = file_record(inputs.event_table, ROOT_DIR)
+    current_sha256 = event_table_record["sha256"]
     # every per-epoch input must hold the epoch register's analysed epochs
     n_epochs = len(analysed_epoch_ids())
 
@@ -1459,7 +1459,7 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     source = f"{rel(inputs.event_table)} (canonical event table)"
     summary.add(*event_cohort_values(events, source))
     summary.add(*boundary_offset_values(events, source))
-    summary.inputs.append(file_record(inputs.event_table, ROOT_DIR))
+    summary.inputs.append(event_table_record)
     extra_paths = sorted(inputs.event_start_rest_theta.glob("*.parquet"))
     if len(extra_paths) != n_epochs:
         raise ValueError(
