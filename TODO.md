@@ -48,17 +48,6 @@ Work that is deferred on purpose. Each item says when it should be done.
   *When:* before the Results that cite them are drafted; mpfc next (Figure 4
   already shares its loader with the builder).
 
-- [ ] **Figure 2 panels b and d from the canonical event table.**
-  `generate_figure02.py` rebuilds the classified event table from the decode
-  frames for panels a, b and d, while the events summary reads
-  `event_table.parquet`. Both now count classes with
-  `event_statistics.compute_swr_overlap_class_counts`, but on two tables, and
-  panel d subtracts the SWR bounds itself. Read the canonical table for panels b
-  and d and use `event_statistics.boundary_offsets`, so the figure cannot differ
-  from the cited numbers. The committed Figure 2 predates the 2026-10 decode
-  refresh, so it has to be regenerated on the cluster in any case.
-  *When:* at the next regeneration of Figure 2.
-
 - [ ] **The events summary reads two inputs from `paper/figures/`.**
   `reported/events.py` reads `paper/figures/reality_all/per_epoch/` (the
   per-epoch spike-evidence metrics) and

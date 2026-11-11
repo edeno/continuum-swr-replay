@@ -109,9 +109,13 @@ describes them (and counts the size of an input). All 331 values, with their
 descriptions and sources, are bit-identical before and after.
 
 `compute_swr_overlap_class_counts`, which Figure 2b draws, moved there too, and
-the summary's class counts come from it. Figure 2d still computes its offsets
-itself, from the classified table it rebuilds; `boundary_offsets` is the
-function for it once Figure 2 reads the canonical event table (`TODO.md`).
+the summary's class counts come from it. Figure 2's panels b and d now read the
+canonical event table and use that function and `boundary_offsets`, so they
+show the cited numbers; the script refuses to draw when the events it
+classifies from the decode frames (panels a, c, e) have other class counts than
+the table. Regenerated on the cluster on 2026-11-11: the frames and the table
+agree, and the panels show the summary's event count, class shares and median
+offsets.
 
 ## As built: naming (2026-11-11)
 
