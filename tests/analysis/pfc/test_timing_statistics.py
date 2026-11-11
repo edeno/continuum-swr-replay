@@ -63,7 +63,9 @@ CURVES = np.column_stack(
 )
 CALLED = np.array([True, True, True, True, True, False, True])
 ANIMALS = np.array(["a", "a", "b", "b", "b", "a", "a"])
-DAYS = np.array(["d1", "d1", "d2", "d2", "d2", "d1", "d1"])
+#: The recording days cut across the animals, so that resampling one is not
+#: resampling the other.
+DAYS = np.array(["d1", "d2", "d1", "d2", "d2", "d1", "d1"])
 #: Matched-control curves: constant, but unit 3's steps from 0.3 to 0.9 at event
 #: onset, and unit 2 has none.
 CONTROL = np.outer(
@@ -76,6 +78,8 @@ CONTROL[LAG_MS >= 0, 3] = 0.9
 #   60 to 100: 0.825   100 to 160: 0.925   160 to 200: 1.075   at 200: 1.275
 # Animal a's (units 0, 1): 0, 0.3, 0.55 from -20, 0.9 from 20, 1.05 from 60.
 # Animal b's (units 2, 3): 0.5, 0.6 from 20, 0.8 from 100, 1.1 from 160, 1.5 at 200.
+# Day 1's (units 0, 2): 0.5, 0.95 from 20, 1.1 from 60, 1.3 from 100.
+# Day 2's (units 1, 3): 0, 0.3 from -100, 0.55 from -20, 0.85 from 160, 1.25 at 200.
 
 
 @pytest.fixture(scope="module")
@@ -159,19 +163,25 @@ def test_called_response_timing_reads_the_sign_aligned_mean_curve(statistics):
 
 
 def test_called_response_timing_intervals_come_from_resampling_days(statistics):
-    # Two days are drawn with replacement: day 1 twice gives animal a's mean
-    # curve, day 2 twice animal b's, one of each the mean of all four. Each of
-    # the first two is a quarter of the draws, so the 2.5th and 97.5th
-    # percentiles are the smaller and the larger of the two curves' values.
+    # Two days are drawn with replacement: day 1 twice gives the mean curve of
+    # units 0 and 2, day 2 twice that of units 1 and 3, one of each the mean of
+    # all four. Each of the first two is a quarter of the draws, so the 2.5th
+    # and 97.5th percentiles are the smallest and the largest of the three
+    # curves' values. (Resampling the animals would draw their curves instead:
+    # peaks at 60 and 200 ms, sizes 1.05 and 1.5.)
+    #
+    #                 peak  onset  rise onset  steepest  size   rise size
+    # day 1 twice      100     20          20        19  1.3    0.8
+    # day 2 twice      200    160         160       199  1.25   1.25
+    # one of each      200     20          60        19  1.275  1.025
     enhanced = statistics.loc["enhanced"]
     expected = {
-        "population_peak_ms": (60, 200),
-        "population_onset_ms": (-20, 100),
-        "population_rise_onset_ms": (-20, 160),
+        "population_peak_ms": (100, 200),
+        "population_onset_ms": (20, 160),
+        "population_rise_onset_ms": (20, 160),
         "population_steepest_ms": (19, 199),
-        "population_size": (1.05, 1.5),
-        # animal b's curve rises from 0.5 to 1.5, animal a's from 0 to 1.05
-        "population_rise_size": (1.0, 1.05),
+        "population_size": (1.25, 1.3),
+        "population_rise_size": (0.8, 1.25),
     }
     for name, (low, high) in expected.items():
         assert enhanced[f"{name}_ci_low"] == pytest.approx(low), name
@@ -256,6 +266,23 @@ def test_a_peak_at_either_end_of_the_lags_given_is_at_the_edge():
     # the edge is where the given lags end (here +/-100 ms), on both sides
     enhanced = _spike_statistics(["a"] * 4).loc["enhanced"]
     assert enhanced["peak_at_edge_fraction"] == 0.5
+
+
+def test_a_lag_at_event_onset_is_not_before_it():
+    enhanced = _spike_statistics(["b", "b", "b", "a"]).loc["enhanced"]
+    # of the four peaks, and the four onsets, only the one at -100 ms is before
+    # event onset: the one at 0 ms is not
+    assert enhanced["peak_before_onset_fraction"] == 0.25
+    assert enhanced["onset_before_onset_fraction"] == 0.25
+    # Animal a has the spike at event onset alone: its onset and its rise onset
+    # are 0 ms, which is not before the event; the step into the spike, its
+    # steepest approach, is at -1 ms. Animal b's mean curve has three equal
+    # spikes and peaks at the first of them, -100 ms, the first lag: its two
+    # onsets are there, and a peak at the first lag has no approach.
+    assert enhanced["n_animals"] == 2
+    assert enhanced["n_animals_onset_before_event"] == 1
+    assert enhanced["n_animals_rise_onset_before_event"] == 1
+    assert enhanced["n_animals_steepest_before_event"] == 1
 
 
 def test_the_mean_curve_has_one_peak_the_lag_of_its_largest_absolute_value():
