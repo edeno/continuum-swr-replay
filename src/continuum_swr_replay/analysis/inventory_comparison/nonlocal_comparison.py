@@ -24,21 +24,20 @@ from continuum_swr_replay import intervals
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
 )
-
-NONLOCAL = "state_space"
-"""The non-local detector's inventory."""
-
-SWR_DEFINITIONS = ("kay", "karlsson", "yu", "zugaro", "carey")
-"""The SWR inventories."""
-
-TRIGGERS = (*SWR_DEFINITIONS, "mua")
-"""The inventories an LFP- or rate-triggered analysis would start from."""
+from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
+    SWR_DEFINITIONS,
+    TRIGGERED,
+)
+from continuum_swr_replay.analysis.inventory_comparison.schema import (
+    MEMORYLESS,
+    STATE_SPACE,
+)
 
 COVERINGS = {
     "kay": ("kay",),
     "swr": SWR_DEFINITIONS,
-    "trigger": TRIGGERS,
-    "widloski": ("memoryless",),
+    "trigger": TRIGGERED,
+    "widloski": (MEMORYLESS,),
 }
 """The sets of inventories whose cover of the non-local event time is measured:
 Kay's SWRs, the five SWR definitions together, those and MUA together, and the
@@ -64,7 +63,7 @@ def other_detector_events(run_dir: Path) -> pd.DataFrame:
     keys = ["animal", "day", "epoch", "detector", "event_key"]
     shares = _read_epochs(run_dir, "state_shares")
     membership = _read_epochs(
-        run_dir, "pair_membership", filters=[("other_detector", "==", NONLOCAL)]
+        run_dir, "pair_membership", filters=[("other_detector", "==", STATE_SPACE)]
     )
     events = shares.merge(
         membership[[*keys, "membership"]], on=keys, how="inner", validate="1:1"
@@ -77,7 +76,7 @@ def check_against_directional(events: pd.DataFrame, directional: pd.DataFrame) -
     """Raise unless the per-event memberships give the comparison's own counts."""
     mine = events.groupby("detector")["matched"].agg(n_eligible="size", n_matched="sum")
     theirs = (
-        directional[directional["target_detector"] == NONLOCAL]
+        directional[directional["target_detector"] == STATE_SPACE]
         .groupby("source_detector")[["n_eligible", "n_matched"]]
         .sum()
     )
@@ -177,7 +176,7 @@ def left_out_seconds(run_dir: Path) -> dict[str, float]:
         table = pd.read_parquet(
             path, columns=["detector", "event_start_s", "event_end_s"]
         )
-        nonlocal_ = _intervals(table, (NONLOCAL,))
+        nonlocal_ = _intervals(table, (STATE_SPACE,))
         totals["nonlocal"] += intervals.total_duration(nonlocal_)
         totals["kay"] += intervals.total_duration(_intervals(table, ("kay",)))
         for name, detectors in COVERINGS.items():
@@ -217,7 +216,9 @@ def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
           ``..._per_hour``, per hour of ``rest_hours``.
     """
     counts = pd.read_csv(report_dir / "counts_by_animal.csv")
-    exposure_s = float(counts.loc[counts["detector"] == NONLOCAL, "exposure_s"].sum())
+    exposure_s = float(
+        counts.loc[counts["detector"] == STATE_SPACE, "exposure_s"].sum()
+    )
     hours = exposure_s / 3600.0
     seconds = left_out_seconds(run_dir)
     statistics = {
@@ -233,7 +234,7 @@ def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
         )
 
     membership = _read_epochs(
-        run_dir, "pair_membership", filters=[("detector", "==", NONLOCAL)]
+        run_dir, "pair_membership", filters=[("detector", "==", STATE_SPACE)]
     )
     known = membership[membership["membership"].isin(_KNOWN)]
     alone = (
@@ -244,13 +245,13 @@ def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
     cells = pd.read_csv(report_dir / "cells_by_animal.csv")
     no_trigger = cells[
         (cells["cell"] == "sequence_matched_by_no_trigger")
-        & (cells["detector"] == NONLOCAL)
+        & (cells["detector"] == STATE_SPACE)
     ][["n_events", "n_unmatched", "n_unknown"]].sum()
     outside_events = {
         "kay": (int(alone.loc["kay", "sum"]), int(alone.loc["kay", "size"])),
         "widloski": (
-            int(alone.loc["memoryless", "sum"]),
-            int(alone.loc["memoryless", "size"]),
+            int(alone.loc[MEMORYLESS, "sum"]),
+            int(alone.loc[MEMORYLESS, "size"]),
         ),
         "trigger": (
             int(no_trigger["n_unmatched"]),
