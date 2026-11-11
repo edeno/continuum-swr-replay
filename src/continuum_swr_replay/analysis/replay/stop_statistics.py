@@ -66,7 +66,12 @@ def stop_cohort_counts(stops: pd.DataFrame) -> dict[str, int]:
 
 
 def dwell_statistics(stops: pd.DataFrame) -> dict[str, float]:
-    """How long the animal stays immobile after a rewarded and an omitted outcome.
+    """How long the analysed immobility lasts after a rewarded and an omitted outcome.
+
+    The duration is the stop's analysed immobility, ``immobility_duration_s``:
+    its span, ``stop_end - stop_start``, less the excluded time inside it. It
+    is shorter than the span for a stop that holds excluded time, and zero for
+    a stop of one sample or wholly inside excluded time.
 
     Parameters
     ----------
@@ -77,13 +82,13 @@ def dwell_statistics(stops: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        ``mean_rewarded_s`` and ``mean_omitted_s``, the mean immobility
-        duration after each outcome, and ``mean_ratio``, rewarded over omitted;
+        ``mean_rewarded_s`` and ``mean_omitted_s``, the mean analysed
+        immobility, in seconds, over all the stops with each outcome (those of
+        zero duration included), and ``mean_ratio``, rewarded over omitted;
         ``median_rewarded_s``, ``median_omitted_s`` and ``median_ratio``, the
         same of the medians.
     """
-    known = stops.dropna(subset=["is_rewarded_outcome"])
-    duration = known.groupby("is_rewarded_outcome")["immobility_duration_s"]
+    duration = stops.groupby("is_rewarded_outcome")["immobility_duration_s"]
     means, medians = duration.mean(), duration.median()
     return {
         "mean_rewarded_s": means[1.0],
@@ -98,19 +103,23 @@ def dwell_statistics(stops: pd.DataFrame) -> dict[str, float]:
 def still_immobile_fraction(stops: pd.DataFrame, at_s: float) -> float:
     """The share of stops still immobile a given time after they began.
 
+    The time is measured from the start of the stop, so excluded time inside a
+    stop is not taken out of it.
+
     Parameters
     ----------
     stops : pd.DataFrame
-        Stops with ``immobility_duration_s``.
+        Stops with ``stop_start`` and ``stop_end``, in seconds.
     at_s : float
         The time since the stop began, in seconds.
 
     Returns
     -------
     fraction : float
-        The share of stops whose immobility lasts at least ``at_s`` seconds.
+        The share, of all the stops, of those whose span, ``stop_end -
+        stop_start``, is at least ``at_s`` seconds.
     """
-    return float((stops["immobility_duration_s"] >= at_s).mean())
+    return float((stops["stop_end"] - stops["stop_start"] >= at_s).mean())
 
 
 def outcome_boundary_statistics(stops: pd.DataFrame) -> dict[str, float]:

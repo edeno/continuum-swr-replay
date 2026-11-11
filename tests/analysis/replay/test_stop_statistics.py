@@ -41,16 +41,20 @@ def test_stop_cohort_counts_divide_the_stops_by_occupancy_and_stay():
     }
 
 
-def test_dwell_statistics_compare_rewarded_and_omitted_stops():
+def test_dwell_statistics_compare_the_analysed_immobility_by_outcome():
+    # The first rewarded stop spans 20 s with 18 s of excluded time inside it,
+    # and the first omitted stop is one sample long: both count as they are.
     stops = pd.DataFrame(
         {
             "is_rewarded_outcome": [1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, NAN],
-            "immobility_duration_s": [2.0, 4.0, 9.0, 1.0, 2.0, 3.0, 6.0, 100.0],
+            "stop_start": [0.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0],
+            "stop_end": [20.0, 34.0, 49.0, 50.0, 62.0, 73.0, 87.0, 190.0],
+            "immobility_duration_s": [2.0, 4.0, 9.0, 0.0, 2.0, 3.0, 7.0, 100.0],
         }
     )
     assert stats.dwell_statistics(stops) == {
-        "mean_rewarded_s": 5.0,
-        "mean_omitted_s": 3.0,
+        "mean_rewarded_s": 5.0,  # of 2, 4 and 9 (the spans' mean is 11)
+        "mean_omitted_s": 3.0,  # of 0, 2, 3 and 7
         "mean_ratio": pytest.approx(5 / 3),
         "median_rewarded_s": 4.0,
         "median_omitted_s": 2.5,
@@ -58,8 +62,17 @@ def test_dwell_statistics_compare_rewarded_and_omitted_stops():
     }
 
 
-def test_still_immobile_counts_a_stop_that_lasts_exactly_that_long():
-    stops = pd.DataFrame({"immobility_duration_s": [1.0, 2.0, 3.0, 4.0]})
+def test_still_immobile_is_measured_from_the_start_of_the_stop():
+    # Spans of 1, 2, 3 and 4 s. The second and the fourth stop hold excluded
+    # time, which is not taken out: they are still immobile at 2 s and at 4 s.
+    stops = pd.DataFrame(
+        {
+            "stop_start": [0.0, 10.0, 20.0, 30.0],
+            "stop_end": [1.0, 12.0, 23.0, 34.0],
+            "immobility_duration_s": [1.0, 1.5, 3.0, 2.5],
+        }
+    )
+    # a stop that lasts exactly that long counts
     assert stats.still_immobile_fraction(stops, 2) == 0.75
     assert stats.still_immobile_fraction(stops, 4) == 0.25
 

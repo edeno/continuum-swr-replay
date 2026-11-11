@@ -1241,7 +1241,9 @@ def stop_table_values(
     stops: pd.DataFrame, onsets: pd.DataFrame, source: str
 ) -> list[Value]:
     """Stop- and onset-table facts the rate docs quote: dwell by outcome on the
-    well-anchored cohort, survival past 2 s and 4 s, the outcome-boundary shift
+    well-anchored cohort (the analysed immobility: the stop's span less the
+    excluded time inside it), survival past 2 s and 4 s (from the stop's
+    start, excluded time not taken out), the outcome-boundary shift
     (``compare_fits.outcome_boundary_shift_cohort``), and the share of onsets
     inside the ``TMAX`` truncation."""
     make = value_factory(stop_table_values, source, TAGS["rate"])
@@ -1252,13 +1254,14 @@ def stop_table_values(
     incomplete = stop_statistics.reward_history_incomplete_statistics(
         stops, onsets, "non_local"
     )
+    analysed = "analysed immobility (the stop's span less the excluded time inside it)"
     values = [
         make(
             "stop_duration_mean_rewarded",
             dwell["mean_rewarded_s"],
             "quantity",
             "sig2",
-            "well-anchored stops with a rewarded outcome: mean immobility duration",
+            f"well-anchored stops with a rewarded outcome: mean {analysed}",
             "s",
         ),
         make(
@@ -1266,7 +1269,7 @@ def stop_table_values(
             dwell["mean_omitted_s"],
             "quantity",
             "sig2",
-            "well-anchored stops with an omitted outcome: mean immobility duration",
+            f"well-anchored stops with an omitted outcome: mean {analysed}",
             "s",
         ),
         make(
@@ -1282,7 +1285,7 @@ def stop_table_values(
             dwell["median_rewarded_s"],
             "quantity",
             "sig2",
-            "well-anchored stops with a rewarded outcome: median immobility duration",
+            f"well-anchored stops with a rewarded outcome: median {analysed}",
             "s",
         ),
         make(
@@ -1290,7 +1293,7 @@ def stop_table_values(
             dwell["median_omitted_s"],
             "quantity",
             "sig2",
-            "well-anchored stops with an omitted outcome: median immobility duration",
+            f"well-anchored stops with an omitted outcome: median {analysed}",
             "s",
         ),
         make(
@@ -1301,20 +1304,20 @@ def stop_table_values(
             "ratio of those medians",
             "ratio",
         ),
+    ]
+    values += [
         make(
-            "stop_survival_two_s",
-            stop_statistics.still_immobile_fraction(anchored, 2),
+            f"stop_survival_{word}_s",
+            stop_statistics.still_immobile_fraction(anchored, at_s),
             "fraction",
             "pct",
-            "share of well-anchored stops still immobile at 2 s",
-        ),
-        make(
-            "stop_survival_four_s",
-            stop_statistics.still_immobile_fraction(anchored, 4),
-            "fraction",
-            "pct",
-            "share of well-anchored stops still immobile at 4 s",
-        ),
+            f"share of well-anchored stops still immobile {at_s} s after they began "
+            f"(stop_end - stop_start at least {at_s} s; excluded time inside the "
+            "stop is not taken out)",
+        )
+        for word, at_s in (("two", 2), ("four", 4))
+    ]
+    values += [
         make(
             "stops_in_transit",
             stop_statistics.stop_cohort_counts(stops)["n_in_transit"],
