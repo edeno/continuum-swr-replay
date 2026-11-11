@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from continuum_swr_replay.reported import values
+from continuum_swr_replay.reported import emit, values
 from continuum_swr_replay.reported.code_record import (
     build_files,
     code_changes,
@@ -79,7 +79,12 @@ def _git(repo: Path, *args: str) -> str:
 
 
 @pytest.fixture
-def repo(tmp_path):
+def repo(tmp_path, monkeypatch):
+    """A git repository with one module and a lock file, committed. Git reads no
+    user or system configuration, so a user's signing or hook settings cannot
+    break it."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "mod.py").write_text(SOURCE)
     (tmp_path / "uv.lock").write_text("lock 1\n")
@@ -156,8 +161,9 @@ def test_under_another_python_only_identical_bytes_count_as_unchanged(repo):
 
 
 def test_when_git_cannot_say_the_record_gives_git_s_message_and_the_build_is_kept(
-    tmp_path,
+    tmp_path, monkeypatch
 ):
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     (tmp_path / "uv.lock").write_text("lock\n")
     (tmp_path / "mod.py").write_text("X = 1\n")
     record = try_code_record(tmp_path, [tmp_path / "mod.py"])
@@ -383,6 +389,32 @@ def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo)
     assert notes == {"events": ["3 inputs not checked (--code-only)"]}
 
 
+def _uncommitted_and_modified(repo: Path) -> dict:
+    module = repo / "pkg" / "mod.py"
+    module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
+    record = code_record(repo, [module])
+    return {**record, "modified_during_build": ["pkg/mod.py"]}
+
+
+@pytest.mark.parametrize(
+    "make_code, migrated, cell",
+    [
+        (lambda repo: None, None, "none"),
+        (lambda repo: {"error": "fatal: not a git repository"}, None, "error"),
+        (lambda repo: code_record(repo, [repo / "pkg" / "mod.py"]), None, "yes"),
+        (_uncommitted_and_modified, None, "yes, uncommitted, modified during build"),
+        (lambda repo: None, {"from": "old.json"}, "migrated, not rebuilt"),
+    ],
+    ids=["none", "error", "committed", "uncommitted", "migrated"],
+)
+def test_the_view_s_summary_table_says_what_each_code_record_is(
+    repo, make_code, migrated, cell
+):
+    summary = _summary(code=make_code(repo), migrated=migrated)
+    view = emit.questions_view({"events": summary})
+    assert f"| `events.json` | `c` | {cell} | 1 | 0 |" in view
+
+
 def _load_script(name: str):
     spec = importlib.util.spec_from_file_location(
         f"_script_{name}", ROOT / "scripts" / "reported" / f"{name}.py"
@@ -415,12 +447,34 @@ def test_check_release_exits_0_only_when_every_summary_is_current(
     assert "missing ['mpfc.json']" in capsys.readouterr().out
 
 
-def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
+def test_check_release_checks_the_inputs_unless_told_code_only(
     repo, monkeypatch, capsys
 ):
+    script = _load_script("check_release")
+    summaries = repo / "reported"
+    summaries.mkdir()
+    monkeypatch.setattr(script, "SUMMARY_DIR", summaries)
+    monkeypatch.setattr(script, "ROOT_DIR", repo)
+    record = code_record(repo, [repo / "pkg" / "mod.py"])
+    _write_all(summaries, code=record)
+    _summary(code=record, inputs=[{"path": "gone.csv", "sha256": "0"}]).write(
+        summaries / "events.json"
+    )
+    assert script.main([]) == 1
+    assert "input not on this machine: gone.csv" in capsys.readouterr().out
+    assert script.main(["--code-only"]) == 0
+    out = capsys.readouterr().out
+    assert "1 inputs not checked (--code-only)" in out
+    assert "code and tags checked" in out
+
+
+def _emitter(repo: Path, monkeypatch):
+    """The emitter script, pointed at ``repo``: summaries in ``repo/reported``,
+    docs in ``repo/docs``."""
     script = _load_script("emit_reported_values")
     reported = repo / "reported"
     reported.mkdir()
+    (repo / "docs").mkdir()
     for name, path in {
         "SUMMARY_DIR": reported,
         "TEX_PATH": repo / "values.tex",
@@ -430,7 +484,14 @@ def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
         "ROOT_DIR": repo,
     }.items():
         monkeypatch.setattr(script, name, path)
-    (repo / "docs").mkdir()
+    return script
+
+
+def test_the_emitter_names_old_summaries_and_records_changed_numbers(
+    repo, monkeypatch, capsys
+):
+    script = _emitter(repo, monkeypatch)
+    reported = repo / "reported"
     doc = repo / "docs" / "note.md"
     doc.write_text("Share <!--v:events.share-->99 %<!--/v-->.\n")
     _write_all(reported, code=code_record(repo, [repo / "pkg" / "mod.py"]))
@@ -443,14 +504,47 @@ def test_the_emitter_names_old_summaries_and_writes_nothing_before_it_can_fail(
     assert "99 %" not in doc.read_text()
     assert "99 %" in (reported / "changes.md").read_text()
 
-    doc.write_text(
-        "<!--v:events.share-->50 %<!--/v--> <!--v:events.gone-->1<!--/v-->\n"
-    )
-    before = (repo / "values.tex").read_text()
-    with pytest.raises(KeyError, match="events.gone"):
+
+def _break_marker(repo: Path) -> None:
+    (repo / "docs" / "b.md").write_text("<!--v:events.gone-->1<!--/v-->\n")
+
+
+def _break_code_record(repo: Path) -> None:
+    path = repo / "reported" / "detection.json"
+    payload = json.loads(path.read_text())
+    del payload["code"]["files"]
+    path.write_text(json.dumps(payload))
+
+
+@pytest.mark.parametrize(
+    "break_it, error",
+    [(_break_marker, "events.gone"), (_break_code_record, "files")],
+    ids=["a marker naming no key", "a code record with no files"],
+)
+def test_the_emitter_writes_nothing_when_it_fails(repo, monkeypatch, break_it, error):
+    """Every output would change (a new value for the macro file, the view, the
+    change log and a doc filled before the failing one), and none is written."""
+    script = _emitter(repo, monkeypatch)
+    reported = repo / "reported"
+    doc = repo / "docs" / "a.md"
+    doc.write_text("<!--v:events.share-->99 %<!--/v-->\n")
+    _write_all(reported, code=code_record(repo, [repo / "pkg" / "mod.py"]))
+    script.main([])
+    events = json.loads((reported / "events.json").read_text())
+    events["values"]["share"]["value"] = 0.25
+    (reported / "events.json").write_text(json.dumps(events))
+    doc.write_text("<!--v:events.share-->50 %<!--/v-->\n")
+    break_it(repo)
+    outputs = [
+        repo / "values.tex",
+        reported / "questions.md",
+        reported / "changes.md",
+        doc,
+    ]
+    before = {path: path.read_text() for path in outputs}
+    with pytest.raises(KeyError, match=error):
         script.main([])
-    assert "50 %" in doc.read_text()
-    assert (repo / "values.tex").read_text() == before
+    assert {path: path.read_text() for path in outputs} == before
 
 
 def test_summarize_records_only_what_the_survey_s_build_used(tmp_path):

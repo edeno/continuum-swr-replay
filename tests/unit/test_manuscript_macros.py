@@ -71,6 +71,15 @@ def test_every_macro_the_manuscript_uses_is_defined():
     )
 
 
+def test_the_manuscript_uses_no_macro_of_the_retired_part_names():
+    """Before the summaries were named for what they hold, their macros were
+    ``\\PartZero…`` to ``\\PartFour…``; the check above cannot see those, since
+    it matches only the current summary names."""
+    retired = re.compile(r"\\Part(?:Zero|One|Two|Three|Four)[A-Z][A-Za-z]*")
+    found = retired.findall(_COMMENT.sub("", (PAPER / "main.tex").read_text()))
+    assert not found, f"main.tex uses retired macros: {sorted(set(found))}"
+
+
 def test_emitted_files_hold_the_committed_summaries():
     summaries = values.read_summaries(PAPER / "reported")
     assert list(summaries) == list(values.SUMMARIES)
