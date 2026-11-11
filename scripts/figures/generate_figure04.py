@@ -94,7 +94,10 @@ from continuum_swr_replay.analysis.pfc.design import symmetric_lags
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.fit import model_penalties
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu
-from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
+from continuum_swr_replay.analysis.pfc.heldout import (
+    DEFAULT_CONTROL_DRAWS,
+    empirical_pvalue_floor,
+)
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
@@ -447,10 +450,11 @@ def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS)
     # preview, and its Monte Carlo resolution is part of what the bars mean.
     # Left-aligned: the title is wider than the axes, and centred it ran under
     # the panel letter.
+    min_pvalue = empirical_pvalue_floor(n_control_draws)["min_pvalue"]
     ax.set_title(
         "Raw empirical p < "
         f"{alpha:g} (descriptive)\n"
-        f"R={n_control_draws}, min p={1 / (n_control_draws + 1):.3f}",
+        f"R={n_control_draws}, min p={min_pvalue:.3f}",
         fontsize=7,
         loc="left",
     )

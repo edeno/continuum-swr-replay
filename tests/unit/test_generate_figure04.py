@@ -43,6 +43,22 @@ def test_panel_d_uses_the_canonical_control_draw_count():
         plt.close(fig)
 
 
+def test_panel_d_draws_the_threshold_and_the_draw_count_it_is_given():
+    frame = pd.DataFrame({column: [0.01, 0.5] for column in HELDOUT_P_COLUMNS.values()})
+    fig, ax = plt.subplots()
+    try:
+        figure04.plot_significance(frame, ax, alpha=0.6, n_control_draws=99)
+        # at 0.6 both units are called, at the default 0.05 one of the two
+        assert [bar.get_height() for bar in ax.patches] == [100.0] * 4
+        assert ax.get_title(loc="left") == (
+            "Raw empirical p < 0.6 (descriptive)\nR=99, min p=0.010"
+        )
+        # the dashed line is the threshold, as a percent
+        assert list(ax.lines[0].get_ydata()) == pytest.approx([60.0, 60.0])
+    finally:
+        plt.close(fig)
+
+
 def test_panel_d_bars_are_the_called_and_best_model_shares_as_percents():
     """Four units. SWR: one untested, two of the three tested called.
     Engagement: three of four called. The other tests: one of four. Best
