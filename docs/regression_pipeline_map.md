@@ -492,7 +492,7 @@ Stage 6: replay content × reward outcome → behavioral change.
 
 Content occupancy of non-local events — where the decoded activity represents.
 
-`animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `quadrant_fractions`, `arm_occupancy`, `analyze`, `render`, `main`
+`animal_from_epoch_id`, `find_sessions`, `session_content_distances`, `quadrant_fractions`, `arm_occupancy`, `analyze`, `group_shares`, `non_swr_shares_by_animal`, `render`, `main`
 
 ### `scripts/content/analyze_uncertainty_content.py`
 
