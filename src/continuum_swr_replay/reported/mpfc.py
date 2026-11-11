@@ -2392,9 +2392,9 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
             )
         )
         summary.inputs += [
-            files_record(f"swr_without_replay/*{STEM}.pkl", extended_bundles, ROOT_DIR),
+            files_record(f"*{STEM}.pkl", extended_bundles, ROOT_DIR),
             files_record(
-                f"swr_without_replay/*{STEM}.*.npy",
+                f"*{STEM}.*.npy",
                 extended_dir.glob(f"*{STEM}.*.npy"),
                 ROOT_DIR,
             ),
