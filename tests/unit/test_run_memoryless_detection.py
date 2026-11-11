@@ -884,6 +884,9 @@ class TestMain:
             return LocalCluster(
                 n_workers=2,
                 processes=False,
+                # A thread worker measures the whole test process, which can pass
+                # dask's memory limit late in the suite and pause the worker for good.
+                memory_limit=0,
                 dashboard_address=":0",
                 local_directory=kwargs["local_directory"],
             )
@@ -1686,6 +1689,9 @@ class TestRunEpochs:
                     lambda: LocalCluster(
                         n_workers=2,
                         processes=False,
+                        # A thread worker measures the whole test process, which can pass
+                        # dask's memory limit late in the suite and pause the worker for good.
+                        memory_limit=0,
                         dashboard_address=":0",
                         local_directory=str(tmp_path / "scratch"),
                     ),
