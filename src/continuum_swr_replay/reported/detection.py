@@ -2,9 +2,10 @@
 detector against the Widloski & Foster detector on simulated replays.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted or re-decoded here. The statistics of the pilot's events are computed
-in ``analysis.hippocampus.memoryless_sequence.event_table``. The inputs
-(:class:`DetectionInputs`):
+refitted or re-decoded here. The statistics of the replay sweep's summary and
+of the pilot's events are computed in
+``analysis.hippocampus.memoryless_sequence`` (``sweep_statistics`` and
+``event_table``). The inputs (:class:`DetectionInputs`):
 
 - the held-out tetrode test per decoder state
   (``Processed-Data/_refresh_20261016/state_evidence``, from
@@ -37,6 +38,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence import (
+    sweep_statistics,
+)
 from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
     outside_window_call_statistics,
 )
@@ -428,57 +432,19 @@ def recording_values(numbers: dict, source: str) -> list[Value]:
 # --- the memoryless comparison: the replay sweep (g-k) ------------------------
 
 
-def _timing(summary: pd.DataFrame, detector: str, edge: str, statistic: str):
-    """True duration (s) and the timing error statistic (ms), by duration."""
-    rows = summary[
-        (summary["summary"] == "timing_by_duration")
-        & (summary["measure"] == f"{detector}_{edge}_error_ms_{statistic}")
-    ].sort_values("duration_s")
-    return rows["duration_s"].to_numpy(), rows["value"].to_numpy()
-
-
-def _whole_count(share: float, n: int) -> int:
-    """The count a share of ``n`` stands for.
-
-    Raises
-    ------
-    ValueError
-        If ``share * n`` is not a whole number to within 1e-6, the rounding error
-        of a share stored as a float.
-    """
-    count = share * n
-    if not np.isclose(count, round(count), rtol=0, atol=1e-6):
-        raise ValueError(f"{share} of {n} is not a whole count")
-    return int(round(count))
-
-
 def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
     """Panels (g-k): replays of chosen shape, one at a time, scored against the
     known answer. Shares are of the swept replays (grid cells)."""
     make = value_factory(sweep_values, source, TAGS["memoryless"])
-    overall = summary[summary["summary"] == "overall"].set_index("measure")["value"]
-    domain = summary[summary["summary"] == "overall_in_domain"].set_index("measure")[
-        "value"
-    ]
-    n = overall["n_cells"]
-    passes = summary[summary["summary"] == "shuffle_pass_rate_by_duration"]
-    jump_pass = (
-        passes[passes["measure"] == "sliding_jump_pass"]
-        .set_index("duration_s")["value"]
-        .sort_index()
-    )
-    _, sliding_start = _timing(summary, "sliding", "start", "median")
-    _, sliding_end = _timing(summary, "sliding", "end", "median")
-    _, sliding_end_q75 = _timing(summary, "sliding", "end", "q75")
-    state_space_edges = np.concatenate(
-        [_timing(summary, "state_space", e, "median")[1] for e in ("start", "end")]
-    )
-    ratio = summary[
-        (summary["summary"] == "median_duration_ratio_by_duration")
-        & (summary["measure"] == "sliding_duration_ratio")
-    ].sort_values("duration_s")
-    shortest = ratio.iloc[0]
-    if not (sliding_start < 0).all() or not (sliding_end > 0).all():
+    overall = sweep_statistics.sweep_measures(summary, "overall")
+    domain = sweep_statistics.sweep_measures(summary, "overall_in_domain")
+    grid = sweep_statistics.sweep_grid_statistics(summary)
+    jump_pass = sweep_statistics.sweep_jump_pass_statistics(summary)
+    timing = sweep_statistics.sweep_timing_statistics(summary)
+    if (
+        not timing["sliding_start_early_min_ms"] > 0
+        or not timing["sliding_end_late_min_ms"] > 0
+    ):
         raise ValueError(
             "the caption says the sliding window starts early and ends late at "
             "every duration; the sweep's median timing errors disagree"
@@ -491,10 +457,16 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         return make(key, x, "quantity", "int", description, "ms")
 
     return [
-        make("sweep_replays", n, "count", "count", "replays swept (grid cells)"),
+        make(
+            "sweep_replays",
+            grid["n_replays"],
+            "count",
+            "count",
+            "replays swept (grid cells)",
+        ),
         share(
             "sweep_domain_fraction",
-            domain["n_cells"] / n,
+            grid["domain_fraction"],
             "share of the swept replays the published definition can accept at all "
             "(its shared target: path over about 42 cm, duration over 100 ms)",
         ),
@@ -560,15 +532,15 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         ),
         share(
             "sweep_jump_half_pass_shortest_fraction",
-            jump_pass.iloc[0],
-            f"share of the shortest ({1000 * jump_pass.index[0]:.0f} ms) replays "
-            "passing the jump half",
+            jump_pass["shortest_fraction"],
+            f"share of the shortest ({1000 * jump_pass['shortest_duration_s']:.0f} ms) "
+            "replays passing the jump half",
         ),
         share(
             "sweep_jump_half_pass_longest_fraction",
-            jump_pass.iloc[-1],
-            f"share of the longest ({1000 * jump_pass.index[-1]:.0f} ms) replays "
-            "passing the jump half",
+            jump_pass["longest_fraction"],
+            f"share of the longest ({1000 * jump_pass['longest_duration_s']:.0f} ms) "
+            "replays passing the jump half",
         ),
         share(
             "sweep_state_space_only_fraction",
@@ -584,7 +556,7 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "sweep_sliding_only_replays",
-            _whole_count(overall["found_by_sliding_window_only"], n),
+            grid["n_sliding_only"],
             "count",
             "count",
             "swept replays the sliding-window detector reported and the state-space "
@@ -592,57 +564,57 @@ def sweep_values(summary: pd.DataFrame, source: str) -> list[Value]:
         ),
         make(
             "sweep_sliding_only_before_test_replays",
-            _whole_count(overall["found_by_sliding_window_only_before_shuffle"], n),
+            grid["n_sliding_only_before_test"],
             "count",
             "count",
             "the same, counting the sliding window's reports before its test",
         ),
         ms(
             "sweep_state_space_edge_error_max_ms",
-            np.abs(state_space_edges).max(),
+            timing["state_space_edge_error_max_ms"],
             "largest absolute median start or end error of the state-space "
             "detector over true durations, replays both detectors reported",
         ),
         ms(
             "sweep_sliding_start_early_min_ms",
-            -sliding_start.max(),
+            timing["sliding_start_early_min_ms"],
             "smallest median amount the sliding window starts early, over true "
             "durations",
         ),
         ms(
             "sweep_sliding_start_early_max_ms",
-            -sliding_start.min(),
+            timing["sliding_start_early_max_ms"],
             "largest median amount the sliding window starts early, over true durations",
         ),
         ms(
             "sweep_sliding_end_late_min_ms",
-            sliding_end.min(),
+            timing["sliding_end_late_min_ms"],
             "smallest median amount the sliding window ends late, over true durations",
         ),
         ms(
             "sweep_sliding_end_late_max_ms",
-            sliding_end.max(),
+            timing["sliding_end_late_max_ms"],
             "largest median amount the sliding window ends late, over true durations",
         ),
         ms(
             "sweep_sliding_end_late_upper_quartile_max_ms",
-            sliding_end_q75.max(),
+            timing["sliding_end_late_upper_quartile_max_ms"],
             "largest upper quartile of the sliding window's end error, over true "
             "durations",
         ),
         ms(
             "sweep_shortest_start_early_ms",
-            -sliding_start[0],
+            timing["shortest_start_early_ms"],
             "median amount the sliding window starts the shortest replays early",
         ),
         ms(
             "sweep_shortest_end_late_ms",
-            sliding_end[0],
+            timing["shortest_end_late_ms"],
             "median amount the sliding window ends the shortest replays late",
         ),
         ms(
             "sweep_shortest_reported_duration_ms",
-            1000 * shortest["duration_s"] * shortest["value"],
+            timing["shortest_reported_duration_ms"],
             "median duration the sliding window reports for the shortest replays",
         ),
         share(
