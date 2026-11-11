@@ -35,12 +35,34 @@ _WALD_Z = 1.96
 
 
 def lag_ms(index: int) -> int:
-    """Lag index ``index`` of a history kernel in ms: ``index + 1`` bins of ``BIN_S``."""
+    """The lag of one index of a history kernel.
+
+    Parameters
+    ----------
+    index : int
+        A position in a kernel's per-lag arrays, from 0.
+
+    Returns
+    -------
+    lag : int
+        The lag in ms: ``index + 1`` bins of ``BIN_S``.
+    """
     return round((index + 1) * BIN_S * 1e3)
 
 
 def lag_index(ms: float) -> int:
-    """The history-kernel index of a lag of ``ms`` milliseconds."""
+    """The index of one lag in a history kernel.
+
+    Parameters
+    ----------
+    ms : float
+        A lag in ms, a whole number of bins of ``BIN_S``.
+
+    Returns
+    -------
+    index : int
+        Its position in a kernel's per-lag arrays, from 0.
+    """
     return round(ms / (BIN_S * 1e3)) - 1
 
 

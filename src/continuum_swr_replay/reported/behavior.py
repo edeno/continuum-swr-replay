@@ -150,7 +150,6 @@ RATE_POPULATIONS = {
 }
 FULL_RATE_RUNG = "M7r_time_histcos_rew"
 IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
-REWARD_COEFS = [f"coef_{c}" for c in REWARD_HISTORY_COLUMNS]
 #: What every value read off one reward basis coefficient says about itself.
 BASIS_COEFFICIENT_NOTE = (
     "a basis coefficient, not the effect of a reward at any lag: the three "

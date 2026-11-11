@@ -280,13 +280,39 @@ def separated_fraction(fits: pd.DataFrame) -> float:
 
 
 def known_fraction(fits: pd.DataFrame, column: str) -> float:
-    """The share of fits that have a value in ``column`` (a held-out score a
-    fit carries only when its cross-validation ran)."""
+    """The share of fits that have a value in one column.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits.
+    column : str
+        A column a fit may lack a value in (a held-out score, which a fit
+        carries only when its cross-validation ran).
+
+    Returns
+    -------
+    fraction : float
+        In [0, 1].
+    """
     return float(fits[column].notna().mean())
 
 
 def fits_carrying(fits: pd.DataFrame, terms: Sequence[str]) -> pd.DataFrame:
-    """The fits that have a coefficient for every one of ``terms``."""
+    """The fits that have a coefficient for every one of some terms.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits with ``coef_<term>`` for each of ``terms``.
+    terms : sequence of str
+        The terms.
+
+    Returns
+    -------
+    carrying : pd.DataFrame
+        The rows of ``fits`` in which no ``coef_<term>`` is missing.
+    """
     return fits.dropna(subset=[f"coef_{term}" for term in terms])
 
 

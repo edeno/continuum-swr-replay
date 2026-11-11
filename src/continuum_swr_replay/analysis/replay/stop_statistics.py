@@ -96,7 +96,20 @@ def dwell_statistics(stops: pd.DataFrame) -> dict[str, float]:
 
 
 def still_immobile_fraction(stops: pd.DataFrame, at_s: float) -> float:
-    """The share of stops whose immobility lasts at least ``at_s`` seconds."""
+    """The share of stops still immobile a given time after they began.
+
+    Parameters
+    ----------
+    stops : pd.DataFrame
+        Stops with ``immobility_duration_s``.
+    at_s : float
+        The time since the stop began, in seconds.
+
+    Returns
+    -------
+    fraction : float
+        The share of stops whose immobility lasts at least ``at_s`` seconds.
+    """
     return float((stops["immobility_duration_s"] >= at_s).mean())
 
 
