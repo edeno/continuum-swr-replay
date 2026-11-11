@@ -29,6 +29,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     control_design,
     control_draw_null,
     empirical_pvalue,
+    empirical_pvalue_floor,
     heldout_deviance,
     null_draw_seeds,
     poisson_deviance,
@@ -452,6 +453,17 @@ class TestEmpiricalPvalue:
         assert np.isnan(
             empirical_pvalue(np.array([2.0]), null, min_usable_draws=1_000)[0]
         )
+
+    def test_the_floor_is_the_p_value_of_a_unit_no_draw_reaches(self):
+        null = np.array([[1.0], [2.0], [3.0], [4.0]])
+
+        floor = empirical_pvalue_floor(4)
+
+        assert floor == {"denominator": 5, "min_pvalue": 0.2}
+        assert floor["min_pvalue"] == pytest.approx(
+            empirical_pvalue(np.array([9.0]), null, min_usable_draws=1)[0]
+        )
+        assert empirical_pvalue_floor(1_000)["denominator"] == 1_001
 
 
 @pytest.fixture

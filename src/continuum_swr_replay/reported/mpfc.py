@@ -1,7 +1,13 @@
 """The mpfc summary: how mPFC units respond to SWR and non-SWR non-local events.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted here. The inputs (:class:`MpfcInputs`):
+refitted here. This module names and describes the values. The statistics are
+computed in ``analysis.pfc.population_statistics`` (the unit population) and
+``analysis.pfc.timing`` (when the responses peak and start), with the smallest
+empirical p-value in ``analysis.pfc.heldout``; here only the size of an input
+(its bundles, units, animals) is counted, and a value that a provenance sidecar,
+the timing calibration, the marked-family summary or the stop-context fits
+already hold is copied out. The inputs (:class:`MpfcInputs`):
 
 - the at-well mPFC unit bundles (``Processed-Data/{epoch}_mPFC_modulation.pkl``
   and their ``*.provenance.json`` sidecars, from
@@ -45,26 +51,11 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from scipy import stats
-from scipy.stats import false_discovery_control
 
-from continuum_swr_replay.analysis.pfc.load_population import (
-    HELDOUT_P_COLUMNS,
-    MATCHED_NULL_OBSERVED_COLUMNS,
-    load_population_data,
-    significant_fraction,
-)
-from continuum_swr_replay.analysis.pfc.modulation import (
-    REPORT_HALF_WINDOW_S,
-    THREE_CLASS_MODEL,
-)
-from continuum_swr_replay.analysis.pfc.timing import (
-    peak_and_onset,
-    population_timing,
-    sign_aligned_mean,
-    steepest_approach_lag,
-)
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
+from continuum_swr_replay.analysis.pfc import population_statistics, timing
+from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
+from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.paths import (
     ROOT_DIR,
     processed_data_dir,
@@ -440,18 +431,9 @@ def cohort_values(
         )
     if _uniform(sidecars, "stop_cohort") != "at_well":
         raise ValueError("the canonical bundles are not the at-well cohort")
-    counts = pd.DataFrame([s["cohort_counts"] for s in sidecars])
-    totals = counts[
-        [
-            "n_bins_fit",
-            "n_bins_immobile",
-            "n_nonlocal_after",
-            "n_nonlocal_before",
-            "n_ripple_after",
-            "n_ripple_before",
-        ]
-    ].sum()
-    swr_share = counts["n_nonlocal_swr"] / counts["n_nonlocal_after"]
+    stats = population_statistics.cohort_count_statistics(
+        pd.DataFrame([s["cohort_counts"] for s in sidecars])
+    )
     return [
         make(
             "sessions",
@@ -487,7 +469,7 @@ def cohort_values(
         ),
         make(
             "bins_fit",
-            totals["n_bins_fit"],
+            stats["n_bins_fit"],
             "count",
             "count",
             "immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, "
@@ -495,49 +477,49 @@ def cohort_values(
         ),
         make(
             "bins_immobile",
-            totals["n_bins_immobile"],
+            stats["n_bins_immobile"],
             "count",
             "count",
             "immobile 2 ms bins before the stop restriction, summed over sessions",
         ),
         make(
             "bins_fit_fraction",
-            totals["n_bins_fit"] / totals["n_bins_immobile"],
+            stats["bins_fit_fraction"],
             "fraction",
             "pct",
             "share of the immobile bins the stop restriction keeps, pooled",
         ),
         make(
             "nonlocal_events_kept",
-            totals["n_nonlocal_after"],
+            stats["n_nonlocal_kept"],
             "count",
             "count",
             "non-local events whose onset is in a kept stop, summed over sessions",
         ),
         make(
             "nonlocal_events_before",
-            totals["n_nonlocal_before"],
+            stats["n_nonlocal_before"],
             "count",
             "count",
             "the session's non-local events before the stop restriction, summed",
         ),
         make(
             "nonlocal_events_kept_fraction",
-            totals["n_nonlocal_after"] / totals["n_nonlocal_before"],
+            stats["nonlocal_kept_fraction"],
             "fraction",
             "pct",
             "share of the non-local events the stop restriction keeps, pooled",
         ),
         make(
             "swrs_kept_fraction",
-            totals["n_ripple_after"] / totals["n_ripple_before"],
+            stats["swrs_kept_fraction"],
             "fraction",
             "pct",
             "share of the SWRs the stop restriction keeps, pooled",
         ),
         make(
             "swr_coupled_share_session_median",
-            swr_share.median(),
+            stats["swr_coupled_share_session_median"],
             "fraction",
             "dec2",
             "median over sessions of the share of kept non-local events that are "
@@ -569,19 +551,22 @@ def estimator_values(
         raise ValueError("the bundles' p-values are not plus-one corrected")
     prior = _uniform(sidecars, "implied_prior_sd")
     draws = _uniform(sidecars, "n_control_draws")
-    fits = pd.DataFrame(
-        [
-            {
-                name: s[name]
-                for name in (
-                    "n_model_fits",
-                    "n_nonconverged_model_fits",
-                    "n_neurons_with_nonconverged_model",
-                )
-            }
-            for s in sidecars
-        ]
-    ).sum()
+    floor = empirical_pvalue_floor(draws)
+    fits = population_statistics.fit_count_statistics(
+        pd.DataFrame(
+            [
+                {
+                    name: s[name]
+                    for name in (
+                        "n_model_fits",
+                        "n_nonconverged_model_fits",
+                        "n_neurons_with_nonconverged_model",
+                    )
+                }
+                for s in sidecars
+            ]
+        )
+    )
     return [
         make(
             "penalty_sigma",
@@ -656,14 +641,14 @@ def estimator_values(
         ),
         make(
             "min_pvalue_denominator",
-            draws + 1,
+            floor["denominator"],
             "count",
             "count",
             "R + 1: the smallest plus-one empirical p-value is one over it",
         ),
         make(
             "min_pvalue",
-            1 / (draws + 1),
+            floor["min_pvalue"],
             "fraction",
             "sig2",
             "the smallest plus-one empirical p-value, 1/(R + 1)",
@@ -691,7 +676,7 @@ def estimator_values(
         ),
         make(
             "nonconverged_percent",
-            100 * fits["n_nonconverged_model_fits"] / fits["n_model_fits"],
+            fits["nonconverged_percent"],
             "quantity",
             "sig2",
             "non-converged fits as a percent of model fits",
@@ -711,31 +696,26 @@ def prior_binding_values(
     that peak's standard error (the bundle's ``prior_binds``). The values are
     the lowest and highest share over the five curves.
     """
-    shares = {}
-    for curve in CURVES:
-        converged = population[f"{curve}: mle_converged"].fillna(False).astype(bool)
-        separated = population[f"{curve}: mle_separated"].fillna(False).astype(bool)
-        well_posed = converged & ~separated
-        binds = population[f"{curve}: prior_binds"].fillna(False).astype(bool)
-        shares[curve] = 100 * (binds & well_posed).sum() / well_posed.sum()
-    shares = pd.Series(shares)
+    shares = population_statistics.lowest_and_highest(
+        population_statistics.prior_binding_percent(population, CURVES)
+    )
     return [
         make(
             "prior_binds_percent_min",
-            shares.min(),
+            shares["min"],
             "quantity",
             "sig2",
             f"lowest per-curve percent of well-posed units the prior binds on "
-            f"({shares.idxmin()})",
+            f"({shares['min_label']})",
             "%",
         ),
         make(
             "prior_binds_percent_max",
-            shares.max(),
+            shares["max"],
             "quantity",
             "sig2",
             f"highest per-curve percent of well-posed units the prior binds on "
-            f"({shares.idxmax()})",
+            f"({shares['max_label']})",
             "%",
         ),
     ]
@@ -753,15 +733,15 @@ def called_fraction_values(
     (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`).
     Engagement is also given per animal.
     """
-    fractions = significant_fraction(population, alpha=ALPHA)
+    fractions = population_statistics.called_fractions(population, ALPHA)
     values = []
     for word, name in CLASSES.items():
-        n_called, n_tested = fractions[name]
+        stats = fractions.loc[name]
         label = CLASS_LABELS[name]
         values += [
             make(
                 f"{word}_called_fraction",
-                n_called / n_tested,
+                stats["fraction"],
                 "fraction",
                 "pct",
                 f"share of tested units at raw empirical p < {ALPHA:g} for {label}, "
@@ -769,39 +749,37 @@ def called_fraction_values(
             ),
             make(
                 f"{word}_units_called",
-                n_called,
+                stats["n_called"],
                 "count",
                 "count",
                 f"units at raw empirical p < {ALPHA:g} for {label}",
             ),
             make(
                 f"{word}_units_tested",
-                n_tested,
+                stats["n_tested"],
                 "count",
                 "count",
                 f"units with a finite p-value for {label}",
             ),
         ]
-    for animal, frame in population.groupby("animal"):
-        n_called, n_tested = significant_fraction(frame, alpha=ALPHA)["engagement"]
+    by_animal = population_statistics.called_fraction_by_animal(
+        population, "engagement", ALPHA
+    )
+    for animal, stats in by_animal.iterrows():
         values.append(
             make(
                 f"engagement_called_fraction_{ANIMAL_WORDS[animal]}",
-                n_called / n_tested,
+                stats["fraction"],
                 "fraction",
                 "pct",
                 f"share of {animal}'s tested units at raw empirical p < {ALPHA:g} for "
                 "the engagement test",
             )
         )
-    pvalues = population[HELDOUT_P_COLUMNS["engagement"]].to_numpy(dtype=float)
-    pvalues = pvalues[np.isfinite(pvalues)]
-    if len(pvalues) != fractions["engagement"][1]:
-        raise ValueError("the engagement p-values are not the units it was tested on")
     values.append(
         make(
             "engagement_bh_fraction",
-            (false_discovery_control(pvalues, method="bh") < ALPHA).mean(),
+            population_statistics.bh_called_fraction(population, "engagement", ALPHA),
             "fraction",
             "pct",
             "share of the tested units with a Benjamini-Hochberg q below "
@@ -812,12 +790,14 @@ def called_fraction_values(
             tags=TAGS["modulation"],
         )
     )
-    counts = population["min_heldout_model"].value_counts()
+    best = population_statistics.best_model_fractions(
+        population, list(BEST_MODELS.values())
+    )
     for word, model in BEST_MODELS.items():
         values.append(
             make(
                 f"best_model_{word}_fraction",
-                counts.get(model, 0) / len(population),
+                best[model],
                 "fraction",
                 "pct",
                 f"share of units whose best model by held-out deviance is {model}",
@@ -846,39 +826,33 @@ def null_geometry_values(
     - Events with no legal within-bout control, which enter neither side:
       per class, summed over sessions.
     """
-    shares = {}
-    for name, column in HELDOUT_P_COLUMNS.items():
-        called = population[column] < ALPHA
-        observed = population[MATCHED_NULL_OBSERVED_COLUMNS[name]]
-        shares[name] = ((called & (observed <= 0)).sum(), called.sum())
-    n_flat, n_called = shares.pop("engagement")
-    class_shares = pd.Series({name: a / b for name, (a, b) in shares.items()})
-
-    overlap = pd.Series([s["engagement_null_overlap"]["median"] for s in sidecars])
-
-    windows = pd.DataFrame(
-        [
-            {
-                "session": s["artifact"].removesuffix(f"{STEM}.pkl"),
-                "event_class": event_class,
-                "total": w["n_events_total"],
-                "excluded": w["n_events_excluded_unmatchable"],
-            }
-            for s in sidecars
-            for event_class, w in s["null_windows"].items()
-        ]
+    flat = population_statistics.called_without_improvement(population, ALPHA)
+    engagement = flat.loc["engagement"]
+    class_shares = population_statistics.lowest_and_highest(
+        flat["fraction"].drop("engagement")
     )
-    by_class = windows.groupby("event_class")[["total", "excluded"]].sum()
-    excluded = 100 * by_class["excluded"] / by_class["total"]
-    with_events = windows[windows["total"] > 0]
-    if with_events.empty:
-        raise ValueError("no session holds an event of any class")
-    worst = with_events.loc[(with_events["excluded"] / with_events["total"]).idxmax()]
-    worst_label = f"{worst['session']} / {worst['event_class']}"
+    overlap = population_statistics.session_value_statistics(
+        [s["engagement_null_overlap"]["median"] for s in sidecars]
+    )
+    unmatchable = population_statistics.unmatchable_event_statistics(
+        pd.DataFrame(
+            [
+                {
+                    "session": s["artifact"].removesuffix(f"{STEM}.pkl"),
+                    "event_class": event_class,
+                    "total": w["n_events_total"],
+                    "excluded": w["n_events_excluded_unmatchable"],
+                }
+                for s in sidecars
+                for event_class, w in s["null_windows"].items()
+            ]
+        )
+    )
+    worst_label = f"{unmatchable['worst_session']} / {unmatchable['worst_event_class']}"
     return [
         make(
             "engagement_called_flat_fraction",
-            n_flat / n_called,
+            engagement["fraction"],
             "fraction",
             "pct",
             "of the units called by the engagement test, the share whose own "
@@ -886,28 +860,28 @@ def null_geometry_values(
         ),
         make(
             "engagement_called_flat",
-            n_flat,
+            engagement["n_flat"],
             "count",
             "count",
             "units called by the engagement test with no positive observed improvement",
         ),
         make(
             "class_called_flat_fraction_min",
-            class_shares.min(),
+            class_shares["min"],
             "fraction",
             "pctnum",
-            f"lowest such share over the four event classes ({class_shares.idxmin()})",
+            f"lowest such share over the four event classes ({class_shares['min_label']})",
         ),
         make(
             "class_called_flat_fraction_max",
-            class_shares.max(),
+            class_shares["max"],
             "fraction",
             "pct",
-            f"highest such share over the four event classes ({class_shares.idxmax()})",
+            f"highest such share over the four event classes ({class_shares['max_label']})",
         ),
         make(
             "engagement_null_overlap_median",
-            overlap.median(),
+            overlap["median"],
             "fraction",
             "pct",
             "median over sessions of each session's median share of an engagement "
@@ -915,45 +889,45 @@ def null_geometry_values(
         ),
         make(
             "engagement_null_overlap_session_min",
-            overlap.min(),
+            overlap["min"],
             "fraction",
             "pctnum",
             "lowest session median of that share",
         ),
         make(
             "engagement_null_overlap_session_max",
-            overlap.max(),
+            overlap["max"],
             "fraction",
             "pct",
             "highest session median of that share",
         ),
         make(
             "unmatchable_percent_class_min",
-            excluded.min(),
+            unmatchable["percent_class_min"],
             "quantity",
             "sig2",
             "lowest percent, over event classes, of a class's events with no legal "
-            f"within-bout control, summed over sessions ({excluded.idxmin()})",
+            f"within-bout control, summed over sessions ({unmatchable['class_min']})",
             "%",
         ),
         make(
             "unmatchable_percent_class_max",
-            excluded.max(),
+            unmatchable["percent_class_max"],
             "quantity",
             "sig2",
-            f"highest such percent ({excluded.idxmax()})",
+            f"highest such percent ({unmatchable['class_max']})",
             "%",
         ),
         make(
             "unmatchable_worst_excluded",
-            worst["excluded"],
+            unmatchable["worst_excluded"],
             "count",
             "count",
             f"events with no legal control in the worst session and class ({worst_label})",
         ),
         make(
             "unmatchable_worst_total",
-            worst["total"],
+            unmatchable["worst_total"],
             "count",
             "count",
             f"events of that class in that session ({worst_label})",
@@ -962,21 +936,6 @@ def null_geometry_values(
 
 
 # --- the summary -------------------------------------------------------------------
-
-
-def odds_ratio(a: int, b: int, c: int, d: int, what: str = "") -> float:
-    """Odds ratio ``(a * d) / (b * c)`` of a 2 x 2 table of unit counts.
-
-    ``a`` both called, ``b`` and ``c`` called for one class only, ``d`` neither.
-    An empty off-diagonal cell makes the ratio infinite, so the summary refuses it
-    rather than raise a bare ZeroDivisionError or report a meaningless number.
-    """
-    if b * c == 0:
-        raise ValueError(
-            f"odds ratio undefined for {what or 'this table'}: a one-class-only "
-            f"cell is empty (both {a}, one-only {b} and {c}, neither {d})"
-        )
-    return (a * d) / (b * c)
 
 
 def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
@@ -997,82 +956,47 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
       response is split by SWR status (``non_local_SWR + non_local_no_SWR vs.
       non_local``), and whose best model by held-out deviance is that split.
     """
-    swr_p = population[HELDOUT_P_COLUMNS["non_local_SWR"]]
-    non_p = population[HELDOUT_P_COLUMNS["non_local_no_SWR"]]
-    tested = swr_p.notna() & non_p.notna()
-    frame = population[tested]
-    swr_called = (swr_p[tested] < ALPHA).to_numpy()
-    non_called = (non_p[tested] < ALPHA).to_numpy()
-    both, swr_only = (
-        int((swr_called & non_called).sum()),
-        int((swr_called & ~non_called).sum()),
-    )
-    non_only, neither = (
-        int((~swr_called & non_called).sum()),
-        int((~swr_called & ~non_called).sum()),
-    )
-    n = int(tested.sum())
-    animals = (
-        frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]).to_numpy()
-    )
-    per_animal = []
-    for animal in np.unique(animals):
-        sc, nc = swr_called[animals == animal], non_called[animals == animal]
-        per_animal.append(
-            odds_ratio(
-                int((sc & nc).sum()),
-                int((sc & ~nc).sum()),
-                int((~sc & nc).sum()),
-                int((~sc & ~nc).sum()),
-                what=f"animal {animal}",
-            )
-        )
-    swr_peak = frame["non_local_SWR: peak_log_modulation"]
-    non_peak = frame["non_local_no_SWR: peak_log_modulation"]
-    either = swr_called | non_called
-    split = population[
-        "non_local_SWR + non_local_no_SWR vs. non_local: heldout_delta_dev"
-    ]
-    best = population["min_heldout_model_replay_split"]
+    overlap = population_statistics.replay_class_overlap_statistics(population, ALPHA)
+    split = population_statistics.replay_split_statistics(population)
     values = [
         make(
             "overlap_units_tested",
-            n,
+            overlap["n_tested"],
             "count",
             "count",
             "units with a finite p-value for both SWR-coupled and non-SWR replay",
         ),
         make(
             "overlap_units_both",
-            both,
+            overlap["n_both"],
             "count",
             "count",
             "of those, units called (raw p < 0.05) for both",
         ),
         make(
             "overlap_units_swr_replay_only",
-            swr_only,
+            overlap["n_swr_only"],
             "count",
             "count",
             "units called for SWR-coupled replay and not for non-SWR replay",
         ),
         make(
             "overlap_units_non_swr_replay_only",
-            non_only,
+            overlap["n_non_swr_only"],
             "count",
             "count",
             "units called for non-SWR replay and not for SWR-coupled replay",
         ),
         make(
             "overlap_units_neither",
-            neither,
+            overlap["n_neither"],
             "count",
             "count",
             "units called for neither",
         ),
         make(
             "overlap_units_both_expected",
-            swr_called.mean() * non_called.mean() * n,
+            overlap["n_both_expected"],
             "quantity",
             "int",
             "units called for both expected if the two calls were independent "
@@ -1081,7 +1005,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "overlap_odds_ratio",
-            odds_ratio(both, swr_only, non_only, neither, what="pooled units"),
+            overlap["odds_ratio"],
             "quantity",
             "sig2",
             "odds ratio of being called for non-SWR replay given called for SWR-coupled "
@@ -1089,28 +1013,28 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "overlap_odds_ratio_animal_min",
-            min(per_animal),
+            overlap["odds_ratio_animal_min"],
             "quantity",
             "sig2",
             "lowest per-animal odds ratio",
         ),
         make(
             "overlap_odds_ratio_animal_max",
-            max(per_animal),
+            overlap["odds_ratio_animal_max"],
             "quantity",
             "sig2",
             "highest per-animal odds ratio",
         ),
         make(
             "overlap_animals_odds_ratio_above_one",
-            sum(r > 1 for r in per_animal),
+            overlap["n_animals_odds_ratio_above_one"],
             "count",
             "count",
             "animals whose odds ratio is above 1",
         ),
         make(
             "overlap_rank_correlation",
-            stats.spearmanr(swr_peak, non_peak).statistic,
+            overlap["rank_correlation"],
             "quantity",
             "dec2",
             "Spearman correlation over units tested for both of the peak log modulation "
@@ -1118,19 +1042,14 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "overlap_rank_correlation_called",
-            stats.spearmanr(swr_peak[either], non_peak[either]).statistic,
+            overlap["rank_correlation_called"],
             "quantity",
             "dec2",
             "the same over units called for either",
         ),
         make(
             "overlap_same_sign_fraction_both",
-            float(
-                (
-                    np.sign(swr_peak[swr_called & non_called])
-                    == np.sign(non_peak[swr_called & non_called])
-                ).mean()
-            ),
+            overlap["same_sign_fraction_both"],
             "fraction",
             "pct",
             "of the units called for both, the share whose two peak modulations have the "
@@ -1138,7 +1057,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "split_improves_fraction",
-            float((split.dropna() > 0).mean()),
+            split["improves_fraction"],
             "fraction",
             "pct",
             "share of units whose held-out deviance improves when the non-local response "
@@ -1146,9 +1065,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "split_best_model_fraction",
-            float(
-                (best == "non_local_SWR + non_local_no_SWR").sum() / best.notna().sum()
-            ),
+            split["best_model_fraction"],
             "fraction",
             "pct",
             "share of units whose best model by held-out deviance (among constant, "
@@ -1156,20 +1073,24 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         ),
         make(
             "split_swr_larger_fraction_called",
-            float((swr_peak[either].abs() > non_peak[either].abs()).mean()),
+            overlap["swr_larger_fraction_called"],
             "fraction",
             "pct",
             "of units called for either, the share whose absolute peak modulation is "
             "larger for SWR-coupled replay than for non-SWR replay",
         ),
     ]
-    for word, column in (
+    effect_curves = (
         ("swr_replay", "non_local_SWR"),
         ("non_swr_replay", "non_local_no_SWR"),
         ("swr", "SWR"),
         ("matched_control", "matched_control"),
-    ):
-        peak = population[f"{column}: peak_log_modulation"].dropna()
+    )
+    effects = population_statistics.peak_modulation_statistics(
+        population, [column for _, column in effect_curves]
+    )
+    for word, column in effect_curves:
+        stats = effects.loc[column]
         label = {
             "swr_replay": "SWR-coupled replay",
             "non_swr_replay": "non-SWR replay",
@@ -1179,7 +1100,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
         values += [
             make(
                 f"effect_abs_peak_median_{word}",
-                peak.abs().median(),
+                stats["abs_peak_median"],
                 "quantity",
                 "dec2",
                 f"median over units of the absolute peak log-rate modulation for {label}",
@@ -1187,7 +1108,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
             ),
             make(
                 f"effect_rate_multiplier_median_{word}",
-                float(np.exp(peak.abs().median())),
+                stats["rate_multiplier_median"],
                 "quantity",
                 "sig2",
                 f"exp of that median: the median unit's largest rate change for {label}, as "
@@ -1196,21 +1117,20 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
             ),
             make(
                 f"effect_suppressed_fraction_{word}",
-                float((peak < 0).mean()),
+                stats["suppressed_fraction"],
                 "fraction",
                 "pct",
                 f"share of units whose peak modulation for {label} is a decrease",
             ),
         ]
-    for word, column, called in (
-        ("swr_replay", "non_local_SWR", swr_called),
-        ("non_swr_replay", "non_local_no_SWR", non_called),
+    for word, called_median in (
+        ("swr_replay", overlap["abs_peak_median_called_swr"]),
+        ("non_swr_replay", overlap["abs_peak_median_called_non_swr"]),
     ):
-        peak = frame[f"{column}: peak_log_modulation"][called]
         values.append(
             make(
                 f"effect_abs_peak_median_called_{word}",
-                peak.abs().median(),
+                called_median,
                 "quantity",
                 "dec2",
                 f"median absolute peak log-rate modulation of the units called for "
@@ -1263,39 +1183,46 @@ def timing_values(
     # are recorded on the same tetrodes and need not be independent.
     sessions = population["nwb_file_name"].astype(str).to_numpy()
     animals = population["animal"].to_numpy()
-    ms = 1e3
     rule = (
         "the half-maximum onset: the earliest lag of the run, ending at the peak, "
         "over which the curve keeps the peak's sign and at least half its size"
     )
-    timing_by_class = {}
+    called_by_class = {}
     for word, (name, curve_key) in TIMING_CLASSES.items():
         label = CLASS_LABELS[name]
-        pvalue = population[HELDOUT_P_COLUMNS[name]].to_numpy(dtype=float)
-        called = pvalue < ALPHA
-        timing = peak_and_onset(curves[curve_key], lag_time)
-        timing_by_class[word] = (called, timing)
-        for direction, sign in (("enhanced", 1.0), ("suppressed", -1.0)):
-            chosen = called & (np.sign(timing.peak) == sign)
+        called = population_statistics.called_units(population, name, ALPHA)
+        called_by_class[word] = called
+        statistics = timing.called_response_timing(
+            curves[curve_key],
+            curves["matched_control"],
+            lag_time,
+            called,
+            sessions,
+            animals,
+            n_boot=TIMING_BOOTSTRAP_DRAWS,
+            seed=TIMING_BOOTSTRAP_SEED,
+        )
+        by_animal = timing.called_response_timing_by_animal(
+            curves[curve_key], lag_time, called, animals
+        )
+        for direction, sign in timing.DIRECTIONS.items():
+            stats = statistics.loc[direction]
             stem = f"{word}_{direction}"
             who = f"units called for {label} (raw p < {ALPHA:g}) whose peak is {'an increase' if sign > 0 else 'a decrease'}"
-            peak_ms = timing.peak_lag[chosen] * ms
-            onset_ms = timing.onset_lag[chosen] * ms
-            add(f"timing_units_{stem}", int(chosen.sum()), "count", "count", who)
-            if not chosen.any():
+            add(f"timing_units_{stem}", stats["n_units"], "count", "count", who)
+            if not stats["n_units"]:
                 continue
             add(
                 f"timing_peak_lag_median_ms_{stem}",
-                np.median(peak_ms),
+                stats["peak_lag_median_ms"],
                 "quantity",
                 "int",
                 f"median peak lag (largest |modulation| within +/-200 ms of onset) of {who}",
                 "ms",
             )
-            low, high = np.percentile(peak_ms, [25, 75])
             add(
                 f"timing_peak_lag_quartile_low_ms_{stem}",
-                low,
+                stats["peak_lag_quartile_low_ms"],
                 "quantity",
                 "int",
                 f"25th percentile of the peak lag of {who}",
@@ -1303,7 +1230,7 @@ def timing_values(
             )
             add(
                 f"timing_peak_lag_quartile_high_ms_{stem}",
-                high,
+                stats["peak_lag_quartile_high_ms"],
                 "quantity",
                 "int",
                 f"75th percentile of the peak lag of {who}",
@@ -1311,14 +1238,14 @@ def timing_values(
             )
             add(
                 f"timing_peak_before_onset_fraction_{stem}",
-                float((peak_ms < 0).mean()),
+                stats["peak_before_onset_fraction"],
                 "fraction",
                 "pct",
                 f"share of {who} whose peak lag is before event onset",
             )
             add(
                 f"timing_onset_median_ms_{stem}",
-                np.median(onset_ms),
+                stats["onset_median_ms"],
                 "quantity",
                 "int",
                 f"median response onset of {who}; onset is {rule}",
@@ -1326,14 +1253,14 @@ def timing_values(
             )
             add(
                 f"timing_onset_before_onset_fraction_{stem}",
-                float((onset_ms < 0).mean()),
+                stats["onset_before_onset_fraction"],
                 "fraction",
                 "pct",
                 f"share of {who} whose response onset is before event onset",
             )
             add(
                 f"timing_onset_at_edge_fraction_{stem}",
-                float(timing.onset_at_edge[chosen].mean()),
+                stats["onset_at_edge_fraction"],
                 "fraction",
                 "pct",
                 f"share of {who} whose half-maximum run reaches the window edge "
@@ -1341,52 +1268,23 @@ def timing_values(
             )
             add(
                 f"timing_peak_at_edge_fraction_{stem}",
-                float((np.abs(peak_ms) >= REPORT_HALF_WINDOW_S * ms - 1e-6).mean()),
+                stats["peak_at_edge_fraction"],
                 "fraction",
                 "pct",
                 f"share of {who} whose peak lies at the edge of the +/-200 ms window",
             )
-            rise_ms = (
-                peak_and_onset(
-                    curves[curve_key][:, chosen], lag_time, baseline="window_start"
-                ).onset_lag
-                * ms
-            )
             add(
                 f"timing_rise_onset_median_ms_{stem}",
-                np.nanmedian(rise_ms),
+                stats["rise_onset_median_ms"],
                 "quantity",
                 "int",
                 f"median rise onset of {who}: the onset rule measured from the curve's "
                 "value at -200 ms instead of from zero",
                 "ms",
             )
-            population_curve = population_timing(
-                curves[curve_key][:, chosen],
-                timing.peak[chosen],
-                sessions[chosen],
-                lag_time,
-                n_boot=TIMING_BOOTSTRAP_DRAWS,
-                seed=TIMING_BOOTSTRAP_SEED,
-            )
-            population_rise = population_timing(
-                curves[curve_key][:, chosen],
-                timing.peak[chosen],
-                sessions[chosen],
-                lag_time,
-                n_boot=TIMING_BOOTSTRAP_DRAWS,
-                seed=TIMING_BOOTSTRAP_SEED,
-                baseline="window_start",
-            )
             add(
                 f"timing_population_pre_event_level_fraction_{stem}",
-                float(
-                    np.clip(
-                        population_curve.curve[0] / np.max(population_curve.curve),
-                        0.0,
-                        1.0,
-                    )
-                ),
+                stats["population_pre_event_level_fraction"],
                 "fraction",
                 "pct",
                 f"value at -200 ms of the sign-aligned mean curve of {who}, as a share "
@@ -1394,7 +1292,7 @@ def timing_values(
             )
             add(
                 f"timing_population_rise_onset_ms_{stem}",
-                population_rise.onset_lag * ms,
+                stats["population_rise_onset_ms"],
                 "quantity",
                 "int",
                 f"rise onset of the sign-aligned mean curve of {who}: half way from its "
@@ -1403,7 +1301,7 @@ def timing_values(
             )
             add(
                 f"timing_population_rise_onset_ms_ci_low_{stem}",
-                population_rise.onset_lag_interval[0] * ms,
+                stats["population_rise_onset_ms_ci_low"],
                 "quantity",
                 "int",
                 f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} session "
@@ -1412,27 +1310,20 @@ def timing_values(
             )
             add(
                 f"timing_population_rise_onset_ms_ci_high_{stem}",
-                population_rise.onset_lag_interval[1] * ms,
+                stats["population_rise_onset_ms_ci_high"],
                 "quantity",
                 "int",
                 "97.5th percentile of that over the same resamples",
                 "ms",
             )
-            for what, point, (ci_low, ci_high) in (
-                ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
-                (
-                    "onset",
-                    population_curve.onset_lag,
-                    population_curve.onset_lag_interval,
-                ),
-            ):
+            for what in ("peak", "onset"):
                 text = (
                     f"{'peak lag' if what == 'peak' else 'onset (' + rule + ')'} of the "
                     f"mean curve of {who}, each unit's curve signed by its peak"
                 )
                 add(
                     f"timing_population_{what}_ms_{stem}",
-                    point * ms,
+                    stats[f"population_{what}_ms"],
                     "quantity",
                     "int",
                     text,
@@ -1440,7 +1331,7 @@ def timing_values(
                 )
                 add(
                     f"timing_population_{what}_ms_ci_low_{stem}",
-                    ci_low * ms,
+                    stats[f"population_{what}_ms_ci_low"],
                     "quantity",
                     "int",
                     f"2.5th percentile of that over {TIMING_BOOTSTRAP_DRAWS:,} session "
@@ -1449,18 +1340,15 @@ def timing_values(
                 )
                 add(
                     f"timing_population_{what}_ms_ci_high_{stem}",
-                    ci_high * ms,
+                    stats[f"population_{what}_ms_ci_high"],
                     "quantity",
                     "int",
                     "97.5th percentile of that over the same resamples",
                     "ms",
                 )
-            steepest_ms = (
-                steepest_approach_lag(curves[curve_key][:, chosen], lag_time) * ms
-            )
             add(
                 f"timing_steepest_median_ms_{stem}",
-                np.nanmedian(steepest_ms),
+                stats["steepest_median_ms"],
                 "quantity",
                 "int",
                 f"median lag of the steepest approach to the peak of {who} (the "
@@ -1469,99 +1357,69 @@ def timing_values(
             )
             add(
                 f"timing_population_steepest_ms_{stem}",
-                population_curve.steepest_lag * ms,
+                stats["population_steepest_ms"],
                 "quantity",
                 "int",
                 f"lag of the steepest approach to the peak of the sign-aligned mean "
                 f"curve of {who}",
                 "ms",
             )
-            for bound, value in zip(
-                ("low", "high"), population_curve.steepest_lag_interval, strict=True
-            ):
+            for bound in ("low", "high"):
                 add(
                     f"timing_population_steepest_ms_ci_{bound}_{stem}",
-                    value * ms,
+                    stats[f"population_steepest_ms_ci_{bound}"],
                     "quantity",
                     "int",
                     f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that over "
                     f"{TIMING_BOOTSTRAP_DRAWS:,} recording-day resamples",
                     "ms",
                 )
-            for rule, result, text in (
-                ("size", population_curve, "its peak, from zero"),
-                (
-                    "rise_size",
-                    population_rise,
-                    "its peak less its value at -200 ms",
-                ),
+            for rule, text in (
+                ("size", "its peak, from zero"),
+                ("rise_size", "its peak less its value at -200 ms"),
             ):
                 add(
                     f"timing_population_{rule}_{stem}",
-                    result.size,
+                    stats[f"population_{rule}"],
                     "quantity",
                     "dec2",
                     f"size of the sign-aligned mean curve of {who}: {text} (log-rate "
                     "units; a decrease is counted as a positive size)",
                     "log rate",
                 )
-                for bound, value in zip(
-                    ("low", "high"), result.size_interval, strict=True
-                ):
+                for bound in ("low", "high"):
                     add(
                         f"timing_population_{rule}_ci_{bound}_{stem}",
-                        value,
+                        stats[f"population_{rule}_ci_{bound}"],
                         "quantity",
                         "dec2",
                         f"{'2.5th' if bound == 'low' else '97.5th'} percentile of that "
                         f"over {TIMING_BOOTSTRAP_DRAWS:,} recording-day resamples",
                         "log rate",
                     )
-            control = curves["matched_control"][:, chosen]
-            usable = np.isfinite(control).all(axis=0)
-            if usable.any():
-                at_peak = int(np.argmax(population_curve.curve))
-                control_mean = sign_aligned_mean(
-                    control[:, usable], timing.peak[chosen][usable]
-                )
-                add(
-                    f"timing_population_size_vs_control_{stem}",
-                    population_curve.curve[at_peak] - control_mean[at_peak],
-                    "quantity",
-                    "dec2",
-                    f"the sign-aligned mean curve of {who} at its peak, less the same "
-                    "units' matched quiet-rest control curves (signed the same way) at "
-                    "that lag",
-                    "log rate",
-                )
-                add(
-                    f"timing_population_control_pre_event_level_fraction_{stem}",
-                    float(
-                        np.clip(control_mean[0] / np.max(population_curve.curve), 0, 1)
-                    ),
-                    "fraction",
-                    "pct",
-                    "the same units' matched-control mean curve at -200 ms, signed by "
-                    "the event curve, as a share of the event curve's peak: how much "
-                    "of the event curve's pre-event level quiet-rest windows also show",
-                )
-            onsets_by_animal = []
-            rises_by_animal = []
-            steepest_by_animal = []
-            for animal in np.unique(animals[chosen]):
-                own = chosen & (animals == animal)
-                own_curve = sign_aligned_mean(
-                    curves[curve_key][:, own], timing.peak[own]
-                )
-                onsets_by_animal.append(
-                    peak_and_onset(own_curve, lag_time).onset_lag[0]
-                )
-                rise = peak_and_onset(own_curve, lag_time, baseline="window_start")
-                rises_by_animal.append(rise.onset_lag[0])
-                steepest_by_animal.append(steepest_approach_lag(own_curve, lag_time)[0])
+            add(
+                f"timing_population_size_vs_control_{stem}",
+                stats["population_size_vs_control"],
+                "quantity",
+                "dec2",
+                f"the sign-aligned mean curve of {who} at its peak, less the same "
+                "units' matched quiet-rest control curves (signed the same way) at "
+                "that lag",
+                "log rate",
+            )
+            add(
+                f"timing_population_control_pre_event_level_fraction_{stem}",
+                stats["population_control_pre_event_level_fraction"],
+                "fraction",
+                "pct",
+                "the same units' matched-control mean curve at -200 ms, signed by "
+                "the event curve, as a share of the event curve's peak: how much "
+                "of the event curve's pre-event level quiet-rest windows also show",
+            )
+            for animal, own in by_animal.loc[direction].iterrows():
                 add(
                     f"timing_population_rise_onset_ms_{stem}_{ANIMAL_WORDS[animal]}",
-                    rise.onset_lag[0] * ms,
+                    own["rise_onset_ms"],
                     "quantity",
                     "int",
                     f"rise onset of the sign-aligned mean curve of {animal}'s {who}",
@@ -1569,14 +1427,14 @@ def timing_values(
                 )
             add(
                 f"timing_population_onset_animals_{stem}",
-                len(onsets_by_animal),
+                stats["n_animals"],
                 "count",
                 "count",
                 f"animals with at least one of the {who}",
             )
             add(
                 f"timing_population_onset_animals_negative_{stem}",
-                int(np.sum(np.asarray(onsets_by_animal) < 0)),
+                stats["n_animals_onset_before_event"],
                 "count",
                 "count",
                 f"of those animals, how many have the half-maximum onset of their own "
@@ -1584,7 +1442,7 @@ def timing_values(
             )
             add(
                 f"timing_population_steepest_animals_negative_{stem}",
-                int(np.sum(np.asarray(steepest_by_animal) < 0)),
+                stats["n_animals_steepest_before_event"],
                 "count",
                 "count",
                 f"of those animals, how many have the steepest approach of their own "
@@ -1592,50 +1450,48 @@ def timing_values(
             )
             add(
                 f"timing_population_rise_onset_animals_negative_{stem}",
-                int(np.sum(np.asarray(rises_by_animal) < 0)),
+                stats["n_animals_rise_onset_before_event"],
                 "count",
                 "count",
                 f"of those animals, how many have the rise onset of their own mean curve "
                 f"of {who} before event onset",
             )
 
-    swr_called, swr_timing = timing_by_class["swr_replay"]
-    non_called, non_timing = timing_by_class["non_swr_replay"]
-    paired = (
-        swr_called & non_called & (np.sign(swr_timing.peak) == np.sign(non_timing.peak))
+    paired = timing.paired_peak_lag_statistics(
+        curves[TIMING_CLASSES["swr_replay"][1]],
+        curves[TIMING_CLASSES["non_swr_replay"][1]],
+        lag_time,
+        called_by_class["swr_replay"],
+        called_by_class["non_swr_replay"],
     )
-    difference = (non_timing.peak_lag[paired] - swr_timing.peak_lag[paired]) * ms
     add(
         "timing_paired_units",
-        int(paired.sum()),
+        paired["n_paired"],
         "count",
         "count",
         "units called for both SWR-coupled and non-SWR replay whose two peaks have the "
         "same sign",
     )
-    if paired.any():
-        add(
-            "timing_peak_lag_difference_median_ms",
-            np.median(difference),
-            "quantity",
-            "int",
-            "over those units, the median of the non-SWR replay peak lag minus the "
-            "SWR-coupled replay peak lag",
-            "ms",
-        )
-        add(
-            "timing_non_swr_later_fraction",
-            float((difference > 0).mean()),
-            "fraction",
-            "pct",
-            "share of those units whose non-SWR replay peak is later than their "
-            "SWR-coupled replay peak",
-        )
-    control = peak_and_onset(curves["matched_control"], lag_time)
-    usable = np.isfinite(control.peak_lag)
+    add(
+        "timing_peak_lag_difference_median_ms",
+        paired["difference_median_ms"],
+        "quantity",
+        "int",
+        "over those units, the median of the non-SWR replay peak lag minus the "
+        "SWR-coupled replay peak lag",
+        "ms",
+    )
+    add(
+        "timing_non_swr_later_fraction",
+        paired["second_later_fraction"],
+        "fraction",
+        "pct",
+        "share of those units whose non-SWR replay peak is later than their "
+        "SWR-coupled replay peak",
+    )
     add(
         "timing_matched_control_peak_before_onset_fraction",
-        float((control.peak_lag[usable] < 0).mean()),
+        timing.peak_before_onset_fraction(curves["matched_control"], lag_time),
         "fraction",
         "pct",
         "share of all units whose matched quiet-rest control curve peaks before the "
@@ -1821,13 +1677,23 @@ def swr_without_replay_values(
         if np.isfinite(float(value)):
             values.append(make(key, value, *args, **kwargs))
 
-    n_events = {
-        (s["nwb_file_name"], s["epoch_name"]): int(s.get("n_swr_no_non_local") or 0)
-        for s in sidecars
-    }
-    total = sum(n_events.values())
-    with_replay = sum(int(s.get("n_swr_with_non_local") or 0) for s in sidecars)
-    unknown = sum(int(s.get("n_swr_no_non_local_unknown") or 0) for s in sidecars)
+    sessions = pd.DataFrame(
+        [
+            {
+                "nwb_file_name": s["nwb_file_name"],
+                "epoch_name": s["epoch_name"],
+                "n_swr_no_non_local": int(s.get("n_swr_no_non_local") or 0),
+                "n_swr_with_non_local": int(s.get("n_swr_with_non_local") or 0),
+                "n_swr_no_non_local_unknown": int(
+                    s.get("n_swr_no_non_local_unknown") or 0
+                ),
+            }
+            for s in sidecars
+        ]
+    )
+    events = population_statistics.swr_without_replay_event_statistics(
+        sessions, SWR_WITHOUT_REPLAY_MIN_EVENTS
+    )
     add(
         "swr_no_replay_sessions",
         len(sidecars),
@@ -1837,7 +1703,7 @@ def swr_without_replay_values(
     )
     add(
         "swr_no_replay_events",
-        total,
+        events["n_events"],
         "count",
         "count",
         "Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed "
@@ -1845,14 +1711,14 @@ def swr_without_replay_values(
     )
     add(
         "swr_no_replay_events_fraction",
-        total / (total + with_replay + unknown),
+        events["events_fraction"],
         "fraction",
         "pct",
         "share of the kept, cohort Kay SWRs that overlap no non-local event",
     )
     add(
         "swr_no_replay_events_unknown",
-        unknown,
+        events["n_unknown"],
         "count",
         "count",
         "kept SWRs left out of the class because they overlap a window the "
@@ -1860,7 +1726,7 @@ def swr_without_replay_values(
     )
     add(
         "swr_no_replay_events_session_median",
-        float(np.median(list(n_events.values()))),
+        events["events_session_median"],
         "quantity",
         "int",
         "median per session of those SWRs",
@@ -1868,162 +1734,136 @@ def swr_without_replay_values(
     )
     add(
         "swr_no_replay_sessions_min_events",
-        sum(n >= SWR_WITHOUT_REPLAY_MIN_EVENTS for n in n_events.values()),
+        events["n_sessions_min_events"],
         "count",
         "count",
         f"sessions with at least {SWR_WITHOUT_REPLAY_MIN_EVENTS} such SWRs",
     )
 
-    session_events = np.array(
-        [
-            n_events[(name, epoch)]
-            for name, epoch in zip(
-                population["nwb_file_name"], population["epoch_name"], strict=True
-            )
-        ]
+    settings = {"alpha": ALPHA, "min_events": SWR_WITHOUT_REPLAY_MIN_EVENTS}
+    statistics = population_statistics.swr_without_replay_unit_statistics(
+        population, sessions, three_class_model=THREE_CLASS_MODEL, **settings
     )
-    new_p = population["SWR_no_non_local: p_heldout"].to_numpy(dtype=float)
-    swr_p = population[HELDOUT_P_COLUMNS["non_local_SWR"]].to_numpy(dtype=float)
-    new_peak = population["SWR_no_non_local: peak_log_modulation"].to_numpy(dtype=float)
-    swr_peak = population["non_local_SWR_3class: peak_log_modulation"].to_numpy(
-        dtype=float
+    by_animal = population_statistics.swr_without_replay_called_by_animal(
+        population, sessions, **settings
     )
-    improves = population[
-        f"{THREE_CLASS_MODEL} vs. non_local_SWR + non_local_no_SWR: heldout_delta_dev"
-    ].to_numpy(dtype=float)
-    best = population["min_heldout_model_three_class"]
-    animals = population["animal"].to_numpy()
-    sessions = population["nwb_file_name"].astype(str).to_numpy()
-
-    for subset, keep, label in (
-        ("all", np.ones(len(population), dtype=bool), "every session"),
+    timing_statistics = population_statistics.swr_without_replay_timing_statistics(
+        population,
+        curves["swr_no_non_local"],
+        lag_time,
+        sessions,
+        n_boot=TIMING_BOOTSTRAP_DRAWS,
+        seed=TIMING_BOOTSTRAP_SEED,
+        **settings,
+    )
+    for subset, label in (
+        ("all", "every session"),
         (
             "min_events",
-            session_events >= SWR_WITHOUT_REPLAY_MIN_EVENTS,
             f"sessions with at least {SWR_WITHOUT_REPLAY_MIN_EVENTS} SWRs without replay",
         ),
     ):
         where = f"({label})"
-        units = int(keep.sum())
-        tested = keep & np.isfinite(new_p)
-        called = tested & (new_p < ALPHA)
+        stats = statistics.loc[subset]
         add(
             f"swr_no_replay_units_{subset}",
-            units,
+            stats["n_units"],
             "count",
             "count",
             f"units in {label} (Figure 4's population)",
         )
         add(
             f"swr_no_replay_units_tested_{subset}",
-            int(tested.sum()),
+            stats["n_tested"],
             "count",
             "count",
             f"of those, units with a finite p-value for SWRs without replay {where}",
         )
-        if tested.any():
+        add(
+            f"swr_no_replay_called_fraction_{subset}",
+            stats["called_fraction"],
+            "fraction",
+            "pct",
+            f"share of tested units at raw empirical p < {ALPHA:g} for SWRs "
+            f"without replay, against their own matched null {where}",
+        )
+        add(
+            f"swr_no_replay_units_called_{subset}",
+            stats["n_called"],
+            "count",
+            "count",
+            f"units called for SWRs without replay {where}",
+        )
+        for (_, animal), own in by_animal[
+            by_animal.index.get_level_values("subset") == subset
+        ].iterrows():
             add(
-                f"swr_no_replay_called_fraction_{subset}",
-                called.sum() / tested.sum(),
+                f"swr_no_replay_called_fraction_{subset}_{ANIMAL_WORDS[animal]}",
+                own["called_fraction"],
                 "fraction",
                 "pct",
-                f"share of tested units at raw empirical p < {ALPHA:g} for SWRs "
-                f"without replay, against their own matched null {where}",
+                f"the same for {animal}'s tested units {where}",
             )
-            add(
-                f"swr_no_replay_units_called_{subset}",
-                int(called.sum()),
-                "count",
-                "count",
-                f"units called for SWRs without replay {where}",
-            )
-            for animal in np.unique(animals[tested]):
-                own = tested & (animals == animal)
-                add(
-                    f"swr_no_replay_called_fraction_{subset}_{ANIMAL_WORDS[animal]}",
-                    called[own].sum() / own.sum(),
-                    "fraction",
-                    "pct",
-                    f"the same for {animal}'s tested units {where}",
-                )
-        both_tested = tested & np.isfinite(swr_p)
-        a = called & (swr_p < ALPHA)
-        b = called & ~(swr_p < ALPHA) & both_tested
-        c = both_tested & ~called & (swr_p < ALPHA)
-        d = both_tested & ~called & ~(swr_p < ALPHA)
-        n_both = int(both_tested.sum())
-        if n_both:
-            add(
-                f"swr_no_replay_overlap_tested_{subset}",
-                n_both,
-                "count",
-                "count",
-                f"units tested for both SWRs without replay and SWR-coupled replay {where}",
-            )
-            for word, mask, text in (
-                ("both", a, "called for both"),
-                ("swr_no_replay_only", b, "called for SWRs without replay only"),
-                ("swr_replay_only", c, "called for SWR-coupled replay only"),
-                ("neither", d, "called for neither"),
-            ):
-                add(
-                    f"swr_no_replay_overlap_{word}_{subset}",
-                    int(mask.sum()),
-                    "count",
-                    "count",
-                    f"of those, units {text} {where}",
-                )
-            expected = (
-                (a | b)[both_tested].mean() * (a | c)[both_tested].mean() * n_both
-            )
-            add(
-                f"swr_no_replay_overlap_expected_{subset}",
-                expected,
-                "quantity",
-                "int",
-                f"units called for both expected if the two calls were independent {where}",
-                "units",
-            )
-            if b.sum() and c.sum():
-                add(
-                    f"swr_no_replay_overlap_odds_ratio_{subset}",
-                    (a.sum() * d.sum()) / (b.sum() * c.sum()),
-                    "quantity",
-                    "sig2",
-                    "odds ratio of being called for SWR-coupled replay given called for "
-                    f"SWRs without replay (1 = independent) {where}",
-                )
-            finite = both_tested & np.isfinite(new_peak) & np.isfinite(swr_peak)
-            if finite.sum() > 2:
-                add(
-                    f"swr_no_replay_rank_correlation_{subset}",
-                    stats.spearmanr(new_peak[finite], swr_peak[finite]).statistic,
-                    "quantity",
-                    "dec2",
-                    "Spearman correlation over units tested for both of the peak log "
-                    "modulation for SWRs without replay and for SWR-coupled replay, both "
-                    f"from the three-class model {where}",
-                )
-            if a.sum():
-                add(
-                    f"swr_no_replay_same_sign_fraction_{subset}",
-                    float((np.sign(new_peak[a]) == np.sign(swr_peak[a])).mean()),
-                    "fraction",
-                    "pct",
-                    f"of the units called for both, the share whose two peaks have the "
-                    f"same sign {where}",
-                )
-        for word, peak, text in (
-            ("swr_no_replay", new_peak, "SWRs without replay"),
-            ("swr_replay", swr_peak, "SWR-coupled replay"),
+        add(
+            f"swr_no_replay_overlap_tested_{subset}",
+            stats["n_overlap_tested"],
+            "count",
+            "count",
+            f"units tested for both SWRs without replay and SWR-coupled replay {where}",
+        )
+        for word, text in (
+            ("both", "called for both"),
+            ("swr_no_replay_only", "called for SWRs without replay only"),
+            ("swr_replay_only", "called for SWR-coupled replay only"),
+            ("neither", "called for neither"),
         ):
-            finite = keep & np.isfinite(peak)
-            if not finite.any():
-                continue
-            median_abs = float(np.median(np.abs(peak[finite])))
+            add(
+                f"swr_no_replay_overlap_{word}_{subset}",
+                stats[f"n_overlap_{word}"],
+                "count",
+                "count",
+                f"of those, units {text} {where}",
+            )
+        add(
+            f"swr_no_replay_overlap_expected_{subset}",
+            stats["n_overlap_expected"],
+            "quantity",
+            "int",
+            f"units called for both expected if the two calls were independent {where}",
+            "units",
+        )
+        add(
+            f"swr_no_replay_overlap_odds_ratio_{subset}",
+            stats["overlap_odds_ratio"],
+            "quantity",
+            "sig2",
+            "odds ratio of being called for SWR-coupled replay given called for "
+            f"SWRs without replay (1 = independent) {where}",
+        )
+        add(
+            f"swr_no_replay_rank_correlation_{subset}",
+            stats["rank_correlation"],
+            "quantity",
+            "dec2",
+            "Spearman correlation over units tested for both of the peak log "
+            "modulation for SWRs without replay and for SWR-coupled replay, both "
+            f"from the three-class model {where}",
+        )
+        add(
+            f"swr_no_replay_same_sign_fraction_{subset}",
+            stats["same_sign_fraction"],
+            "fraction",
+            "pct",
+            f"of the units called for both, the share whose two peaks have the "
+            f"same sign {where}",
+        )
+        for word, text in (
+            ("swr_no_replay", "SWRs without replay"),
+            ("swr_replay", "SWR-coupled replay"),
+        ):
             add(
                 f"swr_no_replay_effect_abs_peak_median_{word}_{subset}",
-                median_abs,
+                stats[f"abs_peak_median_{word}"],
                 "quantity",
                 "dec2",
                 f"median over units of the absolute peak log-rate modulation for {text}, "
@@ -2032,87 +1872,66 @@ def swr_without_replay_values(
             )
             add(
                 f"swr_no_replay_effect_rate_multiplier_median_{word}_{subset}",
-                float(np.exp(median_abs)),
+                stats[f"rate_multiplier_median_{word}"],
                 "quantity",
                 "sig2",
                 f"exp of that median: the median unit's largest rate change for {text} "
                 f"{where}",
                 "x",
             )
-            called_peak = peak[called & np.isfinite(peak)]
-            if called_peak.size:
-                add(
-                    f"swr_no_replay_effect_abs_peak_median_called_{word}_{subset}",
-                    float(np.median(np.abs(called_peak))),
-                    "quantity",
-                    "dec2",
-                    f"the same over the units called for SWRs without replay {where}",
-                    "log rate",
-                )
-        improves_finite = keep & np.isfinite(improves)
-        if improves_finite.any():
             add(
-                f"swr_no_replay_adds_to_split_fraction_{subset}",
-                float((improves[improves_finite] > 0).mean()),
-                "fraction",
-                "pct",
-                "share of units whose held-out deviance improves when SWRs without "
-                f"replay are added to the replay split {where}",
+                f"swr_no_replay_effect_abs_peak_median_called_{word}_{subset}",
+                stats[f"abs_peak_median_called_{word}"],
+                "quantity",
+                "dec2",
+                f"the same over the units called for SWRs without replay {where}",
+                "log rate",
             )
-        best_known = keep & best.notna().to_numpy()
-        if best_known.any():
-            add(
-                f"swr_no_replay_best_model_fraction_{subset}",
-                float((best[best_known] == THREE_CLASS_MODEL).mean()),
-                "fraction",
-                "pct",
-                "share of units whose best model by held-out deviance (constant, "
-                "non_local, the replay split, or the three-class model) is the three-"
-                f"class model {where}",
-            )
-        timing = peak_and_onset(curves["swr_no_non_local"], lag_time)
-        for direction, sign in (("enhanced", 1.0), ("suppressed", -1.0)):
-            chosen = called & (np.sign(timing.peak) == sign)
+        add(
+            f"swr_no_replay_adds_to_split_fraction_{subset}",
+            stats["adds_to_split_fraction"],
+            "fraction",
+            "pct",
+            "share of units whose held-out deviance improves when SWRs without "
+            f"replay are added to the replay split {where}",
+        )
+        add(
+            f"swr_no_replay_best_model_fraction_{subset}",
+            stats["best_model_fraction"],
+            "fraction",
+            "pct",
+            "share of units whose best model by held-out deviance (constant, "
+            "non_local, the replay split, or the three-class model) is the three-"
+            f"class model {where}",
+        )
+        for direction, sign in timing.DIRECTIONS.items():
+            rise = timing_statistics.loc[(subset, direction)]
             stem = f"{direction}_{subset}"
             add(
                 f"swr_no_replay_timing_units_{stem}",
-                int(chosen.sum()),
+                rise["n_units"],
                 "count",
                 "count",
                 f"units called for SWRs without replay whose peak is "
                 f"{'an increase' if sign > 0 else 'a decrease'} {where}",
             )
-            if chosen.sum() < 2:
-                continue
-            rise = population_timing(
-                curves["swr_no_non_local"][:, chosen],
-                timing.peak[chosen],
-                sessions[chosen],
-                lag_time,
-                n_boot=TIMING_BOOTSTRAP_DRAWS,
-                seed=TIMING_BOOTSTRAP_SEED,
-                baseline="window_start",
-            )
-            for key, value, unit, style, text in (
-                ("peak_ms", rise.peak_lag * 1e3, "ms", "int", "peak lag"),
-                ("rise_onset_ms", rise.onset_lag * 1e3, "ms", "int", "rise onset"),
+            for key, unit, style, text in (
+                ("peak_ms", "ms", "int", "peak lag"),
+                ("rise_onset_ms", "ms", "int", "rise onset"),
                 (
                     "rise_onset_ms_ci_low",
-                    rise.onset_lag_interval[0] * 1e3,
                     "ms",
                     "int",
                     "2.5th percentile over recording-day resamples of the rise onset",
                 ),
                 (
                     "rise_onset_ms_ci_high",
-                    rise.onset_lag_interval[1] * 1e3,
                     "ms",
                     "int",
                     "97.5th percentile over recording-day resamples of the rise onset",
                 ),
                 (
                     "rise_size",
-                    rise.size,
                     "log rate",
                     "dec2",
                     "size from the -200 ms value",
@@ -2120,7 +1939,7 @@ def swr_without_replay_values(
             ):
                 add(
                     f"swr_no_replay_timing_{key}_{stem}",
-                    value,
+                    rise[key],
                     "quantity",
                     style,
                     f"{text} of the sign-aligned mean curve of the units called for SWRs "
@@ -2383,9 +2202,9 @@ def rate_cutoff_check_values(
     units at or above the cutoff (``immobility_avg_firing_rate``); only the keys
     of :data:`CHECK_KEYS` are kept, renamed ``check_one_hz_<key>``.
     """
-    gated = population[
-        population["immobility_avg_firing_rate"] >= CHECK_FIRING_RATE_HZ
-    ].reset_index(drop=True)
+    gated, _ = population_statistics.units_at_or_above_rate(
+        population, CHECK_FIRING_RATE_HZ
+    )
     computed = [
         make(
             "units",
@@ -2399,14 +2218,11 @@ def rate_cutoff_check_values(
     computed += overlap_and_effect_values(gated, make)
     if extended is not None:
         ext_population, ext_curves, ext_lag, ext_sidecars = extended
-        rate = ext_population["immobility_avg_firing_rate"].to_numpy(dtype=float)
-        keep = rate >= CHECK_FIRING_RATE_HZ
+        ext_gated, ext_gated_curves = population_statistics.units_at_or_above_rate(
+            ext_population, CHECK_FIRING_RATE_HZ, ext_curves
+        )
         computed += swr_without_replay_values(
-            ext_population[keep].reset_index(drop=True),
-            {k: v[:, keep] for k, v in ext_curves.items()},
-            ext_lag,
-            ext_sidecars,
-            make,
+            ext_gated, ext_gated_curves, ext_lag, ext_sidecars, make
         )
     values = []
     for value in computed:

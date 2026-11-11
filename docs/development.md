@@ -425,10 +425,11 @@ fails when a cited value is pending.
 A builder names and describes values; it does not compute them. The statistics are functions in
 `analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
 tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
-number comes from. The events summary is built this way (`analysis/hippocampus/event_statistics.py`,
-`analysis/inventory_comparison/nonlocal_comparison.py`); the detection, behavior and mpfc builders still
-compute their own statistics (`TODO.md`). A builder may count the size of an input it reads (its epochs,
-its animals).
+number comes from. The events and mpfc summaries are built this way
+(`analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
+`analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`); the detection and behavior builders
+still compute their own statistics (`TODO.md`). A builder may count the size of an input it reads (its
+epochs, its animals) and copy a statistic a file already holds.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and
   name the file and the key. If the number is in no summary, say it is not computed; do not compute it

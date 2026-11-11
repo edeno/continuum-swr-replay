@@ -117,6 +117,10 @@ the table. Regenerated on the cluster on 2026-11-11: the frames and the table
 agree, and the panels show the summary's event count, class shares and median
 offsets.
 
+The mpfc summary followed the same day: `analysis/pfc/population_statistics.py`,
+and the timing statistics in `analysis/pfc/timing.py`. All 604 values are
+bit-identical before and after, on the cluster's data.
+
 ## As built: naming (2026-11-11)
 
 - **Summaries are named for what they hold:** `survey`, `detection`, `events`,

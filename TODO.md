@@ -39,14 +39,31 @@ Work that is deferred on purpose. Each item says when it should be done.
 
 ## Reported values
 
-- [ ] **Statistics out of the detection, behavior and mpfc builders.** The events
-  summary's statistics are functions in `analysis/`
-  (`hippocampus/event_statistics.py`, `inventory_comparison/nonlocal_comparison.py`)
-  and its builder only names and describes them. The other three builders still
-  compute what they report. Move each the same way, checking that every value is
-  unchanged by a trial rebuild on the cluster.
-  *When:* before the Results that cite them are drafted; mpfc next (Figure 4
-  already shares its loader with the builder).
+- [ ] **Statistics out of the detection and behavior builders.** The events and
+  mpfc summaries' statistics are functions in `analysis/`
+  (`hippocampus/event_statistics.py`, `inventory_comparison/nonlocal_comparison.py`,
+  `pfc/population_statistics.py`, `pfc/timing.py`) and their builders only name
+  and describe them. The detection and behavior builders still compute what they
+  report. Move each the same way, checking that every value is unchanged by a
+  trial rebuild on the cluster.
+  *When:* before the Results that cite them are drafted.
+
+- [ ] **Figure 4 and three pfc scripts recompute statistics the mpfc summary
+  reports.** `generate_figure04.py` computes the called shares and the
+  best-model shares itself (as percents); `scripts/pfc/compare_pfc_cohorts.py`
+  (cohort totals, prior-binding share) and
+  `scripts/pfc/measure_pfc_null_geometry.py` (the null-geometry numbers) compute
+  theirs. Call `analysis/pfc/population_statistics.py` instead.
+  *When:* at the next regeneration of Figure 4.
+
+- [ ] **Two faults in the mpfc summary's text, found while moving its
+  statistics; the numbers are not affected.** (1) Five timing descriptions read
+  "onset is rise_size": in `reported/mpfc.py:timing_values` the variable holding
+  the half-maximum rule's wording is reused as a loop variable, so later
+  descriptions name the loop's key instead of the rule. (2) The extended tree's
+  two input records name `swr_without_replay/swr_without_replay/…`: the label
+  passed to `files_record` repeats the folder.
+  *When:* at the next rebuild of the mpfc summary.
 
 - [ ] **The events summary reads two inputs from `paper/figures/`.**
   `reported/events.py` reads `paper/figures/reality_all/per_epoch/` (the
