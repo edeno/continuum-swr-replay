@@ -69,6 +69,7 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     files_record,
+    rel,
     value_factory,
 )
 
@@ -2435,10 +2436,3 @@ def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
         ),
     ]
     return summary
-
-
-def rel(path: Path) -> str:
-    """``path`` relative to the repository when it is under it."""
-    return (
-        str(path.relative_to(ROOT_DIR)) if path.is_relative_to(ROOT_DIR) else str(path)
-    )

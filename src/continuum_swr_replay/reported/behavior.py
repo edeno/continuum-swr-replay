@@ -126,6 +126,7 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     pend,
+    rel,
     value_factory,
 )
 from continuum_swr_replay.tables.session_keys import n_sessions
@@ -2808,8 +2809,9 @@ def fit_staleness(*artifacts: Path) -> str | None:
     """Why the values read from fitted ``artifacts`` are pending, or None.
 
     A fit's provenance sidecar records the SHA-256 of each table and upstream
-    fit it read. A fit with no sidecar, or one that records other inputs than
-    the current ones, describes other data.
+    fit it read. A fit with no sidecar, one that records no input, or one that
+    records other inputs than the current ones, cannot be tied to the current
+    data.
     """
     notes = []
     for artifact in artifacts:
@@ -2820,6 +2822,11 @@ def fit_staleness(*artifacts: Path) -> str | None:
             )
             continue
         recorded = json.loads(sidecar.read_text())["inputs"]
+        if not recorded:
+            notes.append(
+                f"{rel(artifact)} records no input it was fit on; refit before citing"
+            )
+            continue
         inputs = {
             name: (
                 table_path(name, replay_content_dir())
@@ -2850,13 +2857,6 @@ def _read_per_bin_fits(path: Path) -> pd.DataFrame:
             f"{path}: not fit on the {PER_BIN_DESIGN!r} per-bin design; refit it"
         )
     return fits
-
-
-def rel(path: Path) -> str:
-    """``path`` relative to the repository when it is under it."""
-    return (
-        str(path.relative_to(ROOT_DIR)) if path.is_relative_to(ROOT_DIR) else str(path)
-    )
 
 
 def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:

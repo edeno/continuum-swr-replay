@@ -51,6 +51,7 @@ from continuum_swr_replay.reported.values import (
     Tags,
     Value,
     file_record,
+    rel,
     value_factory,
 )
 
@@ -1119,10 +1120,3 @@ def _record(path: Path) -> dict:
     path; this shows the path as the repository reads it.
     """
     return {**file_record(path, ROOT_DIR), "path": rel(path)}
-
-
-def rel(path: Path) -> str:
-    """``path`` relative to the repository when it is under it."""
-    return (
-        str(path.relative_to(ROOT_DIR)) if path.is_relative_to(ROOT_DIR) else str(path)
-    )

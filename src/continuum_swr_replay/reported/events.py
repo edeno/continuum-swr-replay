@@ -80,6 +80,7 @@ from continuum_swr_replay.reported.values import (
     file_record,
     files_record,
     pend,
+    rel,
     value_factory,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -1630,13 +1631,6 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
     )
     summary.inputs += [file_record(folder / name, ROOT_DIR) for name in names]
     return summary
-
-
-def rel(path: Path) -> str:
-    """``path`` relative to the repository when it is under it."""
-    return (
-        str(path.relative_to(ROOT_DIR)) if path.is_relative_to(ROOT_DIR) else str(path)
-    )
 
 
 def _input_run(run_dir: Path, name: str) -> str:

@@ -3,6 +3,8 @@ never refused."""
 
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -57,3 +59,15 @@ def test_a_fit_with_no_provenance_record_is_stale(fit):
     assert "all_models.pkl" not in note
     fit_provenance_path(fit).unlink()
     assert fit_staleness(fit, other).count("has no provenance record") == 2
+
+
+def test_a_fit_whose_record_names_no_input_is_stale(fit):
+    # A record that lists nothing cannot say the fit was made on these tables.
+    path = fit_provenance_path(fit)
+    record = json.loads(path.read_text())
+    record["inputs"] = {}
+    path.write_text(json.dumps(record))
+    note = fit_staleness(fit)
+    assert note.endswith(
+        "all_models.pkl records no input it was fit on; refit before citing"
+    )

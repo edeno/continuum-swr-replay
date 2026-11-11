@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.code_record import CodeRecord
 from continuum_swr_replay.reported.questions import tag_problems
 
@@ -382,6 +383,14 @@ def summary_tag_problems(summary: Summary) -> dict[str, list[str]]:
         for key, value in summary.values.items()
     }
     return {key: found for key, found in problems.items() if found}
+
+
+def rel(path: Path) -> str:
+    """``path`` relative to the repository when it is under it: how a builder
+    names an input in a value's ``source``."""
+    return (
+        str(path.relative_to(ROOT_DIR)) if path.is_relative_to(ROOT_DIR) else str(path)
+    )
 
 
 def _shown(path: Path, root: Path) -> str:
