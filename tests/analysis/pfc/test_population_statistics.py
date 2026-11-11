@@ -563,13 +563,25 @@ def _ramp(peak_ms: int, offset: float) -> np.ndarray:
 
 
 def test_swr_without_replay_timing_statistics_of_the_called_units_mean_curve():
-    # Called units with an increase (0, 5, 8) share one curve and those with a
-    # decrease (1, 4, 9) another, so their mean curves are those curves. The
-    # other units peak at -100 ms and would move the mean if they were included.
+    # The called units with an increase are 0 (chimi's day), 5 and 8 (two epochs
+    # of wilbur's day); their lines reach the top at 98, 58 and 18 ms. Those
+    # with a decrease (1, 4, 9) share one curve. The other units peak at
+    # -100 ms and would move the mean if they were included.
     early = 5.0 * (LAG_MS == -100)
-    up, down = _ramp(98, 0.2), -_ramp(58, 0.2)
+    down = -_ramp(58, 0.2)
     curves = np.column_stack(
-        [up, down, early, early, down, up, -early, early, up, down]
+        [
+            _ramp(98, 0.2),
+            down,
+            early,
+            early,
+            down,
+            _ramp(58, 0.2),
+            -early,
+            early,
+            _ramp(18, 0.2),
+            down,
+        ]
     )
     result = stats.swr_without_replay_timing_statistics(
         _extended_population(),
@@ -588,33 +600,64 @@ def test_swr_without_replay_timing_statistics_of_the_called_units_mean_curve():
         ("min_events", "suppressed"),
     ]
     np.testing.assert_array_equal(result["n_units"], [3, 3, 2, 2])
+    # Every session, increases. Each line is half way up from its value at
+    # -200 ms (0.2) at half its ramp: 49, 29 and 9 ms. The mean of the three
+    # reaches the top (1.2) at 98 ms and is half way up, 0.7, from 20 ms:
+    # (20/98 + 20/58 + 1) / 3 = 0.516, while at 18 ms it is 0.498.
+    enhanced = result.loc[("all", "enhanced")]
+    assert enhanced["peak_ms"] == pytest.approx(98)
+    assert enhanced["rise_onset_ms"] == pytest.approx(20)
+    # the top less the value at -200 ms, not the top itself (1.2)
+    assert enhanced["rise_size"] == pytest.approx(1.0)
+    # Two recording days are resampled, not three epochs. Chimi's day twice is
+    # unit 0's line (half way up from 50 ms); wilbur's day twice is the mean of
+    # units 5 and 8, half way up from 14 ms ((14/58 + 14/18) / 2 = 0.510, at
+    # 12 ms 0.437); one of each is the mean of the three. Each of the first two
+    # is a quarter of the draws, so the percentiles are 14 and 50 ms. (Unit 8
+    # alone, which only resampling epochs can draw, is half way up from 10 ms.)
+    assert enhanced["rise_onset_ms_ci_low"] == pytest.approx(14)
+    assert enhanced["rise_onset_ms_ci_high"] == pytest.approx(50)
+    assert enhanced["rise_size_ci_low"] == pytest.approx(1.0)
+    assert enhanced["rise_size_ci_high"] == pytest.approx(1.0)
+    # Sessions with enough events, increases: units 5 and 8, both of wilbur's
+    # day, so every resample is their mean.
+    enough = result.loc[("min_events", "enhanced")]
+    assert enough["peak_ms"] == pytest.approx(58)
+    assert enough["rise_onset_ms"] == pytest.approx(14)
+    assert enough["rise_onset_ms_ci_low"] == pytest.approx(14)
+    assert enough["rise_onset_ms_ci_high"] == pytest.approx(14)
     for subset in ("all", "min_events"):
-        enhanced = result.loc[(subset, "enhanced")]
-        # The line reaches its top at 98 ms. It is half way up from its value
-        # at -200 ms between 48 and 50 ms. (Half way up from zero, 0.6 of 1.2,
-        # would be 40 ms.)
-        assert enhanced["peak_ms"] == pytest.approx(98)
-        assert enhanced["rise_onset_ms"] == pytest.approx(50)
-        # every resample averages the same curve
-        assert enhanced["rise_onset_ms_ci_low"] == pytest.approx(50)
-        assert enhanced["rise_onset_ms_ci_high"] == pytest.approx(50)
-        # the top less the value at -200 ms, not the top itself (1.2)
-        assert enhanced["rise_size"] == pytest.approx(1.0)
         suppressed = result.loc[(subset, "suppressed")]
         assert suppressed["peak_ms"] == pytest.approx(58)
         assert suppressed["rise_onset_ms"] == pytest.approx(30)
         assert suppressed["rise_size"] == pytest.approx(1.0)
 
-    # with only session 2 kept, each direction has one called unit: no timing
-    alone = stats.swr_without_replay_timing_statistics(
-        _extended_population(),
-        curves,
-        LAG_TIME,
-        SESSIONS,
-        alpha=ALPHA,
-        min_events=20,
-        n_boot=50,
-        seed=0,
-    ).loc["min_events"]
+
+def test_swr_without_replay_timing_statistics_of_one_unit_and_of_none():
+    down = -_ramp(58, 0.2)
+    curves = np.column_stack([down] * 5 + [_ramp(98, 0.2)] + [down] * 4)
+
+    def timing(min_events: int) -> pd.DataFrame:
+        return stats.swr_without_replay_timing_statistics(
+            _extended_population(),
+            curves,
+            LAG_TIME,
+            SESSIONS,
+            alpha=ALPHA,
+            min_events=min_events,
+            n_boot=10,
+            seed=0,
+        ).loc["min_events"]
+
+    # with only session 2 kept, each direction has one called unit (5 and 4),
+    # and its mean curve is that unit's own
+    alone = timing(20)
     np.testing.assert_array_equal(alone["n_units"], [1, 1])
-    assert alone.drop(columns="n_units").isna().all(axis=None)
+    assert alone.loc["enhanced", "peak_ms"] == pytest.approx(98)
+    assert alone.loc["enhanced", "rise_onset_ms"] == pytest.approx(50)
+    assert alone.loc["suppressed", "peak_ms"] == pytest.approx(58)
+    assert alone.loc["suppressed", "rise_onset_ms"] == pytest.approx(30)
+    # no session has 31 events: no unit, and no timing
+    nobody = timing(31)
+    np.testing.assert_array_equal(nobody["n_units"], [0, 0])
+    assert nobody.drop(columns="n_units").isna().all(axis=None)

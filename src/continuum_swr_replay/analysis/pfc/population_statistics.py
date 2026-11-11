@@ -35,7 +35,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 from continuum_swr_replay.analysis.pfc.timing import (
     DIRECTIONS,
     peak_and_onset,
-    population_timing,
+    population_rise_timing,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
@@ -997,10 +997,9 @@ def swr_without_replay_timing_statistics(
     """When the response to SWRs without replay peaks and starts to rise.
 
     Over the units called for SWRs without replay, split by the sign of each
-    unit's peak, the timing of their sign-aligned mean curve measured from its
-    value at the first lag
-    (:func:`~continuum_swr_replay.analysis.pfc.timing.population_timing` with
-    ``baseline="window_start"``), resampling recording days (``nwb_file_name``).
+    unit's peak, the rise timing of their sign-aligned mean curve
+    (:func:`~continuum_swr_replay.analysis.pfc.timing.population_rise_timing`),
+    resampling recording days (``nwb_file_name``).
 
     Parameters
     ----------
@@ -1022,60 +1021,41 @@ def swr_without_replay_timing_statistics(
 
     Returns
     -------
-    statistics : pd.DataFrame, shape (4, 6)
+    statistics : pd.DataFrame, shape (4, 8)
         Indexed by group of sessions (``subset``) and ``direction``
         (``"enhanced"``: the peak is an increase; ``"suppressed"``: a
         decrease):
 
-        - ``n_units``: the called units of that direction.
-        - ``peak_ms``, ``rise_onset_ms``: the mean curve's peak lag and rise
-          onset, in ms.
-        - ``rise_onset_ms_ci_low``, ``rise_onset_ms_ci_high``: the 2.5th and
-          97.5th percentiles of the rise onset over the resamples, in ms.
-        - ``rise_size``: the mean curve's peak less its value at the first
-          lag, on the log-rate scale.
-
-        All but ``n_units`` are NaN with fewer than two units.
+        - ``n_units``: the called units of that direction. A called unit whose
+          curve is not finite or is zero everywhere has no peak, and is in
+          neither direction.
+        - ``peak_ms``, ``rise_onset_ms``, ``rise_onset_ms_ci_low``,
+          ``rise_onset_ms_ci_high``, ``rise_size``, ``rise_size_ci_low``,
+          ``rise_size_ci_high``: the statistics of
+          :func:`~continuum_swr_replay.analysis.pfc.timing.population_rise_timing`
+          for those units (lags in ms, sizes on the log-rate scale), NaN when
+          the direction has no unit.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
     new_p = population["SWR_no_non_local: p_heldout"].to_numpy(dtype=float)
     days = population["nwb_file_name"].astype(str).to_numpy()
-    columns = [
-        "n_units",
-        "peak_ms",
-        "rise_onset_ms",
-        "rise_onset_ms_ci_low",
-        "rise_onset_ms_ci_high",
-        "rise_size",
-    ]
-    index, rows = [], []
+    peak = peak_and_onset(curves, lag_time).peak
+    rows = {}
     for subset, keep in subsets.items():
-        tested = keep & np.isfinite(new_p)
-        called = tested & (new_p < alpha)
-        timing = peak_and_onset(curves, lag_time)
+        called = keep & (new_p < alpha)
         for direction, sign in DIRECTIONS.items():
-            chosen = called & (np.sign(timing.peak) == sign)
-            row: dict[str, float] = dict.fromkeys(columns, np.nan)
-            row["n_units"] = int(chosen.sum())
-            if chosen.sum() >= 2:
-                rise = population_timing(
+            chosen = called & (np.sign(peak) == sign)
+            rows[(subset, direction)] = {
+                "n_units": int(chosen.sum()),
+                **population_rise_timing(
                     curves[:, chosen],
-                    timing.peak[chosen],
+                    peak[chosen],
                     days[chosen],
                     lag_time,
                     n_boot=n_boot,
                     seed=seed,
-                    baseline="window_start",
-                )
-                row["peak_ms"] = rise.peak_lag * 1e3
-                row["rise_onset_ms"] = rise.onset_lag * 1e3
-                row["rise_onset_ms_ci_low"] = rise.onset_lag_interval[0] * 1e3
-                row["rise_onset_ms_ci_high"] = rise.onset_lag_interval[1] * 1e3
-                row["rise_size"] = rise.size
-            index.append((subset, direction))
-            rows.append(row)
-    return pd.DataFrame(
-        rows,
-        index=pd.MultiIndex.from_tuples(index, names=["subset", "direction"]),
-        columns=columns,
-    )
+                ),
+            }
+    statistics = pd.DataFrame.from_dict(rows, orient="index")
+    statistics.index.names = ["subset", "direction"]
+    return statistics

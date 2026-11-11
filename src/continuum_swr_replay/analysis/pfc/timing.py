@@ -429,6 +429,71 @@ _CALLED_TIMING_COLUMNS = (
 )
 
 
+def population_rise_timing(
+    curves: NDArray,
+    peak: NDArray,
+    groups: NDArray,
+    lag_time: NDArray,
+    *,
+    n_boot: int,
+    seed: int,
+) -> dict[str, float]:
+    """When the sign-aligned mean curve of a set of units peaks and starts to rise.
+
+    The timing of the mean curve measured from its value at the first lag
+    (:func:`population_timing` with ``baseline="window_start"``), with 95 %
+    intervals from resampling ``groups``.
+
+    Parameters
+    ----------
+    curves : NDArray, shape (n_lags, n_units)
+        Each unit's peri-event curve.
+    peak : NDArray, shape (n_units,)
+        Signed peaks, from :func:`peak_and_onset`.
+    groups : NDArray, shape (n_units,)
+        The label each unit is resampled by.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row, in seconds, ascending.
+    n_boot, seed : int
+        Resamples of ``groups`` behind the intervals, and their seed.
+
+    Returns
+    -------
+    statistics : dict
+        - ``peak_ms``: the lag of the mean curve's largest absolute value, in
+          ms.
+        - ``rise_onset_ms``: its rise onset, in ms: the earliest lag of the
+          run, ending at the peak, over which the curve is at least half way
+          from its value at the first lag to the peak.
+        - ``rise_size``: its value at the peak less its value at the first
+          lag, on the log-rate scale.
+        - ``rise_onset_ms_ci_low``, ``rise_onset_ms_ci_high``,
+          ``rise_size_ci_low``, ``rise_size_ci_high``: the 2.5th and 97.5th
+          percentiles of the rise onset and the rise size over the resamples.
+
+        One unit is enough: the mean curve is then that unit's own. With no
+        unit, every statistic is NaN.
+    """
+    rise = population_timing(
+        curves,
+        peak,
+        groups,
+        lag_time,
+        n_boot=n_boot,
+        seed=seed,
+        baseline="window_start",
+    )
+    return {
+        "peak_ms": rise.peak_lag * _MS,
+        "rise_onset_ms": rise.onset_lag * _MS,
+        "rise_onset_ms_ci_low": rise.onset_lag_interval[0] * _MS,
+        "rise_onset_ms_ci_high": rise.onset_lag_interval[1] * _MS,
+        "rise_size": rise.size,
+        "rise_size_ci_low": rise.size_interval[0],
+        "rise_size_ci_high": rise.size_interval[1],
+    }
+
+
 def called_response_timing_by_animal(
     curves: NDArray, lag_time: NDArray, called: NDArray, animals: NDArray
 ) -> pd.DataFrame:
@@ -558,7 +623,8 @@ def called_response_timing(
           ``population_rise_onset_ms``, ``population_steepest_ms``: its peak
           lag, half-maximum onset, rise onset and steepest approach.
         - ``population_size``: its peak, from zero; ``population_rise_size``:
-          its peak less its value at the first lag (log-rate scale).
+          its peak less its value at the first lag (log-rate scale). The rise
+          onset and the rise size are those of :func:`population_rise_timing`.
         - ``population_pre_event_level_fraction``: its value at the first lag
           as a share of its largest value, clipped to [0, 1].
         - ``population_size_vs_control``: its largest value less, at that lag,
@@ -606,6 +672,8 @@ def called_response_timing(
             * _MS
         )
         row["rise_onset_median_ms"] = np.nanmedian(rise_ms)
+        steepest_ms = steepest_approach_lag(curves[:, chosen], lag_time) * _MS
+        row["steepest_median_ms"] = np.nanmedian(steepest_ms)
         population_curve = population_timing(
             curves[:, chosen],
             timing.peak[chosen],
@@ -614,15 +682,38 @@ def called_response_timing(
             n_boot=n_boot,
             seed=seed,
         )
-        population_rise = population_timing(
+        for what, point, (ci_low, ci_high) in (
+            ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
+            ("onset", population_curve.onset_lag, population_curve.onset_lag_interval),
+            (
+                "steepest",
+                population_curve.steepest_lag,
+                population_curve.steepest_lag_interval,
+            ),
+        ):
+            row[f"population_{what}_ms"] = point * _MS
+            row[f"population_{what}_ms_ci_low"] = ci_low * _MS
+            row[f"population_{what}_ms_ci_high"] = ci_high * _MS
+        row["population_size"] = population_curve.size
+        row["population_size_ci_low"] = population_curve.size_interval[0]
+        row["population_size_ci_high"] = population_curve.size_interval[1]
+        rise = population_rise_timing(
             curves[:, chosen],
             timing.peak[chosen],
             groups[chosen],
             lag_time,
             n_boot=n_boot,
             seed=seed,
-            baseline="window_start",
         )
+        for name in (
+            "rise_onset_ms",
+            "rise_onset_ms_ci_low",
+            "rise_onset_ms_ci_high",
+            "rise_size",
+            "rise_size_ci_low",
+            "rise_size_ci_high",
+        ):
+            row[f"population_{name}"] = rise[name]
         row["population_pre_event_level_fraction"] = float(
             np.clip(
                 population_curve.curve[0] / np.max(population_curve.curve),
@@ -630,34 +721,6 @@ def called_response_timing(
                 1.0,
             )
         )
-        row["population_rise_onset_ms"] = population_rise.onset_lag * _MS
-        row["population_rise_onset_ms_ci_low"] = (
-            population_rise.onset_lag_interval[0] * _MS
-        )
-        row["population_rise_onset_ms_ci_high"] = (
-            population_rise.onset_lag_interval[1] * _MS
-        )
-        for what, point, (ci_low, ci_high) in (
-            ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
-            ("onset", population_curve.onset_lag, population_curve.onset_lag_interval),
-        ):
-            row[f"population_{what}_ms"] = point * _MS
-            row[f"population_{what}_ms_ci_low"] = ci_low * _MS
-            row[f"population_{what}_ms_ci_high"] = ci_high * _MS
-        steepest_ms = steepest_approach_lag(curves[:, chosen], lag_time) * _MS
-        row["steepest_median_ms"] = np.nanmedian(steepest_ms)
-        row["population_steepest_ms"] = population_curve.steepest_lag * _MS
-        for bound, value in zip(
-            ("low", "high"), population_curve.steepest_lag_interval, strict=True
-        ):
-            row[f"population_steepest_ms_ci_{bound}"] = value * _MS
-        for rule, result in (
-            ("size", population_curve),
-            ("rise_size", population_rise),
-        ):
-            row[f"population_{rule}"] = result.size
-            for bound, value in zip(("low", "high"), result.size_interval, strict=True):
-                row[f"population_{rule}_ci_{bound}"] = value
         chosen_control = control[:, chosen]
         usable = np.isfinite(chosen_control).all(axis=0)
         if usable.any():
