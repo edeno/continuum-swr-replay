@@ -434,7 +434,7 @@ Per-session model fitting for the replay content model hierarchy.
 
 The (stop x bin) point-process design and the bases it is built on.
 
-`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `reward_kernel_rate_ratios`, `self_history_rate_ratios`, `aggregate_to_timebins`
+`attach_is_swr_to_onsets`, `raised_cosine_history_basis`, `reward_basis_from_lags`, `reward_kernel_weights`, `reconstruct_reward_kernels`, `reconstruct_self_history_kernels`, `reward_kernel_rate_ratios`, `self_history_rate_ratios`, `arrival_spanning_stop_ids`, `aggregate_to_timebins`
 
 ### `src/continuum_swr_replay/analysis/replay/per_bin_rate_model.py`
 
@@ -718,7 +718,7 @@ Shared audited aggregation for the is_swr contrast ladders (rate + content).
 
 Replay content × reward outcome → behavioral change.
 
-`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `cross_session_role_summary`
+`StopSummaryConfig`, `stop_replay_summary`, `fit_is_stay_logistic_per_session`, `fit_is_stay_pooled_gee`, `cross_session_role_summary`, `pooled_gee_role_summary`, `smallest_adjusted_p`, `fit_status_counts`
 
 ### `src/continuum_swr_replay/analysis/replay/model_checking.py`
 
@@ -1137,3 +1137,37 @@ Keyed table-to-table parity checks shared across the pipeline.
 Centralized schema/version literals for the covariate pipeline.
 
 `assert_versions_compatible`
+
+## Unassigned
+
+Modules under a mapped root that no stage pattern claims. A module landing here means `write_pipeline_map.py` needs a stage rule, not that the module is unused.
+
+### `src/continuum_swr_replay/analysis/replay/coefficient_statistics.py`
+
+Across-session summaries of what the per-session fits wrote.
+
+`fit_rows`, `session_median_statistics`, `coefficient_statistics`, `gated_coefficient_statistics`, `gated_exp_median_ratio`, `gated_coefficient_difference_statistics`, `aic_difference_statistics`, `separated_fraction`, `known_fraction`, `fits_carrying`, `term_separation_statistics`, `rung_separation_range`, `audited_drop_statistics`, `group_range`
+
+### `src/continuum_swr_replay/analysis/replay/content_statistics.py`
+
+Summary statistics of what the non-local events represent.
+
+`trunk_shares`, `trunk_share_statistics`, `current_patch_trunk_fraction`, `event_length_statistics`, `concentration_contrast_statistics`
+
+### `src/continuum_swr_replay/analysis/replay/history_kernel_statistics.py`
+
+Summary statistics of the event-history kernels of the duration-aware rate fits.
+
+`lag_ms`, `lag_index`, `measurable_kernel`, `kernel_peak`, `self_history_statistics`, `self_history_range_statistics`, `cross_history_statistics`
+
+### `src/continuum_swr_replay/analysis/replay/rate_fit_statistics.py`
+
+Summary statistics of the per-bin event-rate ladder's fits.
+
+`frozen_cohort_statistics`, `baseline_rate_statistics`, `baseline_rate_ratio_statistics`, `reward_gated_fits`, `lag_one_reward_kernels`, `reward_kernel_statistics`, `paired_lag_one_kernel_statistics`, `ladder_fit_statistics`, `arrival_window_statistics`, `fitted_time_course`, `clock_shape_statistics`
+
+### `src/continuum_swr_replay/analysis/replay/stop_statistics.py`
+
+Summary statistics of the immobility stops and of where event onsets fall in them.
+
+`stop_cohort_counts`, `dwell_statistics`, `still_immobile_fraction`, `outcome_boundary_statistics`, `onset_time_statistics`, `reward_history_incomplete_statistics`

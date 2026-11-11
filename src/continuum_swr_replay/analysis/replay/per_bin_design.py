@@ -41,6 +41,7 @@ __all__ = [
     "NO_EXCLUDED_TIME",
     "POPULATIONS",
     "aggregate_to_timebins",
+    "arrival_spanning_stop_ids",
     "attach_is_swr_to_onsets",
     "raised_cosine_history_basis",
     "reconstruct_reward_kernels",
@@ -486,7 +487,7 @@ def self_history_rate_ratios(
     return np.median(np.exp(kernels), axis=0)
 
 
-def _arrival_spanning_stop_ids(stops: pd.DataFrame) -> np.ndarray:
+def arrival_spanning_stop_ids(stops: pd.DataFrame) -> np.ndarray:
     """``stop_id`` of the bouts that contain a later well arrival.
 
     A stop spans an arrival iff the NEXT stop of the same session -- ordering
@@ -668,7 +669,7 @@ def aggregate_to_timebins(
     stop level uses. Bins before the boundary keep the bout-start values. The
     one exception is a bout that spans a well arrival -- the next stop of the
     session arrived inside ``(stop_start, stop_end]`` (see
-    :func:`_arrival_spanning_stop_ids`) -- which changes which trip is the
+    :func:`arrival_spanning_stop_ids`) -- which changes which trip is the
     completed one partway through, so it is never shifted;
     ``out.attrs["n_stops_arrival_spanning"]`` counts how many such stops have at
     least one bin at or after the boundary (a boundary that falls inside a stop
@@ -949,7 +950,7 @@ def aggregate_to_timebins(
         # ``stop_start``) arrived at its well inside ``(stop_start, stop_end]``;
         # arrivals are monotone in the session, so the next stop's is the only
         # one that can fall there and the test is exact.
-        spans_arrival = out["stop_id"].isin(_arrival_spanning_stop_ids(s)).to_numpy()
+        spans_arrival = out["stop_id"].isin(arrival_spanning_stop_ids(s)).to_numpy()
         crosses = inside & ~spans_arrival
         n_stops_arrival_spanning = int(
             pd.unique(out["stop_id"].to_numpy()[inside & spans_arrival]).size

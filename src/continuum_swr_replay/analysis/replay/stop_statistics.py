@@ -20,8 +20,8 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     longest_history_window_s,
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
-    _arrival_spanning_stop_ids,
     aggregate_to_timebins,
+    arrival_spanning_stop_ids,
 )
 
 
@@ -150,7 +150,7 @@ def outcome_boundary_statistics(stops: pd.DataFrame) -> dict[str, float]:
         (stops["stop_start"] < stops["outcome_known_time_s"])
         & (stops["outcome_known_time_s"] <= stops["stop_end"])
     ).fillna(False)
-    spans = stops["stop_id"].isin(_arrival_spanning_stop_ids(stops))
+    spans = stops["stop_id"].isin(arrival_spanning_stop_ids(stops))
     delta = (stops["outcome_known_time_s"] - stops["stop_start"]).to_numpy(float)
     bins = aggregate_to_timebins(
         stops,
