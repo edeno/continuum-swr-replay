@@ -80,6 +80,24 @@ Work that is deferred on purpose. Each item says when it should be done.
   Write each decision in that file.
   *When:* before the Results that cite the value are drafted.
 
+- [ ] **Correctness review of three disagreements found by the cleanup review.**
+  Each may make a reported number, a figure or an audited table disagree with
+  another; none was changed, because settling it changes numbers.
+  - `analysis/replay/coefficient_statistics.py`: `coefficient_statistics` (used by
+    `gated_coefficient_statistics`) computes the signed-rank p for any number of
+    sessions; `contrast_aggregation.aggregate_contrast` gives NaN at 5 sessions or
+    fewer. A reported value and the audited CSV row of the same term can differ.
+  - `scripts/rate/plot_per_bin_rate_summary.py` (`_spline_basis`,
+    `_panel_fitted_timecourse`) rebuilds the fitted time course with its own knots
+    and grid and keeps separated sessions, unlike
+    `rate_fit_statistics.fitted_time_course`, so the plotted curve can disagree with
+    the reported peak.
+  - `analysis/inventory_comparison/nonlocal_comparison.py`: `_read_epochs` globs every
+    `*_{name}.parquet` in the run folder, so it can read epochs the run's manifest
+    does not mark `ok`; `feature_run.read_inputs` reads only the `ok` ones.
+
+  *When:* before the Results that cite these values or figures are drafted.
+
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
   removed after `cad31719`; it used an older claim numbering, so "D" is its claim
   "our method beats SWR-triggered decoding"). Quoted as it wrote them; confirm
