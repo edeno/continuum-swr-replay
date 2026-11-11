@@ -207,6 +207,32 @@ def test_the_gated_statistics_count_what_the_gate_left_out_and_are_still_returne
     assert result["median"] == pytest.approx(0.4)
     assert result["n_dropped"] == 3
     assert result["n_unidentified"] == 1
+    assert result["gate_refuses"]
+
+
+@pytest.mark.parametrize(
+    "separated, refuses",
+    [
+        # six sessions: none left out; one of six (17 %) is within the gate's
+        # 20 %; two of six (33 %) is not
+        (["", "", "", "", "", ""], False),
+        (["x", "", "", "", "", ""], False),
+        (["x", "x", "", "", "", ""], True),
+    ],
+)
+def test_the_gated_statistics_say_when_the_gate_refuses_the_term(separated, refuses):
+    fits = _fits(
+        [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+        ["a", "b", "c", "a", "b", "c"],
+        separated_terms=separated,
+    )
+    assert stats.gated_coefficient_statistics(fits, "x")["gate_refuses"] is refuses
+    assert (
+        stats.gated_coefficient_difference_statistics(
+            fits, _fits([0.0] * 6, ["a", "b", "c", "a", "b", "c"]), "x"
+        )["gate_refuses"]
+        is refuses
+    )
 
 
 def test_significance_is_read_on_the_clustered_standard_error():

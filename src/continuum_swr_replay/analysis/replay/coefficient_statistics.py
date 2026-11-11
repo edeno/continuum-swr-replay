@@ -176,8 +176,9 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
     gate's own refusal
     (:attr:`~continuum_swr_replay.analysis.replay.contrast_aggregation.TermSessionGate.refusal`:
     too few kept sessions, or too large a share left out), at which the audited
-    aggregates publish no row, is not applied here; ``n_dropped`` and
-    ``n_unidentified`` say how many sessions the kept ones stand for.
+    aggregates publish no row, is returned as ``gate_refuses`` for the caller
+    to act on; ``n_dropped`` and ``n_unidentified`` say how many sessions the
+    kept ones stand for.
 
     Parameters
     ----------
@@ -198,6 +199,7 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
           as separated or runaway.
         - ``n_unidentified``: sessions with no coefficient because, by the
           fit's own record, the session cannot inform the term.
+        - ``gate_refuses``: whether the gate refuses the term.
         - ``session_se_median``: the median over sessions of the session's
           standard error of the coefficient (event-clustered where the fit
           wrote one); NaN when the fits carry no standard error.
@@ -216,6 +218,7 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
         **coefficient_statistics(kept, column),
         "n_dropped": gate.n_dropped,
         "n_unidentified": gate.n_unidentified,
+        "gate_refuses": gate.refusal is not None,
         "session_se_median": float(se.median()) if se is not None else float("nan"),
         "significant_fraction": float(
             pct_significant_sessions(kept[column], se, kept.get(f"pval_{term}"))
@@ -255,8 +258,8 @@ def gated_coefficient_difference_statistics(
     within session.
 
     A session enters when the per-term gate keeps the term in both of its fits.
-    As in :func:`gated_coefficient_statistics`, the gate's refusal is not
-    applied.
+    As in :func:`gated_coefficient_statistics`, the gate's refusal is returned,
+    not applied.
 
     Parameters
     ----------
@@ -276,6 +279,8 @@ def gated_coefficient_difference_statistics(
           leaves out as separated or runaway.
         - ``n_unidentified_<fits>``: its sessions with no coefficient because,
           by the fit's own record, the session cannot inform the term.
+
+        and ``gate_refuses``: whether the gate refuses the term in either set.
     """
     column = f"coef_{term}"
     session = list(SESSION_COLUMNS)
@@ -293,6 +298,7 @@ def gated_coefficient_difference_statistics(
         "n_unidentified_a": gate_a.n_unidentified,
         "n_dropped_b": gate_b.n_dropped,
         "n_unidentified_b": gate_b.n_unidentified,
+        "gate_refuses": gate_a.refusal is not None or gate_b.refusal is not None,
     }
 
 

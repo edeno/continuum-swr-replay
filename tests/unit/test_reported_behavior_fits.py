@@ -541,6 +541,53 @@ def test_choice_values_read_each_block_s_own_term():
     assert values["choice_full_p"] == pytest.approx(0.03125)
 
 
+def test_choice_values_read_through_a_refusing_gate_are_pending():
+    # Twelve sessions. The SWR term is separated in three of them, a quarter,
+    # which is more than the per-term gate lets be left out: the audited
+    # aggregates would publish no row for it. Its seven values are kept, over
+    # the nine sessions left, and marked pending; the other terms' are not.
+    swr, non_swr = "replay_fraction_swr", "replay_fraction_non_swr"
+    split = pd.DataFrame(
+        {
+            "animal": list(ANIMALS) * 2,
+            "session_date": list(range(12)),
+            "epoch": "02_r1",
+            f"coef_{non_swr}": 0.2,
+            f"sd_{non_swr}": 0.1,
+            f"bse_{non_swr}": 0.1,
+            f"coef_{swr}": -0.3,
+            f"sd_{swr}": 0.1,
+            f"bse_{swr}": 0.1,
+            "separated_terms": [swr, swr, "", "", "", "", swr, "", "", "", "", ""],
+        }
+    )
+    fits = {
+        "choice_swr_split": {"C_full_swr_split": split},
+        "choice": {
+            "C_full": _coefficient_fits("replay_fraction", [0.3] * 6, 0.1),
+            "C_replay_only": _coefficient_fits("replay_fraction", [-0.9] * 6, 0.1),
+        },
+    }
+
+    values = {value.key: value for value in behavior.choice_values(fits, "source")}
+
+    pending = {key for key, value in values.items() if value.pending is not None}
+    assert pending == {
+        "choice_swr",
+        "choice_swr_p",
+        "choice_swr_sessions",
+        "choice_swr_positive_sessions",
+        "choice_swr_negative_sessions",
+        "choice_swr_animals_positive",
+        "choice_swr_significant_fraction",
+    }
+    assert values["choice_swr_sessions"].value == 9
+    assert values["choice_non_swr_sessions"].value == 12
+    note = values["choice_swr"].pending
+    assert "the per-term session gate refuses replay_fraction_swr" in note
+    assert "more than 20 % of the sessions" in note
+
+
 def test_power_values_read_each_covariate_s_own_column():
     rising = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
     coefs = pd.DataFrame(

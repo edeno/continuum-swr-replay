@@ -57,9 +57,10 @@ animals whose own median is above zero.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -88,6 +89,10 @@ from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     rung_separation_range,
     separated_fraction,
     term_separation_statistics,
+)
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (
+    MAX_UNIDENTIFIED_SHARE,
+    MIN_SESSIONS_PER_TERM,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
@@ -369,6 +374,24 @@ def default_inputs() -> BehaviorInputs:
     )
 
 
+def _gate_note(statistics: Mapping[str, Any], term: str) -> str | None:
+    """Why the values read from a gated statistic are pending, or None.
+
+    The per-term session gate refuses a term when it keeps too few sessions or
+    leaves out too large a share of them
+    (:attr:`~continuum_swr_replay.analysis.replay.contrast_aggregation.TermSessionGate.refusal`),
+    and the audited aggregates publish no row for such a term. The values read
+    here over the kept sessions are then kept and marked pending.
+    """
+    if not statistics["gate_refuses"]:
+        return None
+    return (
+        f"the per-term session gate refuses {term}: it keeps fewer than "
+        f"{MIN_SESSIONS_PER_TERM} sessions, or leaves out more than "
+        f"{100 * MAX_UNIDENTIFIED_SHARE:.0f} % of the sessions with a fit"
+    )
+
+
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
@@ -430,6 +453,7 @@ def per_bin_values(
         baseline = rate_fit_statistics.baseline_rate_statistics(null)
         kernel = rate_fit_statistics.reward_kernel_statistics(full)
         immediate = gated_coefficient_statistics(full, REWARD_HISTORY_COLUMNS[0])
+        immediate_note = _gate_note(immediate, REWARD_HISTORY_COLUMNS[0])
         for stats in (kernel, immediate):
             _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
         marginal = aic_difference_statistics(
@@ -558,6 +582,7 @@ def per_bin_values(
                 f"{label}: exp of the across-session median of the first reward basis "
                 f"coefficient {IMMEDIATE_COEF} in {FULL_RATE_RUNG}; {BASIS_COEFFICIENT_NOTE}",
                 "rate ratio",
+                pending=immediate_note,
             ),
             make(
                 f"rate_immediate_session_positive_fraction_{word}",
@@ -566,6 +591,7 @@ def per_bin_values(
                 "pct",
                 f"{label}: share of sessions whose first reward basis coefficient is "
                 "positive (a basis coefficient, not an effect size)",
+                pending=immediate_note,
             ),
             make(
                 f"rate_immediate_session_animals_{word}",
@@ -574,6 +600,7 @@ def per_bin_values(
                 "count",
                 f"{label}: animals whose median first reward basis coefficient has the "
                 "sign of the across-session median",
+                pending=immediate_note,
             ),
             make(
                 f"rate_immediate_session_p_{word}",
@@ -582,6 +609,7 @@ def per_bin_values(
                 "pval",
                 f"{label}: signed-rank p of the first reward basis coefficient against 0 "
                 "across sessions (a basis coefficient, not an effect size)",
+                pending=immediate_note,
             ),
             make(
                 f"rate_immediate_animal_{word}",
@@ -591,6 +619,7 @@ def per_bin_values(
                 f"{label}: exp of the animal-balanced median first reward basis "
                 f"coefficient (rr_immediate); {BASIS_COEFFICIENT_NOTE}",
                 "rate ratio",
+                pending=immediate_note,
             ),
             make(
                 f"rate_immediate_animals_positive_{word}",
@@ -598,6 +627,7 @@ def per_bin_values(
                 "count",
                 "count",
                 f"{label}: animals whose median first reward basis coefficient is positive",
+                pending=immediate_note,
             ),
             make(
                 f"rate_marginal_reward_delta_aic_{word}",
@@ -717,6 +747,7 @@ def per_bin_values(
             f"paired test spans {stats['n_animals']} animals, not 5",
         )
     immediate_all = gated_coefficient_statistics(no_swr_all, REWARD_HISTORY_COLUMNS[0])
+    immediate_all_note = _gate_note(immediate_all, REWARD_HISTORY_COLUMNS[0])
     kernel_all = rate_fit_statistics.reward_kernel_statistics(no_swr_all)
     _require(kernel_all["n_animals"] == 5, f"{kernel_all['n_animals']} animals, not 5")
     paired_what = (
@@ -791,6 +822,7 @@ def per_bin_values(
             "all-stops fit, non-local without SWR: exp of the across-session median first "
             f"reward basis coefficient; {BASIS_COEFFICIENT_NOTE}",
             "rate ratio",
+            pending=immediate_all_note,
         ),
         make(
             "rate_allstops_immediate_session_p_no_swr",
@@ -798,6 +830,7 @@ def per_bin_values(
             "quantity",
             "pval",
             "its signed-rank p (a basis coefficient, not an effect size)",
+            pending=immediate_all_note,
         ),
         make(
             "rate_allstops_immediate_session_animals_no_swr",
@@ -805,6 +838,7 @@ def per_bin_values(
             "count",
             "count",
             "its animals with the median's sign",
+            pending=immediate_all_note,
         ),
         make(
             "rate_allstops_kernel_lag_one_no_swr",
@@ -838,24 +872,27 @@ def per_bin_values(
             REWARD_HISTORY_COLUMNS[0],
         )
         _require(stats["n_animals"] == 5, f"{stats['n_animals']} animals, not 5")
-        values += [
-            make(
-                f"rate_allstops_immediate_animal_{word}",
-                stats["exp_animal_median"],
-                "quantity",
-                "sig2",
-                f"all-stops fit, {label}: rr_immediate (animal-balanced); "
-                f"{BASIS_COEFFICIENT_NOTE}",
-                "rate ratio",
-            ),
-            make(
-                f"rate_allstops_immediate_animals_positive_{word}",
-                stats["n_animals_positive"],
-                "count",
-                "count",
-                f"all-stops fit, {label}: animals positive",
-            ),
-        ]
+        values += pend(
+            [
+                make(
+                    f"rate_allstops_immediate_animal_{word}",
+                    stats["exp_animal_median"],
+                    "quantity",
+                    "sig2",
+                    f"all-stops fit, {label}: rr_immediate (animal-balanced); "
+                    f"{BASIS_COEFFICIENT_NOTE}",
+                    "rate ratio",
+                ),
+                make(
+                    f"rate_allstops_immediate_animals_positive_{word}",
+                    stats["n_animals_positive"],
+                    "count",
+                    "count",
+                    f"all-stops fit, {label}: animals positive",
+                ),
+            ],
+            _gate_note(stats, REWARD_HISTORY_COLUMNS[0]),
+        )
     for word, model in (
         ("const", "M0_const"),
         ("time", STOP_TIME_RUNG),
@@ -943,6 +980,7 @@ def per_bin_detail_values(
         full = fit_rows(fits, model=FULL_RATE_RUNG, outcome=outcome)
         baseline = rate_fit_statistics.baseline_rate_statistics(null)
         raw = gated_coefficient_statistics(reward_only, REWARD_HISTORY_COLUMNS[0])
+        raw_note = _gate_note(raw, REWARD_HISTORY_COLUMNS[0])
         kernel = rate_fit_statistics.reward_kernel_statistics(full)
         history = term_separation_statistics(
             fits_carrying(full, PER_BIN_HISTORY_COLUMNS), PER_BIN_HISTORY_COLUMNS
@@ -982,6 +1020,7 @@ def per_bin_detail_values(
                 f"{label}: exp of the across-session median {IMMEDIATE_COEF} of M1_rew "
                 f"(uncontrolled); {BASIS_COEFFICIENT_NOTE}",
                 "rate ratio",
+                pending=raw_note,
             ),
             make(
                 f"rate_marginal_reward_child_better_fraction_{word}",
@@ -1008,31 +1047,34 @@ def per_bin_detail_values(
         ]
         for k, bump in ((1, "one"), (2, "two")):
             agg = gated_coefficient_statistics(full, REWARD_HISTORY_COLUMNS[k])
-            values += [
-                make(
-                    f"rate_bump_{bump}_session_{word}",
-                    agg["exp_median"],
-                    "quantity",
-                    "sig2",
-                    f"{label}: exp of the across-session median coef_{REWARD_HISTORY_COLUMNS[k]} "
-                    f"of {FULL_RATE_RUNG}; {BASIS_COEFFICIENT_NOTE}",
-                    "rate ratio",
-                ),
-                make(
-                    f"rate_bump_{bump}_positive_fraction_{word}",
-                    agg["positive_fraction"],
-                    "fraction",
-                    "pct",
-                    f"{label}: share of sessions with that coefficient positive",
-                ),
-                make(
-                    f"rate_bump_{bump}_animals_{word}",
-                    agg["n_animals_same_sign"],
-                    "count",
-                    "count",
-                    f"{label}: animals whose median has the across-session median's sign",
-                ),
-            ]
+            values += pend(
+                [
+                    make(
+                        f"rate_bump_{bump}_session_{word}",
+                        agg["exp_median"],
+                        "quantity",
+                        "sig2",
+                        f"{label}: exp of the across-session median coef_{REWARD_HISTORY_COLUMNS[k]} "
+                        f"of {FULL_RATE_RUNG}; {BASIS_COEFFICIENT_NOTE}",
+                        "rate ratio",
+                    ),
+                    make(
+                        f"rate_bump_{bump}_positive_fraction_{word}",
+                        agg["positive_fraction"],
+                        "fraction",
+                        "pct",
+                        f"{label}: share of sessions with that coefficient positive",
+                    ),
+                    make(
+                        f"rate_bump_{bump}_animals_{word}",
+                        agg["n_animals_same_sign"],
+                        "count",
+                        "count",
+                        f"{label}: animals whose median has the across-session median's sign",
+                    ),
+                ],
+                _gate_note(agg, REWARD_HISTORY_COLUMNS[k]),
+            )
         for i, lag in enumerate(_LAG_WORDS[1:-1], start=1):  # lag ten is above
             values.append(
                 make(
@@ -1502,26 +1544,29 @@ def current_arm_paired_values(fits: pd.DataFrame, source: str) -> list[Value]:
     _require(
         stats["n_sessions"] > 0, "no session keeps is_current_arm in both split fits"
     )
-    return [
-        make(
-            "current_arm_paired_difference",
-            stats["animal_median"],
-            "quantity",
-            "sig2s",
-            "SWR minus non-SWR is_current_arm (C2_base, fitted separately), the "
-            "difference taken within each session, median over the session "
-            f"differences per animal, then over the {stats['n_animals']} animals "
-            f"({stats['n_sessions']} sessions with both fits kept)",
-            "log weight",
-        ),
-        make(
-            "current_arm_paired_difference_animals_positive",
-            stats["n_animals_positive"],
-            "count",
-            "count",
-            "animals whose median within-session difference is positive",
-        ),
-    ]
+    return pend(
+        [
+            make(
+                "current_arm_paired_difference",
+                stats["animal_median"],
+                "quantity",
+                "sig2s",
+                "SWR minus non-SWR is_current_arm (C2_base, fitted separately), the "
+                "difference taken within each session, median over the session "
+                f"differences per animal, then over the {stats['n_animals']} animals "
+                f"({stats['n_sessions']} sessions with both fits kept)",
+                "log weight",
+            ),
+            make(
+                "current_arm_paired_difference_animals_positive",
+                stats["n_animals_positive"],
+                "count",
+                "count",
+                "animals whose median within-session difference is positive",
+            ),
+        ],
+        _gate_note(stats, "is_current_arm"),
+    )
 
 
 #: Per-population rate values whose range over the four populations is quoted.
@@ -2135,38 +2180,41 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
         )
         _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
         what = f"leaf ladder {model} {term}"
-        values += [
-            make(
-                word,
-                stats["median"],
-                "quantity",
-                "sig2s",
-                f"{what}: session median coefficient",
-                "log weight",
-            ),
-            make(
-                f"{word}_sessions",
-                stats["n_sessions"],
-                "count",
-                "count",
-                f"{what}: sessions kept",
-            ),
-            make(
-                f"{word}_animals_positive",
-                stats["n_animals_positive"],
-                "count",
-                "count",
-                f"{what}: animals positive",
-            ),
-            make(
-                f"{word}_se",
-                stats["session_se_median"],
-                "quantity",
-                "sig2",
-                f"{what}: median event-clustered session SE",
-                "log weight",
-            ),
-        ]
+        values += pend(
+            [
+                make(
+                    word,
+                    stats["median"],
+                    "quantity",
+                    "sig2s",
+                    f"{what}: session median coefficient",
+                    "log weight",
+                ),
+                make(
+                    f"{word}_sessions",
+                    stats["n_sessions"],
+                    "count",
+                    "count",
+                    f"{what}: sessions kept",
+                ),
+                make(
+                    f"{word}_animals_positive",
+                    stats["n_animals_positive"],
+                    "count",
+                    "count",
+                    f"{what}: animals positive",
+                ),
+                make(
+                    f"{word}_se",
+                    stats["session_se_median"],
+                    "quantity",
+                    "sig2",
+                    f"{what}: median event-clustered session SE",
+                    "log weight",
+                ),
+            ],
+            _gate_note(stats, term),
+        )
     comparison = pd.read_pickle(leaf_dir / "model_comparison.pkl")
     for word, (parent, child) in LEAF_STEPS.items():
         (row,) = comparison[
@@ -2229,58 +2277,61 @@ def choice_values(fits: dict, source: str) -> list[Value]:
         stats = gated_coefficient_statistics(fits[block][model], term)
         _require(stats["n_animals"] == 5, f"{term}: {stats['n_animals']} animals")
         what = f"{model} {term}"
-        values += [
-            make(
-                word,
-                stats["median"],
-                "quantity",
-                "sig2s",
-                f"{what}: session median coefficient (gated)",
-                "log odds",
-            ),
-            make(
-                f"{word}_p",
-                stats["signed_rank_p"],
-                "quantity",
-                "pval",
-                f"{what}: signed-rank p across sessions",
-            ),
-            make(
-                f"{word}_sessions",
-                stats["n_sessions"],
-                "count",
-                "count",
-                f"{what}: sessions kept",
-            ),
-            make(
-                f"{word}_positive_sessions",
-                stats["n_positive"],
-                "count",
-                "count",
-                f"{what}: sessions with a positive coefficient",
-            ),
-            make(
-                f"{word}_negative_sessions",
-                stats["n_negative"],
-                "count",
-                "count",
-                f"{what}: sessions with a negative coefficient",
-            ),
-            make(
-                f"{word}_animals_positive",
-                stats["n_animals_positive"],
-                "count",
-                "count",
-                f"{what}: animals with a positive median",
-            ),
-            make(
-                f"{word}_significant_fraction",
-                stats["significant_fraction"],
-                "fraction",
-                "pct",
-                f"{what}: share of sessions individually significant",
-            ),
-        ]
+        values += pend(
+            [
+                make(
+                    word,
+                    stats["median"],
+                    "quantity",
+                    "sig2s",
+                    f"{what}: session median coefficient (gated)",
+                    "log odds",
+                ),
+                make(
+                    f"{word}_p",
+                    stats["signed_rank_p"],
+                    "quantity",
+                    "pval",
+                    f"{what}: signed-rank p across sessions",
+                ),
+                make(
+                    f"{word}_sessions",
+                    stats["n_sessions"],
+                    "count",
+                    "count",
+                    f"{what}: sessions kept",
+                ),
+                make(
+                    f"{word}_positive_sessions",
+                    stats["n_positive"],
+                    "count",
+                    "count",
+                    f"{what}: sessions with a positive coefficient",
+                ),
+                make(
+                    f"{word}_negative_sessions",
+                    stats["n_negative"],
+                    "count",
+                    "count",
+                    f"{what}: sessions with a negative coefficient",
+                ),
+                make(
+                    f"{word}_animals_positive",
+                    stats["n_animals_positive"],
+                    "count",
+                    "count",
+                    f"{what}: animals with a positive median",
+                ),
+                make(
+                    f"{word}_significant_fraction",
+                    stats["significant_fraction"],
+                    "fraction",
+                    "pct",
+                    f"{what}: share of sessions individually significant",
+                ),
+            ],
+            _gate_note(stats, term),
+        )
     return values
 
 
