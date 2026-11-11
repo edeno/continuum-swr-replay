@@ -38,8 +38,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
-from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
-
 
 class PeakOnset(NamedTuple):
     """Peak and half-maximum onset of each curve.
@@ -502,7 +500,6 @@ def called_response_timing(
     *,
     n_boot: int = 1_000,
     seed: int = 0,
-    half_window_s: float = REPORT_HALF_WINDOW_S,
 ) -> pd.DataFrame:
     """When the response of the units called for an event class peaks and starts.
 
@@ -528,8 +525,6 @@ def called_response_timing(
         Each unit's animal.
     n_boot, seed : int
         Resamples of ``groups`` behind the intervals, and their seed.
-    half_window_s : float
-        Half-width of the window the curves are on, in seconds.
 
     Returns
     -------
@@ -548,8 +543,8 @@ def called_response_timing(
           (:func:`peak_and_onset`); ``onset_before_onset_fraction``: the share
           whose onset is negative; ``onset_at_edge_fraction``: the share whose
           half-maximum run reaches the first lag.
-        - ``peak_at_edge_fraction``: the share whose peak is at either edge of
-          the window.
+        - ``peak_at_edge_fraction``: the share whose peak is at the first or
+          the last lag of ``lag_time``.
         - ``rise_onset_median_ms``: the median rise onset (the onset measured
           from the curve's value at the first lag).
         - ``steepest_median_ms``: the median lag of the steepest approach to
@@ -602,7 +597,7 @@ def called_response_timing(
         row["onset_before_onset_fraction"] = float((onset_ms < 0).mean())
         row["onset_at_edge_fraction"] = float(timing.onset_at_edge[chosen].mean())
         row["peak_at_edge_fraction"] = float(
-            (np.abs(peak_ms) >= half_window_s * _MS - 1e-6).mean()
+            np.isin(timing.peak_lag[chosen], lag_time[[0, -1]]).mean()
         )
         rise_ms = (
             peak_and_onset(

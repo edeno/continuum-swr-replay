@@ -226,6 +226,36 @@ def test_a_direction_without_units_has_only_its_count():
     assert nothing.empty and list(nothing.index.names) == ["direction", "animal"]
 
 
+# Four spikes on a +/-100 ms window, one per unit: at its first lag, at its last
+# lag, one sample before the last, and (the tallest) at event onset. A spike's
+# peak, onset and rise onset are all at the spike.
+NARROW_LAG_MS = 2 * np.arange(-50, 51)
+SPIKES = np.column_stack(
+    [
+        height * (NARROW_LAG_MS == at_ms)
+        for at_ms, height in ((-100, 1.0), (100, 1.0), (98, 1.0), (0, 1.5))
+    ]
+)
+
+
+def _spike_statistics(animals: list[str]) -> pd.DataFrame:
+    return called_response_timing(
+        SPIKES,
+        np.zeros(SPIKES.shape),
+        NARROW_LAG_MS / 1000.0,
+        np.ones(4, dtype=bool),
+        np.array(["d1"] * 4),
+        np.array(animals),
+        n_boot=10,
+    )
+
+
+def test_a_peak_at_either_end_of_the_lags_given_is_at_the_edge():
+    # the edge is where the given lags end (here +/-100 ms), on both sides
+    enhanced = _spike_statistics(["a"] * 4).loc["enhanced"]
+    assert enhanced["peak_at_edge_fraction"] == 0.5
+
+
 def test_units_without_a_usable_control_curve_have_no_control_comparison():
     statistics = called_response_timing(
         CURVES,
