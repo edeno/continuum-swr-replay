@@ -10,6 +10,7 @@ committed summaries.
 from __future__ import annotations
 
 import ast
+import importlib
 import itertools
 import re
 from pathlib import Path
@@ -151,29 +152,94 @@ def _branches(node: ast.expr) -> list[ast.expr]:
     return [node]
 
 
-def _literal_tags(path: Path) -> list[tuple[int, str, tuple[str, ...]]]:
-    """Every literal claims or used_in tuple a builder passes to ``Value``, its
-    ``_value_factory`` or a factory's ``make`` (as ``claims_`` / ``used_in_``):
-    (line, which, tags). Arguments built at run time are skipped."""
-    found = []
-    for node in ast.walk(ast.parse(path.read_text())):
-        if not isinstance(node, ast.Call):
+def _options(
+    node: ast.expr | None, module, local: dict[str, tuple[str, ...]]
+) -> list[tuple[str, ...]] | None:
+    """The tag tuples an argument can be: each arm of a conditional, a literal, a
+    name the function assigned a literal to, or a module constant; None when it is
+    only known at run time."""
+    if node is None:
+        return None
+    options = []
+    for branch in _branches(node):
+        if isinstance(branch, ast.Name) and branch.id in local:
+            options.append(local[branch.id])
             continue
-        name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
-        arguments = {}
-        if name == "_value_factory" and len(node.args) >= 3:
-            arguments = {"claims": node.args[1], "used_in": node.args[2]}
-        for keyword in node.keywords:
-            if keyword.arg in ("claims", "used_in", "claims_", "used_in_"):
-                arguments[keyword.arg.rstrip("_")] = keyword.value
-        for which, argument in arguments.items():
-            for branch in _branches(argument):
+        if isinstance(branch, ast.Name) and isinstance(
+            getattr(module, branch.id, None), tuple
+        ):
+            options.append(getattr(module, branch.id))
+            continue
+        try:
+            options.append(tuple(ast.literal_eval(branch)))
+        except ValueError:
+            return None
+    return options
+
+
+def _tag_pairs(part: int) -> list[tuple[int, tuple[str, ...], tuple[str, ...]]]:
+    """Every (claims, used_in) pair a builder can give a value, as far as its
+    source says: in each function, a factory's defaults, and each ``make(...)``
+    call's ``claims_`` / ``used_in_`` override paired with the other default;
+    and ``Value(...)`` calls. (line, claims, used_in); a half known only at run
+    time is empty, so that half alone is checked."""
+    module = importlib.import_module(f"continuum_swr_replay.reported.part{part}")
+    tree = ast.parse((BUILDERS / f"part{part}.py").read_text())
+    pairs = []
+
+    def add(line, claims, used_in):
+        for c in claims or [()]:
+            for u in used_in or [()]:
+                pairs.append((line, c, u))
+
+    for function in ast.walk(tree):
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        local = {}
+        for node in ast.walk(function):
+            if (
+                isinstance(node, ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+            ):
                 try:
-                    tags = ast.literal_eval(branch)
+                    value = ast.literal_eval(node.value)
                 except ValueError:
                     continue
-                found.append((node.lineno, which, tuple(tags)))
-    return found
+                if isinstance(value, tuple):
+                    local[node.targets[0].id] = value
+        factories = {}
+        for node in ast.walk(function):
+            if (
+                isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Call)
+                and getattr(node.value.func, "id", None) == "_value_factory"
+                and len(node.value.args) >= 3
+                and isinstance(node.targets[0], ast.Name)
+            ):
+                claims = _options(node.value.args[1], module, local)
+                used_in = _options(node.value.args[2], module, local)
+                factories[node.targets[0].id] = (claims, used_in)
+                add(node.lineno, claims, used_in)
+        for node in ast.walk(function):
+            if not isinstance(node, ast.Call):
+                continue
+            keywords = {k.arg: k.value for k in node.keywords}
+            name = getattr(node.func, "id", None)
+            if name in factories and ({"claims_", "used_in_"} & set(keywords)):
+                claims, used_in = factories[name]
+                if "claims_" in keywords:
+                    claims = _options(keywords["claims_"], module, local)
+                if "used_in_" in keywords:
+                    used_in = _options(keywords["used_in_"], module, local)
+                add(node.lineno, claims, used_in)
+            elif name == "Value":
+                add(
+                    node.lineno,
+                    _options(keywords.get("claims"), module, local),
+                    _options(keywords.get("used_in"), module, local),
+                )
+    return pairs
 
 
 def _named_tags() -> list[tuple[str, tuple[str, ...], tuple[str, ...]]]:
@@ -187,14 +253,29 @@ def _named_tags() -> list[tuple[str, tuple[str, ...], tuple[str, ...]]]:
 
 
 @pytest.mark.parametrize("part", range(5))
-def test_every_literal_tag_a_builder_writes_is_known(part):
-    path = BUILDERS / f"part{part}.py"
-    problems = []
-    for line, which, tags in _literal_tags(path):
-        claims, used_in = (tags, ()) if which == "claims" else ((), tags)
-        found = tag_problems(claims, used_in)
-        problems += [f"part{part}.py:{line}: {p}" for p in found]
+def test_every_tag_pair_a_builder_writes_is_known(part):
+    pairs = _tag_pairs(part)
+    assert pairs, f"no tags found in part{part}.py"
+    problems = [
+        f"part{part}.py:{line}: {p}"
+        for line, claims, used_in in pairs
+        for p in tag_problems(claims, used_in)
+    ]
     assert not problems, "\n".join(problems)
+
+
+def test_the_pair_scan_catches_a_figure_its_question_does_not_list(monkeypatch):
+    source = (
+        "def f(source):\n"
+        "    make = _value_factory(source, ('15',), ('paper', 'figure: 2'))\n"
+        "    return make('k', 1, 'count', 'count', 'd', claims_=('22',))\n"
+    )
+    monkeypatch.setattr(Path, "read_text", lambda self: source)
+    problems = [p for _, c, u in _tag_pairs(0) for p in tag_problems(c, u)]
+    assert problems == [
+        "question 15 does not list figure '2'",
+        "question 22 does not list figure '2'",
+    ]
 
 
 def test_every_named_tag_a_builder_writes_is_known():

@@ -7,13 +7,18 @@ list (`src/continuum_swr_replay/reported/questions.py`) and the summaries
 as a finding. A summary file is where a value is stored; a question's part
 is where the paper reports it.
 
-| Summary | Built at | Values | Values with tag problems |
-|---|---|---|---|
-| `part0.json` | `06368f6c382f` | 32 | 0 |
-| `part1.json` | `7fb1dcfa84ad` | 132 | 99 |
-| `part2.json` | `bfb20f359f8f` | 331 | 86 |
-| `part3.json` | `c96c9133ef6c-dirty` | 922 | 25 |
-| `part4.json` | `5609943e9472-dirty` | 604 | 0 |
+A summary with no code record was built before records were kept, and so
+before the question list: its tags may predate the lead's decisions (for
+example, values a decision moved to another question can still show under
+the old one) until it is rebuilt.
+
+| Summary | Built at | Code record | Values | Values with tag problems |
+|---|---|---|---|---|
+| `part0.json` | `0ce50179395e-dirty` | yes | 32 | 0 |
+| `part1.json` | `7fb1dcfa84ad` | none | 132 | 99 |
+| `part2.json` | `bfb20f359f8f` | none | 331 | 86 |
+| `part3.json` | `c96c9133ef6c-dirty` | none | 922 | 25 |
+| `part4.json` | `5609943e9472-dirty` | none | 604 | 0 |
 
 ## Part 0: introduction
 

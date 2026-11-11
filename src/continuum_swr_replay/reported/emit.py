@@ -186,15 +186,21 @@ def questions_view(summaries: Mapping[int, Summary]) -> str:
         "as a finding. A summary file is where a value is stored; a question's part",
         "is where the paper reports it.",
         "",
-        "| Summary | Built at | Values | Values with tag problems |",
-        "|---|---|---|---|",
+        "A summary with no code record was built before records were kept, and so",
+        "before the question list: its tags may predate the lead's decisions (for",
+        "example, values a decision moved to another question can still show under",
+        "the old one) until it is rebuilt.",
+        "",
+        "| Summary | Built at | Code record | Values | Values with tag problems |",
+        "|---|---|---|---|---|",
     ]
     for part in sorted(summaries):
         summary = summaries[part]
         problems = summary_tag_problems(summary)
+        record = "none" if summary.code is None or "error" in summary.code else "yes"
         lines.append(
-            f"| `part{part}.json` | `{summary.commit}` | {len(summary.values)} "
-            f"| {len(problems)} |"
+            f"| `part{part}.json` | `{summary.commit}` | {record} "
+            f"| {len(summary.values)} | {len(problems)} |"
         )
     for part, section in SECTIONS:
         questions = [q for q in QUESTIONS if (q.part, q.section) == (part, section)]
@@ -257,7 +263,11 @@ def questions_view(summaries: Mapping[int, Summary]) -> str:
                         shown.setdefault(parsed[1], []).append(
                             f"`\\{macro_name(part, value.key)}`"
                         )
-        asked = [q.id for q in QUESTIONS if any(f.startswith(name) for f in q.figures)]
+        asked = [
+            q.id
+            for q in QUESTIONS
+            if any(parse_figure_tag(f"figure: {f}")[0] == name for f in q.figures)
+        ]
         lines += [
             "",
             f"### Figure {name}: {figure.title}",

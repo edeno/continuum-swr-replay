@@ -3,16 +3,19 @@
  "part": 0,
  "title": "the surveyed literature",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "06368f6c382f",
+ "commit": "0ce50179395e-dirty",
  "code": {
+  "head": "0ce50179395e6d8b3bece0650e156558b87a4aef",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
-  "uncommitted": false,
-  "diff": "",
-  "modules": {
+  "uncommitted": true,
+  "diff": "diff --git a/scripts/reported/summarize_part.py b/scripts/reported/summarize_part.py\nindex 13f1dbd0..d716bc9c 100644\n--- a/scripts/reported/summarize_part.py\n+++ b/scripts/reported/summarize_part.py\n@@ -12,8 +12,9 @@ Usage::\n     uv run python scripts/reported/summarize_part.py --part 2\n \n The summary records the code that built it: every package module the part's\n-builder loaded, with its digests, the digest of ``uv.lock``, and the diff of those\n-modules when they differ from ``HEAD`` (``reported/code_record.py``). A build from\n+builder loaded and the package's data files, with their digests, the commit, the\n+digest of ``uv.lock``, and the diff of those files and the ones git does not track\n+when they differ from the commit (``reported/code_record.py``). A build from\n uncommitted code is allowed and recorded; ``scripts/reported/check_release.py``\n flags it at a milestone. Only the requested part's builder is imported, so the\n record lists only the modules that part uses.\n@@ -23,10 +24,11 @@ from __future__ import annotations\n \n import argparse\n import importlib\n+import time\n from collections.abc import Sequence\n \n from continuum_swr_replay.paths import ROOT_DIR\n-from continuum_swr_replay.reported.code_record import code_record, loaded_modules\n+from continuum_swr_replay.reported.code_record import build_files, try_code_record\n from continuum_swr_replay.runs.provenance import described_commit, produced_by\n \n SUMMARY_DIR = ROOT_DIR / \"paper\" / \"reported\"\n@@ -38,19 +40,22 @@ def main(argv: Sequence[str] | None = None) -> None:\n     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])\n     parser.add_argument(\"--part\", type=int, required=True, choices=PARTS)\n     args = parser.parse_args(argv)\n+    started = time.time()\n     builder = importlib.import_module(f\"continuum_swr_replay.reported.part{args.part}\")\n     summary = builder.summarize(\n         builder.default_inputs(), produced_by(__file__), described_commit()\n     )\n-    summary.code = code_record(ROOT_DIR, loaded_modules(ROOT_DIR))\n+    summary.code = try_code_record(ROOT_DIR, build_files(ROOT_DIR), started)\n     path = SUMMARY_DIR / f\"part{args.part}.json\"\n     summary.write(path)\n     n_pending = sum(v.pending is not None for v in summary.values.values())\n-    uncommitted = \" from uncommitted code\" if summary.code[\"uncommitted\"] else \"\"\n-    print(\n-        f\"wrote {len(summary.values)} values ({n_pending} pending){uncommitted} to \"\n-        f\"{path}; the code record lists {len(summary.code['modules'])} files\"\n-    )\n+    code = summary.code\n+    if \"error\" in code:\n+        note = \"with no code record\"\n+    else:\n+        uncommitted = \", from uncommitted code\" if code[\"uncommitted\"] else \"\"\n+        note = f\"with a code record of {len(code['files'])} files{uncommitted}\"\n+    print(f\"wrote {len(summary.values)} values ({n_pending} pending) to {path}, {note}\")\n \n \n if __name__ == \"__main__\":\n",
+  "untracked": [],
+  "modified_during_build": [],
+  "files": {
    "scripts/reported/summarize_part.py": {
-    "sha256": "0568c660424bf43cd82e719232e303b30bc5a2983c9fb84238f5fc94943c4df4",
-    "code_sha256": "b15365eb663e431613503da7ced1de2c05db41edf7df23108c61317e348c001e"
+    "sha256": "4ec2db7150ad915f8d82255c7c6db821a1d51753ca75352dda16002456408a7d",
+    "code_sha256": "b59def1867fe65b24b05e312a9f48a238bb6933622b2aedc68f7188a6d07deea"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -24,11 +27,15 @@
    },
    "src/continuum_swr_replay/data_loaders/constants.py": {
     "sha256": "17fffe227de0b66078d7952ac98ad4c886cf089d4614bd402e1b7b5a424315ad",
-    "code_sha256": "bc462bf2d352d40d3e66f6303764f0cf19d8e1ad5b864adce0e74192dad9f7e8"
+    "code_sha256": "09c11436725a16c73cd9faf504a3ee37d71aa570917b5802e4d655865d2b295c"
+   },
+   "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
+    "sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1",
+    "code_sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1"
    },
    "src/continuum_swr_replay/paths.py": {
     "sha256": "8b97665dec5cf90a2109d94513b790500becbbeea4c19a8387187838bcca11b3",
-    "code_sha256": "6c36e8b535cf4b57e83fcc377b1bd57d33a4085001f88e21b2467daf6b9d8a53"
+    "code_sha256": "7a0036eb8770ba7d1d55d0005fa056bb3376560f3a6820d3dcee12eb7aa85ddd"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "27b4b3b046870f4bebfd79116737a87aaa1cc5447f56b8736799c6c678405e14",
@@ -36,15 +43,15 @@
    },
    "src/continuum_swr_replay/reported/literature.py": {
     "sha256": "a1f97273474493df7b5901540d753996b0fb2a59cfe00d815fecaec59a2d8319",
-    "code_sha256": "8e97e7b8fa303f806bcde84929e9fee40595efe429c4e7ef59ec11fb229a531a"
+    "code_sha256": "6782bca1fb5ad49431635bbc497c7aa5a9f949fc9abfb78de1f2980e502ceb5d"
    },
    "src/continuum_swr_replay/reported/part0.py": {
     "sha256": "09ac1d612f8afd17614b0cad95db088515fa15f921cdbeb9cbb65b09b50ef0e5",
-    "code_sha256": "01d861fd9ed6e4628ef76f4ec78fc5d2606ba2004ae76751d9fccff9f8537a7b"
+    "code_sha256": "35a55f094b2515973cf587289315b084d6460d18e5afe208af8c59b931601353"
    },
    "src/continuum_swr_replay/reported/values.py": {
     "sha256": "53599ba8804fc77bea0f1179d5bd330033543c59dc510e9fc45e58c0c230fbbd",
-    "code_sha256": "d7626ae0087fc1707805ee15d4acf6653e4cdb7618f9cc64273eea1eb835525d"
+    "code_sha256": "da14cd2557c292c671b6f4497fb07b1a24055a36b773440adaf9a24cfbf2b826"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -68,7 +75,7 @@
    },
    "src/continuum_swr_replay/tables/io.py": {
     "sha256": "6350b05f312355bc782e4cdb1577b8a69408ffc58e99f76a27d9fabcabef3eb9",
-    "code_sha256": "4f3f01607f340aecca780c9883f9fc7eddffb2343fe709fd43bb0bc9dd839a0d"
+    "code_sha256": "068f7c9e29e6600614801562847e8e59c86c83e45173b0711a285ed8e516c4c9"
    },
    "src/continuum_swr_replay/tables/versions.py": {
     "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",

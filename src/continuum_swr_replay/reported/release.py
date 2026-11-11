@@ -14,15 +14,29 @@ from continuum_swr_replay.reported.values import Summary, summary_tag_problems
 def staleness(summary: Summary, repo: Path) -> list[str]:
     """Why ``summary`` may not match the code now; empty when it does.
 
-    A summary with no code record, one built from uncommitted code, and one whose
-    recorded modules (or ``uv.lock``) have changed since are each named.
+    A summary with no code record (built before records were kept, or where git
+    could not say), one built from uncommitted or untracked code, one whose files
+    changed while it was built, and one whose recorded files (or ``uv.lock``) have
+    changed since are each named.
     """
-    if summary.code is None:
-        return ["no code record: built before code records were kept"]
+    code = summary.code
+    if code is None:
+        return ["no code record"]
+    if "error" in code:
+        return [f"no code record: {code['error']}"]
     problems = []
-    if summary.code["uncommitted"]:
+    if code["untracked"]:
+        problems.append(
+            f"built from files git does not track: {', '.join(code['untracked'])}"
+        )
+    elif code["uncommitted"]:
         problems.append("built from uncommitted code (the diff is in the record)")
-    changed = code_changes(summary.code, repo)
+    if code["modified_during_build"]:
+        problems.append(
+            "files modified while it was built: "
+            + ", ".join(code["modified_during_build"])
+        )
+    changed = code_changes(code, repo)
     if changed:
         problems.append(f"code changed since the build: {', '.join(changed)}")
     return problems
