@@ -202,6 +202,20 @@ def _manifest(folder: Path) -> dict:
     return json.loads((folder / "manifest.json").read_text())
 
 
+def read_from_start_distance_output(value: Value) -> bool:
+    """Whether a property value (:func:`property_values`) is read from the
+    start-distance output: the start distance's are; the other properties are
+    the event table's own columns, which that output's staleness does not touch."""
+    return value.key.startswith("start_distance_")
+
+
+def read_from_gamma_pass(value: Value) -> bool:
+    """Whether a brain-state value (:func:`brain_state_values`) is read from the
+    gamma pass: slow and fast gamma's are; theta, ripple power and MUA are the
+    event table's and the brain-state reference's."""
+    return value.key.startswith(("slow_gamma_", "fast_gamma_"))
+
+
 # --- how common the events are, and how they sit against SWRs ----------------
 
 
@@ -1426,7 +1440,7 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
         *pend(
             property_values(events_with_extras, extras_source),
             extras_stale,
-            lambda v: v.key.startswith("start_distance_"),
+            read_from_start_distance_output,
         )
     )
     summary.add(
@@ -1485,7 +1499,7 @@ def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
                 f"{rel(inputs.event_gamma)} (scripts/detection/measure_event_gamma.py)",
             ),
             stale(inputs.event_gamma),
-            lambda v: v.key.startswith(("slow_gamma_", "fast_gamma_")),
+            read_from_gamma_pass,
         )
     )
     summary.inputs += [
