@@ -3,9 +3,9 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "d7e273e84b1b",
+ "commit": "3cef11b91eaa",
  "code": {
-  "head": "d7e273e84b1b7003aceda5060ae20fab5e85de9c",
+  "head": "3cef11b91eaacc1a4ad2c6ae48ea17d3f1595c2d",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -63,8 +63,12 @@
     "code_sha256": "e67897b004c1e389f588c56918a5b2f483977621d069938417960ca3e57b8c50"
    },
    "src/continuum_swr_replay/analysis/hippocampus/__init__.py": {
-    "sha256": "8acb47f451f9a2839dfca106b5da490ebc3edf13790282232e228ca1d6e7d344",
-    "code_sha256": "b5f68e0b323e011c6bf4cdd3a267549bc7c75767dc093bd4252c2e770934ac06"
+    "sha256": "55100362be20a8d77c0f6ddfad6f26b23ce9bcb4ee323c7efe2c9f4360b853c7",
+    "code_sha256": "140e49dce65385f42f2f7bbe30f83ba00aeda9249f880906a50259e7f36e2260"
+   },
+   "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
+    "sha256": "7500f5da0b5fa6a93adc4610feca2b4109cab4fa30630205427ba8fbc571b2fb",
+    "code_sha256": "ec71cea7d778e6d5308c73019b7ac2d4719e8dd067a3e1b3c89805a8219d6ddb"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
     "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
@@ -113,6 +117,10 @@
    "src/continuum_swr_replay/analysis/inventory_comparison/features.py": {
     "sha256": "15844a1d8800ce7235d0eb0975b16e4e2302a56e980a633cb69ff028e8b5e9e9",
     "code_sha256": "796dd8b1a36be7204b54c117e4b40b3fba84babf2ce50a2f671d9e1df0f55bc5"
+   },
+   "src/continuum_swr_replay/analysis/inventory_comparison/nonlocal_comparison.py": {
+    "sha256": "ee1aa57aa5501aa94b6cdd7d6b77f65b82327c8a1cf29e9c88e7a85fec68227f",
+    "code_sha256": "f7f5b22141cf70655e561159649d9d786c6798296e4d8c08835e250cc1d8c42d"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
@@ -175,8 +183,8 @@
     "code_sha256": "846c602ddad8247203a36ea80e6a9338144dd869cb6ced5dfe417656d3871156"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "ca699f2bd851df9d09d8dd2717006c5550541601e1e0a311b7e15233e315834b",
-    "code_sha256": "b5a2bd3f512d29de895b47e7a07d9f1ff4490a82964404afa74a7cc35eef3560"
+    "sha256": "d60fdd47e079ae9be7250e61efc8dd9cbd807314e9ce7a10d4a020a165383225",
+    "code_sha256": "36b731a186f468b1a15f96b6233122a9efe0bfb242fbc9250954ca387bc207c6"
    },
    "src/continuum_swr_replay/reported/values.py": {
     "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",

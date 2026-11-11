@@ -12,7 +12,7 @@ computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.
 |---|---|---|---|---|
 | `survey.json` | `349b586507b6` | yes | 32 | 0 |
 | `detection.json` | `d7e273e84b1b` | yes | 132 | 0 |
-| `events.json` | `d7e273e84b1b` | yes | 331 | 0 |
+| `events.json` | `3cef11b91eaa` | yes | 331 | 0 |
 | `behavior.json` | `d7e273e84b1b` | yes | 922 | 0 |
 | `mpfc.json` | `d7e273e84b1b` | yes | 604 | 0 |
 
