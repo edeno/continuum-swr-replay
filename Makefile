@@ -3,6 +3,8 @@
 UV ?= uv
 RUN = $(UV) run --frozen
 SUMMARIES = survey detection events behavior mpfc
+# Extra arguments for release-check, for example ARGS=--code-only.
+ARGS ?=
 
 .DEFAULT_GOAL := help
 .PHONY: help sync sync-dev format check figures summaries reported-values release-check manuscript
@@ -16,6 +18,7 @@ help:
 	@echo "make summaries        Rebuild paper/reported/<summary>.json (all but survey need the lab's processed data)"
 	@echo "make reported-values  Write the summaries' values into the LaTeX macros and the docs"
 	@echo "make release-check    Before a milestone: fail if a summary is stale, uncommitted or mis-tagged"
+	@echo "                       (ARGS=--code-only skips the input files, for a machine without the data)"
 	@echo "make manuscript       Build paper/main.pdf from the committed figures and macros"
 
 # --inexact keeps the development tools that sync-dev installed.
@@ -46,7 +49,7 @@ reported-values:
 	$(RUN) python scripts/reported/emit_reported_values.py
 
 release-check:
-	$(RUN) python scripts/reported/check_release.py
+	$(RUN) python scripts/reported/check_release.py $(ARGS)
 
 manuscript:
 	$(MAKE) -C paper

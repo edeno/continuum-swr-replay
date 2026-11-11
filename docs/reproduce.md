@@ -10,7 +10,7 @@ There are four levels, each needing more than the one before:
 | Build the PDF | `make manuscript` | LaTeX |
 | Write the reported numbers into the LaTeX macros and the docs | `make reported-values` | the committed summaries; Python |
 | Rebuild the summaries and the main figures | `make summaries`, `make figures` | the lab's processed data |
-| Before a milestone (a draft to the co-authors, submission, a release): check that every summary is current with the code | `make release-check` | the committed summaries; Python |
+| Before a milestone (a draft to the co-authors, submission, a release): check that every summary is current with the code and its inputs | `make release-check` | the committed summaries; Python; the lab's processed data (`make release-check ARGS=--code-only` checks the code alone, without it) |
 | Rebuild everything, from the recordings | [the full rebuild](#the-full-rebuild) | the lab's Spyglass database, the NWB files, GPUs |
 
 There is no public reproduction yet: every analysis reads the lab's data.
@@ -88,8 +88,8 @@ after a change to fitting code only, start at step 6.
    refuses it. `make release-check` fails on a missing summary file, a summary with
    no code record, a stale one, one built from uncommitted code, one whose
    single-file inputs changed or are absent, or one with tag problems. Run it at a
-   milestone where the processed data is (`--code-only` skips the inputs), then
-   rebuild only the parts it names.
+   milestone where the processed data is (`make release-check ARGS=--code-only` skips the inputs), then
+   rebuild only the summaries it names.
 
 ## Decoding
 
@@ -181,5 +181,5 @@ Decodes, tables, fits, logs and every other file under the processed-data root
 are not committed. After a change that alters results, commit the summaries,
 the macros, the docs they fill and the rebuilt PDF together.
 
-[Figure pipeline](figure-pipeline.md) traces each figure from its claim to its
-script and inputs.
+[Figure pipeline](figure-pipeline.md) gives each figure's script, inputs and tests;
+the question list gives the questions and values each figure shows.
