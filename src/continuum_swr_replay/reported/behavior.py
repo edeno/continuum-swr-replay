@@ -2909,11 +2909,12 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
         )
     )
     in_transit = _read_per_bin_fits(inputs.per_bin_in_transit)
+    in_transit_stale = fit_staleness(inputs.per_bin_in_transit)
     make_transit = value_factory(
         summarize,
         f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.in_transit)",
         TAGS["rate"],
-        fit_staleness(inputs.per_bin_in_transit),
+        in_transit_stale,
     )
     summary.add(
         make_transit(
@@ -2939,6 +2940,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
     record(inputs.per_bin_audit, inputs.per_stop_audit)
     per_bin = _read_per_bin_fits(inputs.per_bin)
     per_bin_all = _read_per_bin_fits(inputs.per_bin_all_stops)
+    per_bin_stale = fit_staleness(inputs.per_bin, inputs.per_bin_all_stops)
     summary.add(
         *pend(
             per_bin_values(
@@ -2946,21 +2948,23 @@ def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
                 per_bin_all,
                 f"{rel(inputs.per_bin)} (rate.per_bin.at_well) and {rel(inputs.per_bin_all_stops)} (rate.per_bin.all_stops)",
             ),
-            fit_staleness(inputs.per_bin, inputs.per_bin_all_stops),
+            per_bin_stale,
         )
     )
+    # pending on all three fits: the notes join as fit_staleness of the three would
     summary.add(
         *pend(
-            per_bin_detail_values(
-                per_bin,
-                per_bin_all,
-                in_transit,
-                f"{rel(inputs.per_bin)}, {rel(inputs.per_bin_all_stops)} and "
-                f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.*)",
+            pend(
+                per_bin_detail_values(
+                    per_bin,
+                    per_bin_all,
+                    in_transit,
+                    f"{rel(inputs.per_bin)}, {rel(inputs.per_bin_all_stops)} and "
+                    f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.*)",
+                ),
+                per_bin_stale,
             ),
-            fit_staleness(
-                inputs.per_bin, inputs.per_bin_all_stops, inputs.per_bin_in_transit
-            ),
+            in_transit_stale,
         )
     )
     summary.add(
