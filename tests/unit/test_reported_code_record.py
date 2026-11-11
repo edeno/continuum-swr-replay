@@ -1,10 +1,10 @@
 """The record of the code that built a summary, and the release check that reads it.
 
 A summary records the files its build depended on. The record must say when that
-code has really changed since (not when only a docstring or comment did), say when
-the build ran from uncommitted or untracked code and keep a diff that applies,
-survive git failing, and round-trip through the summary file. These run in a
-throwaway git repository.
+code has really changed since (not when only a docstring or comment did), name the
+files that were uncommitted or untracked when it was built, and round-trip through
+the summary file; and no summary is written among the canonical ones from
+uncommitted code. These run in a throwaway git repository.
 """
 
 from __future__ import annotations
@@ -23,7 +23,6 @@ from continuum_swr_replay.reported.code_record import (
     code_changes,
     code_digest,
     code_record,
-    try_code_record,
 )
 from continuum_swr_replay.reported.release import release_problems, staleness
 from continuum_swr_replay.reported.values import file_record
@@ -98,8 +97,7 @@ def test_a_record_of_committed_code_is_current_until_the_code_changes(repo):
     module = repo / "pkg" / "mod.py"
     record = code_record(repo, [module])
     assert record["head"] == _git(repo, "rev-parse", "HEAD").strip()
-    assert record["uncommitted"] is False
-    assert record["diff"] == "" and record["untracked"] == []
+    assert record["uncommitted"] == []
     assert list(record["files"]) == ["pkg/mod.py"]
     assert code_changes(record, repo) == []
 
@@ -117,38 +115,25 @@ def test_a_changed_lock_or_a_removed_file_is_a_change(repo):
     assert code_changes(record, repo) == ["pkg/mod.py", "uv.lock"]
 
 
-def test_the_diff_of_uncommitted_code_applies_to_the_recorded_commit(repo):
+def test_an_edited_module_an_edited_lock_and_an_untracked_module_are_uncommitted(repo):
     module = repo / "pkg" / "mod.py"
-    edited = SOURCE.replace("y = FACTOR * x", "y = FACTOR * x + 1")
-    module.write_text(edited)
-    record = code_record(repo, [module])
-    assert record["uncommitted"] is True
-    assert record["diff"].endswith("\n")
-    _git(repo, "checkout", "-q", "--", "pkg/mod.py")
-    patch = repo / "record.patch"
-    patch.write_text(record["diff"])
-    _git(repo, "apply", str(patch))
-    assert module.read_text() == edited
-
-
-def test_an_untracked_module_is_uncommitted_and_named(repo):
     new = repo / "pkg" / "new.py"
     new.write_text("Z = 1\n")
-    record = code_record(repo, [repo / "pkg" / "mod.py", new])
-    assert record["uncommitted"] is True
-    assert record["untracked"] == ["pkg/new.py"]
-    assert record["diff"] == ""
+    assert code_record(repo, [module, new])["uncommitted"] == ["pkg/new.py"]
+    module.write_text(SOURCE.replace("y = FACTOR * x", "y = FACTOR * x + 1"))
+    assert code_record(repo, [module])["uncommitted"] == ["pkg/mod.py"]
+    (repo / "uv.lock").write_text("lock 2\n")
+    record = code_record(repo, [module, new])
+    assert record["uncommitted"] == ["pkg/mod.py", "pkg/new.py", "uv.lock"]
     assert staleness(_summary(code=record), repo) == [
-        "built from files git does not track: pkg/new.py"
+        "built from uncommitted code: pkg/mod.py, pkg/new.py, uv.lock"
     ]
 
 
-def test_a_file_modified_after_the_build_started_is_named(repo):
-    module = repo / "pkg" / "mod.py"
-    started = module.stat().st_mtime - 1
-    record = code_record(repo, [module], started=started)
-    assert record["modified_during_build"] == ["pkg/mod.py"]
-    assert code_record(repo, [module])["modified_during_build"] == []
+def test_a_file_the_build_did_not_use_may_be_uncommitted(repo):
+    (repo / "notes.md").write_text("draft\n")
+    (repo / "pkg" / "other.py").write_text("Z = 1\n")
+    assert code_record(repo, [repo / "pkg" / "mod.py"])["uncommitted"] == []
 
 
 def test_under_another_python_only_identical_bytes_count_as_unchanged(repo):
@@ -160,53 +145,21 @@ def test_under_another_python_only_identical_bytes_count_as_unchanged(repo):
     assert code_changes(record, repo) == ["pkg/mod.py"]
 
 
-def test_when_git_cannot_say_the_record_gives_git_s_message_and_the_build_is_kept(
-    tmp_path, monkeypatch
-):
+def test_when_git_cannot_say_no_record_is_made(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     (tmp_path / "uv.lock").write_text("lock\n")
     (tmp_path / "mod.py").write_text("X = 1\n")
-    record = try_code_record(tmp_path, [tmp_path / "mod.py"])
-    assert set(record) == {"error"}
-    assert "not a git repository" in record["error"]
-    assert staleness(_summary(code=record), tmp_path) == [
-        f"no code record: {record['error']}"
-    ]
-    with pytest.raises(ValueError, match="not a code record"):
-        code_changes(record, tmp_path)
+    with pytest.raises(subprocess.CalledProcessError) as failed:
+        code_record(tmp_path, [tmp_path / "mod.py"])
+    assert "not a git repository" in failed.value.stderr
 
 
 def test_a_user_s_external_diff_tool_does_not_hide_uncommitted_code(repo):
     module = repo / "pkg" / "mod.py"
     _git(repo, "config", "diff.external", "true")
     _git(repo, "config", "color.ui", "always")
-    edited = SOURCE.replace("FACTOR = 2", "FACTOR = 3")
-    module.write_text(edited)
-    record = code_record(repo, [module])
-    assert record["uncommitted"] is True
-    _git(repo, "checkout", "-q", "--", "pkg/mod.py")
-    (repo / "record.patch").write_text(record["diff"])
-    _git(repo, "apply", "record.patch")
-    assert module.read_text() == edited
-
-
-def test_an_uncommitted_lock_is_uncommitted_and_in_the_diff(repo):
-    (repo / "uv.lock").write_text("lock 2\n")
-    record = code_record(repo, [repo / "pkg" / "mod.py"])
-    assert record["uncommitted"] is True
-    assert "+lock 2" in record["diff"]
-
-
-def test_untracked_files_and_a_diff_are_both_named(repo):
-    module = repo / "pkg" / "mod.py"
     module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
-    new = repo / "pkg" / "new.py"
-    new.write_text("Z = 1\n")
-    record = code_record(repo, [module, new])
-    assert staleness(_summary(code=record), repo) == [
-        "built from files git does not track: pkg/new.py",
-        "built from uncommitted code (the diff is in the record)",
-    ]
+    assert code_record(repo, [module])["uncommitted"] == ["pkg/mod.py"]
 
 
 def test_a_module_that_no_longer_parses_counts_as_changed(repo):
@@ -230,16 +183,6 @@ def test_a_changed_data_file_is_a_change(repo):
     assert code_changes(record, repo) == ["pkg/cohort.csv"]
 
 
-def test_a_build_started_after_the_last_edit_lists_nothing_modified(repo):
-    module = repo / "pkg" / "mod.py"
-    later = code_record(repo, [module], started=module.stat().st_mtime + 1)
-    assert later["modified_during_build"] == []
-    earlier = code_record(repo, [module], started=module.stat().st_mtime - 1)
-    assert staleness(_summary(code=earlier), repo) == [
-        "files modified while it was built: pkg/mod.py"
-    ]
-
-
 def test_a_record_of_no_files_is_not_current(repo):
     assert staleness(_summary(code=code_record(repo, [])), repo) == [
         "the code record lists no files"
@@ -251,7 +194,6 @@ def _summary(
     questions=("2d.2",),
     name="events",
     inputs=(),
-    migrated=None,
     pending=None,
 ) -> values.Summary:
     summary = values.Summary(
@@ -260,7 +202,6 @@ def _summary(
         commit="c",
         code=code,
         inputs=list(inputs),
-        migrated=migrated,
     )
     summary.add(
         values.Value(
@@ -280,14 +221,11 @@ def _summary(
     return summary
 
 
-def test_the_code_record_and_a_migration_round_trip(repo, tmp_path):
+def test_the_code_record_round_trips(repo, tmp_path):
     record = code_record(repo, [repo / "pkg" / "mod.py"])
     path = tmp_path / "events.json"
     _summary(code=record).write(path)
     assert values.read_summary(path).code == record
-    migrated = {"from": "paper/reported/part2.json", "changes": ["renamed"]}
-    _summary(migrated=migrated).write(path)
-    assert values.read_summary(path).migrated == migrated
 
 
 @pytest.mark.parametrize("schema", [5, 7])
@@ -301,16 +239,13 @@ def test_another_schema_is_refused(tmp_path, schema):
         values.read_summary(path)
 
 
-@pytest.mark.parametrize("field", ["code", "migrated"])
-def test_a_summary_file_must_say_whether_it_has_a_code_record_and_a_migration(
-    tmp_path, field
-):
+def test_a_summary_file_must_say_whether_it_has_a_code_record(tmp_path):
     path = tmp_path / "events.json"
     _summary().write(path)
     payload = json.loads(path.read_text())
-    del payload[field]
+    del payload["code"]
     path.write_text(json.dumps(payload))
-    with pytest.raises(ValueError, match=f"no {field}"):
+    with pytest.raises(ValueError, match="no code"):
         values.read_summary(path)
 
 
@@ -349,21 +284,15 @@ def test_the_summaries_are_exactly_one_file_each(tmp_path):
 def test_staleness_names_each_reason_and_the_release_check_adds_bad_tags(repo):
     module = repo / "pkg" / "mod.py"
     assert staleness(_summary(), repo) == ["no code record"]
-    migrated = _summary(migrated={"from": "paper/reported/part2.json"})
-    assert staleness(migrated, repo) == [
-        "migrated from paper/reported/part2.json, not rebuilt: no code record"
-    ]
     current = _summary(code=code_record(repo, [module]))
     assert staleness(current, repo) == []
     module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
     dirty = _summary(code=code_record(repo, [module]))
-    assert staleness(dirty, repo) == [
-        "built from uncommitted code (the diff is in the record)"
-    ]
+    assert staleness(dirty, repo) == ["built from uncommitted code: pkg/mod.py"]
     _git(repo, "commit", "-q", "-am", "triple")
     module.write_text(SOURCE)
     assert staleness(dirty, repo) == [
-        "built from uncommitted code (the diff is in the record)",
+        "built from uncommitted code: pkg/mod.py",
         "code changed since the build: pkg/mod.py",
     ]
     problems, _ = release_problems(
@@ -418,28 +347,23 @@ def test_the_release_check_compares_single_file_inputs_and_notes_file_sets(repo)
     assert notes == {"events": [cited, "3 inputs not checked (--code-only)"]}
 
 
-def _uncommitted_and_modified(repo: Path) -> dict:
+def _uncommitted(repo: Path) -> dict:
     module = repo / "pkg" / "mod.py"
     module.write_text(SOURCE.replace("FACTOR = 2", "FACTOR = 3"))
-    record = code_record(repo, [module])
-    return {**record, "modified_during_build": ["pkg/mod.py"]}
+    return code_record(repo, [module])
 
 
 @pytest.mark.parametrize(
-    "make_code, migrated, cell",
+    "make_code, cell",
     [
-        (lambda repo: None, None, "none"),
-        (lambda repo: {"error": "fatal: not a git repository"}, None, "error"),
-        (lambda repo: code_record(repo, [repo / "pkg" / "mod.py"]), None, "yes"),
-        (_uncommitted_and_modified, None, "yes, uncommitted, modified during build"),
-        (lambda repo: None, {"from": "old.json"}, "migrated, not rebuilt"),
+        (lambda repo: None, "none"),
+        (lambda repo: code_record(repo, [repo / "pkg" / "mod.py"]), "yes"),
+        (_uncommitted, "yes, uncommitted"),
     ],
-    ids=["none", "error", "committed", "uncommitted", "migrated"],
+    ids=["none", "committed", "uncommitted"],
 )
-def test_the_view_s_summary_table_says_what_each_code_record_is(
-    repo, make_code, migrated, cell
-):
-    summary = _summary(code=make_code(repo), migrated=migrated)
+def test_the_view_s_summary_table_says_what_each_code_record_is(repo, make_code, cell):
+    summary = _summary(code=make_code(repo))
     view = emit.questions_view({"events": summary})
     assert f"| `events.json` | `c` | {cell} | 1 | 0 |" in view
 
@@ -621,3 +545,27 @@ def test_summarize_records_only_what_the_survey_s_build_used(tmp_path):
         & files
     )
     assert code_changes(summary.code, ROOT) == []
+
+
+def test_summarize_writes_no_canonical_summary_from_uncommitted_code(
+    repo, monkeypatch, capsys
+):
+    """``repo`` stands for the checkout: its ``uv.lock`` is part of every build."""
+    script = _load_script("summarize")
+    canonical = repo / "paper" / "reported"
+    monkeypatch.setattr(script, "ROOT_DIR", repo)
+    monkeypatch.setattr(script, "SUMMARY_DIR", canonical)
+    (repo / "uv.lock").write_text("lock 2\n")
+    with pytest.raises(SystemExit) as refused:
+        script.main(["--summary", "survey"])
+    assert refused.value.code == 1
+    assert "differ from the commit: uv.lock" in capsys.readouterr().err
+    assert not canonical.exists()
+
+    trial = repo / "trial"
+    script.main(["--summary", "survey", "--output-dir", str(trial)])
+    assert values.read_summary(trial / "survey.json").code["uncommitted"] == ["uv.lock"]
+
+    _git(repo, "commit", "-q", "-am", "lock 2")
+    script.main(["--summary", "survey"])
+    assert values.read_summary(canonical / "survey.json").code["uncommitted"] == []

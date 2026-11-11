@@ -28,7 +28,6 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from continuum_swr_replay.reported.code_record import is_record
 from continuum_swr_replay.reported.formatting import formatted
 from continuum_swr_replay.reported.questions import (
     FIGURES,
@@ -174,20 +173,11 @@ def _cell(text: str) -> str:
 
 
 def _record_cell(summary: Summary) -> str:
-    """The summary table's code-record cell: ``migrated`` (converted from an earlier
-    layout, not rebuilt), ``none``, ``error``, or ``yes`` with what the record
-    flags."""
-    code = summary.code
-    if summary.migrated is not None:
-        return "migrated, not rebuilt"
-    if not is_record(code):
-        return "error" if code else "none"
-    notes = []
-    if code["uncommitted"]:
-        notes.append("uncommitted")
-    if code["modified_during_build"]:
-        notes.append("modified during build")
-    return ", ".join(["yes", *notes])
+    """The summary table's code-record cell: ``none``, ``yes``, or
+    ``yes, uncommitted`` for a build from uncommitted code."""
+    if summary.code is None:
+        return "none"
+    return "yes, uncommitted" if summary.code["uncommitted"] else "yes"
 
 
 def _computed_in(summary: str, value: Value) -> str:
@@ -244,10 +234,6 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
         "as a finding. A summary file is named for what it holds; a question's part",
         "is where the paper reports it. *Computed in* names the function that",
         "computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.",
-        "",
-        "A summary marked *migrated* was converted from an earlier layout, not",
-        "rebuilt: its values are that build's, its tags were mapped to the question",
-        "list, and it has no code record until it is rebuilt.",
         "",
         "| Summary | Built at | Code record | Values | Values with tag problems |",
         "|---|---|---|---|---|",

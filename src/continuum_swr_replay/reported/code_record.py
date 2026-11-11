@@ -6,12 +6,13 @@ package module loaded during the build (the summary's builder and the building
 script's own imports), the script itself, and every non-Python file under the
 package directory (today only ``data_loaders/epoch_register.csv``, the analysed
 cohort), each with two digests. It also records the commit checked out, the digest
-of ``uv.lock``, and, when any of those files or ``uv.lock`` differs from that
-commit, the diff and the files git does not track. Nothing refuses a build: the
-record makes any build traceable, and :func:`code_changes` says later which
-recorded files no longer match. Only ``scripts/reported/check_release.py`` fails
-on a stale or uncommitted summary, and it is run at milestones, not on every
-commit.
+of ``uv.lock``, and which of those files or ``uv.lock`` differ from that commit.
+The rule is that a summary in ``paper/reported/`` is built from committed code:
+``scripts/reported/summarize.py`` refuses to write one there otherwise (a trial
+build goes to another folder), so the commit and the digests are the whole
+record. :func:`code_changes` says later which recorded files no longer match;
+that never refuses anything, and only ``scripts/reported/check_release.py``
+fails on a stale summary, at milestones.
 
 Each file has two digests: ``sha256``, of its bytes, and ``code_sha256``. For a
 module the second is of its syntax tree with every bare string statement (module,
@@ -58,17 +59,8 @@ class CodeRecord(TypedDict):
     head: str
     python: str
     uv_lock_sha256: str
-    uncommitted: bool
-    diff: str
-    untracked: list[str]
-    modified_during_build: list[str]
+    uncommitted: list[str]
     files: dict[str, FileDigests]
-
-
-class CodeRecordError(TypedDict):
-    """What :func:`try_code_record` returns when no record could be made."""
-
-    error: str
 
 
 _STATEMENT_LISTS = ("body", "orelse", "finalbody")
@@ -155,23 +147,8 @@ def build_files(repo: Path) -> list[Path]:
     return sorted(f for f in files if f.is_relative_to(root))
 
 
-_PLAIN_DIFF = (
-    "--no-ext-diff",
-    "--no-textconv",
-    "--no-color",
-    "--src-prefix=a/",
-    "--dst-prefix=b/",
-)
-"""Options that keep ``git diff`` independent of the user's git configuration (an
-external diff tool, text conversion, colour, prefixes), so its output is a patch
-``git apply`` takes."""
-
-
-def _git(
-    repo: Path, *args: str, ok: tuple[int, ...] = (0,)
-) -> subprocess.CompletedProcess:
-    """``git <args>`` in ``repo``, its stdout kept exactly as printed (so a diff
-    keeps its last newline). An exit code outside ``ok`` raises, with git's own
+def _git(repo: Path, *args: str) -> str:
+    """The output of ``git <args>`` in ``repo``; a failure raises, with git's own
     message."""
     result = subprocess.run(
         ["git", "--no-optional-locks", *args],
@@ -179,16 +156,14 @@ def _git(
         capture_output=True,
         text=True,
     )
-    if result.returncode not in ok:
+    if result.returncode != 0:
         raise subprocess.CalledProcessError(
             result.returncode, result.args, result.stdout, result.stderr
         )
-    return result
+    return result.stdout
 
 
-def code_record(
-    repo: Path, files: Iterable[Path], started: float | None = None
-) -> CodeRecord:
+def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
     """What a summary records about the code that built it.
 
     Parameters
@@ -197,10 +172,6 @@ def code_record(
         The git work tree; ``uv.lock`` is read from its root.
     files : iterable of Path
         The files the build depended on (:func:`build_files`).
-    started : float, optional
-        When the build started (``time.time()``). A file modified after it is
-        listed in ``modified_during_build``: the record may not be the code that
-        ran.
 
     Returns
     -------
@@ -208,78 +179,34 @@ def code_record(
         - ``head``: the commit checked out (``git rev-parse HEAD``).
         - ``python``: the major.minor version that computed the ``code_sha256``s.
         - ``uv_lock_sha256``: the sha256 of ``uv.lock``.
-        - ``uncommitted``: whether ``uv.lock`` or any of ``files`` differs from
-          ``head`` (by ``git diff --quiet``) or is not tracked.
-        - ``diff``: ``git diff <head>`` of ``uv.lock`` and the tracked files;
-          empty when they match it. It applies with ``git apply`` on ``head``.
-        - ``untracked``: the files git does not track; their content is in no
-          commit and not in ``diff``, only their digests are kept.
-        - ``modified_during_build``: the files modified after ``started``.
+        - ``uncommitted``: those of ``files`` and ``uv.lock`` that differ from
+          ``head`` or that git does not track, sorted; empty when the build is
+          the code of ``head``.
         - ``files``: each file, relative to ``repo``, with its ``sha256`` and
           ``code_sha256``.
 
     Raises
     ------
     OSError, subprocess.CalledProcessError
-        If a file or ``uv.lock`` cannot be read, or git fails
-        (:func:`try_code_record` turns these into a :class:`CodeRecordError`).
+        If a file or ``uv.lock`` cannot be read, or git fails.
     """
     root = repo.resolve()
     relative = [str(Path(f).resolve().relative_to(root)) for f in files]
-    head = _git(repo, "rev-parse", "HEAD").stdout.strip()
-    paths = sorted({*relative, LOCK})
-    tracked = set(_git(repo, "ls-files", "--", *paths).stdout.splitlines())
-    untracked = sorted(set(relative) - tracked)
-    compared = sorted(tracked)
-    differs = (
-        bool(compared)
-        and _git(
-            repo, "diff", "--quiet", *_PLAIN_DIFF, head, "--", *compared, ok=(0, 1)
-        ).returncode
-        == 1
-    )
-    diff = (
-        _git(repo, "diff", *_PLAIN_DIFF, head, "--", *compared).stdout
-        if differs
-        else ""
-    )
-    modified = (
-        sorted(p for p in relative if (root / p).stat().st_mtime > started)
-        if started is not None
+    head = _git(repo, "rev-parse", "HEAD").strip()
+    paths = {*relative, LOCK}
+    tracked = set(_git(repo, "ls-files", "--", *sorted(paths)).splitlines())
+    changed = (
+        _git(repo, "diff", "--name-only", head, "--", *sorted(tracked)).splitlines()
+        if tracked
         else []
     )
     return {
         "head": head,
         "python": _python(),
         "uv_lock_sha256": hashlib.sha256((repo / LOCK).read_bytes()).hexdigest(),
-        "uncommitted": differs or bool(untracked),
-        "diff": diff,
-        "untracked": untracked,
-        "modified_during_build": modified,
+        "uncommitted": sorted({*changed, *(paths - tracked)}),
         "files": {path: _digests(root / path) for path in relative},
     }
-
-
-def try_code_record(
-    repo: Path, files: Iterable[Path], started: float | None = None
-) -> CodeRecord | CodeRecordError:
-    """:func:`code_record`, or a :class:`CodeRecordError` naming the cause when a
-    file, ``uv.lock`` or git cannot answer, so that a finished build is still
-    written."""
-    try:
-        return code_record(repo, files, started)
-    except subprocess.CalledProcessError as error:
-        message = (error.stderr or "").strip() or str(error)
-        print(f"warning: no code record: git failed: {message}", file=sys.stderr)
-        return {"error": f"git failed: {message}"}
-    except OSError as error:
-        print(f"warning: no code record: {error}", file=sys.stderr)
-        return {"error": str(error)}
-
-
-def is_record(code: CodeRecord | CodeRecordError | None) -> bool:
-    """Whether ``code`` is a real record, not missing and not an error."""
-    return code is not None and "error" not in code
 
 
 def code_changes(record: CodeRecord, repo: Path) -> list[str]:
@@ -290,13 +217,7 @@ def code_changes(record: CodeRecord, repo: Path) -> list[str]:
     version, when its ``code_sha256`` does. A removed file, or a module that no
     longer parses, counts as changed.
 
-    Raises
-    ------
-    ValueError
-        If ``record`` is a :class:`CodeRecordError`, which records no files.
     """
-    if not is_record(record):
-        raise ValueError(f"not a code record: {record}")
     root = repo.resolve()
     same_python = record["python"] == _python()
     changed = []

@@ -76,6 +76,24 @@ Where the build departs from the design below, after two independent reviews:
   `questions.md` does not mark cited values, so editing the manuscript never
   makes a generated file stale.
 
+## As built: simpler rules (2026-11-11)
+
+These replace what "As built" above says about refusal, the code record and the
+release check.
+
+- **One rule for a stale input.** A value read from an output made on other
+  tables than the current ones is kept and marked pending, in every builder (the
+  behavior builder used to refuse). Nothing refuses a build for it; the release
+  check refuses a pending value the manuscript cites.
+- **A summary in `paper/reported/` is built from committed code.**
+  `summarize.py` writes nothing there when a file the build used, or `uv.lock`,
+  differs from the commit; a trial build goes to another folder and records the
+  files that differ. So the code record is the commit, `uv.lock`'s digest and
+  each file's two digests: the stored diff, the untracked list and the
+  modified-during-build list are gone, and a git failure stops the build.
+  A docstring or comment edit still does not make a summary stale.
+- **No `migrated` field.** Every summary is rebuilt under schema 6.
+
 ## As built: naming (2026-11-11)
 
 - **Summaries are named for what they hold:** `survey`, `detection`, `events`,

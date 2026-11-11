@@ -17,7 +17,7 @@ help:
 	@echo "make figures          Regenerate the main figures (needs the lab's processed data)"
 	@echo "make summaries        Rebuild paper/reported/<summary>.json (all but survey need the lab's processed data)"
 	@echo "make reported-values  Write the summaries' values into the LaTeX macros and the docs"
-	@echo "make release-check    Before a milestone: fail if a summary is stale, uncommitted or mis-tagged"
+	@echo "make release-check    Before a milestone: fail if a summary is stale or mis-tagged, or a cited value is pending"
 	@echo "                       (ARGS=--code-only skips the input files, for a machine without the data)"
 	@echo "make manuscript       Build paper/main.pdf from the committed figures and macros"
 

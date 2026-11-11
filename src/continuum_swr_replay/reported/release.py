@@ -7,11 +7,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 
-from continuum_swr_replay.reported.code_record import (
-    code_changes,
-    input_changes,
-    is_record,
-)
+from continuum_swr_replay.reported.code_record import code_changes, input_changes
 from continuum_swr_replay.reported.emit import cited_values
 from continuum_swr_replay.reported.values import Summary, summary_tag_problems
 
@@ -19,33 +15,19 @@ from continuum_swr_replay.reported.values import Summary, summary_tag_problems
 def staleness(summary: Summary, repo: Path) -> list[str]:
     """Why ``summary``'s code record does not vouch for it now; empty when it does.
 
-    Each is named: no code record (built before records were kept, or git could
-    not answer, with its message), a record that lists no files, files git does
-    not track, a tracked diff, files modified while it was built, and recorded
+    Each is named: no code record, a record that lists no files, a build from
+    uncommitted code (a trial build put among the summaries), and recorded
     files (or ``uv.lock``) that changed since.
     """
     code = summary.code
-    if summary.migrated is not None:
-        return [
-            f"migrated from {summary.migrated['from']}, not rebuilt: no code record"
-        ]
     if code is None:
         return ["no code record"]
-    if not is_record(code):
-        return [f"no code record: {code['error']}"]
     problems = []
     if not code["files"]:
         problems.append("the code record lists no files")
-    if code["untracked"]:
+    if code["uncommitted"]:
         problems.append(
-            f"built from files git does not track: {', '.join(code['untracked'])}"
-        )
-    if code["diff"]:
-        problems.append("built from uncommitted code (the diff is in the record)")
-    if code["modified_during_build"]:
-        problems.append(
-            "files modified while it was built: "
-            + ", ".join(code["modified_during_build"])
+            f"built from uncommitted code: {', '.join(code['uncommitted'])}"
         )
     changed = code_changes(code, repo)
     if changed:

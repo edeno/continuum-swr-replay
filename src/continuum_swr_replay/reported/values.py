@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from continuum_swr_replay.reported.code_record import CodeRecord, CodeRecordError
+from continuum_swr_replay.reported.code_record import CodeRecord
 from continuum_swr_replay.reported.questions import tag_problems
 
 SCHEMA_VERSION = 6
@@ -211,16 +211,10 @@ class Summary:
     ----------
     name : str
         A key of :data:`SUMMARIES`.
-    code : CodeRecord, CodeRecordError or None
+    code : CodeRecord or None
         The record of the code that built it
-        (:class:`~continuum_swr_replay.reported.code_record.CodeRecord`); a
-        :class:`~continuum_swr_replay.reported.code_record.CodeRecordError` when
-        git could not answer; None when no build recorded it (a summary that was
-        migrated, or one a builder returned before ``summarize.py`` stamped it).
-    migrated : dict or None
-        For a summary converted from an earlier layout instead of rebuilt: what it
-        was converted from, at which commit, by what, and what changed. A rebuild
-        replaces it with a summary that has none.
+        (:class:`~continuum_swr_replay.reported.code_record.CodeRecord`); None
+        for a summary a builder returned, before ``summarize.py`` records it.
     """
 
     name: str
@@ -228,8 +222,7 @@ class Summary:
     commit: str
     inputs: list[dict[str, Any]] = field(default_factory=list)
     values: dict[str, Value] = field(default_factory=dict)
-    code: CodeRecord | CodeRecordError | None = None
-    migrated: dict[str, Any] | None = None
+    code: CodeRecord | None = None
 
     def __post_init__(self) -> None:
         if self.name not in SUMMARIES:
@@ -249,7 +242,6 @@ class Summary:
             "produced_by": self.produced_by,
             "commit": self.commit,
             "code": self.code,
-            "migrated": self.migrated,
             "inputs": self.inputs,
             "values": {
                 key: {k: v for k, v in asdict(value).items() if k != "key"}
@@ -312,24 +304,21 @@ def read_summary(path: Path) -> Summary:
     Raises
     ------
     ValueError
-        If the schema is not :data:`SCHEMA_VERSION`, or the file lacks ``code``
-        or ``migrated``.
+        If the schema is not :data:`SCHEMA_VERSION`, or the file lacks ``code``.
     """
     payload = json.loads(path.read_text())
     if payload["schema_version"] != SCHEMA_VERSION:
         raise ValueError(
             f"{path}: schema {payload['schema_version']}, expected {SCHEMA_VERSION}"
         )
-    missing = {"code", "migrated"} - set(payload)
-    if missing:
-        raise ValueError(f"{path}: no {', '.join(sorted(missing))}")
+    if "code" not in payload:
+        raise ValueError(f"{path}: no code")
     summary = Summary(
         name=payload["summary"],
         produced_by=payload["produced_by"],
         commit=payload["commit"],
         inputs=payload["inputs"],
         code=payload["code"],
-        migrated=payload["migrated"],
     )
     for key, fields in payload["values"].items():
         fields = dict(fields)

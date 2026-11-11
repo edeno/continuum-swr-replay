@@ -30,9 +30,9 @@ Work that is deferred on purpose. Each item says when it should be done.
   `/cumulus/...`). Add a script that compares a rebuilt summary with the
   committed one within stated tolerances. Record each input file set's glob, not
   a label, so `make release-check` can re-check sets too (today it re-checks only
-  single files). (Each build now records the code that built it, uncommitted
-  builds included, and `make release-check` flags a stale one; a dirty tree is no
-  longer refused.)
+  single files). (Each build records the code that built it; a summary in
+  `paper/reported/` is written only from committed code, and `make release-check`
+  flags a stale one.)
   *When:* together with Tier 1, or when a number in the paper cannot be traced
   back to a commit.
 

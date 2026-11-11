@@ -476,8 +476,9 @@ Every number the project reports is read from a summary file, named for what it 
 (`paper/reported/<summary>.json`: survey, detection, events, behavior, mpfc).
 - `summarize.py --summary NAME` — writes that summary from outputs the analyses already wrote
   (`continuum_swr_replay.reported.<name>`), with a record of the code that built it; refits nothing.
-- `check_release.py` — before a milestone: fails on a summary that is missing, stale, built from
-  uncommitted code, or mis-tagged (`make release-check`).
+  It writes into `paper/reported/` only from committed code; `--output-dir` makes a trial build.
+- `check_release.py` — before a milestone: fails on a summary that is missing, stale or mis-tagged,
+  or on a pending value the manuscript cites (`make release-check`).
 - `emit_reported_values.py` — writes `paper/reported_values.tex` (one LaTeX macro per value) and rewrites the
   number inside every `<!--v:<summary>.key-->…<!--/v-->` marker in the markdown under `paper/` and `docs/`
   (markers in code are left alone). Every number it changes is listed in `paper/reported/changes.md`.
