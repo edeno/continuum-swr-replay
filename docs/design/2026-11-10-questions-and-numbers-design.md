@@ -332,6 +332,14 @@ always, and blocks only at milestones:
        docstring-stripped AST;
      - the SHA-256 of `uv.lock`.
    - The input checksums are already recorded.
+   - As built (after an independent review), the record also:
+     - names the commit its diff is against;
+     - lists files git does not track, which count as uncommitted;
+     - includes the package's data files (the epoch register);
+     - lists files modified while the build ran;
+     - says why, instead of failing, when git cannot answer.
+
+     Attribute docstrings are also left out of the code digest.
    - Building from uncommitted code is allowed, because the diff makes it
      reproducible. Finding 4 could not have happened with this record.
 2. **Report staleness, never fail, during development.**
