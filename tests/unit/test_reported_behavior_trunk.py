@@ -11,40 +11,50 @@ from continuum_swr_replay.reported.behavior import (
     trunk_values,
 )
 
-ANIMALS = ("a", "b", "c")
-
-
-def _arm_table() -> pd.DataFrame:
-    """Per animal, one non-SWR and one SWR event, both with the current arm 2
-    (patch 2, whose trunk is arm 7). Non-SWR: 0.1 on arm 7, 0.1 on arm 6.
-    SWR: 0.2 on arm 7, 0.3 on arm 8."""
-    rows = []
-    for animal in ANIMALS:
-        for is_swr, trunk in ((False, {6: 0.1, 7: 0.1}), (True, {7: 0.2, 8: 0.3})):
-            event = f"{animal}-{int(is_swr)}"
-            leaf = (1.0 - sum(trunk.values())) / 6
-            for arm in range(9):
-                rows.append(
-                    {
-                        "animal": animal,
-                        "event_id": event,
-                        "is_swr": is_swr,
-                        "candidate_arm": arm,
-                        "is_current_arm": int(arm == 2),
-                        "arm_fraction": trunk.get(arm, leaf if arm < 6 else 0.0),
-                    }
-                )
-    return pd.DataFrame(rows)
+# Per animal, one event of each kind, with the current arm 2 (patch 2, whose
+# trunk is arm 7): the event's share on arm 7 and on another trunk (arm 8).
+TRUNK_CONTENT = {
+    ("a", False): (0.1, 0.1),
+    ("a", True): (0.2, 0.3),
+    ("b", False): (0.3, 0.3),
+    ("b", True): (0.1, 0.2),
+    ("c", False): (0.05, 0.25),
+    ("c", True): (0.6, 0.2),
+}
 
 
 def test_trunk_values_summarize_over_animals():
-    values = {v.key: v for v in trunk_values(_arm_table(), "x")}
+    arm = pd.DataFrame(
+        [
+            {
+                "animal": animal,
+                "event_id": f"{animal}-{int(is_swr)}",
+                "is_swr": is_swr,
+                "candidate_arm": candidate,
+                "is_current_arm": int(candidate == 2),
+                "arm_fraction": {7: current, 8: other}.get(
+                    candidate, (1 - current - other) / 6 if candidate < 6 else 0.0
+                ),
+            }
+            for (animal, is_swr), (current, other) in TRUNK_CONTENT.items()
+            for candidate in range(9)
+        ]
+    )
+    values = {v.key: v for v in trunk_values(arm, "x")}
+    # all trunks, SWR: 0.5, 0.3, 0.8; non-SWR: 0.2, 0.6, 0.3 (b's is higher)
     assert values["trunk_share_swr"].value == pytest.approx(0.5)
     assert "over the 3 animals" in values["trunk_share_swr"].description
-    assert values["trunk_share_non_swr"].value == pytest.approx(0.2)
-    assert values["trunk_share_animals_swr_higher"].value == 3
+    assert values["trunk_share_non_swr"].value == pytest.approx(0.3)
+    assert values["trunk_share_animals_swr_higher"].value == 2
+    # the current patch's trunk, SWR: 0.2, 0.1, 0.6; non-SWR: 0.1, 0.3, 0.05
     assert values["trunk_share_current_patch_swr"].value == pytest.approx(0.2)
-    assert values["trunk_share_other_patches_non_swr"].value == pytest.approx(0.1)
+    assert values["trunk_share_current_patch_non_swr"].value == pytest.approx(0.1)
+    assert values["trunk_share_current_patch_animals_swr_higher"].value == 2
+    # the other trunks, SWR: 0.3, 0.2, 0.2; non-SWR: 0.1, 0.3, 0.25 (only a's rises)
+    assert values["trunk_share_other_patches_swr"].value == pytest.approx(0.2)
+    assert values["trunk_share_other_patches_non_swr"].value == pytest.approx(0.25)
+    assert values["trunk_share_other_patches_animals_swr_higher"].value == 1
+    # SWR: 0.2 / 0.5, 0.1 / 0.3, 0.6 / 0.8; non-SWR: 0.1 / 0.2, 0.3 / 0.6, 0.05 / 0.3
     assert values["trunk_current_patch_fraction_swr"].value == pytest.approx(0.4)
     assert values["trunk_current_patch_fraction_non_swr"].value == pytest.approx(0.5)
 

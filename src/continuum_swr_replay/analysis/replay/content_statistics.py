@@ -17,14 +17,10 @@ import pandas as pd
 from continuum_swr_replay.analysis.hippocampus.event_statistics import class_medians
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
-    WELL_PATCH_MAPPING,
+    TRUNK_ARMS,
 )
 
-PATCH_TRUNK = {
-    patch: arm
-    for arm, patch in TRACK_SEGMENT_TO_PATCH.items()
-    if arm not in WELL_PATCH_MAPPING
-}
+PATCH_TRUNK = {TRACK_SEGMENT_TO_PATCH[arm]: arm for arm in TRUNK_ARMS}
 """The trunk arm of each patch (``TRACK_SEGMENT_TO_PATCH``): patch -> trunk arm."""
 
 TRUNK_COLUMNS = ["animal", "event_id", "is_swr", "candidate_arm", "is_current_arm"]
@@ -50,18 +46,31 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        One row per event with exactly one current arm: ``animal``, ``is_swr``,
-        ``trunk`` (share on arms 6-8), ``current_patch_trunk`` (the trunk of the
-        patch holding the current arm) and ``other_trunks`` (the other two).
+        One row per event: ``event_id``, ``animal``, ``is_swr``, ``trunk``
+        (its share on the trunk arms), ``current_patch_trunk`` (on the trunk of
+        the patch holding the current arm) and ``other_trunks`` (on the other
+        two). Each share is a fraction of the event's content.
+
+    Raises
+    ------
+    ValueError
+        If an event's ``is_swr`` or an arm's ``arm_fraction`` is missing, or an
+        event does not have exactly one current arm.
     """
-    arm = arm[arm["is_swr"].notna()]
-    current = arm.loc[arm["is_current_arm"] == 1, ["event_id", "candidate_arm"]]
-    current = current[~current["event_id"].duplicated(keep=False)]
+    for column in ("is_swr", TRUNK_RESPONSE):
+        n_missing = arm.loc[arm[column].isna(), "event_id"].nunique()
+        if n_missing:
+            raise ValueError(f"{n_missing} events have a missing {column}")
+    n_current = (arm["is_current_arm"] == 1).groupby(arm["event_id"]).sum()
+    if (n_current != 1).any():
+        raise ValueError(
+            f"{int((n_current != 1).sum())} events do not have exactly one current arm"
+        )
+    current = arm[arm["is_current_arm"] == 1]
     trunk_of = current.set_index("event_id")["candidate_arm"].map(
         lambda a: PATCH_TRUNK[TRACK_SEGMENT_TO_PATCH[int(a)]]
     )
-    arm = arm[arm["event_id"].isin(trunk_of.index)]
-    on_trunk = arm["candidate_arm"].isin(PATCH_TRUNK.values())
+    on_trunk = arm["candidate_arm"].isin(TRUNK_ARMS)
     on_current = (
         arm["candidate_arm"].to_numpy() == arm["event_id"].map(trunk_of).to_numpy()
     )
@@ -70,7 +79,7 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
         {
             "event_id": arm["event_id"],
             "trunk": share.where(on_trunk, 0.0),
-            "current_patch_trunk": share.where(on_trunk & on_current, 0.0),
+            "current_patch_trunk": share.where(on_current, 0.0),
         }
     )
     events = frame.groupby("event_id", sort=False).sum()
@@ -83,8 +92,16 @@ def trunk_shares(arm: pd.DataFrame) -> pd.DataFrame:
 
 def _animal_mean_shares(events: pd.DataFrame) -> pd.DataFrame:
     """Each animal's mean share on each trunk part over its SWR and its non-SWR
-    events: indexed by ``animal`` and ``is_swr``, one column per part."""
-    return events.groupby(["animal", "is_swr"])[list(TRUNK_PARTS)].mean()
+    events: indexed by ``animal`` and ``is_swr``, one column per part. Refuses
+    an animal without events of both kinds."""
+    means = events.groupby(["animal", "is_swr"])[list(TRUNK_PARTS)].mean()
+    n_classes = means.groupby("animal").size()
+    if (n_classes != 2).any():
+        raise ValueError(
+            "animals without both SWR and non-SWR events: "
+            f"{sorted(n_classes.index[n_classes != 2])}"
+        )
+    return means
 
 
 def trunk_share_statistics(events: pd.DataFrame) -> pd.DataFrame:
@@ -104,9 +121,14 @@ def trunk_share_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
         - ``swr_median``, ``non_swr_median``: the median over animals of the
           animal's share in SWR and in non-SWR events.
-        - ``n_animals``: the animals.
-        - ``n_animals_swr_higher``: animals whose SWR share is above their
-          non-SWR share.
+        - ``n_animals``: the animals, each with events of both kinds.
+        - ``n_animals_swr_higher``: of those, animals whose SWR share is above
+          their non-SWR share.
+
+    Raises
+    ------
+    ValueError
+        If an animal has no SWR or no non-SWR event.
     """
     per_animal = _animal_mean_shares(events)
     rows = {}
@@ -137,6 +159,11 @@ def current_patch_trunk_fraction(events: pd.DataFrame) -> dict[str, float]:
         ``swr`` and ``non_swr``: the median over animals of the animal's mean
         current-patch trunk share divided by its mean share on all trunks, in
         SWR and in non-SWR events.
+
+    Raises
+    ------
+    ValueError
+        If an animal has no SWR or no non-SWR event.
     """
     per_animal = _animal_mean_shares(events)
     fractions = {}
@@ -157,9 +184,11 @@ def event_length_statistics(events: pd.DataFrame) -> dict[str, float]:
     Returns
     -------
     statistics : dict
-        ``median_bins``, the median over all events; ``median_bins_swr`` and
-        ``median_bins_non_swr``, the medians of the SWR and non-SWR events; and
-        ``swr_to_non_swr_ratio``, the SWR median over the non-SWR median.
+        ``median_bins``, the median number of bins over all events with a
+        length, whatever their SWR status; ``median_bins_swr`` and
+        ``median_bins_non_swr``, the medians of the SWR and of the non-SWR
+        events; and ``swr_to_non_swr_ratio``, the SWR median over the non-SWR
+        median.
     """
     medians = class_medians(events, "n_nonlocal_bins", "lower")
     return {
