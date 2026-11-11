@@ -9,7 +9,7 @@ is where the paper reports it.
 
 | Summary | Built at | Values | Values with tag problems |
 |---|---|---|---|
-| `part0.json` | `1577f7209200` | 32 | 0 |
+| `part0.json` | `06368f6c382f` | 32 | 0 |
 | `part1.json` | `7fb1dcfa84ad` | 132 | 99 |
 | `part2.json` | `bfb20f359f8f` | 331 | 86 |
 | `part3.json` | `c96c9133ef6c-dirty` | 922 | 25 |

@@ -1,9 +1,81 @@
 {
- "schema_version": 1,
+ "schema_version": 2,
  "part": 0,
  "title": "the surveyed literature",
  "produced_by": "scripts/reported/summarize_part.py",
- "commit": "1577f7209200",
+ "commit": "06368f6c382f",
+ "code": {
+  "python": "3.11",
+  "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
+  "uncommitted": false,
+  "diff": "",
+  "modules": {
+   "scripts/reported/summarize_part.py": {
+    "sha256": "0568c660424bf43cd82e719232e303b30bc5a2983c9fb84238f5fc94943c4df4",
+    "code_sha256": "b15365eb663e431613503da7ced1de2c05db41edf7df23108c61317e348c001e"
+   },
+   "src/continuum_swr_replay/__init__.py": {
+    "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
+    "code_sha256": "da55fd01482a16ea3f485e7731f53606ebbb1a994b8b2bfe6d6bc2f7dde20d3a"
+   },
+   "src/continuum_swr_replay/data_loaders/__init__.py": {
+    "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
+    "code_sha256": "c3b3d414ebf9ae3bf3b9ac658182312806f76afb2eaaf81f16f61338895323e9"
+   },
+   "src/continuum_swr_replay/data_loaders/constants.py": {
+    "sha256": "17fffe227de0b66078d7952ac98ad4c886cf089d4614bd402e1b7b5a424315ad",
+    "code_sha256": "bc462bf2d352d40d3e66f6303764f0cf19d8e1ad5b864adce0e74192dad9f7e8"
+   },
+   "src/continuum_swr_replay/paths.py": {
+    "sha256": "8b97665dec5cf90a2109d94513b790500becbbeea4c19a8387187838bcca11b3",
+    "code_sha256": "6c36e8b535cf4b57e83fcc377b1bd57d33a4085001f88e21b2467daf6b9d8a53"
+   },
+   "src/continuum_swr_replay/reported/__init__.py": {
+    "sha256": "27b4b3b046870f4bebfd79116737a87aaa1cc5447f56b8736799c6c678405e14",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/reported/literature.py": {
+    "sha256": "a1f97273474493df7b5901540d753996b0fb2a59cfe00d815fecaec59a2d8319",
+    "code_sha256": "8e97e7b8fa303f806bcde84929e9fee40595efe429c4e7ef59ec11fb229a531a"
+   },
+   "src/continuum_swr_replay/reported/part0.py": {
+    "sha256": "09ac1d612f8afd17614b0cad95db088515fa15f921cdbeb9cbb65b09b50ef0e5",
+    "code_sha256": "01d861fd9ed6e4628ef76f4ec78fc5d2606ba2004ae76751d9fccff9f8537a7b"
+   },
+   "src/continuum_swr_replay/reported/values.py": {
+    "sha256": "53599ba8804fc77bea0f1179d5bd330033543c59dc510e9fc45e58c0c230fbbd",
+    "code_sha256": "d7626ae0087fc1707805ee15d4acf6653e4cdb7618f9cc64273eea1eb835525d"
+   },
+   "src/continuum_swr_replay/runs/__init__.py": {
+    "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/runs/io.py": {
+    "sha256": "3a05e9c1bcdcf85ccae04ea7e29d7eb8ed1ba5b76490ecdc039d92f2d211b935",
+    "code_sha256": "1c55cd094982955de66a26a570df73c22ecfc25660e98985787bd973b893d3f1"
+   },
+   "src/continuum_swr_replay/runs/provenance.py": {
+    "sha256": "0517671a2cd647305bd9f067de18ce9af20c57664d96d3537fface7c19dc38e5",
+    "code_sha256": "f6c4e53307ff637290d1cfb6fce4b099e32d7b7f73f1910dc22b4dd76e2b26c8"
+   },
+   "src/continuum_swr_replay/tables/__init__.py": {
+    "sha256": "99a10dac0b91e90337a0f3cd2c121b3dda7276e32c598dc9a05131fdcb7f4edb",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/tables/covariate_registry.py": {
+    "sha256": "6ede5a02c1b6ccb801755f8cc407776714665f1d1d2118fd58cc6be04f888d3d",
+    "code_sha256": "0d3ccc246085b3b01b07217fa15c92f81e1de167ba5cb67d8d3b559ac3bb619d"
+   },
+   "src/continuum_swr_replay/tables/io.py": {
+    "sha256": "6350b05f312355bc782e4cdb1577b8a69408ffc58e99f76a27d9fabcabef3eb9",
+    "code_sha256": "4f3f01607f340aecca780c9883f9fc7eddffb2343fe709fd43bb0bc9dd839a0d"
+   },
+   "src/continuum_swr_replay/tables/versions.py": {
+    "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
+    "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
+   }
+  }
+ },
  "inputs": [
   {
    "path": "paper/tables/table_s1_literature_parameters.csv",
