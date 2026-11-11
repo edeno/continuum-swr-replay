@@ -1,35 +1,80 @@
 {
- "schema_version": 5,
+ "schema_version": 6,
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
- "produced_by": "scripts/reported/summarize_part.py",
- "commit": "7fb1dcfa84ad",
- "code": null,
- "migrated": {
-  "from": "paper/reported/part1.json",
-  "by": "scripts/reported/migrate_summaries.py",
-  "steps": [
-   {
-    "change": "renamed from part1.json to detection.json (schema 1 to 4)",
-    "script_commit": "6e81598c43fc764b4431944e33630a31458115c1",
-    "ran_at": "eb1f98092c89ee24a7a40ca72238a6d3e307003e, from an uncommitted copy"
+ "produced_by": "scripts/reported/summarize.py",
+ "commit": "d7e273e84b1b",
+ "code": {
+  "head": "d7e273e84b1b7003aceda5060ae20fab5e85de9c",
+  "python": "3.11",
+  "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
+  "uncommitted": [],
+  "files": {
+   "scripts/reported/summarize.py": {
+    "sha256": "45a40c6e2abd156f030f1b61ef612f3220c6ebf79b3abe3ea3bb458076ed74e8",
+    "code_sha256": "76142ba35f753fd7b9c66263529e506cbf954df9f94dfab0ec32684a5fb6e7fc"
    },
-   {
-    "change": "claim numbers mapped to question ids, and tags to the question list's decisions (schema 4 to 5)",
-    "script_commit": "b895716f9c48565db933f90417484b88710d4742",
-    "ran_at": "6e81598c43fc764b4431944e33630a31458115c1, from an uncommitted copy"
+   "src/continuum_swr_replay/__init__.py": {
+    "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
+    "code_sha256": "da55fd01482a16ea3f485e7731f53606ebbb1a994b8b2bfe6d6bc2f7dde20d3a"
    },
-   {
-    "change": "questions merged and renumbered, the pilot values moved to 2a.4, figure ids named for their folders",
-    "script_commit": "d833fa8bcc00141bf739f139b11b16c2f061912b",
-    "ran_at": "d833fa8bcc00141bf739f139b11b16c2f061912b"
+   "src/continuum_swr_replay/data_loaders/__init__.py": {
+    "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
+    "code_sha256": "c3b3d414ebf9ae3bf3b9ac658182312806f76afb2eaaf81f16f61338895323e9"
    },
-   {
-    "change": "the simulated comparison moved to Part 1 (question 1.1) and the later questions of section 2a renumbered",
-    "script_commit": "5a6db9ed423c46ef1c56e0c167111eab46d9d39d",
-    "ran_at": "5a6db9ed423c46ef1c56e0c167111eab46d9d39d"
+   "src/continuum_swr_replay/data_loaders/constants.py": {
+    "sha256": "17fffe227de0b66078d7952ac98ad4c886cf089d4614bd402e1b7b5a424315ad",
+    "code_sha256": "09c11436725a16c73cd9faf504a3ee37d71aa570917b5802e4d655865d2b295c"
+   },
+   "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
+    "sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1",
+    "code_sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1"
+   },
+   "src/continuum_swr_replay/paths.py": {
+    "sha256": "8b97665dec5cf90a2109d94513b790500becbbeea4c19a8387187838bcca11b3",
+    "code_sha256": "7a0036eb8770ba7d1d55d0005fa056bb3376560f3a6820d3dcee12eb7aa85ddd"
+   },
+   "src/continuum_swr_replay/reported/__init__.py": {
+    "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/reported/detection.py": {
+    "sha256": "f86ce9d1f39a38c308380cb69231ed68ba3d94259947e4f1d52bc4c46ab155a1",
+    "code_sha256": "846c602ddad8247203a36ea80e6a9338144dd869cb6ced5dfe417656d3871156"
+   },
+   "src/continuum_swr_replay/reported/values.py": {
+    "sha256": "124199ea872a337a8e4a6de24e4c52177babcb0c2b523a2c4cfc307f6fb4bee3",
+    "code_sha256": "4a918c780fe663e1881c024c7110c8ff839878f1484938199a06a56054b07449"
+   },
+   "src/continuum_swr_replay/runs/__init__.py": {
+    "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/runs/io.py": {
+    "sha256": "3a05e9c1bcdcf85ccae04ea7e29d7eb8ed1ba5b76490ecdc039d92f2d211b935",
+    "code_sha256": "1c55cd094982955de66a26a570df73c22ecfc25660e98985787bd973b893d3f1"
+   },
+   "src/continuum_swr_replay/runs/provenance.py": {
+    "sha256": "0517671a2cd647305bd9f067de18ce9af20c57664d96d3537fface7c19dc38e5",
+    "code_sha256": "f6c4e53307ff637290d1cfb6fce4b099e32d7b7f73f1910dc22b4dd76e2b26c8"
+   },
+   "src/continuum_swr_replay/tables/__init__.py": {
+    "sha256": "99a10dac0b91e90337a0f3cd2c121b3dda7276e32c598dc9a05131fdcb7f4edb",
+    "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/tables/covariate_registry.py": {
+    "sha256": "6ede5a02c1b6ccb801755f8cc407776714665f1d1d2118fd58cc6be04f888d3d",
+    "code_sha256": "0d3ccc246085b3b01b07217fa15c92f81e1de167ba5cb67d8d3b559ac3bb619d"
+   },
+   "src/continuum_swr_replay/tables/io.py": {
+    "sha256": "6350b05f312355bc782e4cdb1577b8a69408ffc58e99f76a27d9fabcabef3eb9",
+    "code_sha256": "068f7c9e29e6600614801562847e8e59c86c83e45173b0711a285ed8e516c4c9"
+   },
+   "src/continuum_swr_replay/tables/versions.py": {
+    "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
+    "code_sha256": "cdb6f7af0b61d04ece1cf9dfeb07ee337e592dac4612c5b18e9f632fec633f3d"
    }
-  ]
+  }
  },
  "inputs": [
   {
@@ -75,11 +120,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_continuing_ours_spanning_shortest_fraction": {
@@ -91,11 +136,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_continuing_sliding_one_per_part_longest_fraction": {
@@ -107,11 +152,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_continuing_sliding_spanning_shortest_fraction": {
@@ -123,11 +168,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_elsewhere_ours_one_per_part_longest_fraction": {
@@ -139,11 +184,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_elsewhere_ours_one_per_part_shortest_fraction": {
@@ -155,11 +200,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_elsewhere_sliding_missing_max": {
@@ -171,11 +216,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_elsewhere_sliding_missing_min": {
@@ -187,11 +232,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jump_ours_spanning_max": {
@@ -203,11 +248,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jump_ours_spanning_min": {
@@ -219,11 +264,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jump_sliding_spanning_max": {
@@ -235,11 +280,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jumping_continuous_fraction": {
@@ -251,11 +296,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jumping_nonlocal_fraction": {
@@ -267,11 +312,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jumping_sliding_before_test_fraction": {
@@ -283,11 +328,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_jumping_sliding_fraction": {
@@ -299,11 +344,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_multipart_trials": {
@@ -315,11 +360,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_no_replay_minutes": {
@@ -331,11 +376,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_no_replay_rate_bound": {
@@ -347,11 +392,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_no_replay_recordings": {
@@ -363,11 +408,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_ours_fewer_in_event_trials": {
@@ -379,11 +424,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_ours_more_in_event_trials": {
@@ -395,11 +440,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_ours_recovery_alone_fraction": {
@@ -411,11 +456,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_ours_recovery_in_event_fraction": {
@@ -427,11 +472,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_continuous_fraction": {
@@ -443,11 +488,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_fragmented_share_max": {
@@ -459,11 +504,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_fragmented_share_min": {
@@ -475,11 +520,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_nonlocal_fraction": {
@@ -491,11 +536,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_nonlocal_lowest_rate_fraction": {
@@ -507,11 +552,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_sliding_before_test_fraction": {
@@ -523,11 +568,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_placeless_sliding_fraction": {
@@ -539,11 +584,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_sliding_fewer_in_event_trials": {
@@ -555,11 +600,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_sliding_more_in_event_trials": {
@@ -571,11 +616,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_sliding_recovery_alone_fraction": {
@@ -587,11 +632,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "controls_sliding_recovery_in_event_fraction": {
@@ -603,11 +648,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_controls_summary.csv (scripts/detection/sweep_memoryless_controls.py)",
+   "function": "controls_values",
    "pending": null
   },
   "heldout_continuous_immobile_animals_positive": {
@@ -619,11 +664,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_immobile_ci_high": {
@@ -635,11 +678,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_immobile_ci_low": {
@@ -651,11 +692,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_immobile_epochs": {
@@ -667,11 +706,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_immobile_epochs_positive": {
@@ -683,11 +720,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_immobile_estimate": {
@@ -699,11 +734,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_running_animals_positive": {
@@ -715,11 +748,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_running_ci_high": {
@@ -731,11 +762,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_running_ci_low": {
@@ -747,11 +776,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_running_epochs": {
@@ -763,11 +790,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_running_epochs_positive": {
@@ -779,11 +804,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_continuous_running_estimate": {
@@ -795,11 +818,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_estimator_agreement_min": {
@@ -811,11 +832,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_animals_positive": {
@@ -827,11 +848,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_ci_high": {
@@ -843,11 +862,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_ci_low": {
@@ -859,11 +876,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_epochs": {
@@ -875,11 +890,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_epochs_positive": {
@@ -891,11 +904,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_fragmented_immobile_mismatched_estimate": {
@@ -907,11 +918,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_jumping_support_max": {
@@ -923,11 +932,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_jumping_support_min": {
@@ -939,11 +948,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_local_immobile_animals_positive": {
@@ -955,11 +964,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_local_immobile_ci_high": {
@@ -971,11 +978,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_local_immobile_ci_low": {
@@ -987,11 +992,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_local_immobile_epochs": {
@@ -1003,11 +1006,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_local_immobile_epochs_positive": {
@@ -1019,11 +1020,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_local_immobile_estimate": {
@@ -1035,11 +1034,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_no_spike_immobile_animals_positive": {
@@ -1051,11 +1048,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_no_spike_immobile_ci_high": {
@@ -1067,11 +1062,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_no_spike_immobile_ci_low": {
@@ -1083,11 +1076,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_no_spike_immobile_epochs": {
@@ -1099,11 +1090,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_no_spike_immobile_epochs_positive": {
@@ -1115,11 +1104,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_no_spike_immobile_estimate": {
@@ -1131,11 +1118,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "heldout_ours_only_informative_max": {
@@ -1147,11 +1132,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_ours_only_informative_min": {
@@ -1163,11 +1148,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_ours_only_support_fold_c": {
@@ -1179,11 +1164,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_ours_only_support_max": {
@@ -1195,11 +1180,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_ours_only_support_min": {
@@ -1211,11 +1196,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_placeless_informative_events": {
@@ -1227,11 +1212,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_placeless_loose_events": {
@@ -1243,11 +1228,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_placeless_loose_supported_events": {
@@ -1259,11 +1244,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_shared_informative_max": {
@@ -1275,11 +1260,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_shared_informative_min": {
@@ -1291,11 +1276,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "heldout_shared_support": {
@@ -1307,11 +1292,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_heldout_summary.csv (scripts/detection/sweep_memoryless_heldout.py)",
+   "function": "heldout_values",
    "pending": null
   },
   "pilot_calls_decided_by_outside_window": {
@@ -1323,11 +1308,11 @@
    "questions": [
     "2a.3"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "function": "pilot_stray_window_values",
    "pending": null
   },
   "pilot_replay_calls": {
@@ -1339,11 +1324,11 @@
    "questions": [
     "2a.3"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)",
+   "function": "pilot_stray_window_values",
    "pending": null
   },
   "recording_inbound_p_jump": {
@@ -1355,11 +1340,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_inbound_p_spread": {
@@ -1371,11 +1356,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_outbound_draws_from_passing": {
@@ -1387,11 +1372,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_outbound_duration_ratio": {
@@ -1403,11 +1388,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_outbound_local_fraction": {
@@ -1419,11 +1404,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_outbound_p_jump": {
@@ -1435,11 +1420,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_outbound_p_spread": {
@@ -1451,11 +1436,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_remote_stationary_dispersion_cm": {
@@ -1467,11 +1452,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_short_path_dispersion_cm": {
@@ -1483,11 +1468,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_short_replay_duration_ratio": {
@@ -1499,11 +1484,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_short_replay_local_fraction": {
@@ -1515,11 +1500,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_short_replay_p_jump": {
@@ -1531,11 +1516,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_short_replay_p_spread": {
@@ -1547,11 +1532,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_state_space_bound_error_ms": {
@@ -1563,11 +1548,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_dispersion_cm": {
@@ -1579,11 +1564,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_distance_cm": {
@@ -1595,11 +1580,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_duration_ms": {
@@ -1611,11 +1596,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_local_fraction": {
@@ -1627,11 +1612,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_p_jump": {
@@ -1643,11 +1628,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_p_spread": {
@@ -1659,11 +1644,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "recording_stray_window_pieces_dispersion_cm": {
@@ -1675,11 +1660,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)",
+   "function": "recording_values",
    "pending": null
   },
   "state_evidence_animals": {
@@ -1691,11 +1676,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "state_evidence_epochs": {
@@ -1707,11 +1690,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "state_evidence_epochs_ok": {
@@ -1723,11 +1704,9 @@
    "questions": [
     "2c.3"
    ],
-   "used_in": [
-    "paper",
-    "supplement"
-   ],
+   "figures": [],
    "source": "Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)",
+   "function": "state_evidence_values",
    "pending": null
   },
   "sweep_domain_fraction": {
@@ -1739,11 +1718,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_domain_sliding_before_test_fraction": {
@@ -1755,11 +1734,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_domain_sliding_fraction": {
@@ -1771,11 +1750,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_domain_state_space_fraction": {
@@ -1787,11 +1766,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_domain_state_space_published_fraction": {
@@ -1803,11 +1782,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_failed_test_fraction": {
@@ -1819,11 +1798,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_jump_half_pass_fraction": {
@@ -1835,11 +1814,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_jump_half_pass_longest_fraction": {
@@ -1851,11 +1830,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_jump_half_pass_shortest_fraction": {
@@ -1867,11 +1846,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_replays": {
@@ -1883,11 +1862,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_shortest_end_late_ms": {
@@ -1899,11 +1878,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_shortest_reported_duration_ms": {
@@ -1915,11 +1894,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_shortest_start_early_ms": {
@@ -1931,11 +1910,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_before_test_fraction": {
@@ -1947,11 +1926,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_end_late_max_ms": {
@@ -1963,11 +1942,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_end_late_min_ms": {
@@ -1979,11 +1958,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_end_late_upper_quartile_max_ms": {
@@ -1995,11 +1974,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_fraction": {
@@ -2011,11 +1990,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_not_the_replay_fraction": {
@@ -2027,11 +2006,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_only_before_test_replays": {
@@ -2043,11 +2022,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_only_replays": {
@@ -2059,11 +2038,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_spread_only_fraction": {
@@ -2075,11 +2054,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_start_early_max_ms": {
@@ -2091,11 +2070,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_sliding_start_early_min_ms": {
@@ -2107,11 +2086,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_spread_half_pass_fraction": {
@@ -2123,11 +2102,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_state_space_edge_error_max_ms": {
@@ -2139,11 +2118,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_state_space_fraction": {
@@ -2155,11 +2134,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   },
   "sweep_state_space_only_fraction": {
@@ -2171,11 +2150,11 @@
    "questions": [
     "1.1"
    ],
-   "used_in": [
-    "supplement",
-    "figure: memoryless_comparison"
+   "figures": [
+    "memoryless_comparison"
    ],
    "source": "docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)",
+   "function": "sweep_values",
    "pending": null
   }
  }

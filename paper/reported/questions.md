@@ -5,19 +5,16 @@ list (`src/continuum_swr_replay/reported/questions.py`) and the summaries
 (`paper/reported/<summary>.json`); do not edit by hand. Cite a value in
 `paper/main.tex` by its macro. A value marked *pending* may not be quoted
 as a finding. A summary file is named for what it holds; a question's part
-is where the paper reports it.
-
-A summary marked *migrated* was converted from an earlier layout, not
-rebuilt: its values are that build's, its tags were mapped to the question
-list, and it has no code record until it is rebuilt.
+is where the paper reports it. *Computed in* names the function that
+computed a value, in `src/continuum_swr_replay/reported/<summary>.py`.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `397d6fd089b4` | yes | 32 | 0 |
-| `detection.json` | `7fb1dcfa84ad` | migrated, not rebuilt | 132 | 0 |
-| `events.json` | `bfb20f359f8f` | migrated, not rebuilt | 331 | 0 |
-| `behavior.json` | `c96c9133ef6c-dirty` | migrated, not rebuilt | 922 | 0 |
-| `mpfc.json` | `5609943e9472-dirty` | migrated, not rebuilt | 604 | 0 |
+| `survey.json` | `349b586507b6` | yes | 32 | 0 |
+| `detection.json` | `d7e273e84b1b` | yes | 132 | 0 |
+| `events.json` | `d7e273e84b1b` | yes | 331 | 0 |
+| `behavior.json` | `d7e273e84b1b` | yes | 922 | 0 |
+| `mpfc.json` | `d7e273e84b1b` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -29,40 +26,40 @@ Sources:
 
 - the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\SurveyBandHighMax` | 300 | Hz | Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | paper |
-| `\SurveyBandHighMin` | 200 | Hz | Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | paper |
-| `\SurveyBandHighMode` | 250 | Hz | Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | paper |
-| `\SurveyBandLowMax` | 180 | Hz | Largest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz) | paper |
-| `\SurveyBandLowMin` | 80 | Hz | Smallest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz) | paper |
-| `\SurveyBandLowMode` | 150 | Hz | Most common lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz) | paper |
-| `\SurveyBayesFraction` | 81 |  | Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count) | paper |
-| `\SurveyCellsMax` | 10 | cells | Largest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#) | paper |
-| `\SurveyCellsMin` | 3 | cells | Smallest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#) | paper |
-| `\SurveyCellsMode` | 5 | cells | Most common minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#) | paper |
-| `\SurveyLongestMax` | 2000 | ms | Largest maximum event duration, over the 24 numeric cells of Max Duration (ms) | paper |
-| `\SurveyLongestMin` | 300 | ms | Smallest maximum event duration, over the 24 numeric cells of Max Duration (ms) | paper |
-| `\SurveyLongestMode` | 500 | ms | Most common maximum event duration, over the 24 numeric cells of Max Duration (ms) | paper |
-| `\SurveyMuaOnlyFraction` | 42 |  | Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection names MUA only) | paper |
-| `\SurveyPapers` | 57 |  | Papers in the survey | paper |
-| `\SurveyPositionBinMax` | 10 | cm | Largest decoding position bin, over the 46 numeric cells of Position bin (cm) | paper |
-| `\SurveyPositionBinMin` | 1 | cm | Smallest decoding position bin, over the 46 numeric cells of Position bin (cm) | paper |
-| `\SurveyPositionBinMode` | 2 | cm | Most common decoding position bin, over the 46 numeric cells of Position bin (cm) | paper |
-| `\SurveyShortestMax` | 100 | ms | Largest minimum event duration, over the 40 numeric cells of Min. Duration (ms) | paper |
-| `\SurveyShortestMin` | 15 | ms | Smallest minimum event duration, over the 40 numeric cells of Min. Duration (ms) | paper |
-| `\SurveyShortestMode` | 50 | ms | Most common minimum event duration, over the 40 numeric cells of Min. Duration (ms) | paper |
-| `\SurveySpeedMax` | 10 | cm/s | Largest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s) | paper |
-| `\SurveySpeedMin` | 1 | cm/s | Smallest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s) | paper |
-| `\SurveySpeedMode` | 5 | cm/s | Most common running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s) | paper |
-| `\SurveySwrAndMuaFraction` | 23 |  | Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection names SWR and MUA only) | paper |
-| `\SurveySwrOnlyFraction` | 28 |  | Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection names SWR only) | paper |
-| `\SurveyThresholdMax` | 8 | SD | Largest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD) | paper |
-| `\SurveyThresholdMin` | 1 | SD | Smallest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD) | paper |
-| `\SurveyThresholdMode` | 3 | SD | Most common candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD) | paper |
-| `\SurveyTimeBinMax` | 100 | ms | Largest decoding time bin, over the 46 numeric cells of Time bin (ms) | paper |
-| `\SurveyTimeBinMin` | 2 | ms | Smallest decoding time bin, over the 46 numeric cells of Time bin (ms) | paper |
-| `\SurveyTimeBinMode` | 20 | ms | Most common decoding time bin, over the 46 numeric cells of Time bin (ms) | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\SurveyBandHighMax` | 300 | Hz | Largest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | `survey.parameter_values` |  |
+| `\SurveyBandHighMin` | 200 | Hz | Smallest upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | `survey.parameter_values` |  |
+| `\SurveyBandHighMode` | 250 | Hz | Most common upper edge of the ripple band, over the 38 numeric cells of SWR High Band (Hz) | `survey.parameter_values` |  |
+| `\SurveyBandLowMax` | 180 | Hz | Largest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz) | `survey.parameter_values` |  |
+| `\SurveyBandLowMin` | 80 | Hz | Smallest lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz) | `survey.parameter_values` |  |
+| `\SurveyBandLowMode` | 150 | Hz | Most common lower edge of the ripple band, over the 38 numeric cells of SWR Low Band (Hz) | `survey.parameter_values` |  |
+| `\SurveyBayesFraction` | 81 |  | Share of the 57 surveyed papers whose decoding uses a Bayesian decoder, alone or with another method (Decoding names 'Bayes' or 'Bayesian'; 'non-Bayesian' does not count) | `survey.method_values` |  |
+| `\SurveyCellsMax` | 10 | cells | Largest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#) | `survey.parameter_values` |  |
+| `\SurveyCellsMin` | 3 | cells | Smallest minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#) | `survey.parameter_values` |  |
+| `\SurveyCellsMode` | 5 | cells | Most common minimum number of active cells per event, over the 27 numeric cells of Min. Cells (#) | `survey.parameter_values` |  |
+| `\SurveyLongestMax` | 2000 | ms | Largest maximum event duration, over the 24 numeric cells of Max Duration (ms) | `survey.parameter_values` |  |
+| `\SurveyLongestMin` | 300 | ms | Smallest maximum event duration, over the 24 numeric cells of Max Duration (ms) | `survey.parameter_values` |  |
+| `\SurveyLongestMode` | 500 | ms | Most common maximum event duration, over the 24 numeric cells of Max Duration (ms) | `survey.parameter_values` |  |
+| `\SurveyMuaOnlyFraction` | 42 |  | Share of the 57 surveyed papers whose candidate events are triggered by multiunit activity alone (Detection names MUA only) | `survey.method_values` |  |
+| `\SurveyPapers` | 57 |  | Papers in the survey | `survey.method_values` |  |
+| `\SurveyPositionBinMax` | 10 | cm | Largest decoding position bin, over the 46 numeric cells of Position bin (cm) | `survey.parameter_values` |  |
+| `\SurveyPositionBinMin` | 1 | cm | Smallest decoding position bin, over the 46 numeric cells of Position bin (cm) | `survey.parameter_values` |  |
+| `\SurveyPositionBinMode` | 2 | cm | Most common decoding position bin, over the 46 numeric cells of Position bin (cm) | `survey.parameter_values` |  |
+| `\SurveyShortestMax` | 100 | ms | Largest minimum event duration, over the 40 numeric cells of Min. Duration (ms) | `survey.parameter_values` |  |
+| `\SurveyShortestMin` | 15 | ms | Smallest minimum event duration, over the 40 numeric cells of Min. Duration (ms) | `survey.parameter_values` |  |
+| `\SurveyShortestMode` | 50 | ms | Most common minimum event duration, over the 40 numeric cells of Min. Duration (ms) | `survey.parameter_values` |  |
+| `\SurveySpeedMax` | 10 | cm/s | Largest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s) | `survey.parameter_values` |  |
+| `\SurveySpeedMin` | 1 | cm/s | Smallest running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s) | `survey.parameter_values` |  |
+| `\SurveySpeedMode` | 5 | cm/s | Most common running-speed limit for candidate events, over the 35 numeric cells of Animal Speed (cm/s) | `survey.parameter_values` |  |
+| `\SurveySwrAndMuaFraction` | 23 |  | Share of the 57 surveyed papers that use both ripple power and multiunit activity (Detection names SWR and MUA only) | `survey.method_values` |  |
+| `\SurveySwrOnlyFraction` | 28 |  | Share of the 57 surveyed papers whose candidate events are triggered by ripple power alone (Detection names SWR only) | `survey.method_values` |  |
+| `\SurveyThresholdMax` | 8 | SD | Largest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD) | `survey.parameter_values` |  |
+| `\SurveyThresholdMin` | 1 | SD | Smallest candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD) | `survey.parameter_values` |  |
+| `\SurveyThresholdMode` | 3 | SD | Most common candidate-event threshold on z-scored ripple power or multiunit activity, the ripple and multiunit columns pooled (a paper with both contributes both), over the 64 numeric cells of SWR Z-score Thresh. (STD), MUA Z-score Thresh. (STD) | `survey.parameter_values` |  |
+| `\SurveyTimeBinMax` | 100 | ms | Largest decoding time bin, over the 46 numeric cells of Time bin (ms) | `survey.parameter_values` |  |
+| `\SurveyTimeBinMin` | 2 | ms | Smallest decoding time bin, over the 46 numeric cells of Time bin (ms) | `survey.parameter_values` |  |
+| `\SurveyTimeBinMode` | 20 | ms | Most common decoding time bin, over the 46 numeric cells of Time bin (ms) | `survey.parameter_values` |  |
 
 ## Part 1: the model
 
@@ -77,105 +74,105 @@ Sources:
 - docs/design/replay_detection_comparison/detection_sweep_summary.csv (scripts/detection/sweep_memoryless_detection.py)
 - docs/design/replay_detection_comparison/memoryless_comparison_recording.json (scripts/figures/generate_memoryless_comparison.py, commit 7fb1dcfa84ad)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | supplement, figure: memoryless_comparison |
-| `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | supplement, figure: memoryless_comparison |
-| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 54 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | supplement, figure: memoryless_comparison |
-| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 71 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | supplement, figure: memoryless_comparison |
-| `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 83 |  | the same at the longest gap | supplement, figure: memoryless_comparison |
-| `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 17 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | supplement, figure: memoryless_comparison |
-| `\DetectionControlsElsewhereSlidingMissingMax` | 58 |  | highest such share | supplement, figure: memoryless_comparison |
-| `\DetectionControlsElsewhereSlidingMissingMin` | 38 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpOursSpanningMax` | 85 |  | highest such share | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpOursSpanningMin` | 73 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpSlidingSpanningMax` | 79 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpingContinuousFraction` | 50 |  | share of jumping bursts our continuous state alone covers | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpingNonlocalFraction` | 97 |  | share of jumping bursts our detector's non-local events cover | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 13 |  | the same before its significance test | supplement, figure: memoryless_comparison |
-| `\DetectionControlsJumpingSlidingFraction` | 7 |  | share of jumping bursts the sliding window reports under the published definition | supplement, figure: memoryless_comparison |
-| `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | supplement, figure: memoryless_comparison |
-| `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | supplement, figure: memoryless_comparison |
-| `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | supplement, figure: memoryless_comparison |
-| `\DetectionControlsNoReplayRecordings` | 8 |  | simulated recordings the no-replay stretches come from | supplement, figure: memoryless_comparison |
-| `\DetectionControlsOursFewerInEventTrials` | 2 |  | trials in which our detector recovers fewer parts inside the event than alone | supplement, figure: memoryless_comparison |
-| `\DetectionControlsOursMoreInEventTrials` | 22 |  | trials in which it recovers more inside the event than alone | supplement, figure: memoryless_comparison |
-| `\DetectionControlsOursRecoveryAloneFraction` | 86 |  | the same with each part decoded alone | supplement, figure: memoryless_comparison |
-| `\DetectionControlsOursRecoveryInEventFraction` | 89 |  | share of parts our detector recovers inside the event, the same mean | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessContinuousFraction` | 1 |  | share of place-less bursts our continuous state alone covers | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessFragmentedShareMax` | 80 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessFragmentedShareMin` | 59 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessNonlocalFraction` | 90 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 75 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 15 |  | the same before its significance test | supplement, figure: memoryless_comparison |
-| `\DetectionControlsPlacelessSlidingFraction` | 8 |  | share of place-less bursts the sliding window reports under the published definition | supplement, figure: memoryless_comparison |
-| `\DetectionControlsSlidingFewerInEventTrials` | 15 |  | trials in which the sliding window recovers fewer parts inside the event than alone | supplement, figure: memoryless_comparison |
-| `\DetectionControlsSlidingMoreInEventTrials` | 95 |  | trials in which it recovers more inside the event than alone | supplement, figure: memoryless_comparison |
-| `\DetectionControlsSlidingRecoveryAloneFraction` | 61 |  | the same with each part decoded alone | supplement, figure: memoryless_comparison |
-| `\DetectionControlsSlidingRecoveryInEventFraction` | 72 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutEstimatorAgreementMin` | 99 |  | lowest share over folds of the events informative under both content estimates on which they agree | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutJumpingSupportMax` | 63 |  | the higher of the two | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping bursts: lower of folds A and B's share with held-out support | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutOursOnlyInformativeMax` | 7 |  | the higher of the two | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutOursOnlyInformativeMin` | 6 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportFoldC` | 87 |  | the same share in fold C | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportMax` | 97 |  | the higher of the two | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutOursOnlySupportMin` | 93 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutPlacelessInformativeEvents` | 19 |  | informative place-less burst events over the three folds (none has held-out support) | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutPlacelessLooseEvents` | 75 |  | place-less burst events informative at that floor | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 4 |  | place-less burst events with held-out support at a floor of 2 expected spikes | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutSharedInformativeMax` | 23 |  | the higher of the two | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutSharedInformativeMin` | 16 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | supplement, figure: memoryless_comparison |
-| `\DetectionHeldoutSharedSupport` | 100 |  | replays both detectors reported: share with held-out support, the same in every fold | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingInboundPJump` | 0.020 |  | significance test of the inbound replay: jump half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingInboundPSpread` | 0.0099 |  | significance test of the inbound replay: spread half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingOutboundDrawsFromPassing` | 3 |  | how many more shuffle draws below the observed value than a pass allows | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingOutboundDurationRatio` | 5.8 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingOutboundLocalFraction` | 81 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingOutboundPJump` | 0.079 |  | significance test of the outbound replay: jump half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingOutboundPSpread` | 0.0099 |  | significance test of the outbound replay: spread half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingRemoteStationaryDispersionCm` | 0 | cm | largest dispersion of a candidate over the remote stationary event | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingShortPathDispersionCm` | 6 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingShortReplayDurationRatio` | 1.6 |  | the sliding window's reported duration of the 80 ms replay over its true duration | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingShortReplayLocalFraction` | 0 |  | share of that reported event's kept windows decoding the animal's own place | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingShortReplayPJump` | 0.030 |  | significance test of the 80 ms replay: jump half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStateSpaceBoundErrorMs` | 42 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowDispersionCm` | 14 | cm | its dispersion with the window outside every piece | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowDistanceCm` | 149 | cm | distance from the animal of the far cell whose two spikes fill the stray window | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowDurationMs` | 396 | ms | the stray-window event's reported duration | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowLocalFraction` | 99 |  | share of the stray-window event's kept windows decoding within 15 cm of the animal | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowPJump` | 0.32 |  | significance test of the stray-window event: jump half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowPSpread` | 0.41 |  | significance test of the stray-window event: spread half | supplement, figure: memoryless_comparison |
-| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.53 | cm | its dispersion without that window | supplement, figure: memoryless_comparison |
-| `\DetectionSweepDomainFraction` | 25 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | supplement, figure: memoryless_comparison |
-| `\DetectionSweepDomainSlidingBeforeTestFraction` | 68 |  | on the shared target, share the sliding-window detector reports before its significance test | supplement, figure: memoryless_comparison |
-| `\DetectionSweepDomainSlidingFraction` | 63 |  | on the shared target, share the sliding-window detector reports after its significance test | supplement, figure: memoryless_comparison |
-| `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | supplement, figure: memoryless_comparison |
-| `\DetectionSweepDomainStateSpacePublishedFraction` | 68 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | supplement, figure: memoryless_comparison |
-| `\DetectionSweepFailedTestFraction` | 4 |  | share the sliding-window detector reported and then failed on its significance test | supplement, figure: memoryless_comparison |
-| `\DetectionSweepJumpHalfPassFraction` | 87 |  | of the replays the sliding window reported before its test, share passing the test's jump half | supplement, figure: memoryless_comparison |
-| `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | supplement, figure: memoryless_comparison |
-| `\DetectionSweepJumpHalfPassShortestFraction` | 31 |  | share of the shortest (40 ms) replays passing the jump half | supplement, figure: memoryless_comparison |
-| `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | supplement, figure: memoryless_comparison |
-| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest replays late | supplement, figure: memoryless_comparison |
-| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest replays | supplement, figure: memoryless_comparison |
-| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest replays early | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingNotTheReplayFraction` | 23 |  | share of the sliding-window detector's accepted events that are not the replay put in | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 5 |  | the same, counting the sliding window's reports before its test | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations | supplement, figure: memoryless_comparison |
-| `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | supplement, figure: memoryless_comparison |
-| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported | supplement, figure: memoryless_comparison |
-| `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | supplement, figure: memoryless_comparison |
-| `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | supplement, figure: memoryless_comparison |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\DetectionControlsContinuingOursOnePerPartLongestFraction` | 79 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsContinuingOursSpanningShortestFraction` | 88 |  | the same for our detector | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsContinuingSlidingOnePerPartLongestFraction` | 54 |  | continuing chains at the longest gap: share of trials the sliding window reports as one event per part | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsContinuingSlidingSpanningShortestFraction` | 71 |  | continuing chains at the shortest gap: share of trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsElsewhereOursOnePerPartLongestFraction` | 83 |  | the same at the longest gap | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsElsewhereOursOnePerPartShortestFraction` | 17 |  | chains whose parts are far apart, shortest gap: share of trials our detector reports as one event per part | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsElsewhereSlidingMissingMax` | 58 |  | highest such share | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsElsewhereSlidingMissingMin` | 38 |  | chains whose parts are far apart: lowest share of trials, over gaps, in which the sliding window misses a part | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpOursSpanningMax` | 85 |  | highest such share | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpOursSpanningMin` | 73 |  | lowest share, over jump sizes, of two-part jump trials our detector reports as one event over both parts (pooled over 120 and 200 ms parts) | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpSlidingSpanningMax` | 79 |  | highest share, over jump sizes, of jump trials the sliding window reports as one event over both parts | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpingContinuousFraction` | 50 |  | share of jumping bursts our continuous state alone covers | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpingNonlocalFraction` | 97 |  | share of jumping bursts our detector's non-local events cover | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpingSlidingBeforeTestFraction` | 13 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsJumpingSlidingFraction` | 7 |  | share of jumping bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsMultipartTrials` | 432 |  | two-part trials over every jump and chain condition | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsNoReplayMinutes` | 1.7 | min | minutes of simulated immobility with no replay; no output reported any event there | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsNoReplayRateBound` | 1.8 | events per minute | 95 % upper bound on the false event rate with none observed (the rule of three over those minutes) | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsNoReplayRecordings` | 8 |  | simulated recordings the no-replay stretches come from | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsOursFewerInEventTrials` | 2 |  | trials in which our detector recovers fewer parts inside the event than alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsOursMoreInEventTrials` | 22 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsOursRecoveryAloneFraction` | 86 |  | the same with each part decoded alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsOursRecoveryInEventFraction` | 89 |  | share of parts our detector recovers inside the event, the same mean | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessContinuousFraction` | 1 |  | share of place-less bursts our continuous state alone covers | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessFragmentedShareMax` | 80 |  | highest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessFragmentedShareMin` | 59 |  | lowest share of a place-less burst's time in the fragmented state, over burst durations | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessNonlocalFraction` | 90 |  | share of place-less bursts our detector's non-local events cover, pooled over the three peak rates | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessNonlocalLowestRateFraction` | 75 |  | share of place-less bursts at the lowest peak rate, 20 Hz, our non-local events cover | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessSlidingBeforeTestFraction` | 15 |  | the same before its significance test | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsPlacelessSlidingFraction` | 8 |  | share of place-less bursts the sliding window reports under the published definition | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingFewerInEventTrials` | 15 |  | trials in which the sliding window recovers fewer parts inside the event than alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingMoreInEventTrials` | 95 |  | trials in which it recovers more inside the event than alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingRecoveryAloneFraction` | 61 |  | the same with each part decoded alone | `detection.controls_values` | memoryless_comparison |
+| `\DetectionControlsSlidingRecoveryInEventFraction` | 72 |  | share of parts the sliding window recovers inside the event, mean over jump and chain conditions and levels | `detection.controls_values` | memoryless_comparison |
+| `\DetectionHeldoutEstimatorAgreementMin` | 99 |  | lowest share over folds of the events informative under both content estimates on which they agree | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutJumpingSupportMax` | 63 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutJumpingSupportMin` | 57 |  | jumping bursts: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlyInformativeMax` | 7 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlyInformativeMin` | 6 |  | replays only our detector reported: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportFoldC` | 87 |  | the same share in fold C | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportMax` | 97 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutOursOnlySupportMin` | 93 |  | replays only our detector reported, informative in the evaluation cells: lower of folds A and B's share with held-out support | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutPlacelessInformativeEvents` | 19 |  | informative place-less burst events over the three folds (none has held-out support) | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutPlacelessLooseEvents` | 75 |  | place-less burst events informative at that floor | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutPlacelessLooseSupportedEvents` | 4 |  | place-less burst events with held-out support at a floor of 2 expected spikes | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutSharedInformativeMax` | 23 |  | the higher of the two | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutSharedInformativeMin` | 16 |  | shared replays: lower of folds A and B's share the evaluation cells can judge at all | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionHeldoutSharedSupport` | 100 |  | replays both detectors reported: share with held-out support, the same in every fold | `detection.heldout_values` | memoryless_comparison |
+| `\DetectionRecordingInboundPJump` | 0.020 |  | significance test of the inbound replay: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingInboundPSpread` | 0.0099 |  | significance test of the inbound replay: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundDrawsFromPassing` | 3 |  | how many more shuffle draws below the observed value than a pass allows | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundDurationRatio` | 5.8 |  | the sliding window's reported duration of the continuous outbound replay over its true duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundLocalFraction` | 81 |  | share of that reported event's kept windows decoding the animal's own place (within 15 cm) | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundPJump` | 0.079 |  | significance test of the outbound replay: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingOutboundPSpread` | 0.0099 |  | significance test of the outbound replay: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingRemoteStationaryDispersionCm` | 0 | cm | largest dispersion of a candidate over the remote stationary event | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortPathDispersionCm` | 6 | cm | largest dispersion of a sliding-window candidate over the 30 cm replay | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortReplayDurationRatio` | 1.6 |  | the sliding window's reported duration of the 80 ms replay over its true duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortReplayLocalFraction` | 0 |  | share of that reported event's kept windows decoding the animal's own place | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortReplayPJump` | 0.030 |  | significance test of the 80 ms replay: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingShortReplayPSpread` | 0.0099 |  | significance test of the 80 ms replay: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStateSpaceBoundErrorMs` | 42 | ms | largest error in either bound of the state-space detector's reports of the four zoomed events | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowDispersionCm` | 14 | cm | its dispersion with the window outside every piece | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowDistanceCm` | 149 | cm | distance from the animal of the far cell whose two spikes fill the stray window | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowDurationMs` | 396 | ms | the stray-window event's reported duration | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowLocalFraction` | 99 |  | share of the stray-window event's kept windows decoding within 15 cm of the animal | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowPJump` | 0.32 |  | significance test of the stray-window event: jump half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowPSpread` | 0.41 |  | significance test of the stray-window event: spread half | `detection.recording_values` | memoryless_comparison |
+| `\DetectionRecordingStrayWindowPiecesDispersionCm` | 0.53 | cm | its dispersion without that window | `detection.recording_values` | memoryless_comparison |
+| `\DetectionSweepDomainFraction` | 25 |  | share of the swept replays the published definition can accept at all (its shared target: path over about 42 cm, duration over 100 ms) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingBeforeTestFraction` | 68 |  | on the shared target, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainSlidingFraction` | 63 |  | on the shared target, share the sliding-window detector reports after its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainStateSpaceFraction` | 99 |  | on the shared target, share the state-space detector reports under its own acceptance criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepDomainStateSpacePublishedFraction` | 68 |  | on the shared target, share the state-space detector reports held to the published duration and dispersion criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepFailedTestFraction` | 4 |  | share the sliding-window detector reported and then failed on its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassFraction` | 87 |  | of the replays the sliding window reported before its test, share passing the test's jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassLongestFraction` | 98 |  | share of the longest (500 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepJumpHalfPassShortestFraction` | 31 |  | share of the shortest (40 ms) replays passing the jump half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepReplays` | 4,536 |  | replays swept (grid cells) | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestEndLateMs` | 65 | ms | median amount the sliding window ends the shortest replays late | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestReportedDurationMs` | 132 | ms | median duration the sliding window reports for the shortest replays | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepShortestStartEarlyMs` | 28 | ms | median amount the sliding window starts the shortest replays early | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingBeforeTestFraction` | 21 |  | over the whole grid, share the sliding-window detector reports before its significance test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMaxMs` | 65 | ms | largest median amount the sliding window ends late, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateMinMs` | 21 | ms | smallest median amount the sliding window ends late, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingEndLateUpperQuartileMaxMs` | 231 | ms | largest upper quartile of the sliding window's end error, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingFraction` | 18 |  | over the whole grid, share the sliding-window detector reports under its own criteria, significance test included | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingNotTheReplayFraction` | 23 |  | share of the sliding-window detector's accepted events that are not the replay put in | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyBeforeTestReplays` | 5 |  | the same, counting the sliding window's reports before its test | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingOnlyReplays` | 0 |  | swept replays the sliding-window detector reported and the state-space detector did not | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingSpreadOnlyFraction` | 20 |  | over the whole grid, share the sliding-window detector reports with the spread half of its significance test alone | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMaxMs` | 28 | ms | largest median amount the sliding window starts early, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSlidingStartEarlyMinMs` | 18 | ms | smallest median amount the sliding window starts early, over true durations | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepSpreadHalfPassFraction` | 97 |  | of the replays the sliding window reported before its test, share passing the test's spread half | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceEdgeErrorMaxMs` | 5 | ms | largest absolute median start or end error of the state-space detector over true durations, replays both detectors reported | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceFraction` | 91 |  | over the whole grid, share the state-space detector reports under its own criteria | `detection.sweep_values` | memoryless_comparison |
+| `\DetectionSweepStateSpaceOnlyFraction` | 73 |  | share of the swept replays reported by the state-space detector and not by the sliding-window detector | `detection.sweep_values` | memoryless_comparison |
 
 ## Part 2: it works
 
@@ -195,10 +192,10 @@ Sources:
 
 - Processed-Data/replay_detection_comparison/memoryless/0c2548cacf2d-seed20260922/chimi20200225_02_r1_HPC_memoryless_events.parquet (scripts/detection/run_memoryless_detection.py, commit 0c2548cacf2d)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | supplement, figure: memoryless_comparison |
-| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | supplement, figure: memoryless_comparison |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\DetectionPilotCallsDecidedByOutsideWindow` | 2 |  | of those, calls whose dispersion clears the threshold only with kept windows outside every piece | `detection.pilot_stray_window_values` | memoryless_comparison |
+| `\DetectionPilotReplayCalls` | 4 |  | sliding-window replay calls (duration and dispersion criteria) on the first real-data pilot epoch, chimi20200225_02_r1 | `detection.pilot_stray_window_values` | memoryless_comparison |
 
 ### 2a.4. How often does the detector report non-local events on shuffled or thinned real spikes, and in windows where no replay is expected?
 
@@ -222,42 +219,42 @@ Status: computed. Figures: 2, 2b. Values: 31.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)
-- event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (/cumulus/edeno/continuum-swr-replay/Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)
+- Processed-Data/replay_content/event_table.parquet (canonical event table)
+- event features run 30cf1cc432e9 (every inventory's compared events) and the detector comparison's report (Processed-Data/replay_detection_comparison/inventory/afeb897d850f/report: counts_by_animal.csv, cells_by_animal.csv)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsAnimals` | 5 |  | animals in the event table | paper, figure: 2b |
-| `\EventsAnimalsNonSwrMajority` | 4 |  | animals in which more than half the events are non-SWR | paper, figure: 2b |
-| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals in which non-SWR is the largest of the three overlap classes | paper, figure: 2b |
-| `\EventsEpochs` | 242 |  | epochs in the event table | paper, figure: 2b |
-| `\EventsKayTimeS` | 4127 | s | seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines | paper, figure: 2 |
-| `\EventsNonSwrFraction` | 57 % |  | share of immobile non-local events overlapping no SWR, pooled over animals | paper, figure: 2b |
-| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events | paper, figure: 2b |
-| `\EventsNonSwrFractionAnimalMin` | 47 |  | lowest per-animal share of non-SWR events | paper, figure: 2b |
-| `\EventsNonlocalEvents` | 75,675 |  | immobile non-local events in the canonical event table (whole event below 4 cm/s) | paper, figure: 2b |
-| `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | paper, figure: 2b |
-| `\EventsNonlocalEventsOutsideKay` | 42,962 |  | non-local events no Kay SWR overlaps (detector comparison memberships) | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideKayFraction` | 57 % |  | share of the non-local events with a known membership that no Kay SWR overlaps | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideKayPerHour` | 1100 | per h | non-local events no Kay SWR overlaps, per hour of analysed immobility | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideTrigger` | 19,221 |  | non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger) | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideTriggerFraction` | 25 % |  | share of the non-local events with a known membership that no SWR definition and no MUA event overlaps | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideTriggerPerHour` | 480 | per h | non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideWidloski` | 71,498 |  | non-local events no Widloski event overlaps (detector comparison memberships) | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideWidloskiFraction` | 94 % |  | share of the non-local events with a known membership that no Widloski event overlaps | paper, figure: 2 |
-| `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analysed immobility | paper, figure: 2 |
-| `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | paper, figure: 2b |
-| `\EventsNonlocalEventsSwrPartial` | 16,664 |  | events partly overlapping an SWR (overlap_class swr_partial) | paper, figure: 2b |
-| `\EventsNonlocalTimeOutsideKayFraction` | 53 % |  | share of non-local event time that Kay's SWRs do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideKayS` | 3485 | s | seconds of non-local event time that Kay's SWRs do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideSwrFraction` | 31 % |  | share of non-local event time that the five SWR definitions together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideSwrS` | 2004 | s | seconds of non-local event time that the five SWR definitions together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideTriggerFraction` | 28 % |  | share of non-local event time that the five SWR definitions and MUA together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideTriggerS` | 1821 | s | seconds of non-local event time that the five SWR definitions and MUA together do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideWidloskiFraction` | 93 % |  | share of non-local event time that the Widloski detector's events do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeOutsideWidloskiS` | 6098 | s | seconds of non-local event time that the Widloski detector's events do not cover | paper, figure: 2 |
-| `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | paper, figure: 2 |
-| `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsAnimals` | 5 |  | animals in the event table | `events.event_cohort_values` | 2b |
+| `\EventsAnimalsNonSwrMajority` | 4 |  | animals in which more than half the events are non-SWR | `events.event_cohort_values` | 2b |
+| `\EventsAnimalsNonSwrPlurality` | 5 |  | animals in which non-SWR is the largest of the three overlap classes | `events.event_cohort_values` | 2b |
+| `\EventsEpochs` | 242 |  | epochs in the event table | `events.event_cohort_values` | 2b |
+| `\EventsKayTimeS` | 4127 | s | seconds Kay's SWRs span (compared events): what an SWR-triggered analysis examines | `events.left_out_values` | 2 |
+| `\EventsNonSwrFraction` | 57 % |  | share of immobile non-local events overlapping no SWR, pooled over animals | `events.event_cohort_values` | 2b |
+| `\EventsNonSwrFractionAnimalMax` | 65 % |  | highest per-animal share of non-SWR events | `events.event_cohort_values` | 2b |
+| `\EventsNonSwrFractionAnimalMin` | 47 |  | lowest per-animal share of non-SWR events | `events.event_cohort_values` | 2b |
+| `\EventsNonlocalEvents` | 75,675 |  | immobile non-local events in the canonical event table (whole event below 4 cm/s) | `events.event_cohort_values` | 2b |
+| `\EventsNonlocalEventsNonSwr` | 42,974 |  | of those, events overlapping no SWR (overlap_class non_swr) | `events.event_cohort_values` | 2b |
+| `\EventsNonlocalEventsOutsideKay` | 42,962 |  | non-local events no Kay SWR overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideKayFraction` | 57 % |  | share of the non-local events with a known membership that no Kay SWR overlaps | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideKayPerHour` | 1100 | per h | non-local events no Kay SWR overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideTrigger` | 19,221 |  | non-local events no SWR definition and no MUA event overlaps (cell sequence_matched_by_no_trigger) | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideTriggerFraction` | 25 % |  | share of the non-local events with a known membership that no SWR definition and no MUA event overlaps | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideTriggerPerHour` | 480 | per h | non-local events no SWR definition and no MUA event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideWidloski` | 71,498 |  | non-local events no Widloski event overlaps (detector comparison memberships) | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideWidloskiFraction` | 94 % |  | share of the non-local events with a known membership that no Widloski event overlaps | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsOutsideWidloskiPerHour` | 1800 | per h | non-local events no Widloski event overlaps, per hour of analysed immobility | `events.left_out_values` | 2 |
+| `\EventsNonlocalEventsSwrContained` | 16,037 |  | events lying inside an SWR (overlap_class swr_contained) | `events.event_cohort_values` | 2b |
+| `\EventsNonlocalEventsSwrPartial` | 16,664 |  | events partly overlapping an SWR (overlap_class swr_partial) | `events.event_cohort_values` | 2b |
+| `\EventsNonlocalTimeOutsideKayFraction` | 53 % |  | share of non-local event time that Kay's SWRs do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideKayS` | 3485 | s | seconds of non-local event time that Kay's SWRs do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideSwrFraction` | 31 % |  | share of non-local event time that the five SWR definitions together do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideSwrS` | 2004 | s | seconds of non-local event time that the five SWR definitions together do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideTriggerFraction` | 28 % |  | share of non-local event time that the five SWR definitions and MUA together do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideTriggerS` | 1821 | s | seconds of non-local event time that the five SWR definitions and MUA together do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideWidloskiFraction` | 93 % |  | share of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeOutsideWidloskiS` | 6098 | s | seconds of non-local event time that the Widloski detector's events do not cover | `events.left_out_values` | 2 |
+| `\EventsNonlocalTimeS` | 6562 | s | seconds of non-local event time (compared events), summed over epochs | `events.left_out_values` | 2 |
+| `\EventsRestHours` | 40 | h | hours of analysed immobility the non-local detector observed (exposure), summed over epochs | `events.left_out_values` | 2 |
 
 ### 2b.3. How do SWR detection and non-local detection overlap: for each other detector, what share of its events overlaps no non-local event, how do those divide by decoder state, and, for the ones that do overlap, what share of their time bins does each state take?
 
@@ -267,106 +264,106 @@ Sources:
 
 - event features run 30cf1cc432e9: pair_membership against state_space and state_shares (scripts/detection/add_state_shares.py)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsCareyEvents` | 24,084 |  | carey events compared with the non-local detector | supplement |
-| `\EventsCareyNoNonlocalFraction` | 20 % |  | share of carey events that overlap no non-local event | supplement |
-| `\EventsCareyNoNonlocalMixedFraction` | 18 % |  | of carey events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsCareyNoNonlocalMostlyLocalFraction` | 82 % |  | of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsCareyNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of carey events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsCareyOverlapAllNonlocalFraction` | 12 % |  | share of carey events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsCareyOverlapAnyLocalFraction` | 35 % |  | share of carey events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsCareyOverlapAnyNoSpikeFraction` | 15 % |  | share of carey events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsCareyOverlapLocalShareMedian` | 0 % |  | median over carey events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsCareyOverlapNoSpikeShareMedian` | 0 % |  | median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsCareyOverlapNonlocalShareMedian` | 87 % |  | median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsCareyOverlapUncertainShareMedian` | 9 % |  | median over carey events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsKarlssonEvents` | 60,472 |  | karlsson events compared with the non-local detector | supplement |
-| `\EventsKarlssonNoNonlocalFraction` | 38 % |  | share of karlsson events that overlap no non-local event | supplement |
-| `\EventsKarlssonNoNonlocalMixedFraction` | 18 % |  | of karlsson events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsKarlssonNoNonlocalMostlyLocalFraction` | 81 % |  | of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsKarlssonNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of karlsson events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsKarlssonOverlapAllNonlocalFraction` | 11 % |  | share of karlsson events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsKarlssonOverlapAnyLocalFraction` | 48 % |  | share of karlsson events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsKarlssonOverlapAnyNoSpikeFraction` | 22 % |  | share of karlsson events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsKarlssonOverlapLocalShareMedian` | 0 % |  | median over karlsson events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsKarlssonOverlapNoSpikeShareMedian` | 0 % |  | median over karlsson events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsKarlssonOverlapNonlocalShareMedian` | 77 % |  | median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsKarlssonOverlapUncertainShareMedian` | 13 % |  | median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsKayEvents` | 41,151 |  | kay events compared with the non-local detector | paper, figure: 2 |
-| `\EventsKayNoNonlocalFraction` | 17 % |  | share of kay events that overlap no non-local event | paper, figure: 2 |
-| `\EventsKayNoNonlocalFractionAnimalMax` | 28 % |  | highest per-animal share of kay events overlapping no non-local event | paper, figure: 2 |
-| `\EventsKayNoNonlocalFractionAnimalMin` | 8 |  | lowest per-animal share of kay events overlapping no non-local event | paper, figure: 2 |
-| `\EventsKayNoNonlocalMixedFraction` | 26 % |  | of kay events overlapping no non-local event, the share with neither state in more than half their rows | paper, figure: 2 |
-| `\EventsKayNoNonlocalMostlyLocalFraction` | 74 % |  | of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | paper, figure: 2 |
-| `\EventsKayNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | paper, figure: 2 |
-| `\EventsKayOverlapAllNonlocalFraction` | 17 % |  | share of kay events overlapping a non-local event whose every row is non-local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapAnyLocalFraction` | 32 % |  | share of kay events overlapping a non-local event that hold at least one row with Local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapAnyNoSpikeFraction` | 9 % |  | share of kay events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapLocalShareMedian` | 0 % |  | median over kay events overlapping a non-local event of the share of their rows with Local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapNoSpikeShareMedian` | 0 % |  | median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapNonlocalShareMedian` | 88 % |  | median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8 | paper, figure: 2 |
-| `\EventsKayOverlapUncertainShareMedian` | 9 % |  | median over kay events overlapping a non-local event of the share of their rows with no state above 0.8 | paper, figure: 2 |
-| `\EventsMuaEvents` | 40,732 |  | mua events compared with the non-local detector | supplement |
-| `\EventsMuaNoNonlocalFraction` | 15 % |  | share of mua events that overlap no non-local event | supplement |
-| `\EventsMuaNoNonlocalMixedFraction` | 22 % |  | of mua events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsMuaNoNonlocalMostlyLocalFraction` | 78 % |  | of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsMuaNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of mua events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsMuaOverlapAllNonlocalFraction` | 4 % |  | share of mua events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsMuaOverlapAnyLocalFraction` | 51 % |  | share of mua events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsMuaOverlapAnyNoSpikeFraction` | 11 % |  | share of mua events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsMuaOverlapLocalShareMedian` | 1 % |  | median over mua events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsMuaOverlapNoSpikeShareMedian` | 0 % |  | median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsMuaOverlapNonlocalShareMedian` | 81 % |  | median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsMuaOverlapUncertainShareMedian` | 13 % |  | median over mua events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsWidloskiCriteriaEvents` | 4,388 |  | memoryless_criteria events compared with the non-local detector | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalFraction` | 4 % |  | share of memoryless_criteria events that overlap no non-local event | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalMixedFraction` | 48 % |  | of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiCriteriaNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiCriteriaOverlapAllNonlocalFraction` | 11 % |  | share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapAnyLocalFraction` | 58 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapAnyNoSpikeFraction` | 27 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapLocalShareMedian` | 5 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapNonlocalShareMedian` | 80 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsWidloskiCriteriaOverlapUncertainShareMedian` | 8 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsWidloskiEvents` | 4,092 |  | memoryless events compared with the non-local detector | supplement |
-| `\EventsWidloskiNoNonlocalFraction` | 3 % |  | share of memoryless events that overlap no non-local event | supplement |
-| `\EventsWidloskiNoNonlocalMixedFraction` | 49 % |  | of memoryless events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsWidloskiNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsWidloskiOverlapAllNonlocalFraction` | 10 % |  | share of memoryless events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsWidloskiOverlapAnyLocalFraction` | 59 % |  | share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsWidloskiOverlapAnyNoSpikeFraction` | 28 % |  | share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiOverlapLocalShareMedian` | 6 % |  | median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsWidloskiOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsWidloskiOverlapNonlocalShareMedian` | 79 % |  | median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsWidloskiOverlapUncertainShareMedian` | 8 % |  | median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsYuEvents` | 125,423 |  | yu events compared with the non-local detector | supplement |
-| `\EventsYuNoNonlocalFraction` | 56 % |  | share of yu events that overlap no non-local event | supplement |
-| `\EventsYuNoNonlocalMixedFraction` | 17 % |  | of yu events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsYuNoNonlocalMostlyLocalFraction` | 82 % |  | of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsYuNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of yu events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsYuOverlapAllNonlocalFraction` | 12 % |  | share of yu events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsYuOverlapAnyLocalFraction` | 43 % |  | share of yu events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsYuOverlapAnyNoSpikeFraction` | 14 % |  | share of yu events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsYuOverlapLocalShareMedian` | 0 % |  | median over yu events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsYuOverlapNoSpikeShareMedian` | 0 % |  | median over yu events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsYuOverlapNonlocalShareMedian` | 79 % |  | median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsYuOverlapUncertainShareMedian` | 13 % |  | median over yu events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
-| `\EventsZugaroEvents` | 23,934 |  | zugaro events compared with the non-local detector | supplement |
-| `\EventsZugaroNoNonlocalFraction` | 35 % |  | share of zugaro events that overlap no non-local event | supplement |
-| `\EventsZugaroNoNonlocalMixedFraction` | 18 % |  | of zugaro events overlapping no non-local event, the share with neither state in more than half their rows | supplement |
-| `\EventsZugaroNoNonlocalMostlyLocalFraction` | 81 % |  | of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | supplement |
-| `\EventsZugaroNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of zugaro events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | supplement |
-| `\EventsZugaroOverlapAllNonlocalFraction` | 74 % |  | share of zugaro events overlapping a non-local event whose every row is non-local above 0.8 | supplement |
-| `\EventsZugaroOverlapAnyLocalFraction` | 6 % |  | share of zugaro events overlapping a non-local event that hold at least one row with Local above 0.8 | supplement |
-| `\EventsZugaroOverlapAnyNoSpikeFraction` | 1 % |  | share of zugaro events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | supplement |
-| `\EventsZugaroOverlapLocalShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with Local above 0.8 | supplement |
-| `\EventsZugaroOverlapNoSpikeShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | supplement |
-| `\EventsZugaroOverlapNonlocalShareMedian` | 100 % |  | median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8 | supplement |
-| `\EventsZugaroOverlapUncertainShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8 | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsCareyEvents` | 24,084 |  | carey events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsCareyNoNonlocalFraction` | 20 % |  | share of carey events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsCareyNoNonlocalMixedFraction` | 18 % |  | of carey events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsCareyNoNonlocalMostlyLocalFraction` | 82 % |  | of carey events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsCareyNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of carey events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsCareyOverlapAllNonlocalFraction` | 12 % |  | share of carey events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsCareyOverlapAnyLocalFraction` | 35 % |  | share of carey events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsCareyOverlapAnyNoSpikeFraction` | 15 % |  | share of carey events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsCareyOverlapLocalShareMedian` | 0 % |  | median over carey events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsCareyOverlapNoSpikeShareMedian` | 0 % |  | median over carey events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsCareyOverlapNonlocalShareMedian` | 87 % |  | median over carey events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsCareyOverlapUncertainShareMedian` | 9 % |  | median over carey events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonEvents` | 60,472 |  | karlsson events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsKarlssonNoNonlocalFraction` | 38 % |  | share of karlsson events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsKarlssonNoNonlocalMixedFraction` | 18 % |  | of karlsson events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsKarlssonNoNonlocalMostlyLocalFraction` | 81 % |  | of karlsson events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsKarlssonNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of karlsson events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapAllNonlocalFraction` | 11 % |  | share of karlsson events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapAnyLocalFraction` | 48 % |  | share of karlsson events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapAnyNoSpikeFraction` | 22 % |  | share of karlsson events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapLocalShareMedian` | 0 % |  | median over karlsson events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapNoSpikeShareMedian` | 0 % |  | median over karlsson events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapNonlocalShareMedian` | 77 % |  | median over karlsson events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsKarlssonOverlapUncertainShareMedian` | 13 % |  | median over karlsson events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
+| `\EventsKayEvents` | 41,151 |  | kay events compared with the non-local detector | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalFraction` | 17 % |  | share of kay events that overlap no non-local event | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalFractionAnimalMax` | 28 % |  | highest per-animal share of kay events overlapping no non-local event | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalFractionAnimalMin` | 8 |  | lowest per-animal share of kay events overlapping no non-local event | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalMixedFraction` | 26 % |  | of kay events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalMostlyLocalFraction` | 74 % |  | of kay events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` | 2 |
+| `\EventsKayNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of kay events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapAllNonlocalFraction` | 17 % |  | share of kay events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapAnyLocalFraction` | 32 % |  | share of kay events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapAnyNoSpikeFraction` | 9 % |  | share of kay events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapLocalShareMedian` | 0 % |  | median over kay events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapNoSpikeShareMedian` | 0 % |  | median over kay events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapNonlocalShareMedian` | 88 % |  | median over kay events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsKayOverlapUncertainShareMedian` | 9 % |  | median over kay events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` | 2 |
+| `\EventsMuaEvents` | 40,732 |  | mua events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsMuaNoNonlocalFraction` | 15 % |  | share of mua events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsMuaNoNonlocalMixedFraction` | 22 % |  | of mua events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsMuaNoNonlocalMostlyLocalFraction` | 78 % |  | of mua events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsMuaNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of mua events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsMuaOverlapAllNonlocalFraction` | 4 % |  | share of mua events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsMuaOverlapAnyLocalFraction` | 51 % |  | share of mua events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsMuaOverlapAnyNoSpikeFraction` | 11 % |  | share of mua events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsMuaOverlapLocalShareMedian` | 1 % |  | median over mua events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsMuaOverlapNoSpikeShareMedian` | 0 % |  | median over mua events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsMuaOverlapNonlocalShareMedian` | 81 % |  | median over mua events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsMuaOverlapUncertainShareMedian` | 13 % |  | median over mua events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaEvents` | 4,388 |  | memoryless_criteria events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalFraction` | 4 % |  | share of memoryless_criteria events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalMixedFraction` | 48 % |  | of memoryless_criteria events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless_criteria events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of memoryless_criteria events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapAllNonlocalFraction` | 11 % |  | share of memoryless_criteria events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapAnyLocalFraction` | 58 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapAnyNoSpikeFraction` | 27 % |  | share of memoryless_criteria events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapLocalShareMedian` | 5 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapNonlocalShareMedian` | 80 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiCriteriaOverlapUncertainShareMedian` | 8 % |  | median over memoryless_criteria events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiEvents` | 4,092 |  | memoryless events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalFraction` | 3 % |  | share of memoryless events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalMixedFraction` | 49 % |  | of memoryless events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalMostlyLocalFraction` | 51 % |  | of memoryless events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiNoNonlocalMostlyNoSpikeFraction` | 0 % |  | of memoryless events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapAllNonlocalFraction` | 10 % |  | share of memoryless events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapAnyLocalFraction` | 59 % |  | share of memoryless events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapAnyNoSpikeFraction` | 28 % |  | share of memoryless events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapLocalShareMedian` | 6 % |  | median over memoryless events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapNoSpikeShareMedian` | 0 % |  | median over memoryless events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapNonlocalShareMedian` | 79 % |  | median over memoryless events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsWidloskiOverlapUncertainShareMedian` | 8 % |  | median over memoryless events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuEvents` | 125,423 |  | yu events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsYuNoNonlocalFraction` | 56 % |  | share of yu events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsYuNoNonlocalMixedFraction` | 17 % |  | of yu events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsYuNoNonlocalMostlyLocalFraction` | 82 % |  | of yu events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsYuNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of yu events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsYuOverlapAllNonlocalFraction` | 12 % |  | share of yu events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuOverlapAnyLocalFraction` | 43 % |  | share of yu events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuOverlapAnyNoSpikeFraction` | 14 % |  | share of yu events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuOverlapLocalShareMedian` | 0 % |  | median over yu events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuOverlapNoSpikeShareMedian` | 0 % |  | median over yu events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuOverlapNonlocalShareMedian` | 79 % |  | median over yu events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsYuOverlapUncertainShareMedian` | 13 % |  | median over yu events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroEvents` | 23,934 |  | zugaro events compared with the non-local detector | `events.other_detector_values` |  |
+| `\EventsZugaroNoNonlocalFraction` | 35 % |  | share of zugaro events that overlap no non-local event | `events.other_detector_values` |  |
+| `\EventsZugaroNoNonlocalMixedFraction` | 18 % |  | of zugaro events overlapping no non-local event, the share with neither state in more than half their rows | `events.other_detector_values` |  |
+| `\EventsZugaroNoNonlocalMostlyLocalFraction` | 81 % |  | of zugaro events overlapping no non-local event, the share with Local above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsZugaroNoNonlocalMostlyNoSpikeFraction` | 1 % |  | of zugaro events overlapping no non-local event, the share with No-Spike above 0.8 in more than half their rows | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapAllNonlocalFraction` | 74 % |  | share of zugaro events overlapping a non-local event whose every row is non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapAnyLocalFraction` | 6 % |  | share of zugaro events overlapping a non-local event that hold at least one row with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapAnyNoSpikeFraction` | 1 % |  | share of zugaro events overlapping a non-local event that hold at least one row with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapLocalShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with Local above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapNoSpikeShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with No-Spike above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapNonlocalShareMedian` | 100 % |  | median over zugaro events overlapping a non-local event of the share of their rows with non-local above 0.8 | `events.other_detector_values` |  |
+| `\EventsZugaroOverlapUncertainShareMedian` | 0 % |  | median over zugaro events overlapping a non-local event of the share of their rows with no state above 0.8 | `events.other_detector_values` |  |
 
 ### 2b.4. How do non-local event starts and ends differ from those of the matched SWR?
 
@@ -374,13 +371,13 @@ Status: computed. Figures: 2d. Values: 3.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table)
+- Processed-Data/replay_content/event_table.parquet (canonical event table)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsEndOffsetMedianMs` | −4 | ms | median of event end minus matched SWR end | paper, figure: 2d |
-| `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start | paper, figure: 2d |
-| `\EventsSwrOverlappingEvents` | 32,701 |  | immobile non-local events overlapping an SWR | paper, figure: 2d |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsEndOffsetMedianMs` | −4 | ms | median of event end minus matched SWR end | `events.boundary_offset_values` | 2d |
+| `\EventsStartOffsetMedianMs` | 4 | ms | median of event start minus matched SWR start | `events.boundary_offset_values` | 2d |
+| `\EventsSwrOverlappingEvents` | 32,701 |  | immobile non-local events overlapping an SWR | `events.boundary_offset_values` | 2d |
 
 ### 2b.5. How is SWR z-score distributed at immobile Local and Non-Local time points, and how much of the non-local mass lies below the SWR-detection threshold?
 
@@ -388,26 +385,26 @@ Status: computed. Figures: 3b. Values: 15.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
+- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | paper, figure: 3b |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | paper, figure: 3b |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below their median running level | paper, figure: 3b |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below their median running level | paper, figure: 3b |
-| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | paper, figure: 3b |
-| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | paper, figure: 3b |
-| `\EventsRipplePeakAnimalsUnimodal` | 5 |  | animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05) | supplement |
-| `\EventsRipplePeakModeAnimalMax` | 1.99 | z | highest per-animal location of that mode | supplement |
-| `\EventsRipplePeakModeAnimalMin` | 0.90 | z | lowest per-animal location of the main KDE mode of the events' peak ripple power | supplement |
-| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | paper, figure: 3b |
-| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | paper, figure: 3b |
-| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | paper |
-| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | paper |
-| `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | paper |
-| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below their median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below their median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3b |
+| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
+| `\EventsRipplePeakAnimalsUnimodal` | 5 |  | animals in which Hartigan's dip test does not reject one mode of the events' peak ripple power (p at or above 0.05) | `events.class_distribution_values` |  |
+| `\EventsRipplePeakModeAnimalMax` | 1.99 | z | highest per-animal location of that mode | `events.class_distribution_values` |  |
+| `\EventsRipplePeakModeAnimalMin` | 0.90 | z | lowest per-animal location of the main KDE mode of the events' peak ripple power | `events.class_distribution_values` |  |
+| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
+| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
+| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_values` |  |
+| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_values` |  |
+| `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_values` |  |
+| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2b.6. Does the detector target the represented content rather than an LFP proxy?
 
@@ -427,66 +424,66 @@ Status: computed. Figures: 3b, decoder_validation. Values: 54.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and /cumulus/edeno/continuum-swr-replay/Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass /cumulus/edeno/continuum-swr-replay/Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
+- Processed-Data/event_gamma_power/reference.parquet (scripts/detection/measure_event_gamma.py --out-name event_gamma_power)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level | supplement |
-| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level | supplement |
-| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below their median running level | supplement |
-| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below their median running level | supplement |
-| `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | supplement |
-| `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | supplement |
-| `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | supplement |
-| `\EventsFastGammaDbMedianSwr` | +1.1 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | supplement |
-| `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | supplement |
-| `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | supplement |
-| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | supplement |
-| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | supplement |
-| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate is above their median quiet-rest level | supplement |
-| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate is above their median quiet-rest level | supplement |
-| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate is below their median running level | supplement |
-| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate is below their median running level | supplement |
-| `\EventsMuaMedianNonSwr` | 0.79 | z | median z-scored MUA rate of immobile non-SWR non-local events (event mean) | supplement |
-| `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | supplement |
-| `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | supplement |
-| `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | supplement |
-| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | paper, figure: 3b |
-| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | paper, figure: 3b |
-| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below their median running level | paper, figure: 3b |
-| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below their median running level | paper, figure: 3b |
-| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | paper, figure: 3b |
-| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | paper, figure: 3b |
-| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | paper, figure: 3b |
-| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | paper, figure: 3b |
-| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above their median quiet-rest level | supplement |
-| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above their median quiet-rest level | supplement |
-| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below their median running level | supplement |
-| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below their median running level | supplement |
-| `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | supplement |
-| `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | supplement |
-| `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | supplement |
-| `\EventsSlowGammaDbMedianSwr` | +1.6 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | supplement |
-| `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | supplement |
-| `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | supplement |
-| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | supplement |
-| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | supplement |
-| `\EventsThetaAnimalsAboveRestNonSwr` | 2 |  | animals whose median non-SWR event theta power is above their median quiet-rest level | supplement |
-| `\EventsThetaAnimalsAboveRestSwr` | 2 |  | animals whose median SWR-overlapping event theta power is above their median quiet-rest level | supplement |
-| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power is below their median running level | supplement |
-| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power is below their median running level | supplement |
-| `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows | paper |
-| `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows | paper |
-| `\EventsThetaLikeFractionNonSwr` | 13 % |  | share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level | supplement |
-| `\EventsThetaLikeFractionRestMatchedNonSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta | paper |
-| `\EventsThetaLikeFractionRestMatchedSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta | paper |
-| `\EventsThetaLikeFractionSwr` | 11 % |  | share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level | supplement |
-| `\EventsThetaMedianNonSwr` | −0.62 | z | median z-scored theta power of immobile non-SWR non-local events (event mean) | supplement |
-| `\EventsThetaMedianSwr` | −0.70 | z | median z-scored theta power of immobile SWR-overlapping non-local events (event mean) | supplement |
-| `\EventsThetaRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored theta power in quiet rest | supplement |
-| `\EventsThetaRunningReference` | 0.42 | z | median over epochs of the epoch's median z-scored theta power while running | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below their median running level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below their median running level | `events.brain_state_values` |  |
+| `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsFastGammaDbMedianSwr` | +1.1 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.brain_state_values` |  |
+| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate is below their median running level | `events.brain_state_values` |  |
+| `\EventsMuaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event MUA rate is below their median running level | `events.brain_state_values` |  |
+| `\EventsMuaMedianNonSwr` | 0.79 | z | median z-scored MUA rate of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsMuaMedianSwr` | 2.37 | z | median z-scored MUA rate of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsMuaRestReference` | −0.84 | z | median over epochs of the epoch's median z-scored MUA rate in quiet rest | `events.brain_state_values` |  |
+| `\EventsMuaRunningReference` | 0.56 | z | median over epochs of the epoch's median z-scored MUA rate while running | `events.brain_state_values` |  |
+| `\EventsRippleAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event ripple power is above their median quiet-rest level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event ripple power is below their median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event ripple power is below their median running level | `events.brain_state_values` | 3b |
+| `\EventsRippleMedianNonSwr` | 0.50 | z | median z-scored ripple power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` | 3b |
+| `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
+| `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
+| `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
+| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below their median running level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below their median running level | `events.brain_state_values` |  |
+| `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
+| `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsSlowGammaDbMedianSwr` | +1.6 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
+| `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.brain_state_values` |  |
+| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsAboveRestNonSwr` | 2 |  | animals whose median non-SWR event theta power is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsAboveRestSwr` | 2 |  | animals whose median SWR-overlapping event theta power is above their median quiet-rest level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power is below their median running level | `events.brain_state_values` |  |
+| `\EventsThetaAnimalsBelowRunningSwr` | 5 |  | animals whose median SWR-overlapping event theta power is below their median running level | `events.brain_state_values` |  |
+| `\EventsThetaLikeAnimalsAboveRestMatchedNonSwr` | 2 |  | animals whose share of theta-like non-SWR events is above that of their duration-matched quiet-rest windows | `events.rest_theta_values` |  |
+| `\EventsThetaLikeAnimalsAboveRestMatchedSwr` | 1 |  | animals whose share of theta-like SWR-overlapping events is above that of their duration-matched quiet-rest windows | `events.rest_theta_values` |  |
+| `\EventsThetaLikeFractionNonSwr` | 13 % |  | share of immobile non-SWR non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaLikeFractionRestMatchedNonSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the non-SWR events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
+| `\EventsThetaLikeFractionRestMatchedSwr` | 12 % |  | share of quiet-rest windows, matched in duration to the SWR-overlapping events, whose theta reaches the epoch's median running theta | `events.rest_theta_values` |  |
+| `\EventsThetaLikeFractionSwr` | 11 % |  | share of immobile SWR-overlapping non-local events whose theta power reaches their epoch's median running level | `events.brain_state_values` |  |
+| `\EventsThetaMedianNonSwr` | −0.62 | z | median z-scored theta power of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsThetaMedianSwr` | −0.70 | z | median z-scored theta power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
+| `\EventsThetaRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored theta power in quiet rest | `events.brain_state_values` |  |
+| `\EventsThetaRunningReference` | 0.42 | z | median over epochs of the epoch's median z-scored theta power while running | `events.brain_state_values` |  |
 
 ### 2c.2. How do per-event spike count, MUA z-score and active tetrodes compare across non-SWR events, SWR events and matched immobile non-event windows?
 
@@ -496,22 +493,22 @@ Sources:
 
 - paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | paper, figure: 2 |
-| `\EventsBaselineSpikesMedian` | 11 | spikes | median spike count of matched quiet windows | paper, figure: 2 |
-| `\EventsBaselineTetrodesMedian` | 6 | tetrodes | median number of tetrodes with a spike in matched quiet windows | paper, figure: 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | paper, figure: 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | paper, figure: 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | paper, figure: 2 |
-| `\EventsNonSwrCloseSpikesMedian` | 44 | spikes | median spike count of nonSWR-close events | paper, figure: 2 |
-| `\EventsNonSwrCloseTetrodesMedian` | 12 | tetrodes | median number of tetrodes with a spike in nonSWR-close events | paper, figure: 2 |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | paper, figure: 2 |
-| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | paper, figure: 2 |
-| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | paper, figure: 2 |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | paper, figure: 2 |
-| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | paper, figure: 2 |
-| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineSpikesMedian` | 11 | spikes | median spike count of matched quiet windows | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineTetrodesMedian` | 6 | tetrodes | median number of tetrodes with a spike in matched quiet windows | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseSpikesMedian` | 44 | spikes | median spike count of nonSWR-close events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseTetrodesMedian` | 12 | tetrodes | median number of tetrodes with a spike in nonSWR-close events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
 
 ### 2c.3. Do an event's spikes favor its decoded location over the animal's position, against matched windows and on held-out tetrodes?
 
@@ -519,78 +516,78 @@ Status: computed. Figures: 2. Values: 65.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 - Processed-Data/_refresh_20261016/state_evidence/bout_stats.csv and manifest.json (scripts/detection/run_state_evidence.py; pooled by the runner's own summarize over the per-epoch records, 2026-10-17)
+- Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv
+- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 - paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutContinuousImmobileCiHigh` | 7.9 | nats per window | upper bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutContinuousImmobileCiLow` | 4.2 | nats per window | lower bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutContinuousImmobileEpochs` | 242 |  | epochs with Non-Local Continuous bouts, immobile scored | paper, supplement |
-| `\DetectionHeldoutContinuousImmobileEpochsPositive` | 239 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutContinuousImmobileEstimate` | 6.1 | nats per window | held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | paper, supplement |
-| `\DetectionHeldoutContinuousRunningAnimalsPositive` | 0 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero | paper, supplement |
-| `\DetectionHeldoutContinuousRunningCiHigh` | −0.50 | nats per window | upper bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutContinuousRunningCiLow` | −1.9 | nats per window | lower bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutContinuousRunningEpochs` | 242 |  | epochs with Non-Local Continuous bouts, running scored | paper, supplement |
-| `\DetectionHeldoutContinuousRunningEpochsPositive` | 23 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero | paper, supplement |
-| `\DetectionHeldoutContinuousRunningEstimate` | −1.2 | nats per window | held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | paper, supplement |
-| `\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive` | 3 |  | animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutFragmentedImmobileMismatchedCiHigh` | 0.79 | nats per window | upper bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutFragmentedImmobileMismatchedCiLow` | −0.56 | nats per window | lower bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEpochs` | 242 |  | epochs with Non-Local Fragmented bouts, immobile scored | paper, supplement |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive` | 117 |  | epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutFragmentedImmobileMismatchedEstimate` | 0.12 | nats per window | held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median | paper, supplement |
-| `\DetectionHeldoutLocalImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Local bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutLocalImmobileCiHigh` | 4.4 | nats per window | upper bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutLocalImmobileCiLow` | 1.2 | nats per window | lower bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutLocalImmobileEpochs` | 242 |  | epochs with Local bouts, immobile scored | paper, supplement |
-| `\DetectionHeldoutLocalImmobileEpochsPositive` | 242 |  | epochs whose median held-out evidence of Local bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutLocalImmobileEstimate` | 2.8 | nats per window | held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median | paper, supplement |
-| `\DetectionHeldoutNoSpikeImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of No-Spike bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutNoSpikeImmobileCiHigh` | 9.7 | nats per window | upper bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutNoSpikeImmobileCiLow` | 5.7 | nats per window | lower bound of its 95 % t-interval over animals | paper, supplement |
-| `\DetectionHeldoutNoSpikeImmobileEpochs` | 241 |  | epochs with No-Spike bouts, immobile scored | paper, supplement |
-| `\DetectionHeldoutNoSpikeImmobileEpochsPositive` | 241 |  | epochs whose median held-out evidence of No-Spike bouts, immobile is above zero | paper, supplement |
-| `\DetectionHeldoutNoSpikeImmobileEstimate` | 7.7 | nats per window | held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median | paper, supplement |
-| `\DetectionStateEvidenceAnimals` | 5 |  | animals in the held-out tetrode run | paper, supplement |
-| `\DetectionStateEvidenceEpochs` | 242 |  | epochs the held-out tetrode run lists | paper, supplement |
-| `\DetectionStateEvidenceEpochsOk` | 242 |  | of those, epochs that passed every check of the run (status ok) | paper, supplement |
-| `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | paper, figure: 2 |
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | paper, figure: 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | paper, figure: 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | paper, figure: 2 |
-| `\EventsHeldoutNonSwrAnimals` | 5 |  | animals in that test | paper, figure: 2 |
-| `\EventsHeldoutNonSwrAnimalsPositive` | 5 |  | animals with a positive mean | paper, figure: 2 |
-| `\EventsHeldoutNonSwrPerSpike` | 0.20 | nats per spike | held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals | paper, figure: 2 |
-| `\EventsHeldoutNonSwrPerSpikeCiHigh` | 0.24 | nats per spike | upper bound of its 95 % t-interval over animals | paper, figure: 2 |
-| `\EventsHeldoutNonSwrPerSpikeCiLow` | 0.16 | nats per spike | lower bound of its 95 % t-interval over animals | paper, figure: 2 |
-| `\EventsHeldoutSwrAnimals` | 5 |  | animals in that test | paper, figure: 2 |
-| `\EventsHeldoutSwrAnimalsPositive` | 5 |  | animals with a positive mean | paper, figure: 2 |
-| `\EventsHeldoutSwrPerSpike` | 0.60 | nats per spike | held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals | paper, figure: 2 |
-| `\EventsHeldoutSwrPerSpikeCiHigh` | 0.74 | nats per spike | upper bound of its 95 % t-interval over animals | paper, figure: 2 |
-| `\EventsHeldoutSwrPerSpikeCiLow` | 0.45 | nats per spike | lower bound of its 95 % t-interval over animals | paper, figure: 2 |
-| `\EventsNonSwrCloseAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-close event scores above their median quiet window, per spike | paper, figure: 2 |
-| `\EventsNonSwrCloseDllPerSpikeMedian` | 0.49 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events | paper, figure: 2 |
-| `\EventsNonSwrCloseEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike | paper, figure: 2 |
-| `\EventsNonSwrCloseEpochsScored` | 242 |  | epochs with a scored nonSWR-close event | paper, figure: 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | paper, figure: 2 |
-| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | paper, figure: 2 |
-| `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | paper, figure: 2 |
-| `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | paper, figure: 2 |
-| `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | paper, figure: 2 |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | paper, figure: 2 |
-| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | paper |
-| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | paper |
-| `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | paper |
-| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | paper, figure: 2 |
-| `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | paper, figure: 2 |
-| `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | paper, figure: 2 |
-| `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | paper, figure: 2 |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\DetectionHeldoutContinuousImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileCiHigh` | 7.9 | nats per window | upper bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileCiLow` | 4.2 | nats per window | lower bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEpochs` | 242 |  | epochs with Non-Local Continuous bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEpochsPositive` | 239 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousImmobileEstimate` | 6.1 | nats per window | held-out evidence of Non-Local Continuous bouts, immobile, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningAnimalsPositive` | 0 |  | animals whose mean held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningCiHigh` | −0.50 | nats per window | upper bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningCiLow` | −1.9 | nats per window | lower bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEpochs` | 242 |  | epochs with Non-Local Continuous bouts, running scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEpochsPositive` | 23 |  | epochs whose median held-out evidence of Non-Local Continuous bouts, running is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutContinuousRunningEstimate` | −1.2 | nats per window | held-out evidence of Non-Local Continuous bouts, running, the held-out MAP against the animal's position: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedAnimalsPositive` | 3 |  | animals whose mean held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedCiHigh` | 0.79 | nats per window | upper bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedCiLow` | −0.56 | nats per window | lower bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEpochs` | 242 |  | epochs with Non-Local Fragmented bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEpochsPositive` | 117 |  | epochs whose median held-out evidence of Non-Local Fragmented bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutFragmentedImmobileMismatchedEstimate` | 0.12 | nats per window | held-out evidence of Non-Local Fragmented bouts, immobile, the held-out MAP against a mismatched MAP: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileCiHigh` | 4.4 | nats per window | upper bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileCiLow` | 1.2 | nats per window | lower bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEpochs` | 242 |  | epochs with Local bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEpochsPositive` | 242 |  | epochs whose median held-out evidence of Local bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutLocalImmobileEstimate` | 2.8 | nats per window | held-out evidence of Local bouts, immobile, the animal's position against a mismatched one: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileAnimalsPositive` | 5 |  | animals whose mean held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileCiHigh` | 9.7 | nats per window | upper bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileCiLow` | 5.7 | nats per window | lower bound of its 95 % t-interval over animals | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEpochs` | 241 |  | epochs with No-Spike bouts, immobile scored | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEpochsPositive` | 241 |  | epochs whose median held-out evidence of No-Spike bouts, immobile is above zero | `detection.state_evidence_values` |  |
+| `\DetectionHeldoutNoSpikeImmobileEstimate` | 7.7 | nats per window | held-out evidence of No-Spike bouts, immobile, silence against local coding: mean over animals of each animal's mean epoch median | `detection.state_evidence_values` |  |
+| `\DetectionStateEvidenceAnimals` | 5 |  | animals in the held-out tetrode run | `detection.state_evidence_values` |  |
+| `\DetectionStateEvidenceEpochs` | 242 |  | epochs the held-out tetrode run lists | `detection.state_evidence_values` |  |
+| `\DetectionStateEvidenceEpochsOk` | 242 |  | of those, epochs that passed every check of the run (status ok) | `detection.state_evidence_values` |  |
+| `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsHeldoutNonSwrAnimals` | 5 |  | animals in that test | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutNonSwrAnimalsPositive` | 5 |  | animals with a positive mean | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutNonSwrPerSpike` | 0.20 | nats per spike | held-out evidence per held-out spike for immobile Non-Local Continuous bouts without an SWR, against the animal's position: mean over animals | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutNonSwrPerSpikeCiHigh` | 0.24 | nats per spike | upper bound of its 95 % t-interval over animals | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutNonSwrPerSpikeCiLow` | 0.16 | nats per spike | lower bound of its 95 % t-interval over animals | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutSwrAnimals` | 5 |  | animals in that test | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutSwrAnimalsPositive` | 5 |  | animals with a positive mean | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutSwrPerSpike` | 0.60 | nats per spike | held-out evidence per held-out spike for immobile Non-Local Continuous bouts with an SWR, against the animal's position: mean over animals | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutSwrPerSpikeCiHigh` | 0.74 | nats per spike | upper bound of its 95 % t-interval over animals | `events.heldout_by_swr_values` | 2 |
+| `\EventsHeldoutSwrPerSpikeCiLow` | 0.45 | nats per spike | lower bound of its 95 % t-interval over animals | `events.heldout_by_swr_values` | 2 |
+| `\EventsNonSwrCloseAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-close event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseDllPerSpikeMedian` | 0.49 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-close events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-close event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseEpochsScored` | 242 |  | epochs with a scored nonSWR-close event | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsStepEvidenceCriterionAnimals` | 3 |  | animals with a step at the threshold in spike evidence per spike (remote events): the term's interval excludes 0 and it lowers the held-out error | `events.class_step_values` |  |
+| `\EventsStepEvidenceCriterionAnimalsSameSign` | 5 |  | animals whose jump in spike evidence per spike at the threshold points the way of their SWR minus non-SWR difference, whatever its interval | `events.class_step_values` |  |
+| `\EventsStepEvidenceCriterionShareMedian` | +0.19 |  | median over animals of the jump in spike evidence per spike at the threshold, as a share of the animal's SWR minus non-SWR difference | `events.class_step_values` |  |
+| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
 
 ### 2c.4. Where do event MAPs sit relative to the GPI peak, against matched quiet windows?
 
@@ -600,12 +597,12 @@ Sources:
 
 - paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsBaselineGpiDistanceMedianCm` | 100 | cm | median track distance from the MAP of matched quiet windows to the ground-process intensity peak | supplement |
-| `\EventsNonSwrCloseGpiDistanceMedianCm` | 105 | cm | median track distance from the MAP of nonSWR-close events to the ground-process intensity peak | supplement |
-| `\EventsNonSwrRemoteGpiDistanceMedianCm` | 97 | cm | median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak | supplement |
-| `\EventsSwrRemoteGpiDistanceMedianCm` | 82 | cm | median track distance from the MAP of SWR-remote events to the ground-process intensity peak | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsBaselineGpiDistanceMedianCm` | 100 | cm | median track distance from the MAP of matched quiet windows to the ground-process intensity peak | `events.spike_evidence_values` |  |
+| `\EventsNonSwrCloseGpiDistanceMedianCm` | 105 | cm | median track distance from the MAP of nonSWR-close events to the ground-process intensity peak | `events.spike_evidence_values` |  |
+| `\EventsNonSwrRemoteGpiDistanceMedianCm` | 97 | cm | median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
+| `\EventsSwrRemoteGpiDistanceMedianCm` | 82 | cm | median track distance from the MAP of SWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
 
 ### 2c.5. What spike evidence do matched immobile non-event windows have?
 
@@ -615,15 +612,15 @@ Sources:
 
 - paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | paper, figure: 2 |
-| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | paper, figure: 2 |
-| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | paper, figure: 2 |
-| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | paper, figure: 2 |
-| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | paper, figure: 2 |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | paper, figure: 2 |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsBaselineDllPerSpikeMedian` | 0.00 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of matched quiet windows | `events.spike_evidence_values` | 2 |
+| `\EventsBaselineScored` | 25,167 |  | matched quiet windows scored | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceAnimals` | 5 |  | animals in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsEvidenceEpochs` | 242 |  | epochs in the spike-evidence run | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrCloseScored` | 10,488 |  | nonSWR-close events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
 
 ### 2c.6. Are close events produced by the extent of place fields?
 
@@ -637,24 +634,24 @@ Sources:
 
 - paper/figures/reality_all/per_epoch/*/event_spike_evidence_metrics.parquet (every event, no cap)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | paper, figure: 2 |
-| `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | paper, figure: 2 |
-| `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | paper, figure: 2 |
-| `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | paper, figure: 2 |
-| `\EventsNonSwrRemoteGpiDistanceMedianCm` | 97 | cm | median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak | supplement |
-| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | paper, figure: 2 |
-| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | paper, figure: 2 |
-| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | paper, figure: 2 |
-| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | paper, figure: 2 |
-| `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | paper, figure: 2 |
-| `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | paper, figure: 2 |
-| `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | paper, figure: 2 |
-| `\EventsSwrRemoteGpiDistanceMedianCm` | 82 | cm | median track distance from the MAP of SWR-remote events to the ground-process intensity peak | supplement |
-| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | paper, figure: 2 |
-| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | paper, figure: 2 |
-| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsNonSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median nonSWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteDllPerSpikeMedian` | 0.71 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median nonSWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteEpochsScored` | 242 |  | epochs with a scored nonSWR-remote event | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteGpiDistanceMedianCm` | 97 | cm | median track distance from the MAP of nonSWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
+| `\EventsNonSwrRemoteScored` | 24,079 |  | nonSWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteSpikesMedian` | 36 | spikes | median spike count of nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsNonSwrRemoteTetrodesMedian` | 11 | tetrodes | median number of tetrodes with a spike in nonSWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteAnimalsAboveBaseline` | 5 |  | animals whose median SWR-remote event scores above their median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteDllPerSpikeMedian` | 1.18 | nats per spike | median log-likelihood ratio per spike, decoded location against the animal's, of SWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteEpochsAboveBaseline` | 242 |  | epochs whose median SWR-remote event scores above the epoch's median quiet window, per spike | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteEpochsScored` | 242 |  | epochs with a scored SWR-remote event | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteGpiDistanceMedianCm` | 82 | cm | median track distance from the MAP of SWR-remote events to the ground-process intensity peak | `events.spike_evidence_values` |  |
+| `\EventsSwrRemoteScored` | 20,879 |  | SWR-remote events scored | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteSpikesMedian` | 118 | spikes | median spike count of SWR-remote events | `events.spike_evidence_values` | 2 |
+| `\EventsSwrRemoteTetrodesMedian` | 15 | tetrodes | median number of tetrodes with a spike in SWR-remote events | `events.spike_evidence_values` | 2 |
 
 ### 2c.8. How is the decoded distance from the animal distributed, by SWR status?
 
@@ -664,20 +661,20 @@ Sources:
 
 - paper/figures/content_occupancy/content_occupancy_per_session.csv
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | paper, figure: 2 |
-| `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | paper, figure: 2 |
-| `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentRemotePathFraction` | 73 % |  | share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentRemoteWellFraction` | 21 % |  | share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentRemotePathFraction` | 73 % |  | share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentRemoteWellFraction` | 21 % |  | share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 
 ### 2c.9. Do tetrode holdout and interneuron exclusion, as main-text controls, show the events are real?
 
@@ -691,32 +688,32 @@ Status: partly computed; the own-well share waits for the wider-Local-kernel re-
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 - paper/figures/content_occupancy/content_occupancy_per_session.csv
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | paper, figure: 2 |
-| `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | paper, figure: 2 |
-| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median | paper, figure: 3 |
-| `\EventsStartDistanceDifferenceHigh` | +16 | cm | upper bound of that interval | paper, figure: 3 |
-| `\EventsStartDistanceDifferenceLow` | −11 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | paper, figure: 3 |
-| `\EventsStartDistanceMatchedDifference` | −13 | cm | SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3 |
-| `\EventsStartDistanceMatchedDifferenceHigh` | +4.1 | cm | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3 |
-| `\EventsStartDistanceMatchedDifferenceLow` | −29 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3 |
-| `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | paper, figure: 3 |
-| `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | paper, figure: 3 |
-| `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentRemotePathFraction` | 73 % |  | share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions | paper, figure: 2 |
-| `\EventsSwrContentRemoteWellFraction` | 21 % |  | share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions | paper, figure: 2 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsAnimalsNonSwrMoreAtWell` | 5 |  | animals whose non-SWR content is at a well more often than their SWR content | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentAtWellFraction` | 58 % |  | share of nonSWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentNearOffFraction` | 1 % |  | share of nonSWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentOwnWellFraction` | 13 % |  | share of nonSWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 2 |
+| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsStartDistanceDifferenceHigh` | +16 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
+| `\EventsStartDistanceDifferenceLow` | −11 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` | 3 |
+| `\EventsStartDistanceMatchedDifference` | −13 | cm | SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
+| `\EventsStartDistanceMatchedDifferenceHigh` | +4.1 | cm | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
+| `\EventsStartDistanceMatchedDifferenceLow` | −29 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
+| `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.property_values` | 3 |
+| `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
+| `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentRemotePathFraction` | 73 % |  | share of SWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
+| `\EventsSwrContentRemoteWellFraction` | 21 % |  | share of SWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 
 ### 2d.2. How does replay speed differ between SWR and non-SWR events?
 
@@ -724,21 +721,21 @@ Status: computed. Figures: 3c. Values: 9.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median | paper, figure: 3c |
-| `\EventsSpeedDifferenceHigh` | +230 | cm/s | upper bound of that interval | paper, figure: 3c |
-| `\EventsSpeedDifferenceLow` | +110 | cm/s | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event) | paper, figure: 3c |
-| `\EventsSpeedMatchedDifference` | +180 | cm/s | SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3c |
-| `\EventsSpeedMatchedDifferenceHigh` | +250 | cm/s | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3c |
-| `\EventsSpeedMatchedDifferenceLow` | +110 | cm/s | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3c |
-| `\EventsSpeedMedianNonSwr` | 320 | cm/s | median replay speed (median over the event) of immobile non-SWR non-local events | paper, figure: 3c |
-| `\EventsSpeedMedianSwr` | 490 | cm/s | median replay speed (median over the event) of immobile SWR-overlapping non-local events | paper, figure: 3c |
-| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsSpeedAnimalsInDirection` | 5 |  | animals whose non-SWR median replay speed (median over the event) is lower than their SWR median | `events.property_values` | 3c |
+| `\EventsSpeedDifferenceHigh` | +230 | cm/s | upper bound of that interval | `events.property_interval_values` | 3c |
+| `\EventsSpeedDifferenceLow` | +110 | cm/s | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median replay speed (median over the event) | `events.property_interval_values` | 3c |
+| `\EventsSpeedMatchedDifference` | +180 | cm/s | SWR minus non-SWR difference of median replay speed (median over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3c |
+| `\EventsSpeedMatchedDifferenceHigh` | +250 | cm/s | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3c |
+| `\EventsSpeedMatchedDifferenceLow` | +110 | cm/s | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3c |
+| `\EventsSpeedMedianNonSwr` | 320 | cm/s | median replay speed (median over the event) of immobile non-SWR non-local events | `events.property_values` | 3c |
+| `\EventsSpeedMedianSwr` | 490 | cm/s | median replay speed (median over the event) of immobile SWR-overlapping non-local events | `events.property_values` | 3c |
+| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2d.3. How does spatial extent differ between SWR and non-SWR events?
 
@@ -746,29 +743,29 @@ Status: computed. Figures: 3. Values: 17.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median | paper, figure: 3 |
-| `\EventsArmsDifferenceHigh` | +2.0 |  | upper bound of that interval | paper, figure: 3 |
-| `\EventsArmsDifferenceLow` | +1.0 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits | paper, figure: 3 |
-| `\EventsArmsMatchedDifference` | +0.98 |  | SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3 |
-| `\EventsArmsMatchedDifferenceHigh` | +1.3 |  | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3 |
-| `\EventsArmsMatchedDifferenceLow` | +0.82 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3 |
-| `\EventsArmsMedianNonSwr` | 1 |  | median number of arms the decoded position visits of immobile non-SWR non-local events | paper, figure: 3 |
-| `\EventsArmsMedianSwr` | 3 |  | median number of arms the decoded position visits of immobile SWR-overlapping non-local events | paper, figure: 3 |
-| `\EventsExtentAnimalsInDirection` | 5 |  | animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median | paper, figure: 3 |
-| `\EventsExtentDifferenceHigh` | +58 | cm | upper bound of that interval | paper, figure: 3 |
-| `\EventsExtentDifferenceLow` | +29 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content | paper, figure: 3 |
-| `\EventsExtentMatchedDifference` | +35 | cm | SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3 |
-| `\EventsExtentMatchedDifferenceHigh` | +45 | cm | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3 |
-| `\EventsExtentMatchedDifferenceLow` | +24 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3 |
-| `\EventsExtentMedianNonSwr` | 8.0 | cm | median spatial extent of the decoded content of immobile non-SWR non-local events | paper, figure: 3 |
-| `\EventsExtentMedianSwr` | 50 | cm | median spatial extent of the decoded content of immobile SWR-overlapping non-local events | paper, figure: 3 |
-| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsArmsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of arms the decoded position visits is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsArmsDifferenceHigh` | +2.0 |  | upper bound of that interval | `events.property_interval_values` | 3 |
+| `\EventsArmsDifferenceLow` | +1.0 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of arms the decoded position visits | `events.property_interval_values` | 3 |
+| `\EventsArmsMatchedDifference` | +0.98 |  | SWR minus non-SWR difference of median number of arms the decoded position visits at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
+| `\EventsArmsMatchedDifferenceHigh` | +1.3 |  | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
+| `\EventsArmsMatchedDifferenceLow` | +0.82 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
+| `\EventsArmsMedianNonSwr` | 1 |  | median number of arms the decoded position visits of immobile non-SWR non-local events | `events.property_values` | 3 |
+| `\EventsArmsMedianSwr` | 3 |  | median number of arms the decoded position visits of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
+| `\EventsExtentAnimalsInDirection` | 5 |  | animals whose non-SWR median spatial extent of the decoded content is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsExtentDifferenceHigh` | +58 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
+| `\EventsExtentDifferenceLow` | +29 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median spatial extent of the decoded content | `events.property_interval_values` | 3 |
+| `\EventsExtentMatchedDifference` | +35 | cm | SWR minus non-SWR difference of median spatial extent of the decoded content at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
+| `\EventsExtentMatchedDifferenceHigh` | +45 | cm | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
+| `\EventsExtentMatchedDifferenceLow` | +24 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
+| `\EventsExtentMedianNonSwr` | 8.0 | cm | median spatial extent of the decoded content of immobile non-SWR non-local events | `events.property_values` | 3 |
+| `\EventsExtentMedianSwr` | 50 | cm | median spatial extent of the decoded content of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
+| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2d.4. How much does content move within an event (pauses, largest step, reversals), SWR against non-SWR?
 
@@ -776,35 +773,35 @@ Status: computed. Figures: 3. Values: 24.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsMaxStepAnimalsInDirection` | 5 |  | animals whose non-SWR median largest step of the decoded position is lower than their SWR median | paper, figure: 3 |
-| `\EventsMaxStepDifferenceHigh` | +22 | cm | upper bound of that interval | paper, figure: 3 |
-| `\EventsMaxStepDifferenceLow` | +7.8 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position | paper, figure: 3 |
-| `\EventsMaxStepMatchedDifference` | +24 | cm | SWR minus non-SWR difference of median largest step of the decoded position at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3 |
-| `\EventsMaxStepMatchedDifferenceHigh` | +34 | cm | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3 |
-| `\EventsMaxStepMatchedDifferenceLow` | +14 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3 |
-| `\EventsMaxStepMedianNonSwr` | 2.0 | cm | median largest step of the decoded position of immobile non-SWR non-local events | paper, figure: 3 |
-| `\EventsMaxStepMedianSwr` | 14 | cm | median largest step of the decoded position of immobile SWR-overlapping non-local events | paper, figure: 3 |
-| `\EventsPauseAnimalsInDirection` | 5 |  | animals whose non-SWR median pause fraction is higher than their SWR median | paper, figure: 3 |
-| `\EventsPauseDifferenceHigh` | −0.059 |  | upper bound of that interval | paper, figure: 3 |
-| `\EventsPauseDifferenceLow` | −0.090 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction | paper, figure: 3 |
-| `\EventsPauseMatchedDifference` | −0.050 |  | SWR minus non-SWR difference of median pause fraction at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3 |
-| `\EventsPauseMatchedDifferenceHigh` | −0.034 |  | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3 |
-| `\EventsPauseMatchedDifferenceLow` | −0.079 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3 |
-| `\EventsPauseMedianNonSwr` | 1.00 |  | median pause fraction of immobile non-SWR non-local events | paper, figure: 3 |
-| `\EventsPauseMedianSwr` | 0.93 |  | median pause fraction of immobile SWR-overlapping non-local events | paper, figure: 3 |
-| `\EventsReversalsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of direction reversals is lower than their SWR median | paper, figure: 3 |
-| `\EventsReversalsDifferenceHigh` | +3.0 |  | upper bound of that interval | paper, figure: 3 |
-| `\EventsReversalsDifferenceLow` | +2.0 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals | paper, figure: 3 |
-| `\EventsReversalsMatchedDifference` | +1.7 |  | SWR minus non-SWR difference of median number of direction reversals at matched duration (within ten duration-quantile strata, averaged by stratum size) | paper, figure: 3 |
-| `\EventsReversalsMatchedDifferenceHigh` | +2.3 |  | upper bound of its 95 % nested-bootstrap interval | paper, figure: 3 |
-| `\EventsReversalsMatchedDifferenceLow` | +0.94 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | paper, figure: 3 |
-| `\EventsReversalsMedianNonSwr` | 0 |  | median number of direction reversals of immobile non-SWR non-local events | paper, figure: 3 |
-| `\EventsReversalsMedianSwr` | 3 |  | median number of direction reversals of immobile SWR-overlapping non-local events | paper, figure: 3 |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsMaxStepAnimalsInDirection` | 5 |  | animals whose non-SWR median largest step of the decoded position is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsMaxStepDifferenceHigh` | +22 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
+| `\EventsMaxStepDifferenceLow` | +7.8 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median largest step of the decoded position | `events.property_interval_values` | 3 |
+| `\EventsMaxStepMatchedDifference` | +24 | cm | SWR minus non-SWR difference of median largest step of the decoded position at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
+| `\EventsMaxStepMatchedDifferenceHigh` | +34 | cm | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
+| `\EventsMaxStepMatchedDifferenceLow` | +14 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
+| `\EventsMaxStepMedianNonSwr` | 2.0 | cm | median largest step of the decoded position of immobile non-SWR non-local events | `events.property_values` | 3 |
+| `\EventsMaxStepMedianSwr` | 14 | cm | median largest step of the decoded position of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
+| `\EventsPauseAnimalsInDirection` | 5 |  | animals whose non-SWR median pause fraction is higher than their SWR median | `events.property_values` | 3 |
+| `\EventsPauseDifferenceHigh` | −0.059 |  | upper bound of that interval | `events.property_interval_values` | 3 |
+| `\EventsPauseDifferenceLow` | −0.090 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median pause fraction | `events.property_interval_values` | 3 |
+| `\EventsPauseMatchedDifference` | −0.050 |  | SWR minus non-SWR difference of median pause fraction at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
+| `\EventsPauseMatchedDifferenceHigh` | −0.034 |  | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
+| `\EventsPauseMatchedDifferenceLow` | −0.079 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
+| `\EventsPauseMedianNonSwr` | 1.00 |  | median pause fraction of immobile non-SWR non-local events | `events.property_values` | 3 |
+| `\EventsPauseMedianSwr` | 0.93 |  | median pause fraction of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
+| `\EventsReversalsAnimalsInDirection` | 5 |  | animals whose non-SWR median number of direction reversals is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsReversalsDifferenceHigh` | +3.0 |  | upper bound of that interval | `events.property_interval_values` | 3 |
+| `\EventsReversalsDifferenceLow` | +2.0 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median number of direction reversals | `events.property_interval_values` | 3 |
+| `\EventsReversalsMatchedDifference` | +1.7 |  | SWR minus non-SWR difference of median number of direction reversals at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
+| `\EventsReversalsMatchedDifferenceHigh` | +2.3 |  | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
+| `\EventsReversalsMatchedDifferenceLow` | +0.94 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
+| `\EventsReversalsMedianNonSwr` | 0 |  | median number of direction reversals of immobile non-SWR non-local events | `events.property_values` | 3 |
+| `\EventsReversalsMedianSwr` | 3 |  | median number of direction reversals of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
 
 ### 2d.5. How concentrated is the posterior (peak, HPD coverage, multimodality), SWR against non-SWR?
 
@@ -812,37 +809,37 @@ Status: computed. Values: 25.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsHpdAnimalsInDirection` | 4 |  | animals whose non-SWR median highest-density-region coverage is lower than their SWR median | supplement |
-| `\EventsHpdDifferenceHigh` | +53 | cm | upper bound of that interval | supplement |
-| `\EventsHpdDifferenceLow` | −5.3 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage | supplement |
-| `\EventsHpdMatchedDifference` | +38 | cm | SWR minus non-SWR difference of median highest-density-region coverage at matched duration (within ten duration-quantile strata, averaged by stratum size) | supplement |
-| `\EventsHpdMatchedDifferenceHigh` | +57 | cm | upper bound of its 95 % nested-bootstrap interval | supplement |
-| `\EventsHpdMatchedDifferenceLow` | −1.3 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | supplement |
-| `\EventsHpdMedianNonSwr` | 44 | cm | median highest-density-region coverage of immobile non-SWR non-local events | supplement |
-| `\EventsHpdMedianSwr` | 80 | cm | median highest-density-region coverage of immobile SWR-overlapping non-local events | supplement |
-| `\EventsMultimodalAnimalsInDirection` | 4 |  | animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median | supplement |
-| `\EventsMultimodalDifferenceHigh` | +0.13 |  | upper bound of that interval | supplement |
-| `\EventsMultimodalDifferenceLow` | +0.013 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior | supplement |
-| `\EventsMultimodalMatchedDifference` | +0.072 |  | SWR minus non-SWR difference of median multimodal fraction of the posterior at matched duration (within ten duration-quantile strata, averaged by stratum size) | supplement |
-| `\EventsMultimodalMatchedDifferenceHigh` | +0.12 |  | upper bound of its 95 % nested-bootstrap interval | supplement |
-| `\EventsMultimodalMatchedDifferenceLow` | +0.0050 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | supplement |
-| `\EventsMultimodalMedianNonSwr` | 0.03 |  | median multimodal fraction of the posterior of immobile non-SWR non-local events | supplement |
-| `\EventsMultimodalMedianSwr` | 0.11 |  | median multimodal fraction of the posterior of immobile SWR-overlapping non-local events | supplement |
-| `\EventsPeakAnimalsInDirection` | 4 |  | animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median | supplement |
-| `\EventsPeakDifferenceHigh` | +0.0095 |  | upper bound of that interval | supplement |
-| `\EventsPeakDifferenceLow` | −0.12 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event) | supplement |
-| `\EventsPeakMatchedDifference` | −0.091 |  | SWR minus non-SWR difference of median posterior peak (mean over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | supplement |
-| `\EventsPeakMatchedDifferenceHigh` | −0.032 |  | upper bound of its 95 % nested-bootstrap interval | supplement |
-| `\EventsPeakMatchedDifferenceLow` | −0.13 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | supplement |
-| `\EventsPeakMedianNonSwr` | 0.90 |  | median posterior peak (mean over the event) of immobile non-SWR non-local events | supplement |
-| `\EventsPeakMedianSwr` | 0.82 |  | median posterior peak (mean over the event) of immobile SWR-overlapping non-local events | supplement |
-| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsHpdAnimalsInDirection` | 4 |  | animals whose non-SWR median highest-density-region coverage is lower than their SWR median | `events.property_values` |  |
+| `\EventsHpdDifferenceHigh` | +53 | cm | upper bound of that interval | `events.property_interval_values` |  |
+| `\EventsHpdDifferenceLow` | −5.3 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median highest-density-region coverage | `events.property_interval_values` |  |
+| `\EventsHpdMatchedDifference` | +38 | cm | SWR minus non-SWR difference of median highest-density-region coverage at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
+| `\EventsHpdMatchedDifferenceHigh` | +57 | cm | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` |  |
+| `\EventsHpdMatchedDifferenceLow` | −1.3 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
+| `\EventsHpdMedianNonSwr` | 44 | cm | median highest-density-region coverage of immobile non-SWR non-local events | `events.property_values` |  |
+| `\EventsHpdMedianSwr` | 80 | cm | median highest-density-region coverage of immobile SWR-overlapping non-local events | `events.property_values` |  |
+| `\EventsMultimodalAnimalsInDirection` | 4 |  | animals whose non-SWR median multimodal fraction of the posterior is lower than their SWR median | `events.property_values` |  |
+| `\EventsMultimodalDifferenceHigh` | +0.13 |  | upper bound of that interval | `events.property_interval_values` |  |
+| `\EventsMultimodalDifferenceLow` | +0.013 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median multimodal fraction of the posterior | `events.property_interval_values` |  |
+| `\EventsMultimodalMatchedDifference` | +0.072 |  | SWR minus non-SWR difference of median multimodal fraction of the posterior at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
+| `\EventsMultimodalMatchedDifferenceHigh` | +0.12 |  | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` |  |
+| `\EventsMultimodalMatchedDifferenceLow` | +0.0050 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
+| `\EventsMultimodalMedianNonSwr` | 0.03 |  | median multimodal fraction of the posterior of immobile non-SWR non-local events | `events.property_values` |  |
+| `\EventsMultimodalMedianSwr` | 0.11 |  | median multimodal fraction of the posterior of immobile SWR-overlapping non-local events | `events.property_values` |  |
+| `\EventsPeakAnimalsInDirection` | 4 |  | animals whose non-SWR median posterior peak (mean over the event) is higher than their SWR median | `events.property_values` |  |
+| `\EventsPeakDifferenceHigh` | +0.0095 |  | upper bound of that interval | `events.property_interval_values` |  |
+| `\EventsPeakDifferenceLow` | −0.12 |  | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median posterior peak (mean over the event) | `events.property_interval_values` |  |
+| `\EventsPeakMatchedDifference` | −0.091 |  | SWR minus non-SWR difference of median posterior peak (mean over the event) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` |  |
+| `\EventsPeakMatchedDifferenceHigh` | −0.032 |  | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` |  |
+| `\EventsPeakMatchedDifferenceLow` | −0.13 |  | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` |  |
+| `\EventsPeakMedianNonSwr` | 0.90 |  | median posterior peak (mean over the event) of immobile non-SWR non-local events | `events.property_values` |  |
+| `\EventsPeakMedianSwr` | 0.82 |  | median posterior peak (mean over the event) of immobile SWR-overlapping non-local events | `events.property_values` |  |
+| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2d.6. How does event duration differ between SWR and non-SWR events?
 
@@ -850,18 +847,18 @@ Status: computed. Values: 6.
 
 Sources:
 
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/replay_content/event_table.parquet (canonical event table) and /cumulus/edeno/continuum-swr-replay/Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
-- /cumulus/edeno/continuum-swr-replay/Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
+- Processed-Data/event_property_bootstrap (scripts/detection/bootstrap_event_properties.py)
+- Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)
+- Processed-Data/ripple_class_structure (scripts/detection/measure_ripple_class_structure.py: the event table, event features run 30cf1cc432e9, the decode frames and the spike-evidence run)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\EventsDurationAnimalsInDirection` | 5 |  | animals whose non-SWR median event duration is lower than their SWR median | supplement |
-| `\EventsDurationDifferenceHigh` | +54 | ms | upper bound of that interval | supplement |
-| `\EventsDurationDifferenceLow` | +38 | ms | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration | supplement |
-| `\EventsDurationMedianNonSwr` | 48 | ms | median event duration of immobile non-SWR non-local events | supplement |
-| `\EventsDurationMedianSwr` | 94 | ms | median event duration of immobile SWR-overlapping non-local events | supplement |
-| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\EventsDurationAnimalsInDirection` | 5 |  | animals whose non-SWR median event duration is lower than their SWR median | `events.property_values` |  |
+| `\EventsDurationDifferenceHigh` | +54 | ms | upper bound of that interval | `events.property_interval_values` |  |
+| `\EventsDurationDifferenceLow` | +38 | ms | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median event duration | `events.property_interval_values` |  |
+| `\EventsDurationMedianNonSwr` | 48 | ms | median event duration of immobile non-SWR non-local events | `events.property_values` |  |
+| `\EventsDurationMedianSwr` | 94 | ms | median event duration of immobile SWR-overlapping non-local events | `events.property_values` |  |
+| `\EventsStepOtherPropertiesCriterionAnimalsMax` | 1 |  | the most animals with a step at the threshold in any property but spike evidence (duration, spatial extent, replay speed, posterior peak, HPD coverage, spike count, arms visited): the term's interval excludes 0 and it lowers the held-out error; attained by spatial extent, spike count | `events.class_step_values` |  |
 
 ### 2d.7. Are non-SWR events a different kind of event, with a different function?
 
@@ -885,252 +882,252 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_omitted.pkl (audited aggregate)
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_rewarded.pkl (audited aggregate)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorBaseCurrentAll` | +0.73 | log weight | C2_base is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBaseCurrentAllAnimalsPositive` | 5 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBaseCurrentAllQ` | 3.8e-34 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBaseCurrentAllSessions` | 242 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBaseCurrentNoControlsAll` | +0.78 | log weight | C1_current is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBaseCurrentNoControlsAllAnimalsPositive` | 5 |  | C1_current is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBaseCurrentNoControlsAllQ` | 9.2e-37 |  | C1_current is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBaseCurrentNoControlsAllSessions` | 242 |  | C1_current is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBaseCurrentNoControlsNonSwr` | +0.64 | log weight | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBaseCurrentNoControlsNonSwrAnimalsPositive` | 5 |  | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBaseCurrentNoControlsNonSwrQ` | 4.1e-35 |  | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBaseCurrentNoControlsNonSwrSessions` | 241 |  | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBaseCurrentNoControlsSwr` | +0.84 | log weight | C1_current is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBaseCurrentNoControlsSwrAnimalsPositive` | 5 |  | C1_current is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBaseCurrentNoControlsSwrQ` | 4.1e-34 |  | C1_current is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBaseCurrentNoControlsSwrSessions` | 242 |  | C1_current is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBaseCurrentNonSwr` | +0.53 | log weight | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBaseCurrentNonSwrAnimalsPositive` | 5 |  | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBaseCurrentNonSwrQ` | 1.9e-27 |  | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBaseCurrentNonSwrSessions` | 239 |  | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBaseCurrentSwr` | +0.88 | log weight | C2_base is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBaseCurrentSwrAnimalsPositive` | 4 |  | C2_base is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBaseCurrentSwrQ` | 6.1e-30 |  | C2_base is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBaseCurrentSwrSessions` | 241 |  | C2_base is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBlockCurrentAll` | −0.097 | log weight | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBlockCurrentAllAnimalsPositive` | 0 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBlockCurrentAllQ` | 2.8e-9 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBlockCurrentAllSessions` | 242 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBlockCurrentNonSwr` | −0.012 | log weight | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBlockCurrentNonSwrAnimalsPositive` | 2 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBlockCurrentNonSwrQ` | 0.051 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBlockCurrentNonSwrSessions` | 238 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorBlockCurrentSwr` | −0.15 | log weight | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorBlockCurrentSwrAnimalsPositive` | 0 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorBlockCurrentSwrQ` | 9.7e-9 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorBlockCurrentSwrSessions` | 239 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorCurrentArmPairedDifference` | +0.088 | log weight | SWR minus non-SWR is_current_arm (C2_base, fitted separately), the difference taken within each session, median over the session differences per animal, then over the 5 animals (238 sessions with both fits kept) | paper |
-| `\BehaviorCurrentArmPairedDifferenceAnimalsPositive` | 3 |  | animals whose median within-session difference is positive | paper |
-| `\BehaviorDmBreadth` | +1.7 | log weight | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmBreadthAnimalsPositive` | 5 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmBreadthLengthAdjusted` | +1.4 | log weight | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmBreadthLengthAdjustedAnimalsPositive` | 5 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmBreadthLengthAdjustedPositiveFraction` | 100 % |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): share of sessions with a positive coefficient | supplement |
-| `\BehaviorDmBreadthLengthAdjustedQ` | 2.6e-41 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmBreadthLengthAdjustedRatio` | 3.9 | ratio | the same with the length-dependent concentration | supplement |
-| `\BehaviorDmBreadthLengthAdjustedSessions` | 242 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmBreadthLengthShare` | 21 % |  | share of the concentration contrast that the length term absorbs: 1 - adjusted / total | supplement |
-| `\BehaviorDmBreadthLengthTerm` | +0.55 | log weight | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmBreadthLengthTermAnimalsPositive` | 5 |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmBreadthLengthTermPositiveFraction` | 100 % |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): share of sessions with a positive coefficient | supplement |
-| `\BehaviorDmBreadthLengthTermQ` | 2.6e-41 |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmBreadthLengthTermSessions` | 242 |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmBreadthPositiveFraction` | 100 % |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): share of sessions with a positive coefficient | supplement |
-| `\BehaviorDmBreadthQ` | 2.4e-41 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmBreadthRatio` | 5.6 | ratio | exp of the concentration contrast log_phi_is_swr on C2_base: an SWR event's Dirichlet concentration over a non-SWR event's | supplement |
-| `\BehaviorDmBreadthSessions` | 242 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorEntropyCurrentAll` | −0.040 | log weight | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorEntropyCurrentAllAnimalsPositive` | 2 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorEntropyCurrentAllQ` | 0.60 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorEntropyCurrentAllSessions` | 242 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorEntropyCurrentNonSwr` | +0.031 | log weight | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorEntropyCurrentNonSwrAnimalsPositive` | 3 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorEntropyCurrentNonSwrQ` | 0.74 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorEntropyCurrentNonSwrSessions` | 238 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorEntropyCurrentSwr` | −0.14 | log weight | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorEntropyCurrentSwrAnimalsPositive` | 0 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorEntropyCurrentSwrQ` | 0.023 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorEntropyCurrentSwrSessions` | 239 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorEstArmvalueCount` | −0.038 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountAnimalsPositive` | 2 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountHigh` | +0.71 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountLow` | −0.21 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDm` | +0.028 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmHigh` | +0.99 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmLow` | −0.29 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFraction` | +0.067 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionHigh` | +0.94 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionLow` | −0.26 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicCount` | −64 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicDm` | +2.1 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicFraction` | +2.4 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstBreadthDmHigh` | +2.1 | log concentration | C2_base log_phi_is_swr, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstBreadthDmLow` | +1.5 | log concentration | C2_base log_phi_is_swr, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCount` | +0.67 | log weight | C2_base is_current_arm, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountLow` | +0.36 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDm` | +0.73 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmAnimalsPositive` | 5 |  | C2_base is_current_arm, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmHigh` | +1.2 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmLow` | +0.26 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmSessions` | 242 |  | C2_base is_current_arm, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFraction` | +0.73 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionLow` | +0.25 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCount` | −0.0097 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountHigh` | +0.33 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountLow` | −0.56 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDm` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmHigh` | +0.25 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmLow` | −0.24 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFraction` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionHigh` | +0.61 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionLow` | −0.41 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCount` | +0.13 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountHigh` | +0.39 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountLow` | −0.69 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDm` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFraction` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCount` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountHigh` | +0.71 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountLow` | −0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDm` | +0.20 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmHigh` | +0.56 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmLow` | −0.26 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmSessions` | 241 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFraction` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionHigh` | +0.78 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionLow` | −0.27 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEventBinsMedian` | 32 | bins | median non-local bins per event, all events (event table) | supplement |
-| `\BehaviorEventBinsMedianNonSwr` | 24 | bins | median non-local bins of non-SWR events (event table) | supplement |
-| `\BehaviorEventBinsMedianSwr` | 47 | bins | median non-local bins of SWR-overlapping events (event table) | supplement |
-| `\BehaviorEventBinsRatio` | 2.0 | ratio | ratio of those medians | supplement |
-| `\BehaviorPatchCurrent` | +1.1 | log weight | CP0_base is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorPatchCurrentAnimalsPositive` | 5 |  | CP0_base is_current_patch (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorPatchCurrentQ` | 4.4e-38 |  | CP0_base is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorPatchCurrentSessions` | 230 |  | CP0_base is_current_patch (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorPeriswitchCurrentAll` | +0.22 | log weight | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorPeriswitchCurrentAllAnimalsPositive` | 5 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorPeriswitchCurrentAllQ` | 8.4e-4 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorPeriswitchCurrentAllSessions` | 221 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorPeriswitchCurrentNonSwr` | +0.11 | log weight | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorPeriswitchCurrentNonSwrAnimalsPositive` | 3 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorPeriswitchCurrentNonSwrQ` | 0.60 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorPeriswitchCurrentNonSwrSessions` | 189 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorPeriswitchCurrentSwr` | +0.23 | log weight | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorPeriswitchCurrentSwrAnimalsPositive` | 5 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorPeriswitchCurrentSwrQ` | 3.3e-4 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorPeriswitchCurrentSwrSessions` | 191 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorRelativeValueCurrentAll` | +0.096 | log weight | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorRelativeValueCurrentAllAnimalsPositive` | 4 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorRelativeValueCurrentAllQ` | 4.1e-7 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorRelativeValueCurrentAllSessions` | 242 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorRelativeValueCurrentNonSwr` | +0.054 | log weight | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorRelativeValueCurrentNonSwrAnimalsPositive` | 4 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorRelativeValueCurrentNonSwrQ` | 0.051 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorRelativeValueCurrentNonSwrSessions` | 239 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorRelativeValueCurrentSwr` | +0.14 | log weight | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorRelativeValueCurrentSwrAnimalsPositive` | 5 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorRelativeValueCurrentSwrQ` | 2.1e-7 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorRelativeValueCurrentSwrSessions` | 241 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorRpeCurrentAll` | −0.12 | log weight | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorRpeCurrentAllAnimalsPositive` | 0 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorRpeCurrentAllQ` | 1.1e-7 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorRpeCurrentAllSessions` | 242 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorRpeCurrentNonSwr` | −0.16 | log weight | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorRpeCurrentNonSwrAnimalsPositive` | 0 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorRpeCurrentNonSwrQ` | 7.8e-7 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorRpeCurrentNonSwrSessions` | 239 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorRpeCurrentSwr` | −0.019 | log weight | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorRpeCurrentSwrAnimalsPositive` | 2 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorRpeCurrentSwrQ` | 0.89 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorRpeCurrentSwrSessions` | 240 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrCurrentDirect` | +0.19 | log weight | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrCurrentDirectAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrCurrentDirectOmitted` | +0.044 | log weight | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrCurrentDirectOmittedAnimals` | 4 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): animals contributing | supplement |
-| `\BehaviorSwrCurrentDirectOmittedAnimalsPositive` | 2 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): animals with a positive median | supplement |
-| `\BehaviorSwrCurrentDirectOmittedQ` | 0.93 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrCurrentDirectOmittedSessions` | 14 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrCurrentDirectQ` | 5.2e-7 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrCurrentDirectRewarded` | +0.27 | log weight | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrCurrentDirectRewardedAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): animals with a positive median | supplement |
-| `\BehaviorSwrCurrentDirectRewardedQ` | 1.3e-8 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrCurrentDirectRewardedSessions` | 241 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrCurrentDirectSessions` | 241 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrCurrentTotal` | +0.026 | log weight | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrCurrentTotalAnimalsPositive` | 3 |  | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrCurrentTotalQ` | 0.39 |  | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrCurrentTotalSessions` | 241 |  | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrPatchCurrentDirect` | +0.015 | log weight | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrPatchCurrentDirectAnimalsPositive` | 3 |  | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrPatchCurrentDirectQ` | 0.0016 |  | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrPatchCurrentDirectSessions` | 236 |  | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrPatchCurrentTotal` | −0.21 | log weight | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrPatchCurrentTotalAnimalsPositive` | 1 |  | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrPatchCurrentTotalQ` | 1.2e-6 |  | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrPatchCurrentTotalSessions` | 239 |  | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrPrevDirect` | −0.13 | log weight | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrPrevDirectAnimalsPositive` | 1 |  | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrPrevDirectQ` | 0.0082 |  | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrPrevDirectSessions` | 239 |  | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorTrunkCurrentPatchFractionNonSwr` | 45 % |  | non-SWR events: the current patch's trunk as a share of all trunk content (1/3 if the three trunks shared it evenly), median over animals | paper |
-| `\BehaviorTrunkCurrentPatchFractionSwr` | 41 % |  | SWR events: the current patch's trunk as a share of all trunk content (1/3 if the three trunks shared it evenly), median over animals | paper |
-| `\BehaviorTrunkShareAnimalsSwrHigher` | 5 |  | animals whose SWR share on all three trunks is above their non-SWR share | paper |
-| `\BehaviorTrunkShareCurrentPatchAnimalsSwrHigher` | 5 |  | animals whose SWR share on the trunk of the current arm's patch is above their non-SWR share | paper |
-| `\BehaviorTrunkShareCurrentPatchNonSwr` | 8 % |  | non-SWR events: mean share of an event's content on the trunk of the current arm's patch, median over animals | paper |
-| `\BehaviorTrunkShareCurrentPatchSwr` | 14 % |  | SWR events: mean share of an event's content on the trunk of the current arm's patch, median over the 5 animals (at-well events) | paper |
-| `\BehaviorTrunkShareNonSwr` | 19 % |  | non-SWR events: mean share of an event's content on all three trunks, median over animals | paper |
-| `\BehaviorTrunkShareOtherPatchesAnimalsSwrHigher` | 5 |  | animals whose SWR share on the other two trunks is above their non-SWR share | paper |
-| `\BehaviorTrunkShareOtherPatchesNonSwr` | 10 % |  | non-SWR events: mean share of an event's content on the other two trunks, median over animals | paper |
-| `\BehaviorTrunkShareOtherPatchesSwr` | 21 % |  | SWR events: mean share of an event's content on the other two trunks, median over the 5 animals (at-well events) | paper |
-| `\BehaviorTrunkShareSwr` | 38 % |  | SWR events: mean share of an event's content on all three trunks, median over the 5 animals (at-well events) | paper |
-| `\BehaviorUpdateCurrentAll` | +0.24 | log weight | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorUpdateCurrentAllAnimalsPositive` | 5 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorUpdateCurrentAllQ` | 3.3e-18 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorUpdateCurrentAllSessions` | 242 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorUpdateCurrentNonSwr` | +0.14 | log weight | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorUpdateCurrentNonSwrAnimalsPositive` | 4 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorUpdateCurrentNonSwrQ` | 4.6e-5 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorUpdateCurrentNonSwrSessions` | 237 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorUpdateCurrentSwr` | +0.22 | log weight | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorUpdateCurrentSwrAnimalsPositive` | 5 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorUpdateCurrentSwrQ` | 1.3e-19 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorUpdateCurrentSwrSessions` | 241 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorBaseCurrentAll` | +0.73 | log weight | C2_base is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentAllAnimalsPositive` | 5 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentAllQ` | 3.8e-34 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentAllSessions` | 242 |  | C2_base is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsAll` | +0.78 | log weight | C1_current is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsAllAnimalsPositive` | 5 |  | C1_current is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsAllQ` | 9.2e-37 |  | C1_current is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsAllSessions` | 242 |  | C1_current is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsNonSwr` | +0.64 | log weight | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsNonSwrAnimalsPositive` | 5 |  | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsNonSwrQ` | 4.1e-35 |  | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsNonSwrSessions` | 241 |  | C1_current is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsSwr` | +0.84 | log weight | C1_current is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsSwrAnimalsPositive` | 5 |  | C1_current is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsSwrQ` | 4.1e-34 |  | C1_current is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNoControlsSwrSessions` | 242 |  | C1_current is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNonSwr` | +0.53 | log weight | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNonSwrAnimalsPositive` | 5 |  | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNonSwrQ` | 1.9e-27 |  | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentNonSwrSessions` | 239 |  | C2_base is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentSwr` | +0.88 | log weight | C2_base is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentSwrAnimalsPositive` | 4 |  | C2_base is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentSwrQ` | 6.1e-30 |  | C2_base is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBaseCurrentSwrSessions` | 241 |  | C2_base is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentAll` | −0.097 | log weight | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentAllAnimalsPositive` | 0 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentAllQ` | 2.8e-9 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentAllSessions` | 242 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentNonSwr` | −0.012 | log weight | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentNonSwrAnimalsPositive` | 2 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentNonSwrQ` | 0.051 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentNonSwrSessions` | 238 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentSwr` | −0.15 | log weight | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentSwrAnimalsPositive` | 0 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentSwrQ` | 9.7e-9 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorBlockCurrentSwrSessions` | 239 |  | C11_block trials_since_block_change_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorCurrentArmPairedDifference` | +0.088 | log weight | SWR minus non-SWR is_current_arm (C2_base, fitted separately), the difference taken within each session, median over the session differences per animal, then over the 5 animals (238 sessions with both fits kept) | `behavior.current_arm_paired_values` |  |
+| `\BehaviorCurrentArmPairedDifferenceAnimalsPositive` | 3 |  | animals whose median within-session difference is positive | `behavior.current_arm_paired_values` |  |
+| `\BehaviorDmBreadth` | +1.7 | log weight | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthAnimalsPositive` | 5 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthAdjusted` | +1.4 | log weight | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthAdjustedAnimalsPositive` | 5 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthAdjustedPositiveFraction` | 100 % |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): share of sessions with a positive coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthAdjustedQ` | 2.6e-41 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthAdjustedRatio` | 3.9 | ratio | the same with the length-dependent concentration | `behavior.breadth_derived_values` |  |
+| `\BehaviorDmBreadthLengthAdjustedSessions` | 242 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthShare` | 21 % |  | share of the concentration contrast that the length term absorbs: 1 - adjusted / total | `behavior.breadth_derived_values` |  |
+| `\BehaviorDmBreadthLengthTerm` | +0.55 | log weight | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthTermAnimalsPositive` | 5 |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthTermPositiveFraction` | 100 % |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): share of sessions with a positive coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthTermQ` | 2.6e-41 |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthLengthTermSessions` | 242 |  | C2_base log_phi_log_n_nonlocal_bins_z (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthPositiveFraction` | 100 % |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): share of sessions with a positive coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthQ` | 2.4e-41 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmBreadthRatio` | 5.6 | ratio | exp of the concentration contrast log_phi_is_swr on C2_base: an SWR event's Dirichlet concentration over a non-SWR event's | `behavior.breadth_derived_values` |  |
+| `\BehaviorDmBreadthSessions` | 242 |  | C2_base log_phi_is_swr (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentAll` | −0.040 | log weight | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentAllAnimalsPositive` | 2 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentAllQ` | 0.60 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentAllSessions` | 242 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentNonSwr` | +0.031 | log weight | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentNonSwrAnimalsPositive` | 3 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentNonSwrQ` | 0.74 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentNonSwrSessions` | 238 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentSwr` | −0.14 | log weight | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentSwrAnimalsPositive` | 0 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentSwrQ` | 0.023 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorEntropyCurrentSwrSessions` | 239 |  | C8_uncert reward_belief_differential_entropy_leaf_mean_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorEstArmvalueCount` | −0.038 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountAnimalsPositive` | 2 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountHigh` | +0.71 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountLow` | −0.21 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDm` | +0.028 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmHigh` | +0.99 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmLow` | −0.29 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFraction` | +0.067 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionHigh` | +0.94 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionLow` | −0.26 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicCount` | −64 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicDm` | +2.1 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicFraction` | +2.4 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstBreadthDmHigh` | +2.1 | log concentration | C2_base log_phi_is_swr, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstBreadthDmLow` | +1.5 | log concentration | C2_base log_phi_is_swr, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCount` | +0.67 | log weight | C2_base is_current_arm, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountLow` | +0.36 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDm` | +0.73 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmAnimalsPositive` | 5 |  | C2_base is_current_arm, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmHigh` | +1.2 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmLow` | +0.26 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmSessions` | 242 |  | C2_base is_current_arm, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFraction` | +0.73 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionLow` | +0.25 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCount` | −0.0097 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountHigh` | +0.33 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountLow` | −0.56 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDm` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmHigh` | +0.25 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmLow` | −0.24 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFraction` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionHigh` | +0.61 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionLow` | −0.41 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCount` | +0.13 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountHigh` | +0.39 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountLow` | −0.69 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDm` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFraction` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCount` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountHigh` | +0.71 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountLow` | −0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDm` | +0.20 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmHigh` | +0.56 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmLow` | −0.26 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmSessions` | 241 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFraction` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionHigh` | +0.78 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionLow` | −0.27 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEventBinsMedian` | 32 | bins | median non-local bins per event, all events (event table) | `behavior.breadth_derived_values` |  |
+| `\BehaviorEventBinsMedianNonSwr` | 24 | bins | median non-local bins of non-SWR events (event table) | `behavior.breadth_derived_values` |  |
+| `\BehaviorEventBinsMedianSwr` | 47 | bins | median non-local bins of SWR-overlapping events (event table) | `behavior.breadth_derived_values` |  |
+| `\BehaviorEventBinsRatio` | 2.0 | ratio | ratio of those medians | `behavior.breadth_derived_values` |  |
+| `\BehaviorPatchCurrent` | +1.1 | log weight | CP0_base is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorPatchCurrentAnimalsPositive` | 5 |  | CP0_base is_current_patch (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorPatchCurrentQ` | 4.4e-38 |  | CP0_base is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorPatchCurrentSessions` | 230 |  | CP0_base is_current_patch (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentAll` | +0.22 | log weight | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentAllAnimalsPositive` | 5 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentAllQ` | 8.4e-4 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentAllSessions` | 221 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentNonSwr` | +0.11 | log weight | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentNonSwrAnimalsPositive` | 3 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentNonSwrQ` | 0.60 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentNonSwrSessions` | 189 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentSwr` | +0.23 | log weight | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentSwrAnimalsPositive` | 5 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentSwrQ` | 3.3e-4 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorPeriswitchCurrentSwrSessions` | 191 |  | C10_periswitch periswitch_index_trials_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentAll` | +0.096 | log weight | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentAllAnimalsPositive` | 4 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentAllQ` | 4.1e-7 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentAllSessions` | 242 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentNonSwr` | +0.054 | log weight | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentNonSwrAnimalsPositive` | 4 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentNonSwrQ` | 0.051 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentNonSwrSessions` | 239 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentSwr` | +0.14 | log weight | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentSwrAnimalsPositive` | 5 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentSwrQ` | 2.1e-7 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorRelativeValueCurrentSwrSessions` | 241 |  | C7_value relative_value_switch_minus_stay_preoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentAll` | −0.12 | log weight | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentAllAnimalsPositive` | 0 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentAllQ` | 1.1e-7 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentAllSessions` | 242 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentNonSwr` | −0.16 | log weight | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentNonSwrAnimalsPositive` | 0 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentNonSwrQ` | 7.8e-7 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentNonSwrSessions` | 239 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentSwr` | −0.019 | log weight | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentSwrAnimalsPositive` | 2 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentSwrQ` | 0.89 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorRpeCurrentSwrSessions` | 240 |  | C6_rpe rpe_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirect` | +0.19 | log weight | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectOmitted` | +0.044 | log weight | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectOmittedAnimals` | 4 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): animals contributing | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectOmittedAnimalsPositive` | 2 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectOmittedQ` | 0.93 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectOmittedSessions` | 14 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum omitted): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectQ` | 5.2e-7 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectRewarded` | +0.27 | log weight | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectRewardedAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectRewardedQ` | 1.3e-8 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectRewardedSessions` | 241 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum rewarded): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentDirectSessions` | 241 |  | CS1_current swr_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentTotal` | +0.026 | log weight | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentTotalAnimalsPositive` | 3 |  | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentTotalQ` | 0.39 |  | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrCurrentTotalSessions` | 241 |  | CS1nt_current swr_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentDirect` | +0.015 | log weight | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentDirectAnimalsPositive` | 3 |  | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentDirectQ` | 0.0016 |  | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentDirectSessions` | 236 |  | CPS1_current swr_x_is_current_patch (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentTotal` | −0.21 | log weight | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentTotalAnimalsPositive` | 1 |  | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentTotalQ` | 1.2e-6 |  | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPatchCurrentTotalSessions` | 239 |  | CPS1nt_current swr_x_is_current_patch (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevDirect` | −0.13 | log weight | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevDirectAnimalsPositive` | 1 |  | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevDirectQ` | 0.0082 |  | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevDirectSessions` | 239 |  | CS2_prev swr_x_is_prev_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorTrunkCurrentPatchFractionNonSwr` | 45 % |  | non-SWR events: the current patch's trunk as a share of all trunk content (1/3 if the three trunks shared it evenly), median over animals | `behavior.trunk_values` |  |
+| `\BehaviorTrunkCurrentPatchFractionSwr` | 41 % |  | SWR events: the current patch's trunk as a share of all trunk content (1/3 if the three trunks shared it evenly), median over animals | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareAnimalsSwrHigher` | 5 |  | animals whose SWR share on all three trunks is above their non-SWR share | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareCurrentPatchAnimalsSwrHigher` | 5 |  | animals whose SWR share on the trunk of the current arm's patch is above their non-SWR share | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareCurrentPatchNonSwr` | 8 % |  | non-SWR events: mean share of an event's content on the trunk of the current arm's patch, median over animals | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareCurrentPatchSwr` | 14 % |  | SWR events: mean share of an event's content on the trunk of the current arm's patch, median over the 5 animals (at-well events) | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareNonSwr` | 19 % |  | non-SWR events: mean share of an event's content on all three trunks, median over animals | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareOtherPatchesAnimalsSwrHigher` | 5 |  | animals whose SWR share on the other two trunks is above their non-SWR share | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareOtherPatchesNonSwr` | 10 % |  | non-SWR events: mean share of an event's content on the other two trunks, median over animals | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareOtherPatchesSwr` | 21 % |  | SWR events: mean share of an event's content on the other two trunks, median over the 5 animals (at-well events) | `behavior.trunk_values` |  |
+| `\BehaviorTrunkShareSwr` | 38 % |  | SWR events: mean share of an event's content on all three trunks, median over the 5 animals (at-well events) | `behavior.trunk_values` |  |
+| `\BehaviorUpdateCurrentAll` | +0.24 | log weight | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentAllAnimalsPositive` | 5 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentAllQ` | 3.3e-18 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentAllSessions` | 242 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentNonSwr` | +0.14 | log weight | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentNonSwrAnimalsPositive` | 4 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentNonSwrQ` | 4.6e-5 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentNonSwrSessions` | 237 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentSwr` | +0.22 | log weight | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentSwrAnimalsPositive` | 5 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentSwrQ` | 1.3e-19 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorUpdateCurrentSwrSessions` | 241 |  | C9_update reward_belief_mean_update_l1_all_ports_postoutcome_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
 
 ### 3.2. Is non-SWR content selective for recently rewarded arms (realized reward fraction)?
 
@@ -1141,44 +1138,44 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited.pkl (audited aggregate)
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl (audited aggregate)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorArmrewardAll` | −0.082 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmrewardAllAnimalsPositive` | 2 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmrewardAllQ` | 0.34 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmrewardAllSessions` | 242 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmrewardNonSwr` | +0.027 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmrewardNonSwrAnimalsPositive` | 3 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmrewardNonSwrQ` | 0.35 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmrewardNonSwrSessions` | 239 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmrewardSwr` | −0.26 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmrewardSwrAnimalsPositive` | 0 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmrewardSwrQ` | 3.3e-4 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmrewardSwrSessions` | 241 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmvalueAll` | +0.078 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmvalueAllAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmvalueAllQ` | 0.13 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmvalueAllSessions` | 242 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmvalueNonSwr` | +0.041 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmvalueNonSwrAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmvalueNonSwrQ` | 0.053 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmvalueNonSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmvalueSwr` | −0.11 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmvalueSwrAnimalsPositive` | 2 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmvalueSwrQ` | 0.62 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmvalueSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmSwrArmrewardDirect` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrArmrewardDirectQ` | 0.97 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrArmrewardDirectSessions` | 242 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmrewardDirect` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmrewardDirectQ` | 0.72 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmrewardDirectSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmrewardTotal` | −0.39 | log weight | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmrewardTotalAnimalsPositive` | 1 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmrewardTotalQ` | 3.3e-4 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmrewardTotalSessions` | 241 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorArmrewardAll` | −0.082 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardAllAnimalsPositive` | 2 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardAllQ` | 0.34 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardAllSessions` | 242 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardNonSwr` | +0.027 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardNonSwrAnimalsPositive` | 3 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardNonSwrQ` | 0.35 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardNonSwrSessions` | 239 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardSwr` | −0.26 | log weight | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardSwrAnimalsPositive` | 0 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardSwrQ` | 3.3e-4 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmrewardSwrSessions` | 241 |  | C3_armreward reward_fraction_candidate_arm_last10_visits (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAll` | +0.078 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAllAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAllQ` | 0.13 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAllSessions` | 242 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwr` | +0.041 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwrAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwrQ` | 0.053 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwr` | −0.11 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwrAnimalsPositive` | 2 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwrQ` | 0.62 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirect` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirectQ` | 0.97 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirectSessions` | 242 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirect` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirectQ` | 0.72 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirectSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotal` | −0.39 | log weight | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotalAnimalsPositive` | 1 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotalQ` | 3.3e-4 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotalSessions` | 241 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
 
 ### 3.3. How does the reward-history kernel of event occurrence (lag 1 and the slower lags) compare between SWR-coupled and non-SWR events?
 
@@ -1198,476 +1195,476 @@ Sources:
 - Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet
 - Processed-Data/replay_content/stop_table.parquet and Processed-Data/replay_content/event_onset_table.parquet
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorHistoryCrossEndAnimalsNonSwrFromSwr` | 5 |  | non-SWR rate after SWR-coupled events: animals whose rate ratio at 45 ms has its 95 % interval (posterior mode +- 1.96 posterior SD) above 1, over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets | paper |
-| `\BehaviorHistoryCrossEndAnimalsSwrFromNonSwr` | 5 |  | SWR-coupled rate after non-SWR events: animals whose rate ratio at 45 ms has its 95 % interval (posterior mode +- 1.96 posterior SD) above 1, over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets | paper |
-| `\BehaviorHistoryCrossEndRrNonSwrFromSwr` | 1.92 | rate ratio | non-SWR rate after SWR-coupled events: rate ratio 45 ms after the other stream's event ended (end-locked cross block of Mselfcross_long_dur, 1 s cross window, at-risk design, ridge prior on the history terms with its strength chosen by cross-validation), median over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets; the prior shrinks it toward 1; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryCrossEndRrSwrFromNonSwr` | 3.07 | rate ratio | SWR-coupled rate after non-SWR events: rate ratio 45 ms after the other stream's event ended (end-locked cross block of Mselfcross_long_dur, 1 s cross window, at-risk design, ridge prior on the history terms with its strength chosen by cross-validation), median over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets; the prior shrinks it toward 1; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryCrossHeldoutAnimalsPositiveNonSwrFromSwr` | 5 |  | non-SWR rate after SWR-coupled events: animals, of 5, whose held-out cross gain is positive | paper |
-| `\BehaviorHistoryCrossHeldoutAnimalsPositiveSwrFromNonSwr` | 5 |  | SWR-coupled rate after non-SWR events: animals, of 5, whose held-out cross gain is positive | paper |
-| `\BehaviorHistoryCrossHeldoutGainNonSwrFromSwr` | +0.014 | nats per event | non-SWR rate after SWR-coupled events: median over the 5 animals of the held-out log-likelihood gain per held-out event of Mselfcross_long_dur over Mself_long_dur (five folds of whole stops, each rung's ridge strength chosen by inner cross-validation); positive = the cross block predicts new data | paper |
-| `\BehaviorHistoryCrossHeldoutGainSwrFromNonSwr` | +0.015 | nats per event | SWR-coupled rate after non-SWR events: median over the 5 animals of the held-out log-likelihood gain per held-out event of Mselfcross_long_dur over Mself_long_dur (five folds of whole stops, each rung's ridge strength chosen by inner cross-validation); positive = the cross block predicts new data | paper |
-| `\BehaviorHistoryEndFirstLagRaisedFits` | 15 |  | animal x population fits whose rate 15 ms after the previous event's end is above 1 with its 95 % CI, of the history_fits fits where that lag is measurable | paper |
-| `\BehaviorHistoryEndFirstLagRrHigh` | 4.53 | rate ratio | highest over the four populations of that median rate ratio 15 ms after the previous event's end (19 of 20 fits measurable) | paper |
-| `\BehaviorHistoryEndFirstLagRrLow` | 1.68 | rate ratio | lowest over the four populations of the median (over animals) rate ratio 15 ms after the previous event's end (end-locked part of Mself_dur, at-risk design), over the 19 of 20 animal x population fits whose 15 ms lag is measurable; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryEndFirstLagSuppressedFits` | 0 |  | animal x population fits whose rate 15 ms after the previous event's end is below 1 with its 95 % CI (suppression after the end), of the history_fits fits where that lag is measurable | paper |
-| `\BehaviorHistoryEndPeakAnimalsMin` | 5 |  | fewest, over the populations, animals whose end-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | paper |
-| `\BehaviorHistoryEndPeakHigh` | 4.53 | rate ratio | highest over the four populations of that end-locked peak | paper |
-| `\BehaviorHistoryEndPeakLagMsHigh` | 45 | ms | longest over the populations of the median end-locked peak lag | paper |
-| `\BehaviorHistoryEndPeakLagMsLow` | 15 | ms | shortest over the populations of the median end-locked peak lag | paper |
-| `\BehaviorHistoryEndPeakLow` | 2.63 | rate ratio | lowest over the four populations of the median (over animals) peak rate ratio of the end-locked self-history (Mself_dur, at-risk design, measurable lags); pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryFits` | 19 |  | animal x population pooled fits (20 converged) whose 15 ms end-locked lag is measurable: the denominator of the raised and suppressed counts | paper |
-| `\BehaviorHistoryOnsetAnimalsNonLocal` | 4 |  | non-local (all): animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | paper |
-| `\BehaviorHistoryOnsetAnimalsNonLocalNoSwr` | 2 |  | non-local without SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | paper |
-| `\BehaviorHistoryOnsetAnimalsNonLocalSwr` | 4 |  | non-local with SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | paper |
-| `\BehaviorHistoryOnsetAnimalsSwr` | 5 |  | detected SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | paper |
-| `\BehaviorHistoryOnsetPeakLagMsNonLocal` | 120 | ms | non-local (all): median over animals of that onset-locked peak's lag | paper |
-| `\BehaviorHistoryOnsetPeakLagMsNonLocalNoSwr` | 150 | ms | non-local without SWR: median over animals of that onset-locked peak's lag | paper |
-| `\BehaviorHistoryOnsetPeakLagMsNonLocalSwr` | 105 | ms | non-local with SWR: median over animals of that onset-locked peak's lag | paper |
-| `\BehaviorHistoryOnsetPeakLagMsSwr` | 90 | ms | detected SWR: median over animals of that onset-locked peak's lag | paper |
-| `\BehaviorHistoryOnsetPeakNonLocal` | 1.59 | rate ratio | non-local (all): onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryOnsetPeakNonLocalNoSwr` | 1.34 | rate ratio | non-local without SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryOnsetPeakNonLocalSwr` | 1.83 | rate ratio | non-local with SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorHistoryOnsetPeakSwr` | 2.28 | rate ratio | detected SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | paper |
-| `\BehaviorOnsetMedianSNonLocal` | 2.4 | s | median time of a non-local onset after its stop's speed-threshold crossing | supplement |
-| `\BehaviorOnsetsRewardHistoryIncompleteFractionNonLocal` | 0.015 |  | share of non-local onsets in those stops | supplement |
-| `\BehaviorOnsetsWithinTmaxFractionMua` | 79 % |  | share of MUA onsets within the first 4 s of their stop (event_onset_table) | supplement |
-| `\BehaviorOnsetsWithinTmaxFractionNonLocal` | 79 % |  | share of non_local onsets within the first 4 s of their stop (event_onset_table) | supplement |
-| `\BehaviorOnsetsWithinTmaxFractionSwr` | 80 % |  | share of SWR onsets within the first 4 s of their stop (event_onset_table) | supplement |
-| `\BehaviorPerStopAnimalsChildBetterNonLocal` | 5 |  | non-local (all): animals whose median step is negative | supplement |
-| `\BehaviorPerStopAnimalsChildBetterNonLocalNoSwr` | 2 |  | non-local without SWR: animals whose median step is negative | supplement |
-| `\BehaviorPerStopAnimalsChildBetterNonLocalSwr` | 4 |  | non-local with SWR: animals whose median step is negative | supplement |
-| `\BehaviorPerStopAnimalsChildBetterSwr` | 4 |  | detected SWR: animals whose median step is negative | supplement |
-| `\BehaviorPerStopAuditStopsCommonDrop` | 0 |  | all_models_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock) | supplement |
-| `\BehaviorPerStopAuditStopsFull` | 93,215 |  | all_models_cohort_audit.csv: stops modelled on R1 | supplement |
-| `\BehaviorPerStopAuditStopsFullSessionExcluded` | 340 |  | all_models_cohort_audit.csv: stops in sessions R1 gates out | supplement |
-| `\BehaviorPerStopAuditStopsIn` | 93,560 |  | all_models_cohort_audit.csv: stops entering the cohort | supplement |
-| `\BehaviorPerStopAuditStopsModeled` | 93,555 |  | all_models_cohort_audit.csv: stops modelled on R0 | supplement |
-| `\BehaviorPerStopAuditStopsModeledSessionExcluded` | 0 |  | all_models_cohort_audit.csv: stops in sessions R0 gates out | supplement |
-| `\BehaviorPerStopAuditStopsOwnDrop` | 5 |  | all_models_cohort_audit.csv: stops dropped for a missing own predictor | supplement |
-| `\BehaviorPerStopChildBetterFractionNonLocal` | 74 % |  | non-local (all): share of sessions in which R1 has the lower AIC | supplement |
-| `\BehaviorPerStopChildBetterFractionNonLocalNoSwr` | 46 % |  | non-local without SWR: share of sessions in which R1 has the lower AIC | supplement |
-| `\BehaviorPerStopChildBetterFractionNonLocalSwr` | 66 % |  | non-local with SWR: share of sessions in which R1 has the lower AIC | supplement |
-| `\BehaviorPerStopChildBetterFractionSwr` | 69 % |  | detected SWR: share of sessions in which R1 has the lower AIC | supplement |
-| `\BehaviorPerStopCvFiniteFractionFull` | 52 % |  | share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean | supplement |
-| `\BehaviorPerStopDeltaAicAnimalNonLocal` | −4.3 | AIC | non-local (all): median over animals of the per-animal median AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicAnimalNonLocalNoSwr` | +0.88 | AIC | non-local without SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicAnimalNonLocalSwr` | −2.6 | AIC | non-local with SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicAnimalSwr` | −2.7 | AIC | detected SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicSessionNonLocal` | −4.2 | AIC | non-local (all): median over sessions of AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicSessionNonLocalNoSwr` | +0.88 | AIC | non-local without SWR: median over sessions of AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicSessionNonLocalSwr` | −3.1 | AIC | non-local with SWR: median over sessions of AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopDeltaAicSessionSwr` | −4.3 | AIC | detected SWR: median over sessions of AIC(R1) - AIC(R0) | supplement |
-| `\BehaviorPerStopSessionsNonLocal` | 241 |  | non-local (all): sessions with both rungs fit on the same stops | supplement |
-| `\BehaviorPerStopSessionsNonLocalNoSwr` | 241 |  | non-local without SWR: sessions with both rungs fit on the same stops | supplement |
-| `\BehaviorPerStopSessionsNonLocalSwr` | 241 |  | non-local with SWR: sessions with both rungs fit on the same stops | supplement |
-| `\BehaviorPerStopSessionsSwr` | 241 |  | detected SWR: sessions with both rungs fit on the same stops | supplement |
-| `\BehaviorRateAllstopsArrivalBinsBefore` | 7,943,566 |  | all-stops fit: bins before that removal | supplement |
-| `\BehaviorRateAllstopsArrivalBinsDropped` | 89,838 |  | all-stops fit: bins the arrival clock removed from the common cohort | supplement |
-| `\BehaviorRateAllstopsArrivalBinsDroppedFraction` | 1 % |  | all-stops fit: share of bins the arrival clock removed | supplement |
-| `\BehaviorRateAllstopsArrivalEventShareNonLocal` | 0.86 |  | non-local (all): the same share on the all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalEventShareNonLocalNoSwr` | 0.81 |  | non-local without SWR: the same share on the all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalEventShareNonLocalSwr` | 0.91 |  | non-local with SWR: the same share on the all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalEventShareSwr` | 0.91 |  | detected SWR: the same share on the all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakEdgeCount` | 0 |  | populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit sits on the interval's edge | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakEdgeNonLocalNoSwr` | 0 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSHigh` | 5.79 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSLow` | 3.04 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSNonLocal` | 3.04 | s | non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSNonLocalNoSwr` | 5.79 | s | non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSNonLocalSwr` | 3.49 | s | non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSSwr` | 3.11 | s | detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSessionsNonLocal` | 116 |  | non-local (all): unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSessionsNonLocalNoSwr` | 107 |  | non-local without SWR: unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSessionsNonLocalSwr` | 81 |  | non-local with SWR: unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalPeakSessionsSwr` | 89 |  | detected SWR: unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsArrivalStopsDropped` | 1,509 |  | all-stops fit: stops the arrival clock removed | supplement |
-| `\BehaviorRateAllstopsArrivalWindowBins` | 7,136,257 |  | all-stops fit: frozen-cohort bins inside the arrival window | supplement |
-| `\BehaviorRateAllstopsArrivalWindowFraction` | 91 % |  | all-stops fit: share of frozen-cohort bins inside the arrival window | supplement |
-| `\BehaviorRateAllstopsClockKsHigh` | 0.09 |  | highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsClockKsLow` | 0.08 |  | lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsClockKsNonLocal` | 0.08 |  | non-local (all): KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsClockKsNonLocalNoSwr` | 0.08 |  | non-local without SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsClockKsNonLocalSwr` | 0.09 |  | non-local with SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsClockKsSwr` | 0.08 |  | detected SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsFrozenBins` | 7,853,728 |  | all-stops fit: bins in the frozen common cohort | supplement |
-| `\BehaviorRateAllstopsImmediateAnimalNonLocal` | 2.0 | rate ratio | all-stops fit, non-local (all): rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalNonLocalNoSwr` | 0.90 | rate ratio | all-stops fit, non-local without SWR: rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalNonLocalSwr` | 8.5 | rate ratio | all-stops fit, non-local with SWR: rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalSwr` | 5.4 | rate ratio | all-stops fit, detected SWR: rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalsPositiveNonLocal` | 5 |  | all-stops fit, non-local (all): animals positive | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalsPositiveNonLocalNoSwr` | 2 |  | all-stops fit, non-local without SWR: animals positive | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalsPositiveNonLocalSwr` | 5 |  | all-stops fit, non-local with SWR: animals positive | paper, supplement |
-| `\BehaviorRateAllstopsImmediateAnimalsPositiveSwr` | 5 |  | all-stops fit, detected SWR: animals positive | paper, supplement |
-| `\BehaviorRateAllstopsImmediateSessionAnimalsNoSwr` | 3 |  | its animals with the median's sign | paper, supplement |
-| `\BehaviorRateAllstopsImmediateSessionNoSwr` | 0.88 | rate ratio | all-stops fit, non-local without SWR: exp of the across-session median first reward basis coefficient; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateAllstopsImmediateSessionPNoSwr` | 0.52 |  | its signed-rank p (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateAllstopsKernelLagOneAnimalsPositiveNoSwr` | 0 |  | all-stops fit, non-local without SWR: animals whose median lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateAllstopsKernelLagOneNoSwr` | 0.93 | rate ratio | all-stops fit, non-local without SWR: median reconstructed kernel at lag 1 over the sessions passing the reward gate | paper, supplement |
-| `\BehaviorRateAllstopsKernelLagOnePNoSwr` | 0.068 |  | all-stops fit, non-local without SWR: signed-rank p of the log lag-1 kernel against 0 across sessions | paper, supplement |
-| `\BehaviorRateAllstopsMarginalRewardChildBetterFractionNonLocalNoSwr` | 47 % |  | all-stops fit, non-local without SWR: share of sessions in which M1_rew has the lower AIC | supplement |
-| `\BehaviorRateAllstopsMarginalRewardDeltaAicNonLocalNoSwr` | +0.34 | AIC | all-stops fit, non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const) | supplement |
-| `\BehaviorRateAllstopsPairedP` | 2.3e-24 |  | the same, all-stops fit: signed-rank p | paper, supplement |
-| `\BehaviorRateAllstopsPairedPositiveFraction` | 84 % |  | the same, all-stops fit: share positive | paper, supplement |
-| `\BehaviorRateAllstopsPairedSessions` | 212 |  | the same, all-stops fit: paired sessions | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakEdgeCount` | 1 |  | populations whose argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit sits on the interval's edge | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakEdgeNonLocalNoSwr` | 1 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSHigh` | 3.00 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSLow` | 2.53 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSNonLocal` | 3.00 | s | non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSNonLocalNoSwr` | 3.00 | s | non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit; it sits on the interval's edge, so it bounds the peak rather than locating it | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSNonLocalSwr` | 2.53 | s | non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSSwr` | 2.65 | s | detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSessionsNonLocal` | 241 |  | non-local (all): unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSessionsNonLocalSwr` | 203 |  | non-local with SWR: unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateAllstopsTimePeakSessionsSwr` | 235 |  | detected SWR: unflagged session curves behind that median, all-stops fit | paper, supplement |
-| `\BehaviorRateArrivalConstSessionsNonLocal` | 242 |  | non-local (all): M0a_const_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalConstSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: M0a_const_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalConstSessionsNonLocalSwr` | 242 |  | non-local with SWR: M0a_const_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalConstSessionsSwr` | 242 |  | detected SWR: M0a_const_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalEventShareNonLocal` | 0.91 |  | non-local (all): share of its event bins the arrival window [0, 8] s keeps | paper, supplement |
-| `\BehaviorRateArrivalEventShareNonLocalNoSwr` | 0.88 |  | non-local without SWR: share of its event bins the arrival window [0, 8] s keeps | paper, supplement |
-| `\BehaviorRateArrivalEventShareNonLocalSwr` | 0.94 |  | non-local with SWR: share of its event bins the arrival window [0, 8] s keeps | paper, supplement |
-| `\BehaviorRateArrivalEventShareSwr` | 0.95 |  | detected SWR: share of its event bins the arrival window [0, 8] s keeps | paper, supplement |
-| `\BehaviorRateArrivalFullCvNanFractionNonLocal` | 93 % |  | non-local (all): share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite | supplement |
-| `\BehaviorRateArrivalFullCvNanFractionNonLocalSwr` | 100 % |  | non-local with SWR: share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite | supplement |
-| `\BehaviorRateArrivalFullSessionsNonLocal` | 236 |  | non-local (all): M7ra_time_arrival_histcos_rew fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalFullSessionsNonLocalNoSwr` | 233 |  | non-local without SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalFullSessionsNonLocalSwr` | 221 |  | non-local with SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalFullSessionsSwr` | 237 |  | detected SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalPeakEdgeCount` | 0 |  | populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s sits on the interval's edge | paper, supplement |
-| `\BehaviorRateArrivalPeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakEdgeNonLocalNoSwr` | 0 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSHigh` | 5.21 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSLow` | 2.94 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSNonLocal` | 3.01 | s | non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSNonLocalNoSwr` | 5.21 | s | non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSNonLocalSwr` | 2.94 | s | non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSSwr` | 3.11 | s | detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | paper, supplement |
-| `\BehaviorRateArrivalPeakSessionsNonLocal` | 105 |  | non-local (all): unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateArrivalPeakSessionsNonLocalNoSwr` | 97 |  | non-local without SWR: unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateArrivalPeakSessionsNonLocalSwr` | 80 |  | non-local with SWR: unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateArrivalPeakSessionsSwr` | 89 |  | detected SWR: unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateArrivalSeparatedFractionHigh` | 64 % |  | highest over the populations: share of M5a_time_arrival fits flagged separated | paper, supplement |
-| `\BehaviorRateArrivalSeparatedFractionLow` | 56 % |  | lowest over the populations: share of M5a_time_arrival fits flagged separated | paper, supplement |
-| `\BehaviorRateArrivalSeparatedFractionNonLocal` | 56 % |  | non-local (all): share of M5a_time_arrival fits flagged separated | paper, supplement |
-| `\BehaviorRateArrivalSeparatedFractionNonLocalNoSwr` | 59 % |  | non-local without SWR: share of M5a_time_arrival fits flagged separated | paper, supplement |
-| `\BehaviorRateArrivalSeparatedFractionNonLocalSwr` | 64 % |  | non-local with SWR: share of M5a_time_arrival fits flagged separated | paper, supplement |
-| `\BehaviorRateArrivalSeparatedFractionSwr` | 62 % |  | detected SWR: share of M5a_time_arrival fits flagged separated | paper, supplement |
-| `\BehaviorRateArrivalTimeCvNanFractionNonLocal` | 92 % |  | non-local (all): share of M5a_time_arrival fits whose held-out score is not finite | supplement |
-| `\BehaviorRateArrivalTimeCvNanFractionNonLocalSwr` | 100 % |  | non-local with SWR: share of M5a_time_arrival fits whose held-out score is not finite | supplement |
-| `\BehaviorRateArrivalTimeSessionsNonLocal` | 239 |  | non-local (all): M5a_time_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalTimeSessionsNonLocalNoSwr` | 234 |  | non-local without SWR: M5a_time_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalTimeSessionsNonLocalSwr` | 222 |  | non-local with SWR: M5a_time_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateArrivalTimeSessionsSwr` | 235 |  | detected SWR: M5a_time_arrival fits with a finite AIC | supplement |
-| `\BehaviorRateAuditStopsCommonDrop` | 575 |  | per_bin_rate_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock) | supplement |
-| `\BehaviorRateAuditStopsIn` | 93,560 |  | per_bin_rate_cohort_audit.csv: stops entering the cohort | supplement |
-| `\BehaviorRateAuditStopsModeled` | 92,942 |  | per_bin_rate_cohort_audit.csv: stops modelled on M0_const | supplement |
-| `\BehaviorRateAuditStopsModeledSessionExcluded` | 38 |  | per_bin_rate_cohort_audit.csv: stops in sessions M0_const gates out | supplement |
-| `\BehaviorRateAuditStopsOwnDrop` | 5 |  | per_bin_rate_cohort_audit.csv: stops dropped for a missing own predictor | supplement |
-| `\BehaviorRateBaselineLowerQuartileNonLocal` | 0.33 | events/s | non-local (all): 25th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineLowerQuartileNonLocalNoSwr` | 0.15 | events/s | non-local without SWR: 25th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineLowerQuartileNonLocalSwr` | 0.18 | events/s | non-local with SWR: 25th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineLowerQuartileSwr` | 0.24 | events/s | detected SWR: 25th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineNonLocal` | 0.45 | events/s | non-local (all): median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | paper, supplement |
-| `\BehaviorRateBaselineNonLocalNoSwr` | 0.23 | events/s | non-local without SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | paper, supplement |
-| `\BehaviorRateBaselineNonLocalSwr` | 0.22 | events/s | non-local with SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | paper, supplement |
-| `\BehaviorRateBaselineRatioNoSwrToSwr` | 0.78 | ratio | median within-session M0_const rate ratio, non_local_no_swr over swr | supplement |
-| `\BehaviorRateBaselineRatioNoSwrToSwrP` | 8.8e-10 |  | its paired signed-rank p | supplement |
-| `\BehaviorRateBaselineRatioSwrCoupledToNoSwr` | 0.98 | ratio | median within-session M0_const rate ratio, non_local_swr over non_local_no_swr | supplement |
-| `\BehaviorRateBaselineRatioSwrCoupledToNoSwrP` | 0.30 |  | its paired signed-rank p | supplement |
-| `\BehaviorRateBaselineRatioSwrCoupledToNonLocal` | 0.49 | ratio | median within-session M0_const rate ratio, non_local_swr over non_local | supplement |
-| `\BehaviorRateBaselineRatioSwrCoupledToNonLocalP` | 1.9e-41 |  | its paired signed-rank p | supplement |
-| `\BehaviorRateBaselineRatioSwrCoupledToSwr` | 0.82 | ratio | median within-session M0_const rate ratio, non_local_swr over swr | supplement |
-| `\BehaviorRateBaselineRatioSwrCoupledToSwrP` | 4.3e-40 |  | its paired signed-rank p | supplement |
-| `\BehaviorRateBaselineRatioSwrToNonLocal` | 0.63 | ratio | median within-session M0_const rate ratio, swr over non_local | supplement |
-| `\BehaviorRateBaselineRatioSwrToNonLocalP` | 5.2e-39 |  | its paired signed-rank p | supplement |
-| `\BehaviorRateBaselineSwr` | 0.27 | events/s | detected SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | paper, supplement |
-| `\BehaviorRateBaselineUpperQuartileNonLocal` | 0.59 | events/s | non-local (all): 75th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineUpperQuartileNonLocalNoSwr` | 0.31 | events/s | non-local without SWR: 75th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineUpperQuartileNonLocalSwr` | 0.27 | events/s | non-local with SWR: 75th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBaselineUpperQuartileSwr` | 0.32 | events/s | detected SWR: 75th percentile over sessions of the M0_const rate | supplement |
-| `\BehaviorRateBinCountNonLocal` | 0.0067 | events/bin | non-local (all): median M0_const rate times the 15 ms bin, the mean per-bin count | supplement |
-| `\BehaviorRateBinCountNonLocalNoSwr` | 0.0034 | events/bin | non-local without SWR: median M0_const rate times the 15 ms bin, the mean per-bin count | supplement |
-| `\BehaviorRateBinCountNonLocalSwr` | 0.0033 | events/bin | non-local with SWR: median M0_const rate times the 15 ms bin, the mean per-bin count | supplement |
-| `\BehaviorRateBinCountSwr` | 0.0041 | events/bin | detected SWR: median M0_const rate times the 15 ms bin, the mean per-bin count | supplement |
-| `\BehaviorRateBins` | 7,280,203 |  | 15 ms bins at risk in the frozen common cohort, non-local populations (the bins inside a non-local event are not at risk) | paper, supplement |
-| `\BehaviorRateBinsSwr` | 7,359,637 |  | 15 ms bins at risk in the frozen common cohort, detected SWR (the bins inside a Kay SWR are not at risk) | paper, supplement |
-| `\BehaviorRateBumpOneAnimalsNonLocal` | 5 |  | non-local (all): animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpOneAnimalsNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpOneAnimalsNonLocalSwr` | 5 |  | non-local with SWR: animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpOneAnimalsSwr` | 5 |  | detected SWR: animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpOnePositiveFractionNonLocal` | 18 % |  | non-local (all): share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpOnePositiveFractionNonLocalNoSwr` | 34 % |  | non-local without SWR: share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpOnePositiveFractionNonLocalSwr` | 14 % |  | non-local with SWR: share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpOnePositiveFractionSwr` | 14 % |  | detected SWR: share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpOneSessionNonLocal` | 0.055 | rate ratio | non-local (all): exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpOneSessionNonLocalNoSwr` | 0.16 | rate ratio | non-local without SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpOneSessionNonLocalSwr` | 0.015 | rate ratio | non-local with SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpOneSessionSwr` | 0.024 | rate ratio | detected SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpTwoAnimalsNonLocal` | 5 |  | non-local (all): animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpTwoAnimalsNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpTwoAnimalsNonLocalSwr` | 5 |  | non-local with SWR: animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpTwoAnimalsSwr` | 5 |  | detected SWR: animals whose median has the across-session median's sign | supplement |
-| `\BehaviorRateBumpTwoPositiveFractionNonLocal` | 80 % |  | non-local (all): share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpTwoPositiveFractionNonLocalNoSwr` | 63 % |  | non-local without SWR: share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpTwoPositiveFractionNonLocalSwr` | 83 % |  | non-local with SWR: share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpTwoPositiveFractionSwr` | 80 % |  | detected SWR: share of sessions with that coefficient positive | supplement |
-| `\BehaviorRateBumpTwoSessionNonLocal` | 4.8 | rate ratio | non-local (all): exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpTwoSessionNonLocalNoSwr` | 2.8 | rate ratio | non-local without SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpTwoSessionNonLocalSwr` | 14 | rate ratio | non-local with SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateBumpTwoSessionSwr` | 7.2 | rate ratio | detected SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateClockKsHigh` | 0.09 |  | highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | paper, supplement |
-| `\BehaviorRateClockKsLow` | 0.08 |  | lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | paper, supplement |
-| `\BehaviorRateClockKsNonLocal` | 0.08 |  | non-local (all): KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | paper, supplement |
-| `\BehaviorRateClockKsNonLocalNoSwr` | 0.08 |  | non-local without SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | paper, supplement |
-| `\BehaviorRateClockKsNonLocalSwr` | 0.09 |  | non-local with SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | paper, supplement |
-| `\BehaviorRateClockKsSwr` | 0.09 |  | detected SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | paper, supplement |
-| `\BehaviorRateConditionalRewardDeltaAicNonLocal` | +1.0 | AIC | non-local (all): median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | paper, supplement |
-| `\BehaviorRateConditionalRewardDeltaAicNonLocalNoSwr` | +2.2 | AIC | non-local without SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | paper, supplement |
-| `\BehaviorRateConditionalRewardDeltaAicNonLocalSwr` | +1.8 | AIC | non-local with SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | paper, supplement |
-| `\BehaviorRateConditionalRewardDeltaAicSwr` | +1.2 | AIC | detected SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | paper, supplement |
-| `\BehaviorRateContrastAuditedRows` | 32 |  | rows the audited is_swr-contrast rate aggregate publishes | supplement |
-| `\BehaviorRateContrastExpandedFitsHigh` | 242 |  | most fits over the contrast rungs carrying an is_swr reward expansion (S2-S10) | supplement |
-| `\BehaviorRateContrastExpandedFitsLow` | 242 |  | fewest fits over the contrast rungs carrying an is_swr reward expansion (S2-S10) | supplement |
-| `\BehaviorRateContrastExpandedFlaggedHigh` | 239 |  | most fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10) | supplement |
-| `\BehaviorRateContrastExpandedFlaggedLow` | 223 |  | fewest fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10) | supplement |
-| `\BehaviorRateContrastExpandedSeparatedHigh` | 239 |  | most fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10) | supplement |
-| `\BehaviorRateContrastExpandedSeparatedLow` | 231 |  | fewest fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10) | supplement |
-| `\BehaviorRateContrastMostDropped` | 31 |  | most sessions a key contrast term loses to the gate (S3_periswitch is_swr:periswitch_index_trials) | supplement |
-| `\BehaviorRateContrastMostDroppedOf` | 242 |  | sessions fit for that term (S3_periswitch) | supplement |
-| `\BehaviorRateContrastPlainFits` | 242 |  | S1_rew contrast fits | supplement |
-| `\BehaviorRateContrastPlainFlagged` | 2 |  | S1_rew contrast fits flagging reward_history_rcos_1 separated | supplement |
-| `\BehaviorRateContrastSeparatedFractionPostOutcome` | 68 % |  | share of the is_swr-contrast rate ladder's post_outcome contrast fits flagged separated | supplement |
-| `\BehaviorRateContrastSeparatedFractionPrimary` | 76 % |  | share of the is_swr-contrast rate ladder's primary contrast fits flagged separated | supplement |
-| `\BehaviorRateContrastTermSeparatedFraction` | 94 % |  | share of the fits carrying is_swr:reward_history_rcos_1 that flag it separated | supplement |
-| `\BehaviorRateContrastTermsLosingSessions` | 1 |  | key is_swr contrast terms that lose any session to the per-term gate | supplement |
-| `\BehaviorRateFullSessionsNonLocal` | 242 |  | non-local (all): sessions with a fit of M7r_time_histcos_rew | paper, supplement |
-| `\BehaviorRateFullSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: sessions with a fit of M7r_time_histcos_rew | paper, supplement |
-| `\BehaviorRateFullSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions with a fit of M7r_time_histcos_rew | paper, supplement |
-| `\BehaviorRateFullSessionsSwr` | 242 |  | detected SWR: sessions with a fit of M7r_time_histcos_rew | paper, supplement |
-| `\BehaviorRateHistSeparatedFractionNonLocal` | 1 % |  | non-local (all): share of those fits flagging a self-history term (counted from event ends) separated | supplement |
-| `\BehaviorRateHistSeparatedFractionNonLocalNoSwr` | 24 % |  | non-local without SWR: share of those fits flagging a self-history term (counted from event ends) separated | supplement |
-| `\BehaviorRateHistSeparatedFractionNonLocalSwr` | 13 % |  | non-local with SWR: share of those fits flagging a self-history term (counted from event ends) separated | supplement |
-| `\BehaviorRateHistSeparatedFractionSwr` | 2 % |  | detected SWR: share of those fits flagging a self-history term (counted from event ends) separated | supplement |
-| `\BehaviorRateHistSessionsNonLocal` | 242 |  | non-local (all): sessions whose M7r_time_histcos_rew fit carries the self-history block | supplement |
-| `\BehaviorRateHistSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block | supplement |
-| `\BehaviorRateHistSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block | supplement |
-| `\BehaviorRateHistSessionsSwr` | 242 |  | detected SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block | supplement |
-| `\BehaviorRateImmediateAnimalNonLocal` | 2.9 | rate ratio | non-local (all): exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateAnimalNonLocalNoSwr` | 1.3 | rate ratio | non-local without SWR: exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateAnimalNonLocalSwr` | 9.3 | rate ratio | non-local with SWR: exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateAnimalSwr` | 5.3 | rate ratio | detected SWR: exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateAnimalsPositiveNonLocal` | 5 |  | non-local (all): animals whose median first reward basis coefficient is positive | paper, supplement |
-| `\BehaviorRateImmediateAnimalsPositiveNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median first reward basis coefficient is positive | paper, supplement |
-| `\BehaviorRateImmediateAnimalsPositiveNonLocalSwr` | 5 |  | non-local with SWR: animals whose median first reward basis coefficient is positive | paper, supplement |
-| `\BehaviorRateImmediateAnimalsPositiveSwr` | 5 |  | detected SWR: animals whose median first reward basis coefficient is positive | paper, supplement |
-| `\BehaviorRateImmediateRatioSwrToNoSwr` | 6.7 | ratio | rate_immediate_session_non_local_swr divided by rate_immediate_session_non_local_no_swr; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateSessionAnimalsNonLocal` | 5 |  | non-local (all): animals whose median first reward basis coefficient has the sign of the across-session median | paper, supplement |
-| `\BehaviorRateImmediateSessionAnimalsNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median first reward basis coefficient has the sign of the across-session median | paper, supplement |
-| `\BehaviorRateImmediateSessionAnimalsNonLocalSwr` | 5 |  | non-local with SWR: animals whose median first reward basis coefficient has the sign of the across-session median | paper, supplement |
-| `\BehaviorRateImmediateSessionAnimalsSwr` | 5 |  | detected SWR: animals whose median first reward basis coefficient has the sign of the across-session median | paper, supplement |
-| `\BehaviorRateImmediateSessionNonLocal` | 3.2 | rate ratio | non-local (all): exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateSessionNonLocalNoSwr` | 1.5 | rate ratio | non-local without SWR: exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateSessionNonLocalSwr` | 9.8 | rate ratio | non-local with SWR: exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateImmediateSessionPNonLocal` | 5.9e-23 |  | non-local (all): signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPNonLocalNoSwr` | 9.1e-4 |  | non-local without SWR: signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPNonLocalSwr` | 5.0e-33 |  | non-local with SWR: signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPSwr` | 6.2e-28 |  | detected SWR: signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPositiveFractionNonLocal` | 79 % |  | non-local (all): share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPositiveFractionNonLocalNoSwr` | 58 % |  | non-local without SWR: share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPositiveFractionNonLocalSwr` | 88 % |  | non-local with SWR: share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionPositiveFractionSwr` | 83 % |  | detected SWR: share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | paper, supplement |
-| `\BehaviorRateImmediateSessionSwr` | 6.3 | rate ratio | detected SWR: exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | paper, supplement |
-| `\BehaviorRateIntransitArrivalEventShareHigh` | 0.37 |  | highest over populations of the in-transit fit's arrival-window event share | supplement |
-| `\BehaviorRateIntransitArrivalEventShareLow` | 0.18 |  | lowest over populations of the in-transit fit's arrival-window event share | supplement |
-| `\BehaviorRateIntransitArrivalEventShareNonLocal` | 0.33 |  | non-local (all): share of its event bins the arrival window keeps on the in-transit fit | supplement |
-| `\BehaviorRateIntransitArrivalEventShareNonLocalNoSwr` | 0.37 |  | non-local without SWR: share of its event bins the arrival window keeps on the in-transit fit | supplement |
-| `\BehaviorRateIntransitArrivalEventShareNonLocalSwr` | 0.18 |  | non-local with SWR: share of its event bins the arrival window keeps on the in-transit fit | supplement |
-| `\BehaviorRateIntransitArrivalEventShareSwr` | 0.30 |  | detected SWR: share of its event bins the arrival window keeps on the in-transit fit | supplement |
-| `\BehaviorRateIntransitSessions` | 52 |  | sessions with any per-bin fit on the in-transit stops (the sample gates leave the rest out) | supplement |
-| `\BehaviorRateIntransitSessionsNonLocal` | 51 |  | non-local (all): sessions with a per-bin fit on the in-transit stops | supplement |
-| `\BehaviorRateIntransitSessionsNonLocalNoSwr` | 39 |  | non-local without SWR: sessions with a per-bin fit on the in-transit stops | supplement |
-| `\BehaviorRateIntransitSessionsNonLocalSwr` | 10 |  | non-local with SWR: sessions with a per-bin fit on the in-transit stops | supplement |
-| `\BehaviorRateIntransitSessionsSwr` | 17 |  | detected SWR: sessions with a per-bin fit on the in-transit stops | supplement |
-| `\BehaviorRateKernelDroppedNonLocal` | 2 |  | non-local (all): fitted sessions the gate left out because a reward term was separated or ran away | paper, supplement |
-| `\BehaviorRateKernelDroppedNonLocalNoSwr` | 27 |  | non-local without SWR: fitted sessions the gate left out because a reward term was separated or ran away | paper, supplement |
-| `\BehaviorRateKernelDroppedNonLocalSwr` | 29 |  | non-local with SWR: fitted sessions the gate left out because a reward term was separated or ran away | paper, supplement |
-| `\BehaviorRateKernelDroppedSwr` | 3 |  | detected SWR: fitted sessions the gate left out because a reward term was separated or ran away | paper, supplement |
-| `\BehaviorRateKernelLagEightNonLocal` | 0.98 | rate ratio | non-local (all): median reconstructed reward kernel at lag 8 | supplement |
-| `\BehaviorRateKernelLagEightNonLocalNoSwr` | 0.98 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 8 | supplement |
-| `\BehaviorRateKernelLagEightNonLocalSwr` | 0.98 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 8 | supplement |
-| `\BehaviorRateKernelLagEightSwr` | 0.97 | rate ratio | detected SWR: median reconstructed reward kernel at lag 8 | supplement |
-| `\BehaviorRateKernelLagFiveNonLocal` | 0.92 | rate ratio | non-local (all): median reconstructed reward kernel at lag 5 | supplement |
-| `\BehaviorRateKernelLagFiveNonLocalNoSwr` | 0.94 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 5 | supplement |
-| `\BehaviorRateKernelLagFiveNonLocalSwr` | 0.89 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 5 | supplement |
-| `\BehaviorRateKernelLagFiveSwr` | 0.90 | rate ratio | detected SWR: median reconstructed reward kernel at lag 5 | supplement |
-| `\BehaviorRateKernelLagFourNonLocal` | 0.91 | rate ratio | non-local (all): median reconstructed reward kernel at lag 4 | supplement |
-| `\BehaviorRateKernelLagFourNonLocalNoSwr` | 0.93 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 4 | supplement |
-| `\BehaviorRateKernelLagFourNonLocalSwr` | 0.90 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 4 | supplement |
-| `\BehaviorRateKernelLagFourSwr` | 0.90 | rate ratio | detected SWR: median reconstructed reward kernel at lag 4 | supplement |
-| `\BehaviorRateKernelLagNineNonLocal` | 1.01 | rate ratio | non-local (all): median reconstructed reward kernel at lag 9 | supplement |
-| `\BehaviorRateKernelLagNineNonLocalNoSwr` | 0.99 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 9 | supplement |
-| `\BehaviorRateKernelLagNineNonLocalSwr` | 1.02 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 9 | supplement |
-| `\BehaviorRateKernelLagNineSwr` | 1.01 | rate ratio | detected SWR: median reconstructed reward kernel at lag 9 | supplement |
-| `\BehaviorRateKernelLagOneAnimalNonLocal` | 1.22 | rate ratio | non-local (all): the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalNonLocalNoSwr` | 1.00 | rate ratio | non-local without SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalNonLocalSwr` | 1.47 | rate ratio | non-local with SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalSwr` | 1.41 | rate ratio | detected SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalsPositiveNonLocal` | 5 |  | non-local (all): animals whose median lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalsPositiveNonLocalNoSwr` | 4 |  | non-local without SWR: animals whose median lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalsPositiveNonLocalSwr` | 5 |  | non-local with SWR: animals whose median lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOneAnimalsPositiveSwr` | 5 |  | detected SWR: animals whose median lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOneNonLocal` | 1.18 | rate ratio | non-local (all): reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | paper, supplement |
-| `\BehaviorRateKernelLagOneNonLocalNoSwr` | 1.01 | rate ratio | non-local without SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | paper, supplement |
-| `\BehaviorRateKernelLagOneNonLocalSwr` | 1.44 | rate ratio | non-local with SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | paper, supplement |
-| `\BehaviorRateKernelLagOnePNonLocal` | 2.5e-17 |  | non-local (all): signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | paper, supplement |
-| `\BehaviorRateKernelLagOnePNonLocalNoSwr` | 0.29 |  | non-local without SWR: signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | paper, supplement |
-| `\BehaviorRateKernelLagOnePNonLocalSwr` | 3.4e-26 |  | non-local with SWR: signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | paper, supplement |
-| `\BehaviorRateKernelLagOnePSwr` | 1.6e-24 |  | detected SWR: signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | paper, supplement |
-| `\BehaviorRateKernelLagOnePositiveFractionNonLocal` | 73 % |  | non-local (all): share of sessions whose lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOnePositiveFractionNonLocalNoSwr` | 51 % |  | non-local without SWR: share of sessions whose lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOnePositiveFractionNonLocalSwr` | 86 % |  | non-local with SWR: share of sessions whose lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOnePositiveFractionSwr` | 81 % |  | detected SWR: share of sessions whose lag-1 kernel is above 1 | paper, supplement |
-| `\BehaviorRateKernelLagOneSwr` | 1.39 | rate ratio | detected SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | paper, supplement |
-| `\BehaviorRateKernelLagSevenNonLocal` | 0.95 | rate ratio | non-local (all): median reconstructed reward kernel at lag 7 | supplement |
-| `\BehaviorRateKernelLagSevenNonLocalNoSwr` | 0.97 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 7 | supplement |
-| `\BehaviorRateKernelLagSevenNonLocalSwr` | 0.94 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 7 | supplement |
-| `\BehaviorRateKernelLagSevenSwr` | 0.94 | rate ratio | detected SWR: median reconstructed reward kernel at lag 7 | supplement |
-| `\BehaviorRateKernelLagSixNonLocal` | 0.93 | rate ratio | non-local (all): median reconstructed reward kernel at lag 6 | supplement |
-| `\BehaviorRateKernelLagSixNonLocalNoSwr` | 0.95 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 6 | supplement |
-| `\BehaviorRateKernelLagSixNonLocalSwr` | 0.91 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 6 | supplement |
-| `\BehaviorRateKernelLagSixSwr` | 0.92 | rate ratio | detected SWR: median reconstructed reward kernel at lag 6 | supplement |
-| `\BehaviorRateKernelLagTenNonLocal` | 1.04 | rate ratio | non-local (all): median reconstructed kernel at lag 10 | paper, supplement |
-| `\BehaviorRateKernelLagTenNonLocalNoSwr` | 1.01 | rate ratio | non-local without SWR: median reconstructed kernel at lag 10 | paper, supplement |
-| `\BehaviorRateKernelLagTenNonLocalSwr` | 1.06 | rate ratio | non-local with SWR: median reconstructed kernel at lag 10 | paper, supplement |
-| `\BehaviorRateKernelLagTenSwr` | 1.04 | rate ratio | detected SWR: median reconstructed kernel at lag 10 | paper, supplement |
-| `\BehaviorRateKernelLagThreeNonLocal` | 0.93 | rate ratio | non-local (all): median reconstructed reward kernel at lag 3 | supplement |
-| `\BehaviorRateKernelLagThreeNonLocalNoSwr` | 0.93 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 3 | supplement |
-| `\BehaviorRateKernelLagThreeNonLocalSwr` | 0.95 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 3 | supplement |
-| `\BehaviorRateKernelLagThreeSwr` | 0.93 | rate ratio | detected SWR: median reconstructed reward kernel at lag 3 | supplement |
-| `\BehaviorRateKernelLagTwoNonLocal` | 0.99 | rate ratio | non-local (all): median reconstructed reward kernel at lag 2 | supplement |
-| `\BehaviorRateKernelLagTwoNonLocalNoSwr` | 0.95 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 2 | supplement |
-| `\BehaviorRateKernelLagTwoNonLocalSwr` | 1.06 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 2 | supplement |
-| `\BehaviorRateKernelLagTwoSwr` | 1.05 | rate ratio | detected SWR: median reconstructed reward kernel at lag 2 | supplement |
-| `\BehaviorRateKernelLateMaxNonLocal` | 1.04 | rate ratio | non-local (all): highest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMaxNonLocalNoSwr` | 1.01 | rate ratio | non-local without SWR: highest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMaxNonLocalSwr` | 1.06 | rate ratio | non-local with SWR: highest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMaxSwr` | 1.04 | rate ratio | detected SWR: highest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMinHigh` | 0.93 | rate ratio | highest over the populations: lowest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMinLow` | 0.89 | rate ratio | lowest over the populations: lowest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMinNonLocal` | 0.91 | rate ratio | non-local (all): lowest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMinNonLocalNoSwr` | 0.93 | rate ratio | non-local without SWR: lowest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMinNonLocalSwr` | 0.89 | rate ratio | non-local with SWR: lowest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelLateMinSwr` | 0.90 | rate ratio | detected SWR: lowest median reconstructed kernel over lags 3-10 | paper, supplement |
-| `\BehaviorRateKernelNonconvergedNonLocal` | 0 |  | non-local (all): of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | paper, supplement |
-| `\BehaviorRateKernelNonconvergedNonLocalNoSwr` | 24 |  | non-local without SWR: of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | paper, supplement |
-| `\BehaviorRateKernelNonconvergedNonLocalSwr` | 14 |  | non-local with SWR: of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | paper, supplement |
-| `\BehaviorRateKernelNonconvergedSwr` | 2 |  | detected SWR: of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | paper, supplement |
-| `\BehaviorRateKernelSessionsNonLocal` | 240 |  | non-local (all): sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | paper, supplement |
-| `\BehaviorRateKernelSessionsNonLocalNoSwr` | 215 |  | non-local without SWR: sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | paper, supplement |
-| `\BehaviorRateKernelSessionsNonLocalSwr` | 213 |  | non-local with SWR: sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | paper, supplement |
-| `\BehaviorRateKernelSessionsSwr` | 239 |  | detected SWR: sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | paper, supplement |
-| `\BehaviorRateLadderAicConst` | 2415 | AIC | non-local (all): median AIC of M0_const | paper, supplement |
-| `\BehaviorRateLadderAicFull` | 2303 | AIC | non-local (all): median AIC of M7r_time_histcos_rew | paper, supplement |
-| `\BehaviorRateLadderAicHistcos` | 2384 | AIC | non-local (all): median AIC of M3r_histcos | supplement |
-| `\BehaviorRateLadderAicRew` | 2409 | AIC | non-local (all): median AIC of M1_rew | supplement |
-| `\BehaviorRateLadderAicRewardByTime` | 2308 | AIC | non-local (all): median AIC of M9r_rew_x_time | paper, supplement |
-| `\BehaviorRateLadderAicTime` | 2320 | AIC | non-local (all): median AIC of M5_time | paper, supplement |
-| `\BehaviorRateLadderAicTimeHistcos` | 2307 | AIC | non-local (all): median AIC of M6r_time_histcos | supplement |
-| `\BehaviorRateLadderCvBitsConst` | 0.00 | bits/event | non-local (all): median held-out bits per event of M0_const, over sessions with a finite score | paper, supplement |
-| `\BehaviorRateLadderCvBitsFull` | 0.30 | bits/event | non-local (all): median held-out bits per event of M7r_time_histcos_rew, over sessions with a finite score | paper, supplement |
-| `\BehaviorRateLadderCvBitsHistcos` | 0.09 | bits/event | non-local (all): median held-out bits per event of M3r_histcos, over sessions with a finite score | supplement |
-| `\BehaviorRateLadderCvBitsRew` | 0.03 | bits/event | non-local (all): median held-out bits per event of M1_rew, over sessions with a finite score | supplement |
-| `\BehaviorRateLadderCvBitsRewardByTime` | 0.24 | bits/event | non-local (all): median held-out bits per event of M9r_rew_x_time, over sessions with a finite score | paper, supplement |
-| `\BehaviorRateLadderCvBitsTime` | 0.25 | bits/event | non-local (all): median held-out bits per event of M5_time, over sessions with a finite score | paper, supplement |
-| `\BehaviorRateLadderCvBitsTimeHistcos` | 0.30 | bits/event | non-local (all): median held-out bits per event of M6r_time_histcos, over sessions with a finite score | supplement |
-| `\BehaviorRateLadderCvSessionsConst` | 242 |  | non-local (all): sessions with a finite held-out score for M0_const | paper, supplement |
-| `\BehaviorRateLadderCvSessionsFull` | 213 |  | non-local (all): sessions with a finite held-out score for M7r_time_histcos_rew | paper, supplement |
-| `\BehaviorRateLadderCvSessionsHistcos` | 230 |  | non-local (all): sessions with a finite held-out score for M3r_histcos | supplement |
-| `\BehaviorRateLadderCvSessionsRew` | 238 |  | non-local (all): sessions with a finite held-out score for M1_rew | supplement |
-| `\BehaviorRateLadderCvSessionsRewardByTime` | 128 |  | non-local (all): sessions with a finite held-out score for M9r_rew_x_time | paper, supplement |
-| `\BehaviorRateLadderCvSessionsTime` | 226 |  | non-local (all): sessions with a finite held-out score for M5_time | paper, supplement |
-| `\BehaviorRateLadderCvSessionsTimeHistcos` | 216 |  | non-local (all): sessions with a finite held-out score for M6r_time_histcos | supplement |
-| `\BehaviorRateLadderKsBandConst` | 0.31 |  | non-local (all): share of M0_const fits inside the KS band | paper, supplement |
-| `\BehaviorRateLadderKsBandFull` | 0.95 |  | non-local (all): share of M7r_time_histcos_rew fits inside the KS band | paper, supplement |
-| `\BehaviorRateLadderKsBandHistcos` | 0.30 |  | non-local (all): share of M3r_histcos fits inside the KS band | supplement |
-| `\BehaviorRateLadderKsBandRew` | 0.26 |  | non-local (all): share of M1_rew fits inside the KS band | supplement |
-| `\BehaviorRateLadderKsBandRewardByTime` | 0.95 |  | non-local (all): share of M9r_rew_x_time fits inside the KS band | paper, supplement |
-| `\BehaviorRateLadderKsBandTime` | 0.72 |  | non-local (all): share of M5_time fits inside the KS band | paper, supplement |
-| `\BehaviorRateLadderKsBandTimeHistcos` | 0.94 |  | non-local (all): share of M6r_time_histcos fits inside the KS band | supplement |
-| `\BehaviorRateLadderSessionsConst` | 242 |  | non-local (all): sessions with a finite-AIC fit of M0_const | supplement |
-| `\BehaviorRateLadderSessionsFull` | 242 |  | non-local (all): sessions with a finite-AIC fit of M7r_time_histcos_rew | supplement |
-| `\BehaviorRateLadderSessionsHistcos` | 242 |  | non-local (all): sessions with a finite-AIC fit of M3r_histcos | supplement |
-| `\BehaviorRateLadderSessionsRew` | 242 |  | non-local (all): sessions with a finite-AIC fit of M1_rew | supplement |
-| `\BehaviorRateLadderSessionsRewardByTime` | 242 |  | non-local (all): sessions with a finite-AIC fit of M9r_rew_x_time | supplement |
-| `\BehaviorRateLadderSessionsTime` | 242 |  | non-local (all): sessions with a finite-AIC fit of M5_time | supplement |
-| `\BehaviorRateLadderSessionsTimeHistcos` | 242 |  | non-local (all): sessions with a finite-AIC fit of M6r_time_histcos | supplement |
-| `\BehaviorRateMarginalRewardChildBetterFractionNonLocal` | 85 % |  | non-local (all): share of sessions in which M1_rew has the lower AIC than M0_const | supplement |
-| `\BehaviorRateMarginalRewardChildBetterFractionNonLocalNoSwr` | 52 % |  | non-local without SWR: share of sessions in which M1_rew has the lower AIC than M0_const | supplement |
-| `\BehaviorRateMarginalRewardChildBetterFractionNonLocalSwr` | 83 % |  | non-local with SWR: share of sessions in which M1_rew has the lower AIC than M0_const | supplement |
-| `\BehaviorRateMarginalRewardChildBetterFractionSwr` | 80 % |  | detected SWR: share of sessions in which M1_rew has the lower AIC than M0_const | supplement |
-| `\BehaviorRateMarginalRewardDeltaAicNonLocal` | −8.9 | AIC | non-local (all): median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | paper, supplement |
-| `\BehaviorRateMarginalRewardDeltaAicNonLocalNoSwr` | −0.53 | AIC | non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | paper, supplement |
-| `\BehaviorRateMarginalRewardDeltaAicNonLocalSwr` | −6.0 | AIC | non-local with SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | paper, supplement |
-| `\BehaviorRateMarginalRewardDeltaAicSwr` | −7.6 | AIC | detected SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | paper, supplement |
-| `\BehaviorRatePairedAnimalsPositive` | 5 |  | animals whose median paired difference is positive | paper, supplement |
-| `\BehaviorRatePairedP` | 3.2e-18 |  | signed-rank p of the paired difference, treating sessions as independent | paper, supplement |
-| `\BehaviorRatePairedPositiveFraction` | 78 % |  | share of paired sessions in which the reconstructed lag-1 reward kernel, SWR-coupled minus non-SWR non-local events, within session, over the sessions in which both streams' reward terms pass the per-term separation gate is positive | paper, supplement |
-| `\BehaviorRatePairedSessions` | 197 |  | sessions in the paired comparison of the reconstructed lag-1 reward kernel, SWR-coupled minus non-SWR non-local events, within session, over the sessions in which both streams' reward terms pass the per-term separation gate | paper, supplement |
-| `\BehaviorRateRawImmediateSessionNonLocal` | 32 | rate ratio | non-local (all): exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateRawImmediateSessionNonLocalNoSwr` | 13 | rate ratio | non-local without SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateRawImmediateSessionNonLocalSwr` | 130 | rate ratio | non-local with SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateRawImmediateSessionSwr` | 63 | rate ratio | detected SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | supplement |
-| `\BehaviorRateSessions` | 242 |  | sessions in the per-bin rate fit | paper, supplement |
-| `\BehaviorRateStops` | 92,942 |  | stops in the frozen common cohort (M0_const, every population) | paper, supplement |
-| `\BehaviorRateTimePeakEdgeCount` | 0 |  | populations whose argmax of the median fitted M5_time time course, read on [1, 3] s sits on the interval's edge | paper, supplement |
-| `\BehaviorRateTimePeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakEdgeNonLocalNoSwr` | 0 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSHigh` | 2.95 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSLow` | 2.48 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSNonLocal` | 2.95 | s | non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSNonLocalNoSwr` | 2.48 | s | non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSNonLocalSwr` | 2.51 | s | non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSSwr` | 2.61 | s | detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s | paper, supplement |
-| `\BehaviorRateTimePeakSessionsNonLocal` | 236 |  | non-local (all): unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateTimePeakSessionsNonLocalNoSwr` | 233 |  | non-local without SWR: unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateTimePeakSessionsNonLocalSwr` | 192 |  | non-local with SWR: unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateTimePeakSessionsSwr` | 232 |  | detected SWR: unflagged session curves behind that median | paper, supplement |
-| `\BehaviorRateTimeSessionsNonLocal` | 242 |  | non-local (all): sessions with a fit of M5_time | paper, supplement |
-| `\BehaviorRateTimeSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: sessions with a fit of M5_time | paper, supplement |
-| `\BehaviorRateTimeSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions with a fit of M5_time | paper, supplement |
-| `\BehaviorRateTimeSessionsSwr` | 242 |  | detected SWR: sessions with a fit of M5_time | paper, supplement |
-| `\BehaviorStopDurationMeanRatio` | 3.6 | ratio | ratio of those means | supplement |
-| `\BehaviorStopDurationMeanRewarded` | 2.2 | s | well-anchored stops with a rewarded outcome: mean immobility duration | supplement |
-| `\BehaviorStopDurationMeanUnrewarded` | 0.60 | s | well-anchored stops with an omitted outcome: mean immobility duration | supplement |
-| `\BehaviorStopDurationMedianRatio` | 3.6 | ratio | ratio of those medians | supplement |
-| `\BehaviorStopDurationMedianRewarded` | 1.0 | s | well-anchored stops with a rewarded outcome: median immobility duration | supplement |
-| `\BehaviorStopDurationMedianUnrewarded` | 0.28 | s | well-anchored stops with an omitted outcome: median immobility duration | supplement |
-| `\BehaviorStopSurvivalFourS` | 14 % |  | share of well-anchored stops still immobile at 4 s | supplement |
-| `\BehaviorStopSurvivalTwoS` | 25 % |  | share of well-anchored stops still immobile at 2 s | supplement |
-| `\BehaviorStopsCrossingOutcome` | 16,353 |  | stops with stop_start < outcome_known_time_s <= stop_end (all stops) | supplement |
-| `\BehaviorStopsCrossingOutcomeFraction` | 14 % |  | their share of all stops | supplement |
-| `\BehaviorStopsInTransit` | 25,768 |  | in-transit stops in the canonical stop table | supplement |
-| `\BehaviorStopsOutcomeShifted` | 16,066 |  | crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary) | supplement |
-| `\BehaviorStopsOutcomeShiftedFraction` | 13 % |  | their share of all stops | supplement |
-| `\BehaviorStopsRewardHistoryIncompleteFraction` | 0.013 |  | share of stops flagged reward_history_incomplete (fewer than two known outcomes) | supplement |
-| `\BehaviorStopsSpanningArrival` | 185 |  | stops containing a later well arrival | supplement |
-| `\BehaviorStopsSpanningArrivalCrossing` | 0 |  | of those, stops that also cross their outcome boundary | supplement |
-| `\BehaviorStopsTotal` | 120,320 |  | stops in the canonical stop table | supplement |
-| `\BehaviorStopsWellAnchored` | 93,560 |  | stops with occupancy_state at_well or mixed (the shared cohort) | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorHistoryCrossEndAnimalsNonSwrFromSwr` | 5 |  | non-SWR rate after SWR-coupled events: animals whose rate ratio at 45 ms has its 95 % interval (posterior mode +- 1.96 posterior SD) above 1, over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossEndAnimalsSwrFromNonSwr` | 5 |  | SWR-coupled rate after non-SWR events: animals whose rate ratio at 45 ms has its 95 % interval (posterior mode +- 1.96 posterior SD) above 1, over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossEndRrNonSwrFromSwr` | 1.92 | rate ratio | non-SWR rate after SWR-coupled events: rate ratio 45 ms after the other stream's event ended (end-locked cross block of Mselfcross_long_dur, 1 s cross window, at-risk design, ridge prior on the history terms with its strength chosen by cross-validation), median over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets; the prior shrinks it toward 1; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossEndRrSwrFromNonSwr` | 3.07 | rate ratio | SWR-coupled rate after non-SWR events: rate ratio 45 ms after the other stream's event ended (end-locked cross block of Mselfcross_long_dur, 1 s cross window, at-risk design, ridge prior on the history terms with its strength chosen by cross-validation), median over the 5 of 5 animals whose 45 ms lag has at least 3 expected onsets; the prior shrinks it toward 1; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossHeldoutAnimalsPositiveNonSwrFromSwr` | 5 |  | non-SWR rate after SWR-coupled events: animals, of 5, whose held-out cross gain is positive | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossHeldoutAnimalsPositiveSwrFromNonSwr` | 5 |  | SWR-coupled rate after non-SWR events: animals, of 5, whose held-out cross gain is positive | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossHeldoutGainNonSwrFromSwr` | +0.014 | nats per event | non-SWR rate after SWR-coupled events: median over the 5 animals of the held-out log-likelihood gain per held-out event of Mselfcross_long_dur over Mself_long_dur (five folds of whole stops, each rung's ridge strength chosen by inner cross-validation); positive = the cross block predicts new data | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryCrossHeldoutGainSwrFromNonSwr` | +0.015 | nats per event | SWR-coupled rate after non-SWR events: median over the 5 animals of the held-out log-likelihood gain per held-out event of Mselfcross_long_dur over Mself_long_dur (five folds of whole stops, each rung's ridge strength chosen by inner cross-validation); positive = the cross block predicts new data | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndFirstLagRaisedFits` | 15 |  | animal x population fits whose rate 15 ms after the previous event's end is above 1 with its 95 % CI, of the history_fits fits where that lag is measurable | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndFirstLagRrHigh` | 4.53 | rate ratio | highest over the four populations of that median rate ratio 15 ms after the previous event's end (19 of 20 fits measurable) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndFirstLagRrLow` | 1.68 | rate ratio | lowest over the four populations of the median (over animals) rate ratio 15 ms after the previous event's end (end-locked part of Mself_dur, at-risk design), over the 19 of 20 animal x population fits whose 15 ms lag is measurable; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndFirstLagSuppressedFits` | 0 |  | animal x population fits whose rate 15 ms after the previous event's end is below 1 with its 95 % CI (suppression after the end), of the history_fits fits where that lag is measurable | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakAnimalsMin` | 5 |  | fewest, over the populations, animals whose end-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakHigh` | 4.53 | rate ratio | highest over the four populations of that end-locked peak | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakLagMsHigh` | 45 | ms | longest over the populations of the median end-locked peak lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakLagMsLow` | 15 | ms | shortest over the populations of the median end-locked peak lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryEndPeakLow` | 2.63 | rate ratio | lowest over the four populations of the median (over animals) peak rate ratio of the end-locked self-history (Mself_dur, at-risk design, measurable lags); pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryFits` | 19 |  | animal x population pooled fits (20 converged) whose 15 ms end-locked lag is measurable: the denominator of the raised and suppressed counts | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsNonLocal` | 4 |  | non-local (all): animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsNonLocalNoSwr` | 2 |  | non-local without SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsNonLocalSwr` | 4 |  | non-local with SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetAnimalsSwr` | 5 |  | detected SWR: animals whose onset-locked peak has its 95 % CI above 1, the interval widened for the measurable lags searched (Bonferroni) | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsNonLocal` | 120 | ms | non-local (all): median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsNonLocalNoSwr` | 150 | ms | non-local without SWR: median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsNonLocalSwr` | 105 | ms | non-local with SWR: median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakLagMsSwr` | 90 | ms | detected SWR: median over animals of that onset-locked peak's lag | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakNonLocal` | 1.59 | rate ratio | non-local (all): onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakNonLocalNoSwr` | 1.34 | rate ratio | non-local without SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakNonLocalSwr` | 1.83 | rate ratio | non-local with SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorHistoryOnsetPeakSwr` | 2.28 | rate ratio | detected SWR: onset-locked part of the self-history (both-anchor rung Mself_dur, at-risk design): median over animals of each animal's peak rate ratio over its measurable lags; pooled within animal with a session fixed effect; an upper bound, since rate variation between stops that the model does not capture inflates history terms | `behavior.duration_aware_history_values` |  |
+| `\BehaviorOnsetMedianSNonLocal` | 2.4 | s | median time of a non-local onset after its stop's speed-threshold crossing | `behavior.stop_table_values` |  |
+| `\BehaviorOnsetsRewardHistoryIncompleteFractionNonLocal` | 0.015 |  | share of non-local onsets in those stops | `behavior.stop_table_values` |  |
+| `\BehaviorOnsetsWithinTmaxFractionMua` | 79 % |  | share of MUA onsets within the first 4 s of their stop (event_onset_table) | `behavior.stop_table_values` |  |
+| `\BehaviorOnsetsWithinTmaxFractionNonLocal` | 79 % |  | share of non_local onsets within the first 4 s of their stop (event_onset_table) | `behavior.stop_table_values` |  |
+| `\BehaviorOnsetsWithinTmaxFractionSwr` | 80 % |  | share of SWR onsets within the first 4 s of their stop (event_onset_table) | `behavior.stop_table_values` |  |
+| `\BehaviorPerStopAnimalsChildBetterNonLocal` | 5 |  | non-local (all): animals whose median step is negative | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopAnimalsChildBetterNonLocalNoSwr` | 2 |  | non-local without SWR: animals whose median step is negative | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopAnimalsChildBetterNonLocalSwr` | 4 |  | non-local with SWR: animals whose median step is negative | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopAnimalsChildBetterSwr` | 4 |  | detected SWR: animals whose median step is negative | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopAuditStopsCommonDrop` | 0 |  | all_models_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock) | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsFull` | 93,215 |  | all_models_cohort_audit.csv: stops modelled on R1 | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsFullSessionExcluded` | 340 |  | all_models_cohort_audit.csv: stops in sessions R1 gates out | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsIn` | 93,560 |  | all_models_cohort_audit.csv: stops entering the cohort | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsModeled` | 93,555 |  | all_models_cohort_audit.csv: stops modelled on R0 | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsModeledSessionExcluded` | 0 |  | all_models_cohort_audit.csv: stops in sessions R0 gates out | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopAuditStopsOwnDrop` | 5 |  | all_models_cohort_audit.csv: stops dropped for a missing own predictor | `behavior.cohort_audit_values` |  |
+| `\BehaviorPerStopChildBetterFractionNonLocal` | 74 % |  | non-local (all): share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopChildBetterFractionNonLocalNoSwr` | 46 % |  | non-local without SWR: share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopChildBetterFractionNonLocalSwr` | 66 % |  | non-local with SWR: share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopChildBetterFractionSwr` | 69 % |  | detected SWR: share of sessions in which R1 has the lower AIC | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopCvFiniteFractionFull` | 52 % |  | share of R1 session-fits (all populations) carrying a finite cv_ll_per_stop_mean | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicAnimalNonLocal` | −4.3 | AIC | non-local (all): median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicAnimalNonLocalNoSwr` | +0.88 | AIC | non-local without SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicAnimalNonLocalSwr` | −2.6 | AIC | non-local with SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicAnimalSwr` | −2.7 | AIC | detected SWR: median over animals of the per-animal median AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicSessionNonLocal` | −4.2 | AIC | non-local (all): median over sessions of AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicSessionNonLocalNoSwr` | +0.88 | AIC | non-local without SWR: median over sessions of AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicSessionNonLocalSwr` | −3.1 | AIC | non-local with SWR: median over sessions of AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopDeltaAicSessionSwr` | −4.3 | AIC | detected SWR: median over sessions of AIC(R1) - AIC(R0) | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopSessionsNonLocal` | 241 |  | non-local (all): sessions with both rungs fit on the same stops | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopSessionsNonLocalNoSwr` | 241 |  | non-local without SWR: sessions with both rungs fit on the same stops | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopSessionsNonLocalSwr` | 241 |  | non-local with SWR: sessions with both rungs fit on the same stops | `behavior.per_stop_values` |  |
+| `\BehaviorPerStopSessionsSwr` | 241 |  | detected SWR: sessions with both rungs fit on the same stops | `behavior.per_stop_values` |  |
+| `\BehaviorRateAllstopsArrivalBinsBefore` | 7,943,566 |  | all-stops fit: bins before that removal | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsArrivalBinsDropped` | 89,838 |  | all-stops fit: bins the arrival clock removed from the common cohort | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsArrivalBinsDroppedFraction` | 1 % |  | all-stops fit: share of bins the arrival clock removed | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsArrivalEventShareNonLocal` | 0.86 |  | non-local (all): the same share on the all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalEventShareNonLocalNoSwr` | 0.81 |  | non-local without SWR: the same share on the all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalEventShareNonLocalSwr` | 0.91 |  | non-local with SWR: the same share on the all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalEventShareSwr` | 0.91 |  | detected SWR: the same share on the all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakEdgeCount` | 0 |  | populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit sits on the interval's edge | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakEdgeNonLocalNoSwr` | 0 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSHigh` | 5.79 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSLow` | 3.04 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSNonLocal` | 3.04 | s | non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSNonLocalNoSwr` | 5.79 | s | non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSNonLocalSwr` | 3.49 | s | non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSSwr` | 3.11 | s | detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSessionsNonLocal` | 116 |  | non-local (all): unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSessionsNonLocalNoSwr` | 107 |  | non-local without SWR: unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSessionsNonLocalSwr` | 81 |  | non-local with SWR: unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalPeakSessionsSwr` | 89 |  | detected SWR: unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsArrivalStopsDropped` | 1,509 |  | all-stops fit: stops the arrival clock removed | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsArrivalWindowBins` | 7,136,257 |  | all-stops fit: frozen-cohort bins inside the arrival window | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsArrivalWindowFraction` | 91 % |  | all-stops fit: share of frozen-cohort bins inside the arrival window | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsClockKsHigh` | 0.09 |  | highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsClockKsLow` | 0.08 |  | lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsClockKsNonLocal` | 0.08 |  | non-local (all): KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsClockKsNonLocalNoSwr` | 0.08 |  | non-local without SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsClockKsNonLocalSwr` | 0.09 |  | non-local with SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsClockKsSwr` | 0.08 |  | detected SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsFrozenBins` | 7,853,728 |  | all-stops fit: bins in the frozen common cohort | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalNonLocal` | 2.0 | rate ratio | all-stops fit, non-local (all): rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalNonLocalNoSwr` | 0.90 | rate ratio | all-stops fit, non-local without SWR: rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalNonLocalSwr` | 8.5 | rate ratio | all-stops fit, non-local with SWR: rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalSwr` | 5.4 | rate ratio | all-stops fit, detected SWR: rr_immediate (animal-balanced); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalsPositiveNonLocal` | 5 |  | all-stops fit, non-local (all): animals positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalsPositiveNonLocalNoSwr` | 2 |  | all-stops fit, non-local without SWR: animals positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalsPositiveNonLocalSwr` | 5 |  | all-stops fit, non-local with SWR: animals positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateAnimalsPositiveSwr` | 5 |  | all-stops fit, detected SWR: animals positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateSessionAnimalsNoSwr` | 3 |  | its animals with the median's sign | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateSessionNoSwr` | 0.88 | rate ratio | all-stops fit, non-local without SWR: exp of the across-session median first reward basis coefficient; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsImmediateSessionPNoSwr` | 0.52 |  | its signed-rank p (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsKernelLagOneAnimalsPositiveNoSwr` | 0 |  | all-stops fit, non-local without SWR: animals whose median lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsKernelLagOneNoSwr` | 0.93 | rate ratio | all-stops fit, non-local without SWR: median reconstructed kernel at lag 1 over the sessions passing the reward gate | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsKernelLagOnePNoSwr` | 0.068 |  | all-stops fit, non-local without SWR: signed-rank p of the log lag-1 kernel against 0 across sessions | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsMarginalRewardChildBetterFractionNonLocalNoSwr` | 47 % |  | all-stops fit, non-local without SWR: share of sessions in which M1_rew has the lower AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsMarginalRewardDeltaAicNonLocalNoSwr` | +0.34 | AIC | all-stops fit, non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAllstopsPairedP` | 2.3e-24 |  | the same, all-stops fit: signed-rank p | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsPairedPositiveFraction` | 84 % |  | the same, all-stops fit: share positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsPairedSessions` | 212 |  | the same, all-stops fit: paired sessions | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakEdgeCount` | 1 |  | populations whose argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit sits on the interval's edge | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakEdgeNonLocalNoSwr` | 1 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSHigh` | 3.00 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSLow` | 2.53 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSNonLocal` | 3.00 | s | non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSNonLocalNoSwr` | 3.00 | s | non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit; it sits on the interval's edge, so it bounds the peak rather than locating it | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSNonLocalSwr` | 2.53 | s | non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSSwr` | 2.65 | s | detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSessionsNonLocal` | 241 |  | non-local (all): unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSessionsNonLocalSwr` | 203 |  | non-local with SWR: unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateAllstopsTimePeakSessionsSwr` | 235 |  | detected SWR: unflagged session curves behind that median, all-stops fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalConstSessionsNonLocal` | 242 |  | non-local (all): M0a_const_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalConstSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: M0a_const_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalConstSessionsNonLocalSwr` | 242 |  | non-local with SWR: M0a_const_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalConstSessionsSwr` | 242 |  | detected SWR: M0a_const_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalEventShareNonLocal` | 0.91 |  | non-local (all): share of its event bins the arrival window [0, 8] s keeps | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalEventShareNonLocalNoSwr` | 0.88 |  | non-local without SWR: share of its event bins the arrival window [0, 8] s keeps | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalEventShareNonLocalSwr` | 0.94 |  | non-local with SWR: share of its event bins the arrival window [0, 8] s keeps | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalEventShareSwr` | 0.95 |  | detected SWR: share of its event bins the arrival window [0, 8] s keeps | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalFullCvNanFractionNonLocal` | 93 % |  | non-local (all): share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalFullCvNanFractionNonLocalSwr` | 100 % |  | non-local with SWR: share of M7ra_time_arrival_histcos_rew fits whose held-out score is not finite | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalFullSessionsNonLocal` | 236 |  | non-local (all): M7ra_time_arrival_histcos_rew fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalFullSessionsNonLocalNoSwr` | 233 |  | non-local without SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalFullSessionsNonLocalSwr` | 221 |  | non-local with SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalFullSessionsSwr` | 237 |  | detected SWR: M7ra_time_arrival_histcos_rew fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalPeakEdgeCount` | 0 |  | populations whose argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s sits on the interval's edge | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakEdgeNonLocalNoSwr` | 0 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSHigh` | 5.21 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSLow` | 2.94 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSNonLocal` | 3.01 | s | non-local (all): argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSNonLocalNoSwr` | 5.21 | s | non-local without SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSNonLocalSwr` | 2.94 | s | non-local with SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSSwr` | 3.11 | s | detected SWR: argmax of the median fitted M5a_time_arrival time course, read on [1, 6] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSessionsNonLocal` | 105 |  | non-local (all): unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSessionsNonLocalNoSwr` | 97 |  | non-local without SWR: unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSessionsNonLocalSwr` | 80 |  | non-local with SWR: unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalPeakSessionsSwr` | 89 |  | detected SWR: unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalSeparatedFractionHigh` | 64 % |  | highest over the populations: share of M5a_time_arrival fits flagged separated | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalSeparatedFractionLow` | 56 % |  | lowest over the populations: share of M5a_time_arrival fits flagged separated | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalSeparatedFractionNonLocal` | 56 % |  | non-local (all): share of M5a_time_arrival fits flagged separated | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalSeparatedFractionNonLocalNoSwr` | 59 % |  | non-local without SWR: share of M5a_time_arrival fits flagged separated | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalSeparatedFractionNonLocalSwr` | 64 % |  | non-local with SWR: share of M5a_time_arrival fits flagged separated | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalSeparatedFractionSwr` | 62 % |  | detected SWR: share of M5a_time_arrival fits flagged separated | `behavior.per_bin_values` |  |
+| `\BehaviorRateArrivalTimeCvNanFractionNonLocal` | 92 % |  | non-local (all): share of M5a_time_arrival fits whose held-out score is not finite | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalTimeCvNanFractionNonLocalSwr` | 100 % |  | non-local with SWR: share of M5a_time_arrival fits whose held-out score is not finite | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalTimeSessionsNonLocal` | 239 |  | non-local (all): M5a_time_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalTimeSessionsNonLocalNoSwr` | 234 |  | non-local without SWR: M5a_time_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalTimeSessionsNonLocalSwr` | 222 |  | non-local with SWR: M5a_time_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateArrivalTimeSessionsSwr` | 235 |  | detected SWR: M5a_time_arrival fits with a finite AIC | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateAuditStopsCommonDrop` | 575 |  | per_bin_rate_cohort_audit.csv: stops dropped by the common-cohort freeze (another rung's covariate, here the arrival clock) | `behavior.cohort_audit_values` |  |
+| `\BehaviorRateAuditStopsIn` | 93,560 |  | per_bin_rate_cohort_audit.csv: stops entering the cohort | `behavior.cohort_audit_values` |  |
+| `\BehaviorRateAuditStopsModeled` | 92,942 |  | per_bin_rate_cohort_audit.csv: stops modelled on M0_const | `behavior.cohort_audit_values` |  |
+| `\BehaviorRateAuditStopsModeledSessionExcluded` | 38 |  | per_bin_rate_cohort_audit.csv: stops in sessions M0_const gates out | `behavior.cohort_audit_values` |  |
+| `\BehaviorRateAuditStopsOwnDrop` | 5 |  | per_bin_rate_cohort_audit.csv: stops dropped for a missing own predictor | `behavior.cohort_audit_values` |  |
+| `\BehaviorRateBaselineLowerQuartileNonLocal` | 0.33 | events/s | non-local (all): 25th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineLowerQuartileNonLocalNoSwr` | 0.15 | events/s | non-local without SWR: 25th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineLowerQuartileNonLocalSwr` | 0.18 | events/s | non-local with SWR: 25th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineLowerQuartileSwr` | 0.24 | events/s | detected SWR: 25th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineNonLocal` | 0.45 | events/s | non-local (all): median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | `behavior.per_bin_values` |  |
+| `\BehaviorRateBaselineNonLocalNoSwr` | 0.23 | events/s | non-local without SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | `behavior.per_bin_values` |  |
+| `\BehaviorRateBaselineNonLocalSwr` | 0.22 | events/s | non-local with SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | `behavior.per_bin_values` |  |
+| `\BehaviorRateBaselineRatioNoSwrToSwr` | 0.78 | ratio | median within-session M0_const rate ratio, non_local_no_swr over swr | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioNoSwrToSwrP` | 8.8e-10 |  | its paired signed-rank p | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrCoupledToNoSwr` | 0.98 | ratio | median within-session M0_const rate ratio, non_local_swr over non_local_no_swr | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrCoupledToNoSwrP` | 0.30 |  | its paired signed-rank p | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrCoupledToNonLocal` | 0.49 | ratio | median within-session M0_const rate ratio, non_local_swr over non_local | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrCoupledToNonLocalP` | 1.9e-41 |  | its paired signed-rank p | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrCoupledToSwr` | 0.82 | ratio | median within-session M0_const rate ratio, non_local_swr over swr | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrCoupledToSwrP` | 4.3e-40 |  | its paired signed-rank p | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrToNonLocal` | 0.63 | ratio | median within-session M0_const rate ratio, swr over non_local | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineRatioSwrToNonLocalP` | 5.2e-39 |  | its paired signed-rank p | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineSwr` | 0.27 | events/s | detected SWR: median over sessions of exp(intercept) of M0_const, events per at-risk second (no event of its detector ongoing) | `behavior.per_bin_values` |  |
+| `\BehaviorRateBaselineUpperQuartileNonLocal` | 0.59 | events/s | non-local (all): 75th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineUpperQuartileNonLocalNoSwr` | 0.31 | events/s | non-local without SWR: 75th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineUpperQuartileNonLocalSwr` | 0.27 | events/s | non-local with SWR: 75th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBaselineUpperQuartileSwr` | 0.32 | events/s | detected SWR: 75th percentile over sessions of the M0_const rate | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBinCountNonLocal` | 0.0067 | events/bin | non-local (all): median M0_const rate times the 15 ms bin, the mean per-bin count | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBinCountNonLocalNoSwr` | 0.0034 | events/bin | non-local without SWR: median M0_const rate times the 15 ms bin, the mean per-bin count | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBinCountNonLocalSwr` | 0.0033 | events/bin | non-local with SWR: median M0_const rate times the 15 ms bin, the mean per-bin count | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBinCountSwr` | 0.0041 | events/bin | detected SWR: median M0_const rate times the 15 ms bin, the mean per-bin count | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBins` | 7,280,203 |  | 15 ms bins at risk in the frozen common cohort, non-local populations (the bins inside a non-local event are not at risk) | `behavior.per_bin_values` |  |
+| `\BehaviorRateBinsSwr` | 7,359,637 |  | 15 ms bins at risk in the frozen common cohort, detected SWR (the bins inside a Kay SWR are not at risk) | `behavior.per_bin_values` |  |
+| `\BehaviorRateBumpOneAnimalsNonLocal` | 5 |  | non-local (all): animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneAnimalsNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneAnimalsNonLocalSwr` | 5 |  | non-local with SWR: animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneAnimalsSwr` | 5 |  | detected SWR: animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOnePositiveFractionNonLocal` | 18 % |  | non-local (all): share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOnePositiveFractionNonLocalNoSwr` | 34 % |  | non-local without SWR: share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOnePositiveFractionNonLocalSwr` | 14 % |  | non-local with SWR: share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOnePositiveFractionSwr` | 14 % |  | detected SWR: share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneSessionNonLocal` | 0.055 | rate ratio | non-local (all): exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneSessionNonLocalNoSwr` | 0.16 | rate ratio | non-local without SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneSessionNonLocalSwr` | 0.015 | rate ratio | non-local with SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpOneSessionSwr` | 0.024 | rate ratio | detected SWR: exp of the across-session median coef_reward_history_rcos_1 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoAnimalsNonLocal` | 5 |  | non-local (all): animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoAnimalsNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoAnimalsNonLocalSwr` | 5 |  | non-local with SWR: animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoAnimalsSwr` | 5 |  | detected SWR: animals whose median has the across-session median's sign | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoPositiveFractionNonLocal` | 80 % |  | non-local (all): share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoPositiveFractionNonLocalNoSwr` | 63 % |  | non-local without SWR: share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoPositiveFractionNonLocalSwr` | 83 % |  | non-local with SWR: share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoPositiveFractionSwr` | 80 % |  | detected SWR: share of sessions with that coefficient positive | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoSessionNonLocal` | 4.8 | rate ratio | non-local (all): exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoSessionNonLocalNoSwr` | 2.8 | rate ratio | non-local without SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoSessionNonLocalSwr` | 14 | rate ratio | non-local with SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateBumpTwoSessionSwr` | 7.2 | rate ratio | detected SWR: exp of the across-session median coef_reward_history_rcos_2 of M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateClockKsHigh` | 0.09 |  | highest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | `behavior.per_bin_values` |  |
+| `\BehaviorRateClockKsLow` | 0.08 |  | lowest over the populations: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | `behavior.per_bin_values` |  |
+| `\BehaviorRateClockKsNonLocal` | 0.08 |  | non-local (all): KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | `behavior.per_bin_values` |  |
+| `\BehaviorRateClockKsNonLocalNoSwr` | 0.08 |  | non-local without SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | `behavior.per_bin_values` |  |
+| `\BehaviorRateClockKsNonLocalSwr` | 0.09 |  | non-local with SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | `behavior.per_bin_values` |  |
+| `\BehaviorRateClockKsSwr` | 0.09 |  | detected SWR: KS distance between the two clocks' median time courses, each normalized over its own supported interval and read on relative position | `behavior.per_bin_values` |  |
+| `\BehaviorRateConditionalRewardDeltaAicNonLocal` | +1.0 | AIC | non-local (all): median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateConditionalRewardDeltaAicNonLocalNoSwr` | +2.2 | AIC | non-local without SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateConditionalRewardDeltaAicNonLocalSwr` | +1.8 | AIC | non-local with SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateConditionalRewardDeltaAicSwr` | +1.2 | AIC | detected SWR: median per-session AIC(M7r_time_histcos_rew) - AIC(M6r_time_histcos); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateContrastAuditedRows` | 32 |  | rows the audited is_swr-contrast rate aggregate publishes | `behavior.rate_contrast_audit_values` |  |
+| `\BehaviorRateContrastExpandedFitsHigh` | 242 |  | most fits over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFitsLow` | 242 |  | fewest fits over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFlaggedHigh` | 239 |  | most fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedFlaggedLow` | 223 |  | fewest fits flagging is_swr:reward_history_rcos_1 over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedSeparatedHigh` | 239 |  | most fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastExpandedSeparatedLow` | 231 |  | fewest fits flagged separated over the contrast rungs carrying an is_swr reward expansion (S2-S10) | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastMostDropped` | 31 |  | most sessions a key contrast term loses to the gate (S3_periswitch is_swr:periswitch_index_trials) | `behavior.rate_contrast_audit_values` |  |
+| `\BehaviorRateContrastMostDroppedOf` | 242 |  | sessions fit for that term (S3_periswitch) | `behavior.rate_contrast_audit_values` |  |
+| `\BehaviorRateContrastPlainFits` | 242 |  | S1_rew contrast fits | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastPlainFlagged` | 2 |  | S1_rew contrast fits flagging reward_history_rcos_1 separated | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastSeparatedFractionPostOutcome` | 68 % |  | share of the is_swr-contrast rate ladder's post_outcome contrast fits flagged separated | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastSeparatedFractionPrimary` | 76 % |  | share of the is_swr-contrast rate ladder's primary contrast fits flagged separated | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastTermSeparatedFraction` | 94 % |  | share of the fits carrying is_swr:reward_history_rcos_1 that flag it separated | `behavior.rate_contrast_separation_values` |  |
+| `\BehaviorRateContrastTermsLosingSessions` | 1 |  | key is_swr contrast terms that lose any session to the per-term gate | `behavior.rate_contrast_audit_values` |  |
+| `\BehaviorRateFullSessionsNonLocal` | 242 |  | non-local (all): sessions with a fit of M7r_time_histcos_rew | `behavior.per_bin_values` |  |
+| `\BehaviorRateFullSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: sessions with a fit of M7r_time_histcos_rew | `behavior.per_bin_values` |  |
+| `\BehaviorRateFullSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions with a fit of M7r_time_histcos_rew | `behavior.per_bin_values` |  |
+| `\BehaviorRateFullSessionsSwr` | 242 |  | detected SWR: sessions with a fit of M7r_time_histcos_rew | `behavior.per_bin_values` |  |
+| `\BehaviorRateHistSeparatedFractionNonLocal` | 1 % |  | non-local (all): share of those fits flagging a self-history term (counted from event ends) separated | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSeparatedFractionNonLocalNoSwr` | 24 % |  | non-local without SWR: share of those fits flagging a self-history term (counted from event ends) separated | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSeparatedFractionNonLocalSwr` | 13 % |  | non-local with SWR: share of those fits flagging a self-history term (counted from event ends) separated | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSeparatedFractionSwr` | 2 % |  | detected SWR: share of those fits flagging a self-history term (counted from event ends) separated | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSessionsNonLocal` | 242 |  | non-local (all): sessions whose M7r_time_histcos_rew fit carries the self-history block | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateHistSessionsSwr` | 242 |  | detected SWR: sessions whose M7r_time_histcos_rew fit carries the self-history block | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateImmediateAnimalNonLocal` | 2.9 | rate ratio | non-local (all): exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalNonLocalNoSwr` | 1.3 | rate ratio | non-local without SWR: exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalNonLocalSwr` | 9.3 | rate ratio | non-local with SWR: exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalSwr` | 5.3 | rate ratio | detected SWR: exp of the animal-balanced median first reward basis coefficient (rr_immediate); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalsPositiveNonLocal` | 5 |  | non-local (all): animals whose median first reward basis coefficient is positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalsPositiveNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median first reward basis coefficient is positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalsPositiveNonLocalSwr` | 5 |  | non-local with SWR: animals whose median first reward basis coefficient is positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateAnimalsPositiveSwr` | 5 |  | detected SWR: animals whose median first reward basis coefficient is positive | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateRatioSwrToNoSwr` | 6.7 | ratio | rate_immediate_session_non_local_swr divided by rate_immediate_session_non_local_no_swr; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionAnimalsNonLocal` | 5 |  | non-local (all): animals whose median first reward basis coefficient has the sign of the across-session median | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionAnimalsNonLocalNoSwr` | 5 |  | non-local without SWR: animals whose median first reward basis coefficient has the sign of the across-session median | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionAnimalsNonLocalSwr` | 5 |  | non-local with SWR: animals whose median first reward basis coefficient has the sign of the across-session median | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionAnimalsSwr` | 5 |  | detected SWR: animals whose median first reward basis coefficient has the sign of the across-session median | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionNonLocal` | 3.2 | rate ratio | non-local (all): exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionNonLocalNoSwr` | 1.5 | rate ratio | non-local without SWR: exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionNonLocalSwr` | 9.8 | rate ratio | non-local with SWR: exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPNonLocal` | 5.9e-23 |  | non-local (all): signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPNonLocalNoSwr` | 9.1e-4 |  | non-local without SWR: signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPNonLocalSwr` | 5.0e-33 |  | non-local with SWR: signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPSwr` | 6.2e-28 |  | detected SWR: signed-rank p of the first reward basis coefficient against 0 across sessions (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPositiveFractionNonLocal` | 79 % |  | non-local (all): share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPositiveFractionNonLocalNoSwr` | 58 % |  | non-local without SWR: share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPositiveFractionNonLocalSwr` | 88 % |  | non-local with SWR: share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionPositiveFractionSwr` | 83 % |  | detected SWR: share of sessions whose first reward basis coefficient is positive (a basis coefficient, not an effect size) | `behavior.per_bin_values` |  |
+| `\BehaviorRateImmediateSessionSwr` | 6.3 | rate ratio | detected SWR: exp of the across-session median of the first reward basis coefficient coef_reward_history_rcos_0 in M7r_time_histcos_rew; a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_values` |  |
+| `\BehaviorRateIntransitArrivalEventShareHigh` | 0.37 |  | highest over populations of the in-transit fit's arrival-window event share | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateIntransitArrivalEventShareLow` | 0.18 |  | lowest over populations of the in-transit fit's arrival-window event share | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateIntransitArrivalEventShareNonLocal` | 0.33 |  | non-local (all): share of its event bins the arrival window keeps on the in-transit fit | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateIntransitArrivalEventShareNonLocalNoSwr` | 0.37 |  | non-local without SWR: share of its event bins the arrival window keeps on the in-transit fit | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateIntransitArrivalEventShareNonLocalSwr` | 0.18 |  | non-local with SWR: share of its event bins the arrival window keeps on the in-transit fit | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateIntransitArrivalEventShareSwr` | 0.30 |  | detected SWR: share of its event bins the arrival window keeps on the in-transit fit | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateIntransitSessions` | 52 |  | sessions with any per-bin fit on the in-transit stops (the sample gates leave the rest out) | `behavior.summarize` |  |
+| `\BehaviorRateIntransitSessionsNonLocal` | 51 |  | non-local (all): sessions with a per-bin fit on the in-transit stops | `behavior.summarize` |  |
+| `\BehaviorRateIntransitSessionsNonLocalNoSwr` | 39 |  | non-local without SWR: sessions with a per-bin fit on the in-transit stops | `behavior.summarize` |  |
+| `\BehaviorRateIntransitSessionsNonLocalSwr` | 10 |  | non-local with SWR: sessions with a per-bin fit on the in-transit stops | `behavior.summarize` |  |
+| `\BehaviorRateIntransitSessionsSwr` | 17 |  | detected SWR: sessions with a per-bin fit on the in-transit stops | `behavior.summarize` |  |
+| `\BehaviorRateKernelDroppedNonLocal` | 2 |  | non-local (all): fitted sessions the gate left out because a reward term was separated or ran away | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelDroppedNonLocalNoSwr` | 27 |  | non-local without SWR: fitted sessions the gate left out because a reward term was separated or ran away | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelDroppedNonLocalSwr` | 29 |  | non-local with SWR: fitted sessions the gate left out because a reward term was separated or ran away | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelDroppedSwr` | 3 |  | detected SWR: fitted sessions the gate left out because a reward term was separated or ran away | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagEightNonLocal` | 0.98 | rate ratio | non-local (all): median reconstructed reward kernel at lag 8 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagEightNonLocalNoSwr` | 0.98 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 8 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagEightNonLocalSwr` | 0.98 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 8 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagEightSwr` | 0.97 | rate ratio | detected SWR: median reconstructed reward kernel at lag 8 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFiveNonLocal` | 0.92 | rate ratio | non-local (all): median reconstructed reward kernel at lag 5 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFiveNonLocalNoSwr` | 0.94 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 5 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFiveNonLocalSwr` | 0.89 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 5 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFiveSwr` | 0.90 | rate ratio | detected SWR: median reconstructed reward kernel at lag 5 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFourNonLocal` | 0.91 | rate ratio | non-local (all): median reconstructed reward kernel at lag 4 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFourNonLocalNoSwr` | 0.93 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 4 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFourNonLocalSwr` | 0.90 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 4 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagFourSwr` | 0.90 | rate ratio | detected SWR: median reconstructed reward kernel at lag 4 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagNineNonLocal` | 1.01 | rate ratio | non-local (all): median reconstructed reward kernel at lag 9 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagNineNonLocalNoSwr` | 0.99 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 9 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagNineNonLocalSwr` | 1.02 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 9 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagNineSwr` | 1.01 | rate ratio | detected SWR: median reconstructed reward kernel at lag 9 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagOneAnimalNonLocal` | 1.22 | rate ratio | non-local (all): the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalNonLocalNoSwr` | 1.00 | rate ratio | non-local without SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalNonLocalSwr` | 1.47 | rate ratio | non-local with SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalSwr` | 1.41 | rate ratio | detected SWR: the same lag-1 kernel, median over animals of each animal's median (animal-balanced) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalsPositiveNonLocal` | 5 |  | non-local (all): animals whose median lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalsPositiveNonLocalNoSwr` | 4 |  | non-local without SWR: animals whose median lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalsPositiveNonLocalSwr` | 5 |  | non-local with SWR: animals whose median lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneAnimalsPositiveSwr` | 5 |  | detected SWR: animals whose median lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneNonLocal` | 1.18 | rate ratio | non-local (all): reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneNonLocalNoSwr` | 1.01 | rate ratio | non-local without SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneNonLocalSwr` | 1.44 | rate ratio | non-local with SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePNonLocal` | 2.5e-17 |  | non-local (all): signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePNonLocalNoSwr` | 0.29 |  | non-local without SWR: signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePNonLocalSwr` | 3.4e-26 |  | non-local with SWR: signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePSwr` | 1.6e-24 |  | detected SWR: signed-rank p of the log lag-1 kernel against 0 across sessions, treating sessions as independent | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePositiveFractionNonLocal` | 73 % |  | non-local (all): share of sessions whose lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePositiveFractionNonLocalNoSwr` | 51 % |  | non-local without SWR: share of sessions whose lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePositiveFractionNonLocalSwr` | 86 % |  | non-local with SWR: share of sessions whose lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOnePositiveFractionSwr` | 81 % |  | detected SWR: share of sessions whose lag-1 kernel is above 1 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagOneSwr` | 1.39 | rate ratio | detected SWR: reward kernel at lag 1, reconstructed per session from the three basis coefficients of M7r_time_histcos_rew, median over the sessions whose three reward terms pass the per-term separation gate (session-pooled) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagSevenNonLocal` | 0.95 | rate ratio | non-local (all): median reconstructed reward kernel at lag 7 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSevenNonLocalNoSwr` | 0.97 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 7 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSevenNonLocalSwr` | 0.94 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 7 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSevenSwr` | 0.94 | rate ratio | detected SWR: median reconstructed reward kernel at lag 7 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSixNonLocal` | 0.93 | rate ratio | non-local (all): median reconstructed reward kernel at lag 6 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSixNonLocalNoSwr` | 0.95 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 6 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSixNonLocalSwr` | 0.91 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 6 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagSixSwr` | 0.92 | rate ratio | detected SWR: median reconstructed reward kernel at lag 6 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagTenNonLocal` | 1.04 | rate ratio | non-local (all): median reconstructed kernel at lag 10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagTenNonLocalNoSwr` | 1.01 | rate ratio | non-local without SWR: median reconstructed kernel at lag 10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagTenNonLocalSwr` | 1.06 | rate ratio | non-local with SWR: median reconstructed kernel at lag 10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagTenSwr` | 1.04 | rate ratio | detected SWR: median reconstructed kernel at lag 10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLagThreeNonLocal` | 0.93 | rate ratio | non-local (all): median reconstructed reward kernel at lag 3 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagThreeNonLocalNoSwr` | 0.93 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 3 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagThreeNonLocalSwr` | 0.95 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 3 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagThreeSwr` | 0.93 | rate ratio | detected SWR: median reconstructed reward kernel at lag 3 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagTwoNonLocal` | 0.99 | rate ratio | non-local (all): median reconstructed reward kernel at lag 2 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagTwoNonLocalNoSwr` | 0.95 | rate ratio | non-local without SWR: median reconstructed reward kernel at lag 2 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagTwoNonLocalSwr` | 1.06 | rate ratio | non-local with SWR: median reconstructed reward kernel at lag 2 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLagTwoSwr` | 1.05 | rate ratio | detected SWR: median reconstructed reward kernel at lag 2 | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateKernelLateMaxNonLocal` | 1.04 | rate ratio | non-local (all): highest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMaxNonLocalNoSwr` | 1.01 | rate ratio | non-local without SWR: highest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMaxNonLocalSwr` | 1.06 | rate ratio | non-local with SWR: highest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMaxSwr` | 1.04 | rate ratio | detected SWR: highest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMinHigh` | 0.93 | rate ratio | highest over the populations: lowest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMinLow` | 0.89 | rate ratio | lowest over the populations: lowest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMinNonLocal` | 0.91 | rate ratio | non-local (all): lowest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMinNonLocalNoSwr` | 0.93 | rate ratio | non-local without SWR: lowest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMinNonLocalSwr` | 0.89 | rate ratio | non-local with SWR: lowest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelLateMinSwr` | 0.90 | rate ratio | detected SWR: lowest median reconstructed kernel over lags 3-10 | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelNonconvergedNonLocal` | 0 |  | non-local (all): of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelNonconvergedNonLocalNoSwr` | 24 |  | non-local without SWR: of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelNonconvergedNonLocalSwr` | 14 |  | non-local with SWR: of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelNonconvergedSwr` | 2 |  | detected SWR: of the kernel values' sessions, fits the optimizer flagged as not converged (kept: convergence is not part of the gate) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelSessionsNonLocal` | 240 |  | non-local (all): sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelSessionsNonLocalNoSwr` | 215 |  | non-local without SWR: sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelSessionsNonLocalSwr` | 213 |  | non-local with SWR: sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | `behavior.per_bin_values` |  |
+| `\BehaviorRateKernelSessionsSwr` | 239 |  | detected SWR: sessions whose M7r_time_histcos_rew reward terms all pass the per-term separation gate (the kernel values' sessions) | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderAicConst` | 2415 | AIC | non-local (all): median AIC of M0_const | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderAicFull` | 2303 | AIC | non-local (all): median AIC of M7r_time_histcos_rew | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderAicHistcos` | 2384 | AIC | non-local (all): median AIC of M3r_histcos | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderAicRew` | 2409 | AIC | non-local (all): median AIC of M1_rew | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderAicRewardByTime` | 2308 | AIC | non-local (all): median AIC of M9r_rew_x_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderAicTime` | 2320 | AIC | non-local (all): median AIC of M5_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderAicTimeHistcos` | 2307 | AIC | non-local (all): median AIC of M6r_time_histcos | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderCvBitsConst` | 0.00 | bits/event | non-local (all): median held-out bits per event of M0_const, over sessions with a finite score | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvBitsFull` | 0.30 | bits/event | non-local (all): median held-out bits per event of M7r_time_histcos_rew, over sessions with a finite score | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvBitsHistcos` | 0.09 | bits/event | non-local (all): median held-out bits per event of M3r_histcos, over sessions with a finite score | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderCvBitsRew` | 0.03 | bits/event | non-local (all): median held-out bits per event of M1_rew, over sessions with a finite score | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderCvBitsRewardByTime` | 0.24 | bits/event | non-local (all): median held-out bits per event of M9r_rew_x_time, over sessions with a finite score | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvBitsTime` | 0.25 | bits/event | non-local (all): median held-out bits per event of M5_time, over sessions with a finite score | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvBitsTimeHistcos` | 0.30 | bits/event | non-local (all): median held-out bits per event of M6r_time_histcos, over sessions with a finite score | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderCvSessionsConst` | 242 |  | non-local (all): sessions with a finite held-out score for M0_const | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvSessionsFull` | 213 |  | non-local (all): sessions with a finite held-out score for M7r_time_histcos_rew | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvSessionsHistcos` | 230 |  | non-local (all): sessions with a finite held-out score for M3r_histcos | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderCvSessionsRew` | 238 |  | non-local (all): sessions with a finite held-out score for M1_rew | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderCvSessionsRewardByTime` | 128 |  | non-local (all): sessions with a finite held-out score for M9r_rew_x_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvSessionsTime` | 226 |  | non-local (all): sessions with a finite held-out score for M5_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderCvSessionsTimeHistcos` | 216 |  | non-local (all): sessions with a finite held-out score for M6r_time_histcos | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderKsBandConst` | 0.31 |  | non-local (all): share of M0_const fits inside the KS band | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderKsBandFull` | 0.95 |  | non-local (all): share of M7r_time_histcos_rew fits inside the KS band | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderKsBandHistcos` | 0.30 |  | non-local (all): share of M3r_histcos fits inside the KS band | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderKsBandRew` | 0.26 |  | non-local (all): share of M1_rew fits inside the KS band | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderKsBandRewardByTime` | 0.95 |  | non-local (all): share of M9r_rew_x_time fits inside the KS band | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderKsBandTime` | 0.72 |  | non-local (all): share of M5_time fits inside the KS band | `behavior.per_bin_values` |  |
+| `\BehaviorRateLadderKsBandTimeHistcos` | 0.94 |  | non-local (all): share of M6r_time_histcos fits inside the KS band | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsConst` | 242 |  | non-local (all): sessions with a finite-AIC fit of M0_const | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsFull` | 242 |  | non-local (all): sessions with a finite-AIC fit of M7r_time_histcos_rew | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsHistcos` | 242 |  | non-local (all): sessions with a finite-AIC fit of M3r_histcos | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsRew` | 242 |  | non-local (all): sessions with a finite-AIC fit of M1_rew | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsRewardByTime` | 242 |  | non-local (all): sessions with a finite-AIC fit of M9r_rew_x_time | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsTime` | 242 |  | non-local (all): sessions with a finite-AIC fit of M5_time | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateLadderSessionsTimeHistcos` | 242 |  | non-local (all): sessions with a finite-AIC fit of M6r_time_histcos | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateMarginalRewardChildBetterFractionNonLocal` | 85 % |  | non-local (all): share of sessions in which M1_rew has the lower AIC than M0_const | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateMarginalRewardChildBetterFractionNonLocalNoSwr` | 52 % |  | non-local without SWR: share of sessions in which M1_rew has the lower AIC than M0_const | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateMarginalRewardChildBetterFractionNonLocalSwr` | 83 % |  | non-local with SWR: share of sessions in which M1_rew has the lower AIC than M0_const | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateMarginalRewardChildBetterFractionSwr` | 80 % |  | detected SWR: share of sessions in which M1_rew has the lower AIC than M0_const | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateMarginalRewardDeltaAicNonLocal` | −8.9 | AIC | non-local (all): median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateMarginalRewardDeltaAicNonLocalNoSwr` | −0.53 | AIC | non-local without SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateMarginalRewardDeltaAicNonLocalSwr` | −6.0 | AIC | non-local with SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRateMarginalRewardDeltaAicSwr` | −7.6 | AIC | detected SWR: median per-session AIC(M1_rew) - AIC(M0_const); negative = child better | `behavior.per_bin_values` |  |
+| `\BehaviorRatePairedAnimalsPositive` | 5 |  | animals whose median paired difference is positive | `behavior.per_bin_values` |  |
+| `\BehaviorRatePairedP` | 3.2e-18 |  | signed-rank p of the paired difference, treating sessions as independent | `behavior.per_bin_values` |  |
+| `\BehaviorRatePairedPositiveFraction` | 78 % |  | share of paired sessions in which the reconstructed lag-1 reward kernel, SWR-coupled minus non-SWR non-local events, within session, over the sessions in which both streams' reward terms pass the per-term separation gate is positive | `behavior.per_bin_values` |  |
+| `\BehaviorRatePairedSessions` | 197 |  | sessions in the paired comparison of the reconstructed lag-1 reward kernel, SWR-coupled minus non-SWR non-local events, within session, over the sessions in which both streams' reward terms pass the per-term separation gate | `behavior.per_bin_values` |  |
+| `\BehaviorRateRawImmediateSessionNonLocal` | 32 | rate ratio | non-local (all): exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateRawImmediateSessionNonLocalNoSwr` | 13 | rate ratio | non-local without SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateRawImmediateSessionNonLocalSwr` | 130 | rate ratio | non-local with SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateRawImmediateSessionSwr` | 63 | rate ratio | detected SWR: exp of the across-session median coef_reward_history_rcos_0 of M1_rew (uncontrolled); a basis coefficient, not the effect of a reward at any lag: the three coefficients are strongly collinear and a 0 to 1 change in one feature with the others held fixed is no reward history that occurs; the effect of a reward at lag 1 is the reconstructed kernel (rate_kernel_lag_one_*) | `behavior.per_bin_detail_values` |  |
+| `\BehaviorRateSessions` | 242 |  | sessions in the per-bin rate fit | `behavior.per_bin_values` |  |
+| `\BehaviorRateStops` | 92,942 |  | stops in the frozen common cohort (M0_const, every population) | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakEdgeCount` | 0 |  | populations whose argmax of the median fitted M5_time time course, read on [1, 3] s sits on the interval's edge | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakEdgeNonLocal` | 0 |  | non-local (all): 1 if that argmax sits on the edge of [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakEdgeNonLocalNoSwr` | 0 |  | non-local without SWR: 1 if that argmax sits on the edge of [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakEdgeNonLocalSwr` | 0 |  | non-local with SWR: 1 if that argmax sits on the edge of [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakEdgeSwr` | 0 |  | detected SWR: 1 if that argmax sits on the edge of [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSHigh` | 2.95 | s | highest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSLow` | 2.48 | s | lowest over the populations whose peak is located (not on the edge): argmax of the median fitted M5_time time course, read on [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSNonLocal` | 2.95 | s | non-local (all): argmax of the median fitted M5_time time course, read on [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSNonLocalNoSwr` | 2.48 | s | non-local without SWR: argmax of the median fitted M5_time time course, read on [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSNonLocalSwr` | 2.51 | s | non-local with SWR: argmax of the median fitted M5_time time course, read on [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSSwr` | 2.61 | s | detected SWR: argmax of the median fitted M5_time time course, read on [1, 3] s | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSessionsNonLocal` | 236 |  | non-local (all): unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSessionsNonLocalNoSwr` | 233 |  | non-local without SWR: unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSessionsNonLocalSwr` | 192 |  | non-local with SWR: unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimePeakSessionsSwr` | 232 |  | detected SWR: unflagged session curves behind that median | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimeSessionsNonLocal` | 242 |  | non-local (all): sessions with a fit of M5_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimeSessionsNonLocalNoSwr` | 242 |  | non-local without SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimeSessionsNonLocalSwr` | 242 |  | non-local with SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
+| `\BehaviorRateTimeSessionsSwr` | 242 |  | detected SWR: sessions with a fit of M5_time | `behavior.per_bin_values` |  |
+| `\BehaviorStopDurationMeanRatio` | 3.6 | ratio | ratio of those means | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMeanRewarded` | 2.2 | s | well-anchored stops with a rewarded outcome: mean immobility duration | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMeanUnrewarded` | 0.60 | s | well-anchored stops with an omitted outcome: mean immobility duration | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianRatio` | 3.6 | ratio | ratio of those medians | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianRewarded` | 1.0 | s | well-anchored stops with a rewarded outcome: median immobility duration | `behavior.stop_table_values` |  |
+| `\BehaviorStopDurationMedianUnrewarded` | 0.28 | s | well-anchored stops with an omitted outcome: median immobility duration | `behavior.stop_table_values` |  |
+| `\BehaviorStopSurvivalFourS` | 14 % |  | share of well-anchored stops still immobile at 4 s | `behavior.stop_table_values` |  |
+| `\BehaviorStopSurvivalTwoS` | 25 % |  | share of well-anchored stops still immobile at 2 s | `behavior.stop_table_values` |  |
+| `\BehaviorStopsCrossingOutcome` | 16,353 |  | stops with stop_start < outcome_known_time_s <= stop_end (all stops) | `behavior.stop_table_values` |  |
+| `\BehaviorStopsCrossingOutcomeFraction` | 14 % |  | their share of all stops | `behavior.stop_table_values` |  |
+| `\BehaviorStopsInTransit` | 25,768 |  | in-transit stops in the canonical stop table | `behavior.stop_table_values` |  |
+| `\BehaviorStopsOutcomeShifted` | 16,066 |  | crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary) | `behavior.stop_table_values` |  |
+| `\BehaviorStopsOutcomeShiftedFraction` | 13 % |  | their share of all stops | `behavior.stop_table_values` |  |
+| `\BehaviorStopsRewardHistoryIncompleteFraction` | 0.013 |  | share of stops flagged reward_history_incomplete (fewer than two known outcomes) | `behavior.stop_table_values` |  |
+| `\BehaviorStopsSpanningArrival` | 185 |  | stops containing a later well arrival | `behavior.stop_table_values` |  |
+| `\BehaviorStopsSpanningArrivalCrossing` | 0 |  | of those, stops that also cross their outcome boundary | `behavior.stop_table_values` |  |
+| `\BehaviorStopsTotal` | 120,320 |  | stops in the canonical stop table | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsWellAnchored` | 93,560 |  | stops with occupancy_state at_well or mixed (the shared cohort) | `behavior.stay_leave_values` |  |
 
 ### 3.4. Does content correlate with the upcoming choice once behavior is in the model, with or without SWR?
 
@@ -1677,36 +1674,36 @@ Sources:
 
 - Processed-Data/replay_content/event_source_comparison/non_local_HPC_comparison_fits.pkl (behavior.event_source_suite.non_local)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorChoiceFull` | +0.054 | log odds | C_full replay_fraction: session median coefficient (gated) | supplement |
-| `\BehaviorChoiceFullAnimalsPositive` | 4 |  | C_full replay_fraction: animals with a positive median | supplement |
-| `\BehaviorChoiceFullNegativeSessions` | 80 |  | C_full replay_fraction: sessions with a negative coefficient | supplement |
-| `\BehaviorChoiceFullP` | 0.38 |  | C_full replay_fraction: signed-rank p across sessions | supplement |
-| `\BehaviorChoiceFullPositiveSessions` | 100 |  | C_full replay_fraction: sessions with a positive coefficient | supplement |
-| `\BehaviorChoiceFullSessions` | 180 |  | C_full replay_fraction: sessions kept | supplement |
-| `\BehaviorChoiceFullSignificantFraction` | 7 % |  | C_full replay_fraction: share of sessions individually significant | supplement |
-| `\BehaviorChoiceNonSwr` | +0.040 | log odds | C_full_swr_split replay_fraction_non_swr: session median coefficient (gated) | supplement |
-| `\BehaviorChoiceNonSwrAnimalsPositive` | 5 |  | C_full_swr_split replay_fraction_non_swr: animals with a positive median | supplement |
-| `\BehaviorChoiceNonSwrNegativeSessions` | 33 |  | C_full_swr_split replay_fraction_non_swr: sessions with a negative coefficient | supplement |
-| `\BehaviorChoiceNonSwrP` | 0.84 |  | C_full_swr_split replay_fraction_non_swr: signed-rank p across sessions | supplement |
-| `\BehaviorChoiceNonSwrPositiveSessions` | 52 |  | C_full_swr_split replay_fraction_non_swr: sessions with a positive coefficient | supplement |
-| `\BehaviorChoiceNonSwrSessions` | 85 |  | C_full_swr_split replay_fraction_non_swr: sessions kept | supplement |
-| `\BehaviorChoiceNonSwrSignificantFraction` | 5 % |  | C_full_swr_split replay_fraction_non_swr: share of sessions individually significant | supplement |
-| `\BehaviorChoiceRaw` | −0.65 | log odds | C_replay_only replay_fraction: session median coefficient (gated) | supplement |
-| `\BehaviorChoiceRawAnimalsPositive` | 0 |  | C_replay_only replay_fraction: animals with a positive median | supplement |
-| `\BehaviorChoiceRawNegativeSessions` | 133 |  | C_replay_only replay_fraction: sessions with a negative coefficient | supplement |
-| `\BehaviorChoiceRawP` | 2.3e-13 |  | C_replay_only replay_fraction: signed-rank p across sessions | supplement |
-| `\BehaviorChoiceRawPositiveSessions` | 59 |  | C_replay_only replay_fraction: sessions with a positive coefficient | supplement |
-| `\BehaviorChoiceRawSessions` | 192 |  | C_replay_only replay_fraction: sessions kept | supplement |
-| `\BehaviorChoiceRawSignificantFraction` | 17 % |  | C_replay_only replay_fraction: share of sessions individually significant | supplement |
-| `\BehaviorChoiceSwr` | +0.041 | log odds | C_full_swr_split replay_fraction_swr: session median coefficient (gated) | supplement |
-| `\BehaviorChoiceSwrAnimalsPositive` | 3 |  | C_full_swr_split replay_fraction_swr: animals with a positive median | supplement |
-| `\BehaviorChoiceSwrNegativeSessions` | 33 |  | C_full_swr_split replay_fraction_swr: sessions with a negative coefficient | supplement |
-| `\BehaviorChoiceSwrP` | 0.66 |  | C_full_swr_split replay_fraction_swr: signed-rank p across sessions | supplement |
-| `\BehaviorChoiceSwrPositiveSessions` | 41 |  | C_full_swr_split replay_fraction_swr: sessions with a positive coefficient | supplement |
-| `\BehaviorChoiceSwrSessions` | 74 |  | C_full_swr_split replay_fraction_swr: sessions kept | supplement |
-| `\BehaviorChoiceSwrSignificantFraction` | 3 % |  | C_full_swr_split replay_fraction_swr: share of sessions individually significant | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorChoiceFull` | +0.054 | log odds | C_full replay_fraction: session median coefficient (gated) | `behavior.choice_values` |  |
+| `\BehaviorChoiceFullAnimalsPositive` | 4 |  | C_full replay_fraction: animals with a positive median | `behavior.choice_values` |  |
+| `\BehaviorChoiceFullNegativeSessions` | 80 |  | C_full replay_fraction: sessions with a negative coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceFullP` | 0.38 |  | C_full replay_fraction: signed-rank p across sessions | `behavior.choice_values` |  |
+| `\BehaviorChoiceFullPositiveSessions` | 100 |  | C_full replay_fraction: sessions with a positive coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceFullSessions` | 180 |  | C_full replay_fraction: sessions kept | `behavior.choice_values` |  |
+| `\BehaviorChoiceFullSignificantFraction` | 7 % |  | C_full replay_fraction: share of sessions individually significant | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwr` | +0.040 | log odds | C_full_swr_split replay_fraction_non_swr: session median coefficient (gated) | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwrAnimalsPositive` | 5 |  | C_full_swr_split replay_fraction_non_swr: animals with a positive median | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwrNegativeSessions` | 33 |  | C_full_swr_split replay_fraction_non_swr: sessions with a negative coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwrP` | 0.84 |  | C_full_swr_split replay_fraction_non_swr: signed-rank p across sessions | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwrPositiveSessions` | 52 |  | C_full_swr_split replay_fraction_non_swr: sessions with a positive coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwrSessions` | 85 |  | C_full_swr_split replay_fraction_non_swr: sessions kept | `behavior.choice_values` |  |
+| `\BehaviorChoiceNonSwrSignificantFraction` | 5 % |  | C_full_swr_split replay_fraction_non_swr: share of sessions individually significant | `behavior.choice_values` |  |
+| `\BehaviorChoiceRaw` | −0.65 | log odds | C_replay_only replay_fraction: session median coefficient (gated) | `behavior.choice_values` |  |
+| `\BehaviorChoiceRawAnimalsPositive` | 0 |  | C_replay_only replay_fraction: animals with a positive median | `behavior.choice_values` |  |
+| `\BehaviorChoiceRawNegativeSessions` | 133 |  | C_replay_only replay_fraction: sessions with a negative coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceRawP` | 2.3e-13 |  | C_replay_only replay_fraction: signed-rank p across sessions | `behavior.choice_values` |  |
+| `\BehaviorChoiceRawPositiveSessions` | 59 |  | C_replay_only replay_fraction: sessions with a positive coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceRawSessions` | 192 |  | C_replay_only replay_fraction: sessions kept | `behavior.choice_values` |  |
+| `\BehaviorChoiceRawSignificantFraction` | 17 % |  | C_replay_only replay_fraction: share of sessions individually significant | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwr` | +0.041 | log odds | C_full_swr_split replay_fraction_swr: session median coefficient (gated) | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrAnimalsPositive` | 3 |  | C_full_swr_split replay_fraction_swr: animals with a positive median | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrNegativeSessions` | 33 |  | C_full_swr_split replay_fraction_swr: sessions with a negative coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrP` | 0.66 |  | C_full_swr_split replay_fraction_swr: signed-rank p across sessions | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrPositiveSessions` | 41 |  | C_full_swr_split replay_fraction_swr: sessions with a positive coefficient | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrSessions` | 74 |  | C_full_swr_split replay_fraction_swr: sessions kept | `behavior.choice_values` |  |
+| `\BehaviorChoiceSwrSignificantFraction` | 3 % |  | C_full_swr_split replay_fraction_swr: share of sessions individually significant | `behavior.choice_values` |  |
 
 ### 3.5. Does non-SWR content predict staying or leaving?
 
@@ -1716,25 +1713,25 @@ Sources:
 
 - Processed-Data/replay_content/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and Processed-Data/replay_content/stop_table.parquet
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorStayConvergedAll` | 141 |  | stratum all: converged session-by-role logistic fits | supplement |
-| `\BehaviorStayConvergedMua` | 45 |  | stratum mua: converged session-by-role logistic fits | supplement |
-| `\BehaviorStayConvergedNonSwr` | 78 |  | stratum non_swr: converged session-by-role logistic fits | supplement |
-| `\BehaviorStayConvergedSwr` | 38 |  | stratum swr: converged session-by-role logistic fits | supplement |
-| `\BehaviorStayFitsAll` | 1,936 |  | stratum all: session-by-role logistic fits attempted | supplement |
-| `\BehaviorStayFitsMua` | 1,936 |  | stratum mua: session-by-role logistic fits attempted | supplement |
-| `\BehaviorStayFitsNonSwr` | 1,936 |  | stratum non_swr: session-by-role logistic fits attempted | supplement |
-| `\BehaviorStayFitsSwr` | 1,936 |  | stratum swr: session-by-role logistic fits attempted | supplement |
-| `\BehaviorStayMinQGee` | 0.52 |  | smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all) | supplement |
-| `\BehaviorStayMinQSignrank` | 0.44 |  | smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role last_rewarded, stratum non_swr) | supplement |
-| `\BehaviorStopsAtWellWithStay` | 75,785 |  | at_well stops carrying an is_stay (Stage 6's population) | supplement |
-| `\BehaviorStopsDropped` | 26,760 |  | stops the well-anchored cohort leaves out | supplement |
-| `\BehaviorStopsDroppedWithStay` | 0 |  | of those, stops carrying an is_stay | supplement |
-| `\BehaviorStopsMixed` | 16,061 |  | mixed stops (every one without an is_stay) | supplement |
-| `\BehaviorStopsMixedWithStay` | 0 |  | mixed stops carrying an is_stay | supplement |
-| `\BehaviorStopsTotal` | 120,320 |  | stops in the canonical stop table | supplement |
-| `\BehaviorStopsWellAnchored` | 93,560 |  | stops with occupancy_state at_well or mixed (the shared cohort) | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorStayConvergedAll` | 141 |  | stratum all: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
+| `\BehaviorStayConvergedMua` | 45 |  | stratum mua: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
+| `\BehaviorStayConvergedNonSwr` | 78 |  | stratum non_swr: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
+| `\BehaviorStayConvergedSwr` | 38 |  | stratum swr: converged session-by-role logistic fits | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsAll` | 1,936 |  | stratum all: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsMua` | 1,936 |  | stratum mua: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsNonSwr` | 1,936 |  | stratum non_swr: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
+| `\BehaviorStayFitsSwr` | 1,936 |  | stratum swr: session-by-role logistic fits attempted | `behavior.stay_leave_values` |  |
+| `\BehaviorStayMinQGee` | 0.52 |  | smallest FDR-adjusted pooled-GEE p over roles and strata (role best, stratum all) | `behavior.stay_leave_values` |  |
+| `\BehaviorStayMinQSignrank` | 0.44 |  | smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role last_rewarded, stratum non_swr) | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsAtWellWithStay` | 75,785 |  | at_well stops carrying an is_stay (Stage 6's population) | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsDropped` | 26,760 |  | stops the well-anchored cohort leaves out | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsDroppedWithStay` | 0 |  | of those, stops carrying an is_stay | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsMixed` | 16,061 |  | mixed stops (every one without an is_stay) | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsMixedWithStay` | 0 |  | mixed stops carrying an is_stay | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsTotal` | 120,320 |  | stops in the canonical stop table | `behavior.stay_leave_values` |  |
+| `\BehaviorStopsWellAnchored` | 93,560 |  | stops with occupancy_state at_well or mixed (the shared cohort) | `behavior.stay_leave_values` |  |
 
 ### 3.6. How does SWR against non-SWR content depend on the arm's reward fraction (CS4) and, separately, on its value (CS5), as direct (length-adjusted) and total effects?
 
@@ -1749,144 +1746,144 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl (audited aggregate)
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_rewarded.pkl (audited aggregate)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorDmSwrArmrewardDirect` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrArmrewardDirectQ` | 0.97 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrArmrewardDirectSessions` | 242 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmSwrArmvalueDirect` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrArmvalueDirectAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrArmvalueDirectQ` | 0.87 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrArmvalueDirectSessions` | 241 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmSwrArmvalueTotal` | −0.43 | log weight | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrArmvalueTotalAnimalsPositive` | 0 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrArmvalueTotalQ` | 1.2e-4 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrArmvalueTotalSessions` | 241 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmSwrPrevgoal` | −0.11 | log weight | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrPrevgoalAnimalsPositive` | 2 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrPrevgoalQ` | 0.77 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrPrevgoalSeparated` | 105 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session fits flagged separated | supplement |
-| `\BehaviorDmSwrPrevgoalSessions` | 157 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorEstArmvalueCount` | −0.038 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountAnimalsPositive` | 2 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountHigh` | +0.71 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountLow` | −0.21 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDm` | +0.028 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmHigh` | +0.99 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmLow` | −0.29 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFraction` | +0.067 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionHigh` | +0.94 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionLow` | −0.26 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicCount` | −64 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicDm` | +2.1 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicFraction` | +2.4 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCount` | +0.67 | log weight | C2_base is_current_arm, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountLow` | +0.36 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDm` | +0.73 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmAnimalsPositive` | 5 |  | C2_base is_current_arm, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmHigh` | +1.2 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmLow` | +0.26 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmSessions` | 242 |  | C2_base is_current_arm, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFraction` | +0.73 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionLow` | +0.25 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCount` | −0.0097 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountHigh` | +0.33 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountLow` | −0.56 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDm` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmHigh` | +0.25 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmLow` | −0.24 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFraction` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionHigh` | +0.61 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionLow` | −0.41 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCount` | +0.13 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountHigh` | +0.39 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountLow` | −0.69 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDm` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFraction` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCount` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountHigh` | +0.71 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountLow` | −0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDm` | +0.20 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmHigh` | +0.56 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmLow` | −0.26 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmSessions` | 241 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFraction` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionHigh` | +0.78 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionLow` | −0.27 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorSwitchrateCurrentAll` | +0.18 | log weight | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwitchrateCurrentAllAnimalsPositive` | 5 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwitchrateCurrentAllQ` | 1.0e-22 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwitchrateCurrentAllSessions` | 242 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwitchrateCurrentNonSwr` | +0.23 | log weight | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwitchrateCurrentNonSwrAnimalsPositive` | 5 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwitchrateCurrentNonSwrQ` | 7.3e-10 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwitchrateCurrentNonSwrSessions` | 237 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwitchrateCurrentSwr` | +0.33 | log weight | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwitchrateCurrentSwrAnimalsPositive` | 5 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwitchrateCurrentSwrQ` | 3.6e-22 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwitchrateCurrentSwrSessions` | 239 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmrewardDirect` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmrewardDirectQ` | 0.72 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmrewardDirectSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmrewardTotal` | −0.39 | log weight | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmrewardTotalAnimalsPositive` | 1 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmrewardTotalQ` | 3.3e-4 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmrewardTotalSessions` | 241 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmvalueDirect` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmvalueDirectAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmvalueDirectQ` | 0.93 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmvalueDirectRewarded` | +0.15 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmvalueDirectRewardedAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animals with a positive median | supplement |
-| `\BehaviorSwrArmvalueDirectRewardedQ` | 0.95 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmvalueDirectRewardedSessions` | 235 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmvalueDirectSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmvalueTotal` | −0.13 | log weight | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmvalueTotalAnimalsPositive` | 1 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmvalueTotalQ` | 0.026 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmvalueTotalRewarded` | −0.18 | log weight | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmvalueTotalRewardedAnimalsPositive` | 0 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animals with a positive median | supplement |
-| `\BehaviorSwrArmvalueTotalRewardedQ` | 0.028 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmvalueTotalRewardedSessions` | 237 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmvalueTotalSessions` | 238 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrPrevgoal` | +0.015 | log weight | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrPrevgoalAnimalsPositive` | 3 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrPrevgoalQ` | 0.72 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrPrevgoalSeparated` | 5 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session fits flagged separated | supplement |
-| `\BehaviorSwrPrevgoalSessions` | 197 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorDmSwrArmrewardDirect` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirectQ` | 0.97 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmrewardDirectSessions` | 242 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueDirect` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueDirectAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueDirectQ` | 0.87 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueDirectSessions` | 241 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueTotal` | −0.43 | log weight | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueTotalAnimalsPositive` | 0 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueTotalQ` | 1.2e-4 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmvalueTotalSessions` | 241 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrPrevgoal` | −0.11 | log weight | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrPrevgoalAnimalsPositive` | 2 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrPrevgoalQ` | 0.77 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrPrevgoalSeparated` | 105 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): session fits flagged separated | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrPrevgoalSessions` | 157 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorEstArmvalueCount` | −0.038 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountAnimalsPositive` | 2 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountHigh` | +0.71 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountLow` | −0.21 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDm` | +0.028 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmHigh` | +0.99 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmLow` | −0.29 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFraction` | +0.067 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionHigh` | +0.94 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionLow` | −0.26 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicCount` | −64 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicDm` | +2.1 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicFraction` | +2.4 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCount` | +0.67 | log weight | C2_base is_current_arm, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountLow` | +0.36 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDm` | +0.73 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmAnimalsPositive` | 5 |  | C2_base is_current_arm, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmHigh` | +1.2 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmLow` | +0.26 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmSessions` | 242 |  | C2_base is_current_arm, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFraction` | +0.73 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionLow` | +0.25 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCount` | −0.0097 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountHigh` | +0.33 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountLow` | −0.56 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDm` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmHigh` | +0.25 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmLow` | −0.24 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFraction` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionHigh` | +0.61 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionLow` | −0.41 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCount` | +0.13 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountHigh` | +0.39 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountLow` | −0.69 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDm` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFraction` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCount` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountHigh` | +0.71 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountLow` | −0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDm` | +0.20 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmHigh` | +0.56 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmLow` | −0.26 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmSessions` | 241 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFraction` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionHigh` | +0.78 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionLow` | −0.27 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorSwitchrateCurrentAll` | +0.18 | log weight | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentAllAnimalsPositive` | 5 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentAllQ` | 1.0e-22 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentAllSessions` | 242 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentNonSwr` | +0.23 | log weight | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentNonSwrAnimalsPositive` | 5 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentNonSwrQ` | 7.3e-10 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentNonSwrSessions` | 237 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentSwr` | +0.33 | log weight | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentSwrAnimalsPositive` | 5 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentSwrQ` | 3.6e-22 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwitchrateCurrentSwrSessions` | 239 |  | C12_switchrate patch_switch_fraction_last5_completed_trips_z_x_is_current_arm (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirect` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirectAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirectQ` | 0.72 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardDirectSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotal` | −0.39 | log weight | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotalAnimalsPositive` | 1 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotalQ` | 3.3e-4 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmrewardTotalSessions` | 241 |  | CS4nt_armreward swr_x_reward_fraction_candidate_arm_last10_visits (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirect` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectQ` | 0.93 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectRewarded` | +0.15 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectRewardedAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectRewardedQ` | 0.95 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectRewardedSessions` | 235 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueDirectSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotal` | −0.13 | log weight | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalAnimalsPositive` | 1 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalQ` | 0.026 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalRewarded` | −0.18 | log weight | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalRewardedAnimalsPositive` | 0 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalRewardedQ` | 0.028 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalRewardedSessions` | 237 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum rewarded): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmvalueTotalSessions` | 238 |  | CS5nt_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevgoal` | +0.015 | log weight | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevgoalAnimalsPositive` | 3 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevgoalQ` | 0.72 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevgoalSeparated` | 5 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session fits flagged separated | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrPrevgoalSessions` | 197 |  | CS5b_valuevsprevgoal swr_x_reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
 
 ### 3.7. Does content over-represent arms the animal is uncertain about, or arms of high value?
 
@@ -1900,173 +1897,173 @@ Sources:
 - Processed-Data/replay_content/models_swr_contrast/swr_contrast_content_audited_dm.pkl (audited aggregate)
 - Processed-Data/replay_content/uncertainty_content/horserace_summary.csv (content.uncertainty)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorArmuncertAll` | +0.31 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmuncertAllAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmuncertAllQ` | 5.4e-27 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmuncertAllSessions` | 242 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmuncertNonSwr` | +0.18 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmuncertNonSwrAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmuncertNonSwrQ` | 1.8e-14 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmuncertNonSwrSessions` | 239 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmuncertSwr` | +0.37 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmuncertSwrAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmuncertSwrQ` | 1.9e-27 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmuncertSwrSessions` | 239 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmvalueAll` | +0.078 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmvalueAllAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmvalueAllQ` | 0.13 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmvalueAllSessions` | 242 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmvalueNonSwr` | +0.041 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmvalueNonSwrAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmvalueNonSwrQ` | 0.053 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmvalueNonSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorArmvalueSwr` | −0.11 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorArmvalueSwrAnimalsPositive` | 2 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorArmvalueSwrQ` | 0.62 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorArmvalueSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmSwrArmuncertDirect` | −0.067 | log weight | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrArmuncertDirectAnimalsPositive` | 2 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrArmuncertDirectQ` | 0.015 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrArmuncertDirectSessions` | 242 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorDmSwrArmuncertTotal` | +0.11 | log weight | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorDmSwrArmuncertTotalAnimalsPositive` | 3 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorDmSwrArmuncertTotalQ` | 1.2e-4 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorDmSwrArmuncertTotalSessions` | 241 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorEstArmvalueCount` | −0.038 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountAnimalsPositive` | 2 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountHigh` | +0.71 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountLow` | −0.21 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueCountSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDm` | +0.028 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmHigh` | +0.99 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmLow` | −0.29 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueDmSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFraction` | +0.067 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionHigh` | +0.94 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionLow` | −0.26 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueFractionSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicCount` | −64 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicDm` | +2.1 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstArmvalueRungDeltaAicFraction` | +2.4 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCount` | +0.67 | log weight | C2_base is_current_arm, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountLow` | +0.36 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentCountSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDm` | +0.73 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmAnimalsPositive` | 5 |  | C2_base is_current_arm, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmHigh` | +1.2 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmLow` | +0.26 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentDmSessions` | 242 |  | C2_base is_current_arm, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFraction` | +0.73 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionLow` | +0.25 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstCurrentFractionSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCount` | −0.0097 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountHigh` | +0.33 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountLow` | −0.56 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardCountSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDm` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmHigh` | +0.25 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmLow` | −0.24 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardDmSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFraction` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionHigh` | +0.61 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionLow` | −0.41 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmrewardFractionSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCount` | +0.13 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountHigh` | +0.39 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountLow` | −0.69 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueCountSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDm` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueDmSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFraction` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrArmvalueFractionSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCount` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountHigh` | +0.71 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountLow` | −0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentCountSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDm` | +0.20 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmHigh` | +0.56 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmLow` | −0.26 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentDmSessions` | 241 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: sessions | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFraction` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal-balanced median | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animals positive | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionHigh` | +0.78 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionLow` | −0.27 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | supplement, figure: content_estimators |
-| `\BehaviorEstSwrCurrentFractionSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: sessions | supplement, figure: content_estimators |
-| `\BehaviorHorseraceConditionNumberAll` | 3.09 |  | all events: median per-session condition number of the four-predictor design (collinearity check; below 10 = separable) | paper |
-| `\BehaviorHorseraceConditionNumberNonSwr` | 2.98 |  | non_SWR events: median per-session condition number of the four-predictor design (collinearity check; below 10 = separable) | paper |
-| `\BehaviorHorseraceConditionNumberSwr` | 3.36 |  | SWR events: median per-session condition number of the four-predictor design (collinearity check; below 10 = separable) | paper |
-| `\BehaviorHorseraceDistanceAll` | −0.014 | arm fraction per SD | all events: within-arm coefficient of distance to the arm, the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceDistanceAllAnimals` | 5 |  | all events: animals whose own median distance to the arm coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceDistanceNonSwr` | −0.014 | arm fraction per SD | non_SWR events: within-arm coefficient of distance to the arm, the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceDistanceNonSwrAnimals` | 5 |  | non_SWR events: animals whose own median distance to the arm coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceDistanceSwr` | −0.011 | arm fraction per SD | SWR events: within-arm coefficient of distance to the arm, the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceDistanceSwrAnimals` | 4 |  | SWR events: animals whose own median distance to the arm coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceRecencyAll` | +0.0026 | arm fraction per SD | all events: within-arm coefficient of visit recency, the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceRecencyAllAnimals` | 3 |  | all events: animals whose own median visit recency coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceRecencyNonSwr` | −0.0012 | arm fraction per SD | non_SWR events: within-arm coefficient of visit recency, the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceRecencyNonSwrAnimals` | 4 |  | non_SWR events: animals whose own median visit recency coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceRecencySwr` | +0.0083 | arm fraction per SD | SWR events: within-arm coefficient of visit recency, the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceRecencySwrAnimals` | 5 |  | SWR events: animals whose own median visit recency coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceUncertaintyAll` | +0.037 | arm fraction per SD | all events: within-arm coefficient of reward-belief variance (uncertainty), the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceUncertaintyAllAnimals` | 5 |  | all events: animals whose own median reward-belief variance (uncertainty) coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceUncertaintyNonSwr` | +0.039 | arm fraction per SD | non_SWR events: within-arm coefficient of reward-belief variance (uncertainty), the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceUncertaintyNonSwrAnimals` | 5 |  | non_SWR events: animals whose own median reward-belief variance (uncertainty) coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceUncertaintySwr` | +0.034 | arm fraction per SD | SWR events: within-arm coefficient of reward-belief variance (uncertainty), the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceUncertaintySwrAnimals` | 5 |  | SWR events: animals whose own median reward-belief variance (uncertainty) coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceValueAll` | −0.0012 | arm fraction per SD | all events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceValueAllAnimals` | 4 |  | all events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceValueNonSwr` | −0.00052 | arm fraction per SD | non_SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceValueNonSwrAnimals` | 2 |  | non_SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | paper |
-| `\BehaviorHorseraceValueSwr` | −0.0018 | arm fraction per SD | SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | paper |
-| `\BehaviorHorseraceValueSwrAnimals` | 5 |  | SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | paper |
-| `\BehaviorLeafStepBoth` | −1.5 | AIC | leaf ladder Mu to Mvu: median per-session AIC(parent) - AIC(child); positive = child better | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepBothAnimals` | 0 |  | leaf ladder Mu to Mvu: animals whose median step favours the child | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepBothClear` | 12 |  | leaf ladder Mu to Mvu: sessions in which the child's AIC is lower by more than 2 | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepBothSessions` | 242 |  | leaf ladder Mu to Mvu: sessions compared | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepUncertainty` | +1.3 | AIC | leaf ladder M4 to Mu: median per-session AIC(parent) - AIC(child); positive = child better | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepUncertaintyAnimals` | 5 |  | leaf ladder M4 to Mu: animals whose median step favours the child | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepUncertaintyClear` | 112 |  | leaf ladder M4 to Mu: sessions in which the child's AIC is lower by more than 2 | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepUncertaintySessions` | 242 |  | leaf ladder M4 to Mu: sessions compared | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepValue` | −2.4 | AIC | leaf ladder M4 to Mv: median per-session AIC(parent) - AIC(child); positive = child better | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepValueAnimals` | 0 |  | leaf ladder M4 to Mv: animals whose median step favours the child | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepValueClear` | 22 |  | leaf ladder M4 to Mv: sessions in which the child's AIC is lower by more than 2 | supplement, figure: uncertainty_content |
-| `\BehaviorLeafStepValueSessions` | 242 |  | leaf ladder M4 to Mv: sessions compared | supplement, figure: uncertainty_content |
-| `\BehaviorLeafUncertainty` | +0.31 | log weight | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: session median coefficient | supplement, figure: uncertainty_content |
-| `\BehaviorLeafUncertaintyAnimalsPositive` | 5 |  | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: animals positive | supplement, figure: uncertainty_content |
-| `\BehaviorLeafUncertaintySe` | 0.18 | log weight | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: median event-clustered session SE | supplement, figure: uncertainty_content |
-| `\BehaviorLeafUncertaintySessions` | 242 |  | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: sessions kept | supplement, figure: uncertainty_content |
-| `\BehaviorLeafValue` | +0.24 | log weight | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: session median coefficient | supplement, figure: uncertainty_content |
-| `\BehaviorLeafValueAnimalsPositive` | 3 |  | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: animals positive | supplement, figure: uncertainty_content |
-| `\BehaviorLeafValueSe` | 1.0 | log weight | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: median event-clustered session SE | supplement, figure: uncertainty_content |
-| `\BehaviorLeafValueSessions` | 242 |  | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: sessions kept | supplement, figure: uncertainty_content |
-| `\BehaviorSwrArmuncertDirect` | −0.062 | log weight | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmuncertDirectAnimalsPositive` | 2 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmuncertDirectQ` | 0.33 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmuncertDirectSessions` | 242 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
-| `\BehaviorSwrArmuncertTotal` | +0.10 | log weight | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | supplement |
-| `\BehaviorSwrArmuncertTotalAnimalsPositive` | 3 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | supplement |
-| `\BehaviorSwrArmuncertTotalQ` | 5.2e-7 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | supplement |
-| `\BehaviorSwrArmuncertTotalSessions` | 242 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): sessions the per-term gate keeps | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorArmuncertAll` | +0.31 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertAllAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertAllQ` | 5.4e-27 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertAllSessions` | 242 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertNonSwr` | +0.18 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertNonSwrAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertNonSwrQ` | 1.8e-14 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertNonSwrSessions` | 239 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertSwr` | +0.37 | log weight | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertSwrAnimalsPositive` | 5 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertSwrQ` | 1.9e-27 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmuncertSwrSessions` | 239 |  | C13_armuncert reward_belief_variance_candidate_arm_preoutcome_z (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAll` | +0.078 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAllAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAllQ` | 0.13 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueAllSessions` | 242 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwr` | +0.041 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwrAnimalsPositive` | 4 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwrQ` | 0.053 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueNonSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population nonSWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwr` | −0.11 | log weight | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwrAnimalsPositive` | 2 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwrQ` | 0.62 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorArmvalueSwrSessions` | 239 |  | C4_armvalue reward_belief_mean_candidate_arm_preoutcome (fraction, population SWR, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertDirect` | −0.067 | log weight | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertDirectAnimalsPositive` | 2 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertDirectQ` | 0.015 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertDirectSessions` | 242 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertTotal` | +0.11 | log weight | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertTotalAnimalsPositive` | 3 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertTotalQ` | 1.2e-4 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorDmSwrArmuncertTotalSessions` | 241 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (Dirichlet-multinomial, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorEstArmvalueCount` | −0.038 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountAnimalsPositive` | 2 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountHigh` | +0.71 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountLow` | −0.21 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueCountSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDm` | +0.028 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmHigh` | +0.99 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmLow` | −0.29 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueDmSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFraction` | +0.067 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionHigh` | +0.94 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionLow` | −0.26 | log weight | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueFractionSessions` | 242 |  | CS5_armvalue reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicCount` | −64 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_count: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicDm` | +2.1 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), dirichlet_multinomial: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstArmvalueRungDeltaAicFraction` | +2.4 | AIC | CS5_armvalue against C2_base_swr_leaf (the same base and SWR arm baselines, without the two value terms), conditional_poisson_fraction: animal-balanced median per-session AIC(rung) - AIC(parent); negative = rung better | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCount` | +0.67 | log weight | C2_base is_current_arm, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountLow` | +0.36 | log weight | C2_base is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentCountSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDm` | +0.73 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmAnimalsPositive` | 5 |  | C2_base is_current_arm, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmHigh` | +1.2 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmLow` | +0.26 | log weight | C2_base is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentDmSessions` | 242 |  | C2_base is_current_arm, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFraction` | +0.73 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionAnimalsPositive` | 5 |  | C2_base is_current_arm, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionHigh` | +1.4 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionLow` | +0.25 | log weight | C2_base is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstCurrentFractionSessions` | 242 |  | C2_base is_current_arm, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCount` | −0.0097 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountHigh` | +0.33 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountLow` | −0.56 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardCountSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDm` | −0.010 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmHigh` | +0.25 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmLow` | −0.24 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardDmSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFraction` | −0.18 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionAnimalsPositive` | 2 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionHigh` | +0.61 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionLow` | −0.41 | log weight | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmrewardFractionSessions` | 241 |  | CS4_armreward swr_x_reward_fraction_candidate_arm_last10_visits, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCount` | +0.13 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountHigh` | +0.39 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountLow` | −0.69 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueCountSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDm` | −0.040 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmAnimalsPositive` | 2 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueDmSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFraction` | +0.082 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionAnimalsPositive` | 3 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionHigh` | +0.30 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionLow` | −1.2 | log weight | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrArmvalueFractionSessions` | 236 |  | CS5_armvalue swr_x_reward_belief_mean_candidate_arm_preoutcome, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCount` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountHigh` | +0.71 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountLow` | −0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_count: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentCountSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_count: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDm` | +0.20 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmHigh` | +0.56 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmLow` | −0.26 | log weight | CS1_current swr_x_is_current_arm, dirichlet_multinomial: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentDmSessions` | 241 |  | CS1_current swr_x_is_current_arm, dirichlet_multinomial: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFraction` | +0.19 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal-balanced median | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionAnimalsPositive` | 3 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animals positive | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionHigh` | +0.78 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 97.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionLow` | −0.27 | log weight | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: animal bootstrap 2.5th percentile | `behavior.estimator_values` | content_estimators |
+| `\BehaviorEstSwrCurrentFractionSessions` | 241 |  | CS1_current swr_x_is_current_arm, conditional_poisson_fraction: sessions | `behavior.estimator_values` | content_estimators |
+| `\BehaviorHorseraceConditionNumberAll` | 3.09 |  | all events: median per-session condition number of the four-predictor design (collinearity check; below 10 = separable) | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceConditionNumberNonSwr` | 2.98 |  | non_SWR events: median per-session condition number of the four-predictor design (collinearity check; below 10 = separable) | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceConditionNumberSwr` | 3.36 |  | SWR events: median per-session condition number of the four-predictor design (collinearity check; below 10 = separable) | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceDistanceAll` | −0.014 | arm fraction per SD | all events: within-arm coefficient of distance to the arm, the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceDistanceAllAnimals` | 5 |  | all events: animals whose own median distance to the arm coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceDistanceNonSwr` | −0.014 | arm fraction per SD | non_SWR events: within-arm coefficient of distance to the arm, the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceDistanceNonSwrAnimals` | 5 |  | non_SWR events: animals whose own median distance to the arm coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceDistanceSwr` | −0.011 | arm fraction per SD | SWR events: within-arm coefficient of distance to the arm, the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceDistanceSwrAnimals` | 4 |  | SWR events: animals whose own median distance to the arm coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceRecencyAll` | +0.0026 | arm fraction per SD | all events: within-arm coefficient of visit recency, the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceRecencyAllAnimals` | 3 |  | all events: animals whose own median visit recency coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceRecencyNonSwr` | −0.0012 | arm fraction per SD | non_SWR events: within-arm coefficient of visit recency, the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceRecencyNonSwrAnimals` | 4 |  | non_SWR events: animals whose own median visit recency coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceRecencySwr` | +0.0083 | arm fraction per SD | SWR events: within-arm coefficient of visit recency, the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceRecencySwrAnimals` | 5 |  | SWR events: animals whose own median visit recency coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceUncertaintyAll` | +0.037 | arm fraction per SD | all events: within-arm coefficient of reward-belief variance (uncertainty), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceUncertaintyAllAnimals` | 5 |  | all events: animals whose own median reward-belief variance (uncertainty) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceUncertaintyNonSwr` | +0.039 | arm fraction per SD | non_SWR events: within-arm coefficient of reward-belief variance (uncertainty), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceUncertaintyNonSwrAnimals` | 5 |  | non_SWR events: animals whose own median reward-belief variance (uncertainty) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceUncertaintySwr` | +0.034 | arm fraction per SD | SWR events: within-arm coefficient of reward-belief variance (uncertainty), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceUncertaintySwrAnimals` | 5 |  | SWR events: animals whose own median reward-belief variance (uncertainty) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceValueAll` | −0.0012 | arm fraction per SD | all events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceValueAllAnimals` | 4 |  | all events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceValueNonSwr` | −0.00052 | arm fraction per SD | non_SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceValueNonSwrAnimals` | 2 |  | non_SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceValueSwr` | −0.0018 | arm fraction per SD | SWR events: within-arm coefficient of reward-belief mean (value), the four predictors entered together; median over sessions | `behavior.horserace_values` |  |
+| `\BehaviorHorseraceValueSwrAnimals` | 5 |  | SWR events: animals whose own median reward-belief mean (value) coefficient has the sign of the overall median | `behavior.horserace_values` |  |
+| `\BehaviorLeafStepBoth` | −1.5 | AIC | leaf ladder Mu to Mvu: median per-session AIC(parent) - AIC(child); positive = child better | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepBothAnimals` | 0 |  | leaf ladder Mu to Mvu: animals whose median step favours the child | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepBothClear` | 12 |  | leaf ladder Mu to Mvu: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepBothSessions` | 242 |  | leaf ladder Mu to Mvu: sessions compared | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertainty` | +1.3 | AIC | leaf ladder M4 to Mu: median per-session AIC(parent) - AIC(child); positive = child better | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertaintyAnimals` | 5 |  | leaf ladder M4 to Mu: animals whose median step favours the child | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertaintyClear` | 112 |  | leaf ladder M4 to Mu: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepUncertaintySessions` | 242 |  | leaf ladder M4 to Mu: sessions compared | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValue` | −2.4 | AIC | leaf ladder M4 to Mv: median per-session AIC(parent) - AIC(child); positive = child better | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValueAnimals` | 0 |  | leaf ladder M4 to Mv: animals whose median step favours the child | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValueClear` | 22 |  | leaf ladder M4 to Mv: sessions in which the child's AIC is lower by more than 2 | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafStepValueSessions` | 242 |  | leaf ladder M4 to Mv: sessions compared | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafUncertainty` | +0.31 | log weight | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: session median coefficient | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafUncertaintyAnimalsPositive` | 5 |  | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: animals positive | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafUncertaintySe` | 0.18 | log weight | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: median event-clustered session SE | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafUncertaintySessions` | 242 |  | leaf ladder Mu reward_belief_variance_candidate_arm_preoutcome_z: sessions kept | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafValue` | +0.24 | log weight | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: session median coefficient | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafValueAnimalsPositive` | 3 |  | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: animals positive | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafValueSe` | 1.0 | log weight | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: median event-clustered session SE | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorLeafValueSessions` | 242 |  | leaf ladder Mv reward_belief_mean_candidate_arm_preoutcome: sessions kept | `behavior.leaf_values` | uncertainty_content |
+| `\BehaviorSwrArmuncertDirect` | −0.062 | log weight | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertDirectAnimalsPositive` | 2 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertDirectQ` | 0.33 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertDirectSessions` | 242 |  | CS6_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertTotal` | +0.10 | log weight | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animal-balanced median coefficient | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertTotalAnimalsPositive` | 3 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): animals with a positive median | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertTotalQ` | 5.2e-7 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): session signed-rank BH-FDR q (across the bundle's rungs per population) | `behavior.content_contrast_values` |  |
+| `\BehaviorSwrArmuncertTotalSessions` | 242 |  | CS6nt_armuncert swr_x_reward_belief_variance_candidate_arm_preoutcome_z (fraction, population all, outcome stratum all): sessions the per-term gate keeps | `behavior.content_contrast_values` |  |
 
 ### 3.8. Does the ripple power of events depend on the recent patch-switch rate, the previous trial's reward outcome or the post-outcome reward prediction error?
 
@@ -2076,18 +2073,18 @@ Sources:
 
 - Processed-Data/replay_content/models_per_event_swr_power/swr_power_model.pkl (coupling.ripple_power)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\BehaviorPowerExploration` | −0.073 | SD of power per SD | patch_switch_fraction_last5_completed_trips: median per-session coefficient on ripple_power_z | supplement |
-| `\BehaviorPowerExplorationAnimalsPositive` | 0 |  | patch_switch_fraction_last5_completed_trips: animals with a positive median | supplement |
-| `\BehaviorPowerExplorationP` | 9.8e-11 |  | patch_switch_fraction_last5_completed_trips: signed-rank p | supplement |
-| `\BehaviorPowerReward` | +0.040 | SD of power per SD | known_reward_outcome_lag_1: median per-session coefficient on ripple_power_z | supplement |
-| `\BehaviorPowerRewardAnimalsPositive` | 5 |  | known_reward_outcome_lag_1: animals with a positive median | supplement |
-| `\BehaviorPowerRewardP` | 1.1e-5 |  | known_reward_outcome_lag_1: signed-rank p | supplement |
-| `\BehaviorPowerRpe` | +0.10 | SD of power per SD | rpe_postoutcome: median per-session coefficient on ripple_power_z | supplement |
-| `\BehaviorPowerRpeAnimalsPositive` | 5 |  | rpe_postoutcome: animals with a positive median | supplement |
-| `\BehaviorPowerRpeP` | 5.9e-22 |  | rpe_postoutcome: signed-rank p | supplement |
-| `\BehaviorPowerSessions` | 242 |  | sessions in the SWR-power model | supplement |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\BehaviorPowerExploration` | −0.073 | SD of power per SD | patch_switch_fraction_last5_completed_trips: median per-session coefficient on ripple_power_z | `behavior.power_values` |  |
+| `\BehaviorPowerExplorationAnimalsPositive` | 0 |  | patch_switch_fraction_last5_completed_trips: animals with a positive median | `behavior.power_values` |  |
+| `\BehaviorPowerExplorationP` | 9.8e-11 |  | patch_switch_fraction_last5_completed_trips: signed-rank p | `behavior.power_values` |  |
+| `\BehaviorPowerReward` | +0.040 | SD of power per SD | known_reward_outcome_lag_1: median per-session coefficient on ripple_power_z | `behavior.power_values` |  |
+| `\BehaviorPowerRewardAnimalsPositive` | 5 |  | known_reward_outcome_lag_1: animals with a positive median | `behavior.power_values` |  |
+| `\BehaviorPowerRewardP` | 1.1e-5 |  | known_reward_outcome_lag_1: signed-rank p | `behavior.power_values` |  |
+| `\BehaviorPowerRpe` | +0.10 | SD of power per SD | rpe_postoutcome: median per-session coefficient on ripple_power_z | `behavior.power_values` |  |
+| `\BehaviorPowerRpeAnimalsPositive` | 5 |  | rpe_postoutcome: animals with a positive median | `behavior.power_values` |  |
+| `\BehaviorPowerRpeP` | 5.9e-22 |  | rpe_postoutcome: signed-rank p | `behavior.power_values` |  |
+| `\BehaviorPowerSessions` | 242 |  | sessions in the SWR-power model | `behavior.power_values` |  |
 
 ### 3.9. Are SWR and non-SWR events recruited differently by behavior?
 
@@ -2110,612 +2107,612 @@ Sources:
 - Processed-Data/pfc_response_followups/stop_context/results.csv (scripts/pfc/run_pfc_stop_context.py fit; conditional estimator)
 - Processed-Data/pfc_response_followups/swr_without_replay/*_mPFC_modulation.pkl and sidecars (scripts/pfc/run_pfc_analysis_bandit.py --event-set with_swr_without_replay), 75 bundles, Figure 4's loader (no firing-rate cutoff)
 
-| Macro | Value | Unit | What it is | Used in |
-|---|---|---|---|---|
-| `\MpfcAnalysedEpochs` | 242 |  | analysed epochs the PFC cohort is drawn from | paper |
-| `\MpfcAnimals` | 5 |  | animals in the mPFC population | paper |
-| `\MpfcBestModelConstantFraction` | 52 % |  | share of units whose best model by held-out deviance is constant | figure: 4d |
-| `\MpfcBestModelJointFraction` | 6 % |  | share of units whose best model by held-out deviance is SWR + non_local_no_SWR | figure: 4d |
-| `\MpfcBestModelNonlocalFraction` | 28 % |  | share of units whose best model by held-out deviance is non_local | figure: 4d |
-| `\MpfcBestModelSwrFraction` | 14 % |  | share of units whose best model by held-out deviance is SWR | figure: 4d |
-| `\MpfcBinsFit` | 20,618,388 |  | immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, summed over sessions | paper |
-| `\MpfcBinsFitFraction` | 92 % |  | share of the immobile bins the stop restriction keeps, pooled | paper |
-| `\MpfcBinsImmobile` | 22,360,999 |  | immobile 2 ms bins before the stop restriction, summed over sessions | paper |
-| `\MpfcCheckOneHzEngagementCalledFraction` | 23 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | paper |
-| `\MpfcCheckOneHzNonSwrReplayCalledFraction` | 23 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive) | paper |
-| `\MpfcCheckOneHzOverlapOddsRatio` | 3.3 |  | check, units at or above 1 Hz on the fitted bins: odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent) | paper |
-| `\MpfcCheckOneHzOverlapRankCorrelation` | 0.35 |  | check, units at or above 1 Hz on the fitted bins: Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay | paper |
-| `\MpfcCheckOneHzSwrNoReplayCalledFractionAll` | 8 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session) | paper |
-| `\MpfcCheckOneHzSwrReplayCalledFraction` | 33 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive) | paper |
-| `\MpfcCheckOneHzUnits` | 11,604 |  | check, units at or above 1 Hz on the fitted bins: mPFC units in the population (a usable fit and finite curves) | paper |
-| `\MpfcClassCalledFlatFractionMax` | 8 % |  | highest such share over the four event classes (non_local_no_SWR) | paper |
-| `\MpfcClassCalledFlatFractionMin` | 4 |  | lowest such share over the four event classes (non_local_SWR) | paper |
-| `\MpfcEffectAbsPeakMedianCalledNonSwrReplay` | 0.85 | log rate | median absolute peak log-rate modulation of the units called for non-SWR replay | paper |
-| `\MpfcEffectAbsPeakMedianCalledSwrReplay` | 0.93 | log rate | median absolute peak log-rate modulation of the units called for SWR-coupled replay | paper |
-| `\MpfcEffectAbsPeakMedianMatchedControl` | 0.56 | log rate | median over units of the absolute peak log-rate modulation for matched quiet-rest control windows (the noise floor) | paper |
-| `\MpfcEffectAbsPeakMedianNonSwrReplay` | 0.85 | log rate | median over units of the absolute peak log-rate modulation for non-SWR replay | paper |
-| `\MpfcEffectAbsPeakMedianSwr` | 0.78 | log rate | median over units of the absolute peak log-rate modulation for SWRs | paper |
-| `\MpfcEffectAbsPeakMedianSwrReplay` | 0.93 | log rate | median over units of the absolute peak log-rate modulation for SWR-coupled replay | paper |
-| `\MpfcEffectRateMultiplierMedianMatchedControl` | 1.8 | x | exp of that median: the median unit's largest rate change for matched quiet-rest control windows (the noise floor), as a multiplier (up or down) | paper |
-| `\MpfcEffectRateMultiplierMedianNonSwrReplay` | 2.4 | x | exp of that median: the median unit's largest rate change for non-SWR replay, as a multiplier (up or down) | paper |
-| `\MpfcEffectRateMultiplierMedianSwr` | 2.2 | x | exp of that median: the median unit's largest rate change for SWRs, as a multiplier (up or down) | paper |
-| `\MpfcEffectRateMultiplierMedianSwrReplay` | 2.5 | x | exp of that median: the median unit's largest rate change for SWR-coupled replay, as a multiplier (up or down) | paper |
-| `\MpfcEffectSuppressedFractionMatchedControl` | 64 % |  | share of units whose peak modulation for matched quiet-rest control windows (the noise floor) is a decrease | paper |
-| `\MpfcEffectSuppressedFractionNonSwrReplay` | 66 % |  | share of units whose peak modulation for non-SWR replay is a decrease | paper |
-| `\MpfcEffectSuppressedFractionSwr` | 62 % |  | share of units whose peak modulation for SWRs is a decrease | paper |
-| `\MpfcEffectSuppressedFractionSwrReplay` | 63 % |  | share of units whose peak modulation for SWR-coupled replay is a decrease | paper |
-| `\MpfcEngagementBhFraction` | 6 % |  | share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid | paper |
-| `\MpfcEngagementCalledFlat` | 259 |  | units called by the engagement test with no positive observed improvement | paper |
-| `\MpfcEngagementCalledFlatFraction` | 7 % |  | of the units called by the engagement test, the share whose own observed held-out improvement is not positive | paper |
-| `\MpfcEngagementCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | paper, figure: 4d |
-| `\MpfcEngagementCalledFractionChimi` | 32 % |  | share of chimi's tested units at raw empirical p < 0.05 for the engagement test | paper, figure: 4d |
-| `\MpfcEngagementCalledFractionJsixteen` | 17 % |  | share of j16's tested units at raw empirical p < 0.05 for the engagement test | paper, figure: 4d |
-| `\MpfcEngagementCalledFractionPeanut` | 22 % |  | share of peanut's tested units at raw empirical p < 0.05 for the engagement test | paper, figure: 4d |
-| `\MpfcEngagementCalledFractionSenor` | 20 % |  | share of senor's tested units at raw empirical p < 0.05 for the engagement test | paper, figure: 4d |
-| `\MpfcEngagementCalledFractionWilbur` | 18 % |  | share of wilbur's tested units at raw empirical p < 0.05 for the engagement test | paper, figure: 4d |
-| `\MpfcEngagementNullOverlapMedian` | 11 % |  | median over sessions of each session's median share of an engagement null draw's windows that land on the shipped matched control | paper |
-| `\MpfcEngagementNullOverlapSessionMax` | 36 % |  | highest session median of that share | paper |
-| `\MpfcEngagementNullOverlapSessionMin` | 5 |  | lowest session median of that share | paper |
-| `\MpfcEngagementUnitsCalled` | 3,531 |  | units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | paper, figure: 4d |
-| `\MpfcEngagementUnitsTested` | 18,410 |  | units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | paper, figure: 4d |
-| `\MpfcFolds` | 5 |  | blocked folds of whole immobility runs the held-out deviance is scored on | paper |
-| `\MpfcMarkedAnimals` | 5 |  | animals in the marked-family summary | paper |
-| `\MpfcMarkedContentCurrentArmNonSwrReplayHeldoutGainFraction` | 34 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedContentCurrentArmNonSwrReplayPeak` | −0.027 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedContentCurrentArmNonSwrReplayPeakLagMs` | 74 | ms | lag of that peak, current_arm_fraction in model replay_content, non_local_no_SWR | paper |
-| `\MpfcMarkedContentCurrentArmNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, current_arm_fraction in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedContentCurrentArmNonSwrReplayPostOnsetMean` | −0.023 | log rate | mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_no_SWR | paper |
-| `\MpfcMarkedContentCurrentArmSwrReplayHeldoutGainFraction` | 35 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedContentCurrentArmSwrReplayPeak` | −0.031 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedContentCurrentArmSwrReplayPeakLagMs` | 60 | ms | lag of that peak, current_arm_fraction in model replay_content, non_local_SWR | paper |
-| `\MpfcMarkedContentCurrentArmSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, current_arm_fraction in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedContentCurrentArmSwrReplayPostOnsetMean` | −0.026 | log rate | mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_SWR | paper |
-| `\MpfcMarkedContentRecentRewardNonSwrReplayHeldoutGainFraction` | 30 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedContentRecentRewardNonSwrReplayPeak` | −0.013 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedContentRecentRewardNonSwrReplayPeakLagMs` | 84 | ms | lag of that peak, content_weighted_recent_reward in model replay_content, non_local_no_SWR | paper |
-| `\MpfcMarkedContentRecentRewardNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_recent_reward in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedContentRecentRewardNonSwrReplayPostOnsetMean` | −0.012 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_no_SWR | paper |
-| `\MpfcMarkedContentRecentRewardSwrReplayHeldoutGainFraction` | 31 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedContentRecentRewardSwrReplayPeak` | −0.011 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedContentRecentRewardSwrReplayPeakLagMs` | 96 | ms | lag of that peak, content_weighted_recent_reward in model replay_content, non_local_SWR | paper |
-| `\MpfcMarkedContentRecentRewardSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_recent_reward in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedContentRecentRewardSwrReplayPostOnsetMean` | −0.0088 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_SWR | paper |
-| `\MpfcMarkedContentUncertaintyNonSwrReplayPeak` | 0.013 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedContentUncertaintyNonSwrReplayPeakLagMs` | 108 | ms | lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR | paper |
-| `\MpfcMarkedContentUncertaintyNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedContentUncertaintyNonSwrReplayPostOnsetMean` | 0.011 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR | paper |
-| `\MpfcMarkedContentUncertaintySwrReplayPeak` | −0.0096 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedContentUncertaintySwrReplayPeakLagMs` | −72 | ms | lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_SWR | paper |
-| `\MpfcMarkedContentUncertaintySwrReplayPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_belief_uncertainty in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedContentUncertaintySwrReplayPostOnsetMean` | −0.00077 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_SWR | paper |
-| `\MpfcMarkedRippleMuaCorrelationNonSwrReplay` | 0.65 |  | within-session correlation of ripple power and hippocampal multiunit rate over non_local_no_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage) | paper |
-| `\MpfcMarkedRippleMuaCorrelationSwrReplay` | 0.79 |  | within-session correlation of ripple power and hippocampal multiunit rate over non_local_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage) | paper |
-| `\MpfcMarkedRippleRipplePowerNonSwrReplayPeak` | 0.0091 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedRippleRipplePowerNonSwrReplayPeakLagMs` | −98 | ms | lag of that peak, ripple_power_z in model ripple_power, non_local_no_SWR | paper |
-| `\MpfcMarkedRippleRipplePowerNonSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedRippleRipplePowerNonSwrReplayPostOnsetMean` | −0.0039 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_no_SWR | paper |
-| `\MpfcMarkedRippleRipplePowerSwrNoReplayPeak` | −0.0096 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, SWR_no_non_local (unit -> session -> animal) | paper |
-| `\MpfcMarkedRippleRipplePowerSwrNoReplayPeakLagMs` | −98 | ms | lag of that peak, ripple_power_z in model ripple_power, SWR_no_non_local | paper |
-| `\MpfcMarkedRippleRipplePowerSwrNoReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, SWR_no_non_local (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedRippleRipplePowerSwrNoReplayPostOnsetMean` | −0.0057 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, SWR_no_non_local | paper |
-| `\MpfcMarkedRippleRipplePowerSwrReplayPeak` | 0.014 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedRippleRipplePowerSwrReplayPeakLagMs` | 8 | ms | lag of that peak, ripple_power_z in model ripple_power, non_local_SWR | paper |
-| `\MpfcMarkedRippleRipplePowerSwrReplayPostOnsetAnimalsSameSign` | 4 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedRippleRipplePowerSwrReplayPostOnsetMean` | 0.0079 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_SWR | paper |
-| `\MpfcMarkedRipplepooledRipplePowerPooledPeak` | 0.012 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power_pooled, all classes pooled (unit -> session -> animal) | paper |
-| `\MpfcMarkedRipplepooledRipplePowerPooledPeakLagMs` | −84 | ms | lag of that peak, ripple_power_z in model ripple_power_pooled, all classes pooled | paper |
-| `\MpfcMarkedRipplepooledRipplePowerPooledPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power_pooled, all classes pooled (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedRipplepooledRipplePowerPooledPostOnsetMean` | 0.0046 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power_pooled, all classes pooled | paper |
-| `\MpfcMarkedStrengthDurationNonSwrReplayPeak` | 0.0076 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedStrengthDurationNonSwrReplayPeakLagMs` | 190 | ms | lag of that peak, log_event_duration_s in model event_strength, non_local_no_SWR | paper |
-| `\MpfcMarkedStrengthDurationNonSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, log_event_duration_s in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedStrengthDurationNonSwrReplayPostOnsetMean` | 0.0013 | log rate | mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_no_SWR | paper |
-| `\MpfcMarkedStrengthDurationSwrReplayPeak` | 0.010 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedStrengthDurationSwrReplayPeakLagMs` | 200 | ms | lag of that peak, log_event_duration_s in model event_strength, non_local_SWR | paper |
-| `\MpfcMarkedStrengthDurationSwrReplayPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, log_event_duration_s in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedStrengthDurationSwrReplayPostOnsetMean` | −0.0011 | log rate | mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_SWR | paper |
-| `\MpfcMarkedStrengthMuaRateNonSwrReplayHeldoutGainFraction` | 29 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedStrengthMuaRateNonSwrReplayPeak` | −0.020 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedStrengthMuaRateNonSwrReplayPeakLagMs` | 58 | ms | lag of that peak, mua_rate_z in model event_strength, non_local_no_SWR | paper |
-| `\MpfcMarkedStrengthMuaRateNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, mua_rate_z in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedStrengthMuaRateNonSwrReplayPostOnsetMean` | −0.015 | log rate | mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_no_SWR | paper |
-| `\MpfcMarkedStrengthMuaRateSwrReplayHeldoutGainFraction` | 28 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedStrengthMuaRateSwrReplayPeak` | −0.0055 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedStrengthMuaRateSwrReplayPeakLagMs` | −200 | ms | lag of that peak, mua_rate_z in model event_strength, non_local_SWR | paper |
-| `\MpfcMarkedStrengthMuaRateSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, mua_rate_z in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedStrengthMuaRateSwrReplayPostOnsetMean` | −0.00080 | log rate | mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_SWR | paper |
-| `\MpfcMarkedStrengthRipplePowerNonSwrReplayHeldoutGainFraction` | 26 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPeak` | 0.0088 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_no_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPeakLagMs` | −106 | ms | lag of that peak, ripple_power_z in model event_strength, non_local_no_SWR | paper |
-| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPostOnsetMean` | −0.000039 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_no_SWR | paper |
-| `\MpfcMarkedStrengthRipplePowerSwrReplayHeldoutGainFraction` | 26 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | paper |
-| `\MpfcMarkedStrengthRipplePowerSwrReplayPeak` | −0.0077 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_SWR (unit -> session -> animal) | paper |
-| `\MpfcMarkedStrengthRipplePowerSwrReplayPeakLagMs` | 168 | ms | lag of that peak, ripple_power_z in model event_strength, non_local_SWR | paper |
-| `\MpfcMarkedStrengthRipplePowerSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | paper |
-| `\MpfcMarkedStrengthRipplePowerSwrReplayPostOnsetMean` | 0.0015 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_SWR | paper |
-| `\MpfcMinPvalue` | 0.0010 |  | the smallest plus-one empirical p-value, 1/(R + 1) | paper |
-| `\MpfcMinPvalueDenominator` | 1,001 |  | R + 1: the smallest plus-one empirical p-value is one over it | paper |
-| `\MpfcModelFits` | 166,968 |  | neuron x model fits in the bundles | paper |
-| `\MpfcNonSwrReplayCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive) | paper, figure: 4d |
-| `\MpfcNonSwrReplayUnitsCalled` | 3,431 |  | units at raw empirical p < 0.05 for non-SWR replay | paper, figure: 4d |
-| `\MpfcNonSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for non-SWR replay | paper, figure: 4d |
-| `\MpfcNonconvergedModelFits` | 432 |  | of those, fits that ran to maxiter without converging | paper |
-| `\MpfcNonconvergedNeurons` | 48 |  | neurons carrying at least one non-converged fit | paper |
-| `\MpfcNonconvergedPercent` | 0.26 | % | non-converged fits as a percent of model fits | paper |
-| `\MpfcNonlocalCalledFraction` | 32 % |  | share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive) | paper, figure: 4d |
-| `\MpfcNonlocalEventsBefore` | 17,726 |  | the session's non-local events before the stop restriction, summed | paper |
-| `\MpfcNonlocalEventsKept` | 16,419 |  | non-local events whose onset is in a kept stop, summed over sessions | paper |
-| `\MpfcNonlocalEventsKeptFraction` | 93 % |  | share of the non-local events the stop restriction keeps, pooled | paper |
-| `\MpfcNonlocalUnitsCalled` | 5,821 |  | units at raw empirical p < 0.05 for all non-local events | paper, figure: 4d |
-| `\MpfcNonlocalUnitsTested` | 18,410 |  | units with a finite p-value for all non-local events | paper, figure: 4d |
-| `\MpfcNullDraws` | 1,000 |  | matched-control draws in each unit's null | paper |
-| `\MpfcOverlapAnimalsOddsRatioAboveOne` | 5 |  | animals whose odds ratio is above 1 | paper |
-| `\MpfcOverlapOddsRatio` | 3.2 |  | odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent) | paper |
-| `\MpfcOverlapOddsRatioAnimalMax` | 5.7 |  | highest per-animal odds ratio | paper |
-| `\MpfcOverlapOddsRatioAnimalMin` | 2.7 |  | lowest per-animal odds ratio | paper |
-| `\MpfcOverlapRankCorrelation` | 0.33 |  | Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay | paper |
-| `\MpfcOverlapRankCorrelationCalled` | 0.41 |  | the same over units called for either | paper |
-| `\MpfcOverlapSameSignFractionBoth` | 84 % |  | of the units called for both, the share whose two peak modulations have the same sign (both up or both down) | paper |
-| `\MpfcOverlapUnitsBoth` | 1,634 |  | of those, units called (raw p < 0.05) for both | paper |
-| `\MpfcOverlapUnitsBothExpected` | 923 | units | units called for both expected if the two calls were independent (product of the two called shares times the units tested) | paper |
-| `\MpfcOverlapUnitsNeither` | 11,661 |  | units called for neither | paper |
-| `\MpfcOverlapUnitsNonSwrReplayOnly` | 1,797 |  | units called for non-SWR replay and not for SWR-coupled replay | paper |
-| `\MpfcOverlapUnitsSwrReplayOnly` | 3,318 |  | units called for SWR-coupled replay and not for non-SWR replay | paper |
-| `\MpfcOverlapUnitsTested` | 18,410 |  | units with a finite p-value for both SWR-coupled and non-SWR replay | paper |
-| `\MpfcPenaltySigma` | 3 | log rate | prior standard deviation of an event-basis coefficient | paper |
-| `\MpfcPriorBindsPercentMax` | 4.9 | % | highest per-curve percent of well-posed units the prior binds on (no_SWR) | paper |
-| `\MpfcPriorBindsPercentMin` | 2.6 | % | lowest per-curve percent of well-posed units the prior binds on (matched_control) | paper |
-| `\MpfcPriorMultiplierPerLagHigh` | 57 | rate multiplier | upper end of that multiplier | paper |
-| `\MpfcPriorMultiplierPerLagLow` | 0.017 | rate multiplier | lower end of the rate multiplier that per-lag sd allows at 95 % | paper |
-| `\MpfcPriorMultiplierSustainedHigh` | 5.9 | rate multiplier | upper end of that multiplier | paper |
-| `\MpfcPriorMultiplierSustainedLow` | 0.17 | rate multiplier | lower end of the rate multiplier that sustained sd allows at 95 % | paper |
-| `\MpfcPriorSdPerLag` | 2.07 | log rate | the prior's implied standard deviation of a curve at one lag | paper |
-| `\MpfcPriorSdSustained` | 0.90 | log rate | the prior's implied standard deviation of a curve sustained over the reported window | paper |
-| `\MpfcSessions` | 75 |  | epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting) | paper |
-| `\MpfcSplitBestModelFraction` | 10 % |  | share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status | paper |
-| `\MpfcSplitImprovesFraction` | 21 % |  | share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local) | paper |
-| `\MpfcSplitSwrLargerFractionCalled` | 63 % |  | of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayDecrease` | 1.00 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayDecreaseCiHigh` | 1.06 | x | upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayDecreaseCiLow` | 0.95 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncrease` | 1.06 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAllUnits` | 1.04 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, all units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAllUnitsCiHigh` | 1.08 | x | upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, all units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAllUnitsCiLow` | 1.01 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, all units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAnimalsPooledSign` | 4 |  | animals whose own estimate has the pooled sign, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseCiHigh` | 1.12 | x | upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseCiLow` | 1.00 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseLoaoMax` | 1.08 | x | largest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainNonSwrReplayIncreaseLoaoMin` | 1.04 | x | smallest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayDecrease` | 0.96 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayDecreaseCiHigh` | 1.00 | x | upper end of that interval, rewarded stops, non_local_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayDecreaseCiLow` | 0.92 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncrease` | 1.08 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseAllUnits` | 1.08 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, all units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseAllUnitsCiHigh` | 1.12 | x | upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, all units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseAllUnitsCiLow` | 1.04 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, all units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseAnimalsPooledSign` | 3 |  | animals whose own estimate has the pooled sign, rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseCiHigh` | 1.15 | x | upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseCiLow` | 1.02 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseLoaoMax` | 1.10 | x | largest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextRewardGainSwrReplayIncreaseLoaoMin` | 1.02 | x | smallest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayDecrease` | 1.02 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayDecreaseCiHigh` | 1.06 | x | upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayDecreaseCiLow` | 0.98 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncrease` | 1.01 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseAnimalsPooledSign` | 2 |  | animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseCiHigh` | 1.05 | x | upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseCiLow` | 0.97 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseLoaoMax` | 1.02 | x | largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseLoaoMin` | 0.99 | x | smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayDecrease` | 1.00 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayDecreaseCiHigh` | 1.04 | x | upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayDecreaseCiLow` | 0.95 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncrease` | 0.99 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncreaseAnimalsPooledSign` | 2 |  | animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncreaseCiHigh` | 1.03 | x | upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncreaseCiLow` | 0.96 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncreaseLoaoMax` | 1.01 | x | largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcStopContextSwitchGainSwrReplayIncreaseLoaoMin` | 0.99 | x | smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | paper |
-| `\MpfcSwrCalledFraction` | 25 % |  | share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive) | paper, figure: 4d |
-| `\MpfcSwrCoupledShareSessionMedian` | 0.51 |  | median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr) | paper |
-| `\MpfcSwrNoReplayAddsToSplitFractionAll` | 25 % |  | share of units whose held-out deviance improves when SWRs without replay are added to the replay split (every session) | paper |
-| `\MpfcSwrNoReplayAddsToSplitFractionMinEvents` | 21 % |  | share of units whose held-out deviance improves when SWRs without replay are added to the replay split (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayBestModelFractionAll` | 5 % |  | share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (every session) | paper |
-| `\MpfcSwrNoReplayBestModelFractionMinEvents` | 5 % |  | share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayCalledFractionAll` | 7 % |  | share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session) | paper |
-| `\MpfcSwrNoReplayCalledFractionAllChimi` | 24 % |  | the same for chimi's tested units (every session) | paper |
-| `\MpfcSwrNoReplayCalledFractionAllJsixteen` | 10 % |  | the same for j16's tested units (every session) | paper |
-| `\MpfcSwrNoReplayCalledFractionAllPeanut` | 6 % |  | the same for peanut's tested units (every session) | paper |
-| `\MpfcSwrNoReplayCalledFractionAllSenor` | 6 % |  | the same for senor's tested units (every session) | paper |
-| `\MpfcSwrNoReplayCalledFractionAllWilbur` | 6 % |  | the same for wilbur's tested units (every session) | paper |
-| `\MpfcSwrNoReplayCalledFractionMinEvents` | 8 % |  | share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayCalledFractionMinEventsChimi` | 24 % |  | the same for chimi's tested units (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayCalledFractionMinEventsJsixteen` | 10 % |  | the same for j16's tested units (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayCalledFractionMinEventsPeanut` | 6 % |  | the same for peanut's tested units (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayCalledFractionMinEventsSenor` | 4 % |  | the same for senor's tested units (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayCalledFractionMinEventsWilbur` | 6 % |  | the same for wilbur's tested units (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrNoReplayAll` | 1.32 | log rate | the same over the units called for SWRs without replay (every session) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrNoReplayMinEvents` | 1.33 | log rate | the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrReplayAll` | 0.86 | log rate | the same over the units called for SWRs without replay (every session) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrReplayMinEvents` | 0.80 | log rate | the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrNoReplayAll` | 1.09 | log rate | median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (every session) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrNoReplayMinEvents` | 1.04 | log rate | median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrReplayAll` | 0.94 | log rate | median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (every session) | paper |
-| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrReplayMinEvents` | 0.92 | log rate | median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrNoReplayAll` | 3.0 | x | exp of that median: the median unit's largest rate change for SWRs without replay (every session) | paper |
-| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrNoReplayMinEvents` | 2.8 | x | exp of that median: the median unit's largest rate change for SWRs without replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrReplayAll` | 2.5 | x | exp of that median: the median unit's largest rate change for SWR-coupled replay (every session) | paper |
-| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrReplayMinEvents` | 2.5 | x | exp of that median: the median unit's largest rate change for SWR-coupled replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayEvents` | 2,290 |  | Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed over sessions | paper |
-| `\MpfcSwrNoReplayEventsFraction` | 20 % |  | share of the kept, cohort Kay SWRs that overlap no non-local event | paper |
-| `\MpfcSwrNoReplayEventsSessionMedian` | 29 | events | median per session of those SWRs | paper |
-| `\MpfcSwrNoReplayEventsUnknown` | 0 |  | kept SWRs left out of the class because they overlap a window the analysed-time rule dropped | paper |
-| `\MpfcSwrNoReplayOverlapBothAll` | 438 |  | of those, units called for both (every session) | paper |
-| `\MpfcSwrNoReplayOverlapBothMinEvents` | 362 |  | of those, units called for both (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayOverlapExpectedAll` | 359 | units | units called for both expected if the two calls were independent (every session) | paper |
-| `\MpfcSwrNoReplayOverlapExpectedMinEvents` | 287 | units | units called for both expected if the two calls were independent (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayOverlapNeitherAll` | 12,186 |  | of those, units called for neither (every session) | paper |
-| `\MpfcSwrNoReplayOverlapNeitherMinEvents` | 9,572 |  | of those, units called for neither (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayOverlapOddsRatioAll` | 1.4 |  | odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (every session) | paper |
-| `\MpfcSwrNoReplayOverlapOddsRatioMinEvents` | 1.4 |  | odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayOverlapSwrNoReplayOnlyAll` | 886 |  | of those, units called for SWRs without replay only (every session) | paper |
-| `\MpfcSwrNoReplayOverlapSwrNoReplayOnlyMinEvents` | 705 |  | of those, units called for SWRs without replay only (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayOverlapSwrReplayOnlyAll` | 4,434 |  | of those, units called for SWR-coupled replay only (every session) | paper |
-| `\MpfcSwrNoReplayOverlapSwrReplayOnlyMinEvents` | 3,414 |  | of those, units called for SWR-coupled replay only (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayOverlapTestedAll` | 17,944 |  | units tested for both SWRs without replay and SWR-coupled replay (every session) | paper |
-| `\MpfcSwrNoReplayOverlapTestedMinEvents` | 14,053 |  | units tested for both SWRs without replay and SWR-coupled replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayRankCorrelationAll` | 0.07 |  | Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (every session) | paper |
-| `\MpfcSwrNoReplayRankCorrelationMinEvents` | 0.12 |  | Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplaySameSignFractionAll` | 65 % |  | of the units called for both, the share whose two peaks have the same sign (every session) | paper |
-| `\MpfcSwrNoReplaySameSignFractionMinEvents` | 66 % |  | of the units called for both, the share whose two peaks have the same sign (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplaySessions` | 75 |  | sessions in the extended-event-set tree | paper |
-| `\MpfcSwrNoReplaySessionsMinEvents` | 60 |  | sessions with at least 10 such SWRs | paper |
-| `\MpfcSwrNoReplayTimingPeakMsEnhancedAll` | −40 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | paper |
-| `\MpfcSwrNoReplayTimingPeakMsEnhancedMinEvents` | −46 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingPeakMsSuppressedAll` | 82 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | paper |
-| `\MpfcSwrNoReplayTimingPeakMsSuppressedMinEvents` | 84 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighEnhancedAll` | 62 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighEnhancedMinEvents` | 22 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighSuppressedAll` | 24 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighSuppressedMinEvents` | 42 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowEnhancedAll` | −108 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowEnhancedMinEvents` | −192 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowSuppressedAll` | −130 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowSuppressedMinEvents` | −112 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsEnhancedAll` | −76 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsEnhancedMinEvents` | −82 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsSuppressedAll` | −22 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseOnsetMsSuppressedMinEvents` | −18 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseSizeEnhancedAll` | 0.10 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseSizeEnhancedMinEvents` | 0.09 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingRiseSizeSuppressedAll` | 0.17 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | paper |
-| `\MpfcSwrNoReplayTimingRiseSizeSuppressedMinEvents` | 0.18 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingUnitsEnhancedAll` | 465 |  | units called for SWRs without replay whose peak is an increase (every session) | paper |
-| `\MpfcSwrNoReplayTimingUnitsEnhancedMinEvents` | 390 |  | units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayTimingUnitsSuppressedAll` | 859 |  | units called for SWRs without replay whose peak is a decrease (every session) | paper |
-| `\MpfcSwrNoReplayTimingUnitsSuppressedMinEvents` | 677 |  | units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayUnitsAll` | 18,410 |  | units in every session (Figure 4's population) | paper |
-| `\MpfcSwrNoReplayUnitsCalledAll` | 1,324 |  | units called for SWRs without replay (every session) | paper |
-| `\MpfcSwrNoReplayUnitsCalledMinEvents` | 1,067 |  | units called for SWRs without replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrNoReplayUnitsMinEvents` | 14,054 |  | units in sessions with at least 10 SWRs without replay (Figure 4's population) | paper |
-| `\MpfcSwrNoReplayUnitsTestedAll` | 17,944 |  | of those, units with a finite p-value for SWRs without replay (every session) | paper |
-| `\MpfcSwrNoReplayUnitsTestedMinEvents` | 14,053 |  | of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay) | paper |
-| `\MpfcSwrReplayCalledFraction` | 27 % |  | share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive) | paper, figure: 4d |
-| `\MpfcSwrReplayUnitsCalled` | 4,952 |  | units at raw empirical p < 0.05 for SWR-coupled replay | paper, figure: 4d |
-| `\MpfcSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for SWR-coupled replay | paper, figure: 4d |
-| `\MpfcSwrUnitsCalled` | 4,512 |  | units at raw empirical p < 0.05 for SWR | paper, figure: 4d |
-| `\MpfcSwrUnitsTested` | 18,410 |  | units with a finite p-value for SWR | paper, figure: 4d |
-| `\MpfcSwrsKeptFraction` | 93 % |  | share of the SWRs the stop restriction keeps, pooled | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaEnhanced` | 2 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaShallowSuppressed` | 6 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaSuppressed` | 6 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetRiseBoxcarEnhanced` | 0 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetRiseBoxcarShallowSuppressed` | 16 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetRiseBoxcarSuppressed` | 12 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetZeroAlphaEnhanced` | 2 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetZeroAlphaShallowSuppressed` | 0 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetZeroAlphaSuppressed` | 6 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetZeroBoxcarEnhanced` | 0 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetZeroBoxcarShallowSuppressed` | 14 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsOnsetZeroBoxcarSuppressed` | 10 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsPeakAlphaEnhanced` | 18 | ms | peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsPeakAlphaShallowSuppressed` | 18 | ms | peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsPeakAlphaSuppressed` | 20 | ms | peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsSteepestAlphaEnhanced` | 12 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsSteepestAlphaShallowSuppressed` | 10 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsSteepestAlphaSuppressed` | 14 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsSteepestBoxcarEnhanced` | −4 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsSteepestBoxcarShallowSuppressed` | 18 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationBiasMsSteepestBoxcarSuppressed` | 14 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | paper |
-| `\MpfcTimingCalibrationOnsetBeforeZeroFractionAlphaEnhanced` | 35 % |  | share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | paper |
-| `\MpfcTimingCalibrationOnsetBeforeZeroFractionAlphaShallowSuppressed` | 47 % |  | share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | paper |
-| `\MpfcTimingCalibrationOnsetBeforeZeroFractionAlphaSuppressed` | 25 % |  | share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | paper |
-| `\MpfcTimingCalibrationOnsetBeforeZeroFractionBoxcarEnhanced` | 44 % |  | share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | paper |
-| `\MpfcTimingCalibrationOnsetBeforeZeroFractionBoxcarShallowSuppressed` | 38 % |  | share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | paper |
-| `\MpfcTimingCalibrationOnsetBeforeZeroFractionBoxcarSuppressed` | 25 % |  | share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | paper |
-| `\MpfcTimingCalibrationSizeBiasAlphaEnhanced` | −0.13 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | paper |
-| `\MpfcTimingCalibrationSizeBiasAlphaShallowSuppressed` | −0.08 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | paper |
-| `\MpfcTimingCalibrationSizeBiasAlphaSuppressed` | −0.07 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | paper |
-| `\MpfcTimingCalibrationSizeBiasBoxcarEnhanced` | 0.07 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | paper |
-| `\MpfcTimingCalibrationSizeBiasBoxcarShallowSuppressed` | 0.05 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | paper |
-| `\MpfcTimingCalibrationSizeBiasBoxcarSuppressed` | 0.14 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | paper |
-| `\MpfcTimingCalibrationStopOffsetPlusResponseBiasMsOnsetRise` | 14 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's | paper |
-| `\MpfcTimingCalibrationStopOffsetPlusResponseBiasMsOnsetZero` | 8 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's | paper |
-| `\MpfcTimingCalibrationStopOffsetPlusResponseBiasMsSteepest` | 16 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's | paper |
-| `\MpfcTimingCalibrationStopOffsetPlusResponseRiseSize` | 0.86 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset | paper |
-| `\MpfcTimingCalibrationStopOffsetPlusResponseSize` | 1.07 | log rate | size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset | paper |
-| `\MpfcTimingCalibrationStopOffsetPlusResponseSuppressedFraction` | 100 % |  | share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset whose peak is a decrease | paper |
-| `\MpfcTimingCalibrationStopOffsetRiseSize` | 0.01 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response | paper |
-| `\MpfcTimingCalibrationStopOffsetSize` | 0.19 | log rate | size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response | paper |
-| `\MpfcTimingCalibrationStopOffsetSuppressedFraction` | 97 % |  | share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response whose peak is a decrease | paper |
-| `\MpfcTimingCalibrationWideBiasMsOnsetRiseAlphaEnhanced` | 2 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingCalibrationWideBiasMsOnsetRiseAlphaShallowSuppressed` | 2 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingCalibrationWideBiasMsOnsetRiseAlphaSuppressed` | 6 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarEnhanced` | 2 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarShallowSuppressed` | 18 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarSuppressed` | 12 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingCalibrationWideStopOffsetSize` | 0.20 | log rate | size from zero of the stop-offset scenario's sign-aligned mean curve for a kernel fit on +/-1.05 s and read on +/-1.0 s | paper |
-| `\MpfcTimingMatchedControlPeakBeforeOnsetFraction` | 50 % |  | share of all units whose matched quiet-rest control curve peaks before the control window's onset (what a peak lag drawn by noise gives) | paper |
-| `\MpfcTimingNonSwrLaterFraction` | 37 % |  | share of those units whose non-SWR replay peak is later than their SWR-coupled replay peak | paper |
-| `\MpfcTimingOnsetAtEdgeFractionNonSwrReplayEnhanced` | 4 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | paper |
-| `\MpfcTimingOnsetAtEdgeFractionNonSwrReplaySuppressed` | 16 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | paper |
-| `\MpfcTimingOnsetAtEdgeFractionSwrEnhanced` | 5 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | paper |
-| `\MpfcTimingOnsetAtEdgeFractionSwrReplayEnhanced` | 5 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | paper |
-| `\MpfcTimingOnsetAtEdgeFractionSwrReplaySuppressed` | 16 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | paper |
-| `\MpfcTimingOnsetAtEdgeFractionSwrSuppressed` | 13 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | paper |
-| `\MpfcTimingOnsetBeforeOnsetFractionNonSwrReplayEnhanced` | 53 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose response onset is before event onset | paper |
-| `\MpfcTimingOnsetBeforeOnsetFractionNonSwrReplaySuppressed` | 65 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose response onset is before event onset | paper |
-| `\MpfcTimingOnsetBeforeOnsetFractionSwrEnhanced` | 45 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose response onset is before event onset | paper |
-| `\MpfcTimingOnsetBeforeOnsetFractionSwrReplayEnhanced` | 46 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose response onset is before event onset | paper |
-| `\MpfcTimingOnsetBeforeOnsetFractionSwrReplaySuppressed` | 59 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose response onset is before event onset | paper |
-| `\MpfcTimingOnsetBeforeOnsetFractionSwrSuppressed` | 55 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose response onset is before event onset | paper |
-| `\MpfcTimingOnsetMedianMsNonSwrReplayEnhanced` | −10 | ms | median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase; onset is rise_size | paper |
-| `\MpfcTimingOnsetMedianMsNonSwrReplaySuppressed` | −38 | ms | median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease; onset is rise_size | paper |
-| `\MpfcTimingOnsetMedianMsSwrEnhanced` | 10 | ms | median response onset of units called for SWR (raw p < 0.05) whose peak is an increase; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size | paper |
-| `\MpfcTimingOnsetMedianMsSwrReplayEnhanced` | 8 | ms | median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase; onset is rise_size | paper |
-| `\MpfcTimingOnsetMedianMsSwrReplaySuppressed` | −26 | ms | median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease; onset is rise_size | paper |
-| `\MpfcTimingOnsetMedianMsSwrSuppressed` | −16 | ms | median response onset of units called for SWR (raw p < 0.05) whose peak is a decrease; onset is rise_size | paper |
-| `\MpfcTimingPairedUnits` | 1,368 |  | units called for both SWR-coupled and non-SWR replay whose two peaks have the same sign | paper |
-| `\MpfcTimingPeakAtEdgeFractionNonSwrReplayEnhanced` | 4 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window | paper |
-| `\MpfcTimingPeakAtEdgeFractionNonSwrReplaySuppressed` | 6 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window | paper |
-| `\MpfcTimingPeakAtEdgeFractionSwrEnhanced` | 5 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window | paper |
-| `\MpfcTimingPeakAtEdgeFractionSwrReplayEnhanced` | 5 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window | paper |
-| `\MpfcTimingPeakAtEdgeFractionSwrReplaySuppressed` | 8 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window | paper |
-| `\MpfcTimingPeakAtEdgeFractionSwrSuppressed` | 8 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window | paper |
-| `\MpfcTimingPeakBeforeOnsetFractionNonSwrReplayEnhanced` | 22 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose peak lag is before event onset | paper |
-| `\MpfcTimingPeakBeforeOnsetFractionNonSwrReplaySuppressed` | 41 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset | paper |
-| `\MpfcTimingPeakBeforeOnsetFractionSwrEnhanced` | 18 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose peak lag is before event onset | paper |
-| `\MpfcTimingPeakBeforeOnsetFractionSwrReplayEnhanced` | 15 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose peak lag is before event onset | paper |
-| `\MpfcTimingPeakBeforeOnsetFractionSwrReplaySuppressed` | 36 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset | paper |
-| `\MpfcTimingPeakBeforeOnsetFractionSwrSuppressed` | 36 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset | paper |
-| `\MpfcTimingPeakLagDifferenceMedianMs` | −14 | ms | over those units, the median of the non-SWR replay peak lag minus the SWR-coupled replay peak lag | paper |
-| `\MpfcTimingPeakLagMedianMsNonSwrReplayEnhanced` | 56 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagMedianMsNonSwrReplaySuppressed` | 18 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagMedianMsSwrEnhanced` | 87 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagMedianMsSwrReplayEnhanced` | 86 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagMedianMsSwrReplaySuppressed` | 44 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagMedianMsSwrSuppressed` | 46 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagQuartileHighMsNonSwrReplayEnhanced` | 110 | ms | 75th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagQuartileHighMsNonSwrReplaySuppressed` | 96 | ms | 75th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagQuartileHighMsSwrEnhanced` | 134 | ms | 75th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagQuartileHighMsSwrReplayEnhanced` | 134 | ms | 75th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagQuartileHighMsSwrReplaySuppressed` | 110 | ms | 75th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagQuartileHighMsSwrSuppressed` | 108 | ms | 75th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagQuartileLowMsNonSwrReplayEnhanced` | 4 | ms | 25th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagQuartileLowMsNonSwrReplaySuppressed` | −78 | ms | 25th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagQuartileLowMsSwrEnhanced` | 24 | ms | 25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagQuartileLowMsSwrReplayEnhanced` | 32 | ms | 25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPeakLagQuartileLowMsSwrReplaySuppressed` | −62 | ms | 25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPeakLagQuartileLowMsSwrSuppressed` | −76 | ms | 25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplayEnhanced` | 0 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | paper |
-| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplaySuppressed` | 16 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | paper |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | paper |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplayEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | paper |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplaySuppressed` | 12 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | paper |
-| `\MpfcTimingPopulationControlPreEventLevelFractionSwrSuppressed` | 13 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNegativeNonSwrReplayEnhanced` | 4 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNegativeNonSwrReplaySuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrEnhanced` | 3 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrReplaySuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrSuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNonSwrReplayEnhanced` | 5 |  | animals with at least one of the units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationOnsetAnimalsNonSwrReplaySuppressed` | 5 |  | animals with at least one of the units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationOnsetAnimalsSwrEnhanced` | 5 |  | animals with at least one of the units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationOnsetAnimalsSwrReplayEnhanced` | 5 |  | animals with at least one of the units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationOnsetAnimalsSwrReplaySuppressed` | 5 |  | animals with at least one of the units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationOnsetAnimalsSwrSuppressed` | 5 |  | animals with at least one of the units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationOnsetMsCiHighNonSwrReplayEnhanced` | −24 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationOnsetMsCiHighNonSwrReplaySuppressed` | −146 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationOnsetMsCiHighSwrEnhanced` | 0 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationOnsetMsCiHighSwrReplayEnhanced` | 0 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationOnsetMsCiHighSwrReplaySuppressed` | −134 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationOnsetMsCiHighSwrSuppressed` | −126 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplayEnhanced` | −56 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplaySuppressed` | −200 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrEnhanced` | −52 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrReplayEnhanced` | −44 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrReplaySuppressed` | −188 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationOnsetMsCiLowSwrSuppressed` | −200 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationOnsetMsNonSwrReplayEnhanced` | −38 | ms | onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationOnsetMsNonSwrReplaySuppressed` | −192 | ms | onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationOnsetMsSwrEnhanced` | −30 | ms | onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationOnsetMsSwrReplayEnhanced` | −30 | ms | onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationOnsetMsSwrReplaySuppressed` | −162 | ms | onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationOnsetMsSwrSuppressed` | −166 | ms | onset (rise_size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPeakMsCiHighNonSwrReplayEnhanced` | 100 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationPeakMsCiHighNonSwrReplaySuppressed` | 42 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationPeakMsCiHighSwrEnhanced` | 114 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationPeakMsCiHighSwrReplayEnhanced` | 104 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationPeakMsCiHighSwrReplaySuppressed` | 62 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationPeakMsCiHighSwrSuppressed` | 84 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplayEnhanced` | 74 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplaySuppressed` | 18 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationPeakMsCiLowSwrEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationPeakMsCiLowSwrReplayEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationPeakMsCiLowSwrReplaySuppressed` | 46 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationPeakMsCiLowSwrSuppressed` | 52 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationPeakMsNonSwrReplayEnhanced` | 92 | ms | peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPeakMsNonSwrReplaySuppressed` | 32 | ms | peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPeakMsSwrEnhanced` | 96 | ms | peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPeakMsSwrReplayEnhanced` | 92 | ms | peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPeakMsSwrReplaySuppressed` | 54 | ms | peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPeakMsSwrSuppressed` | 64 | ms | peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | paper |
-| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplayEnhanced` | 3 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | paper |
-| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplaySuppressed` | 49 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | paper |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrEnhanced` | 14 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | paper |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrReplayEnhanced` | 8 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | paper |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrReplaySuppressed` | 44 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | paper |
-| `\MpfcTimingPopulationPreEventLevelFractionSwrSuppressed` | 47 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | paper |
-| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeNonSwrReplayEnhanced` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeNonSwrReplaySuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrEnhanced` | 2 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrReplaySuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrSuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiHighNonSwrReplayEnhanced` | −18 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiHighNonSwrReplaySuppressed` | −30 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrEnhanced` | 16 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrReplayEnhanced` | 8 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrReplaySuppressed` | −24 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrSuppressed` | −6 | ms | 97.5th percentile of that over the same resamples | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplayEnhanced` | −50 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplaySuppressed` | −62 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrEnhanced` | −32 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplayEnhanced` | −34 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplaySuppressed` | −42 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrSuppressed` | −26 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhanced` | −36 | ms | rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedChimi` | −46 | ms | rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedJsixteen` | −18 | ms | rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedPeanut` | 34 | ms | rise onset of the sign-aligned mean curve of peanut's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedSenor` | −38 | ms | rise onset of the sign-aligned mean curve of senor's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedWilbur` | −44 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressed` | −46 | ms | rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedChimi` | −60 | ms | rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedJsixteen` | 4 | ms | rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedPeanut` | −14 | ms | rise onset of the sign-aligned mean curve of peanut's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedSenor` | −116 | ms | rise onset of the sign-aligned mean curve of senor's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedWilbur` | −56 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrEnhanced` | −14 | ms | rise onset of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedChimi` | 72 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedJsixteen` | 16 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedPeanut` | 30 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedSenor` | −42 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedWilbur` | −28 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhanced` | −22 | ms | rise onset of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedChimi` | 38 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedJsixteen` | 12 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedPeanut` | 30 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedSenor` | −36 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedWilbur` | −38 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressed` | −32 | ms | rise onset of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedChimi` | −64 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedJsixteen` | 4 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedPeanut` | −32 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedSenor` | −28 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedWilbur` | −38 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressed` | −18 | ms | rise onset of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedChimi` | −38 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedJsixteen` | 0 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedPeanut` | −38 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedSenor` | −12 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedWilbur` | −16 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationRiseSizeCiHighNonSwrReplayEnhanced` | 0.40 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiHighNonSwrReplaySuppressed` | 0.33 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiHighSwrEnhanced` | 0.46 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiHighSwrReplayEnhanced` | 0.57 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiHighSwrReplaySuppressed` | 0.38 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiHighSwrSuppressed` | 0.35 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiLowNonSwrReplayEnhanced` | 0.28 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiLowNonSwrReplaySuppressed` | 0.26 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiLowSwrEnhanced` | 0.30 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiLowSwrReplayEnhanced` | 0.42 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiLowSwrReplaySuppressed` | 0.31 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeCiLowSwrSuppressed` | 0.21 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationRiseSizeNonSwrReplayEnhanced` | 0.35 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationRiseSizeNonSwrReplaySuppressed` | 0.29 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationRiseSizeSwrEnhanced` | 0.39 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationRiseSizeSwrReplayEnhanced` | 0.52 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationRiseSizeSwrReplaySuppressed` | 0.35 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationRiseSizeSwrSuppressed` | 0.27 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeCiHighNonSwrReplayEnhanced` | 0.41 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiHighNonSwrReplaySuppressed` | 0.63 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiHighSwrEnhanced` | 0.51 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiHighSwrReplayEnhanced` | 0.62 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiHighSwrReplaySuppressed` | 0.65 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiHighSwrSuppressed` | 0.58 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiLowNonSwrReplayEnhanced` | 0.31 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiLowNonSwrReplaySuppressed` | 0.52 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiLowSwrEnhanced` | 0.37 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiLowSwrReplayEnhanced` | 0.46 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiLowSwrReplaySuppressed` | 0.56 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeCiLowSwrSuppressed` | 0.45 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSizeNonSwrReplayEnhanced` | 0.36 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeNonSwrReplaySuppressed` | 0.58 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeSwrEnhanced` | 0.45 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeSwrReplayEnhanced` | 0.56 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeSwrReplaySuppressed` | 0.61 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeSwrSuppressed` | 0.51 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | paper |
-| `\MpfcTimingPopulationSizeVsControlNonSwrReplayEnhanced` | 0.38 | log rate | the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | paper |
-| `\MpfcTimingPopulationSizeVsControlNonSwrReplaySuppressed` | 0.51 | log rate | the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | paper |
-| `\MpfcTimingPopulationSizeVsControlSwrEnhanced` | 0.48 | log rate | the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | paper |
-| `\MpfcTimingPopulationSizeVsControlSwrReplayEnhanced` | 0.58 | log rate | the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | paper |
-| `\MpfcTimingPopulationSizeVsControlSwrReplaySuppressed` | 0.54 | log rate | the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | paper |
-| `\MpfcTimingPopulationSizeVsControlSwrSuppressed` | 0.45 | log rate | the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | paper |
-| `\MpfcTimingPopulationSteepestAnimalsNegativeNonSwrReplayEnhanced` | 3 |  | of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationSteepestAnimalsNegativeNonSwrReplaySuppressed` | 3 |  | of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrEnhanced` | 1 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | paper |
-| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrReplaySuppressed` | 4 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrSuppressed` | 5 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | paper |
-| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplayEnhanced` | 59 | ms | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplaySuppressed` | 1 | ms | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrEnhanced` | 37 | ms | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrReplayEnhanced` | 29 | ms | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrReplaySuppressed` | 9 | ms | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrSuppressed` | −3 | ms | 97.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplayEnhanced` | −63 | ms | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplaySuppressed` | −33 | ms | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrEnhanced` | −17 | ms | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrReplayEnhanced` | −23 | ms | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrReplaySuppressed` | −27 | ms | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrSuppressed` | −19 | ms | 2.5th percentile of that over 1,000 recording-day resamples | paper |
-| `\MpfcTimingPopulationSteepestMsNonSwrReplayEnhanced` | −29 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationSteepestMsNonSwrReplaySuppressed` | −21 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationSteepestMsSwrEnhanced` | 13 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationSteepestMsSwrReplayEnhanced` | 5 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingPopulationSteepestMsSwrReplaySuppressed` | −15 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingPopulationSteepestMsSwrSuppressed` | −13 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingRiseOnsetMedianMsNonSwrReplayEnhanced` | −10 | ms | median rise onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero | paper |
-| `\MpfcTimingRiseOnsetMedianMsNonSwrReplaySuppressed` | −34 | ms | median rise onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero | paper |
-| `\MpfcTimingRiseOnsetMedianMsSwrEnhanced` | 10 | ms | median rise onset of units called for SWR (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero | paper |
-| `\MpfcTimingRiseOnsetMedianMsSwrReplayEnhanced` | 6 | ms | median rise onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero | paper |
-| `\MpfcTimingRiseOnsetMedianMsSwrReplaySuppressed` | −22 | ms | median rise onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero | paper |
-| `\MpfcTimingRiseOnsetMedianMsSwrSuppressed` | −14 | ms | median rise onset of units called for SWR (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero | paper |
-| `\MpfcTimingSteepestMedianMsNonSwrReplayEnhanced` | −69 | ms | median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak) | paper |
-| `\MpfcTimingSteepestMedianMsNonSwrReplaySuppressed` | −77 | ms | median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak) | paper |
-| `\MpfcTimingSteepestMedianMsSwrEnhanced` | −69 | ms | median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak) | paper |
-| `\MpfcTimingSteepestMedianMsSwrReplayEnhanced` | −69 | ms | median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak) | paper |
-| `\MpfcTimingSteepestMedianMsSwrReplaySuppressed` | −71 | ms | median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak) | paper |
-| `\MpfcTimingSteepestMedianMsSwrSuppressed` | −65 | ms | median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak) | paper |
-| `\MpfcTimingUnitsNonSwrReplayEnhanced` | 1,401 |  | units called for non-SWR replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingUnitsNonSwrReplaySuppressed` | 2,030 |  | units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingUnitsSwrEnhanced` | 2,240 |  | units called for SWR (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingUnitsSwrReplayEnhanced` | 2,298 |  | units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | paper |
-| `\MpfcTimingUnitsSwrReplaySuppressed` | 2,654 |  | units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcTimingUnitsSwrSuppressed` | 2,272 |  | units called for SWR (raw p < 0.05) whose peak is a decrease | paper |
-| `\MpfcUnits` | 18,410 |  | mPFC units in the population: every unit with a usable fit (no firing-rate cutoff; a unit with no spike in the fitted bins has none) and finite modulation curves | paper, figure: 4c, figure: 4d |
-| `\MpfcUnmatchablePercentClassMax` | 0.60 | % | highest such percent (non_local_no_SWR) | paper |
-| `\MpfcUnmatchablePercentClassMin` | 0.27 | % | lowest percent, over event classes, of a class's events with no legal within-bout control, summed over sessions (non_local_SWR) | paper |
-| `\MpfcUnmatchableWorstExcluded` | 8 |  | events with no legal control in the worst session and class (j1620210709_10_r5 / non_local_SWR) | paper |
-| `\MpfcUnmatchableWorstTotal` | 102 |  | events of that class in that session (j1620210709_10_r5 / non_local_SWR) | paper |
+| Macro | Value | Unit | What it is | Computed in | Figures |
+|---|---|---|---|---|---|
+| `\MpfcAnalysedEpochs` | 242 |  | analysed epochs the PFC cohort is drawn from | `mpfc.cohort_values` |  |
+| `\MpfcAnimals` | 5 |  | animals in the mPFC population | `mpfc.cohort_values` |  |
+| `\MpfcBestModelConstantFraction` | 52 % |  | share of units whose best model by held-out deviance is constant | `mpfc.called_fraction_values` | 4d |
+| `\MpfcBestModelJointFraction` | 6 % |  | share of units whose best model by held-out deviance is SWR + non_local_no_SWR | `mpfc.called_fraction_values` | 4d |
+| `\MpfcBestModelNonlocalFraction` | 28 % |  | share of units whose best model by held-out deviance is non_local | `mpfc.called_fraction_values` | 4d |
+| `\MpfcBestModelSwrFraction` | 14 % |  | share of units whose best model by held-out deviance is SWR | `mpfc.called_fraction_values` | 4d |
+| `\MpfcBinsFit` | 20,618,388 |  | immobile 2 ms bins inside a kept stop, the bins the GLM is fit on, summed over sessions | `mpfc.cohort_values` |  |
+| `\MpfcBinsFitFraction` | 92 % |  | share of the immobile bins the stop restriction keeps, pooled | `mpfc.cohort_values` |  |
+| `\MpfcBinsImmobile` | 22,360,999 |  | immobile 2 ms bins before the stop restriction, summed over sessions | `mpfc.cohort_values` |  |
+| `\MpfcCheckOneHzEngagementCalledFraction` | 23 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcCheckOneHzNonSwrReplayCalledFraction` | 23 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive) | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcCheckOneHzOverlapOddsRatio` | 3.3 |  | check, units at or above 1 Hz on the fitted bins: odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent) | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcCheckOneHzOverlapRankCorrelation` | 0.35 |  | check, units at or above 1 Hz on the fitted bins: Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcCheckOneHzSwrNoReplayCalledFractionAll` | 8 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session) | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcCheckOneHzSwrReplayCalledFraction` | 33 % |  | check, units at or above 1 Hz on the fitted bins: share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive) | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcCheckOneHzUnits` | 11,604 |  | check, units at or above 1 Hz on the fitted bins: mPFC units in the population (a usable fit and finite curves) | `mpfc.rate_cutoff_check_values` |  |
+| `\MpfcClassCalledFlatFractionMax` | 8 % |  | highest such share over the four event classes (non_local_no_SWR) | `mpfc.null_geometry_values` |  |
+| `\MpfcClassCalledFlatFractionMin` | 4 |  | lowest such share over the four event classes (non_local_SWR) | `mpfc.null_geometry_values` |  |
+| `\MpfcEffectAbsPeakMedianCalledNonSwrReplay` | 0.85 | log rate | median absolute peak log-rate modulation of the units called for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianCalledSwrReplay` | 0.93 | log rate | median absolute peak log-rate modulation of the units called for SWR-coupled replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianMatchedControl` | 0.56 | log rate | median over units of the absolute peak log-rate modulation for matched quiet-rest control windows (the noise floor) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianNonSwrReplay` | 0.85 | log rate | median over units of the absolute peak log-rate modulation for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianSwr` | 0.78 | log rate | median over units of the absolute peak log-rate modulation for SWRs | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectAbsPeakMedianSwrReplay` | 0.93 | log rate | median over units of the absolute peak log-rate modulation for SWR-coupled replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectRateMultiplierMedianMatchedControl` | 1.8 | x | exp of that median: the median unit's largest rate change for matched quiet-rest control windows (the noise floor), as a multiplier (up or down) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectRateMultiplierMedianNonSwrReplay` | 2.4 | x | exp of that median: the median unit's largest rate change for non-SWR replay, as a multiplier (up or down) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectRateMultiplierMedianSwr` | 2.2 | x | exp of that median: the median unit's largest rate change for SWRs, as a multiplier (up or down) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectRateMultiplierMedianSwrReplay` | 2.5 | x | exp of that median: the median unit's largest rate change for SWR-coupled replay, as a multiplier (up or down) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectSuppressedFractionMatchedControl` | 64 % |  | share of units whose peak modulation for matched quiet-rest control windows (the noise floor) is a decrease | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectSuppressedFractionNonSwrReplay` | 66 % |  | share of units whose peak modulation for non-SWR replay is a decrease | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectSuppressedFractionSwr` | 62 % |  | share of units whose peak modulation for SWRs is a decrease | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEffectSuppressedFractionSwrReplay` | 63 % |  | share of units whose peak modulation for SWR-coupled replay is a decrease | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcEngagementBhFraction` | 6 % |  | share of the tested units with a Benjamini-Hochberg q below 0.05 for the engagement test, BH applied once over the pooled plus-one empirical p-values of every tested unit (scipy.stats.false_discovery_control). For reference only: the units are not independent, and the p-values sit on a 1/(R + 1) grid | `mpfc.called_fraction_values` |  |
+| `\MpfcEngagementCalledFlat` | 259 |  | units called by the engagement test with no positive observed improvement | `mpfc.null_geometry_values` |  |
+| `\MpfcEngagementCalledFlatFraction` | 7 % |  | of the units called by the engagement test, the share whose own observed held-out improvement is not positive | `mpfc.null_geometry_values` |  |
+| `\MpfcEngagementCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control), pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementCalledFractionChimi` | 32 % |  | share of chimi's tested units at raw empirical p < 0.05 for the engagement test | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementCalledFractionJsixteen` | 17 % |  | share of j16's tested units at raw empirical p < 0.05 for the engagement test | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementCalledFractionPeanut` | 22 % |  | share of peanut's tested units at raw empirical p < 0.05 for the engagement test | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementCalledFractionSenor` | 20 % |  | share of senor's tested units at raw empirical p < 0.05 for the engagement test | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementCalledFractionWilbur` | 18 % |  | share of wilbur's tested units at raw empirical p < 0.05 for the engagement test | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementNullOverlapMedian` | 11 % |  | median over sessions of each session's median share of an engagement null draw's windows that land on the shipped matched control | `mpfc.null_geometry_values` |  |
+| `\MpfcEngagementNullOverlapSessionMax` | 36 % |  | highest session median of that share | `mpfc.null_geometry_values` |  |
+| `\MpfcEngagementNullOverlapSessionMin` | 5 |  | lowest session median of that share | `mpfc.null_geometry_values` |  |
+| `\MpfcEngagementUnitsCalled` | 3,531 |  | units at raw empirical p < 0.05 for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcEngagementUnitsTested` | 18,410 |  | units with a finite p-value for the engagement test (matched_control + non_local_no_SWR vs. matched_control) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcFolds` | 5 |  | blocked folds of whole immobility runs the held-out deviance is scored on | `mpfc.estimator_values` |  |
+| `\MpfcMarkedAnimals` | 5 |  | animals in the marked-family summary | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmNonSwrReplayHeldoutGainFraction` | 34 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmNonSwrReplayPeak` | −0.027 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmNonSwrReplayPeakLagMs` | 74 | ms | lag of that peak, current_arm_fraction in model replay_content, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, current_arm_fraction in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmNonSwrReplayPostOnsetMean` | −0.023 | log rate | mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmSwrReplayHeldoutGainFraction` | 35 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmSwrReplayPeak` | −0.031 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of current_arm_fraction in model replay_content, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmSwrReplayPeakLagMs` | 60 | ms | lag of that peak, current_arm_fraction in model replay_content, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, current_arm_fraction in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentCurrentArmSwrReplayPostOnsetMean` | −0.026 | log rate | mean of the population slope curve from 0 to +150 ms after onset, current_arm_fraction in model replay_content, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardNonSwrReplayHeldoutGainFraction` | 30 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardNonSwrReplayPeak` | −0.013 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardNonSwrReplayPeakLagMs` | 84 | ms | lag of that peak, content_weighted_recent_reward in model replay_content, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_recent_reward in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardNonSwrReplayPostOnsetMean` | −0.012 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardSwrReplayHeldoutGainFraction` | 31 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardSwrReplayPeak` | −0.011 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_recent_reward in model replay_content, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardSwrReplayPeakLagMs` | 96 | ms | lag of that peak, content_weighted_recent_reward in model replay_content, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_recent_reward in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentRecentRewardSwrReplayPostOnsetMean` | −0.0088 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_recent_reward in model replay_content, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintyNonSwrReplayPeak` | 0.013 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintyNonSwrReplayPeakLagMs` | 108 | ms | lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintyNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintyNonSwrReplayPostOnsetMean` | 0.011 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintySwrReplayPeak` | −0.0096 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of content_weighted_belief_uncertainty in model replay_content, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintySwrReplayPeakLagMs` | −72 | ms | lag of that peak, content_weighted_belief_uncertainty in model replay_content, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintySwrReplayPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, content_weighted_belief_uncertainty in model replay_content, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedContentUncertaintySwrReplayPostOnsetMean` | −0.00077 | log rate | mean of the population slope curve from 0 to +150 ms after onset, content_weighted_belief_uncertainty in model replay_content, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleMuaCorrelationNonSwrReplay` | 0.65 |  | within-session correlation of ripple power and hippocampal multiunit rate over non_local_no_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleMuaCorrelationSwrReplay` | 0.79 |  | within-session correlation of ripple power and hippocampal multiunit rate over non_local_SWR events (mean over animals of session means): their slopes may carry each other's effect (ridge leakage) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerNonSwrReplayPeak` | 0.0091 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerNonSwrReplayPeakLagMs` | −98 | ms | lag of that peak, ripple_power_z in model ripple_power, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerNonSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerNonSwrReplayPostOnsetMean` | −0.0039 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrNoReplayPeak` | −0.0096 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, SWR_no_non_local (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrNoReplayPeakLagMs` | −98 | ms | lag of that peak, ripple_power_z in model ripple_power, SWR_no_non_local | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrNoReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, SWR_no_non_local (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrNoReplayPostOnsetMean` | −0.0057 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, SWR_no_non_local | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrReplayPeak` | 0.014 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrReplayPeakLagMs` | 8 | ms | lag of that peak, ripple_power_z in model ripple_power, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrReplayPostOnsetAnimalsSameSign` | 4 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRippleRipplePowerSwrReplayPostOnsetMean` | 0.0079 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRipplepooledRipplePowerPooledPeak` | 0.012 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model ripple_power_pooled, all classes pooled (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRipplepooledRipplePowerPooledPeakLagMs` | −84 | ms | lag of that peak, ripple_power_z in model ripple_power_pooled, all classes pooled | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRipplepooledRipplePowerPooledPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model ripple_power_pooled, all classes pooled (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedRipplepooledRipplePowerPooledPostOnsetMean` | 0.0046 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model ripple_power_pooled, all classes pooled | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationNonSwrReplayPeak` | 0.0076 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationNonSwrReplayPeakLagMs` | 190 | ms | lag of that peak, log_event_duration_s in model event_strength, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationNonSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, log_event_duration_s in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationNonSwrReplayPostOnsetMean` | 0.0013 | log rate | mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationSwrReplayPeak` | 0.010 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of log_event_duration_s in model event_strength, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationSwrReplayPeakLagMs` | 200 | ms | lag of that peak, log_event_duration_s in model event_strength, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationSwrReplayPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, log_event_duration_s in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthDurationSwrReplayPostOnsetMean` | −0.0011 | log rate | mean of the population slope curve from 0 to +150 ms after onset, log_event_duration_s in model event_strength, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateNonSwrReplayHeldoutGainFraction` | 29 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateNonSwrReplayPeak` | −0.020 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateNonSwrReplayPeakLagMs` | 58 | ms | lag of that peak, mua_rate_z in model event_strength, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateNonSwrReplayPostOnsetAnimalsSameSign` | 5 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, mua_rate_z in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateNonSwrReplayPostOnsetMean` | −0.015 | log rate | mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateSwrReplayHeldoutGainFraction` | 28 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateSwrReplayPeak` | −0.0055 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of mua_rate_z in model event_strength, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateSwrReplayPeakLagMs` | −200 | ms | lag of that peak, mua_rate_z in model event_strength, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, mua_rate_z in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthMuaRateSwrReplayPostOnsetMean` | −0.00080 | log rate | mean of the population slope curve from 0 to +150 ms after onset, mua_rate_z in model event_strength, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerNonSwrReplayHeldoutGainFraction` | 26 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPeak` | 0.0088 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_no_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPeakLagMs` | −106 | ms | lag of that peak, ripple_power_z in model event_strength, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPostOnsetAnimalsSameSign` | 2 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model event_strength, non_local_no_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerNonSwrReplayPostOnsetMean` | −0.000039 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_no_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerSwrReplayHeldoutGainFraction` | 26 % |  | share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerSwrReplayPeak` | −0.0077 | log rate | population slope at its peak: change of the peri-event log rate per within-session SD of ripple_power_z in model event_strength, non_local_SWR (unit -> session -> animal) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerSwrReplayPeakLagMs` | 168 | ms | lag of that peak, ripple_power_z in model event_strength, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerSwrReplayPostOnsetAnimalsSameSign` | 3 |  | animals whose own mean slope from 0 to +150 ms after onset has the sign of the population's, ripple_power_z in model event_strength, non_local_SWR (a window fixed in advance; the count at the peak lag is not reported, since the lag is chosen where the population curve is largest and the animals agree there by selection) | `mpfc.marked_family_values` |  |
+| `\MpfcMarkedStrengthRipplePowerSwrReplayPostOnsetMean` | 0.0015 | log rate | mean of the population slope curve from 0 to +150 ms after onset, ripple_power_z in model event_strength, non_local_SWR | `mpfc.marked_family_values` |  |
+| `\MpfcMinPvalue` | 0.0010 |  | the smallest plus-one empirical p-value, 1/(R + 1) | `mpfc.estimator_values` |  |
+| `\MpfcMinPvalueDenominator` | 1,001 |  | R + 1: the smallest plus-one empirical p-value is one over it | `mpfc.estimator_values` |  |
+| `\MpfcModelFits` | 166,968 |  | neuron x model fits in the bundles | `mpfc.estimator_values` |  |
+| `\MpfcNonSwrReplayCalledFraction` | 19 % |  | share of tested units at raw empirical p < 0.05 for non-SWR replay, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonSwrReplayUnitsCalled` | 3,431 |  | units at raw empirical p < 0.05 for non-SWR replay | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for non-SWR replay | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonconvergedModelFits` | 432 |  | of those, fits that ran to maxiter without converging | `mpfc.estimator_values` |  |
+| `\MpfcNonconvergedNeurons` | 48 |  | neurons carrying at least one non-converged fit | `mpfc.estimator_values` |  |
+| `\MpfcNonconvergedPercent` | 0.26 | % | non-converged fits as a percent of model fits | `mpfc.estimator_values` |  |
+| `\MpfcNonlocalCalledFraction` | 32 % |  | share of tested units at raw empirical p < 0.05 for all non-local events, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonlocalEventsBefore` | 17,726 |  | the session's non-local events before the stop restriction, summed | `mpfc.cohort_values` |  |
+| `\MpfcNonlocalEventsKept` | 16,419 |  | non-local events whose onset is in a kept stop, summed over sessions | `mpfc.cohort_values` |  |
+| `\MpfcNonlocalEventsKeptFraction` | 93 % |  | share of the non-local events the stop restriction keeps, pooled | `mpfc.cohort_values` |  |
+| `\MpfcNonlocalUnitsCalled` | 5,821 |  | units at raw empirical p < 0.05 for all non-local events | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNonlocalUnitsTested` | 18,410 |  | units with a finite p-value for all non-local events | `mpfc.called_fraction_values` | 4d |
+| `\MpfcNullDraws` | 1,000 |  | matched-control draws in each unit's null | `mpfc.estimator_values` |  |
+| `\MpfcOverlapAnimalsOddsRatioAboveOne` | 5 |  | animals whose odds ratio is above 1 | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapOddsRatio` | 3.2 |  | odds ratio of being called for non-SWR replay given called for SWR-coupled replay, pooled over units (1 = independent) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapOddsRatioAnimalMax` | 5.7 |  | highest per-animal odds ratio | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapOddsRatioAnimalMin` | 2.7 |  | lowest per-animal odds ratio | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapRankCorrelation` | 0.33 |  | Spearman correlation over units tested for both of the peak log modulation for SWR-coupled replay and for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapRankCorrelationCalled` | 0.41 |  | the same over units called for either | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapSameSignFractionBoth` | 84 % |  | of the units called for both, the share whose two peak modulations have the same sign (both up or both down) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapUnitsBoth` | 1,634 |  | of those, units called (raw p < 0.05) for both | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapUnitsBothExpected` | 923 | units | units called for both expected if the two calls were independent (product of the two called shares times the units tested) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapUnitsNeither` | 11,661 |  | units called for neither | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapUnitsNonSwrReplayOnly` | 1,797 |  | units called for non-SWR replay and not for SWR-coupled replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapUnitsSwrReplayOnly` | 3,318 |  | units called for SWR-coupled replay and not for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcOverlapUnitsTested` | 18,410 |  | units with a finite p-value for both SWR-coupled and non-SWR replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcPenaltySigma` | 3 | log rate | prior standard deviation of an event-basis coefficient | `mpfc.estimator_values` |  |
+| `\MpfcPriorBindsPercentMax` | 4.9 | % | highest per-curve percent of well-posed units the prior binds on (no_SWR) | `mpfc.prior_binding_values` |  |
+| `\MpfcPriorBindsPercentMin` | 2.6 | % | lowest per-curve percent of well-posed units the prior binds on (matched_control) | `mpfc.prior_binding_values` |  |
+| `\MpfcPriorMultiplierPerLagHigh` | 57 | rate multiplier | upper end of that multiplier | `mpfc.estimator_values` |  |
+| `\MpfcPriorMultiplierPerLagLow` | 0.017 | rate multiplier | lower end of the rate multiplier that per-lag sd allows at 95 % | `mpfc.estimator_values` |  |
+| `\MpfcPriorMultiplierSustainedHigh` | 5.9 | rate multiplier | upper end of that multiplier | `mpfc.estimator_values` |  |
+| `\MpfcPriorMultiplierSustainedLow` | 0.17 | rate multiplier | lower end of the rate multiplier that sustained sd allows at 95 % | `mpfc.estimator_values` |  |
+| `\MpfcPriorSdPerLag` | 2.07 | log rate | the prior's implied standard deviation of a curve at one lag | `mpfc.estimator_values` |  |
+| `\MpfcPriorSdSustained` | 0.90 | log rate | the prior's implied standard deviation of a curve sustained over the reported window | `mpfc.estimator_values` |  |
+| `\MpfcSessions` | 75 |  | epochs with an mPFC unit bundle (the PFC cohort: analysed epochs with curated cortical spike sorting) | `mpfc.cohort_values` |  |
+| `\MpfcSplitBestModelFraction` | 10 % |  | share of units whose best model by held-out deviance (among constant, non_local, and the split) is the split by SWR status | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcSplitImprovesFraction` | 21 % |  | share of units whose held-out deviance improves when the non-local response is split by SWR status (non_local_SWR + non_local_no_SWR vs. non_local) | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcSplitSwrLargerFractionCalled` | 63 % |  | of units called for either, the share whose absolute peak modulation is larger for SWR-coupled replay than for non-SWR replay | `mpfc.overlap_and_effect_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayDecrease` | 1.00 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayDecreaseCiHigh` | 1.06 | x | upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayDecreaseCiLow` | 0.95 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncrease` | 1.06 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAllUnits` | 1.04 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_no_SWR, units whose peak is an increase, all units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAllUnitsCiHigh` | 1.08 | x | upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, all units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAllUnitsCiLow` | 1.01 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, all units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseAnimalsPooledSign` | 4 |  | animals whose own estimate has the pooled sign, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseCiHigh` | 1.12 | x | upper end of that interval, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseCiLow` | 1.00 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseLoaoMax` | 1.08 | x | largest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainNonSwrReplayIncreaseLoaoMin` | 1.04 | x | smallest leave-one-animal-out estimate, rewarded stops, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayDecrease` | 0.96 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayDecreaseCiHigh` | 1.00 | x | upper end of that interval, rewarded stops, non_local_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayDecreaseCiLow` | 0.92 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncrease` | 1.08 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseAllUnits` | 1.08 | x | multiplicative change of the post-onset response relative to the stop baseline at rewarded stops, non_local_SWR, units whose peak is an increase, all units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseAllUnitsCiHigh` | 1.12 | x | upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, all units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseAllUnitsCiLow` | 1.04 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, all units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseAnimalsPooledSign` | 3 |  | animals whose own estimate has the pooled sign, rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseCiHigh` | 1.15 | x | upper end of that interval, rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseCiLow` | 1.02 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseLoaoMax` | 1.10 | x | largest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextRewardGainSwrReplayIncreaseLoaoMin` | 1.02 | x | smallest leave-one-animal-out estimate, rewarded stops, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayDecrease` | 1.02 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayDecreaseCiHigh` | 1.06 | x | upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayDecreaseCiLow` | 0.98 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncrease` | 1.01 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseAnimalsPooledSign` | 2 |  | animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseCiHigh` | 1.05 | x | upper end of that interval, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseCiLow` | 0.97 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseLoaoMax` | 1.02 | x | largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainNonSwrReplayIncreaseLoaoMin` | 0.99 | x | smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_no_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayDecrease` | 1.00 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayDecreaseCiHigh` | 1.04 | x | upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayDecreaseCiLow` | 0.95 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is a decrease, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncrease` | 0.99 | x | multiplicative change of the post-onset response relative to the stop baseline at stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncreaseAnimalsEstimated` | 5 |  | animals with an estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncreaseAnimalsPooledSign` | 2 |  | animals whose own estimate has the pooled sign, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncreaseCiHigh` | 1.03 | x | upper end of that interval, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncreaseCiLow` | 0.96 | x | lower end of the recording-day-clustered 95 % interval of that (t with G - 1 degrees of freedom), stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncreaseLoaoMax` | 1.01 | x | largest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcStopContextSwitchGainSwrReplayIncreaseLoaoMin` | 0.99 | x | smallest leave-one-animal-out estimate, stops before a patch-leaving trip, non_local_SWR, units whose peak is an increase, called units | `mpfc.stop_context_values` |  |
+| `\MpfcSwrCalledFraction` | 25 % |  | share of tested units at raw empirical p < 0.05 for SWR, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrCoupledShareSessionMedian` | 0.51 |  | median over sessions of the share of kept non-local events that are SWR-coupled (the canonical event table's is_swr) | `mpfc.cohort_values` |  |
+| `\MpfcSwrNoReplayAddsToSplitFractionAll` | 25 % |  | share of units whose held-out deviance improves when SWRs without replay are added to the replay split (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayAddsToSplitFractionMinEvents` | 21 % |  | share of units whose held-out deviance improves when SWRs without replay are added to the replay split (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayBestModelFractionAll` | 5 % |  | share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayBestModelFractionMinEvents` | 5 % |  | share of units whose best model by held-out deviance (constant, non_local, the replay split, or the three-class model) is the three-class model (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionAll` | 7 % |  | share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionAllChimi` | 24 % |  | the same for chimi's tested units (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionAllJsixteen` | 10 % |  | the same for j16's tested units (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionAllPeanut` | 6 % |  | the same for peanut's tested units (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionAllSenor` | 6 % |  | the same for senor's tested units (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionAllWilbur` | 6 % |  | the same for wilbur's tested units (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionMinEvents` | 8 % |  | share of tested units at raw empirical p < 0.05 for SWRs without replay, against their own matched null (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionMinEventsChimi` | 24 % |  | the same for chimi's tested units (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionMinEventsJsixteen` | 10 % |  | the same for j16's tested units (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionMinEventsPeanut` | 6 % |  | the same for peanut's tested units (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionMinEventsSenor` | 4 % |  | the same for senor's tested units (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayCalledFractionMinEventsWilbur` | 6 % |  | the same for wilbur's tested units (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrNoReplayAll` | 1.32 | log rate | the same over the units called for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrNoReplayMinEvents` | 1.33 | log rate | the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrReplayAll` | 0.86 | log rate | the same over the units called for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianCalledSwrReplayMinEvents` | 0.80 | log rate | the same over the units called for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrNoReplayAll` | 1.09 | log rate | median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrNoReplayMinEvents` | 1.04 | log rate | median over units of the absolute peak log-rate modulation for SWRs without replay, three-class model (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrReplayAll` | 0.94 | log rate | median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectAbsPeakMedianSwrReplayMinEvents` | 0.92 | log rate | median over units of the absolute peak log-rate modulation for SWR-coupled replay, three-class model (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrNoReplayAll` | 3.0 | x | exp of that median: the median unit's largest rate change for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrNoReplayMinEvents` | 2.8 | x | exp of that median: the median unit's largest rate change for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrReplayAll` | 2.5 | x | exp of that median: the median unit's largest rate change for SWR-coupled replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEffectRateMultiplierMedianSwrReplayMinEvents` | 2.5 | x | exp of that median: the median unit's largest rate change for SWR-coupled replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEvents` | 2,290 |  | Kay SWRs (kept, in the stop cohort) that overlap no non-local event, summed over sessions | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEventsFraction` | 20 % |  | share of the kept, cohort Kay SWRs that overlap no non-local event | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEventsSessionMedian` | 29 | events | median per session of those SWRs | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayEventsUnknown` | 0 |  | kept SWRs left out of the class because they overlap a window the analysed-time rule dropped | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapBothAll` | 438 |  | of those, units called for both (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapBothMinEvents` | 362 |  | of those, units called for both (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapExpectedAll` | 359 | units | units called for both expected if the two calls were independent (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapExpectedMinEvents` | 287 | units | units called for both expected if the two calls were independent (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapNeitherAll` | 12,186 |  | of those, units called for neither (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapNeitherMinEvents` | 9,572 |  | of those, units called for neither (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapOddsRatioAll` | 1.4 |  | odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapOddsRatioMinEvents` | 1.4 |  | odds ratio of being called for SWR-coupled replay given called for SWRs without replay (1 = independent) (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapSwrNoReplayOnlyAll` | 886 |  | of those, units called for SWRs without replay only (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapSwrNoReplayOnlyMinEvents` | 705 |  | of those, units called for SWRs without replay only (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapSwrReplayOnlyAll` | 4,434 |  | of those, units called for SWR-coupled replay only (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapSwrReplayOnlyMinEvents` | 3,414 |  | of those, units called for SWR-coupled replay only (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapTestedAll` | 17,944 |  | units tested for both SWRs without replay and SWR-coupled replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayOverlapTestedMinEvents` | 14,053 |  | units tested for both SWRs without replay and SWR-coupled replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayRankCorrelationAll` | 0.07 |  | Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayRankCorrelationMinEvents` | 0.12 |  | Spearman correlation over units tested for both of the peak log modulation for SWRs without replay and for SWR-coupled replay, both from the three-class model (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplaySameSignFractionAll` | 65 % |  | of the units called for both, the share whose two peaks have the same sign (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplaySameSignFractionMinEvents` | 66 % |  | of the units called for both, the share whose two peaks have the same sign (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplaySessions` | 75 |  | sessions in the extended-event-set tree | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplaySessionsMinEvents` | 60 |  | sessions with at least 10 such SWRs | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingPeakMsEnhancedAll` | −40 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingPeakMsEnhancedMinEvents` | −46 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingPeakMsSuppressedAll` | 82 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingPeakMsSuppressedMinEvents` | 84 | ms | peak lag of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighEnhancedAll` | 62 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighEnhancedMinEvents` | 22 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighSuppressedAll` | 24 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiHighSuppressedMinEvents` | 42 | ms | 97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowEnhancedAll` | −108 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowEnhancedMinEvents` | −192 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowSuppressedAll` | −130 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsCiLowSuppressedMinEvents` | −112 | ms | 2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsEnhancedAll` | −76 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsEnhancedMinEvents` | −82 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsSuppressedAll` | −22 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseOnsetMsSuppressedMinEvents` | −18 | ms | rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseSizeEnhancedAll` | 0.10 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseSizeEnhancedMinEvents` | 0.09 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseSizeSuppressedAll` | 0.17 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingRiseSizeSuppressedMinEvents` | 0.18 | log rate | size from the -200 ms value of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingUnitsEnhancedAll` | 465 |  | units called for SWRs without replay whose peak is an increase (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingUnitsEnhancedMinEvents` | 390 |  | units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingUnitsSuppressedAll` | 859 |  | units called for SWRs without replay whose peak is a decrease (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayTimingUnitsSuppressedMinEvents` | 677 |  | units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsAll` | 18,410 |  | units in every session (Figure 4's population) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsCalledAll` | 1,324 |  | units called for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsCalledMinEvents` | 1,067 |  | units called for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsMinEvents` | 14,054 |  | units in sessions with at least 10 SWRs without replay (Figure 4's population) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsTestedAll` | 17,944 |  | of those, units with a finite p-value for SWRs without replay (every session) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrNoReplayUnitsTestedMinEvents` | 14,053 |  | of those, units with a finite p-value for SWRs without replay (sessions with at least 10 SWRs without replay) | `mpfc.swr_without_replay_values` |  |
+| `\MpfcSwrReplayCalledFraction` | 27 % |  | share of tested units at raw empirical p < 0.05 for SWR-coupled replay, pooled (descriptive) | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrReplayUnitsCalled` | 4,952 |  | units at raw empirical p < 0.05 for SWR-coupled replay | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrReplayUnitsTested` | 18,410 |  | units with a finite p-value for SWR-coupled replay | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrUnitsCalled` | 4,512 |  | units at raw empirical p < 0.05 for SWR | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrUnitsTested` | 18,410 |  | units with a finite p-value for SWR | `mpfc.called_fraction_values` | 4d |
+| `\MpfcSwrsKeptFraction` | 93 % |  | share of the SWRs the stop restriction keeps, pooled | `mpfc.cohort_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaEnhanced` | 2 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaShallowSuppressed` | 6 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetRiseAlphaSuppressed` | 6 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetRiseBoxcarEnhanced` | 0 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetRiseBoxcarShallowSuppressed` | 16 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetRiseBoxcarSuppressed` | 12 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetZeroAlphaEnhanced` | 2 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetZeroAlphaShallowSuppressed` | 0 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetZeroAlphaSuppressed` | 6 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetZeroBoxcarEnhanced` | 0 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetZeroBoxcarShallowSuppressed` | 14 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsOnsetZeroBoxcarSuppressed` | 10 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsPeakAlphaEnhanced` | 18 | ms | peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsPeakAlphaShallowSuppressed` | 18 | ms | peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsPeakAlphaSuppressed` | 20 | ms | peak lag of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsSteepestAlphaEnhanced` | 12 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsSteepestAlphaShallowSuppressed` | 10 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsSteepestAlphaSuppressed` | 14 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsSteepestBoxcarEnhanced` | −4 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsSteepestBoxcarShallowSuppressed` | 18 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationBiasMsSteepestBoxcarSuppressed` | 14 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth read by the same rule | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationOnsetBeforeZeroFractionAlphaEnhanced` | 35 % |  | share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationOnsetBeforeZeroFractionAlphaShallowSuppressed` | 47 % |  | share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationOnsetBeforeZeroFractionAlphaSuppressed` | 25 % |  | share of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationOnsetBeforeZeroFractionBoxcarEnhanced` | 44 % |  | share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationOnsetBeforeZeroFractionBoxcarShallowSuppressed` | 38 % |  | share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationOnsetBeforeZeroFractionBoxcarSuppressed` | 25 % |  | share of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter whose half-maximum onset is before event onset: the noise floor of the per-unit share | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationSizeBiasAlphaEnhanced` | −0.13 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationSizeBiasAlphaShallowSuppressed` | −0.08 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationSizeBiasAlphaSuppressed` | −0.07 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, an alpha function peaking 30 ms after it starts of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationSizeBiasBoxcarEnhanced` | 0.07 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain +0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationSizeBiasBoxcarShallowSuppressed` | 0.05 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.3, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationSizeBiasBoxcarSuppressed` | 0.14 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units (200) whose response, a 100 ms boxcar of log-rate gain -0.7, starts exactly at event onset, fit by the shipped basis, prior and fitter, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetPlusResponseBiasMsOnsetRise` | 14 | ms | rise onset (half way from the -200 ms value to the peak) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetPlusResponseBiasMsOnsetZero` | 8 | ms | half-maximum onset from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetPlusResponseBiasMsSteepest` | 16 | ms | steepest approach to the peak of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset, minus the truth's | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetPlusResponseRiseSize` | 0.86 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetPlusResponseSize` | 1.07 | log rate | size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetPlusResponseSuppressedFraction` | 100 % |  | share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, plus a -0.7 boxcar decrease from event onset whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetRiseSize` | 0.01 | log rate | size (peak less the -200 ms value) of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetSize` | 0.19 | log rate | size from zero of the sign-aligned mean curve of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationStopOffsetSuppressedFraction` | 97 % |  | share of simulated units whose rate is lower (by log 0.3) in 40 % of 20 s stretches, with 80 % of the events in those stretches, and no event-locked response whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideBiasMsOnsetRiseAlphaEnhanced` | 2 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideBiasMsOnsetRiseAlphaShallowSuppressed` | 2 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideBiasMsOnsetRiseAlphaSuppressed` | 6 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarEnhanced` | 2 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarShallowSuppressed` | 18 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideBiasMsOnsetRiseBoxcarSuppressed` | 12 | ms | rise onset minus the truth's, as the canonical-window key, for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingCalibrationWideStopOffsetSize` | 0.20 | log rate | size from zero of the stop-offset scenario's sign-aligned mean curve for a kernel fit on +/-1.05 s and read on +/-1.0 s | `mpfc.timing_values` |  |
+| `\MpfcTimingMatchedControlPeakBeforeOnsetFraction` | 50 % |  | share of all units whose matched quiet-rest control curve peaks before the control window's onset (what a peak lag drawn by noise gives) | `mpfc.timing_values` |  |
+| `\MpfcTimingNonSwrLaterFraction` | 37 % |  | share of those units whose non-SWR replay peak is later than their SWR-coupled replay peak | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetAtEdgeFractionNonSwrReplayEnhanced` | 4 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetAtEdgeFractionNonSwrReplaySuppressed` | 16 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetAtEdgeFractionSwrEnhanced` | 5 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetAtEdgeFractionSwrReplayEnhanced` | 5 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetAtEdgeFractionSwrReplaySuppressed` | 16 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetAtEdgeFractionSwrSuppressed` | 13 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose half-maximum run reaches the window edge (-200 ms), so their onset is at or before it | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetBeforeOnsetFractionNonSwrReplayEnhanced` | 53 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose response onset is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetBeforeOnsetFractionNonSwrReplaySuppressed` | 65 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose response onset is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetBeforeOnsetFractionSwrEnhanced` | 45 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose response onset is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetBeforeOnsetFractionSwrReplayEnhanced` | 46 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose response onset is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetBeforeOnsetFractionSwrReplaySuppressed` | 59 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose response onset is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetBeforeOnsetFractionSwrSuppressed` | 55 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose response onset is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetMedianMsNonSwrReplayEnhanced` | −10 | ms | median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase; onset is rise_size | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetMedianMsNonSwrReplaySuppressed` | −38 | ms | median response onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease; onset is rise_size | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetMedianMsSwrEnhanced` | 10 | ms | median response onset of units called for SWR (raw p < 0.05) whose peak is an increase; onset is the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetMedianMsSwrReplayEnhanced` | 8 | ms | median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase; onset is rise_size | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetMedianMsSwrReplaySuppressed` | −26 | ms | median response onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease; onset is rise_size | `mpfc.timing_values` |  |
+| `\MpfcTimingOnsetMedianMsSwrSuppressed` | −16 | ms | median response onset of units called for SWR (raw p < 0.05) whose peak is a decrease; onset is rise_size | `mpfc.timing_values` |  |
+| `\MpfcTimingPairedUnits` | 1,368 |  | units called for both SWR-coupled and non-SWR replay whose two peaks have the same sign | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakAtEdgeFractionNonSwrReplayEnhanced` | 4 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakAtEdgeFractionNonSwrReplaySuppressed` | 6 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakAtEdgeFractionSwrEnhanced` | 5 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakAtEdgeFractionSwrReplayEnhanced` | 5 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose peak lies at the edge of the +/-200 ms window | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakAtEdgeFractionSwrReplaySuppressed` | 8 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakAtEdgeFractionSwrSuppressed` | 8 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose peak lies at the edge of the +/-200 ms window | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakBeforeOnsetFractionNonSwrReplayEnhanced` | 22 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is an increase whose peak lag is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakBeforeOnsetFractionNonSwrReplaySuppressed` | 41 % |  | share of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakBeforeOnsetFractionSwrEnhanced` | 18 % |  | share of units called for SWR (raw p < 0.05) whose peak is an increase whose peak lag is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakBeforeOnsetFractionSwrReplayEnhanced` | 15 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase whose peak lag is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakBeforeOnsetFractionSwrReplaySuppressed` | 36 % |  | share of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakBeforeOnsetFractionSwrSuppressed` | 36 % |  | share of units called for SWR (raw p < 0.05) whose peak is a decrease whose peak lag is before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagDifferenceMedianMs` | −14 | ms | over those units, the median of the non-SWR replay peak lag minus the SWR-coupled replay peak lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagMedianMsNonSwrReplayEnhanced` | 56 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagMedianMsNonSwrReplaySuppressed` | 18 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagMedianMsSwrEnhanced` | 87 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagMedianMsSwrReplayEnhanced` | 86 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagMedianMsSwrReplaySuppressed` | 44 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagMedianMsSwrSuppressed` | 46 | ms | median peak lag (largest \|modulation\| within +/-200 ms of onset) of units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileHighMsNonSwrReplayEnhanced` | 110 | ms | 75th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileHighMsNonSwrReplaySuppressed` | 96 | ms | 75th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileHighMsSwrEnhanced` | 134 | ms | 75th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileHighMsSwrReplayEnhanced` | 134 | ms | 75th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileHighMsSwrReplaySuppressed` | 110 | ms | 75th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileHighMsSwrSuppressed` | 108 | ms | 75th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileLowMsNonSwrReplayEnhanced` | 4 | ms | 25th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileLowMsNonSwrReplaySuppressed` | −78 | ms | 25th percentile of the peak lag of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileLowMsSwrEnhanced` | 24 | ms | 25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileLowMsSwrReplayEnhanced` | 32 | ms | 25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileLowMsSwrReplaySuppressed` | −62 | ms | 25th percentile of the peak lag of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPeakLagQuartileLowMsSwrSuppressed` | −76 | ms | 25th percentile of the peak lag of units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplayEnhanced` | 0 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionNonSwrReplaySuppressed` | 16 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplayEnhanced` | 1 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrReplaySuppressed` | 12 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationControlPreEventLevelFractionSwrSuppressed` | 13 % |  | the same units' matched-control mean curve at -200 ms, signed by the event curve, as a share of the event curve's peak: how much of the event curve's pre-event level quiet-rest windows also show | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNegativeNonSwrReplayEnhanced` | 4 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNegativeNonSwrReplaySuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrEnhanced` | 3 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrReplaySuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNegativeSwrSuppressed` | 5 |  | of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNonSwrReplayEnhanced` | 5 |  | animals with at least one of the units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsNonSwrReplaySuppressed` | 5 |  | animals with at least one of the units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsSwrEnhanced` | 5 |  | animals with at least one of the units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsSwrReplayEnhanced` | 5 |  | animals with at least one of the units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsSwrReplaySuppressed` | 5 |  | animals with at least one of the units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetAnimalsSwrSuppressed` | 5 |  | animals with at least one of the units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiHighNonSwrReplayEnhanced` | −24 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiHighNonSwrReplaySuppressed` | −146 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiHighSwrEnhanced` | 0 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiHighSwrReplayEnhanced` | 0 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiHighSwrReplaySuppressed` | −134 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiHighSwrSuppressed` | −126 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplayEnhanced` | −56 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowNonSwrReplaySuppressed` | −200 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrEnhanced` | −52 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrReplayEnhanced` | −44 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrReplaySuppressed` | −188 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsCiLowSwrSuppressed` | −200 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsNonSwrReplayEnhanced` | −38 | ms | onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsNonSwrReplaySuppressed` | −192 | ms | onset (rise_size) of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsSwrEnhanced` | −30 | ms | onset (the half-maximum onset: the earliest lag of the run, ending at the peak, over which the curve keeps the peak's sign and at least half its size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsSwrReplayEnhanced` | −30 | ms | onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsSwrReplaySuppressed` | −162 | ms | onset (rise_size) of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationOnsetMsSwrSuppressed` | −166 | ms | onset (rise_size) of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiHighNonSwrReplayEnhanced` | 100 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiHighNonSwrReplaySuppressed` | 42 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiHighSwrEnhanced` | 114 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiHighSwrReplayEnhanced` | 104 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiHighSwrReplaySuppressed` | 62 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiHighSwrSuppressed` | 84 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplayEnhanced` | 74 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowNonSwrReplaySuppressed` | 18 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrReplayEnhanced` | 78 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrReplaySuppressed` | 46 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsCiLowSwrSuppressed` | 52 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsNonSwrReplayEnhanced` | 92 | ms | peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsNonSwrReplaySuppressed` | 32 | ms | peak lag of the mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsSwrEnhanced` | 96 | ms | peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsSwrReplayEnhanced` | 92 | ms | peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsSwrReplaySuppressed` | 54 | ms | peak lag of the mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPeakMsSwrSuppressed` | 64 | ms | peak lag of the mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, each unit's curve signed by its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplayEnhanced` | 3 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionNonSwrReplaySuppressed` | 49 % |  | value at -200 ms of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrEnhanced` | 14 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrReplayEnhanced` | 8 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrReplaySuppressed` | 44 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationPreEventLevelFractionSwrSuppressed` | 47 % |  | value at -200 ms of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease, as a share of its peak: how far the curve sits from zero before the event | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeNonSwrReplayEnhanced` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeNonSwrReplaySuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrEnhanced` | 2 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrReplaySuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetAnimalsNegativeSwrSuppressed` | 4 |  | of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiHighNonSwrReplayEnhanced` | −18 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiHighNonSwrReplaySuppressed` | −30 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrEnhanced` | 16 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrReplayEnhanced` | 8 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrReplaySuppressed` | −24 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiHighSwrSuppressed` | −6 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplayEnhanced` | −50 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowNonSwrReplaySuppressed` | −62 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrEnhanced` | −32 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplayEnhanced` | −34 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrReplaySuppressed` | −42 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsCiLowSwrSuppressed` | −26 | ms | 2.5th percentile of that over 1,000 session resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhanced` | −36 | ms | rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedChimi` | −46 | ms | rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedJsixteen` | −18 | ms | rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedPeanut` | 34 | ms | rise onset of the sign-aligned mean curve of peanut's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedSenor` | −38 | ms | rise onset of the sign-aligned mean curve of senor's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplayEnhancedWilbur` | −44 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressed` | −46 | ms | rise onset of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedChimi` | −60 | ms | rise onset of the sign-aligned mean curve of chimi's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedJsixteen` | 4 | ms | rise onset of the sign-aligned mean curve of j16's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedPeanut` | −14 | ms | rise onset of the sign-aligned mean curve of peanut's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedSenor` | −116 | ms | rise onset of the sign-aligned mean curve of senor's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsNonSwrReplaySuppressedWilbur` | −56 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrEnhanced` | −14 | ms | rise onset of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedChimi` | 72 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedJsixteen` | 16 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedPeanut` | 30 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedSenor` | −42 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrEnhancedWilbur` | −28 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhanced` | −22 | ms | rise onset of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedChimi` | 38 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedJsixteen` | 12 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedPeanut` | 30 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedSenor` | −36 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplayEnhancedWilbur` | −38 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressed` | −32 | ms | rise onset of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedChimi` | −64 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedJsixteen` | 4 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedPeanut` | −32 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedSenor` | −28 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrReplaySuppressedWilbur` | −38 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressed` | −18 | ms | rise onset of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: half way from its value at -200 ms to its peak | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedChimi` | −38 | ms | rise onset of the sign-aligned mean curve of chimi's units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedJsixteen` | 0 | ms | rise onset of the sign-aligned mean curve of j16's units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedPeanut` | −38 | ms | rise onset of the sign-aligned mean curve of peanut's units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedSenor` | −12 | ms | rise onset of the sign-aligned mean curve of senor's units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseOnsetMsSwrSuppressedWilbur` | −16 | ms | rise onset of the sign-aligned mean curve of wilbur's units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiHighNonSwrReplayEnhanced` | 0.40 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiHighNonSwrReplaySuppressed` | 0.33 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiHighSwrEnhanced` | 0.46 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiHighSwrReplayEnhanced` | 0.57 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiHighSwrReplaySuppressed` | 0.38 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiHighSwrSuppressed` | 0.35 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiLowNonSwrReplayEnhanced` | 0.28 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiLowNonSwrReplaySuppressed` | 0.26 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiLowSwrEnhanced` | 0.30 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiLowSwrReplayEnhanced` | 0.42 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiLowSwrReplaySuppressed` | 0.31 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeCiLowSwrSuppressed` | 0.21 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeNonSwrReplayEnhanced` | 0.35 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeNonSwrReplaySuppressed` | 0.29 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrEnhanced` | 0.39 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrReplayEnhanced` | 0.52 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrReplaySuppressed` | 0.35 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationRiseSizeSwrSuppressed` | 0.27 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak less its value at -200 ms (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiHighNonSwrReplayEnhanced` | 0.41 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiHighNonSwrReplaySuppressed` | 0.63 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiHighSwrEnhanced` | 0.51 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiHighSwrReplayEnhanced` | 0.62 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiHighSwrReplaySuppressed` | 0.65 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiHighSwrSuppressed` | 0.58 | log rate | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiLowNonSwrReplayEnhanced` | 0.31 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiLowNonSwrReplaySuppressed` | 0.52 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiLowSwrEnhanced` | 0.37 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiLowSwrReplayEnhanced` | 0.46 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiLowSwrReplaySuppressed` | 0.56 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeCiLowSwrSuppressed` | 0.45 | log rate | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeNonSwrReplayEnhanced` | 0.36 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeNonSwrReplaySuppressed` | 0.58 | log rate | size of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrEnhanced` | 0.45 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrReplayEnhanced` | 0.56 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrReplaySuppressed` | 0.61 | log rate | size of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeSwrSuppressed` | 0.51 | log rate | size of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease: its peak, from zero (log-rate units; a decrease is counted as a positive size) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeVsControlNonSwrReplayEnhanced` | 0.38 | log rate | the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeVsControlNonSwrReplaySuppressed` | 0.51 | log rate | the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeVsControlSwrEnhanced` | 0.48 | log rate | the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeVsControlSwrReplayEnhanced` | 0.58 | log rate | the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeVsControlSwrReplaySuppressed` | 0.54 | log rate | the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSizeVsControlSwrSuppressed` | 0.45 | log rate | the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease at its peak, less the same units' matched quiet-rest control curves (signed the same way) at that lag | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestAnimalsNegativeNonSwrReplayEnhanced` | 3 |  | of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestAnimalsNegativeNonSwrReplaySuppressed` | 3 |  | of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrEnhanced` | 1 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrReplaySuppressed` | 4 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestAnimalsNegativeSwrSuppressed` | 5 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplayEnhanced` | 59 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplaySuppressed` | 1 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrEnhanced` | 37 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrReplayEnhanced` | 29 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrReplaySuppressed` | 9 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrSuppressed` | −3 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplayEnhanced` | −63 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplaySuppressed` | −33 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrEnhanced` | −17 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrReplayEnhanced` | −23 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrReplaySuppressed` | −27 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrSuppressed` | −19 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsNonSwrReplayEnhanced` | −29 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsNonSwrReplaySuppressed` | −21 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsSwrEnhanced` | 13 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsSwrReplayEnhanced` | 5 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsSwrReplaySuppressed` | −15 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsSwrSuppressed` | −13 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingRiseOnsetMedianMsNonSwrReplayEnhanced` | −10 | ms | median rise onset of units called for non-SWR replay (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero | `mpfc.timing_values` |  |
+| `\MpfcTimingRiseOnsetMedianMsNonSwrReplaySuppressed` | −34 | ms | median rise onset of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero | `mpfc.timing_values` |  |
+| `\MpfcTimingRiseOnsetMedianMsSwrEnhanced` | 10 | ms | median rise onset of units called for SWR (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero | `mpfc.timing_values` |  |
+| `\MpfcTimingRiseOnsetMedianMsSwrReplayEnhanced` | 6 | ms | median rise onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase: the onset rule measured from the curve's value at -200 ms instead of from zero | `mpfc.timing_values` |  |
+| `\MpfcTimingRiseOnsetMedianMsSwrReplaySuppressed` | −22 | ms | median rise onset of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero | `mpfc.timing_values` |  |
+| `\MpfcTimingRiseOnsetMedianMsSwrSuppressed` | −14 | ms | median rise onset of units called for SWR (raw p < 0.05) whose peak is a decrease: the onset rule measured from the curve's value at -200 ms instead of from zero | `mpfc.timing_values` |  |
+| `\MpfcTimingSteepestMedianMsNonSwrReplayEnhanced` | −69 | ms | median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak) | `mpfc.timing_values` |  |
+| `\MpfcTimingSteepestMedianMsNonSwrReplaySuppressed` | −77 | ms | median lag of the steepest approach to the peak of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak) | `mpfc.timing_values` |  |
+| `\MpfcTimingSteepestMedianMsSwrEnhanced` | −69 | ms | median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak) | `mpfc.timing_values` |  |
+| `\MpfcTimingSteepestMedianMsSwrReplayEnhanced` | −69 | ms | median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the level-free rule: where the curve moves fastest toward its peak) | `mpfc.timing_values` |  |
+| `\MpfcTimingSteepestMedianMsSwrReplaySuppressed` | −71 | ms | median lag of the steepest approach to the peak of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak) | `mpfc.timing_values` |  |
+| `\MpfcTimingSteepestMedianMsSwrSuppressed` | −65 | ms | median lag of the steepest approach to the peak of units called for SWR (raw p < 0.05) whose peak is a decrease (the level-free rule: where the curve moves fastest toward its peak) | `mpfc.timing_values` |  |
+| `\MpfcTimingUnitsNonSwrReplayEnhanced` | 1,401 |  | units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingUnitsNonSwrReplaySuppressed` | 2,030 |  | units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingUnitsSwrEnhanced` | 2,240 |  | units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingUnitsSwrReplayEnhanced` | 2,298 |  | units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
+| `\MpfcTimingUnitsSwrReplaySuppressed` | 2,654 |  | units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcTimingUnitsSwrSuppressed` | 2,272 |  | units called for SWR (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
+| `\MpfcUnits` | 18,410 |  | mPFC units in the population: every unit with a usable fit (no firing-rate cutoff; a unit with no spike in the fitted bins has none) and finite modulation curves | `mpfc.cohort_values` | 4c, 4d |
+| `\MpfcUnmatchablePercentClassMax` | 0.60 | % | highest such percent (non_local_no_SWR) | `mpfc.null_geometry_values` |  |
+| `\MpfcUnmatchablePercentClassMin` | 0.27 | % | lowest percent, over event classes, of a class's events with no legal within-bout control, summed over sessions (non_local_SWR) | `mpfc.null_geometry_values` |  |
+| `\MpfcUnmatchableWorstExcluded` | 8 |  | events with no legal control in the worst session and class (j1620210709_10_r5 / non_local_SWR) | `mpfc.null_geometry_values` |  |
+| `\MpfcUnmatchableWorstTotal` | 102 |  | events of that class in that session (j1620210709_10_r5 / non_local_SWR) | `mpfc.null_geometry_values` |  |
 
 ## Values by figure
 
