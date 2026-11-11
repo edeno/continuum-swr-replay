@@ -36,7 +36,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import TypedDict
 
-from continuum_swr_replay.runs.provenance import git
+from continuum_swr_replay.runs.io import sha256_file
+from continuum_swr_replay.runs.provenance import git, git_commit
 
 PACKAGE = "continuum_swr_replay"
 
@@ -106,11 +107,12 @@ def code_digest(source: str) -> str:
 
 
 def _digests(file: Path) -> FileDigests:
-    raw = hashlib.sha256(file.read_bytes()).hexdigest()
+    data = file.read_bytes()
+    raw = hashlib.sha256(data).hexdigest()
     code = raw
     if file.suffix == ".py":
         try:
-            code = code_digest(file.read_text())
+            code = code_digest(data.decode())
         except SyntaxError:
             pass
     return {"sha256": raw, "code_sha256": code}
@@ -217,7 +219,7 @@ def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
     """
     root = repo.resolve()
     relative = [str(Path(f).resolve().relative_to(root)) for f in files]
-    head = git(repo, "rev-parse", "HEAD").strip()
+    head = git_commit(repo)
     paths = sorted({*relative, LOCK})
     committed = _committed_blobs(repo, paths)
     working = dict(
@@ -226,7 +228,7 @@ def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
     return {
         "head": head,
         "python": _python(),
-        "uv_lock_sha256": hashlib.sha256((repo / LOCK).read_bytes()).hexdigest(),
+        "uv_lock_sha256": sha256_file(repo / LOCK),
         "uncommitted": [p for p in paths if committed.get(p) != working[p]],
         "files": {path: _digests(root / path) for path in relative},
     }
@@ -257,15 +259,12 @@ def code_changes(record: CodeRecord, repo: Path) -> list[str]:
         if not file.is_file():
             changed.append(path)
             continue
-        now = _digests(file)
-        if now["sha256"] == digests["sha256"]:
+        if sha256_file(file) == digests["sha256"]:
             continue
-        if same_python and now["code_sha256"] == digests["code_sha256"]:
+        if same_python and _digests(file)["code_sha256"] == digests["code_sha256"]:
             continue
         changed.append(path)
     lock = root / LOCK
-    if not lock.is_file() or (
-        hashlib.sha256(lock.read_bytes()).hexdigest() != record["uv_lock_sha256"]
-    ):
+    if not lock.is_file() or sha256_file(lock) != record["uv_lock_sha256"]:
         changed.append(LOCK)
     return changed

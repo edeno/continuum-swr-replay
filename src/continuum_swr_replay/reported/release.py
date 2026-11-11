@@ -4,13 +4,13 @@ a release), and never on every commit."""
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 
 from continuum_swr_replay.reported.code_record import code_changes
 from continuum_swr_replay.reported.emit import cited_values
 from continuum_swr_replay.reported.values import Summary, summary_tag_problems
+from continuum_swr_replay.runs.io import sha256_file
 
 
 def staleness(summary: Summary, repo: Path) -> list[str]:
@@ -36,11 +36,17 @@ def staleness(summary: Summary, repo: Path) -> list[str]:
     return problems
 
 
-def input_problems(summary: Summary, root: Path) -> tuple[list[str], list[str]]:
+def input_problems(
+    summary: Summary, root: Path, hashes: dict[Path, str] | None = None
+) -> tuple[list[str], list[str]]:
     """What the recorded inputs say: problems (a single file whose sha256 differs
     now, or that is not on this machine) and notes (sets of files, records with
     ``n_files``: they name a label, not the selection the builder made, so they
-    cannot be re-checked without rebuilding)."""
+    cannot be re-checked without rebuilding).
+
+    ``hashes`` holds the sha256 of each file already read, and is filled in, so
+    that an input several summaries record is read once."""
+    hashes = {} if hashes is None else hashes
     problems, notes = [], []
     for record in summary.inputs:
         path = record["path"]
@@ -49,8 +55,11 @@ def input_problems(summary: Summary, root: Path) -> tuple[list[str], list[str]]:
             notes.append(f"input file set not re-checked: {path}")
         elif not file.is_file():
             problems.append(f"input not on this machine: {path}")
-        elif hashlib.sha256(file.read_bytes()).hexdigest() != record["sha256"]:
-            problems.append(f"input changed since the build: {path}")
+        else:
+            if file not in hashes:
+                hashes[file] = sha256_file(file)
+            if hashes[file] != record["sha256"]:
+                problems.append(f"input changed since the build: {path}")
     return problems, notes
 
 
@@ -73,6 +82,7 @@ def release_problems(
     problems: dict[str, list[str]] = {}
     notes: dict[str, list[str]] = {}
     cited = cited_values(summaries, manuscript)
+    hashes: dict[Path, str] = {}
     for name, summary in summaries.items():
         found = staleness(summary, repo)
         tags = summary_tag_problems(summary)
@@ -88,7 +98,7 @@ def release_problems(
             f"the manuscript cites {len(cited[name])} of {len(summary.values)} values"
         ]
         if check_inputs:
-            input_found, input_notes = input_problems(summary, repo)
+            input_found, input_notes = input_problems(summary, repo, hashes)
             found += input_found
             notes[name] += input_notes
         else:
