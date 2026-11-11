@@ -13,12 +13,11 @@ detector reported. Those panels read the aggregates the sweep saves, so the
 figure and the numbers quoted from the sweep cannot disagree; re-run the sweep
 to change them.
 
-The caption, `paper/figures/memoryless_comparison/memoryless_comparison_caption.md`,
-is prose this script does not write. Its numbers are reported values
+The figure's caption is prose this script does not write, and no draft of it is
+kept in the repository. Its numbers are reported values
 (`continuum_swr_replay.reported.detection`): the sweep's from the sweeps' CSVs, the
 labeled recording's (a-f) from the JSON this script writes
-(:data:`RECORDING_NUMBERS_PATH`), filled into the caption by
-`scripts/reported/emit_reported_values.py`. Where the prose commits to a verdict
+(:data:`RECORDING_NUMBERS_PATH`). Where the prose commits to a verdict
 -- an event missed, declined, found, passing or failing the significance test --
 the script checks it and stops rather than draw a figure the caption contradicts.
 

@@ -65,9 +65,12 @@ Table S1 needs no lab data. Its values are corrected in the survey CSV ([paper/R
 
 ## Captions
 
-A caption draft sits beside its figure as `<topic>_caption.md` (for example
-`paper/figures/memoryless_comparison/memoryless_comparison_caption.md`). A number
-in a caption is written as an inline value marker, `<!--v:<summary>.key-->…<!--/v-->`,
-which `make reported-values` fills, never typed by hand. When a caption moves into
-`paper/main.tex`, its numbers become the matching macros
+No caption draft is kept in the repository. Three were, beside their figures, until
+2026-11-11 (`paper/figures/<topic>/<topic>_caption.md` for `memoryless_comparison`,
+`content_estimators` and `uncertainty_content`; they are in git history). The
+content-estimator and uncertainty-content scripts write theirs again when they run;
+the memoryless comparison's was hand-written prose, and its script still checks the
+verdicts that prose stated. A number in a caption is never typed by hand: in a
+markdown draft it is an inline value marker, `<!--v:<summary>.key-->…<!--/v-->`,
+which `make reported-values` fills, and in `paper/main.tex` it is the matching macro
 ([paper/README.md](../paper/README.md#numbers)).
