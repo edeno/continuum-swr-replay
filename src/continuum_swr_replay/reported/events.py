@@ -795,7 +795,13 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
         stats = statistics.loc[group]
         label = "matched quiet windows" if word == "baseline" else f"{group} events"
         # the remote groups' values also answer question 2c.7: the ``_remote`` tags
-        remote = "_remote" if word.endswith("remote") else ""
+        remote = word.endswith("remote")
+        scored_tags = TAGS["spike_remote"] if remote else TAGS["spike"]
+        count_tags = TAGS["spike_count_remote"] if remote else TAGS["spike_count"]
+        evidence_tags = (
+            TAGS["spike_evidence_remote"] if remote else TAGS["spike_evidence"]
+        )
+        gpi_tags = TAGS["spike_gpi_remote"] if remote else TAGS["spike_gpi"]
         values += [
             make(
                 f"{word}_scored",
@@ -803,7 +809,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"{label} scored",
-                tags=TAGS[f"spike{remote}"],
+                tags=scored_tags,
             ),
             make(
                 f"{word}_spikes_median",
@@ -812,7 +818,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median spike count of {label}",
                 "spikes",
-                tags=TAGS[f"spike_count{remote}"],
+                tags=count_tags,
             ),
             make(
                 f"{word}_tetrodes_median",
@@ -821,7 +827,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "int",
                 f"median number of tetrodes with a spike in {label}",
                 "tetrodes",
-                tags=TAGS[f"spike_count{remote}"],
+                tags=count_tags,
             ),
             make(
                 f"{word}_dll_per_spike_median",
@@ -833,7 +839,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "nats per spike",
                 tags=TAGS["spike_evidence_baseline"]
                 if word == "baseline"
-                else TAGS[f"spike_evidence{remote}"],
+                else evidence_tags,
             ),
             make(
                 f"{word}_gpi_distance_median_cm",
@@ -843,7 +849,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 f"median track distance from the MAP of {label} to the ground-process "
                 "intensity peak",
                 "cm",
-                tags=TAGS[f"spike_gpi{remote}"],
+                tags=gpi_tags,
             ),
         ]
         if word == "baseline":
@@ -856,7 +862,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"epochs whose median {group} event scores above the epoch's median quiet "
                 "window, per spike",
-                tags=TAGS[f"spike_evidence{remote}"],
+                tags=evidence_tags,
             ),
             make(
                 f"{word}_epochs_scored",
@@ -864,7 +870,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"epochs with a scored {group} event",
-                tags=TAGS[f"spike_evidence{remote}"],
+                tags=evidence_tags,
             ),
             make(
                 f"{word}_animals_above_baseline",
@@ -873,7 +879,7 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
                 "window, per spike",
-                tags=TAGS[f"spike_evidence{remote}"],
+                tags=evidence_tags,
             ),
         ]
     values.append(
