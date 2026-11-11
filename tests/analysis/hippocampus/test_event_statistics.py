@@ -77,6 +77,8 @@ def test_overlap_class_statistics_count_an_absent_class_as_a_share_of_zero():
         ]
     )
     result = stats.overlap_class_statistics(pd.concat([EVENTS, only_swr]))
+    assert (result["n_swr_contained"], result["n_swr_partial"]) == (4, 2)
+    assert result["non_swr_fraction"] == pytest.approx(5 / 11)
     assert result["non_swr_fraction_animal_min"] == 0.0
     assert result["non_swr_fraction_animal_max"] == pytest.approx(3 / 4)
     assert result["n_animals"] == 3
@@ -264,15 +266,18 @@ def test_rest_matched_theta_statistics_average_events_not_windows():
 
 
 def _spike_metrics() -> pd.DataFrame:
+    """Six quiet windows and six remote events in five epochs of three animals;
+    no median equals its mean, and more epochs than animals are above baseline."""
     return pd.DataFrame(
         {
-            "group": ["baseline"] * 4 + ["remote"] * 4,
-            "animal": ["a", "a", "b", "b"] * 2,
-            "epoch_id": ["a1", "a2", "b1", "b1"] * 2,
-            "n_spikes": [10, 20, 30, 40, 1, 2, 3, 4],
-            "n_tetrodes": [1, 1, 2, 2, 3, 3, 4, 4],
-            "dll_per_spike": [0.0, 1.0, 2.0, 4.0, 0.0, 1.0, 4.0, 6.0],
-            "dist_to_gpi_peak": [5.0, 5.0, 5.0, 5.0, 10.0, 20.0, 30.0, 40.0],
+            "group": ["baseline"] * 6 + ["remote"] * 6,
+            "animal": ["a", "a", "b", "b", "c", "c"] * 2,
+            "epoch_id": ["a1", "a2", "b1", "b1", "c1", "c2"] * 2,
+            "n_spikes": [10, 20, 30, 40, 50, 90] + [1, 2, 3, 4, 5, 30],
+            "n_tetrodes": [1, 1, 2, 2, 2, 5] + [3, 3, 4, 4, 5, 8],
+            "dll_per_spike": [0.0, 1.0, 2.0, 4.0, 0.0, 10.0]
+            + [0.0, 1.0, 4.0, 6.0, 1.0, 3.0],
+            "dist_to_gpi_peak": [5.0] * 6 + [10.0, 20.0, 30.0, 40.0, 50.0, 150.0],
         }
     )
 
@@ -288,7 +293,7 @@ def test_spike_evidence_statistics_refuse_an_epoch_without_its_baseline():
     with pytest.raises(ValueError, match="1 epochs have no 'baseline' dll_per_spike"):
         stats.spike_evidence_statistics(metrics, "baseline")
     # a group name the run does not hold
-    with pytest.raises(ValueError, match="3 epochs have no 'quiet' dll_per_spike"):
+    with pytest.raises(ValueError, match="5 epochs have no 'quiet' dll_per_spike"):
         stats.spike_evidence_statistics(_spike_metrics(), "quiet")
 
 
@@ -296,16 +301,26 @@ def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseli
     metrics = _spike_metrics()
     result = stats.spike_evidence_statistics(metrics, "baseline")
     remote = result.loc["remote"]
-    assert remote["n_scored"] == 4
-    assert remote["spikes_median"] == 2.5
-    assert remote["dll_per_spike_median"] == 2.5
-    assert remote["gpi_distance_median_cm"] == 25.0
-    assert remote["n_epochs_scored"] == 3
-    # a1 and a2 equal their baselines (0.0, 1.0), which is not above; b1: 5.0 > 3.0
-    assert remote["n_epochs_above_baseline"] == 1
-    # a: 0.5 against 0.5 (not above); b: 5.0 against 3.0
+    assert remote["n_scored"] == 6
+    assert remote["spikes_median"] == 3.5  # the mean is 7.5
+    assert remote["tetrodes_median"] == 4.0  # the mean is 4.5
+    assert remote["dll_per_spike_median"] == 2.0  # the mean is 2.5
+    assert remote["gpi_distance_median_cm"] == 35.0  # the mean is 50
+    assert remote["n_epochs_scored"] == 5
+    # a1 and a2 equal their baselines (0.0, 1.0), which is not above; b1: 5.0
+    # against 3.0; c1: 1.0 against 0.0; c2: 3.0 against 10.0
+    assert remote["n_epochs_above_baseline"] == 2
+    # a: 0.5 against 0.5 (not above); b: 5.0 against 3.0; c: 2.0 against 5.0
     assert remote["n_animals_above_baseline"] == 1
-    assert np.isnan(result.loc["baseline", "n_epochs_above_baseline"])
+    baseline = result.loc["baseline"]
+    assert baseline["n_scored"] == 6
+    assert baseline["spikes_median"] == 35.0
+    assert baseline["tetrodes_median"] == 2.0
+    assert baseline["dll_per_spike_median"] == 1.5
+    assert baseline["gpi_distance_median_cm"] == 5.0
+    assert baseline["n_epochs_scored"] == 5
+    assert np.isnan(baseline["n_epochs_above_baseline"])
+    assert np.isnan(baseline["n_animals_above_baseline"])
 
 
 STEP_COLUMNS = [
