@@ -83,6 +83,7 @@ __all__ = [
     "build_shuffle_draw_table",
     "canonical_swr_intervals",
     "observed_intervals",
+    "outside_window_call_statistics",
     "shuffle_eligible",
 ]
 
@@ -660,3 +661,43 @@ def build_shuffle_draw_table(
         for index, result in sorted(shuffle_results.items())
     ]
     return pd.concat(parts, ignore_index=True).astype(dict(SHUFFLE_DRAW_TABLE_DTYPES))
+
+
+def outside_window_call_statistics(
+    table: pd.DataFrame, dispersion_threshold_cm: float
+) -> dict[str, int]:
+    """Replay calls whose verdict rests on kept windows outside every piece.
+
+    A replay call is a candidate that meets the duration and dispersion
+    criteria (``is_replay``). It is decided by outside windows when it has at
+    least one kept window outside every piece and its pieces' own dispersion
+    (``pieces_dispersion_cm``) is not above the threshold: its dispersion
+    clears the threshold only with those windows.
+
+    Parameters
+    ----------
+    table : DataFrame
+        From :func:`build_memoryless_event_table`.
+    dispersion_threshold_cm : float
+        The detector's dispersion threshold, in cm.
+
+    Returns
+    -------
+    statistics : dict
+        - ``n_replay_calls``: the replay calls.
+        - ``n_decided_by_outside_window``: of those, the calls decided by
+          outside windows.
+        - ``n_decided_passing_shuffle``: of the calls decided by outside
+          windows, those that passed the shuffle (``shuffle_pass``).
+
+    """
+    replay = table[table["is_replay"]]
+    decided = replay[
+        (replay["n_kept_windows_outside_pieces"] > 0)
+        & ~(replay["pieces_dispersion_cm"] > dispersion_threshold_cm)
+    ]
+    return {
+        "n_replay_calls": len(replay),
+        "n_decided_by_outside_window": len(decided),
+        "n_decided_passing_shuffle": int(decided["shuffle_pass"].sum()),
+    }

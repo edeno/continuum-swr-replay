@@ -2,7 +2,9 @@
 detector against the Widloski & Foster detector on simulated replays.
 
 Every value is read from an output an analysis already wrote; nothing is
-refitted or re-decoded here. The inputs (:class:`DetectionInputs`):
+refitted or re-decoded here. The statistics of the pilot's events are computed
+in ``analysis.hippocampus.memoryless_sequence.event_table``. The inputs
+(:class:`DetectionInputs`):
 
 - the held-out tetrode test per decoder state
   (``Processed-Data/_refresh_20261016/state_evidence``, from
@@ -35,6 +37,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.hippocampus.memoryless_sequence.event_table import (
+    outside_window_call_statistics,
+)
 from continuum_swr_replay.paths import ROOT_DIR, memoryless_root, processed_data_dir
 from continuum_swr_replay.reported.values import (
     Summary,
@@ -252,12 +257,8 @@ def pilot_stray_window_values(
     dispersion does not.
     """
     make = value_factory(pilot_stray_window_values, source, TAGS["pilot"])
-    replay = events[events["is_replay"]]
-    decided = replay[
-        (replay["n_kept_windows_outside_pieces"] > 0)
-        & ~(replay["pieces_dispersion_cm"] > dispersion_threshold_cm)
-    ]
-    if not decided["shuffle_pass"].all():
+    stats = outside_window_call_statistics(events, dispersion_threshold_cm)
+    if stats["n_decided_passing_shuffle"] != stats["n_decided_by_outside_window"]:
         raise ValueError(
             "the caption says every pilot replay call decided by an outside window "
             "passed the significance test; the pilot's events disagree"
@@ -265,7 +266,7 @@ def pilot_stray_window_values(
     return [
         make(
             "pilot_replay_calls",
-            len(replay),
+            stats["n_replay_calls"],
             "count",
             "count",
             "sliding-window replay calls (duration and dispersion criteria) on the "
@@ -273,7 +274,7 @@ def pilot_stray_window_values(
         ),
         make(
             "pilot_calls_decided_by_outside_window",
-            len(decided),
+            stats["n_decided_by_outside_window"],
             "count",
             "count",
             "of those, calls whose dispersion clears the threshold only with kept "
