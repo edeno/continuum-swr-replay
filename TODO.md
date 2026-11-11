@@ -33,6 +33,22 @@ Work that is deferred on purpose. Each item says when it should be done.
   *When:* together with Tier 1, or when a number in the paper cannot be traced
   back to a commit.
 
+## Reported values
+
+- [ ] **Held-out test split by SWR (claim 7): confirm which script made it.**
+  `part2.json`'s 10 `heldout_*` values are read from
+  `Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv`.
+  - The Part 2 builder says the tracked
+    `scripts/detection/split_state_evidence_by_swr.py` writes that file. The
+    script was added in `e78273b5` (2026-10-30).
+  - The claims table says an untracked research script made them and that they
+    are pending (`paper/claims_table.md:49`, `:112`, `:119–120`).
+  - On the cluster, read `nl_bouts_by_swr.provenance.json` beside the CSV: its
+    commit and script. Then mark the values pending in
+    `reported/part2.py:heldout_by_swr_values`, or correct the claims table.
+
+  *When:* at the next session on the cluster, before the Part 2 rebuild.
+
 ## Checks
 
 - [ ] **Type checking.** `mypy src/` reports about 400 errors in 90 files.
