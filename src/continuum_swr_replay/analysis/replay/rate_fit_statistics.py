@@ -27,6 +27,7 @@ from patsy import dmatrix
 from scipy.stats import wilcoxon
 
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    require_one_fit_per_session,
     separated_fraction,
     session_median_statistics,
 )
@@ -102,7 +103,8 @@ def baseline_rate_statistics(null_fits: pd.DataFrame) -> dict[str, float]:
     ----------
     null_fits : pd.DataFrame
         The constant-rate rung's fits of one population, one row per session,
-        with ``coef_Intercept`` (log events per at-risk second).
+        with the session columns and ``coef_Intercept`` (log events per
+        at-risk second).
 
     Returns
     -------
@@ -111,6 +113,7 @@ def baseline_rate_statistics(null_fits: pd.DataFrame) -> dict[str, float]:
         ``exp(intercept)``, in events per at-risk second, and
         ``events_per_bin``, the median rate times the bin width.
     """
+    require_one_fit_per_session(null_fits)
     rate = np.exp(null_fits["coef_Intercept"].dropna())
     return {
         "median": float(rate.median()),
@@ -129,7 +132,7 @@ def baseline_rate_ratio_statistics(
     ----------
     null_a, null_b : pd.DataFrame
         The constant-rate rung's fits of each population, with the session
-        columns and ``coef_Intercept``.
+        columns and ``coef_Intercept``; at most one row per session.
 
     Returns
     -------
@@ -142,7 +145,7 @@ def baseline_rate_ratio_statistics(
     columns = [*session, "coef_Intercept"]
     merged = (
         null_a[columns]
-        .merge(null_b[columns], on=session, suffixes=("_a", "_b"))
+        .merge(null_b[columns], on=session, suffixes=("_a", "_b"), validate="1:1")
         .dropna()
     )
     difference = merged["coef_Intercept_a"] - merged["coef_Intercept_b"]
@@ -169,13 +172,14 @@ def reward_gated_fits(fits: pd.DataFrame) -> pd.DataFrame:
     ----------
     fits : pd.DataFrame
         Per-session fits of one rung and population that carries the reward
-        block.
+        block, one row per session, with the session columns.
 
     Returns
     -------
     gated : pd.DataFrame
         The kept rows of ``fits``.
     """
+    require_one_fit_per_session(fits)
     kept = np.ones(len(fits), dtype=bool)
     for term in REWARD_HISTORY_COLUMNS:
         kept &= gate_term_sessions(fits, term).kept.to_numpy()
@@ -289,7 +293,10 @@ def paired_lag_one_kernel_statistics(
         ``signed_rank_p``, the paired Wilcoxon signed-rank p.
     """
     merged = lag_one_reward_kernels(fits_a).merge(
-        lag_one_reward_kernels(fits_b), on=list(SESSION_COLUMNS), suffixes=("_a", "_b")
+        lag_one_reward_kernels(fits_b),
+        on=list(SESSION_COLUMNS),
+        suffixes=("_a", "_b"),
+        validate="1:1",
     )
     difference = session_median_statistics(
         merged["lag_one_a"] - merged["lag_one_b"], merged["animal"]
@@ -402,9 +409,10 @@ def fitted_time_course(
     Parameters
     ----------
     fits : pd.DataFrame
-        Per-session fits of one time rung and population, with
-        ``coef_Intercept``, ``separated`` and the coefficient of each basis
-        column of the clock's spline (``coef_<term>[k]``).
+        Per-session fits of one time rung and population, one row per session,
+        with the session columns, ``coef_Intercept``, ``separated`` and the
+        coefficient of each basis column of the clock's spline
+        (``coef_<term>[k]``).
     time_clock : str
         ``"stop"`` or ``"arrival"``: the clock the rung's spline is on.
 
@@ -418,6 +426,7 @@ def fitted_time_course(
     n_curves : int
         The session curves the median is over.
     """
+    require_one_fit_per_session(fits)
     term, column, knots = time_course_spline(time_clock)
     grid = np.linspace(knots[0], knots[-1], TIME_COURSE_GRID_POINTS)
     basis = np.asarray(dmatrix(f"{term} - 1", {column: grid}, return_type="dataframe"))

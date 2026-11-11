@@ -59,6 +59,29 @@ def fit_rows(fits: pd.DataFrame, **labels: str) -> pd.DataFrame:
     return fits[keep]
 
 
+def require_one_fit_per_session(fits: pd.DataFrame) -> None:
+    """Refuse fits that hold two rows for one session.
+
+    A summary over sessions reads one fit per session. Fits of several rungs
+    or populations passed where one is read would count a session once per
+    rung or population.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame
+        Per-session fits with the session columns.
+
+    Raises
+    ------
+    ValueError
+        If two rows of ``fits`` are of the same session.
+    """
+    if fits.duplicated(list(SESSION_COLUMNS)).any():
+        raise ValueError(
+            "more than one fit for a session: pass the fits of one rung and population"
+        )
+
+
 def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:
     """The median of a per-session number, with the sessions' and animals' signs.
 
@@ -108,8 +131,8 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
     Parameters
     ----------
     fits : pd.DataFrame, shape (n_sessions, n_columns)
-        One row per session, with ``animal`` and ``column``. A session whose
-        ``column`` is missing is left out.
+        One row per session, with the session columns and ``column``. A
+        session whose ``column`` is missing is left out.
     column : str
         The coefficient's column.
 
@@ -124,6 +147,7 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
         - ``signed_rank_p``: the Wilcoxon signed-rank p of the sessions'
           coefficients against zero.
     """
+    require_one_fit_per_session(fits)
     known = fits.dropna(subset=[column])
     values = known[column]
     statistics = session_median_statistics(values, known["animal"])
@@ -141,7 +165,7 @@ def gated_coefficient_statistics(fits: pd.DataFrame, term: str) -> dict[str, flo
     Parameters
     ----------
     fits : pd.DataFrame, shape (n_sessions, n_columns)
-        Per-session fits of one rung and population, with ``animal``,
+        Per-session fits of one rung and population, with the session columns,
         ``coef_<term>`` and the columns
         :func:`~continuum_swr_replay.analysis.replay.contrast_aggregation.gate_term_sessions`
         reads.
@@ -238,7 +262,7 @@ def aic_difference_statistics(
     ----------
     child, parent : pd.DataFrame
         Per-session fits of the two rungs for one population, with the session
-        columns, ``aic`` and the ``same`` columns.
+        columns, ``aic`` and the ``same`` columns; at most one row per session.
     same : sequence of str
         Columns that must be equal in a session's two fits for it to count
         (``n_stops``: both rungs were fit on the same stops).
@@ -255,7 +279,7 @@ def aic_difference_statistics(
     session = list(SESSION_COLUMNS)
     columns = [*session, "aic", *same]
     merged = child[columns].merge(
-        parent[columns], on=session, suffixes=("_child", "_parent")
+        parent[columns], on=session, suffixes=("_child", "_parent"), validate="1:1"
     )
     for column in same:
         merged = merged[merged[f"{column}_child"] == merged[f"{column}_parent"]]

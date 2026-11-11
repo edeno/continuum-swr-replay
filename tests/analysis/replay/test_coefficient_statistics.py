@@ -103,13 +103,20 @@ def test_same_sign_follows_a_negative_median():
 # --- one coefficient ------------------------------------------------------------------
 
 
-def test_coefficient_statistics_leave_out_sessions_without_the_coefficient():
-    fits = pd.DataFrame(
+def _coefficients(animals, beta) -> pd.DataFrame:
+    """One session per coefficient ``beta``, each of its animal."""
+    return pd.DataFrame(
         {
-            "animal": ["a", "a", "b", "b", "c"],
-            "beta": [0.5, 1.0, 1.5, 2.0, NAN],
+            "animal": list(animals),
+            "session_date": list(range(len(beta))),
+            "epoch": "02_r1",
+            "beta": beta,
         }
     )
+
+
+def test_coefficient_statistics_leave_out_sessions_without_the_coefficient():
+    fits = _coefficients(["a", "a", "b", "b", "c"], [0.5, 1.0, 1.5, 2.0, NAN])
     result = stats.coefficient_statistics(fits, "beta")
     assert result["n_sessions"] == 4
     assert result["median"] == 1.25
@@ -124,9 +131,7 @@ def test_coefficient_statistics_leave_out_sessions_without_the_coefficient():
 
 
 def test_the_signed_rank_p_is_of_the_sessions_against_zero():
-    fits = pd.DataFrame(
-        {"animal": ["a", "b", "c", "d", "e"], "beta": [1.0, -2.0, 3.0, 4.0, 5.0]}
-    )
+    fits = _coefficients(["a", "b", "c", "d", "e"], [1.0, -2.0, 3.0, 4.0, 5.0])
     # The negative ranks sum to 2. Of the 32 sign patterns, three have a rank
     # sum of at most 2 ({}, {1}, {2}): two-sided p = 2 * 3 / 32.
     result = stats.coefficient_statistics(fits, "beta")
@@ -136,11 +141,21 @@ def test_the_signed_rank_p_is_of_the_sessions_against_zero():
 
 
 def test_exp_of_the_two_medians_are_separate_numbers():
-    fits = pd.DataFrame({"animal": ["a"] * 3 + ["b"], "beta": [0.0, 0.0, 0.0, 2.0]})
+    fits = _coefficients(["a"] * 3 + ["b"], [0.0, 0.0, 0.0, 2.0])
     result = stats.coefficient_statistics(fits, "beta")
     assert result["exp_median"] == 1.0  # session median 0
     # animal medians 0 and 2 -> 1 -> e
     assert result["exp_animal_median"] == pytest.approx(2.718281828459045)
+
+
+def test_a_coefficient_is_summarized_over_one_fit_per_session():
+    # The fits of two populations stacked: every session twice.
+    one = _coefficients(["a", "a", "b"], [0.5, 1.0, 1.5])
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.coefficient_statistics(pd.concat([one, one]), "beta")
+    gated = _fits([0.2, 0.4, 0.6], ["a", "a", "b"])
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.gated_coefficient_statistics(pd.concat([gated, gated]), "x")
 
 
 def test_the_gate_leaves_out_separated_runaway_and_missing_sessions():
@@ -299,6 +314,15 @@ def test_the_aic_difference_can_require_the_same_stops():
     assert result["median"] == -4.0
     assert result["negative_fraction"] == 1.0
     assert stats.aic_difference_statistics(child, parent)["n_sessions"] == 4
+
+
+def test_the_aic_difference_refuses_two_fits_of_one_session():
+    child = _rung([10.0, 20.0, 30.0, 40.0])
+    parent = _rung([12.0, 19.0, 35.0, 44.0])
+    with pytest.raises(pd.errors.MergeError):
+        stats.aic_difference_statistics(child, pd.concat([parent, parent]))
+    with pytest.raises(pd.errors.MergeError):
+        stats.aic_difference_statistics(pd.concat([child, child]), parent)
 
 
 # --- separation -----------------------------------------------------------------------

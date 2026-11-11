@@ -116,15 +116,6 @@ def test_the_frozen_cohort_refuses_populations_on_different_cohorts():
         )
 
 
-def test_the_baseline_rate_is_exp_of_the_intercept_over_sessions():
-    fits = pd.DataFrame({"coef_Intercept": [*np.log([1.0, 2.0, 3.0, 4.0]), NAN]})
-    result = stats.baseline_rate_statistics(fits)
-    assert result["median"] == pytest.approx(2.5)
-    assert result["lower_quartile"] == pytest.approx(1.75)
-    assert result["upper_quartile"] == pytest.approx(3.25)
-    assert result["events_per_bin"] == pytest.approx(0.0375)  # 2.5 per s * 15 ms
-
-
 def _intercepts(rates) -> pd.DataFrame:
     n = len(rates)
     return pd.DataFrame(
@@ -135,6 +126,26 @@ def _intercepts(rates) -> pd.DataFrame:
             "coef_Intercept": np.log(rates),
         }
     )
+
+
+def test_the_baseline_rate_is_exp_of_the_intercept_over_sessions():
+    fits = _intercepts([1.0, 2.0, 3.0, 4.0, NAN])
+    result = stats.baseline_rate_statistics(fits)
+    assert result["median"] == pytest.approx(2.5)
+    assert result["lower_quartile"] == pytest.approx(1.75)
+    assert result["upper_quartile"] == pytest.approx(3.25)
+    assert result["events_per_bin"] == pytest.approx(0.0375)  # 2.5 per s * 15 ms
+
+
+def test_the_baseline_statistics_refuse_two_fits_of_one_session():
+    one = _intercepts([1.0, 2.0, 3.0])
+    two = pd.concat([one, one])
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.baseline_rate_statistics(two)
+    with pytest.raises(pd.errors.MergeError):
+        stats.baseline_rate_ratio_statistics(two, one)
+    with pytest.raises(pd.errors.MergeError):
+        stats.baseline_rate_ratio_statistics(one, two)
 
 
 def test_the_baseline_ratio_is_within_session():
@@ -306,6 +317,15 @@ def test_the_paired_difference_is_a_minus_b_over_sessions_and_animals():
     assert reverse["n_animals_positive"] == 1
 
 
+def test_the_reward_kernel_refuses_two_fits_of_one_session():
+    one = _fits(_first_bump([0.5, 0.2, 0.9, 0.6, -0.2]))
+    two = pd.concat([one, one])
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.reward_kernel_statistics(two)
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.paired_lag_one_kernel_statistics(one, two)
+
+
 # --- each rung's fits -----------------------------------------------------------------
 
 
@@ -378,6 +398,9 @@ def _time_fits(spline: str, n_basis: int, intercepts, bumps=None, separated=None
     n = len(intercepts)
     frame = pd.DataFrame(
         {
+            "animal": ["a"] * n,
+            "session_date": list(range(n)),
+            "epoch": ["02_r1"] * n,
             "coef_Intercept": np.asarray(intercepts, dtype=float),
             "separated": separated if separated is not None else [False] * n,
         }
@@ -438,6 +461,12 @@ def test_the_time_course_leaves_out_separated_and_non_finite_sessions():
     _, curve, n_curves = stats.fitted_time_course(fits, "stop")
     np.testing.assert_allclose(curve, 2.0)
     assert n_curves == 3
+
+
+def test_the_time_course_refuses_two_fits_of_one_session():
+    fits = _time_fits(STOP_SPLINE, 6, np.log([1.0, 2.0, 4.0]))
+    with pytest.raises(ValueError, match="more than one fit for a session"):
+        stats.fitted_time_course(pd.concat([fits, fits]), "stop")
 
 
 def test_a_peak_inside_the_interval_is_located_and_one_at_its_end_is_not():
