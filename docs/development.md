@@ -427,7 +427,10 @@ fails when a cited value is pending.
   inline or quote it from memory.
 - In a doc, write a reported number inside a marker, `<!--v:<summary>.key-->…<!--/v-->`, and let the
   emitter fill it. Rounding happens only in `continuum_swr_replay.reported.formatting`.
-- A value with a `pending` note is not quoted as a finding.
+- A value with a `pending` note is not quoted as a finding. A value read from an output made on other
+  tables than the current ones (a stale fit, a stale per-event measure) is kept and marked pending with
+  the reason; no builder refuses to build because an input is stale, and `make release-check` fails when
+  the manuscript cites a pending value.
 - A number quoted from a cited paper (for example, another study's share of replays) is not a result
   of this project and has no summary key: write it as text beside its citation. A number this project
   computes, even from published sources (the survey summary's literature numbers), is a reported number.

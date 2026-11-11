@@ -11,11 +11,10 @@ from continuum_swr_replay.reported.events import (
     _PROPERTIES,
     event_table_staleness,
     gamma_db_values,
-    pend,
     property_interval_values,
     rest_theta_values,
 )
-from continuum_swr_replay.reported.values import Value
+from continuum_swr_replay.reported.values import Value, pend
 
 CURRENT = "a" * 64
 

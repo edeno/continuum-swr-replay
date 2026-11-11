@@ -1,7 +1,8 @@
 """The behavior summary: how the events relate to the task, SWR against non-SWR.
 
 Every value is read from an output a fit already wrote; nothing is refitted
-here. The inputs (:class:`BehaviorInputs`), with their runs in
+here. A value read from a fit made on other tables than the current ones is
+pending (:func:`fit_staleness`). The inputs (:class:`BehaviorInputs`), with their runs in
 ``scripts/qa/run_refits.py``:
 
 - the per-bin rate ladder, Family B (``models_per_bin_rate/all_models.pkl``,
@@ -109,6 +110,7 @@ from continuum_swr_replay.reported.values import (
     Tags,
     Value,
     file_record,
+    pend,
     value_factory,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
@@ -3112,20 +3114,37 @@ def horserace_values(summary: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-def _check_fresh(artifact: Path) -> None:
-    """Refuse a fit whose provenance sidecar says a table it read has changed."""
-    recorded = json.loads(fit_provenance_path(artifact).read_text())["inputs"]
-    inputs = {
-        name: (
-            table_path(name, replay_content_dir())
-            if name in CANONICAL_TABLE_BASENAMES
-            else artifact.with_name(f"{name}.pkl")  # an upstream fit beside it
-        )
-        for name in recorded
-    }
-    stale = check_fit_provenance(artifact, inputs)
-    if stale:
-        raise ValueError(f"{artifact}: stale against {stale}; refit before summarizing")
+def fit_staleness(*artifacts: Path) -> str | None:
+    """Why the values read from fitted ``artifacts`` are pending, or None.
+
+    A fit's provenance sidecar records the SHA-256 of each table and upstream
+    fit it read. A fit with no sidecar, or one that records other inputs than
+    the current ones, describes other data.
+    """
+    notes = []
+    for artifact in artifacts:
+        sidecar = fit_provenance_path(artifact)
+        if not sidecar.exists():
+            notes.append(
+                f"{rel(artifact)} has no provenance record; refit before citing"
+            )
+            continue
+        recorded = json.loads(sidecar.read_text())["inputs"]
+        inputs = {
+            name: (
+                table_path(name, replay_content_dir())
+                if name in CANONICAL_TABLE_BASENAMES
+                else artifact.with_name(f"{name}.pkl")  # an upstream fit beside it
+            )
+            for name in recorded
+        }
+        stale = check_fit_provenance(artifact, inputs)
+        if stale:
+            notes.append(
+                f"{rel(artifact)} was fit on other inputs than the current ones "
+                f"({', '.join(stale)}); refit before citing"
+            )
+    return "; ".join(notes) or None
 
 
 def _read_per_bin_fits(path: Path) -> pd.DataFrame:
@@ -3164,21 +3183,24 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
         inputs.rate_contrast,
         inputs.per_stop,
     )
-    for artifact in rate_fits:
-        _check_fresh(artifact)
     contrast_audited = inputs.rate_contrast.with_name("swr_contrast_rate_audited.pkl")
-    _check_fresh(contrast_audited)
     summary.add(
-        *rate_contrast_audit_values(
-            pd.read_pickle(contrast_audited),
-            f"{rel(contrast_audited)} (rate.swr_contrast.at_well)",
+        *pend(
+            rate_contrast_audit_values(
+                pd.read_pickle(contrast_audited),
+                f"{rel(contrast_audited)} (rate.swr_contrast.at_well)",
+            ),
+            fit_staleness(contrast_audited),
         )
     )
     record(contrast_audited)
     summary.add(
-        *rate_contrast_separation_values(
-            _read_per_bin_fits(inputs.rate_contrast),
-            f"{rel(inputs.rate_contrast)} (rate.swr_contrast.at_well)",
+        *pend(
+            rate_contrast_separation_values(
+                _read_per_bin_fits(inputs.rate_contrast),
+                f"{rel(inputs.rate_contrast)} (rate.swr_contrast.at_well)",
+            ),
+            fit_staleness(inputs.rate_contrast),
         )
     )
     in_transit = _read_per_bin_fits(inputs.per_bin_in_transit)
@@ -3186,6 +3208,7 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
         summarize,
         f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.in_transit)",
         TAGS["rate"],
+        fit_staleness(inputs.per_bin_in_transit),
     )
     summary.add(
         make_transit(
@@ -3212,38 +3235,50 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     per_bin = _read_per_bin_fits(inputs.per_bin)
     per_bin_all = _read_per_bin_fits(inputs.per_bin_all_stops)
     summary.add(
-        *per_bin_values(
-            per_bin,
-            per_bin_all,
-            f"{rel(inputs.per_bin)} (rate.per_bin.at_well) and {rel(inputs.per_bin_all_stops)} (rate.per_bin.all_stops)",
+        *pend(
+            per_bin_values(
+                per_bin,
+                per_bin_all,
+                f"{rel(inputs.per_bin)} (rate.per_bin.at_well) and {rel(inputs.per_bin_all_stops)} (rate.per_bin.all_stops)",
+            ),
+            fit_staleness(inputs.per_bin, inputs.per_bin_all_stops),
         )
     )
     summary.add(
-        *per_bin_detail_values(
-            per_bin,
-            per_bin_all,
-            in_transit,
-            f"{rel(inputs.per_bin)}, {rel(inputs.per_bin_all_stops)} and "
-            f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.*)",
+        *pend(
+            per_bin_detail_values(
+                per_bin,
+                per_bin_all,
+                in_transit,
+                f"{rel(inputs.per_bin)}, {rel(inputs.per_bin_all_stops)} and "
+                f"{rel(inputs.per_bin_in_transit)} (rate.per_bin.*)",
+            ),
+            fit_staleness(
+                inputs.per_bin, inputs.per_bin_all_stops, inputs.per_bin_in_transit
+            ),
         )
     )
     summary.add(
-        *per_stop_values(
-            pd.read_pickle(inputs.per_stop),
-            f"{rel(inputs.per_stop)} (rate.per_stop.at_well)",
+        *pend(
+            per_stop_values(
+                pd.read_pickle(inputs.per_stop),
+                f"{rel(inputs.per_stop)} (rate.per_stop.at_well)",
+            ),
+            fit_staleness(inputs.per_stop),
         )
     )
     record(*rate_fits)
 
-    for artifact in (inputs.duration_aware_pooled, inputs.cross_ridge_cv):
-        _check_fresh(artifact)
     summary.add(
-        *duration_aware_history_values(
-            pd.read_pickle(inputs.cross_ridge_cv),
-            pd.read_pickle(inputs.duration_aware_pooled),
-            f"{rel(inputs.duration_aware_pooled)} "
-            "(rate.duration_aware_history.pooled_at_well) and "
-            f"{rel(inputs.cross_ridge_cv)} (rate.cross_history_ridge_cv.at_well)",
+        *pend(
+            duration_aware_history_values(
+                pd.read_pickle(inputs.cross_ridge_cv),
+                pd.read_pickle(inputs.duration_aware_pooled),
+                f"{rel(inputs.duration_aware_pooled)} "
+                "(rate.duration_aware_history.pooled_at_well) and "
+                f"{rel(inputs.cross_ridge_cv)} (rate.cross_history_ridge_cv.at_well)",
+            ),
+            fit_staleness(inputs.duration_aware_pooled, inputs.cross_ridge_cv),
         )
     )
     record(inputs.duration_aware_pooled, inputs.cross_ridge_cv)
@@ -3251,75 +3286,97 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     audited, sources = {}, {}
     for suffix in sorted({spec[0] for spec in CONTENT_SPECS.values()}):
         path = inputs.content_contrast_dir / f"swr_contrast_content_audited{suffix}.pkl"
-        _check_fresh(path)
         audited[suffix] = pd.read_pickle(path)
         sources[suffix] = f"{rel(path)} (audited aggregate)"
         record(path)
+    content_stale = fit_staleness(
+        *(
+            inputs.content_contrast_dir / f"swr_contrast_content_audited{suffix}.pkl"
+            for suffix in audited
+        )
+    )
     content = content_contrast_values(audited, sources)
-    summary.add(*content)
+    summary.add(*pend(content, content_stale))
     events = pd.read_parquet(inputs.event_table, columns=["is_swr", "n_nonlocal_bins"])
     summary.add(
-        *breadth_derived_values(
-            {v.key: v for v in content},
-            events,
-            f"{sources['_dm']}, {sources['_dm_len']} and {rel(inputs.event_table)}",
+        *pend(
+            breadth_derived_values(
+                {v.key: v for v in content},
+                events,
+                f"{sources['_dm']}, {sources['_dm_len']} and {rel(inputs.event_table)}",
+            ),
+            content_stale,
         )
     )
     record(inputs.event_table)
 
-    _check_fresh(
-        inputs.estimator_summary.with_name("content_estimator_comparison.parquet")
-    )
     summary.add(
-        *estimator_values(
-            pd.read_csv(inputs.estimator_summary),
-            pd.read_csv(inputs.estimator_bootstrap),
-            f"{rel(inputs.estimator_summary.parent)} (content.estimator_comparison)",
+        *pend(
+            estimator_values(
+                pd.read_csv(inputs.estimator_summary),
+                pd.read_csv(inputs.estimator_bootstrap),
+                f"{rel(inputs.estimator_summary.parent)} (content.estimator_comparison)",
+            ),
+            fit_staleness(
+                inputs.estimator_summary.with_name(
+                    "content_estimator_comparison.parquet"
+                )
+            ),
         )
     )
     record(inputs.estimator_summary, inputs.estimator_bootstrap)
 
-    for name in ("Mu", "Mv", "model_comparison"):
-        _check_fresh(inputs.leaf_dir / f"{name}.pkl")
+    leaf_fits = [inputs.leaf_dir / f"{n}.pkl" for n in ("Mu", "Mv", "model_comparison")]
     summary.add(
-        *leaf_values(
-            inputs.leaf_dir, f"{rel(inputs.leaf_dir)} (content.arm_ladder.leaf_arms)"
+        *pend(
+            leaf_values(
+                inputs.leaf_dir,
+                f"{rel(inputs.leaf_dir)} (content.arm_ladder.leaf_arms)",
+            ),
+            fit_staleness(*leaf_fits),
         )
     )
-    record(*(inputs.leaf_dir / f"{n}.pkl" for n in ("Mu", "Mv", "model_comparison")))
+    record(*leaf_fits)
 
-    _check_fresh(inputs.horserace_summary)
     summary.add(
-        *horserace_values(
-            pd.read_csv(inputs.horserace_summary),
-            f"{rel(inputs.horserace_summary)} (content.uncertainty)",
+        *pend(
+            horserace_values(
+                pd.read_csv(inputs.horserace_summary),
+                f"{rel(inputs.horserace_summary)} (content.uncertainty)",
+            ),
+            fit_staleness(inputs.horserace_summary),
         )
     )
     record(inputs.horserace_summary)
 
-    _check_fresh(inputs.choice_fits)
     summary.add(
-        *choice_values(
-            pd.read_pickle(inputs.choice_fits),
-            f"{rel(inputs.choice_fits)} (behavior.event_source_suite.non_local)",
+        *pend(
+            choice_values(
+                pd.read_pickle(inputs.choice_fits),
+                f"{rel(inputs.choice_fits)} (behavior.event_source_suite.non_local)",
+            ),
+            fit_staleness(inputs.choice_fits),
         )
     )
     record(inputs.choice_fits)
 
     bundles = {}
+    stay_leave_fits = []
     for stratum, sfx in STAY_STRATA.items():
         logistic = inputs.stay_leave_dir / f"stage6_is_stay_logistic{sfx}.pkl"
         pooled = inputs.stay_leave_dir / f"stage6_is_stay_pooled_gee{sfx}.pkl"
-        for path in (logistic, pooled):
-            _check_fresh(path)
+        stay_leave_fits += [logistic, pooled]
         bundles[stratum] = (pd.read_pickle(logistic), pd.read_pickle(pooled))
         record(logistic, pooled)
     stops = pd.read_parquet(inputs.stop_table)
     summary.add(
-        *stay_leave_values(
-            bundles,
-            stops,
-            f"{rel(inputs.stay_leave_dir)}/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and {rel(inputs.stop_table)}",
+        *pend(
+            stay_leave_values(
+                bundles,
+                stops,
+                f"{rel(inputs.stay_leave_dir)}/stage6_is_stay_*.pkl (behavior.stay_leave.at_well*) and {rel(inputs.stop_table)}",
+            ),
+            fit_staleness(*stay_leave_fits),
         )
     )
     record(inputs.stop_table)
@@ -3342,19 +3399,23 @@ def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
     summary.add(*trunk_values(arm, f"{rel(inputs.event_arm_table)} (at-well events)"))
     record(inputs.event_arm_table)
     split_fits = inputs.content_contrast_dir / "swr_contrast_content_arm.pkl"
-    _check_fresh(split_fits)
     summary.add(
-        *current_arm_paired_values(
-            pd.read_pickle(split_fits), f"{rel(split_fits)} (per-session fits)"
+        *pend(
+            current_arm_paired_values(
+                pd.read_pickle(split_fits), f"{rel(split_fits)} (per-session fits)"
+            ),
+            fit_staleness(split_fits),
         )
     )
     record(split_fits)
 
-    _check_fresh(inputs.swr_power)
     summary.add(
-        *power_values(
-            pd.read_pickle(inputs.swr_power),
-            f"{rel(inputs.swr_power)} (coupling.ripple_power)",
+        *pend(
+            power_values(
+                pd.read_pickle(inputs.swr_power),
+                f"{rel(inputs.swr_power)} (coupling.ripple_power)",
+            ),
+            fit_staleness(inputs.swr_power),
         )
     )
     record(inputs.swr_power)

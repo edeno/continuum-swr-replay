@@ -7,7 +7,7 @@ import json
 import math
 import re
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -275,6 +275,28 @@ class Summary:
         tmp = path.with_suffix(path.suffix + ".tmp")
         tmp.write_text(self.to_json())
         tmp.replace(path)
+
+
+def pend(
+    values: Iterable[Value],
+    note: str | None,
+    selected: Callable[[Value], bool] = lambda value: True,
+) -> list[Value]:
+    """``values`` with ``note`` added to the pending note of the selected ones.
+
+    The one rule for a value read from a stale output (one made from other
+    tables than the current ones): it is kept and marked pending with the
+    reason, never dropped and never a reason to refuse the build. The release
+    check refuses a pending value the manuscript cites.
+    """
+    if note is None:
+        return list(values)
+    return [
+        replace(v, pending=note if v.pending is None else f"{v.pending}; {note}")
+        if selected(v)
+        else v
+        for v in values
+    ]
 
 
 def read_summary(path: Path) -> Summary:

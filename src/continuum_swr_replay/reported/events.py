@@ -44,8 +44,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, replace
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -73,6 +73,7 @@ from continuum_swr_replay.reported.values import (
     Value,
     file_record,
     files_record,
+    pend,
     value_factory,
 )
 
@@ -186,22 +187,6 @@ def event_table_staleness(manifest: dict, current_sha256: str, what: str) -> str
             "before citing"
         )
     return None
-
-
-def pend(
-    values: Iterable[Value],
-    note: str | None,
-    selected: Callable[[Value], bool] = lambda value: True,
-) -> list[Value]:
-    """``values`` with ``note`` added to the pending note of the selected ones."""
-    if note is None:
-        return list(values)
-    return [
-        replace(v, pending=note if v.pending is None else f"{v.pending}; {note}")
-        if selected(v)
-        else v
-        for v in values
-    ]
 
 
 def _manifest(folder: Path) -> dict:
