@@ -271,6 +271,30 @@ def _register(path: Path, epochs: list[str]) -> Path:
     return path
 
 
+def test_figure02_panels_b_and_d_come_from_the_canonical_event_table(offline):
+    """Panel b's counts and panel d's offsets are computed from the event table
+    the summary cites, and the figure is refused when that table and the decode
+    frames give different events."""
+    figure02 = offline("scripts.figures.generate_figure02")
+    events = pd.DataFrame(
+        {
+            "overlap_class": ["non_swr", "non_swr", "swr_contained", "swr_partial"],
+            "whole_event_speed_eligible": True,
+            "event_start_s": [0.0, 1.0, 2.02, 2.95],
+            "event_end_s": [0.1, 1.1, 2.08, 3.20],
+            "matched_swr_start": [np.nan, np.nan, 2.0, 3.0],
+            "matched_swr_end": [np.nan, np.nan, 2.1, 3.1],
+        }
+    )
+    frames = {"swr_contained": 1, "swr_partial": 1, "non_swr": 2, "total": 4}
+    class_counts, offsets = figure02.event_table_panels(events, frames)
+    assert class_counts == frames
+    np.testing.assert_allclose(offsets["start_diff"], [0.02, -0.05])
+    np.testing.assert_allclose(offsets["end_diff"], [-0.02, 0.10])
+    with pytest.raises(ValueError, match="give different immobile non-local events"):
+        figure02.event_table_panels(events, {**frames, "non_swr": 3, "total": 5})
+
+
 def test_the_figure02_cache_is_keyed_on_the_analysed_epochs(
     offline, tmp_path, monkeypatch
 ):
