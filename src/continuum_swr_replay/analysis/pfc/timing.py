@@ -20,12 +20,14 @@ measures it on simulated responses of known onset. Read onsets beside it.
 
 The population curve is the mean over units of each curve multiplied by the
 sign of its own peak (so a suppression counts as a response of the same
-size), with a percentile interval from resampling sessions.
+size), with a percentile interval from resampling the units' groups (their
+sessions, or their recording days).
 
 The timing statistics of the units called for an event class
 (:func:`called_response_timing`, :func:`called_response_timing_by_animal`,
-:func:`paired_peak_lag_statistics`, :func:`peak_before_onset_fraction`) are the
-ones the mpfc summary reports; they give lags in ms.
+:func:`population_rise_timing`, :func:`paired_peak_lag_statistics`,
+:func:`peak_before_onset_fraction`) are the ones the mpfc summary reports; the
+lags they return are in ms, where the functions above them return seconds.
 """
 
 from __future__ import annotations
@@ -253,19 +255,23 @@ class PopulationTiming(NamedTuple):
     curve : NDArray, shape (n_lags,)
         The sign-aligned mean curve.
     peak_lag, onset_lag : float
-        Its peak lag and half-maximum onset, in seconds.
+        Its peak lag (the lag of its largest absolute value) and half-maximum
+        onset, in seconds.
     peak_lag_interval, onset_lag_interval : tuple of float
-        2.5th and 97.5th percentiles over session resamples, in seconds.
+        2.5th and 97.5th percentiles over the resamples of the groups, in
+        seconds.
     steepest_lag : float
         Its steepest approach to the peak (:func:`steepest_approach_lag`), s.
     steepest_lag_interval : tuple of float
     size : float
-        Its peak less the reference level of ``baseline``
-        (:func:`response_size`), log-rate units; positive for both signs,
-        since the curve is signed by each unit's peak.
+        Its value at the peak less the reference level of ``baseline``
+        (:func:`response_size`), log-rate units. Each unit's curve is signed
+        by its own peak, so an increase and a decrease both count as positive;
+        the size is negative only if the mean curve's largest absolute value
+        is on the other side of zero from the units' own peaks.
     size_interval : tuple of float
     n_units, n_groups : int
-        Units and sessions the curve averages.
+        Units and groups the curve averages.
     """
 
     curve: NDArray
@@ -292,12 +298,12 @@ def population_timing(
     fraction: float = 0.5,
     baseline: str | tuple[float, float] = "zero",
 ) -> PopulationTiming:
-    """Timing of the sign-aligned population curve, resampling sessions.
+    """Timing of the sign-aligned population curve, resampling groups of units.
 
-    Each bootstrap draw resamples the sessions (``groups``) with replacement
-    and averages every unit of every drawn session, a session drawn twice
-    counting twice; the aligned mean curve of the draw gives one peak lag and
-    one onset.
+    Each bootstrap draw resamples the groups (``groups``: the units' sessions,
+    or their recording days) with replacement and averages every unit of every
+    drawn group, a group drawn twice counting twice; the aligned mean curve of
+    the draw gives one peak lag and one onset.
 
     Parameters
     ----------
@@ -305,10 +311,10 @@ def population_timing(
     peak : NDArray, shape (n_units,)
         Signed peaks, from :func:`peak_and_onset`.
     groups : NDArray, shape (n_units,)
-        Session label of each unit.
+        The label each unit is resampled by.
     lag_time : NDArray, shape (n_lags,)
     n_boot : int
-        Session resamples.
+        Resamples of the groups.
     seed : int
         Seed of the resampling.
     fraction, baseline
@@ -447,15 +453,16 @@ def called_response_timing_by_animal(
 
     Returns
     -------
-    timing : pd.DataFrame, shape (n_direction_animals, 4)
+    timing : pd.DataFrame, shape (n_direction_animals, 3)
         Indexed by ``direction`` (a key of :data:`DIRECTIONS`) and ``animal``,
-        animals in sorted order:
+        animals in sorted order. Each lag is in ms, relative to event onset:
 
-        - ``onset_lag``: the half-maximum onset of the animal's mean curve, s.
-        - ``rise_onset_lag``: its rise onset, measured from the curve's value
-          at the first lag, s; ``rise_onset_ms``: the same in ms.
-        - ``steepest_lag``: its steepest approach to the peak
-          (:func:`steepest_approach_lag`), s.
+        - ``onset_ms``: the half-maximum onset of the animal's mean curve.
+        - ``rise_onset_ms``: its rise onset, measured from the curve's value
+          at the first lag.
+        - ``steepest_ms``: its steepest approach to the peak
+          (:func:`steepest_approach_lag`); NaN when the mean curve peaks at
+          the first lag.
     """
     timing = peak_and_onset(curves, lag_time)
     directions, names, rows = [], [], []
@@ -471,10 +478,9 @@ def called_response_timing_by_animal(
             names.append(animal)
             rows.append(
                 {
-                    "onset_lag": onset,
-                    "rise_onset_lag": rise.onset_lag[0],
+                    "onset_ms": onset * _MS,
                     "rise_onset_ms": rise.onset_lag[0] * _MS,
-                    "steepest_lag": steepest,
+                    "steepest_ms": steepest * _MS,
                 }
             )
     return pd.DataFrame(
@@ -482,7 +488,7 @@ def called_response_timing_by_animal(
         index=pd.MultiIndex.from_arrays(
             [directions, names], names=["direction", "animal"]
         ),
-        columns=["onset_lag", "rise_onset_lag", "rise_onset_ms", "steepest_lag"],
+        columns=["onset_ms", "rise_onset_ms", "steepest_ms"],
     )
 
 
@@ -672,15 +678,8 @@ def called_response_timing(
             )
         own = by_animal.loc[direction]
         row["n_animals"] = len(own)
-        row["n_animals_onset_before_event"] = int(
-            np.sum(own["onset_lag"].to_numpy() < 0)
-        )
-        row["n_animals_steepest_before_event"] = int(
-            np.sum(own["steepest_lag"].to_numpy() < 0)
-        )
-        row["n_animals_rise_onset_before_event"] = int(
-            np.sum(own["rise_onset_lag"].to_numpy() < 0)
-        )
+        for rule in ("onset", "steepest", "rise_onset"):
+            row[f"n_animals_{rule}_before_event"] = int((own[f"{rule}_ms"] < 0).sum())
     return pd.DataFrame.from_dict(
         rows, orient="index", columns=list(_CALLED_TIMING_COLUMNS)
     )

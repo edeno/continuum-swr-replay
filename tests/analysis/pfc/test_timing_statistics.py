@@ -203,10 +203,10 @@ def test_called_response_timing_by_animal():
         ("enhanced", "b"),
         ("suppressed", "b"),
     ]
-    np.testing.assert_allclose(by_animal["onset_lag"], [-0.020, 0.100, -0.200])
-    np.testing.assert_allclose(by_animal["rise_onset_lag"], [-0.020, 0.160, 0.100])
+    assert list(by_animal.columns) == ["onset_ms", "rise_onset_ms", "steepest_ms"]
+    np.testing.assert_allclose(by_animal["onset_ms"], [-20, 100, -200])
     np.testing.assert_allclose(by_animal["rise_onset_ms"], [-20, 160, 100])
-    np.testing.assert_allclose(by_animal["steepest_lag"], [0.019, 0.199, 0.099])
+    np.testing.assert_allclose(by_animal["steepest_ms"], [19, 199, 99])
 
 
 def test_a_direction_without_units_has_only_its_count():
