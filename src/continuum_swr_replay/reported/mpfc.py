@@ -274,25 +274,17 @@ def read_sidecars(bundle_dir: Path) -> list[dict[str, Any]]:
     return [json.loads(p.read_text()) for p in paths]
 
 
-def staleness(
-    sidecars: list[dict[str, Any]], event_table: Path, stop_table: Path
-) -> str | None:
+def staleness(sidecars: list[dict[str, Any]], current: dict[str, str]) -> str | None:
     """Why the bundles are stale against the current tables, or None.
 
     A bundle records the SHA-256 of the canonical event table and the stop
     table it was fit on; a bundle fit on other tables describes other events.
+    ``current`` holds the current tables' (:func:`table_hashes`).
     """
-    current = table_hashes(event_table, stop_table)
     stale = {
         name: sum(s.get(name) != sha for s in sidecars) for name, sha in current.items()
     }
-    if not any(stale.values()):
-        return None
-    return (
-        "the mPFC bundles were fit on other tables than the current ones "
-        f"({', '.join(f'{n} differs in {k} bundles' for n, k in stale.items() if k)}); "
-        "refit before citing"
-    )
+    return _stale_note("the mPFC bundles", stale, len(sidecars))
 
 
 def table_hashes(event_table: Path, stop_table: Path) -> dict[str, str]:
@@ -2291,7 +2283,8 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
     """The mpfc summary from ``inputs``."""
     summary = Summary(name="mpfc", produced_by=produced_by)
     sidecars = read_sidecars(inputs.bundle_dir)
-    pending = staleness(sidecars, inputs.event_table, inputs.stop_table)
+    current = table_hashes(inputs.event_table, inputs.stop_table)
+    pending = staleness(sidecars, current)
     population, curves, lag_time = load_population_data(
         inputs.bundle_dir, min_firing_rate=MIN_FIRING_RATE_HZ
     )
@@ -2343,7 +2336,6 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
             value_factory(timing_values, source, main, pending),
         )
     )
-    current = table_hashes(inputs.event_table, inputs.stop_table)
     values, records = followup_values(inputs, current, cohort["n_pfc_cohort"])
     summary.add(*values)
     summary.inputs += records
@@ -2353,9 +2345,7 @@ def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
     if extended_bundles:
         extended_sidecars = read_sidecars(extended_dir)
         incomplete = len(extended_sidecars) < len(sidecars)
-        extended_pending = staleness(
-            extended_sidecars, inputs.event_table, inputs.stop_table
-        ) or (
+        extended_pending = staleness(extended_sidecars, current) or (
             f"the extended-event-set batch holds {len(extended_sidecars)} of "
             f"{len(sidecars)} sessions; refresh when it completes"
             if incomplete

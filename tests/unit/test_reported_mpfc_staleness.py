@@ -43,10 +43,11 @@ def test_bundle_staleness_names_the_count(tables):
         "stop_table_sha256": _sha(stop),
     }
     sidecars = [dict(fresh), dict(fresh), dict(fresh)]
-    assert staleness(sidecars, event, stop) is None
+    assert staleness(sidecars, table_hashes(event, stop)) is None
     sidecars[1]["stop_table_sha256"] = "old"
-    note = staleness(sidecars, event, stop)
-    assert "stop_table_sha256 differs in 1 bundles" in note
+    note = staleness(sidecars, table_hashes(event, stop))
+    assert note.startswith("the mPFC bundles were made from other inputs")
+    assert "stop_table_sha256 differs in 1 of 3" in note
     assert "canonical_event_table_sha256" not in note
 
 
