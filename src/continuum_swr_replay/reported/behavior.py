@@ -1344,7 +1344,10 @@ def stop_table_values(
             boundary["n_shifted"],
             "count",
             "count",
-            "crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary)",
+            "crossing stops whose per-bin reward history can be shifted: no later "
+            "arrival inside, and a bin at or past the boundary in the stop-level "
+            "design (before a fitted population's bins inside its ongoing events "
+            "are dropped, so an upper bound for each fitted population)",
         ),
         make(
             "stops_outcome_shifted_fraction",

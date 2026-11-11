@@ -78,48 +78,88 @@ def test_still_immobile_is_measured_from_the_start_of_the_stop():
 
 
 def _boundary_stops() -> pd.DataFrame:
-    """Eight stops in two sessions, rows out of time order.
+    """Ten stops in two sessions, rows out of time order.
 
     Session a: stop 1 learns its outcome 1 s in (shifted). Stop 2 learns it
     before it starts, and contains stop 3's arrival (22 s). Stop 3 learns it
     as it ends, 0.5 s in: its bins end before the boundary. Stop 4 learns it
     5 s in, past the 4 s the design keeps. Stop 5 learns it 1 s in but
     contains stop 6's arrival (52 s). Stop 6 has no outcome time.
-    Session b: stop 7 learns its outcome 1 s in (shifted); stop 8 before it starts.
+    Session b: stop 7 learns its outcome 1 s in (shifted); stop 8 as it starts
+    (not a crossing). Stop 9 lasts 36 ms, three bins of 15 ms, and learns its
+    outcome 20 ms in: only its last bin starts past the boundary (shifted).
+    Stop 10 learns it before it starts.
     """
     stops = pd.DataFrame(
         {
-            "animal": ["a"] * 6 + ["b"] * 2,
+            "animal": ["a"] * 6 + ["b"] * 4,
             "session_date": 1,
             "epoch": "02_r1",
-            "stop_id": [1, 2, 3, 4, 5, 6, 7, 8],
-            "stop_start": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 5.0, 70.0],
-            "stop_end": [13.0, 23.0, 30.5, 46.0, 53.0, 63.0, 8.0, 73.0],
-            "outcome_known_time_s": [11.0, 19.5, 30.5, 45.0, 51.0, NAN, 6.0, 69.5],
-            "last_well_arrival_time_s": [9.0, 19.0, 22.0, 39.0, 49.0, 52.0, 4.0, 69.0],
+            "stop_id": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            "stop_start": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 5.0, 70.0, 80.0, 90.0],
+            "stop_end": [13.0, 23.0, 30.5, 46.0, 53.0, 63.0, 8.0, 73.0, 80.036, 93.0],
+            "outcome_known_time_s": [
+                11.0,
+                19.5,
+                30.5,
+                45.0,
+                51.0,
+                NAN,
+                6.0,
+                70.0,
+                80.02,
+                89.5,
+            ],
+            "last_well_arrival_time_s": [
+                9.0,
+                19.0,
+                22.0,
+                39.0,
+                49.0,
+                52.0,
+                4.0,
+                69.0,
+                79.0,
+                89.0,
+            ],
             "occupancy_state": "at_well",
         }
     )
     stops["immobility_duration_s"] = stops["stop_end"] - stops["stop_start"]
-    return stops.iloc[[5, 2, 7, 0, 4, 1, 6, 3]].reset_index(drop=True)
+    return stops.iloc[[5, 2, 7, 9, 0, 4, 8, 1, 6, 3]].reset_index(drop=True)
 
 
-def test_the_outcome_boundary_shift_needs_a_crossing_no_arrival_and_a_bin(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        per_bin_design,
-        "excluded_intervals_by_session",
-        lambda sessions: per_bin_design.NO_EXCLUDED_TIME,
-    )
-    assert stats.outcome_boundary_statistics(_boundary_stops()) == {
-        "n_crossing": 5,  # stops 1, 3, 4, 5 and 7
-        "crossing_fraction": 0.625,
-        "n_shifted": 2,  # stops 1 and 7
-        "shifted_fraction": 0.25,
+def test_the_outcome_boundary_shift_needs_a_crossing_no_arrival_and_a_bin():
+    assert stats.outcome_boundary_statistics(
+        _boundary_stops(), per_bin_design.NO_EXCLUDED_TIME
+    ) == {
+        "n_crossing": 6,  # stops 1, 3, 4, 5, 7 and 9
+        "crossing_fraction": 0.6,
+        "n_shifted": 3,  # stops 1, 7 and 9
+        "shifted_fraction": 0.3,
         "n_spanning_arrival": 2,  # stops 2 and 5
         "n_spanning_arrival_crossing": 1,  # stop 5
     }
+
+
+def test_a_stop_whose_bins_past_the_boundary_are_excluded_is_not_shifted():
+    # Session a's excluded time starts as stop 1 learns its outcome (11 s) and
+    # outlasts the stop: every bin at or past the boundary is dropped.
+    # Session b's leaves stop 7 the bins that start 6.0 to 6.08 s, just past its
+    # boundary (6 s), but their 0.15 s of history reaches the excluded 5.9 s.
+    excluded = pd.DataFrame(
+        {
+            "animal": ["a", "b", "b"],
+            "session_date": 1,
+            "epoch": "02_r1",
+            "start_time": [11.0, 5.9, 6.1],
+            "end_time": [13.5, 5.95, 8.5],
+        }
+    )
+    result = stats.outcome_boundary_statistics(_boundary_stops(), excluded)
+    assert result["n_crossing"] == 6
+    assert result["n_shifted"] == 1  # stop 9
+    assert result["shifted_fraction"] == 0.1
 
 
 def test_onset_time_statistics_have_one_row_per_event_type():
@@ -148,13 +188,13 @@ def test_reward_history_incomplete_shares_of_stops_and_of_onsets():
     )
     onsets = pd.DataFrame(
         {
-            "event_type": ["non_local"] * 5 + ["SWR"] * 2,
-            "stop_id": [1, 1, 2, 3, 4, 2, 2],
+            "event_type": ["non_local"] * 8 + ["SWR"] * 2,
+            "stop_id": [1, 1, 2, 3, 4, 4, 4, 4, 2, 2],
         }
     )
     assert stats.reward_history_incomplete_statistics(stops, onsets, "non_local") == {
-        "stop_fraction": 0.4,
-        "onset_fraction": 0.6,
+        "stop_fraction": 0.4,  # 2 of 5 stops
+        "onset_fraction": 0.75,  # 6 of 8 non-local onsets
     }
     assert (
         stats.reward_history_incomplete_statistics(stops, onsets, "SWR")[

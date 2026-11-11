@@ -122,17 +122,24 @@ def still_immobile_fraction(stops: pd.DataFrame, at_s: float) -> float:
     return float((stops["stop_end"] - stops["stop_start"] >= at_s).mean())
 
 
-def outcome_boundary_statistics(stops: pd.DataFrame) -> dict[str, float]:
-    """Which stops the per-bin design's outcome-boundary shift applies to.
+def outcome_boundary_statistics(
+    stops: pd.DataFrame, excluded_intervals: pd.DataFrame | None = None
+) -> dict[str, float]:
+    """Which stops the per-bin design's outcome-boundary shift can apply to.
 
     A stop crosses its outcome boundary when the outcome becomes known inside
     it: ``stop_start < outcome_known_time_s <= stop_end``. It spans an arrival
     when the session's next stop arrived at its well inside this one. The
     per-bin design shifts a bin's reward history at the boundary in the
     crossing stops that span no arrival, and only where it still has a bin
-    that starts at or past the boundary (bins of ``BIN_S`` within ``TMAX`` of
-    the stop's start, less those that excluded time and the ladder's history
-    window drop).
+    that starts at or past the boundary.
+
+    The bins counted here are the stop-level design's: bins of ``BIN_S`` within
+    ``TMAX`` of the stop's start, less those that excluded time and the
+    ladder's history window drop. A fitted population's design also drops the
+    bins inside one of its ongoing events, which is not done here, so
+    ``n_shifted`` is an upper bound on the stops shifted in each fitted
+    population.
 
     Parameters
     ----------
@@ -141,24 +148,27 @@ def outcome_boundary_statistics(stops: pd.DataFrame) -> dict[str, float]:
         :func:`~continuum_swr_replay.analysis.replay.per_bin_design.aggregate_to_timebins`
         reads (the session columns, ``stop_id``, ``stop_start``, ``stop_end``,
         ``immobility_duration_s``, ``outcome_known_time_s`` and
-        ``last_well_arrival_time_s``). Each session's excluded time is read
-        from the SWR source.
+        ``last_well_arrival_time_s``).
+    excluded_intervals : pd.DataFrame, optional
+        Each session's excluded time, as ``aggregate_to_timebins`` takes it:
+        the session columns, ``start_time`` and ``end_time``, in seconds. None
+        (the default) reads it from the SWR source.
 
     Returns
     -------
     statistics : dict
         - ``n_crossing``, ``crossing_fraction``: stops that cross their outcome
           boundary, and their share of all stops.
-        - ``n_shifted``, ``shifted_fraction``: stops whose reward history is
-          shifted, and their share of all stops.
+        - ``n_shifted``, ``shifted_fraction``: crossing stops that span no
+          arrival and keep a bin at or past the boundary, and their share of
+          all stops.
         - ``n_spanning_arrival``: stops that contain a later well arrival.
         - ``n_spanning_arrival_crossing``: of those, stops that also cross
           their outcome boundary.
     """
-    crosses = (
-        (stops["stop_start"] < stops["outcome_known_time_s"])
-        & (stops["outcome_known_time_s"] <= stops["stop_end"])
-    ).fillna(False)
+    crosses = (stops["stop_start"] < stops["outcome_known_time_s"]) & (
+        stops["outcome_known_time_s"] <= stops["stop_end"]
+    )
     spans = stops["stop_id"].isin(arrival_spanning_stop_ids(stops))
     delta = (stops["outcome_known_time_s"] - stops["stop_start"]).to_numpy(float)
     bins = aggregate_to_timebins(
@@ -166,16 +176,13 @@ def outcome_boundary_statistics(stops: pd.DataFrame) -> dict[str, float]:
         pd.DataFrame({"stop_id": [], "t_since_stop_onset": []}),
         bin_s=BIN_S,
         tmax=TMAX,
+        excluded_intervals=excluded_intervals,
         history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
     )
     last_bin = stops["stop_id"].map(bins.groupby("stop_id")["binj"].max())
-    with np.errstate(invalid="ignore"):
-        has_bin = last_bin.to_numpy(float) >= np.ceil(delta / BIN_S)
-    shifted = (
-        crosses
-        & ~spans
-        & pd.Series(np.nan_to_num(has_bin, nan=False).astype(bool), stops.index)
-    )
+    # a stop with no bin, or with no outcome time, compares False
+    has_bin = last_bin.to_numpy(float) >= np.ceil(delta / BIN_S)
+    shifted = crosses & ~spans & has_bin
     return {
         "n_crossing": int(crosses.sum()),
         "crossing_fraction": float(crosses.mean()),
