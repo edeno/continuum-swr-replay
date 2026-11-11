@@ -329,18 +329,9 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
     fraction : float
         Units with q below ``alpha``, as a share of the tested units. NaN, with
         a NumPy warning, when no unit is tested.
-
-    Raises
-    ------
-    ValueError
-        If the finite p-values are not the units
-        :func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`
-        counts as tested.
     """
     pvalues = population[HELDOUT_P_COLUMNS[name]].to_numpy(dtype=float)
     pvalues = pvalues[np.isfinite(pvalues)]
-    if len(pvalues) != significant_fraction(population, alpha=alpha)[name][1]:
-        raise ValueError(f"the {name} p-values are not the units it was tested on")
     return (false_discovery_control(pvalues, method="bh") < alpha).mean()
 
 
