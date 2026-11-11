@@ -346,6 +346,16 @@ def test_the_aic_difference_needs_both_fits_of_a_session():
     assert stats.aic_difference_statistics(child, parent)["n_sessions"] == 3
 
 
+def test_an_infinite_aic_is_kept_unless_both_are_infinite():
+    child = _rung([10.0, np.inf, 30.0, np.inf])
+    parent = _rung([12.0, 19.0, 35.0, np.inf])
+    # differences -2, inf, -5; inf - inf is missing and its session is left out
+    result = stats.aic_difference_statistics(child, parent)
+    assert result["n_sessions"] == 3
+    assert result["median"] == -2.0
+    assert result["negative_fraction"] == pytest.approx(2 / 3)
+
+
 def test_the_aic_difference_can_require_the_same_stops():
     child = _rung([10.0, 20.0, 30.0, 40.0])
     parent = _rung([12.0, 19.0, 35.0, 44.0], n_stops=[5, 6, 5, 5])
