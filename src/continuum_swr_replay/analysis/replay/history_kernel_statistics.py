@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from continuum_swr_replay.analysis.replay.coefficient_statistics import group_range
 from continuum_swr_replay.analysis.replay.model_specs import BIN_S
 
 HISTORY_MIN_SUPPORT = 3.0
@@ -285,8 +286,9 @@ def self_history_range_statistics(by_population: pd.DataFrame) -> dict[str, floa
         ("end_peak_rate_ratio", "end_peak_rate_ratio_median"),
         ("end_peak_lag_ms", "end_peak_lag_ms_median"),
     ):
-        statistics[f"{name}_low"] = by_population[column].min()
-        statistics[f"{name}_high"] = by_population[column].max()
+        span = group_range(by_population[column].to_dict())
+        statistics[f"{name}_low"] = span["low"]
+        statistics[f"{name}_high"] = span["high"]
     statistics["n_end_peaks_above_one_min"] = int(
         by_population["n_end_peaks_above_one"].min()
     )
