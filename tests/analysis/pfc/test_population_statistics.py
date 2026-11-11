@@ -351,8 +351,8 @@ def _overlap_population(units: list[tuple]) -> pd.DataFrame:
             "non_local_no_SWR: peak_log_modulation",
         ],
     )
-    # the animal is read from the file name, not from this column
-    return frame.assign(animal="x")
+    animals = {_CHIMI: "chimi", _WILBUR: "wilbur"}
+    return frame.assign(animal=frame["nwb_file_name"].map(animals))
 
 
 def test_replay_class_overlap_statistics_on_twelve_tested_units():

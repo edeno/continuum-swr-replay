@@ -45,7 +45,6 @@ from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_rise_timing,
 )
-from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 # --- the cohort and its fits ---------------------------------------------------------
 
@@ -583,8 +582,8 @@ def replay_class_overlap_statistics(
     Parameters
     ----------
     population : pd.DataFrame, shape (n_units, n_columns)
-        The unit table, with ``nwb_file_name`` (the animal is read from it) and
-        the two classes' p-values and peaks.
+        The unit table, with ``animal`` and the two classes' p-values and
+        peaks.
     alpha : float
         The raw empirical-p threshold.
 
@@ -628,9 +627,7 @@ def replay_class_overlap_statistics(
     swr_called, non_called = swr_called[tested], non_called[tested]
     swr_peak = frame["non_local_SWR: peak_log_modulation"].to_numpy(dtype=float)
     non_peak = frame["non_local_no_SWR: peak_log_modulation"].to_numpy(dtype=float)
-    animals = (
-        frame["nwb_file_name"].map(lambda name: parse_nwb_filename(name)[0]).to_numpy()
-    )
+    animals = frame["animal"].to_numpy()
 
     def overlap_of(units: NDArray) -> dict[str, float]:
         """The overlap statistics of some of the units tested for both."""
