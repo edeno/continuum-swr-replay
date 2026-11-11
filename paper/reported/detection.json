@@ -3,16 +3,16 @@
  "summary": "detection",
  "title": "the detector: the held-out tetrode test of each decoder state, and the comparison with the Widloski & Foster detector on simulated replays",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "14df6718f6e7",
+ "commit": "342d9d43da1f",
  "code": {
-  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
+  "head": "342d9d43da1fd033655100ad70d0fc81ea15b793",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
-    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
+    "sha256": "ce9d2c1dae346a7a88211fc8fb00ebf2890a819234148b9e7532eb621da51083",
+    "code_sha256": "ab61ce34f3e1d62d6bbc8a3f9f48bb8dc9cdfc70aa5a23490c1d444ecb3a90cb"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -79,8 +79,8 @@
     "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "1fd43efe11b2a9cb549c20f44c7f4095d8643ab76c7fdb7cc0161bdec9cfd7c5",
-    "code_sha256": "9845b7a5dfa4e08cae4d50d49aefa5c4679f4ef41c8666fc5904550bede3183c"
+    "sha256": "0dfeb0ff83859fdb77057d4043e80b29aa9925b643b7c90c908922a3ebd7d1f4",
+    "code_sha256": "198d0e670ee3114d43ee34b10949cfffb379f65ea1208083d9496607de3ce238"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -119,20 +119,20 @@
     "code_sha256": "338068b33f6638598496ff6c8b1c83b29f18de54cea9d84833f7dbb7f4e61c77"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "f1cb76b1cdef9ccc04c58a8a728d1c017db0fe78ef882329accb2d94f769a029",
-    "code_sha256": "668a7a32d226a0855971d2120c241fcc85bae068e76629b45973b80e3bfcfe56"
+    "sha256": "bb70e9381257b0a341d5676cd41192562cd079ae210304e72c864ee1041f3ee5",
+    "code_sha256": "c618c1c0a792d7431e8a6af680a8b3fff1009892418c36175ea4a22d1a4124c4"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "47b15df018ae1612711de335d2515a9720e2e5cbc770da0e8e37483aec7ca860",
-    "code_sha256": "2b9e47d56821390d2174f5f1d12e46012aa1e55ca8a8f95d2b86d92015cec8a4"
+    "sha256": "2c1dfec78f887c1ceb6b197f75adab890a0f16dd48b287196515003821b21cb7",
+    "code_sha256": "6f6b1b40c64f8f2aeb37accd1960e10c515406418ada9bd96d52d9ee1faea370"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
-    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
+    "sha256": "253391bf28f9d88cfc9d3375d3dd810f062e0ed9db6ee46b1f9ec2b6937cb8a9",
+    "code_sha256": "a4990a7727203d9f6864f7461b7cb6624f8fc926cd89d5fbeab92ae3eccd5de4"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",

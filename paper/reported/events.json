@@ -3,16 +3,16 @@
  "summary": "events",
  "title": "the events: their overlap with SWRs and the other detectors, their spike support, and their properties",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "14df6718f6e7",
+ "commit": "342d9d43da1f",
  "code": {
-  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
+  "head": "342d9d43da1fd033655100ad70d0fc81ea15b793",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
-    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
+    "sha256": "ce9d2c1dae346a7a88211fc8fb00ebf2890a819234148b9e7532eb621da51083",
+    "code_sha256": "ab61ce34f3e1d62d6bbc8a3f9f48bb8dc9cdfc70aa5a23490c1d444ecb3a90cb"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -29,6 +29,10 @@
    "src/continuum_swr_replay/analysis/events/__init__.py": {
     "sha256": "7b187fa5fd1a0b7634f9ea00bdbd2c1dd65de8561fb015f3664b4f82c682a5b2",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/analysis/events/analysed_time.py": {
+    "sha256": "477d889fd55b0f9f6e643c5c8b23343f22f9352b38bdf517a532d2fcff28f6ff",
+    "code_sha256": "f91938d507bce6afa8508b765b45b07e4e9f63700b94cb113d6bd6e248ad2b83"
    },
    "src/continuum_swr_replay/analysis/events/artifact_intervals.py": {
     "sha256": "a9fb2c62382f4b52e29329017892fd6afd17c25a1330551afa730a860e5292b6",
@@ -50,6 +54,10 @@
     "sha256": "9b822a9dc94321cf1a7ef368ebeeaa3bd473b5eea915c124487243c803e9831c",
     "code_sha256": "379a15c677b24a3c015d263ccb5abaae47932ca9a55b05256534e9ac16a09865"
    },
+   "src/continuum_swr_replay/analysis/events/epoch_normalizers.py": {
+    "sha256": "1c5ac2c7b6c816854e1d0638e78e3058764b47c9d8c016ee81680ca8bd89a05d",
+    "code_sha256": "8e7c4bdc7fd93c200b4452cfe020a57e624623c6cf4e46ba4bc8eb0727640cf1"
+   },
    "src/continuum_swr_replay/analysis/events/immobility.py": {
     "sha256": "a851929ce05c637294297c18c3d620dc7136527b8e39fa63927d19f84af2f723",
     "code_sha256": "b28f2241802c703d90872efad704ea57dbb801032612667db5a8794cac6914f5"
@@ -66,9 +74,13 @@
     "sha256": "8e0b5ee16dcc2d9ec74d4fa5cbc2bf7df353ffd4c99fa403eae9e745ce81d8b6",
     "code_sha256": "9dfd31371132808f497c7138273e7e3915f1266b2e26fd4bda37c457c256a084"
    },
+   "src/continuum_swr_replay/analysis/hippocampus/detection_inputs.py": {
+    "sha256": "67c12f8d877482c1f0da519ae5fa65268bba3a47f7339dc09a9eff94360c1d4d",
+    "code_sha256": "b176291217c441d363af87c9125922bea7ce9d9aac090708279b800405bd919a"
+   },
    "src/continuum_swr_replay/analysis/hippocampus/event_statistics.py": {
-    "sha256": "18887e1e784dddd19854d815b410ec6a5c17fb95cb29cdedf4c64292e90e3c1d",
-    "code_sha256": "2ffaf918ffe1f4e9b00bb3f4071b9ba83605f39bb39bc84622df1fc74ad7c514"
+    "sha256": "833606ced9bfdfae7a07ae9d1fe3ac98c21fe00524e9e295819d148e2da940d1",
+    "code_sha256": "50dd6522a752fb1d96f8a82e3c0082717c09597171b7fe562b9a236157932724"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/__init__.py": {
     "sha256": "be00f35a8fd3f9b5f8f01cffbb8b160bc1c4dcd8b1b3095c1ebf390cb8eb5146",
@@ -99,8 +111,8 @@
     "code_sha256": "b1b1c3f934d17a7c694b7b18ac7209f4ca782788ccfa0cc3735fed6aa85aacd8"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/sweep_statistics.py": {
-    "sha256": "1fd43efe11b2a9cb549c20f44c7f4095d8643ab76c7fdb7cc0161bdec9cfd7c5",
-    "code_sha256": "9845b7a5dfa4e08cae4d50d49aefa5c4679f4ef41c8666fc5904550bede3183c"
+    "sha256": "0dfeb0ff83859fdb77057d4043e80b29aa9925b643b7c90c908922a3ebd7d1f4",
+    "code_sha256": "198d0e670ee3114d43ee34b10949cfffb379f65ea1208083d9496607de3ce238"
    },
    "src/continuum_swr_replay/analysis/hippocampus/memoryless_sequence/window_statistics.py": {
     "sha256": "f6903667a06ceaf44f0c60bbedc0b507ea7024b4c563c4ad4659efab55d2634c",
@@ -118,13 +130,33 @@
     "sha256": "78e6f85bcaabaa81a5939d33cfbf2945a989dfa8e26e6fbdf9867cd3be9fe902",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
+   "src/continuum_swr_replay/analysis/inventory_comparison/adapters.py": {
+    "sha256": "882e8378889c5494d43dd6690c8925074f4bb50d57213c0d64f8971758dd0837",
+    "code_sha256": "d537b90690abd059fab705275077532fca3693b842f6d85aaaea210a4572463e"
+   },
+   "src/continuum_swr_replay/analysis/inventory_comparison/availability.py": {
+    "sha256": "e75012d41ed52c211a201408ef3e8f4224edf505a6187fdf57037f6fd5664c03",
+    "code_sha256": "61797e4e6a7104be5730de25310f714b6576c27bb8e8c40d0b7270f2c1f4e33c"
+   },
+   "src/continuum_swr_replay/analysis/inventory_comparison/cells.py": {
+    "sha256": "ec07dbb2f0f575b1ad2e35327627c0f15823578a218ed4d2b9a4da8d7232c857",
+    "code_sha256": "089147dfbf234ced2d28064e64a87d647b079a57b0fe8bf7a754b98ca2fc35b5"
+   },
+   "src/continuum_swr_replay/analysis/inventory_comparison/components.py": {
+    "sha256": "578058cf73a9c76dd31b9f79215c24cb37a90f2f2184dd9d550dc03a0715ee34",
+    "code_sha256": "9c4b747f3cd155820b8759ef1303822bd2238d2d425b4d8551e160e3593621dc"
+   },
    "src/continuum_swr_replay/analysis/inventory_comparison/features.py": {
     "sha256": "15844a1d8800ce7235d0eb0975b16e4e2302a56e980a633cb69ff028e8b5e9e9",
     "code_sha256": "796dd8b1a36be7204b54c117e4b40b3fba84babf2ce50a2f671d9e1df0f55bc5"
    },
+   "src/continuum_swr_replay/analysis/inventory_comparison/inventory_run.py": {
+    "sha256": "e49b377a4fc13b7a499b957bd20fce15ade5f8a0c2dda59712abd02e3bd08867",
+    "code_sha256": "afc9c407dfd964a9b39a7018635669df9d71091ecd9f96edf5a2751e849ccce6"
+   },
    "src/continuum_swr_replay/analysis/inventory_comparison/nonlocal_comparison.py": {
-    "sha256": "73a99121ed6d3709dce697c7a169ab4f215afd4b37a445aed0ae847fd2825727",
-    "code_sha256": "38887528728a99a0ca6503aa2efa038175a0dfa113aec2b2173bbbfbcba56244"
+    "sha256": "d0e7814d955479754dbb61a170d711c57310140e91a0ec5adbcae10dc0c135eb",
+    "code_sha256": "492afbec09e2f537d050b2702b7710d0c04c9eef6808ca21e59cd6e7d9e0f164"
    },
    "src/continuum_swr_replay/analysis/inventory_comparison/overlap.py": {
     "sha256": "a0eeab4df008e1021e79a025ad27f3c8c3d91844ec59d1c69f568f1922afb39f",
@@ -137,6 +169,10 @@
    "src/continuum_swr_replay/analysis/inventory_comparison/schema.py": {
     "sha256": "71809ba1bc75043822ceaedefc1b3663149199118335bf4a0fd01c5aa4a91fe9",
     "code_sha256": "9a62fa70eb32f51fba91d6b8f819fb974549cec61eb906aa27274dbb995141c8"
+   },
+   "src/continuum_swr_replay/analysis/inventory_comparison/swr_matrix.py": {
+    "sha256": "6773cefbbd7c079ddcaa48f738068c9cf7fb8ab1bbaece8dde435037cd6d5b78",
+    "code_sha256": "d1a3f3d6fccad518c38e97f521088cc7e82969619d48cc99f8e95f455fed5598"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -154,6 +190,10 @@
     "sha256": "df347b9fc9781dfb034df02bfd6f15304a00a8426f23671bfcc2bc2f9bfdc482",
     "code_sha256": "3fbdc1aaa24f78e2c8196a062589c6691f3d52419d3e976c0c7a5f4e27ba7dcd"
    },
+   "src/continuum_swr_replay/data_loaders/spikes.py": {
+    "sha256": "ddaeebc8b774802a821d06225852807e0343f02ce378992d949af07606e48775",
+    "code_sha256": "986bd4f318dd67697d3171887a9c3f6941b1cc7906739187442a4bdfc850ba1b"
+   },
    "src/continuum_swr_replay/data_loaders/utils.py": {
     "sha256": "1f798ed63335fa32a63c491c8ddb4ed83350a330b30152a5b7bea65547fed35c",
     "code_sha256": "818b503a3b74eaa381e35b614f36ef9b20683b2a8c2c67990ee9da0b65915897"
@@ -165,6 +205,10 @@
    "src/continuum_swr_replay/decoding/__init__.py": {
     "sha256": "fd2afc791fae372daa3c83ddd5de0eea5025542625baf0f79499ce0928602cf2",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
+   },
+   "src/continuum_swr_replay/decoding/files.py": {
+    "sha256": "b5cb81902b85082296637ffe849017d2484c287189e0d6ad1e692ac92e683e4c",
+    "code_sha256": "a506cacfade7583767e7d34b7e675b6e018146f5e08cfb333069247fc8ec554f"
    },
    "src/continuum_swr_replay/decoding/identifiers.py": {
     "sha256": "5da0c6b16fd83d62925dfb408e8b17e339ba71fc587100dd153bf6825604a931",
@@ -179,24 +223,24 @@
     "code_sha256": "338068b33f6638598496ff6c8b1c83b29f18de54cea9d84833f7dbb7f4e61c77"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "f1cb76b1cdef9ccc04c58a8a728d1c017db0fe78ef882329accb2d94f769a029",
-    "code_sha256": "668a7a32d226a0855971d2120c241fcc85bae068e76629b45973b80e3bfcfe56"
+    "sha256": "bb70e9381257b0a341d5676cd41192562cd079ae210304e72c864ee1041f3ee5",
+    "code_sha256": "c618c1c0a792d7431e8a6af680a8b3fff1009892418c36175ea4a22d1a4124c4"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/detection.py": {
-    "sha256": "47b15df018ae1612711de335d2515a9720e2e5cbc770da0e8e37483aec7ca860",
-    "code_sha256": "2b9e47d56821390d2174f5f1d12e46012aa1e55ca8a8f95d2b86d92015cec8a4"
+    "sha256": "2c1dfec78f887c1ceb6b197f75adab890a0f16dd48b287196515003821b21cb7",
+    "code_sha256": "6f6b1b40c64f8f2aeb37accd1960e10c515406418ada9bd96d52d9ee1faea370"
    },
    "src/continuum_swr_replay/reported/events.py": {
-    "sha256": "39fcfc0011adca7e4de515d194485d8c9ff23bcae6b7601c9a635ff97fc3444e",
-    "code_sha256": "e1698032b886d9efa9766cbe15b7814a7ae81e1574d14ff32d16b02c7487b4d9"
+    "sha256": "530f7bfdb8c9ee23264c82dfe462b69bce8ca02595c95bd5d3818b6a152a3b3c",
+    "code_sha256": "e4e71c9e96e4b069d237690e7c80d3c6b5e46042cea61fdb1c5bac2ff051aa08"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
-    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
+    "sha256": "253391bf28f9d88cfc9d3375d3dd810f062e0ed9db6ee46b1f9ec2b6937cb8a9",
+    "code_sha256": "a4990a7727203d9f6864f7461b7cb6624f8fc926cd89d5fbeab92ae3eccd5de4"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -1056,7 +1100,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_animals_above_rest_swr": {
@@ -1070,7 +1114,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_animals_below_running_non_swr": {
@@ -1084,7 +1128,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_animals_below_running_swr": {
@@ -1098,7 +1142,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_db_animals_above_rest_non_swr": {
@@ -1168,7 +1212,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_median_swr": {
@@ -1182,7 +1226,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_rest_reference": {
@@ -1196,7 +1240,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "fast_gamma_running_reference": {
@@ -1210,7 +1254,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "heldout_non_swr_animals": {
@@ -3752,7 +3796,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_animals_above_rest_swr": {
@@ -3766,7 +3810,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_animals_below_running_non_swr": {
@@ -3780,7 +3824,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_animals_below_running_swr": {
@@ -3794,7 +3838,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_db_animals_above_rest_non_swr": {
@@ -3864,7 +3908,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_median_swr": {
@@ -3878,7 +3922,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_rest_reference": {
@@ -3892,7 +3936,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "slow_gamma_running_reference": {
@@ -3906,7 +3950,7 @@
    ],
    "figures": [],
    "source": "Processed-Data/replay_content/event_table.parquet (event theta_z, ripple_power_z, mua_rate_z) and Processed-Data/brain_state_reference/reference.parquet (scripts/detection/measure_brain_state_reference.py) and the gamma pass Processed-Data/event_gamma (scripts/detection/measure_event_gamma.py)",
-   "function": "brain_state_values",
+   "function": "gamma_z_values",
    "pending": null
   },
   "speed_animals_in_direction": {
@@ -4050,7 +4094,7 @@
     "3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
-   "function": "property_values",
+   "function": "start_distance_values",
    "pending": null
   },
   "start_distance_difference_high": {
@@ -4146,7 +4190,7 @@
     "3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
-   "function": "property_values",
+   "function": "start_distance_values",
    "pending": null
   },
   "start_distance_median_swr": {
@@ -4162,7 +4206,7 @@
     "3"
    ],
    "source": "Processed-Data/replay_content/event_table.parquet (canonical event table) and Processed-Data/event_start_rest_theta (scripts/detection/measure_event_start_and_rest_theta.py)",
-   "function": "property_values",
+   "function": "start_distance_values",
    "pending": null
   },
   "start_offset_median_ms": {

@@ -3,16 +3,16 @@
  "summary": "mpfc",
  "title": "how mPFC units respond to the events",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "14df6718f6e7",
+ "commit": "342d9d43da1f",
  "code": {
-  "head": "14df6718f6e7b705797873ad2f35aa1a54792758",
+  "head": "342d9d43da1fd033655100ad70d0fc81ea15b793",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
   "files": {
    "scripts/reported/summarize.py": {
-    "sha256": "c8f8faa2f3af1d417f0a967b5f7193f3e1627ff5679ecafed4664f2539ed7740",
-    "code_sha256": "3ea58744384e848330228289f6783cb98a6ab3a4fbb62bb8533fd15f049a809f"
+    "sha256": "ce9d2c1dae346a7a88211fc8fb00ebf2890a819234148b9e7532eb621da51083",
+    "code_sha256": "ab61ce34f3e1d62d6bbc8a3f9f48bb8dc9cdfc70aa5a23490c1d444ecb3a90cb"
    },
    "src/continuum_swr_replay/__init__.py": {
     "sha256": "6ea568210a93eecf37c5d78dcb809a6c69f74c3546633591975f0f70c49627e0",
@@ -30,6 +30,18 @@
     "sha256": "7b187fa5fd1a0b7634f9ea00bdbd2c1dd65de8561fb015f3664b4f82c682a5b2",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
+   "src/continuum_swr_replay/analysis/events/analysed_time.py": {
+    "sha256": "477d889fd55b0f9f6e643c5c8b23343f22f9352b38bdf517a532d2fcff28f6ff",
+    "code_sha256": "f91938d507bce6afa8508b765b45b07e4e9f63700b94cb113d6bd6e248ad2b83"
+   },
+   "src/continuum_swr_replay/analysis/events/artifact_intervals.py": {
+    "sha256": "a9fb2c62382f4b52e29329017892fd6afd17c25a1330551afa730a860e5292b6",
+    "code_sha256": "b8e9489c5b7a8530f334cb6ef7235250e64198244a3675b0c5678d6a0b9371dd"
+   },
+   "src/continuum_swr_replay/analysis/events/artifact_masks.py": {
+    "sha256": "60bdd8dffb88a10fc11396348ffb15f2812877d22d39f2c01f453cc8bfff7b69",
+    "code_sha256": "cdfa979dfc76d95523de60422744635982f10b6f79b38867a73d0ec1d657a843"
+   },
    "src/continuum_swr_replay/analysis/events/cohort_selection.py": {
     "sha256": "fd4b1efae6ffb951dbac58c52cf2728fbb8159eea537ae6613088b36a0ef9da0",
     "code_sha256": "22b84eaebda245a8c71c7b62f5dc775bf4ab36757c3cc00394fa65bff976e7a3"
@@ -38,9 +50,17 @@
     "sha256": "9b822a9dc94321cf1a7ef368ebeeaa3bd473b5eea915c124487243c803e9831c",
     "code_sha256": "379a15c677b24a3c015d263ccb5abaae47932ca9a55b05256534e9ac16a09865"
    },
+   "src/continuum_swr_replay/analysis/events/epoch_normalizers.py": {
+    "sha256": "1c5ac2c7b6c816854e1d0638e78e3058764b47c9d8c016ee81680ca8bd89a05d",
+    "code_sha256": "8e7c4bdc7fd93c200b4452cfe020a57e624623c6cf4e46ba4bc8eb0727640cf1"
+   },
    "src/continuum_swr_replay/analysis/events/immobility.py": {
     "sha256": "a851929ce05c637294297c18c3d620dc7136527b8e39fa63927d19f84af2f723",
     "code_sha256": "b28f2241802c703d90872efad704ea57dbb801032612667db5a8794cac6914f5"
+   },
+   "src/continuum_swr_replay/analysis/events/swr_source.py": {
+    "sha256": "e9e8292fcc566d997d421885e1a0b0ffa6c242650eb6f04810a9477232e61fd2",
+    "code_sha256": "e67897b004c1e389f588c56918a5b2f483977621d069938417960ca3e57b8c50"
    },
    "src/continuum_swr_replay/analysis/pfc/__init__.py": {
     "sha256": "fa9ffa35603c1f10f212754cc655f3c8878c1fdb87a2d2e3b13ae82e8980eb3d",
@@ -67,8 +87,8 @@
     "code_sha256": "13f07042304cc88cfc4ee105da9001b5f75db9c544b705d25ee9e29a3a01f603"
    },
    "src/continuum_swr_replay/analysis/pfc/load_population.py": {
-    "sha256": "4d71d3cacb5db17c232c4a7251f8933d90fbaa91c22fb92ac0ba12334e2dcdc4",
-    "code_sha256": "1e9d89f481694bfa5e5bfc5f770fa0efcb0002a31c7d2febdfc9e4b5e985fbe3"
+    "sha256": "4693919e107767493673d43f6422a4384bdfcba8b0cd2620fd4daf7b600441db",
+    "code_sha256": "6ee4ce712b5686ad39066bc51f849080bbfa864333ca9a20a9caeeed574cb3be"
    },
    "src/continuum_swr_replay/analysis/pfc/matched_control.py": {
     "sha256": "7335ea02abb3e2b6f2e2dce4170c96983dabf703c79bc4bce051b5a02ac5705c",
@@ -79,20 +99,120 @@
     "code_sha256": "40ae946bcdce07b3de2dc541f13fd4e982ad8cab53ceed202ea0a4ed057a0b38"
    },
    "src/continuum_swr_replay/analysis/pfc/population_statistics.py": {
-    "sha256": "c80390be12c7b89b2c8601b2fd65105865c97c3d638e5d5e03e36fab2d114eda",
-    "code_sha256": "d8c772d1a981e532b4d1110868e4545c04fd483a0de1a6947b22b19fdcb22130"
+    "sha256": "89e92037a6a3263e032422120298984d79c7011aadf9316632660d180b16d258",
+    "code_sha256": "f0c77d8a50f12f86901863a42d89e6eb420ed37df5cf2bb592571de03739805c"
    },
    "src/continuum_swr_replay/analysis/pfc/timing.py": {
-    "sha256": "bb795a814d07a9b3bd9617dd2a9a8376692ea181f353cf6b72e9a343ca9506cf",
-    "code_sha256": "0756753cd7713e21fb187c4f5ce3d7ea0f61842380b8e6068974c44b4dc3f696"
+    "sha256": "a998e413bbea4c9c3434216bc629626069c1b425629e2448138edfc5f8f6670d",
+    "code_sha256": "8156003ab494a92ca9c1217ce1063103a176780f49971bda1e953b66b62546d4"
    },
    "src/continuum_swr_replay/analysis/replay/__init__.py": {
     "sha256": "0b0d18307f7614693f41eb3629365da8f7e49dcf8115ca40a59bf5d77c2e9bd4",
     "code_sha256": "1d48929e5d19f928bb5000f5010909d4f8d42f7e9962beae63eee44050b1bbe9"
    },
+   "src/continuum_swr_replay/analysis/replay/_fit_diagnostics.py": {
+    "sha256": "71724952faf2e72d9e66e044dadfb1e936cf8980fd7231c15416c910c859eeff",
+    "code_sha256": "dff397b03906488bcc452220c8d4e289f88528721655e9b390f15b8948de6600"
+   },
+   "src/continuum_swr_replay/analysis/replay/_helpers.py": {
+    "sha256": "bcbfc19ea9da18cd2612ed4ab901d2d96ff99c18d48823cbab8186142dc73325",
+    "code_sha256": "e91ca3884cbc5ca3151315663601318ed3307f44a304c39cf613a67c5544204c"
+   },
+   "src/continuum_swr_replay/analysis/replay/coefficient_statistics.py": {
+    "sha256": "236cac8b500785b7742bb20d947f2658dd67442ff544d21168cc460e1a3884ea",
+    "code_sha256": "e1f5217f95ccdb24dea953e588b601d675254675eba5817a15e3c91eeddf6b22"
+   },
+   "src/continuum_swr_replay/analysis/replay/cohort_audit.py": {
+    "sha256": "e217c7de1f144a0cb78ae0ee162a0766fce11940547c00b9a9630d77f691ff1b",
+    "code_sha256": "06ac1b2e0250b99c01a60d165f43649d10bfb59655d55d8f1dc8458d53600ae0"
+   },
+   "src/continuum_swr_replay/analysis/replay/content_response.py": {
+    "sha256": "d802280005875762c10d2db5813befaa305d14a66eec11e9a69acfdb147d9b54",
+    "code_sha256": "d97816573cd8a53e780bb898a4e7e9b4d9ed9036a35edab19d1e4fa13e512b51"
+   },
+   "src/continuum_swr_replay/analysis/replay/contrast_aggregation.py": {
+    "sha256": "da3a6fe12afb2bd55476773fe698f7b1608aae387aa49c79412bbb7a7d879b78",
+    "code_sha256": "bfc1687c5e14977e9ea4cc2cb2275164946b4424651d3128410d24e9446d1e0f"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/__init__.py": {
+    "sha256": "d48cc318bd253e8be59cca3723a0e46de38ec86a62036c383aec722ba49cc61c",
+    "code_sha256": "dbf09f6aea07a62df999998a092d37e263d00a0541cf5f6da16bb6fa5df4edf3"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/candidate_arm.py": {
+    "sha256": "42b09d5422eb5ed56cfdad20a443194b848d79f7af5024bcff3bf3d599db54ce",
+    "code_sha256": "42f875d64189515e5aa555da096c101cc07466c758bd709ecedf7b9f0a227710"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/clocks.py": {
+    "sha256": "c31433e5eb256ef84445def3ee79361fdb4250f1a2d5ba48504710f9a71c9127",
+    "code_sha256": "6407dab067d31986221ab2f04f22904e23ba7acea70b2e54ec79ec9214fd7210"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/context.py": {
+    "sha256": "e455bf2934a8a47a32299787ee271f3b37e2a4a9130456d8c8a06dc9be08e46b",
+    "code_sha256": "6f120f68c6a3556de7990a358aeb4d2711eb474147aef27c7c114a0a9566ef02"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/definitions.py": {
+    "sha256": "5673c1dbd7af53aa6a138cd29ce196262e3c85f03cecde10f672669ea4179b72",
+    "code_sha256": "77c2e5c27effc49ac85a6096093c132dadbe502efd34a88d28dba750cc9811eb"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/__init__.py": {
+    "sha256": "3654302f0fd09d0e5e897fdfcaab33231006c5ae281694ff09a449812b8c6178",
+    "code_sha256": "d59bcbbd8f49b259b312c03bb6ed10bfffb33bb8c43d3856efb12b6e6a76bd32"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/_common.py": {
+    "sha256": "18f3bfa8c4ed442b71d88cd2159c0caeae22496b63d9d6663a33abc90e89ad5a",
+    "code_sha256": "a004f2300e6d16347d01e37904e73cff001eb0d53b2179167c142361530f381d"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/diagnostics.py": {
+    "sha256": "0b864cfac0eb3eee5d164ac10ab0bdef07e92eca479883db9ecefe80627e41d1",
+    "code_sha256": "6550a61123b056103e8156fc48337a0e656570993f495f9436b35158fd0d3d9c"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/reward_history.py": {
+    "sha256": "2c5e738597d7d5e9e540f64c9d9982b6eb21db3c6a3aaf57e73960bfe7466c0a",
+    "code_sha256": "fd0d9695ecf2b3fd324de729031ce4e8126a2c2200e7f542575ea1452fa57e05"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/value_block.py": {
+    "sha256": "b2672adeb6246933e5eb551673c2e9d7c62fe3eaa6892c4161b16e285c851fac",
+    "code_sha256": "7620f387877e650170a049fbd31f861150fc5a566c9c29bfdb5999889559d487"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/value_uncertainty.py": {
+    "sha256": "7ca3b7bbeb67f19ee852242a0570a99aa412770c3fe0b009f422b8b44d4084b9",
+    "code_sha256": "5d931d255cf58ec8180dea9c0b08bb202e0048c928103b36714a735a52e4ccd1"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/history/visit_recency.py": {
+    "sha256": "a2973b4b0290749a53454ad1a8be9dc18090be5bf6c2e4d0374b0ed9ae544556",
+    "code_sha256": "4c5ceb504b99359f174dff8094bd9a0331a0f48d9ff4bb38ad4ec98a81222ee2"
+   },
+   "src/continuum_swr_replay/analysis/replay/covariates/interactions.py": {
+    "sha256": "20664d9c0435a03c380ce09cb44f3da86d4111c18a164108d26afb9bc120edf5",
+    "code_sha256": "9841767c8b3f774325c941d9b7213dba047ca454adffb543f6fe90fd24e65fec"
+   },
+   "src/continuum_swr_replay/analysis/replay/design_constants.py": {
+    "sha256": "9d4eebfe06558a70613411e1d57e929b65244a87fe4dab1501bc93fd3f6f567b",
+    "code_sha256": "c47cab9d5e370ecc0b8eb42188e26b7d3297f075e2000969b0166ba7dac1684b"
+   },
    "src/continuum_swr_replay/analysis/replay/fit_provenance.py": {
     "sha256": "aecf02ea8b0d477b4e3ead86ba11a8906563885552daeead867d880c36dc717d",
     "code_sha256": "21a32bfa257976d029c5ebbcb9f0befe889df831cf5d92d5d550f77c9ce6ab62"
+   },
+   "src/continuum_swr_replay/analysis/replay/fitting.py": {
+    "sha256": "32d812fa4c8983784db7887a1134c65dae92339e5ece4bb2b585b5c920e863da",
+    "code_sha256": "748268d0bf528ae7601482d1172aa1f9f23f4ca250401cc09e850b92fdc82503"
+   },
+   "src/continuum_swr_replay/analysis/replay/model_specs.py": {
+    "sha256": "f3ecbded6eda87a3481a0932b5130d12d729c60e6701604922d0f6d5f714b7b0",
+    "code_sha256": "3709b9ffee0ddb88da41f78b8f2101ebffa4eb5ea6fe470e93c1f83e30ded5c3"
+   },
+   "src/continuum_swr_replay/analysis/replay/per_bin_design.py": {
+    "sha256": "6f5672452c93f97f3267e923c757bbc6a52fcdb41e9c2e6ebdc8016a255642b1",
+    "code_sha256": "9c301612c9ea1236d103ecad69f825fd942ba0c7959626838f52de75a752531e"
+   },
+   "src/continuum_swr_replay/analysis/replay/spatial.py": {
+    "sha256": "67e7ed51c2c12c54009b01c81b07f514716ef0f0ac2dfbc6bc850e5c72843b2d",
+    "code_sha256": "842faab90175b31bb92226eecd437d46b0ea2f9640887a4367293134b9b66c59"
+   },
+   "src/continuum_swr_replay/analysis/replay/spatial_mapping.py": {
+    "sha256": "f4602070599348af352f11bb684a6bf57e72783b08304d62031e09ed98f1e9f7",
+    "code_sha256": "d7e69ff9e5807718d122651ff3dceb4df754a77c9a104bc197d8d1c9904336c9"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -105,6 +225,10 @@
    "src/continuum_swr_replay/data_loaders/epoch_register.csv": {
     "sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1",
     "code_sha256": "dca699adef3bfa8cfc1aa4910cb84bf17d5a4197d7b3184ca3efcb2ba274d6f1"
+   },
+   "src/continuum_swr_replay/data_loaders/trial_clocks.py": {
+    "sha256": "55b760af4deb44b9dee7ef233939cba477a3b54bddbc16a3d96a0958a4482fdb",
+    "code_sha256": "67abbba96445b691b4dd78f091275d17a7ad90975300144c29c5190de67e8445"
    },
    "src/continuum_swr_replay/data_loaders/utils.py": {
     "sha256": "1f798ed63335fa32a63c491c8ddb4ed83350a330b30152a5b7bea65547fed35c",
@@ -127,20 +251,20 @@
     "code_sha256": "338068b33f6638598496ff6c8b1c83b29f18de54cea9d84833f7dbb7f4e61c77"
    },
    "src/continuum_swr_replay/paths.py": {
-    "sha256": "f1cb76b1cdef9ccc04c58a8a728d1c017db0fe78ef882329accb2d94f769a029",
-    "code_sha256": "668a7a32d226a0855971d2120c241fcc85bae068e76629b45973b80e3bfcfe56"
+    "sha256": "bb70e9381257b0a341d5676cd41192562cd079ae210304e72c864ee1041f3ee5",
+    "code_sha256": "c618c1c0a792d7431e8a6af680a8b3fff1009892418c36175ea4a22d1a4124c4"
    },
    "src/continuum_swr_replay/reported/__init__.py": {
     "sha256": "0cd79335a4e1080b5b7abcdb7e34f09c684645806e0f28cbb3007ea45932679a",
     "code_sha256": "5c04595997820c90159baeb6d4411d9a479f4dc26f1ac532dd740dcb011f3e23"
    },
    "src/continuum_swr_replay/reported/mpfc.py": {
-    "sha256": "555163dd43e93c2d6bcc0019052ee9708acbba84a1c1286c9d3be3d5bdec022a",
-    "code_sha256": "8a755d34e0256a10945e0759599c68e8d72d3f2666266e9bee877d34a1b4ceed"
+    "sha256": "093bcd5e7b8c87d29f6fbb862909244493c8967bfd1bcbce1b379f5f55c8555d",
+    "code_sha256": "771f6878e8dcb3e90004b14bd9d668ba38af7b9a49b6a7eb6e5b4425fc9016fb"
    },
    "src/continuum_swr_replay/reported/values.py": {
-    "sha256": "5406cb7260fa9ea78fb3969452dcd8e63e7450c32469276095e2831b4f27a62d",
-    "code_sha256": "c4f2d8a747334fa87589068a816379c6174c08981275407d81713347cbc87249"
+    "sha256": "253391bf28f9d88cfc9d3375d3dd810f062e0ed9db6ee46b1f9ec2b6937cb8a9",
+    "code_sha256": "a4990a7727203d9f6864f7461b7cb6624f8fc926cd89d5fbeab92ae3eccd5de4"
    },
    "src/continuum_swr_replay/runs/__init__.py": {
     "sha256": "3d7c34c4b4e5cd90007d84f20bfe763ee5897ac7d2a26cdd3f7a0f38f112720e",
@@ -169,6 +293,10 @@
    "src/continuum_swr_replay/tables/session_keys.py": {
     "sha256": "af0c4f23a03b2374087f422371a3f0c5ced2bbf03c173ab7419f9b0cbc1fd015",
     "code_sha256": "b9dbbf51a10fb5c54f61b15c26fcd02ab2a21be6402d530b32e716a6ebec3427"
+   },
+   "src/continuum_swr_replay/tables/standardization.py": {
+    "sha256": "af03fbd7194acfacb24dce8911c6d22ec41b2aa628296ce0b63dadbf29ce7ab8",
+    "code_sha256": "6f451e9597704f1db8dbbba1b29e10a872437a0d671e15803c8599db5bd14008"
    },
    "src/continuum_swr_replay/tables/versions.py": {
     "sha256": "e4389862b4f0992453506d860b21fb44a8d4ae24ce8341a8aefe0953f137eba2",
@@ -8163,7 +8291,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over the same resamples",
    "questions": [
     "4.1"
    ],
@@ -8177,7 +8305,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over the same resamples",
    "questions": [
     "4.1"
    ],
@@ -8191,7 +8319,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over the same resamples",
    "questions": [
     "4.1"
    ],
@@ -8205,7 +8333,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over the same resamples",
    "questions": [
     "4.1"
    ],
@@ -8219,7 +8347,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over the same resamples",
    "questions": [
     "4.1"
    ],
@@ -8233,7 +8361,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over the same resamples",
    "questions": [
     "4.1"
    ],
@@ -8247,7 +8375,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8261,7 +8389,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8275,7 +8403,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8289,7 +8417,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8303,7 +8431,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8317,7 +8445,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
    "questions": [
     "4.1"
    ],

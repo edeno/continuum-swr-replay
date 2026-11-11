@@ -13,11 +13,11 @@ an input.
 
 | Summary | Built at | Code record | Values | Values with tag problems |
 |---|---|---|---|---|
-| `survey.json` | `14df6718f6e7` | yes | 32 | 0 |
-| `detection.json` | `14df6718f6e7` | yes | 132 | 0 |
-| `events.json` | `14df6718f6e7` | yes | 331 | 0 |
-| `behavior.json` | `14df6718f6e7` | yes | 922 | 0 |
-| `mpfc.json` | `14df6718f6e7` | yes | 604 | 0 |
+| `survey.json` | `342d9d43da1f` | yes | 32 | 0 |
+| `detection.json` | `342d9d43da1f` | yes | 132 | 0 |
+| `events.json` | `342d9d43da1f` | yes | 331 | 0 |
+| `behavior.json` | `342d9d43da1f` | yes | 922 | 0 |
+| `mpfc.json` | `342d9d43da1f` | yes | 604 | 0 |
 
 ## Part 0: introduction
 
@@ -433,18 +433,18 @@ Sources:
 
 | Macro | Value | Unit | What it is | Builder function | Figures |
 |---|---|---|---|---|---|
-| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
-| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsFastGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsFastGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event fast-gamma power (65-100 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestNonSwr` | 5 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbMedianNonSwr` | +0.52 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
 | `\EventsFastGammaDbMedianSwr` | +1.1 | dB | median over epochs of the change in fast-gamma power (65-100 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
-| `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.brain_state_values` |  |
-| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.brain_state_values` |  |
+| `\EventsFastGammaMedianNonSwr` | −0.21 | z | median z-scored fast-gamma power (65-100 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsFastGammaMedianSwr` | 0.11 | z | median z-scored fast-gamma power (65-100 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsFastGammaRestReference` | −0.43 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) in quiet rest | `events.gamma_z_values` |  |
+| `\EventsFastGammaRunningReference` | −0.14 | z | median over epochs of the epoch's median z-scored fast-gamma power (65-100 Hz) while running | `events.gamma_z_values` |  |
 | `\EventsMuaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
 | `\EventsMuaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event MUA rate is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
 | `\EventsMuaAnimalsBelowRunningNonSwr` | 1 |  | animals whose median non-SWR event MUA rate is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
@@ -461,18 +461,18 @@ Sources:
 | `\EventsRippleMedianSwr` | 2.35 | z | median z-scored ripple power of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` | 3b |
 | `\EventsRippleRestReference` | −0.60 | z | median over epochs of the epoch's median z-scored ripple power in quiet rest | `events.brain_state_values` | 3b |
 | `\EventsRippleRunningReference` | 0.33 | z | median over epochs of the epoch's median z-scored ripple power while running | `events.brain_state_values` | 3b |
-| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
-| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestNonSwr` | 5 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsAboveRestSwr` | 5 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningNonSwr` | 0 |  | animals whose median non-SWR event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
+| `\EventsSlowGammaAnimalsBelowRunningSwr` | 0 |  | animals whose median SWR-overlapping event slow-gamma power (25-55 Hz) is below the median, over the same events, of each event's own epoch's median running level | `events.gamma_z_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestNonSwr` | 3 |  | animals whose median over epochs of that change (non-SWR events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbAnimalsAboveRestSwr` | 5 |  | animals whose median over epochs of that change (SWR-overlapping events) is above 0 dB | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbMedianNonSwr` | +0.36 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during non-SWR events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
 | `\EventsSlowGammaDbMedianSwr` | +1.6 | dB | median over epochs of the change in slow-gamma power (25-55 Hz) during SWR-overlapping events against the epoch's quiet rest: 10 log10 of the ratio of mean band powers | `events.gamma_db_values` |  |
-| `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.brain_state_values` |  |
-| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.brain_state_values` |  |
-| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.brain_state_values` |  |
+| `\EventsSlowGammaMedianNonSwr` | −0.10 | z | median z-scored slow-gamma power (25-55 Hz) of immobile non-SWR non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsSlowGammaMedianSwr` | 0.36 | z | median z-scored slow-gamma power (25-55 Hz) of immobile SWR-overlapping non-local events (event mean) | `events.gamma_z_values` |  |
+| `\EventsSlowGammaRestReference` | −0.28 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) in quiet rest | `events.gamma_z_values` |  |
+| `\EventsSlowGammaRunningReference` | −0.30 | z | median over epochs of the epoch's median z-scored slow-gamma power (25-55 Hz) while running | `events.gamma_z_values` |  |
 | `\EventsThetaAnimalsAboveRestNonSwr` | 2 |  | animals whose median non-SWR event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
 | `\EventsThetaAnimalsAboveRestSwr` | 2 |  | animals whose median SWR-overlapping event theta power is above the median, over the same events, of each event's own epoch's median quiet-rest level | `events.brain_state_values` |  |
 | `\EventsThetaAnimalsBelowRunningNonSwr` | 5 |  | animals whose median non-SWR event theta power is below the median, over the same events, of each event's own epoch's median running level | `events.brain_state_values` |  |
@@ -706,14 +706,14 @@ Sources:
 | `\EventsNonSwrContentRemotePathFraction` | 41 % |  | share of nonSWR non-local time bins whose content is remote path, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsNonSwrContentRemoteWellFraction` | 45 % |  | share of nonSWR non-local time bins whose content is remote well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsOccupancyEpochs` | 242 |  | epochs in the content-occupancy table | `events.content_occupancy_values` | 2 |
-| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median | `events.property_values` | 3 |
+| `\EventsStartDistanceAnimalsInDirection` | 3 |  | animals whose non-SWR median start distance (track-graph distance from the animal to the event's first decoded position) is lower than their SWR median | `events.start_distance_values` | 3 |
 | `\EventsStartDistanceDifferenceHigh` | +16 | cm | upper bound of that interval | `events.property_interval_values` | 3 |
 | `\EventsStartDistanceDifferenceLow` | −11 | cm | lower bound of the 95 % nested-bootstrap interval of the SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) | `events.property_interval_values` | 3 |
 | `\EventsStartDistanceMatchedDifference` | −13 | cm | SWR minus non-SWR difference of median start distance (track-graph distance from the animal to the event's first decoded position) at matched duration (within ten duration-quantile strata, averaged by stratum size) | `events.property_interval_values` | 3 |
 | `\EventsStartDistanceMatchedDifferenceHigh` | +4.1 | cm | upper bound of its 95 % nested-bootstrap interval | `events.property_interval_values` | 3 |
 | `\EventsStartDistanceMatchedDifferenceLow` | −29 | cm | lower bound of its 95 % nested-bootstrap interval; 0 of 1000 replicates left out a stratum that drew no event of a class, 0 had no estimate | `events.property_interval_values` | 3 |
-| `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.property_values` | 3 |
-| `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.property_values` | 3 |
+| `\EventsStartDistanceMedianNonSwr` | 110 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile non-SWR non-local events | `events.start_distance_values` | 3 |
+| `\EventsStartDistanceMedianSwr` | 120 | cm | median start distance (track-graph distance from the animal to the event's first decoded position) of immobile SWR-overlapping non-local events | `events.start_distance_values` | 3 |
 | `\EventsSwrContentAtWellFraction` | 26 % |  | share of SWR non-local time bins whose content is at well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsSwrContentNearOffFraction` | 0 % |  | share of SWR non-local time bins whose content is near off, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
 | `\EventsSwrContentOwnWellFraction` | 5 % |  | share of SWR non-local time bins whose content is own well, weighted by time bins over sessions | `events.content_occupancy_values` | 2 |
@@ -2677,18 +2677,18 @@ Sources:
 | `\MpfcTimingPopulationSteepestAnimalsNegativeSwrReplayEnhanced` | 2 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSteepestAnimalsNegativeSwrReplaySuppressed` | 4 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSteepestAnimalsNegativeSwrSuppressed` | 5 |  | of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplayEnhanced` | 59 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplaySuppressed` | 1 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrEnhanced` | 37 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrReplayEnhanced` | 29 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrReplaySuppressed` | 9 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiHighSwrSuppressed` | −3 | ms | 97.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplayEnhanced` | −63 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplaySuppressed` | −33 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrEnhanced` | −17 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrReplayEnhanced` | −23 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrReplaySuppressed` | −27 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
-| `\MpfcTimingPopulationSteepestMsCiLowSwrSuppressed` | −19 | ms | 2.5th percentile of that over 1,000 recording-day resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplayEnhanced` | 59 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighNonSwrReplaySuppressed` | 1 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrEnhanced` | 37 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrReplayEnhanced` | 29 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrReplaySuppressed` | 9 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiHighSwrSuppressed` | −3 | ms | 97.5th percentile of that over the same resamples | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplayEnhanced` | −63 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowNonSwrReplaySuppressed` | −33 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrEnhanced` | −17 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrReplayEnhanced` | −23 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrReplaySuppressed` | −27 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
+| `\MpfcTimingPopulationSteepestMsCiLowSwrSuppressed` | −19 | ms | 2.5th percentile of that over 1,000 recording-day resamples (seed 0) | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSteepestMsNonSwrReplayEnhanced` | −29 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSteepestMsNonSwrReplaySuppressed` | −21 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease | `mpfc.timing_values` |  |
 | `\MpfcTimingPopulationSteepestMsSwrEnhanced` | 13 | ms | lag of the steepest approach to the peak of the sign-aligned mean curve of units called for SWR (raw p < 0.05) whose peak is an increase | `mpfc.timing_values` |  |
