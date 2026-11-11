@@ -5,8 +5,10 @@ Part 4 reads its unit population through Figure 4's loader
 with a 1 Hz gate on ``immobility_avg_firing_rate``, the rate over the bins the
 unit GLM was fit on. The bundles themselves hold every curated mPFC unit with at
 least one spike in the epoch: nothing is gated at fit time. So the gate can be
-moved without a refit. This script reloads the population at several gates and
-recomputes Part 4's per-unit values with Part 4's own functions
+moved without a refit. This script loads the population once, keeps the units at
+or above each gate
+(:func:`~continuum_swr_replay.analysis.pfc.population_statistics.units_at_or_above_rate`)
+and recomputes Part 4's per-unit values with Part 4's own functions
 (:func:`~continuum_swr_replay.reported.mpfc.called_fraction_values`,
 :func:`~continuum_swr_replay.reported.mpfc.overlap_and_effect_values`,
 :func:`~continuum_swr_replay.reported.mpfc.swr_without_replay_values`). It
@@ -39,16 +41,19 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
+from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_FIT_COLUMN,
     load_population_data,
-    significant_fraction,
 )
+from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc import (
     ALPHA,
+    MIN_FIRING_RATE_HZ,
     STEM,
     SWR_WITHOUT_REPLAY_CURVES,
+    SWR_WITHOUT_REPLAY_MIN_EVENTS,
     called_fraction_values,
     default_inputs,
     overlap_and_effect_values,
@@ -179,9 +184,18 @@ def funnel(raw: pd.DataFrame, gate: float, n_kept: int) -> dict[str, float]:
 
 
 def band_rows(
-    population: pd.DataFrame, extended: pd.DataFrame, spikes: pd.Series
+    population: pd.DataFrame,
+    extended: pd.DataFrame,
+    spikes: pd.Series,
+    sessions: pd.DataFrame,
 ) -> list[dict[str, object]]:
     """Called fractions and spike counts per firing-rate band.
+
+    The fractions are those of
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`
+    and, for SWRs without replay, of
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.swr_without_replay_unit_statistics`
+    over every session, on the band's units.
 
     Parameters
     ----------
@@ -191,6 +205,9 @@ def band_rows(
         Extended-event-set population at the lowest gate (same units).
     spikes : pandas.Series
         Spikes on the fitted bins per unit of ``population``, same order.
+    sessions : pandas.DataFrame
+        One row per session of the extended event set: ``nwb_file_name``,
+        ``epoch_name`` and ``n_swr_no_non_local``.
 
     Returns
     -------
@@ -208,21 +225,22 @@ def band_rows(
             "spikes_fit_median": float(spikes[keep].median()),
             "spikes_fit_min": float(spikes[keep].min()),
         }
-        for name, (n_called, n_tested) in significant_fraction(
-            population[keep], alpha=ALPHA
-        ).items():
-            values[f"{name}_units_tested"] = n_tested
-            values[f"{name}_called_fraction"] = (
-                n_called / n_tested if n_tested else np.nan
-            )
-        p = extended.loc[
-            (ext_rate >= low) & (ext_rate < high), "SWR_no_non_local: p_heldout"
-        ].to_numpy(dtype=float)
-        tested = np.isfinite(p)
-        values["SWR_no_non_local_units_tested"] = int(tested.sum())
-        values["SWR_no_non_local_called_fraction"] = (
-            float((p[tested] < ALPHA).mean()) if tested.any() else np.nan
-        )
+        for name, fraction in population_statistics.called_fractions(
+            population[keep], ALPHA
+        ).iterrows():
+            values[f"{name}_units_tested"] = fraction["n_tested"]
+            values[f"{name}_called_fraction"] = fraction["fraction"]
+        swr_without_replay = population_statistics.swr_without_replay_unit_statistics(
+            extended[(ext_rate >= low) & (ext_rate < high)],
+            sessions,
+            alpha=ALPHA,
+            min_events=SWR_WITHOUT_REPLAY_MIN_EVENTS,
+            three_class_model=THREE_CLASS_MODEL,
+        ).loc["all"]
+        values["SWR_no_non_local_units_tested"] = swr_without_replay["n_tested"]
+        values["SWR_no_non_local_called_fraction"] = swr_without_replay[
+            "called_fraction"
+        ]
         rows += [
             {"selection": selection, "key": k, "value": v} for k, v in values.items()
         ]
@@ -237,16 +255,32 @@ def main(argv: list[str] | None = None) -> None:
     inputs = default_inputs()
     extended_dir = inputs.swr_without_replay_dir
     extended_sidecars = read_sidecars(extended_dir)
+    sessions = pd.DataFrame(
+        [
+            {
+                "nwb_file_name": s["nwb_file_name"],
+                "epoch_name": s["epoch_name"],
+                "n_swr_no_non_local": int(s.get("n_swr_no_non_local") or 0),
+            }
+            for s in extended_sidecars
+        ]
+    )
     raw = raw_units(inputs.bundle_dir)
+    every_unit, _, lag_time = load_population_data(
+        inputs.bundle_dir, min_firing_rate=MIN_FIRING_RATE_HZ
+    )
+    every_extended_unit, every_extended_curve, _ = load_population_data(
+        extended_dir,
+        min_firing_rate=MIN_FIRING_RATE_HZ,
+        extra_curves=SWR_WITHOUT_REPLAY_CURVES,
+    )
 
     wide: dict[str, dict[str, float]] = {}
     long_rows: list[dict[str, object]] = []
     for label, gate in GATES.items():
-        population, _, lag_time = load_population_data(
-            inputs.bundle_dir, min_firing_rate=gate
-        )
-        extended, extended_curves, _ = load_population_data(
-            extended_dir, min_firing_rate=gate, extra_curves=SWR_WITHOUT_REPLAY_CURVES
+        population, _ = population_statistics.units_at_or_above_rate(every_unit, gate)
+        extended, extended_curves = population_statistics.units_at_or_above_rate(
+            every_extended_unit, gate, every_extended_curve
         )
         if len(extended) != len(population):
             raise ValueError(
@@ -270,7 +304,7 @@ def main(argv: list[str] | None = None) -> None:
         ]
         if label == "none":
             spikes = spikes_on_fitted_bins(population, inputs.bundle_dir)
-            long_rows += band_rows(population, extended, spikes)
+            long_rows += band_rows(population, extended, spikes, sessions)
 
     table = pd.DataFrame(wide).T
     table.index.name = "gate"
