@@ -221,7 +221,11 @@ def event_signal_statistics(
     """Each signal during events, against the same epochs' running and rest levels.
 
     An event's value of a signal is its mean over the event's bins of the
-    epoch's z-scored signal.
+    epoch's z-scored signal. Each event is compared with the reference of the
+    epoch it occurred in: an animal's running (quiet-rest) level is the median,
+    over its events of the class, of each event's own epoch's level, so an
+    epoch counts once for each event in it, and an epoch with no such event
+    does not count.
 
     Parameters
     ----------
@@ -240,13 +244,15 @@ def event_signal_statistics(
     statistics : pd.DataFrame, shape (2 * n_signals, 4)
         Indexed by signal and ``is_swr``:
 
-        - ``median``: the median event value.
-        - ``n_animals_below_running``: animals whose median event value is below
-          the median of their epochs' running levels.
-        - ``n_animals_above_rest``: animals whose median event value is above
-          the median of their epochs' quiet-rest levels.
-        - ``reaches_running_fraction``: the share of events whose value reaches
-          their own epoch's median running level.
+        - ``median``: the median event value, z, over the class's events.
+        - ``n_animals_below_running``: animals, of those with an event of the
+          class, whose median event value is below the median over the same
+          events of each event's own epoch's running level.
+        - ``n_animals_above_rest``: animals, of those with an event of the
+          class, whose median event value is above the median over the same
+          events of each event's own epoch's quiet-rest level.
+        - ``reaches_running_fraction``: the share of the class's events whose
+          value reaches their own epoch's median running level.
 
     Raises
     ------

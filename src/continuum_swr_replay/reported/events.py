@@ -640,16 +640,16 @@ def brain_state_values(
                     stats["n_animals_below_running"],
                     "count",
                     "count",
-                    f"animals whose median {name} event {label} is below their median running "
-                    "level",
+                    f"animals whose median {name} event {label} is below the median, over "
+                    "the same events, of each event's own epoch's median running level",
                 ),
                 make(
                     f"{word}_animals_above_rest_{group}",
                     stats["n_animals_above_rest"],
                     "count",
                     "count",
-                    f"animals whose median {name} event {label} is above their median "
-                    "quiet-rest level",
+                    f"animals whose median {name} event {label} is above the median, over "
+                    "the same events, of each event's own epoch's median quiet-rest level",
                 ),
             ]
             if word == "theta":

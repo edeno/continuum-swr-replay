@@ -93,6 +93,9 @@ def test_boundary_offsets_refuse_an_overlapping_event_without_its_swr():
 
 
 def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Animal a has three events of each class in epoch e1 and one in e2, so the
+    median over its events of the epoch levels (e1's) is not the median of its
+    two epochs' levels (their mean)."""
     reference = pd.DataFrame(
         {
             "animal": ["a", "a", "b"],
@@ -102,16 +105,23 @@ def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
             "theta_rest_median": [-1.0, 0.0, -0.5],
         }
     )
-    events = pd.DataFrame(
-        {
-            "animal": ["a", "a", "a", "b", "b", "b"],
-            "session_date": "d1",
-            "epoch": ["e1", "e2", "e2", "e1", "e1", "e1"],
-            "is_swr": [False, False, True, False, False, True],
-            "theta_z": [1.5, 0.5, np.nan, -1.0, 5.0, 0.0],
-        }
-    )
-    return events, reference
+    rows = [
+        ("a", "e1", False, 1.2),
+        ("a", "e1", False, 1.4),
+        ("a", "e1", False, 0.8),
+        ("a", "e2", False, 1.3),
+        ("b", "e1", False, -1.0),
+        ("b", "e1", False, 5.0),
+        ("b", "e1", False, 0.0),
+        ("a", "e1", True, -0.7),
+        ("a", "e1", True, -0.8),
+        ("a", "e1", True, -0.6),
+        ("a", "e2", True, -0.75),
+        ("b", "e1", True, 0.0),
+        ("b", "e1", True, np.nan),
+    ]
+    events = pd.DataFrame(rows, columns=["animal", "epoch", "is_swr", "theta_z"])
+    return events.assign(session_date="d1"), reference
 
 
 def test_reference_medians_are_medians_over_epochs():
@@ -121,22 +131,31 @@ def test_reference_medians_are_medians_over_epochs():
     assert levels.loc["theta", "rest"] == -0.5
 
 
-def test_event_signal_statistics_compare_each_animal_with_its_own_levels():
+def test_event_signal_statistics_compare_each_event_with_its_own_epoch():
     events, reference = _signal_tables()
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
-    # non-SWR events: a has 1.5 (e1) and 0.5 (e2); b has -1.0 and 5.0 (mean 1.5)
-    assert non_swr["median"] == pytest.approx(1.0)
-    # a: event median 1.0 against running median 1.5; b: 2.0 against 1.0
+    # -1, 0, 0.8, 1.2, 1.3, 1.4, 5: the median is 1.2 (the mean is 1.24)
+    assert non_swr["median"] == pytest.approx(1.2)
+    # a: event median 1.25 against the running levels 1, 1, 1, 2 of its events'
+    # epochs, median 1.0: not below (it is below 1.5, the median of a's two
+    # epochs). b: 0.0 against 1.0: below.
     assert non_swr["n_animals_below_running"] == 1
-    # a: 1.0 against rest median -0.5; b: 2.0 against -0.5
+    # a: 1.25 against rest -1.0; b: 0.0 against -0.5
     assert non_swr["n_animals_above_rest"] == 2
-    # 1.5 >= 1 (yes), 0.5 >= 2 (no), -1 >= 1 (no), 5 >= 1 (yes)
-    assert non_swr["reaches_running_fraction"] == pytest.approx(0.5)
-    # the SWR event with no theta value is left out: only b's 0.0 remains
+    # 1.2, 1.4 and 5.0 reach their epoch's 1.0; 0.8, -1.0 and 0.0 do not, and
+    # 1.3 does not reach e2's 2.0
+    assert non_swr["reaches_running_fraction"] == pytest.approx(3 / 7)
+    # the SWR event with no theta value is left out
     swr = result.loc[("theta", True)]
-    assert swr["median"] == 0.0
-    assert swr["n_animals_below_running"] == 1
+    # -0.8, -0.75, -0.7, -0.6, 0.0
+    assert swr["median"] == pytest.approx(-0.7)
+    assert swr["n_animals_below_running"] == 2
+    # a: event median -0.725 against the rest levels -1, -1, -1, 0 of its events'
+    # epochs, median -1.0: above (it is not above -0.5, the median of a's two
+    # epochs). b: 0.0 against -0.5: above.
+    assert swr["n_animals_above_rest"] == 2
+    assert swr["reaches_running_fraction"] == 0.0
 
 
 def test_event_signal_statistics_refuse_an_epoch_without_a_reference():
