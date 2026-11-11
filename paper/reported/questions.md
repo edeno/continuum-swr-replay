@@ -218,7 +218,7 @@ Status: no numbers; example events, one per overlap class. Figures: 2a. Values: 
 
 Status: computed. Figures: 2, 2b. Values: 31.
 
-*Note:* The claims table reads these as the events SWR-triggered detection misses; that reading belongs in the Results.
+*Note:* The retired claims table (in git history) read these as the events SWR-triggered detection misses; that reading belongs in the Results.
 
 Sources:
 
@@ -413,7 +413,7 @@ Sources:
 
 Status: no numbers; framing (a candidate claim). Values: 0.
 
-*Note:* Wording written by the assistant from the claim; check it.
+*Note:* Wording written by the assistant from the retired claims table; check it.
 
 ### 2b.7. Are non-SWR events something other than sub-threshold SWRs?
 
@@ -1740,7 +1740,7 @@ Sources:
 
 Status: partly computed; an interaction-block refit is pending. Figures: content_estimators, swr_contrast. Values: 136.
 
-*Note:* The claim's "high-value" covers both; the claims table's dropped list calls the CS4 total effect avoidance of recently rewarded arms. Keep the two apart or merge them.
+*Note:* The retired claims table's "high-value" covers both, and its dropped list calls the CS4 total effect avoidance of recently rewarded arms. Keep the two apart or merge them.
 
 Sources:
 

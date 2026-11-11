@@ -21,8 +21,8 @@ builder's selection); they are listed as notes.
 
 Usage::
 
-    uv run python scripts/reported/check_release.py
-    uv run python scripts/reported/check_release.py --code-only
+    uv run --frozen python scripts/reported/check_release.py
+    uv run --frozen python scripts/reported/check_release.py --code-only
 """
 
 from __future__ import annotations

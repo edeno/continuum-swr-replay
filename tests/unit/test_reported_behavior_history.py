@@ -1,4 +1,4 @@
-"""Part 3's duration-aware history and horse-race values, on synthetic inputs."""
+"""The behavior summary's duration-aware history and horse-race values, on synthetic inputs."""
 
 from __future__ import annotations
 

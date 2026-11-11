@@ -52,17 +52,18 @@ Work that is deferred on purpose. Each item says when it should be done.
 - [ ] **Held-out test split by SWR (question 2c.3): confirm which script made it.**
   `events.json`'s 10 `heldout_*` values are read from
   `Processed-Data/_refresh_20261016/state_evidence/nl_bouts_by_swr_stats.csv`.
-  - The Part 2 builder says the tracked
+  - The events builder says the tracked
     `scripts/detection/split_state_evidence_by_swr.py` writes that file. The
     script was added in `e78273b5` (2026-10-30).
   - The claims table says an untracked research script made them and that they
     are pending (`paper/claims_table.md:49`, `:112`, `:119–120` at `c74e56b8`;
     the claims table is retired).
   - On the cluster, read `nl_bouts_by_swr.provenance.json` beside the CSV: its
-    commit and script. Then mark the values pending in
-    `reported/events.py:heldout_by_swr_values`, or correct the claims table.
+    commit and script. If the tracked script did not make it, mark the values
+    pending in `reported/events.py:heldout_by_swr_values`; if it did, say so in
+    question 2c.3's note.
 
-  *When:* at the next session on the cluster, before the Part 2 rebuild.
+  *When:* at the next session on the cluster, before the events summary is rebuilt.
 
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
   removed after `cad31719`; it used an older claim numbering, so "D" is its claim

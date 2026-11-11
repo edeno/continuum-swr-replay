@@ -9,7 +9,7 @@ intersected, so a per-(session, rung) event set is identical across the three
 estimators — a difference between them is a difference of likelihood and never
 of cohort).
 
-Every number below is read from `paper/reported/part3.json` (or `part2.json`)
+Every number below is read from `paper/reported/behavior.json` (or `events.json`)
 through a value marker. A number this document used to type that no summary
 holds was taken out; each removal is listed in
 [`paper/reported/removed_part3.md`](../../paper/reported/removed_part3.md). The
@@ -45,7 +45,7 @@ axis (identity dashed, colour = animal). `log_phi_by_session.png` plots the DM
 concentration intercept and its `is_swr` shift per session for `C2_base`, with
 the animal-bootstrap band.
 
-Claim 19f of the claims table (`paper/claims_table.md`, retired; in git history) cited the
+Question 3.6 (`src/continuum_swr_replay/reported/questions.py`) is answered by the
 arm-value comparison (§3, §4); the rest of this document is the method record
 behind it.
 

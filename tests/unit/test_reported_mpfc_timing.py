@@ -1,4 +1,4 @@
-"""Part 4's timing values on a synthetic population."""
+"""The mPFC summary's timing values on a synthetic population."""
 
 import numpy as np
 import pandas as pd

@@ -1,4 +1,4 @@
-"""Part 4's SWRs-without-replay values on a synthetic extended population."""
+"""The mPFC summary's SWRs-without-replay values on a synthetic extended population."""
 
 import numpy as np
 import pandas as pd

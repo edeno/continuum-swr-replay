@@ -1,4 +1,4 @@
-"""Part 3's trunk-share and paired current-arm values (claim 19a), on synthetic tables."""
+"""The behavior summary's trunk-share and paired current-arm values (question 3.1), on synthetic tables."""
 
 from __future__ import annotations
 

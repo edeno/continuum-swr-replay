@@ -262,7 +262,7 @@ def questions_view(summaries: Mapping[str, Summary]) -> str:
             "list, or a question whose status says it has no values. A summary built",
             "before the list changed has these until it is rebuilt.",
             "",
-            "| Macro | Value | Unit | What it is | Claims | Used in | Problem |",
+            "| Macro | Value | Unit | What it is | Questions | Used in | Problem |",
             "|---|---|---|---|---|---|---|",
         ]
         order = {name: i for i, name in enumerate(SUMMARIES)}

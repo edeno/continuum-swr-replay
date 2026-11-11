@@ -1,4 +1,4 @@
-"""Part 4's marked-family values from a synthetic summary table."""
+"""The mPFC summary's marked-family values from a synthetic summary table."""
 
 import pandas as pd
 

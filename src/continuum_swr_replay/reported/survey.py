@@ -324,7 +324,7 @@ def summarize(inputs: SurveyInputs, produced_by: str, commit: str) -> Summary:
     Returns
     -------
     summary : Summary
-        Every part-0 value, with the survey's path and checksum as its input.
+        Every survey value, with the survey's path and checksum as its input.
     """
     summary = Summary(name="survey", produced_by=produced_by, commit=commit)
     source = "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)"

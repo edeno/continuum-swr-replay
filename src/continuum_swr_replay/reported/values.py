@@ -1,4 +1,4 @@
-"""The reported-value record and the summary file that holds one part's values."""
+"""The reported-value record and the summary file that holds one builder's values."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ class Value:
     Attributes
     ----------
     key : str
-        Lower-case words joined by underscores, unique within the part. No
+        Lower-case words joined by underscores, unique within the summary. No
         digits: the key becomes a LaTeX macro name.
     value : float or int
         At full precision. Never NaN or infinite.

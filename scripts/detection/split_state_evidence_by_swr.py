@@ -16,7 +16,7 @@ Reads every epoch of the run whose ``per_epoch/{epoch}_validation.json`` is
 ``ok``. Writes, beside the run:
 
 - ``nl_bouts_by_swr.parquet``: the labelled windows;
-- ``nl_bouts_by_swr_stats.csv``: the statistics (Part 2 reads it, claim 7);
+- ``nl_bouts_by_swr_stats.csv``: the statistics (the events summary reads it, question 2c.3);
 - ``nl_bouts_by_swr.provenance.json``: the commit, the SWR source and the epochs.
 
 Usage::

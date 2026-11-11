@@ -399,7 +399,7 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
-# --- 3a: rate, per time bin (Family B) ----------------------------------------
+# --- rate, per time bin (Family B) --------------------------------------------
 
 
 def _rung(fits: pd.DataFrame, model: str, outcome: str) -> pd.DataFrame:
@@ -1866,7 +1866,7 @@ def _population_ranges(values: list[Value], make: Callable[..., Value]) -> list[
     return ranges
 
 
-# --- 3a: rate, per stop (Family A) -------------------------------------------
+# --- rate, per stop (Family A) -----------------------------------------------
 
 
 def rate_contrast_separation_values(fits: pd.DataFrame, source: str) -> list[Value]:
@@ -2115,7 +2115,7 @@ def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-# --- 3b: content ---------------------------------------------------------------
+# --- content -------------------------------------------------------------------
 
 
 #: The tags of each content key word, by its leading words.
@@ -2512,7 +2512,7 @@ def leaf_values(leaf_dir: Path, source: str) -> list[Value]:
     return values
 
 
-# --- 3c: choice and stay/leave ----------------------------------------------------
+# --- choice and stay/leave --------------------------------------------------------
 
 
 def choice_values(fits: dict, source: str) -> list[Value]:
@@ -2755,7 +2755,7 @@ def power_values(coefs: pd.DataFrame, source: str) -> list[Value]:
 # --- the summary -------------------------------------------------------------------
 
 
-# --- 3a: event history on the duration-aware design ---------------------------
+# --- event history on the duration-aware design -------------------------------
 
 #: A pooled kernel's lag is read when it has this many expected onsets ...
 HISTORY_MIN_SUPPORT = 3.0
@@ -3074,7 +3074,7 @@ def duration_aware_history_values(
     return values
 
 
-# --- 3b: the within-arm horse race --------------------------------------------
+# --- the within-arm horse race ------------------------------------------------
 
 #: Horse-race predictors: key word -> (summary column, label).
 HORSERACE_PREDICTORS = {

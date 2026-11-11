@@ -59,6 +59,7 @@ partial rebuild mis-joins silently
 
 Each summary records the commit that built it and the SHA-256 of every file it
 read (its `inputs` list), so a reported number can be traced to the files it
-came from: under the root for parts 1–4, in the repository for part 0. The
-trace is not yet exact: some summaries record absolute paths or were built at a
-`-dirty` commit (see "Summary provenance" in `TODO.md`).
+came from: under the root for the lab-data summaries, in the repository for the
+survey summary. The trace is not yet exact: some summaries record absolute paths,
+and four were migrated rather than rebuilt (see "Summary input paths" and
+"Rebuild the four migrated summaries" in `TODO.md`).

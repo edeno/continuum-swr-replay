@@ -226,7 +226,7 @@ QUESTIONS: tuple[Question, ...] = (
         "2b.2",
         "How many immobile non-local events overlap no SWR, and what fraction of them is that?",
         figures=("2", "2b"),
-        note="The claims table reads these as the events SWR-triggered detection misses; that reading belongs in the Results.",
+        note="The retired claims table (in git history) read these as the events SWR-triggered detection misses; that reading belongs in the Results.",
     ),
     Question(
         "2b.3",
@@ -248,7 +248,7 @@ QUESTIONS: tuple[Question, ...] = (
         "Does the detector target the represented content rather than an LFP proxy?",
         status="no numbers",
         reason="framing (a candidate claim)",
-        note="Wording written by the assistant from the claim; check it.",
+        note="Wording written by the assistant from the retired claims table; check it.",
     ),
     Question(
         "2c.1",
@@ -345,7 +345,7 @@ QUESTIONS: tuple[Question, ...] = (
         status="partly computed",
         reason="an interaction-block refit is pending",
         figures=("content_estimators", "swr_contrast"),
-        note="The claim's \"high-value\" covers both; the claims table's dropped list calls the CS4 total effect avoidance of recently rewarded arms. Keep the two apart or merge them.",
+        note='The retired claims table\'s "high-value" covers both, and its dropped list calls the CS4 total effect avoidance of recently rewarded arms. Keep the two apart or merge them.',
     ),
     Question(
         "3.7",

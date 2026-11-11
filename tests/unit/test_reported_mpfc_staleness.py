@@ -1,4 +1,4 @@
-"""Part 4: values read from fits made on other inputs than the current ones are
+"""The mPFC summary: values read from fits made on other inputs than the current ones are
 pending, and a fit that does not cover the PFC cohort is refused."""
 
 from __future__ import annotations

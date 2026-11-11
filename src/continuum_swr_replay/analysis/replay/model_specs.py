@@ -1596,7 +1596,7 @@ SWR_CONTRAST_CONTENT_ARM_LADDER: dict[str, tuple[list[str], str]] = {
     # value effect net of previous-goal. The rung is REFUSED as unidentified
     # (most fitted sessions are flagged separated); it is kept so the refusal is
     # reproducible, not because its coefficient is citable. Fitted values are
-    # reported values (question 19f, paper/reported/behavior.json) — do not duplicate
+    # reported values (question 3.6, paper/reported/behavior.json) — do not duplicate
     # them here.
     "CS5b_valuevsprevgoal": (
         [

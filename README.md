@@ -51,7 +51,7 @@ what each step needs, and gives the full rebuild from the recordings to the PDF.
 | Guide | Purpose |
 | --- | --- |
 | [Reproduction](docs/reproduce.md) | Requirements, the full rebuild in order, and what is committed |
-| [Figure pipeline](docs/figure-pipeline.md) | Each figure's claims, script, inputs, and tests |
+| [Figure pipeline](docs/figure-pipeline.md) | Each figure's script, inputs, and tests |
 | [Data lineage](docs/data-lineage.md) | Where each stage reads and writes, from the NWB files to the summaries |
 | [Questions and numbers](paper/reported/questions.md) | Every question of the paper, by part, with the values that answer it |
 | [Development](docs/development.md) | Setup, code layout, and the project's analysis conventions |

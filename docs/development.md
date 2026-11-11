@@ -409,10 +409,10 @@ introduction quotes, computed from the replay-study survey of Supplementary Tabl
 
 Which question each value answers, and which figure shows it, is written once, in the question list
 (`src/continuum_swr_replay/reported/questions.py`). It organizes the writing by part: a question need
-not have a figure. A question's id is its place in the outline (`2d.2`: section 2d, its second question),
-and it keeps the claim number it had before (`claim`), so older notes still trace. A builder that writes a value whose question or figure tag the list does not know
-fails; a summary written before the list changed is still emitted, and its mis-tagged values are listed
-in `paper/reported/questions.md` until it is rebuilt. `make reported-values` writes that file: every
+not have a figure. A question's id is its place in the outline (`2d.2`: section 2d, its second question).
+Each builder declares its values' tags in one table (`TAGS`), and a summary whose values name a question
+or figure the list does not know is not written; a summary written before the list changed is still
+emitted, and its mis-tagged values are listed in `paper/reported/questions.md` until it is rebuilt. `make reported-values` writes that file: every
 question in the paper's outline, with the values that answer it, their macros, and the values by figure.
 
 - When stating a result number — in a doc, a caption or a chat reply — read it from a summary file and

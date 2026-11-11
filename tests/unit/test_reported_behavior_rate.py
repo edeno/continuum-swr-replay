@@ -1,4 +1,4 @@
-"""Part 3's per-bin rate values: the reward gate, the lag-1 kernel and the
+"""The behavior summary's per-bin rate values: the reward gate, the lag-1 kernel and the
 corrected history peak, on synthetic fits."""
 
 import numpy as np

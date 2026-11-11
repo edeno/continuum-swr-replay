@@ -1,4 +1,4 @@
-"""Part 2: values read from an output made from another event table are pending,
+"""The events summary: values read from an output made from another event table are pending,
 and nothing is dropped silently from the values behind a quoted number."""
 
 from __future__ import annotations

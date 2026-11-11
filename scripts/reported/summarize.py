@@ -1,16 +1,15 @@
 """Write one summary file, paper/reported/<name>.json, from outputs the analyses already wrote.
 
 Every number the project reports is a value in one of these files
-(``continuum_swr_replay.reported``; design
-``docs/design/2026-10-26-reported-values-design.md``). This reads the
-analyses' outputs and refits nothing. Afterwards run
+(``continuum_swr_replay.reported``). This reads the analyses' outputs and refits
+nothing. Afterwards run
 ``scripts/reported/emit_reported_values.py`` to write the values into the
 LaTeX macros and the docs.
 
 Usage::
 
-    uv run python scripts/reported/summarize.py --summary events
-    uv run python scripts/reported/summarize.py --summary survey --output-dir /tmp/check
+    uv run --frozen python scripts/reported/summarize.py --summary events
+    uv run --frozen python scripts/reported/summarize.py --summary survey --output-dir /tmp/check
 
 The summary records the code that built it (``reported/code_record.py``): every
 package module loaded during the build (the summary's builder and this script's own

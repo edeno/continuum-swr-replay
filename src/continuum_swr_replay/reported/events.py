@@ -244,7 +244,7 @@ def _manifest(folder: Path) -> dict:
     return json.loads((folder / "manifest.json").read_text())
 
 
-# --- 2a: how common the events are, and how they sit against SWRs ------------
+# --- how common the events are, and how they sit against SWRs ----------------
 
 
 def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
@@ -546,7 +546,7 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-# --- 2a: what an analysis without the non-local detector leaves out -------------
+# --- what an analysis without the non-local detector leaves out -----------------
 
 #: The other inventories an SWR- or rate-triggered analysis would use.
 SWR_DEFINITIONS = ("kay", "karlsson", "yu", "zugaro", "carey")
@@ -740,7 +740,7 @@ def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]
     return values
 
 
-# --- 2b: theta, ripple and MUA during events --------------------------------------
+# --- theta, ripple and MUA during events ------------------------------------------
 
 _SIGNAL_EVENT_COLUMNS = {
     "theta": "theta_z",
@@ -894,7 +894,7 @@ def gamma_db_values(reference: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-# --- 2b: spike support ------------------------------------------------------
+# --- spike support ----------------------------------------------------------
 
 _REALITY_GROUPS = {
     "swr_remote": "SWR-remote",
@@ -1112,7 +1112,7 @@ def heldout_by_swr_values(stats: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-# --- 2b: one class or two -------------------------------------------------------
+# --- one class or two -----------------------------------------------------------
 
 #: The properties of the step test (``measure_ripple_class_structure.PROPERTIES``)
 #: other than spike evidence, by their word in ``step_fits.csv``.
@@ -1241,7 +1241,7 @@ def class_step_values(steps: pd.DataFrame, source: str) -> list[Value]:
     ]
 
 
-# --- 2c: properties -----------------------------------------------------------
+# --- properties ---------------------------------------------------------------
 
 #: (word, column, scale, unit, style, the expected direction for non-SWR against
 #: SWR, tags)
@@ -1535,7 +1535,7 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
     return values
 
 
-# --- 2c: where content sits ---------------------------------------------------
+# --- where content sits -------------------------------------------------------
 
 
 def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value]:

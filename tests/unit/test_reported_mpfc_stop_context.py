@@ -1,4 +1,4 @@
-"""Part 4's stop-context values from a synthetic results table."""
+"""The mPFC summary's stop-context values from a synthetic results table."""
 
 import itertools
 

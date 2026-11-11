@@ -30,7 +30,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
   `src/continuum_swr_replay/reported/questions.py` and the summaries).
 - [reproduce.md](reproduce.md) — *how to run*: what each level of rebuild needs, the full
   rebuild in order (from the cohort to the PDF), the decoders, and what is committed.
-- [figure-pipeline.md](figure-pipeline.md) — *figures*: each figure's claims, script, inputs,
+- [figure-pipeline.md](figure-pipeline.md) — *figures*: each figure's script, inputs,
   output and tests.
 - [data-lineage.md](data-lineage.md) — *data*: where each stage reads and writes, from the NWB
   files to the summaries.
@@ -102,7 +102,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     with its effect and blind checks, why the reference veto and the field's noise-channel
     form are not used, the visit-onset numbers, and the limits.
   - [design/2026-11-10-questions-and-numbers-design.md](design/2026-11-10-questions-and-numbers-design.md)
-    — draft: one question list with each question's numbers, generated from the
+    — one question list with each question's numbers, generated from the
     summaries; interpretation moved into the manuscript's Results; the documents it
     retires and where each section goes; the inventory's findings and the lead's
     decisions.
@@ -113,7 +113,7 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     — the retired count multinomial vs the shipped per-event fractions vs a
     Dirichlet-multinomial, on one 218-session cohort: what each assumes,
     simulation recovery, which conclusions are estimator-dependent, and the
-    `log_phi_is_swr` concentration result. Not yet reflected in the claims table.
+    `log_phi_is_swr` concentration result. Its values answer questions 3.1, 3.6 and 3.7.
   - [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md)
     — the content-marked mPFC replay kernels: the `current_arm_fraction` mark
     and its within-session/class scaling, the jointly fit ordinary + duration +
@@ -387,7 +387,7 @@ Three tiers:
    | artifact | producer | holds |
    |---|---|---|
    | `Processed-Data/{epoch_identifier}_mPFC_modulation.pkl` + five `*_modulation.npy` | `scripts/pfc/run_pfc_analysis_bandit.py` | per-unit penalised-GLM statistics — held-out deviance and separated-column count per model, each nested pair's held-out difference (total and per fold), an empirical p-value per event class and for the engagement comparison, the best model by held-out deviance, and per curve the penalised and unpenalised peak with that peak's own standard error — plus the five peri-event modulation time courses (`SWR`, `no_SWR`, `non_local_SWR`, `non_local_no_SWR`, and `matched_control`, the duration-matched non-event baseline). All five are read into the Figure 4 population by `analysis/pfc/load_population.py`; the first four are NaN-free by its drop rule, while the matched-control curve may carry NaN and is reduced with `nanmean` |
-   | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/run_stay_leave.py` | the per-stop replay summary and the stay/leave models (claim 19e) |
+   | `replay_content/stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/run_stay_leave.py` | the per-stop replay summary and the stay/leave models (question 3.5) |
    | `replay_content/stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/behavior/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
    | `pfc_marked_kernels/{epoch_identifier}_{mark}_marked_kernels.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.mark_slope.npy`, `.mark_label_shuffle_reference.npz`, `.provenance.json` | `scripts/pfc/run_pfc_marked_kernels.py` | the content-marked kernels of [design/pfc_marked_event_kernels.md](design/pfc_marked_event_kernels.md). One bundle per session × mark (`current_arm_fraction`, or `current_arm_fraction_posterior` as a sensitivity): the pickle holds the per-neuron statistics (held-out deviance of the joint full model and of each class's reduced model, the class's held-out improvement, the label-shuffle tail fraction and usable-shuffle count, convergence flags); the `.npy` companions hold the reported lag axis and, per replay class (`non_local_SWR`, `non_local_no_SWR`), the typical-event kernel and the content mark-slope kernel; the `.npz` holds that class's shuffled held-out improvements; the sidecar the provenance. **No bundle exists on disk** |
    | `pfc_marked_model_family/{epoch_identifier}_{model}_marked_family.pkl` + `.lag_time.npy`, `.{class}.typical.npy`, `.{class}.{target}.slope.npy`, `.provenance.json` | `scripts/pfc/run_pfc_marked_model_family.py` | the no-p-value descriptive family in [design/pfc_marked_model_family.md](design/pfc_marked_model_family.md): one bundle per session × eligible model, with all recorded units, target-specific blocked-held-out deviance changes, typical-event and one-SD target kernels, exact mark scales/ranks/device/timing in provenance, and sidecar-only markers for ineligible or no-unit sessions. The bundles on disk are the **2026-09-19 corpus batch** (71 sessions × 12 models, 816 bundles + 36 ineligible markers, git 4d69b83, base σ 3 / mark σ 0.5), fit before the analysed-time rule and the current cohort: [2026-09-19-pfc-marked-family-corpus.md](../.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md), population summary (unit → session → animal, `scripts/pfc/summarize_pfc_marked_family.py`, figures under `paper/figures/pfc_marked_family/`) in [2026-09-19-pfc-marked-family-summary.md](../.claude/docs/reviews/2026-09-19-pfc-marked-family-summary.md); the prior choice and why a family `typical` curve is not the Figure 4 kernel are in [2026-09-18-pfc-marked-family-smoke.md](../.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md) |
@@ -458,7 +458,7 @@ Three tiers:
    shipped control they are entered beside on a median <!--v:mpfc.engagement_null_overlap_median-->11 %<!--/v--> of their windows, <!--v:mpfc.class_called_flat_fraction_min@pctnum-->4<!--/v-->–<!--v:mpfc.class_called_flat_fraction_max-->8 %<!--/v--> of
    the units called at raw p < .05 for an event class have no positive held-out improvement of their own,
    and <!--v:mpfc.unmatchable_percent_class_min-->0.27<!--/v-->–<!--v:mpfc.unmatchable_percent_class_max-->0.60<!--/v-->% of a class's events have no legal within-bout control and enter neither
-   side of its test. Figure 4 is regenerated from these bundles; claim 20's numbers are read from
+   side of its test. Figure 4 is regenerated from these bundles; question 4.1's numbers are read from
    `paper/reported/mpfc.json`. A one-session sensitivity pair at σ = 2 and σ = 4.5
    (`j1620210710_02_r1`) was fit beside the first batch under `_sigma2` / `_sigma4p5`; it was
    not refit on the R11 re-decode and is no longer in `Processed-Data/`.

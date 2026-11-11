@@ -2,7 +2,7 @@
 
 Each value names the questions it answers (``questions``) and the figures that show
 it (``used_in``); the question list (``reported/questions.py``) is the one place
-those are defined. These tests check the list itself, the tags the part builders
+those are defined. These tests check the list itself, the tags the builders
 write (read from their source, so no lab data is needed), the tags of the
 committed summaries, and the generated view.
 """
@@ -315,5 +315,7 @@ def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tag
 
 def test_a_question_with_no_figure_shows_no_figures_line():
     view = emit.questions_view({})
-    question_17 = view.split("### 2d.5. ")[1].split("\n\n")[1]
-    assert question_17.startswith("Status: computed.") and "Figures" not in question_17
+    question_2d_5 = view.split("### 2d.5. ")[1].split("\n\n")[1]
+    assert (
+        question_2d_5.startswith("Status: computed.") and "Figures" not in question_2d_5
+    )

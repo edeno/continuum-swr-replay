@@ -32,7 +32,7 @@ Do not type a result number into `main.tex`. Use the macro that
 `reported_values.tex` defines for it, for example
 `\DetectionSweepReplays{}`; [reported/questions.md](reported/questions.md)
 lists every value under the question it answers, with its macro (or, until its
-summary is rebuilt, among the values with tag problems). The macro for summary key `part1.sweep_replays` is
+summary is rebuilt, among the values with tag problems). The macro for summary key `detection.sweep_replays` is
 the summary's name capitalized (`Detection`) followed by the key in CamelCase.
 
 When a summary changes, regenerate the macros, then rebuild:

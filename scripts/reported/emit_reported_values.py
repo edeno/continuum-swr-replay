@@ -23,7 +23,7 @@ is the check that fails, at a milestone.
 
 Usage::
 
-    uv run python scripts/reported/emit_reported_values.py
+    uv run --frozen python scripts/reported/emit_reported_values.py
 """
 
 from __future__ import annotations

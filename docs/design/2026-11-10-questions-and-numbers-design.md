@@ -20,9 +20,10 @@ its place, as `[part2.key]`.
 
 Where the build departs from the design below, after two independent reviews:
 
-- **The question list** (`reported/questions.py`): each `Question` has `id`,
-  `part` (an integer) with a separate `section` (the outline's sub-question), `text`,
-  `status`, `reason`, `figures` and `note`. A question need not have a figure: the
+- **The question list** (`reported/questions.py`): the outline is one table of
+  sections (`Section(code, part, title)`); each `Question` has `id`, `text`,
+  `status`, `reason`, `figures` and `note`, and its section is read from its id
+  (`2d.2` is in section 2d). A question need not have a figure: the
   list organizes the writing by part. A figure tag names the figure the paper
   places a value in, which may be one whose panels are not designed yet
   (unlettered, `figure: 2`). `ANSWERED` holds the statuses that have values.
@@ -37,10 +38,9 @@ Where the build departs from the design below, after two independent reviews:
   "Values by figure". Its test checks that each figure's script is named there.
 - **`questions.md`**: grouped by part and section; a summary table at the top
   (build commit, code record, values, tag problems); per question its status,
-  figures (only when it has some), value count, note, sources and values; a value
-  from a summary with no code record is marked *(tags not yet rebuilt)*; a section
+  figures (only when it has some), value count, note, sources and values; a section
   of values with tag problems; the values by figure. No live staleness.
-- **The code record** (schema 3, `reported/code_record.py`): per file two digests
+- **The code record** (`reported/code_record.py`, part of summary schema 5): per file two digests
   (bytes; docstring-stripped syntax tree, compared only under the same Python);
   the files are the package modules loaded during the build, the building script
   and the package's data files; the commit, `uv.lock`'s digest, an applicable diff
@@ -53,13 +53,13 @@ Where the build departs from the design below, after two independent reviews:
   Input file sets are only noted (their records name a label, not the builder's
   selection; `TODO.md`). `--code-only` skips the inputs. There is no release
   workflow; it is run by hand at a milestone.
-- **The emitter** reads exactly `part0`–`part4`, and does everything that can fail
+- **The emitter** reads exactly the five summaries, and does everything that can fail
   (rendering, staleness, filling every doc in memory) before it writes any file.
-- **Tests:** the builders' tags are checked statically in pairs, and the halves
-  the scan cannot resolve must equal a listed set; the committed summaries'
-  expected tag problems and status mismatches are pinned exactly
-  (`EXPECTED_TAG_PROBLEMS`, `EXPECTED_STATUS_MISMATCHES`), not xfailed; the
-  scripts' `main()` paths are tested, Part 0's build in a subprocess.
+- **Tests:** each builder's `TAGS` table is checked against the question list;
+  each builder uses every entry of its table and names a question id or figure
+  tag nowhere else; the committed summaries match the question list exactly, and
+  a question has values exactly when its status says so; the scripts' `main()`
+  paths are tested, the survey build in a subprocess.
 
 ## As built: naming (2026-11-11)
 
@@ -67,13 +67,17 @@ Where the build departs from the design below, after two independent reviews:
   `behavior`, `mpfc` (`paper/reported/<name>.json`, builders `reported/<name>.py`,
   macros `\<Summary><Key>`, markers `<!--v:<summary>.key-->`). The old part
   numbering broke when the outline moved "it works" from Part 1 to Part 2.
-- **Question ids follow the outline** (`2d.2`); each keeps its claim number in
-  `claim`. Values name their `questions`, not `claims` (schema 5).
+- **Question ids follow the outline** (`2d.2`). Values name their `questions`,
+  not `claims` (schema 5). The claim numbers were then dropped; the question list
+  at `d833fa8b`, the last commit before that, gives each question's old claim
+  number (`claim`). The ids have moved since (merged questions, and question 1.1).
 - **The four summaries that need the cluster were migrated, not rebuilt**
-  (a one-time script, `migrate_summaries.py`, in git at `d833fa8b`): renamed, and their tags mapped to the
-  question list's decisions, every number unchanged (checked against the files
-  before the change). Each records the migration and has no code record until
-  rebuilt. The pinned mismatch sets and the "tags not yet rebuilt" marks are gone:
+  (a one-time script, `migrate_summaries.py`; each step's commit is named in the
+  summary's `migrated` record): renamed, and their tags mapped to the question
+  list's decisions, every number unchanged (checked against the files before the
+  change). The last step moved the simulated comparison with the Widloski & Foster
+  detector to Part 1 (question 1.1) and kept the real-epoch pilot in Part 2
+  (2a.3). Each records the migration and has no code record until rebuilt. The pinned mismatch sets and the "tags not yet rebuilt" marks are gone:
   the committed summaries now match the question list exactly.
 
 ## The problem

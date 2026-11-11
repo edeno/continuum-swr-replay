@@ -1,4 +1,4 @@
-"""Part 4's 1 Hz check: the main values count every unit, the check only units
+"""The mPFC summary's 1 Hz check: the main values count every unit, the check only units
 at or above 1 Hz."""
 
 import numpy as np

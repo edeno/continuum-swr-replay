@@ -2,7 +2,7 @@
 the summary's inputs still match.
 
 A summary records, when it is built, the files the build depended on: every
-package module loaded during the build (the part's builder and the building
+package module loaded during the build (the summary's builder and the building
 script's own imports), the script itself, and every non-Python file under the
 package directory (today only ``data_loaders/epoch_register.csv``, the analysed
 cohort), each with two digests. It also records the commit checked out, the digest
