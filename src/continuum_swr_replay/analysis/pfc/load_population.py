@@ -562,8 +562,33 @@ def load_population_data(
     return df, modulations, lag_time
 
 
+def tested_and_called(pvalue: pd.Series, alpha: float) -> tuple[np.ndarray, np.ndarray]:
+    """Which units are tested for one test, and which are called.
+
+    Parameters
+    ----------
+    pvalue : pandas.Series, shape (n_units,)
+        Each unit's empirical p-value for the test (a column of
+        :data:`HELDOUT_P_COLUMNS`, or another test's).
+    alpha : float
+        Raw empirical-p threshold.
+
+    Returns
+    -------
+    tested, called : numpy.ndarray of bool, each shape (n_units,)
+        ``tested``: the p-value is finite (a unit is untested for a class its
+        session had no events of, and must not be counted as a negative);
+        ``called``: the p-value is below ``alpha``, which an untested unit's is
+        not.
+    """
+    values = pvalue.to_numpy(dtype=float)
+    return np.isfinite(values), values < alpha
+
+
 def significant_fraction(
-    df: pd.DataFrame, alpha: float = 0.05
+    df: pd.DataFrame,
+    alpha: float = 0.05,
+    columns: dict[str, str] = HELDOUT_P_COLUMNS,
 ) -> dict[str, tuple[int, int]]:
     """Descriptive raw-p fraction per class and engagement.
 
@@ -574,21 +599,17 @@ def significant_fraction(
     alpha : float
         Raw empirical-p threshold. This is a preview, not population
         inference; neurons are not independent replicates.
+    columns : dict of str to str
+        The p-value column of each test, by name.
 
     Returns
     -------
     dict[str, tuple[int, int]]
-        ``(n_below_alpha, n_tested)`` per key of :data:`HELDOUT_P_COLUMNS`.
-        ``n_tested`` counts the units with a finite p: a unit is untested for a
-        class its session had no events of, and must not be counted as a
-        negative.
+        ``(n_below_alpha, n_tested)`` per key of ``columns``
+        (:func:`tested_and_called`).
     """
     fractions: dict[str, tuple[int, int]] = {}
-    for name, column in HELDOUT_P_COLUMNS.items():
-        pvalue = df[column].to_numpy(dtype=float)
-        tested = np.isfinite(pvalue)
-        fractions[name] = (
-            int((pvalue[tested] < alpha).sum()),
-            int(tested.sum()),
-        )
+    for name, column in columns.items():
+        tested, called = tested_and_called(df[column], alpha)
+        fractions[name] = (int(called.sum()), int(tested.sum()))
     return fractions

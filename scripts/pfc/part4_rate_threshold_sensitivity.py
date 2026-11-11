@@ -46,6 +46,7 @@ from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_FIT_COLUMN,
     load_population_data,
+    significant_fraction,
 )
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc import (
@@ -190,9 +191,10 @@ def band_rows(
 
     The fractions of the five canonical tests are those of
     :func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_fractions`
-    on the band's units. The fraction for SWRs without replay is the band's
-    units with a p-value below ``ALPHA``, as a share of those with a finite
-    one (NaN when there is none).
+    on the band's units. The fraction for SWRs without replay is counted the
+    same way
+    (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`),
+    NaN when no unit of the band is tested.
 
     Parameters
     ----------
@@ -224,14 +226,14 @@ def band_rows(
         ).iterrows():
             values[f"{name}_units_tested"] = fraction["n_tested"]
             values[f"{name}_called_fraction"] = fraction["fraction"]
-        p = extended.loc[
-            (ext_rate >= low) & (ext_rate < high),
-            population_statistics.SWR_WITHOUT_REPLAY_P_COLUMN,
-        ].to_numpy(dtype=float)
-        tested = np.isfinite(p)
-        values["SWR_no_non_local_units_tested"] = int(tested.sum())
+        n_called, n_tested = significant_fraction(
+            extended[(ext_rate >= low) & (ext_rate < high)],
+            ALPHA,
+            population_statistics.SWR_WITHOUT_REPLAY_P_COLUMNS,
+        )[population_statistics.SWR_WITHOUT_REPLAY]
+        values["SWR_no_non_local_units_tested"] = n_tested
         values["SWR_no_non_local_called_fraction"] = (
-            float((p[tested] < ALPHA).mean()) if tested.any() else np.nan
+            n_called / n_tested if n_tested else np.nan
         )
         rows += [
             {"selection": selection, "key": k, "value": v} for k, v in values.items()

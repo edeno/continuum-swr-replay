@@ -14,7 +14,10 @@ called for SWRs without replay.
 
 A unit is *tested* for an event class when its plus-one empirical p-value
 (:data:`~continuum_swr_replay.analysis.pfc.load_population.HELDOUT_P_COLUMNS`)
-is finite, and *called* when that p-value is below ``alpha``. The fractions of
+is finite, and *called* when that p-value is below ``alpha``
+(:func:`~continuum_swr_replay.analysis.pfc.load_population.tested_and_called`;
+SWRs without replay are tested the same way on
+:data:`SWR_WITHOUT_REPLAY_P_COLUMN`). The fractions of
 units are descriptive, pooled over sessions and animals: they are not
 population inference. A unit's *peak* for a curve is its
 ``<curve>: peak_log_modulation``, the fit's largest log-rate change over the
@@ -35,6 +38,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
     MATCHED_NULL_OBSERVED_COLUMNS,
     significant_fraction,
+    tested_and_called,
 )
 from continuum_swr_replay.analysis.pfc.timing import (
     DIRECTIONS,
@@ -181,12 +185,9 @@ def prior_binding_percent(population: pd.DataFrame, curves: Sequence[str]) -> pd
 #: has (it is not one of ``HELDOUT_P_COLUMNS``).
 SWR_WITHOUT_REPLAY_P_COLUMN = "SWR_no_non_local: p_heldout"
 
-
-def _tested_and_called(pvalue: pd.Series, alpha: float) -> tuple[NDArray, NDArray]:
-    """Which units are tested for one test (a finite p-value) and which are
-    called (a p-value below ``alpha``). Two boolean arrays, shape (n_units,)."""
-    values = pvalue.to_numpy(dtype=float)
-    return np.isfinite(values), values < alpha
+#: That test by its name, as the ``columns`` of :func:`called_fractions`.
+SWR_WITHOUT_REPLAY = "SWR_no_non_local"
+SWR_WITHOUT_REPLAY_P_COLUMNS = {SWR_WITHOUT_REPLAY: SWR_WITHOUT_REPLAY_P_COLUMN}
 
 
 def called_units(population: pd.DataFrame, name: str, alpha: float) -> NDArray:
@@ -208,10 +209,14 @@ def called_units(population: pd.DataFrame, name: str, alpha: float) -> NDArray:
         True where the unit's p-value is below ``alpha``; False for an
         untested unit.
     """
-    return _tested_and_called(population[HELDOUT_P_COLUMNS[name]], alpha)[1]
+    return tested_and_called(population[HELDOUT_P_COLUMNS[name]], alpha)[1]
 
 
-def called_fractions(population: pd.DataFrame, alpha: float) -> pd.DataFrame:
+def called_fractions(
+    population: pd.DataFrame,
+    alpha: float,
+    columns: Mapping[str, str] = HELDOUT_P_COLUMNS,
+) -> pd.DataFrame:
     """The share of tested units called, for every test.
 
     Parameters
@@ -220,14 +225,16 @@ def called_fractions(population: pd.DataFrame, alpha: float) -> pd.DataFrame:
         The unit table.
     alpha : float
         The raw empirical-p threshold.
+    columns : mapping of str to str
+        The p-value column of each test, by name: by default
+        :data:`~continuum_swr_replay.analysis.pfc.load_population.HELDOUT_P_COLUMNS`;
+        :data:`SWR_WITHOUT_REPLAY_P_COLUMNS` for SWRs without replay.
 
     Returns
     -------
     fractions : pd.DataFrame, shape (n_tests, 3)
-        Indexed by the keys of
-        :data:`~continuum_swr_replay.analysis.pfc.load_population.HELDOUT_P_COLUMNS`:
-        ``n_called``, ``n_tested`` and ``fraction``, the called units as a
-        share of the tested ones
+        Indexed by the keys of ``columns``: ``n_called``, ``n_tested`` and
+        ``fraction``, the called units as a share of the tested ones
         (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`).
 
     Raises
@@ -237,7 +244,7 @@ def called_fractions(population: pd.DataFrame, alpha: float) -> pd.DataFrame:
     """
     rows = {}
     for name, (n_called, n_tested) in significant_fraction(
-        population, alpha=alpha
+        population, alpha=alpha, columns=columns
     ).items():
         rows[name] = {
             "n_called": n_called,
@@ -248,7 +255,10 @@ def called_fractions(population: pd.DataFrame, alpha: float) -> pd.DataFrame:
 
 
 def called_fraction_by_animal(
-    population: pd.DataFrame, name: str, alpha: float
+    population: pd.DataFrame,
+    name: str,
+    alpha: float,
+    columns: Mapping[str, str] = HELDOUT_P_COLUMNS,
 ) -> pd.DataFrame:
     """The share of each animal's tested units called for one test.
 
@@ -257,10 +267,12 @@ def called_fraction_by_animal(
     population : pd.DataFrame, shape (n_units, n_columns)
         The unit table, with ``animal``.
     name : str
-        A key of
-        :data:`~continuum_swr_replay.analysis.pfc.load_population.HELDOUT_P_COLUMNS`.
+        A key of ``columns``.
     alpha : float
         The raw empirical-p threshold.
+    columns : mapping of str to str
+        The p-value column of each test, by name, as in
+        :func:`called_fractions`.
 
     Returns
     -------
@@ -275,7 +287,9 @@ def called_fraction_by_animal(
     """
     rows = {}
     for animal, frame in population.groupby("animal"):
-        n_called, n_tested = significant_fraction(frame, alpha=alpha)[name]
+        n_called, n_tested = significant_fraction(
+            frame, alpha=alpha, columns={name: columns[name]}
+        )[name]
         rows[animal] = {
             "n_called": n_called,
             "n_tested": n_tested,
@@ -408,7 +422,7 @@ def called_without_improvement(population: pd.DataFrame, alpha: float) -> pd.Dat
     """
     rows = {}
     for name, column in HELDOUT_P_COLUMNS.items():
-        called = population[column] < alpha
+        _, called = tested_and_called(population[column], alpha)
         observed = population[MATCHED_NULL_OBSERVED_COLUMNS[name]]
         n_flat, n_called = (called & (observed <= 0)).sum(), called.sum()
         rows[name] = {
@@ -603,10 +617,10 @@ def replay_class_overlap_statistics(
         no unit is called for SWR-coupled replay only, or none for non-SWR
         replay only.
     """
-    swr_tested, swr_called = _tested_and_called(
+    swr_tested, swr_called = tested_and_called(
         population[HELDOUT_P_COLUMNS["non_local_SWR"]], alpha
     )
-    non_tested, non_called = _tested_and_called(
+    non_tested, non_called = tested_and_called(
         population[HELDOUT_P_COLUMNS["non_local_no_SWR"]], alpha
     )
     tested = swr_tested & non_tested
@@ -896,10 +910,10 @@ def swr_without_replay_unit_statistics(
         of SWRs without replay.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
-    new_tested, new_called = _tested_and_called(
+    new_tested, new_called = tested_and_called(
         population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha
     )
-    swr_tested, swr_called = _tested_and_called(
+    swr_tested, swr_called = tested_and_called(
         population[HELDOUT_P_COLUMNS["non_local_SWR"]], alpha
     )
     new_peak = population["SWR_no_non_local: peak_log_modulation"].to_numpy(dtype=float)
@@ -938,10 +952,12 @@ def swr_without_replay_unit_statistics(
         row: dict[str, float] = dict.fromkeys(columns, np.nan)
         tested, called = keep & new_tested, keep & new_called
         row["n_units"] = int(keep.sum())
-        row["n_tested"] = int(tested.sum())
-        row["n_called"] = int(called.sum())
-        if tested.any():
-            row["called_fraction"] = called.sum() / tested.sum()
+        n_called, n_tested = significant_fraction(
+            population[keep], alpha, SWR_WITHOUT_REPLAY_P_COLUMNS
+        )[SWR_WITHOUT_REPLAY]
+        row["n_tested"], row["n_called"] = n_tested, n_called
+        if n_tested:
+            row["called_fraction"] = n_called / n_tested
         both_tested = tested & swr_tested
         overlap = call_overlap_statistics(
             called[both_tested],
@@ -1014,17 +1030,19 @@ def swr_without_replay_called_by_animal(
         its tested units.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
-    new_tested, new_called = _tested_and_called(
-        population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha
-    )
-    animals = population["animal"].to_numpy()
+    new_tested, _ = tested_and_called(population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha)
     index, fractions = [], []
     for subset, keep in subsets.items():
-        tested = keep & new_tested
-        for animal in np.unique(animals[tested]):
-            own = tested & (animals == animal)
+        # Over the tested units only, so that every animal left has one.
+        by_animal = called_fraction_by_animal(
+            population[keep & new_tested],
+            SWR_WITHOUT_REPLAY,
+            alpha,
+            columns=SWR_WITHOUT_REPLAY_P_COLUMNS,
+        )
+        for animal, own in by_animal.iterrows():
             index.append((subset, animal))
-            fractions.append(new_called[own].sum() / own.sum())
+            fractions.append(own["fraction"])
     return pd.DataFrame(
         {"called_fraction": fractions},
         index=pd.MultiIndex.from_arrays(
@@ -1087,7 +1105,7 @@ def swr_without_replay_timing_statistics(
           the direction has no unit.
     """
     subsets = _swr_without_replay_subsets(population, sessions, min_events)
-    _, new_called = _tested_and_called(population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha)
+    _, new_called = tested_and_called(population[SWR_WITHOUT_REPLAY_P_COLUMN], alpha)
     days = population["nwb_file_name"].astype(str).to_numpy()
     peak = peak_and_onset(curves, lag_time).peak
     rows = {}
