@@ -984,6 +984,7 @@ def plot_event_example_stack(
 
 def plot_swr_overlap_class_bar(
     counts: dict[str, int],
+    percent_labels: dict[str, str],
     ax: plt.Axes | None = None,
 ) -> None:
     """Horizontal stacked bar of non-local events by SWR-overlap class.
@@ -999,6 +1000,11 @@ def plot_swr_overlap_class_bar(
         Output of :func:`compute_swr_overlap_class_counts`. Must
         contain the keys ``swr_contained``, ``swr_partial``,
         ``non_swr``, and ``total``.
+    percent_labels : dict
+        For each of ``swr_contained``, ``swr_partial`` and ``non_swr``, the
+        class's share of the events as a percent, already rounded and printed
+        (``"57"``). Written on the class's segment, followed by ``%``; no
+        percent is computed here.
     ax : matplotlib.axes.Axes, optional
         Axes to draw on. If None, a standalone figure is created.
 
@@ -1042,7 +1048,7 @@ def plot_swr_overlap_class_bar(
             ax.text(
                 left + frac / 2,
                 0,
-                f"{100 * frac:.0f}%\n{segment_labels[cls]}",
+                f"{percent_labels[cls]}%\n{segment_labels[cls]}",
                 ha="center",
                 va="center",
                 color="white",
@@ -1072,6 +1078,7 @@ def plot_swr_overlap_class_bar(
 
 def plot_event_timing_offsets(
     offsets: pd.DataFrame,
+    median_labels: dict[str, str],
     axes: list[plt.Axes] | None = None,
     *,
     xlim_ms: tuple[float, float] = (-100.0, 100.0),
@@ -1079,16 +1086,17 @@ def plot_event_timing_offsets(
 ) -> None:
     """Two side-by-side histograms of non-local/SWR timing offsets.
 
-    Takes a per-event ``start_diff`` / ``end_diff`` DataFrame and renders:
+    Takes a per-event ``start_offset_s`` / ``end_offset_s`` DataFrame and
+    renders:
 
         - Left axis:  non-local-start minus SWR-start (ms)
         - Right axis: non-local-end   minus SWR-end   (ms)
 
-    The offsets are computed inline in ``generate_figure02.generate_figure``
-    by subtracting the matched SWR's ``matched_swr_start`` /
-    ``matched_swr_end`` from each event's ``event_start`` / ``event_end``
-    (columns of :func:`build_classified_nonlocal_event_table`), restricted
-    to immobile, SWR-overlapping events — one row per event.
+    The offsets are those of
+    :func:`~continuum_swr_replay.analysis.hippocampus.event_statistics.boundary_offsets`
+    on the canonical event table: each immobile, SWR-overlapping event's
+    ``event_start_s`` / ``event_end_s`` minus its matched SWR's
+    ``matched_swr_start`` / ``matched_swr_end`` — one row per event.
 
     Positive left-axis / negative right-axis means non-local events
     are typically contained inside the SWR window. A long tail on
@@ -1097,9 +1105,13 @@ def plot_event_timing_offsets(
 
     Parameters
     ----------
-    offsets : pd.DataFrame
-        Per-overlap offset DataFrame with ``start_diff`` and
-        ``end_diff`` columns (seconds).
+    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
+        ``start_offset_s`` and ``end_offset_s`` (seconds).
+    median_labels : dict
+        For each of those columns, its median in milliseconds, already rounded
+        and printed (``"+4"``). Written in the panel's corner as
+        ``median <label> ms``. The dashed line is drawn at the median of the
+        column; the label is not computed here.
     axes : list of matplotlib.axes.Axes, optional
         Two axes [left, right]. If None, a standalone 1x2 figure
         is created.
@@ -1131,13 +1143,13 @@ def plot_event_timing_offsets(
     for ax, col, xlabel, title in (
         (
             ax_start,
-            "start_diff",
+            "start_offset_s",
             "NL start − SWR start (ms)",
             "Start alignment",
         ),
         (
             ax_end,
-            "end_diff",
+            "end_offset_s",
             "NL end − SWR end (ms)",
             "End alignment",
         ),
@@ -1172,7 +1184,7 @@ def plot_event_timing_offsets(
         ax.text(
             0.97,
             0.97,
-            f"median {median_ms:+.0f} ms",
+            f"median {median_labels[col]} ms",
             transform=ax.transAxes,
             ha="right",
             va="top",

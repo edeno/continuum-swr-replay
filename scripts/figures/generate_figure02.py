@@ -30,7 +30,9 @@ Panels b and d are drawn from the canonical event table
 (``replay_content/event_table.parquet``), the table the events summary cites,
 by the functions the summary uses (``analysis.hippocampus.event_statistics``):
 panel b counts its ``overlap_class`` and panel d subtracts ``matched_swr_*``
-from the event bounds. So the panels show the numbers the text cites.
+from the event bounds. The percents and medians printed on them are those
+functions' numbers, rounded by the summary's rule (``reported.formatting``),
+so a panel prints the digits the text cites.
 
 Panels a, c and e are drawn from the decode frames. Panel a picks its
 examples from ``build_classified_nonlocal_event_table``, computed once over the
@@ -39,7 +41,8 @@ timing, strict positive-duration SWR overlap, matched SWR); panel c keeps
 ``get_event_types`` (parity-tested against the same table) for its
 event-triggered windows. The class counts of the events classified from the
 frames must equal the canonical table's, or the figure is not drawn: the table
-was then built from other decode frames than the ones read here.
+was then built from other decode frames than the ones read here. Equal counts
+do not prove that the two hold the same events.
 
 Remaining validation panels (non-local probability threshold,
 calibration curve, full four-signal triggered averages, moving-vs-
@@ -83,13 +86,15 @@ from continuum_swr_replay.analysis.events.swr_source import (
 )
 from continuum_swr_replay.analysis.hippocampus import (
     compute_local_decoding_error,
-    compute_swr_overlap_class_counts,
     get_event_types,
     load_data_over_time,
     load_results,
 )
 from continuum_swr_replay.analysis.hippocampus.event_statistics import (
+    boundary_offset_statistics,
     boundary_offsets,
+    compute_swr_overlap_class_counts,
+    overlap_class_statistics,
 )
 from continuum_swr_replay.data_loaders import load_data
 from continuum_swr_replay.data_loaders.epoch_register import (
@@ -112,6 +117,9 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.reported.events import TAGS
+from continuum_swr_replay.reported.formatting import formatted
+from continuum_swr_replay.reported.values import value_factory
 from continuum_swr_replay.visualization.figure_panels import (
     compute_triggered_average_curves,
     plot_decoding_error_distribution,
@@ -140,7 +148,7 @@ TRIGGERED_SIGNALS = ["Non-Local_prob", "SWR_zscore"]
 # averages, ``compute_local_decoding_error``). Without a bump the figure is
 # drawn from the old cache, unless ``--force-recompute`` is passed.
 # 1: the cache named ``..._figure02_whole_event_speed_v1_...``.
-# 2: panel e's decoding error leaves excluded time out (task 26b).
+# 2: panel e's decoding error leaves excluded time out.
 # 3: panels b and d are read from the canonical event table when the figure is
 #    drawn; the cache keeps the class counts of the events classified from the
 #    decode frames, to check against that table.
@@ -297,25 +305,22 @@ def _compute_figure_inputs(
     )
     event_types = get_event_types(data_over_time)
 
-    # Single classification source for panels a/b/d: the unfiltered
-    # classified table with full label-window timing, computed once over
-    # the multi-session aggregate. Panel c stays on ``get_event_types``
-    # (parity-tested against this table).
+    # The events classified from the decode frames: the unfiltered classified
+    # table with full label-window timing, computed once over the
+    # multi-session aggregate. Panel a picks its examples from it, and its
+    # class counts are what the canonical event table (panels b and d) is
+    # checked against. Panel c stays on ``get_event_types`` (parity-tested
+    # against this table).
     classified_events_all = build_classified_nonlocal_event_table(data_over_time)
-    n_total = len(classified_events_all)
-    immobile_mask = classified_events_all["whole_event_speed_eligible"].astype(bool)
-    n_immobile = int(immobile_mask.sum())
-    class_counts_log = classified_events_all.loc[immobile_mask][
-        "overlap_class"
-    ].value_counts()
+    classified_class_counts = compute_swr_overlap_class_counts(classified_events_all)
     logging.info(
         "Classified %d non-local events; %d pass whole-event immobility; "
         "by class: contained=%d, partial=%d, non_swr=%d",
-        n_total,
-        n_immobile,
-        int(class_counts_log.get("swr_contained", 0)),
-        int(class_counts_log.get("swr_partial", 0)),
-        int(class_counts_log.get("non_swr", 0)),
+        len(classified_events_all),
+        classified_class_counts["total"],
+        classified_class_counts["swr_contained"],
+        classified_class_counts["swr_partial"],
+        classified_class_counts["non_swr"],
     )
 
     logging.info("Selecting three example events...")
@@ -351,8 +356,6 @@ def _compute_figure_inputs(
                 f"in classified_events_all (expected 1) — hash collision."
             )
 
-    classified_class_counts = compute_swr_overlap_class_counts(classified_events_all)
-
     logging.info("Computing triggered-average curves (panel c)...")
     triggered_curves = compute_triggered_average_curves(
         data_over_time,
@@ -380,8 +383,12 @@ def _compute_figure_inputs(
 
 def event_table_panels(
     events: pd.DataFrame, classified_class_counts: dict[str, int]
-) -> tuple[dict[str, int], pd.DataFrame]:
+) -> dict:
     """Panels b and d, from the canonical event table.
+
+    The table is checked against the decode frames by its class counts alone.
+    Equal counts do not prove that the two hold the same events: a table built
+    from other frames that happen to give the same three counts is not refused.
 
     Parameters
     ----------
@@ -395,30 +402,77 @@ def event_table_panels(
 
     Returns
     -------
-    class_counts : dict
-        The events of each overlap class, and their total (panel b).
-    offsets : pd.DataFrame, shape (n_overlapping_events, 2)
-        ``start_diff`` and ``end_diff``: each SWR-overlapping event's start and
-        end minus its matched SWR's, in seconds (panel d).
+    panels : dict
+        - ``class_counts``: the events of each overlap class, and their
+          ``total`` (panel b's bar).
+        - ``class_percents``: each class's share of the events as a whole
+          percent, printed as the events summary prints ``non_swr_fraction``,
+          without the percent sign (panel b's labels).
+        - ``offsets``: one row per SWR-overlapping event, with
+          ``start_offset_s`` and ``end_offset_s``, its start and end minus its
+          matched SWR's, in seconds (panel d's histograms).
+        - ``offset_medians``: for each of those columns, its median in whole
+          milliseconds, printed as the events summary prints
+          ``start_offset_median_ms`` and ``end_offset_median_ms``, with a plus
+          sign when positive (panel d's labels).
 
     Raises
     ------
     ValueError
-        If the table's class counts are not those of the events classified
-        from the decode frames: the two then describe different events.
+        If an event of the table is not immobile as a whole, or the table's
+        class counts are not those of the events classified from the decode
+        frames.
     """
-    class_counts = compute_swr_overlap_class_counts(events)
+    classes = overlap_class_statistics(events)
+    class_counts = {cls: classes[f"n_{cls}"] for cls in CLASS_ORDER}
+    class_counts["total"] = classes["n_events"]
     if class_counts != classified_class_counts:
         raise ValueError(
-            "the canonical event table and the decode frames give different "
-            f"immobile non-local events (table {class_counts}, frames "
-            f"{classified_class_counts}); rebuild the canonical tables from these "
-            "decode frames before drawing the figure"
+            "the canonical event table's overlap-class counts are not those of "
+            f"the events classified from the decode frames (table {class_counts}, "
+            f"frames {classified_class_counts}); rebuild the canonical tables from "
+            "these decode frames before drawing the figure"
         )
-    offsets = boundary_offsets(events).rename(
-        columns={"start_offset_s": "start_diff", "end_offset_s": "end_diff"}
-    )
-    return class_counts, offsets
+    medians = boundary_offset_statistics(events)
+    share = value_factory(event_table_panels, "the event table", TAGS["cohort"])
+    median = value_factory(event_table_panels, "the event table", TAGS["boundaries"])
+    return {
+        "class_counts": class_counts,
+        "class_percents": {
+            cls: formatted(
+                share(
+                    "share",
+                    class_counts[cls] / class_counts["total"],
+                    "fraction",
+                    "pctnum",
+                    "",
+                )
+            )
+            for cls in CLASS_ORDER
+        },
+        "offsets": boundary_offsets(events),
+        "offset_medians": {
+            f"{bound}_offset_s": _with_plus(
+                formatted(
+                    median(
+                        "median",
+                        1000 * medians[f"{bound}_offset_median_s"],
+                        "quantity",
+                        "int",
+                        "",
+                        "ms",
+                    )
+                )
+            )
+            for bound in ("start", "end")
+        },
+    }
+
+
+def _with_plus(text: str) -> str:
+    """A printed offset with a plus sign when it is positive: the formatter
+    writes a negative with a true minus, and a positive and a zero bare."""
+    return text if text.startswith("−") or text == "0" else f"+{text}"
 
 
 def generate_figure(
@@ -459,20 +513,18 @@ def generate_figure(
         data_dir / replay_content_dir().relative_to(processed_data_dir()),
     )
     logging.info(f"Reading panels b and d from {event_table}...")
-    class_counts, offsets = event_table_panels(
+    panels = event_table_panels(
         pd.read_parquet(event_table), inputs["classified_class_counts"]
     )
+    class_counts = panels["class_counts"]
     logging.info(
         f"  {class_counts['total']:,} immobile NL events; "
         f"SWR-contained {class_counts['swr_contained']:,} / "
         f"SWR-partial {class_counts['swr_partial']:,} / "
         f"non-SWR {class_counts['non_swr']:,}; "
-        f"{len(offsets):,} overlap an SWR"
+        f"{len(panels['offsets']):,} overlap an SWR"
     )
-    return _render_figure(
-        {**inputs, "class_counts": class_counts, "offsets": offsets},
-        window_sec=window_sec,
-    )
+    return _render_figure({**inputs, **panels}, window_sec=window_sec)
 
 
 def _render_figure(inputs: dict, window_sec: float = 0.4):
@@ -482,7 +534,9 @@ def _render_figure(inputs: dict, window_sec: float = 0.4):
     env = inputs["env"]
     chosen = inputs["chosen"]
     class_counts = inputs["class_counts"]
+    class_percents = inputs["class_percents"]
     offsets = inputs["offsets"]
+    offset_medians = inputs["offset_medians"]
     triggered_curves = inputs["triggered_curves"]
     error_df = inputs["error_df"]
 
@@ -570,7 +624,7 @@ def _render_figure(inputs: dict, window_sec: float = 0.4):
 
     # ── Row 2: panel b (wide overlap stacked bar) ──
     ax_b = fig.add_subplot(outer[1])
-    plot_swr_overlap_class_bar(class_counts, ax=ax_b)
+    plot_swr_overlap_class_bar(class_counts, class_percents, ax=ax_b)
 
     # ── Row 3: panels c (triggered averages), d (timing), e (error) ──
     # One flat 2×4 grid so every panel shares the same two grid rows: c is
@@ -599,7 +653,7 @@ def _render_figure(inputs: dict, window_sec: float = 0.4):
 
     ax_d_start = fig.add_subplot(gs_cde[:, 1])
     ax_d_end = fig.add_subplot(gs_cde[:, 2], sharey=ax_d_start)
-    plot_event_timing_offsets(offsets, axes=[ax_d_start, ax_d_end])
+    plot_event_timing_offsets(offsets, offset_medians, axes=[ax_d_start, ax_d_end])
     ax_d_end.tick_params(labelleft=False)
     ax_d_end.set_ylabel("")
 
