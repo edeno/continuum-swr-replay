@@ -186,6 +186,25 @@ def tracked(repo: Path, paths: Iterable[str]) -> list[str]:
     return [path for path in paths if path in committed]
 
 
+def _relative(repo: Path, files: Iterable[Path]) -> list[str]:
+    root = repo.resolve()
+    return [str(Path(f).resolve().relative_to(root)) for f in files]
+
+
+def uncommitted(repo: Path, files: Iterable[Path]) -> list[str]:
+    """Those of ``files`` and ``uv.lock`` whose content is not what the commit
+    checked out holds for them (changed, or not in the commit), relative to
+    ``repo`` and sorted: :func:`code_record`'s ``uncommitted``, without the
+    digests. The working file's content is compared, so a file hidden from
+    ``git status`` (``assume-unchanged``, ``skip-worktree``) is still found."""
+    paths = sorted({*_relative(repo, files), LOCK})
+    committed = _committed_blobs(repo, paths)
+    working = dict(
+        zip(paths, git(repo, "hash-object", "--", *paths).split(), strict=True)
+    )
+    return [p for p in paths if committed.get(p) != working[p]]
+
+
 def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
     """What a summary records about the files of the checkout that built it.
 
@@ -204,10 +223,8 @@ def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
         - ``python``: the major.minor version that computed the ``code_sha256``s.
         - ``uv_lock_sha256``: the sha256 of ``uv.lock``.
         - ``uncommitted``: those of ``files`` and ``uv.lock`` whose content is
-          not what ``head`` holds for them (changed, or not in the commit),
-          sorted; empty when the build is the files of ``head``. The working
-          file's content is compared, so a file hidden from ``git status``
-          (``assume-unchanged``, ``skip-worktree``) is still found.
+          not what ``head`` holds for them (:func:`uncommitted`); empty when
+          the build is the files of ``head``.
         - ``files``: each file, relative to ``repo``, with its ``sha256`` and
           ``code_sha256``.
 
@@ -217,20 +234,14 @@ def code_record(repo: Path, files: Iterable[Path]) -> CodeRecord:
         If a file or ``uv.lock`` cannot be read, git fails, or a file is outside
         ``repo``.
     """
+    files = list(files)
     root = repo.resolve()
-    relative = [str(Path(f).resolve().relative_to(root)) for f in files]
-    head = git_commit(repo)
-    paths = sorted({*relative, LOCK})
-    committed = _committed_blobs(repo, paths)
-    working = dict(
-        zip(paths, git(repo, "hash-object", "--", *paths).split(), strict=True)
-    )
     return {
-        "head": head,
+        "head": git_commit(repo),
         "python": _python(),
         "uv_lock_sha256": sha256_file(repo / LOCK),
-        "uncommitted": [p for p in paths if committed.get(p) != working[p]],
-        "files": {path: _digests(root / path) for path in relative},
+        "uncommitted": uncommitted(repo, files),
+        "files": {path: _digests(root / path) for path in _relative(repo, files)},
     }
 
 

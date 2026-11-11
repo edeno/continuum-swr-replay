@@ -233,7 +233,6 @@ def _summary(
     summary = values.Summary(
         name=name,
         produced_by="by",
-        commit="c",
         code=code,
         inputs=list(inputs),
     )
@@ -412,7 +411,7 @@ def _uncommitted(repo: Path) -> dict:
 def test_the_view_s_summary_table_says_what_each_code_record_is(repo, make_code, cell):
     summary = _summary(code=make_code(repo))
     view = emit.questions_view({"events": summary})
-    assert f"| `events.json` | `c` | {cell} | 1 | 0 |" in view
+    assert f"| `events.json` | `{summary.commit}` | {cell} | 1 | 0 |" in view
 
 
 def _load_script(name: str):

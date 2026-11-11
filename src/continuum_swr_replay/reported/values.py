@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from continuum_swr_replay.paths import ROOT_DIR
-from continuum_swr_replay.reported.code_record import CodeRecord
+from continuum_swr_replay.reported.code_record import CodeRecord, commit_label
 from continuum_swr_replay.reported.questions import tag_problems
 
 SCHEMA_VERSION = 6
@@ -229,9 +229,6 @@ class Summary:
         A key of :data:`SUMMARIES`.
     produced_by : str
         The script that built it, relative to the repository.
-    commit : str
-        The commit it was built at
-        (:func:`~continuum_swr_replay.reported.code_record.commit_label`).
     inputs : list of dict
         One record per input file (:func:`file_record`) or set of files
         (:func:`files_record`).
@@ -245,7 +242,6 @@ class Summary:
 
     name: str
     produced_by: str
-    commit: str
     inputs: list[dict[str, Any]] = field(default_factory=list)
     values: dict[str, Value] = field(default_factory=dict)
     code: CodeRecord | None = None
@@ -253,6 +249,13 @@ class Summary:
     def __post_init__(self) -> None:
         if self.name not in SUMMARIES:
             raise ValueError(f"no summary {self.name!r}; one of {list(SUMMARIES)}")
+
+    @property
+    def commit(self) -> str:
+        """The commit it was built at, from its code record
+        (:func:`~continuum_swr_replay.reported.code_record.commit_label`); empty
+        before ``summarize.py`` records it."""
+        return commit_label(self.code) if self.code is not None else ""
 
     def add(self, *values: Value) -> None:
         for value in values:
@@ -342,7 +345,6 @@ def read_summary(path: Path) -> Summary:
     summary = Summary(
         name=payload["summary"],
         produced_by=payload["produced_by"],
-        commit=payload["commit"],
         inputs=payload["inputs"],
         code=payload["code"],
     )

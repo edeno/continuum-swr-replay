@@ -288,7 +288,7 @@ def method_values(survey: pd.DataFrame, source: str) -> list[Value]:
     return out
 
 
-def summarize(inputs: SurveyInputs, produced_by: str, commit: str) -> Summary:
+def summarize(inputs: SurveyInputs, produced_by: str) -> Summary:
     """The survey summary: the survey's parameter values and method shares.
 
     Parameters
@@ -297,15 +297,13 @@ def summarize(inputs: SurveyInputs, produced_by: str, commit: str) -> Summary:
         The survey to read.
     produced_by : str
         The command that builds the summary, for its record.
-    commit : str
-        The commit the summary is built at.
 
     Returns
     -------
     summary : Summary
         Every survey value, with the survey's path and checksum as its input.
     """
-    summary = Summary(name="survey", produced_by=produced_by, commit=commit)
+    summary = Summary(name="survey", produced_by=produced_by)
     source = "the replay-literature survey of Supplementary Table S1 (paper/tables/table_s1_literature_parameters.csv)"
     survey = literature.load_survey(inputs.survey)
     summary.add(*parameter_values(numeric(survey[list(PARAMETER_COLUMNS)]), source))

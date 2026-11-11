@@ -2858,9 +2858,9 @@ def _read_per_bin_fits(path: Path) -> pd.DataFrame:
     return fits
 
 
-def summarize(inputs: BehaviorInputs, produced_by: str, commit: str) -> Summary:
+def summarize(inputs: BehaviorInputs, produced_by: str) -> Summary:
     """The behavior summary from ``inputs``."""
-    summary = Summary(name="behavior", produced_by=produced_by, commit=commit)
+    summary = Summary(name="behavior", produced_by=produced_by)
 
     def record(*paths: Path) -> None:
         summary.inputs.extend(file_record(p, ROOT_DIR) for p in paths)

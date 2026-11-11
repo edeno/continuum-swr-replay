@@ -1406,9 +1406,9 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
 # --- the summary ---------------------------------------------------------------
 
 
-def summarize(inputs: EventsInputs, produced_by: str, commit: str) -> Summary:
+def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     """The events summary from ``inputs``."""
-    summary = Summary(name="events", produced_by=produced_by, commit=commit)
+    summary = Summary(name="events", produced_by=produced_by)
 
     events = pd.read_parquet(inputs.event_table)
     current_sha256 = hashlib.sha256(inputs.event_table.read_bytes()).hexdigest()

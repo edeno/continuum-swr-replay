@@ -2301,9 +2301,9 @@ def followup_values(
     return values, records
 
 
-def summarize(inputs: MpfcInputs, produced_by: str, commit: str) -> Summary:
+def summarize(inputs: MpfcInputs, produced_by: str) -> Summary:
     """The mpfc summary from ``inputs``."""
-    summary = Summary(name="mpfc", produced_by=produced_by, commit=commit)
+    summary = Summary(name="mpfc", produced_by=produced_by)
     sidecars = read_sidecars(inputs.bundle_dir)
     pending = staleness(sidecars, inputs.event_table, inputs.stop_table)
     population, curves, lag_time = load_population_data(

@@ -131,7 +131,7 @@ def _value(**fields) -> values.Value:
 
 
 def test_a_summary_with_a_bad_tag_is_not_written(tmp_path):
-    summary = values.Summary(name="events", produced_by="by", commit="c")
+    summary = values.Summary(name="events", produced_by="by")
     summary.add(_value(questions=("12",)))
     summary.add(_value(key="other", figures=("main, left out",)))
     path = tmp_path / "events.json"
@@ -145,7 +145,7 @@ def test_a_summary_with_a_bad_tag_is_not_written(tmp_path):
 def test_a_summary_written_before_the_list_changed_is_read_and_its_problems_listed(
     tmp_path,
 ):
-    summary = values.Summary(name="detection", produced_by="by", commit="c")
+    summary = values.Summary(name="detection", produced_by="by")
     summary.add(_value())
     path = tmp_path / "detection.json"
     summary.write(path)
@@ -346,7 +346,7 @@ def test_a_question_has_values_exactly_when_its_status_says_so(committed):
 
 
 def test_the_view_lists_a_value_under_each_question_it_answers_and_flags_old_tags():
-    summary = values.Summary(name="events", produced_by="by", commit="c")
+    summary = values.Summary(name="events", produced_by="by")
     summary.add(_value(key="shared", questions=("2d.3", "2d.4"), figures=("3",)))
     summary.add(_value(key="old", questions=("12",)))
     view = emit.questions_view({"events": summary})

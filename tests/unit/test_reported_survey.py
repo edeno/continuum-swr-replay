@@ -24,7 +24,7 @@ SUMMARY = Path(__file__).resolve().parents[2] / "paper" / "reported" / "survey.j
 
 @pytest.fixture(scope="module")
 def fresh() -> values.Summary:
-    return builder.summarize(builder.default_inputs(), "by", "commit")
+    return builder.summarize(builder.default_inputs(), "by")
 
 
 def test_only_bare_numbers_count():

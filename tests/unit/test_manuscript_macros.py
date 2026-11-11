@@ -131,7 +131,7 @@ def test_a_marker_naming_no_summary_key_is_an_error():
 
 
 def test_a_pending_value_is_flagged_in_the_macros_and_the_questions():
-    summary = values.Summary(name="survey", produced_by="by", commit="c")
+    summary = values.Summary(name="survey", produced_by="by")
     summary.add(_value("share", 0.5, pending="untracked script"))
     assert "[PENDING: untracked script]" in emit.tex_file({"survey": summary})
     assert "pending: untracked script" in emit.questions_view({"survey": summary})

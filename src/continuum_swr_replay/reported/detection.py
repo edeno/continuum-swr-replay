@@ -1056,9 +1056,9 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
 # --- the summary ---------------------------------------------------------------
 
 
-def summarize(inputs: DetectionInputs, produced_by: str, commit: str) -> Summary:
+def summarize(inputs: DetectionInputs, produced_by: str) -> Summary:
     """The detection summary from ``inputs``."""
-    summary = Summary(name="detection", produced_by=produced_by, commit=commit)
+    summary = Summary(name="detection", produced_by=produced_by)
 
     bouts_path = inputs.state_evidence_dir / "bout_stats.csv"
     manifest_path = inputs.state_evidence_dir / "manifest.json"
@@ -1072,8 +1072,8 @@ def summarize(inputs: DetectionInputs, produced_by: str, commit: str) -> Summary
         )
     )
     summary.inputs += [
-        _record(bouts_path),
-        _record(manifest_path),
+        file_record(bouts_path, ROOT_DIR),
+        file_record(manifest_path, ROOT_DIR),
     ]
 
     pilot_settings = json.loads(inputs.pilot_manifest.read_text())["settings"]
@@ -1086,8 +1086,8 @@ def summarize(inputs: DetectionInputs, produced_by: str, commit: str) -> Summary
         )
     )
     summary.inputs += [
-        _record(inputs.pilot_events),
-        _record(inputs.pilot_manifest),
+        file_record(inputs.pilot_events, ROOT_DIR),
+        file_record(inputs.pilot_manifest, ROOT_DIR),
     ]
 
     recording = json.loads(inputs.recording_numbers.read_text())
@@ -1098,7 +1098,7 @@ def summarize(inputs: DetectionInputs, produced_by: str, commit: str) -> Summary
             f"{recording['git_commit']})",
         )
     )
-    summary.inputs.append(_record(inputs.recording_numbers))
+    summary.inputs.append(file_record(inputs.recording_numbers, ROOT_DIR))
 
     for path, build, script in (
         (inputs.sweep_summary, sweep_values, "sweep_memoryless_detection.py"),
@@ -1108,15 +1108,5 @@ def summarize(inputs: DetectionInputs, produced_by: str, commit: str) -> Summary
         summary.add(
             *build(pd.read_csv(path), f"{rel(path)} (scripts/detection/{script})")
         )
-        summary.inputs.append(_record(path))
+        summary.inputs.append(file_record(path, ROOT_DIR))
     return summary
-
-
-def _record(path: Path) -> dict:
-    """An input's :func:`file_record`, its path shown relative to the repository.
-
-    ``file_record`` resolves symbolic links first, so in a worktree whose
-    ``Processed-Data`` links to another checkout's it would show an absolute
-    path; this shows the path as the repository reads it.
-    """
-    return {**file_record(path, ROOT_DIR), "path": rel(path)}

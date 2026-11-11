@@ -62,7 +62,7 @@ def test_a_malformed_value_is_refused(change, error):
 
 
 def test_a_summary_refuses_a_second_value_with_the_same_key():
-    summary = Summary(name="events", produced_by="by", commit="c")
+    summary = Summary(name="events", produced_by="by")
     summary.add(Value(**GOOD))
     with pytest.raises(ValueError, match="duplicate key non_swr_share"):
         summary.add(Value(**{**GOOD, "value": 0.6}))

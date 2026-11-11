@@ -33,16 +33,13 @@ from pathlib import Path
 
 from continuum_swr_replay.paths import ROOT_DIR, SUMMARY_DIR
 from continuum_swr_replay.reported.code_record import (
-    CodeRecord,
     build_files,
     code_record,
-    commit_label,
     tracked,
+    uncommitted,
 )
 from continuum_swr_replay.reported.values import SUMMARIES
-from continuum_swr_replay.runs.provenance import produced_by
-
-SUMMARY_DIR = ROOT_DIR / "paper" / "reported"
+from continuum_swr_replay.runs.provenance import git_commit, produced_by
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -61,24 +58,23 @@ def main(argv: Sequence[str] | None = None) -> None:
         and args.output_dir.samefile(SUMMARY_DIR)
     )
 
-    def committed(code: CodeRecord) -> CodeRecord:
-        """``code``, refused for ``paper/reported/`` when any of it is uncommitted."""
-        if canonical and code["uncommitted"]:
+    def refuse_uncommitted(files: list[str]) -> None:
+        """Exit when a summary for ``paper/reported/`` would be built from
+        ``files`` that differ from the commit."""
+        if canonical and files:
             parser.exit(
                 1,
                 f"not written: a summary in {SUMMARY_DIR.relative_to(ROOT_DIR)} is "
                 "built from committed files, and these differ from the commit: "
-                f"{', '.join(code['uncommitted'])}. Commit them, or pass "
+                f"{', '.join(files)}. Commit them, or pass "
                 "--output-dir for a trial build.\n",
             )
-        return code
 
     builder = importlib.import_module(f"continuum_swr_replay.reported.{args.summary}")
     # Checked before the build, so uncommitted code costs no build.
-    before = committed(code_record(ROOT_DIR, build_files(ROOT_DIR)))
-    summary = builder.summarize(
-        builder.default_inputs(), produced_by(__file__), commit_label(before)
-    )
+    head = git_commit(ROOT_DIR)
+    refuse_uncommitted(uncommitted(ROOT_DIR, build_files(ROOT_DIR)))
+    summary = builder.summarize(builder.default_inputs(), produced_by(__file__))
     inputs = tracked(
         ROOT_DIR,
         [
@@ -87,16 +83,16 @@ def main(argv: Sequence[str] | None = None) -> None:
             if "n_files" not in record and not Path(record["path"]).is_absolute()
         ],
     )
-    summary.code = committed(
-        code_record(ROOT_DIR, [*build_files(ROOT_DIR), *(ROOT_DIR / i for i in inputs)])
+    summary.code = code_record(
+        ROOT_DIR, [*build_files(ROOT_DIR), *(ROOT_DIR / i for i in inputs)]
     )
-    if summary.code["head"] != before["head"]:
+    refuse_uncommitted(summary.code["uncommitted"])
+    if summary.code["head"] != head:
         parser.exit(
             1,
             "not written: the checkout moved to another commit while the summary "
             "was built; rebuild\n",
         )
-    summary.commit = commit_label(summary.code)
     path = args.output_dir / f"{args.summary}.json"
     summary.write(path)
     n_pending = sum(v.pending is not None for v in summary.values.values())
