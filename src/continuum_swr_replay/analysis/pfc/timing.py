@@ -323,11 +323,9 @@ def population_timing(
     PopulationTiming
     """
     curves = np.asarray(curves, dtype=float)
-    aligned = curves * np.sign(np.asarray(peak, dtype=float))[None, :]
-    labels, group_index = np.unique(np.asarray(groups), return_inverse=True)
-    n_groups = len(labels)
-    nan_pair = (float("nan"), float("nan"))
-    if n_groups == 0:
+    resampled = _resampled_mean_curves(curves, peak, groups, n_boot=n_boot, seed=seed)
+    if resampled is None:
+        nan_pair = (float("nan"), float("nan"))
         empty = np.full(curves.shape[0], np.nan)
         return PopulationTiming(
             empty,
@@ -342,19 +340,54 @@ def population_timing(
             0,
             0,
         )
+    return _mean_curve_timing(
+        *resampled,
+        lag_time,
+        n_units=curves.shape[1],
+        fraction=fraction,
+        baseline=baseline,
+    )
+
+
+def _resampled_mean_curves(
+    curves: NDArray, peak: NDArray, groups: NDArray, *, n_boot: int, seed: int
+) -> tuple[NDArray, NDArray, int] | None:
+    """The sign-aligned mean curve, shape (n_lags,), its ``n_boot`` resamples of
+    the groups, shape (n_boot, n_lags), and the number of groups; None when
+    there is no group."""
+    aligned = curves * np.sign(np.asarray(peak, dtype=float))[None, :]
+    labels, group_index = np.unique(np.asarray(groups), return_inverse=True)
+    n_groups = len(labels)
+    if n_groups == 0:
+        return None
 
     # Per-session sums make every resample one weighted average.
     sums = np.zeros((n_groups, curves.shape[0]))
     np.add.at(sums, group_index, aligned.T)
     sizes = np.bincount(group_index, minlength=n_groups).astype(float)
     curve = sums.sum(axis=0) / sizes.sum()
-    observed = peak_and_onset(curve, lag_time, fraction=fraction, baseline=baseline)
 
     rng = np.random.default_rng(seed)
     draws = rng.integers(0, n_groups, size=(n_boot, n_groups))
     weights = np.zeros((n_boot, n_groups))
     np.add.at(weights, (np.arange(n_boot)[:, None], draws), 1.0)
     boot_curves = (weights @ sums) / (weights @ sizes)[:, None]
+    return curve, boot_curves, n_groups
+
+
+def _mean_curve_timing(
+    curve: NDArray,
+    boot_curves: NDArray,
+    n_groups: int,
+    lag_time: NDArray,
+    *,
+    n_units: int,
+    fraction: float,
+    baseline: str | tuple[float, float],
+) -> PopulationTiming:
+    """:func:`population_timing` of a mean curve and its resamples
+    (:func:`_resampled_mean_curves`)."""
+    observed = peak_and_onset(curve, lag_time, fraction=fraction, baseline=baseline)
     boot = peak_and_onset(boot_curves.T, lag_time, fraction=fraction, baseline=baseline)
 
     observed_steepest = steepest_approach_lag(curve, lag_time)
@@ -376,7 +409,7 @@ def population_timing(
         steepest_lag_interval=interval(boot_steepest),
         size=float(observed_size[0]),
         size_interval=interval(boot_size),
-        n_units=int(curves.shape[1]),
+        n_units=n_units,
         n_groups=n_groups,
     )
 
@@ -474,15 +507,22 @@ def population_rise_timing(
         One unit is enough: the mean curve is then that unit's own. With no
         unit, every statistic is NaN.
     """
-    rise = population_timing(
-        curves,
-        peak,
-        groups,
-        lag_time,
-        n_boot=n_boot,
-        seed=seed,
-        baseline="window_start",
+    return _rise_statistics(
+        population_timing(
+            curves,
+            peak,
+            groups,
+            lag_time,
+            n_boot=n_boot,
+            seed=seed,
+            baseline="window_start",
+        )
     )
+
+
+def _rise_statistics(rise: PopulationTiming) -> dict[str, float]:
+    """The statistics of :func:`population_rise_timing` from the timing of the
+    mean curve measured from its value at the first lag."""
     return {
         "peak_ms": rise.peak_lag * _MS,
         "rise_onset_ms": rise.onset_lag * _MS,
@@ -565,7 +605,7 @@ def called_response_timing(
     *,
     n_boot: int = 1_000,
     seed: int = 0,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     """When the response of the units called for an event class peaks and starts.
 
     The called units are split by the sign of their peak (:data:`DIRECTIONS`);
@@ -648,6 +688,10 @@ def called_response_timing(
           ``n_animals_rise_onset_before_event``,
           ``n_animals_steepest_before_event``: those whose own mean curve has
           a negative half-maximum onset, rise onset and steepest approach.
+
+    by_animal : pd.DataFrame
+        The per-animal timing those counts are read from
+        (:func:`called_response_timing_by_animal` of the same units).
     """
     timing = peak_and_onset(curves, lag_time)
     by_animal = called_response_timing_by_animal(curves, lag_time, called, animals)
@@ -681,13 +725,23 @@ def called_response_timing(
         row["rise_onset_median_ms"] = np.nanmedian(rise_ms)
         steepest_ms = steepest_approach_lag(curves[:, chosen], lag_time) * _MS
         row["steepest_median_ms"] = np.nanmedian(steepest_ms)
-        population_curve = population_timing(
+        # One resampling of the days, read from zero and from the first lag.
+        resampled = _resampled_mean_curves(
             curves[:, chosen],
             timing.peak[chosen],
             groups[chosen],
-            lag_time,
             n_boot=n_boot,
             seed=seed,
+        )
+        population_curve, rise_curve = (
+            _mean_curve_timing(
+                *resampled,
+                lag_time,
+                n_units=int(chosen.sum()),
+                fraction=0.5,
+                baseline=baseline,
+            )
+            for baseline in ("zero", "window_start")
         )
         for what, point, (ci_low, ci_high) in (
             ("peak", population_curve.peak_lag, population_curve.peak_lag_interval),
@@ -704,14 +758,7 @@ def called_response_timing(
         row["population_size"] = population_curve.size
         row["population_size_ci_low"] = population_curve.size_interval[0]
         row["population_size_ci_high"] = population_curve.size_interval[1]
-        rise = population_rise_timing(
-            curves[:, chosen],
-            timing.peak[chosen],
-            groups[chosen],
-            lag_time,
-            n_boot=n_boot,
-            seed=seed,
-        )
+        rise = _rise_statistics(rise_curve)
         for name in (
             "rise_onset_ms",
             "rise_onset_ms_ci_low",
@@ -749,9 +796,10 @@ def called_response_timing(
         row["n_animals"] = len(own)
         for rule in ("onset", "steepest", "rise_onset"):
             row[f"n_animals_{rule}_before_event"] = int((own[f"{rule}_ms"] < 0).sum())
-    return pd.DataFrame.from_dict(
+    statistics = pd.DataFrame.from_dict(
         rows, orient="index", columns=list(_CALLED_TIMING_COLUMNS)
     )
+    return statistics, by_animal
 
 
 def paired_peak_lag_statistics(

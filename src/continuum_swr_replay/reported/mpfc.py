@@ -1200,7 +1200,7 @@ def timing_values(
         label = CLASS_LABELS[name]
         called = population_statistics.called_units(population, name, ALPHA)
         called_by_class[word] = called
-        statistics = timing.called_response_timing(
+        statistics, by_animal = timing.called_response_timing(
             curves[curve_key],
             curves["matched_control"],
             lag_time,
@@ -1209,9 +1209,6 @@ def timing_values(
             animals,
             n_boot=TIMING_BOOTSTRAP_DRAWS,
             seed=TIMING_BOOTSTRAP_SEED,
-        )
-        by_animal = timing.called_response_timing_by_animal(
-            curves[curve_key], lag_time, called, animals
         )
         for direction, sign in timing.DIRECTIONS.items():
             stats = statistics.loc[direction]

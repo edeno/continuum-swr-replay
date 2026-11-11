@@ -86,7 +86,7 @@ CONTROL[LAG_MS >= 0, 3] = 0.9
 def statistics() -> pd.DataFrame:
     return called_response_timing(
         CURVES, CONTROL, LAG_TIME, CALLED, DAYS, ANIMALS, n_boot=200, seed=0
-    )
+    )[0]
 
 
 def test_directions_are_the_signs_of_the_peak():
@@ -223,14 +223,17 @@ def test_called_response_timing_by_animal():
 
 def test_a_direction_without_units_has_only_its_count():
     called = CALLED & (np.arange(len(CALLED)) != 4)
-    statistics = called_response_timing(
+    statistics, by_animal = called_response_timing(
         CURVES, CONTROL, LAG_TIME, called, DAYS, ANIMALS, n_boot=10
     )
     suppressed = statistics.loc["suppressed"]
     assert suppressed["n_units"] == 0
     assert suppressed.drop("n_units").isna().all()
     assert statistics.loc["enhanced", "n_units"] == 4
-    by_animal = called_response_timing_by_animal(CURVES, LAG_TIME, called, ANIMALS)
+    # the per-animal timing returned beside the statistics is that of the same units
+    pd.testing.assert_frame_equal(
+        by_animal, called_response_timing_by_animal(CURVES, LAG_TIME, called, ANIMALS)
+    )
     assert list(by_animal.index.get_level_values("direction")) == ["enhanced"] * 2
     nothing = called_response_timing_by_animal(
         CURVES, LAG_TIME, np.zeros(len(CALLED), dtype=bool), ANIMALS
@@ -259,7 +262,7 @@ def _spike_statistics(animals: list[str]) -> pd.DataFrame:
         np.array(["d1"] * 4),
         np.array(animals),
         n_boot=10,
-    )
+    )[0]
 
 
 def test_a_peak_at_either_end_of_the_lags_given_is_at_the_edge():
@@ -301,7 +304,7 @@ def test_the_mean_curve_has_one_peak_the_lag_of_its_largest_absolute_value():
         np.array(["d1", "d1"]),
         np.array(["a", "a"]),
         n_boot=10,
-    ).loc["enhanced"]
+    )[0].loc["enhanced"]
     assert statistics["population_peak_ms"] == pytest.approx(-50)
     assert statistics["population_size"] == pytest.approx(-0.8)
     assert statistics["population_pre_event_level_fraction"] == pytest.approx(0.5)
@@ -323,7 +326,7 @@ def test_a_pre_event_level_on_the_other_side_of_zero_is_reported_as_zero():
         np.array(["d1"]),
         np.array(["a"]),
         n_boot=10,
-    ).loc["enhanced"]
+    )[0].loc["enhanced"]
     assert statistics["population_pre_event_level_fraction"] == 0.0
     assert statistics["population_control_pre_event_level_fraction"] == 0.0
 
@@ -337,7 +340,7 @@ def test_units_without_a_usable_control_curve_have_no_control_comparison():
         DAYS,
         ANIMALS,
         n_boot=10,
-    )
+    )[0]
     enhanced = statistics.loc["enhanced"]
     assert np.isnan(enhanced["population_size_vs_control"])
     assert np.isnan(enhanced["population_control_pre_event_level_fraction"])
