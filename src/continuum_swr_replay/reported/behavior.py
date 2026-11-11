@@ -60,10 +60,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
-from statsmodels.stats.multitest import multipletests
 
-from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
-from continuum_swr_replay.analysis.replay import rate_fit_statistics
+from continuum_swr_replay.analysis.events.cohort_selection import (
+    select_event_cohort,
+    select_stop_cohort,
+)
+from continuum_swr_replay.analysis.replay import rate_fit_statistics, stop_statistics
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (
     aic_difference_statistics,
     audited_drop_statistics,
@@ -83,19 +85,19 @@ from continuum_swr_replay.analysis.replay.fit_provenance import (
     check_fit_provenance,
     fit_provenance_path,
 )
-from continuum_swr_replay.analysis.replay.learning import cross_session_role_summary
+from continuum_swr_replay.analysis.replay.learning import (
+    cross_session_role_summary,
+    fit_status_counts,
+    pooled_gee_role_summary,
+    smallest_adjusted_p,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     BIN_S,
-    MODEL_PER_BIN_RATE,
     PER_BIN_DESIGN,
     PER_BIN_HISTORY_COLUMNS,
     REWARD_HISTORY_COLUMNS,
     REWARD_HISTORY_N_LAGS,
     TMAX,
-    longest_history_window_s,
-)
-from continuum_swr_replay.analysis.replay.per_bin_design import (
-    aggregate_to_timebins,
 )
 from continuum_swr_replay.data_loaders.constants import (
     TRACK_SEGMENT_TO_PATCH,
@@ -1243,43 +1245,17 @@ def stop_table_values(
     (``compare_fits.outcome_boundary_shift_cohort``), and the share of onsets
     inside the ``TMAX`` truncation."""
     make = value_factory(stop_table_values, source, TAGS["rate"])
-    anchored = stops[stops["occupancy_state"].isin(["at_well", "mixed"])]
-    known = anchored.dropna(subset=["is_rewarded_outcome"])
-    duration = known.groupby("is_rewarded_outcome")["immobility_duration_s"]
-    means, medians = duration.mean(), duration.median()
-    crosses = (
-        (stops["stop_start"] < stops["outcome_known_time_s"])
-        & (stops["outcome_known_time_s"] <= stops["stop_end"])
-    ).fillna(False)
-    ordered = stops.sort_values(SC + ["stop_start"], kind="stable")
-    next_arrival = ordered.groupby(SC, sort=False, observed=True)[
-        "last_well_arrival_time_s"
-    ].shift(-1)
-    spans = (
-        ((next_arrival > ordered["stop_start"]) & (next_arrival <= ordered["stop_end"]))
-        .fillna(False)
-        .reindex(stops.index)
-    )
-    delta = (stops["outcome_known_time_s"] - stops["stop_start"]).to_numpy(float)
-    bins = aggregate_to_timebins(
-        stops,
-        pd.DataFrame({"stop_id": [], "t_since_stop_onset": []}),
-        bin_s=BIN_S,
-        tmax=TMAX,
-        history_window_s=longest_history_window_s(MODEL_PER_BIN_RATE.values()),
-    )
-    last_bin = stops["stop_id"].map(bins.groupby("stop_id")["binj"].max())
-    with np.errstate(invalid="ignore"):
-        has_bin = last_bin.to_numpy(float) >= np.ceil(delta / BIN_S)
-    shifted = (
-        crosses
-        & ~spans
-        & pd.Series(np.nan_to_num(has_bin, nan=False).astype(bool), stops.index)
+    anchored, _ = select_stop_cohort(stops, cohort="at_well")
+    dwell = stop_statistics.dwell_statistics(anchored)
+    boundary = stop_statistics.outcome_boundary_statistics(stops)
+    onset_times = stop_statistics.onset_time_statistics(onsets, TMAX)
+    incomplete = stop_statistics.reward_history_incomplete_statistics(
+        stops, onsets, "non_local"
     )
     values = [
         make(
             "stop_duration_mean_rewarded",
-            means[1.0],
+            dwell["mean_rewarded_s"],
             "quantity",
             "sig2",
             "well-anchored stops with a rewarded outcome: mean immobility duration",
@@ -1287,7 +1263,7 @@ def stop_table_values(
         ),
         make(
             "stop_duration_mean_unrewarded",
-            means[0.0],
+            dwell["mean_omitted_s"],
             "quantity",
             "sig2",
             "well-anchored stops with an omitted outcome: mean immobility duration",
@@ -1295,7 +1271,7 @@ def stop_table_values(
         ),
         make(
             "stop_duration_mean_ratio",
-            means[1.0] / means[0.0],
+            dwell["mean_ratio"],
             "quantity",
             "sig2",
             "ratio of those means",
@@ -1303,7 +1279,7 @@ def stop_table_values(
         ),
         make(
             "stop_duration_median_rewarded",
-            medians[1.0],
+            dwell["median_rewarded_s"],
             "quantity",
             "sig2",
             "well-anchored stops with a rewarded outcome: median immobility duration",
@@ -1311,7 +1287,7 @@ def stop_table_values(
         ),
         make(
             "stop_duration_median_unrewarded",
-            medians[0.0],
+            dwell["median_omitted_s"],
             "quantity",
             "sig2",
             "well-anchored stops with an omitted outcome: median immobility duration",
@@ -1319,7 +1295,7 @@ def stop_table_values(
         ),
         make(
             "stop_duration_median_ratio",
-            medians[1.0] / medians[0.0],
+            dwell["median_ratio"],
             "quantity",
             "sig2",
             "ratio of those medians",
@@ -1327,63 +1303,63 @@ def stop_table_values(
         ),
         make(
             "stop_survival_two_s",
-            (anchored["immobility_duration_s"] >= 2).mean(),
+            stop_statistics.still_immobile_fraction(anchored, 2),
             "fraction",
             "pct",
             "share of well-anchored stops still immobile at 2 s",
         ),
         make(
             "stop_survival_four_s",
-            (anchored["immobility_duration_s"] >= 4).mean(),
+            stop_statistics.still_immobile_fraction(anchored, 4),
             "fraction",
             "pct",
             "share of well-anchored stops still immobile at 4 s",
         ),
         make(
             "stops_in_transit",
-            (stops["occupancy_state"] == "in_transit").sum(),
+            stop_statistics.stop_cohort_counts(stops)["n_in_transit"],
             "count",
             "count",
             "in-transit stops in the canonical stop table",
         ),
         make(
             "stops_crossing_outcome",
-            crosses.sum(),
+            boundary["n_crossing"],
             "count",
             "count",
             "stops with stop_start < outcome_known_time_s <= stop_end (all stops)",
         ),
         make(
             "stops_crossing_outcome_fraction",
-            crosses.mean(),
+            boundary["crossing_fraction"],
             "fraction",
             "pct",
             "their share of all stops",
         ),
         make(
             "stops_outcome_shifted",
-            shifted.sum(),
+            boundary["n_shifted"],
             "count",
             "count",
             "crossing stops whose per-bin reward history is shifted (no later arrival inside, a bin at or past the boundary)",
         ),
         make(
             "stops_outcome_shifted_fraction",
-            shifted.mean(),
+            boundary["shifted_fraction"],
             "fraction",
             "pct",
             "their share of all stops",
         ),
         make(
             "stops_spanning_arrival",
-            spans.sum(),
+            boundary["n_spanning_arrival"],
             "count",
             "count",
             "stops containing a later well arrival",
         ),
         make(
             "stops_spanning_arrival_crossing",
-            (spans & crosses).sum(),
+            boundary["n_spanning_arrival_crossing"],
             "count",
             "count",
             "of those, stops that also cross their outcome boundary",
@@ -1394,41 +1370,35 @@ def stop_table_values(
         ("swr", "SWR"),
         ("mua", "MUA"),
     ):
-        t = onsets.loc[
-            onsets["event_type"] == event_type, "t_since_stop_onset"
-        ].dropna()
         values.append(
             make(
                 f"onsets_within_tmax_fraction_{word}",
-                (t < TMAX).mean(),
+                onset_times.loc[event_type, "within_window_fraction"],
                 "fraction",
                 "pct",
                 f"share of {event_type} onsets within the first {TMAX:g} s of their stop (event_onset_table)",
             )
         )
-    incomplete = stops.set_index("stop_id")["reward_history_incomplete"]
-    nl_onsets = onsets.loc[onsets["event_type"] == "non_local", "stop_id"]
     values += [
         make(
             "stops_reward_history_incomplete_fraction",
-            (stops["reward_history_incomplete"] == 1).mean(),
+            incomplete["stop_fraction"],
             "fraction",
             "sig2",
             "share of stops flagged reward_history_incomplete (fewer than two known outcomes)",
         ),
         make(
             "onsets_reward_history_incomplete_fraction_non_local",
-            (nl_onsets.map(incomplete) == 1).mean(),
+            incomplete["onset_fraction"],
             "fraction",
             "sig2",
             "share of non-local onsets in those stops",
         ),
     ]
-    t = onsets.loc[onsets["event_type"] == "non_local", "t_since_stop_onset"].dropna()
     values.append(
         make(
             "onset_median_s_non_local",
-            t.median(),
+            onset_times.loc["non_local", "median_s"],
             "quantity",
             "sig2",
             "median time of a non-local onset after its stop's speed-threshold crossing",
@@ -2364,60 +2334,56 @@ def stay_leave_values(
     stratum, as ``run_stay_leave.py`` logs it.
     """
     make = value_factory(stay_leave_values, source, TAGS["stay_leave"])
-    signrank, gee = [], []
     values = []
-    for stratum, (logistic, pooled) in bundles.items():
-        summary = cross_session_role_summary(logistic)
-        signrank += [
-            (q, stratum, role)
-            for q, role in zip(summary["p_fdr"], summary["role"], strict=True)
-            if np.isfinite(q)
-        ]
-        converged = pooled[pooled["status"] == "ok"]
-        q = multipletests(converged["p_inter"].fillna(1.0).to_numpy(), method="fdr_bh")[
-            1
-        ]
-        gee += [
-            (qi, stratum, role) for qi, role in zip(q, converged["role"], strict=True)
-        ]
+    for stratum, (logistic, _) in bundles.items():
+        fits = fit_status_counts(logistic)
         values += [
             make(
                 f"stay_converged_{stratum}",
-                (logistic["status"] == "ok").sum(),
+                fits["n_converged"],
                 "count",
                 "count",
                 f"stratum {stratum}: converged session-by-role logistic fits",
             ),
             make(
                 f"stay_fits_{stratum}",
-                len(logistic),
+                fits["n_fits"],
                 "count",
                 "count",
                 f"stratum {stratum}: session-by-role logistic fits attempted",
             ),
         ]
-    q_min, stratum_min, role_min = min(signrank)
-    g_min, g_stratum, g_role = min(gee)
-    occupancy = stops["occupancy_state"]
-    anchored = occupancy.isin(["at_well", "mixed"])
+    signrank = smallest_adjusted_p(
+        {
+            stratum: cross_session_role_summary(logistic)
+            for stratum, (logistic, _) in bundles.items()
+        }
+    )
+    gee = smallest_adjusted_p(
+        {
+            stratum: pooled_gee_role_summary(pooled)
+            for stratum, (_, pooled) in bundles.items()
+        }
+    )
+    cohort = stop_statistics.stop_cohort_counts(stops)
     values += [
         make(
             "stay_min_q_signrank",
-            q_min,
+            signrank["p_fdr"],
             "quantity",
             "pval",
-            f"smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role {role_min}, stratum {stratum_min})",
+            f"smallest FDR-adjusted per-session Wilcoxon p over roles and strata (role {signrank['role']}, stratum {signrank['stratum']})",
         ),
         make(
             "stay_min_q_gee",
-            g_min,
+            gee["p_fdr"],
             "quantity",
             "pval",
-            f"smallest FDR-adjusted pooled-GEE p over roles and strata (role {g_role}, stratum {g_stratum})",
+            f"smallest FDR-adjusted pooled-GEE p over roles and strata (role {gee['role']}, stratum {gee['stratum']})",
         ),
         make(
             "stops_total",
-            len(stops),
+            cohort["n_stops"],
             "count",
             "count",
             "stops in the canonical stop table",
@@ -2425,7 +2391,7 @@ def stay_leave_values(
         ),
         make(
             "stops_well_anchored",
-            anchored.sum(),
+            cohort["n_well_anchored"],
             "count",
             "count",
             "stops with occupancy_state at_well or mixed (the shared cohort)",
@@ -2433,35 +2399,35 @@ def stay_leave_values(
         ),
         make(
             "stops_dropped",
-            (~anchored).sum(),
+            cohort["n_not_anchored"],
             "count",
             "count",
             "stops the well-anchored cohort leaves out",
         ),
         make(
             "stops_dropped_with_stay",
-            stops.loc[~anchored, "is_stay"].notna().sum(),
+            cohort["n_not_anchored_with_stay"],
             "count",
             "count",
             "of those, stops carrying an is_stay",
         ),
         make(
             "stops_mixed",
-            (occupancy == "mixed").sum(),
+            cohort["n_mixed"],
             "count",
             "count",
             "mixed stops (every one without an is_stay)",
         ),
         make(
             "stops_mixed_with_stay",
-            stops.loc[occupancy == "mixed", "is_stay"].notna().sum(),
+            cohort["n_mixed_with_stay"],
             "count",
             "count",
             "mixed stops carrying an is_stay",
         ),
         make(
             "stops_at_well_with_stay",
-            stops.loc[occupancy == "at_well", "is_stay"].notna().sum(),
+            cohort["n_at_well_with_stay"],
             "count",
             "count",
             "at_well stops carrying an is_stay (Stage 6's population)",
