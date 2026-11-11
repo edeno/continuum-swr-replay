@@ -42,7 +42,6 @@ from continuum_swr_replay.analysis.replay.model_specs import (
 )
 from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
-    reward_kernel_rate_ratios,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
 
@@ -183,6 +182,18 @@ def reward_gated_fits(fits: pd.DataFrame) -> pd.DataFrame:
     return fits[kept]
 
 
+def _gated_reward_kernels(fits: pd.DataFrame) -> tuple[pd.DataFrame, np.ndarray]:
+    """The reward-gated fits (:func:`reward_gated_fits`) and each one's
+    reconstructed kernel: log rate ratios, shape (n_gated_sessions, n_lags)."""
+    gated = reward_gated_fits(fits)
+    kernels = reconstruct_reward_kernels(
+        gated[_REWARD_COEFFICIENTS].to_numpy(dtype=float),
+        REWARD_HISTORY_N_LAGS,
+        REWARD_HISTORY_N_BASIS,
+    )
+    return gated, kernels
+
+
 def lag_one_reward_kernels(fits: pd.DataFrame) -> pd.DataFrame:
     """Each gated session's reconstructed reward kernel at lag 1.
 
@@ -198,13 +209,8 @@ def lag_one_reward_kernels(fits: pd.DataFrame) -> pd.DataFrame:
         The session columns, ``converged`` and ``lag_one``: the log rate ratio
         of a reward one trial back.
     """
-    fitted = reward_gated_fits(fits).dropna(subset=_REWARD_COEFFICIENTS)
-    kernels = reconstruct_reward_kernels(
-        fitted[_REWARD_COEFFICIENTS].to_numpy(dtype=float),
-        REWARD_HISTORY_N_LAGS,
-        REWARD_HISTORY_N_BASIS,
-    )
-    return fitted[[*SESSION_COLUMNS, "converged"]].assign(lag_one=kernels[:, 0])
+    gated, kernels = _gated_reward_kernels(fits)
+    return gated[[*SESSION_COLUMNS, "converged"]].assign(lag_one=kernels[:, 0])
 
 
 def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
@@ -238,26 +244,27 @@ def reward_kernel_statistics(fits: pd.DataFrame) -> dict[str, float]:
         - ``n_animals_lag_one_positive``: animals whose median lag-1 kernel is
           above a rate ratio of 1.
     """
-    kernels = lag_one_reward_kernels(fits)
-    lag_one = session_median_statistics(kernels["lag_one"], kernels["animal"])
-    rate_ratios = reward_kernel_rate_ratios(reward_gated_fits(fits))
+    gated, kernels = _gated_reward_kernels(fits)
+    lag_one = pd.Series(kernels[:, 0], index=gated.index)
+    lag_one_statistics = session_median_statistics(lag_one, gated["animal"])
+    rate_ratios = np.median(np.exp(kernels), axis=0)
     late = rate_ratios[FIRST_LATE_REWARD_LAG - 1 :]
     n_fitted = int(fits[_REWARD_COEFFICIENTS].notna().all(axis=1).sum())
     return {
-        "n_sessions": len(kernels),
-        "n_dropped": n_fitted - len(kernels),
-        "n_nonconverged": int((kernels["converged"] == False).sum()),  # noqa: E712
+        "n_sessions": len(gated),
+        "n_dropped": n_fitted - len(gated),
+        "n_nonconverged": int((gated["converged"] == False).sum()),  # noqa: E712
         **{
             f"rate_ratio_lag_{lag}": float(rate_ratio)
             for lag, rate_ratio in enumerate(rate_ratios, start=1)
         },
         "late_rate_ratio_min": float(late.min()),
         "late_rate_ratio_max": float(late.max()),
-        "lag_one_positive_fraction": lag_one["positive_fraction"],
-        "lag_one_signed_rank_p": float(wilcoxon(kernels["lag_one"]).pvalue),
-        "lag_one_animal_rate_ratio": float(np.exp(lag_one["animal_median"])),
-        "n_animals": lag_one["n_animals"],
-        "n_animals_lag_one_positive": lag_one["n_animals_positive"],
+        "lag_one_positive_fraction": lag_one_statistics["positive_fraction"],
+        "lag_one_signed_rank_p": float(wilcoxon(lag_one).pvalue),
+        "lag_one_animal_rate_ratio": float(np.exp(lag_one_statistics["animal_median"])),
+        "n_animals": lag_one_statistics["n_animals"],
+        "n_animals_lag_one_positive": lag_one_statistics["n_animals_positive"],
     }
 
 
@@ -463,7 +470,7 @@ def clock_shape_statistics(
     """
     grid, stop_curve, n_stop = fitted_time_course(stop_fits, "stop")
     arrival_grid, arrival_curve, n_arrival = fitted_time_course(arrival_fits, "arrival")
-    ks = np.nanmax(
+    ks = np.max(
         np.abs(_shape_cdf(grid, stop_curve) - _shape_cdf(arrival_grid, arrival_curve))
     )
     stop_i, arrival_i = int(np.argmax(stop_curve)), int(np.argmax(arrival_curve))
