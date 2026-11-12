@@ -17,7 +17,7 @@ Per session, per direction (specs: ``model_specs.MODEL_CROSS_HISTORY_RATE``):
   Mselfcross = Mself + cross-history (raised cosine)
 We report the cross-history coefficients, the self->cross AIC drop, and the
 cross cv-bits/event gain; then aggregate across sessions (median, %+, per-animal
-sign consistency, FDR Wilcoxon).
+sign consistency, Benjamini-Hochberg q of the signed-rank p).
 
 Usage: python scripts/rate/fit_cross_history_rate.py [--max-per-animal N] [--write]
 """
@@ -30,8 +30,6 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
-from statsmodels.stats.multitest import multipletests
 
 from continuum_swr_replay.analysis.events.analysed_time import (
     require_swr_source,
@@ -51,9 +49,17 @@ from continuum_swr_replay.analysis.replay import (
     fit_per_bin_rate_model,
     freeze_per_bin_cohort,
 )
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    coefficient_statistics,
+)
 from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
+)
+from continuum_swr_replay.analysis.statistics import (
+    benjamini_hochberg,
+    session_median_statistics,
+    signed_rank_p,
 )
 from continuum_swr_replay.paths import model_dir, table_path
 from continuum_swr_replay.tables.covariate_registry import (
@@ -145,36 +151,40 @@ def fit_cross_history(stop_table: pd.DataFrame, onsets: pd.DataFrame) -> pd.Data
 
 
 def _summary(models: pd.DataFrame) -> None:
+    """Print each direction's summary over sessions.
+
+    The medians and signs are ``session_median_statistics``', the coefficients'
+    ``coefficient_statistics``', every p ``signed_rank_p``'s (NaN below six
+    non-zero differences) and the q values ``benjamini_hochberg``'s over the
+    cross-history basis.
+    """
     for direction, g in models.groupby("direction"):
         print(f"\n=== {direction}  (n={len(g)} sessions) ===")
-        da = g["delta_aic"].dropna()
-        if len(da) >= 5:
-            print(
-                f"  self->+cross AIC drop: median {da.median():+.2f}  "
-                f"%improved {100 * (da > 0).mean():.0f}%  "
-                f"p={wilcoxon(da)[1]:.1e}"
-            )
-        else:
-            print("  (n<5)")
+        da = g.dropna(subset=["delta_aic"])
+        aic = session_median_statistics(da["delta_aic"], da["animal"])
+        print(
+            f"  self->+cross AIC drop: median {aic['median']:+.2f}  "
+            f"%improved {100 * aic['positive_fraction']:.0f}%  "
+            f"p={signed_rank_p(da['delta_aic']):.1e}"
+        )
         if "delta_cv_bits" in g:
-            dc = g["delta_cv_bits"].dropna()
-            if len(dc) >= 5:
-                print(
-                    f"  cross cv-bits/event gain: median {dc.median():+.4f}  "
-                    f"%+ {100 * (dc > 0).mean():.0f}%"
-                )
+            dc = g.dropna(subset=["delta_cv_bits"])
+            cv = session_median_statistics(dc["delta_cv_bits"], dc["animal"])
+            print(
+                f"  cross cv-bits/event gain: median {cv['median']:+.4f}  "
+                f"%+ {100 * cv['positive_fraction']:.0f}%  (n={cv['n_sessions']})"
+            )
         # cross-history coefficients (FDR across the basis)
-        present = [c for c in CROSS_COEFS if c in g and g[c].notna().sum() >= 5]
+        present = [c for c in CROSS_COEFS if c in g and g[c].notna().any()]
         if present:
-            pvals = [wilcoxon(g[c].dropna())[1] for c in present]
-            fdr = multipletests(pvals, method="fdr_bh")[1]
+            stats = {c: coefficient_statistics(g, c) for c in present}
+            fdr = benjamini_hochberg([stats[c]["signed_rank_p"] for c in present])
             print("  cross-history basis coefficients (early->late lag):")
             for c, q in zip(present, fdr, strict=True):
-                s = g[c].dropna()
-                n_an = (g.groupby("animal")[c].median() > 0).sum()
+                animals = f"{stats[c]['n_animals_positive']}/{stats[c]['n_animals']}"
                 print(
-                    f"    {c.removeprefix('coef_'):<18}{s.median():>+8.3f}"
-                    f"{(s > 0).mean() * 100:>6.0f}%{f'{n_an}/5':>7}  q={q:.1e}"
+                    f"    {c.removeprefix('coef_'):<18}{stats[c]['median']:>+8.3f}"
+                    f"{stats[c]['positive_fraction'] * 100:>6.0f}%{animals:>7}  q={q:.1e}"
                 )
 
 
