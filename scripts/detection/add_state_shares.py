@@ -141,14 +141,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parser.parse_args(argv)
 
     run_dir = event_features_root() / args.event_features_run
-    run_manifest = json.loads((run_dir / "manifest.json").read_text())
+    run_manifest = feature_run.read_manifest(run_dir)
     manifest_path = run_dir / MANIFEST_NAME
     previous = (
         json.loads(manifest_path.read_text())["epochs"]
         if manifest_path.exists()
         else {}
     )
-    ok = sorted(i for i, r in run_manifest["epochs"].items() if r["status"] == "ok")
+    ok = feature_run.ok_epochs(run_manifest)
     todo = [
         i
         for i in ok
