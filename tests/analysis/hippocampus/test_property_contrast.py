@@ -7,52 +7,10 @@ import pytest
 from continuum_swr_replay.analysis.hippocampus import property_contrast as pc
 
 
-def test_weighted_median_equals_median_of_repeated_sample():
-    rng = np.random.default_rng(0)
-    for _ in range(50):
-        values = np.sort(rng.normal(size=rng.integers(1, 12)))
-        weights = rng.integers(0, 4, values.size)
-        if weights.sum() == 0:
-            assert np.isnan(pc.weighted_median(values, weights))
-            continue
-        expected = np.median(np.repeat(values, weights))
-        assert pc.weighted_median(values, weights) == pytest.approx(expected)
-
-
 def _design(n_animals=5, n_sessions=8, n_events=40):
     animal = np.repeat(np.arange(n_animals), n_sessions * n_events)
     session = np.repeat(np.arange(n_animals * n_sessions), n_events)
     return animal, session
-
-
-def test_nested_counts_keep_the_totals_and_the_nesting():
-    animal, session = _design()
-    rng = np.random.default_rng(1)
-    for _ in range(20):
-        counts = pc.nested_bootstrap_counts(animal, session, rng)
-        # every level draws as many as it has: the total is unchanged
-        assert counts.sum() == animal.size
-        # a drawn session's events total a multiple of its size
-        per_session = pd.Series(counts).groupby(session).sum()
-        assert (per_session % 40 == 0).all()
-        per_animal = pd.Series(counts).groupby(animal).sum()
-        assert (per_animal % (8 * 40) == 0).all()
-
-
-def test_nested_bootstrap_spread_tracks_between_animal_variation():
-    # an animal-level effect dominates the median's uncertainty: the
-    # nested bootstrap must see it (a flat event bootstrap would not)
-    animal, session = _design()
-    rng = np.random.default_rng(2)
-    offsets = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
-    values = offsets[animal] + rng.normal(0, 0.1, animal.size)
-    medians = []
-    for _ in range(200):
-        counts = pc.nested_bootstrap_counts(animal, session, rng)
-        order = np.argsort(values)
-        medians.append(pc.weighted_median(values[order], counts[order]))
-    flat = [np.median(rng.choice(values, values.size)) for _ in range(200)]
-    assert np.std(medians) > 10 * np.std(flat)
 
 
 def _duration_world(rng, class_effect, n=20_000):

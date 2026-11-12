@@ -229,3 +229,81 @@ def test_animal_medians_are_each_animals_median_over_its_rows_in_sorted_order():
 def test_animal_medians_need_the_animals_indexed_as_the_values():
     with pytest.raises(ValueError, match="indexed alike"):
         stats.animal_medians(pd.Series([1.0, 2.0]), pd.Series(["a", "b"], index=[5, 6]))
+
+
+# --- the nested bootstrap -------------------------------------------------------------
+
+
+def test_weighted_median_equals_median_of_repeated_sample():
+    rng = np.random.default_rng(0)
+    for _ in range(50):
+        values = np.sort(rng.normal(size=rng.integers(1, 12)))
+        weights = rng.integers(0, 4, values.size)
+        if weights.sum() == 0:
+            assert np.isnan(stats.weighted_median(values, weights))
+            continue
+        expected = np.median(np.repeat(values, weights))
+        assert stats.weighted_median(values, weights) == pytest.approx(expected)
+
+
+def _design(n_animals=5, n_sessions=8, n_events=40):
+    animal = np.repeat(np.arange(n_animals), n_sessions * n_events)
+    session = np.repeat(np.arange(n_animals * n_sessions), n_events)
+    return animal, session
+
+
+def test_nested_counts_keep_the_totals_and_the_nesting():
+    animal, session = _design()
+    rng = np.random.default_rng(1)
+    for _ in range(20):
+        counts = stats.nested_bootstrap_draw(animal, session, rng).rows
+        # every level draws as many as it has: the total is unchanged
+        assert counts.sum() == animal.size
+        # a drawn session's events total a multiple of its size
+        per_session = pd.Series(counts).groupby(session).sum()
+        assert (per_session % 40 == 0).all()
+        per_animal = pd.Series(counts).groupby(animal).sum()
+        assert (per_animal % (8 * 40) == 0).all()
+
+
+def test_nested_bootstrap_spread_tracks_between_animal_variation():
+    # an animal-level effect dominates the median's uncertainty: the
+    # nested bootstrap must see it (a flat event bootstrap would not)
+    animal, session = _design()
+    rng = np.random.default_rng(2)
+    offsets = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+    values = offsets[animal] + rng.normal(0, 0.1, animal.size)
+    medians = []
+    for _ in range(200):
+        counts = stats.nested_bootstrap_draw(animal, session, rng).rows
+        order = np.argsort(values)
+        medians.append(stats.weighted_median(values[order], counts[order]))
+    flat = [np.median(rng.choice(values, values.size)) for _ in range(200)]
+    assert np.std(medians) > 10 * np.std(flat)
+
+
+def test_the_draw_counts_each_level_consistently():
+    # Unequal sizes: animal 0 has sessions of 1 and 3 rows, animal 1 one of 2.
+    animal = np.array([0, 0, 0, 0, 1, 1])
+    session = np.array([0, 1, 1, 1, 2, 2])
+    sizes = np.array([1, 3, 2])
+    rng = np.random.default_rng(4)
+    for _ in range(50):
+        draw = stats.nested_bootstrap_draw(animal, session, rng)
+        assert draw.animals.sum() == 2
+        # each draw of an animal draws as many sessions as it has
+        assert draw.sessions[:2].sum() == 2 * draw.animals[0]
+        assert draw.sessions[2] == draw.animals[1]
+        # each draw of a session draws as many rows as it has
+        per_session = np.bincount(session, weights=draw.rows, minlength=3)
+        np.testing.assert_array_equal(per_session, draw.sessions * sizes)
+
+
+def test_nested_codes_follow_the_sorted_labels_and_refuse_a_shared_session():
+    animal, session = stats.nested_codes(
+        np.array(["b", "a", "b"]), np.array(["s2", "s1", "s3"])
+    )
+    np.testing.assert_array_equal(animal, [1, 0, 1])
+    np.testing.assert_array_equal(session, [1, 0, 2])
+    with pytest.raises(ValueError, match="more than one animal"):
+        stats.nested_codes(np.array([0, 0, 1, 1]), np.array([0, 0, 0, 1]))

@@ -7,6 +7,10 @@
 - :func:`session_median_statistics`: the animal-balanced summary of one number
   per session: the median over sessions with the sessions' signs, and the
   median over animals of each animal's own median with the animals' signs.
+- :func:`nested_bootstrap_draw`: one replicate of the nested bootstrap
+  (animals, then sessions within each drawn animal, then the units or events
+  within each drawn session), the resampling behind every interval; with
+  :func:`nested_codes` and :func:`weighted_median`.
 
 A signed-rank p over sessions treats the sessions as independent, which
 sessions of one animal are not: it describes consistency across sessions and is
@@ -14,6 +18,8 @@ not a test on the animals.
 """
 
 from __future__ import annotations
+
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -162,3 +168,130 @@ def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str,
         "n_animals_negative": int((per_animal < 0).sum()),
         "n_animals_same_sign": int((np.sign(per_animal) == np.sign(median)).sum()),
     }
+
+
+def nested_codes(
+    animal: ArrayLike, session: ArrayLike
+) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """Each row's animal and session as codes ``0..n-1``, for
+    :func:`nested_bootstrap_draw`.
+
+    Parameters
+    ----------
+    animal, session : array_like, shape (n_rows,)
+        Each row's animal and session labels. A session label names one
+        session across animals.
+
+    Returns
+    -------
+    animal_codes, session_codes : NDArray of int, shape (n_rows,)
+        Codes in sorted label order (:func:`numpy.unique`).
+
+    Raises
+    ------
+    ValueError
+        If a session belongs to more than one animal.
+    """
+    _, animal_codes = np.unique(np.asarray(animal), return_inverse=True)
+    _, session_codes = np.unique(np.asarray(session), return_inverse=True)
+    pairs = pd.DataFrame({"a": animal_codes, "s": session_codes}).drop_duplicates()
+    if pairs.s.duplicated().any():
+        raise ValueError("a session belongs to more than one animal")
+    return animal_codes.astype(np.int64), session_codes.astype(np.int64)
+
+
+class NestedDraw(NamedTuple):
+    """One replicate of :func:`nested_bootstrap_draw`.
+
+    Attributes
+    ----------
+    animals : NDArray of int, shape (n_animals,)
+        How often each animal is drawn, by animal code.
+    sessions : NDArray of int, shape (n_sessions,)
+        How often each session is drawn, by session code.
+    rows : NDArray of int, shape (n_rows,)
+        How often each row (a unit, an event, or a session when the sessions
+        are the rows) is drawn.
+    """
+
+    animals: NDArray[np.int64]
+    sessions: NDArray[np.int64]
+    rows: NDArray[np.int64]
+
+
+def nested_bootstrap_draw(
+    animal: NDArray[np.int64], session: NDArray[np.int64], rng: np.random.Generator
+) -> NestedDraw:
+    """One replicate of the nested bootstrap: how often each animal, session
+    and row is drawn.
+
+    Animals are drawn with replacement (as many as there are); each draw of an
+    animal draws its sessions with replacement (as many as it has); each draw of
+    a session draws its rows with replacement (as many as it has). Drawing an
+    animal or a session ``k`` times and resampling its members each time is
+    drawn as one multinomial of ``k`` times as many members, so the ``k``
+    copies' members are pooled: exact for a statistic pooled over the rows and
+    for a mean of means; a median within a drawn animal or session is taken
+    over the pooled members of its copies.
+
+    Parameters
+    ----------
+    animal, session : NDArray of int, shape (n_rows,)
+        Codes ``0..n-1`` (:func:`nested_codes`); every session belongs to one
+        animal.
+    rng : numpy.random.Generator
+        The draws' source.
+
+    Returns
+    -------
+    NestedDraw
+    """
+    animal = np.asarray(animal, dtype=np.int64)
+    session = np.asarray(session, dtype=np.int64)
+    n_animals = int(animal.max()) + 1
+    session_animal = np.zeros(int(session.max()) + 1, dtype=np.int64)
+    session_animal[session] = animal
+    animal_draws = rng.multinomial(n_animals, np.full(n_animals, 1.0 / n_animals))
+    session_draws = np.zeros(session_animal.size, dtype=np.int64)
+    for a in np.flatnonzero(animal_draws):
+        mine = np.flatnonzero(session_animal == a)
+        session_draws[mine] = rng.multinomial(
+            animal_draws[a] * mine.size, np.full(mine.size, 1.0 / mine.size)
+        )
+    counts = np.zeros(animal.size, dtype=np.int64)
+    order = np.argsort(session, kind="stable")
+    bounds = np.searchsorted(session[order], np.arange(session_animal.size + 1))
+    for s in np.flatnonzero(session_draws):
+        members = order[bounds[s] : bounds[s + 1]]
+        counts[members] = rng.multinomial(
+            session_draws[s] * members.size, np.full(members.size, 1.0 / members.size)
+        )
+    return NestedDraw(animal_draws, session_draws, counts)
+
+
+def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
+    """The median of ``values_sorted`` with each value repeated ``weights`` times.
+
+    With whole weights this is ``np.median`` of the repeated sample (the mean
+    of the two middle values when the total is even).
+
+    Parameters
+    ----------
+    values_sorted : NDArray, shape (n,)
+        Ascending.
+    weights : NDArray, shape (n,)
+        Non-negative counts.
+
+    Returns
+    -------
+    float
+        NaN when the weights sum to 0.
+    """
+    cumulative = np.cumsum(weights)
+    total = cumulative[-1] if cumulative.size else 0
+    if total <= 0:
+        return float("nan")
+    # 1-based positions of the two middle draws of the repeated sample
+    low = np.searchsorted(cumulative, (total + 1) // 2, side="left")
+    high = np.searchsorted(cumulative, total // 2 + 1, side="left")
+    return float((values_sorted[low] + values_sorted[high]) / 2.0)

@@ -3,11 +3,12 @@
 Part 2 compares event properties between SWR-overlapping and non-SWR events by
 the median of each class over every event. Events are nested in sessions
 (epochs) and sessions in animals, so the uncertainty comes from a bootstrap
-that resamples at each level in turn (:func:`nested_bootstrap_counts`): the
-animals with replacement, then each drawn animal's sessions with replacement,
-then each drawn session's events with replacement. A replicate is a vector of
-counts, how many times each event was drawn, so every property and both
-classes are read from the same resample.
+that resamples at each level in turn
+(:func:`~continuum_swr_replay.analysis.shared_statistics.nested_bootstrap_draw`):
+the animals with replacement, then each drawn animal's sessions with
+replacement, then each drawn session's events with replacement. A replicate is
+a vector of counts, how many times each event was drawn, so every property and
+both classes are read from the same resample.
 
 Non-SWR events are shorter than SWR events, so a raw contrast mixes any class
 difference with a duration difference. :func:`matched_difference`
@@ -32,83 +33,17 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.shared_statistics import (
+    nested_bootstrap_draw,
+    nested_codes,
+    weighted_median,
+)
 from continuum_swr_replay.parameters import SAMPLING_FREQUENCY
 
 #: An event's duration is a whole number of decode samples of this length (s).
 DECODE_SAMPLE_S = 1.0 / SAMPLING_FREQUENCY
 #: The largest share of bootstrap replicates allowed to have no estimate.
 MAX_NAN_REPLICATE_SHARE = 0.01
-
-
-def nested_bootstrap_counts(
-    animal: NDArray[np.int64], session: NDArray[np.int64], rng: np.random.Generator
-) -> NDArray[np.int64]:
-    """One replicate of the nested bootstrap: how often each event is drawn.
-
-    Animals are drawn with replacement (as many as there are); each draw of an
-    animal draws its sessions with replacement (as many as it has); each draw of
-    a session draws its events with replacement (as many as it has). Drawing a
-    unit ``k`` times and resampling its members each time is one multinomial of
-    ``k`` times as many draws, which is how the counts are made.
-
-    Parameters
-    ----------
-    animal, session : NDArray of int, shape (n_events,)
-        Codes ``0..n-1``; every session belongs to one animal.
-
-    Returns
-    -------
-    counts : NDArray of int, shape (n_events,)
-    """
-    animal = np.asarray(animal, dtype=np.int64)
-    session = np.asarray(session, dtype=np.int64)
-    n_animals = int(animal.max()) + 1
-    session_animal = np.zeros(int(session.max()) + 1, dtype=np.int64)
-    session_animal[session] = animal
-    animal_draws = rng.multinomial(n_animals, np.full(n_animals, 1.0 / n_animals))
-    session_draws = np.zeros(session_animal.size, dtype=np.int64)
-    for a in np.flatnonzero(animal_draws):
-        mine = np.flatnonzero(session_animal == a)
-        session_draws[mine] = rng.multinomial(
-            animal_draws[a] * mine.size, np.full(mine.size, 1.0 / mine.size)
-        )
-    counts = np.zeros(animal.size, dtype=np.int64)
-    order = np.argsort(session, kind="stable")
-    bounds = np.searchsorted(session[order], np.arange(session_animal.size + 1))
-    for s in np.flatnonzero(session_draws):
-        members = order[bounds[s] : bounds[s + 1]]
-        counts[members] = rng.multinomial(
-            session_draws[s] * members.size, np.full(members.size, 1.0 / members.size)
-        )
-    return counts
-
-
-def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:
-    """The median of ``values_sorted`` with each value repeated ``weights`` times.
-
-    With whole weights this is ``np.median`` of the repeated sample (the mean
-    of the two middle values when the total is even).
-
-    Parameters
-    ----------
-    values_sorted : NDArray, shape (n,)
-        Ascending.
-    weights : NDArray, shape (n,)
-        Non-negative counts.
-
-    Returns
-    -------
-    float
-        NaN when the weights sum to 0.
-    """
-    cumulative = np.cumsum(weights)
-    total = cumulative[-1] if cumulative.size else 0
-    if total <= 0:
-        return float("nan")
-    # 1-based positions of the two middle draws of the repeated sample
-    low = np.searchsorted(cumulative, (total + 1) // 2, side="left")
-    high = np.searchsorted(cumulative, total // 2 + 1, side="left")
-    return float((values_sorted[low] + values_sorted[high]) / 2.0)
 
 
 def duration_strata(
@@ -254,11 +189,7 @@ def bootstrap_contrasts(
         the replicate drew no event of a class in, left out of its average).
     """
     is_swr = np.asarray(is_swr, dtype=bool)
-    _, animal_codes = np.unique(np.asarray(animal), return_inverse=True)
-    _, session_codes = np.unique(np.asarray(session), return_inverse=True)
-    pairs = pd.DataFrame({"a": animal_codes, "s": session_codes}).drop_duplicates()
-    if pairs.s.duplicated().any():
-        raise ValueError("a session belongs to more than one animal")
+    animal_codes, session_codes = nested_codes(animal, session)
     strata = duration_strata(duration, n_strata)
     groups = {name: _SortedGroups(v, is_swr, strata) for name, v in properties.items()}
     eligible = {name: _eligible_strata(g, min_per_class) for name, g in groups.items()}
@@ -268,7 +199,7 @@ def bootstrap_contrasts(
         weights = (
             np.ones(is_swr.size, dtype=np.int64)
             if replicate < 0
-            else nested_bootstrap_counts(animal_codes, session_codes, rng)
+            else nested_bootstrap_draw(animal_codes, session_codes, rng).rows
         )
         for name, g in groups.items():
             non, swr = g.median(False, weights), g.median(True, weights)
