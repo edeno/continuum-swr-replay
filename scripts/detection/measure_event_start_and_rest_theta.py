@@ -58,6 +58,7 @@ from continuum_swr_replay.paths import (
     table_path,
 )
 from continuum_swr_replay.reported.events import EVENT_FEATURES_RUN
+from continuum_swr_replay.runs.io import read_manifest
 from continuum_swr_replay.runs.provenance import described_commit, produced_by
 
 OUT_NAME = "event_start_rest_theta"
@@ -143,9 +144,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--n-windows", type=int, default=10)
     parser.add_argument("--epochs", nargs="*")
     args = parser.parse_args(argv)
-    manifest = json.loads(
-        (event_features_root() / EVENT_FEATURES_RUN / "manifest.json").read_text()
-    )
+    manifest = read_manifest(event_features_root() / EVENT_FEATURES_RUN)
     event_table = table_path("event_table", replay_content_dir())
     events = pd.read_parquet(
         event_table,
