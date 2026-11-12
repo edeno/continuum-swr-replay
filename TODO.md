@@ -74,6 +74,19 @@ Work that is deferred on purpose. Each item says when it should be done.
   number. The choice is open to a different method later: the panel's reduction is
   that one call, so changing it means swapping the function.
 
+- [ ] **Refit the content models at the next regeneration.** Two stored content
+  outputs predate today's rules. (1) The six `models_validation/` staging bundles
+  of the 2026-09-01 regeneration (`replay_content_regen_staging/`,
+  `contfrag_replay_content_regen_staging/`) fail `write_regeneration_manifest.py`'s
+  convergence gate: their null rung (M0/P0) records no `converged` flag, which the
+  gate reads as not converged. The conditional-Poisson null records its flags since
+  `745204e8`. (2) The leaf bundle's stored cohort audit
+  (`replay_content/models_leaf_M0-M0a-M1-M2-M3-M4-Mv-Mu-Mvu`, written 2026-10-16)
+  books rung Mu's qvals-gap events under the older audit rule (as own-predictor
+  missing); rebuilt with today's code, that row moves to `n_drop_qvals_gap`. No
+  reported value reads either. *When:* the next content regeneration, which writes
+  fresh staging bundles and fits with the current code.
+
 - [ ] **Decide the open choices in the reported statistics.**
   `docs/known_issues/reported_statistics_choices.md` lists them: where each is
   made, what the code does, what is open, and what was measured on the current
