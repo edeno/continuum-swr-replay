@@ -84,7 +84,6 @@ from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E40
 from continuum_swr_replay.analysis.pfc import run_session  # noqa: E402
 from continuum_swr_replay.analysis.pfc.batched_glm import (  # noqa: E402
     DEFAULT_PENALTY_SIGMA,
-    fit_poisson_glms,
     implied_prior_sd,
 )
 from continuum_swr_replay.analysis.pfc.canonical_events import (  # noqa: E402
@@ -100,7 +99,6 @@ from continuum_swr_replay.analysis.pfc.event_sets import (  # noqa: E402
     EVENT_SETS,
     EXTENDED_EVENT_CLASSES,
 )
-from continuum_swr_replay.analysis.pfc.fit import model_penalties  # noqa: E402
 from continuum_swr_replay.analysis.pfc.gpu import configure_jax_gpu  # noqa: E402
 from continuum_swr_replay.analysis.pfc.heldout import (  # noqa: E402
     CONTROL_NULL_EVENT_POLICY,
@@ -117,15 +115,16 @@ from continuum_swr_replay.analysis.pfc.matched_control import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     EXTENDED_CURVE_SOURCES,
-    THREE_CLASS_MODEL,
-    curve_coefficients,
     in_report_window,
 )
 from continuum_swr_replay.analysis.pfc.runner_support import (  # noqa: E402
     read_session_list,
     session_seed,
 )
-from continuum_swr_replay.analysis.pfc.scoring import score_session  # noqa: E402
+from continuum_swr_replay.analysis.pfc.scoring import (  # noqa: E402
+    extended_curves,
+    score_session,
+)
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epochs,
 )
@@ -340,56 +339,6 @@ def results_exist(
         and record.get("matched_control_placement_method")
         == MATCHED_CONTROL_PLACEMENT_METHOD
     )
-
-
-def extended_curves(
-    context: dict[str, object], penalty_sigma: float
-) -> dict[str, NDArray]:
-    """The extended event set's two curves, off :data:`THREE_CLASS_MODEL`.
-
-    The model is refit here on the session's fit bins under the shipped prior;
-    it is the same design, counts, penalty and fitter as the session's own
-    prefit of that model, so the fit is the same one. A unit whose fit did not
-    converge, or a session whose design is rank-deficient (no SWR without
-    replay), gets a NaN curve.
-
-    Parameters
-    ----------
-    context : dict
-        The session's fit material from ``run_session`` (``scoring_out``).
-    penalty_sigma : float
-        The shipped prior.
-
-    Returns
-    -------
-    dict[str, NDArray]
-        :data:`EXTENDED_CURVE_SOURCES` key -> ``(n_report_lags, n_units)``.
-    """
-    fit_rows = np.asarray(context["fit_mask"], dtype=bool)
-    design = np.asarray(context["designs"][THREE_CLASS_MODEL])[fit_rows]
-    counts = np.asarray(context["counts"], dtype=float)[fit_rows]
-    basis = np.asarray(context["spline_basis"])
-    lag_time = np.asarray(context["lag_time"])
-    report = in_report_window(lag_time)
-    n_basis = basis.shape[1]
-    curves: dict[str, NDArray] = {}
-    if np.linalg.matrix_rank(design) < design.shape[1]:
-        nan = np.full((int(report.sum()), counts.shape[1]), np.nan)
-        return {name: nan.copy() for name in EXTENDED_CURVE_SOURCES}
-    fit = fit_poisson_glms(
-        design,
-        counts,
-        penalty=model_penalties({THREE_CLASS_MODEL: design}, penalty_sigma)[
-            THREE_CLASS_MODEL
-        ],
-        compute_covariance=False,
-    )
-    params = np.asarray(fit.params).copy()
-    params[~np.asarray(fit.converged, dtype=bool)] = np.nan
-    for name in EXTENDED_CURVE_SOURCES:
-        _, block = curve_coefficients(name, n_basis, EXTENDED_CURVE_SOURCES)
-        curves[name] = basis[report] @ params[:, block].T
-    return curves
 
 
 def drop_retired_statistics(neuron_stats: pd.DataFrame) -> pd.DataFrame:

@@ -347,3 +347,75 @@ def test_a_nonconverged_mle_is_not_used_for_the_prior_audit(monkeypatch):
         assert np.isnan(columns[f"{curve}: peak_log_modulation_mle"][0])
         assert np.isfinite(columns[f"{curve}: peak_log_modulation_mle"][1])
         assert not columns[f"{curve}: prior_binds"][0]
+
+
+def _three_class_context(design: np.ndarray, n_units: int = 2) -> dict:
+    """A context holding only the three-class design: two basis functions read
+    on three lags, of which -0.3 s is outside the reported window. The last two
+    bins are outside the fit mask."""
+    from continuum_swr_replay.analysis.pfc.modulation import THREE_CLASS_MODEL
+
+    fit_mask = np.ones(len(design), dtype=bool)
+    fit_mask[-2:] = False
+    return {
+        "fit_mask": fit_mask,
+        "designs": {THREE_CLASS_MODEL: design},
+        "counts": np.ones((len(design), n_units)),
+        "spline_basis": np.array([[1.0, 0.0], [0.5, 0.5], [0.0, 1.0]]),
+        "lag_time": np.array([-0.3, 0.0, 0.1]),
+    }
+
+
+def test_the_extended_curves_read_their_own_blocks_of_the_three_class_fit(
+    monkeypatch,
+):
+    """Block 2 (SWRs without replay) and block 1 (SWR-coupled replay) of the
+    three-class fit, on the reported lags only; a unit whose fit did not
+    converge gets a NaN curve, and only the fit-mask rows are fit."""
+    from continuum_swr_replay.analysis.pfc.batched_glm import BatchedGLMResults
+
+    design = np.random.default_rng(0).normal(size=(12, 7))
+    params = np.array(
+        [
+            [0.0, 9.0, 9.0, 9.0, 9.0, 9.0, 9.0],
+            [0.0, 7.0, 7.0, 2.0, 4.0, 1.0, 3.0],
+        ]
+    )
+
+    def known_fit(design, counts, **kwargs):
+        assert len(design) == len(counts) == 10
+        return BatchedGLMResults(
+            params=params,
+            llf=np.zeros(2),
+            deviance=np.zeros(2),
+            aic=np.zeros(2),
+            converged=np.array([False, True]),
+            n_iter=np.array([100, 2]),
+            rank=7,
+            nobs=len(design),
+            n_features=7,
+            covariance=None,
+        )
+
+    monkeypatch.setattr(scoring, "fit_poisson_glms", known_fit)
+    curves = scoring.extended_curves(_three_class_context(design), 3.0)
+
+    # lags 0.0 and 0.1: 0.5 * b0 + 0.5 * b1, then b1
+    np.testing.assert_allclose(curves["SWR_no_non_local"][:, 1], [2.0, 3.0])
+    np.testing.assert_allclose(curves["non_local_SWR_3class"][:, 1], [3.0, 4.0])
+    for curve in curves.values():
+        assert curve.shape == (2, 2)
+        assert np.isnan(curve[:, 0]).all()
+
+
+def test_a_rank_deficient_three_class_design_gives_nan_curves():
+    """No SWR without replay: its block is all zero, so no curve is fit."""
+    design = np.random.default_rng(0).normal(size=(12, 7))
+    design[:, 5:] = 0.0
+
+    curves = scoring.extended_curves(_three_class_context(design, n_units=3), 3.0)
+
+    assert set(curves) == {"SWR_no_non_local", "non_local_SWR_3class"}
+    for curve in curves.values():
+        assert curve.shape == (2, 3)
+        assert np.isnan(curve).all()

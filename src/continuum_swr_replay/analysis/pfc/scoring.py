@@ -6,7 +6,8 @@ improvement against redraws of the matched non-event control
 (:mod:`~continuum_swr_replay.analysis.pfc.heldout`), and picks each unit's best
 model per decomposition. :func:`maximum_likelihood_comparison` fits the
 curve-bearing models unpenalised, so the prior's effect on each peak can be
-read against the same curve fit without it. The batch runner
+read against the same curve fit without it. :func:`extended_curves` reads the
+extended event set's two curves off the three-class model. The batch runner
 (``scripts/pfc/run_pfc_analysis_bandit.py``) calls them after ``run_session``.
 """
 
@@ -48,6 +49,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     THREE_CLASS_MODEL,
     curve_coefficients,
     curve_peaks,
+    in_report_window,
     is_separated,
     peak_log_modulation,
     peak_modulation_se,
@@ -459,6 +461,56 @@ def maximum_likelihood_comparison(
             penalised_peak, mle.value, mle_se
         )
     return columns
+
+
+def extended_curves(
+    context: dict[str, object], penalty_sigma: float
+) -> dict[str, NDArray]:
+    """The extended event set's two curves, off :data:`THREE_CLASS_MODEL`.
+
+    The model is refit here on the session's fit bins under the shipped prior;
+    it is the same design, counts, penalty and fitter as the session's own
+    prefit of that model, so the fit is the same one. A unit whose fit did not
+    converge, or a session whose design is rank-deficient (no SWR without
+    replay), gets a NaN curve.
+
+    Parameters
+    ----------
+    context : dict
+        The session's fit material from ``run_session`` (``scoring_out``).
+    penalty_sigma : float
+        The shipped prior.
+
+    Returns
+    -------
+    dict[str, NDArray]
+        :data:`EXTENDED_CURVE_SOURCES` key -> ``(n_report_lags, n_units)``.
+    """
+    fit_rows = np.asarray(context["fit_mask"], dtype=bool)
+    design = np.asarray(context["designs"][THREE_CLASS_MODEL])[fit_rows]
+    counts = np.asarray(context["counts"], dtype=float)[fit_rows]
+    basis = np.asarray(context["spline_basis"])
+    lag_time = np.asarray(context["lag_time"])
+    report = in_report_window(lag_time)
+    n_basis = basis.shape[1]
+    curves: dict[str, NDArray] = {}
+    if np.linalg.matrix_rank(design) < design.shape[1]:
+        nan = np.full((int(report.sum()), counts.shape[1]), np.nan)
+        return {name: nan.copy() for name in EXTENDED_CURVE_SOURCES}
+    fit = fit_poisson_glms(
+        design,
+        counts,
+        penalty=model_penalties({THREE_CLASS_MODEL: design}, penalty_sigma)[
+            THREE_CLASS_MODEL
+        ],
+        compute_covariance=False,
+    )
+    params = np.asarray(fit.params).copy()
+    params[~np.asarray(fit.converged, dtype=bool)] = np.nan
+    for name in EXTENDED_CURVE_SOURCES:
+        _, block = curve_coefficients(name, n_basis, EXTENDED_CURVE_SOURCES)
+        curves[name] = basis[report] @ params[:, block].T
+    return curves
 
 
 def events_per_fold(context: dict[str, object], folds: NDArray) -> dict[str, list[int]]:
