@@ -79,8 +79,8 @@ correlation has median `-0.129` across 436 session × class groups (138 have
 `|r| > 0.2`), and content/session-time correlation exceeds `|r| = 0.2` in 71
 groups. Occupied-arm identity explains a median 6.8% of content-mark variance.
 These are computed by `scripts/pfc/measure_pfc_mark_context.py` over the
-well-anchored events (event `occupancy_state` of `at_well` or `mixed`, the
-population the kernels fit) of all canonical sessions, not only the mPFC
+at-well events (event `occupancy_state` of `at_well`, the events whose content
+mark the kernels fit) of all canonical sessions, not only the mPFC
 sessions; "session time" is the event midpoint. The numbers above were measured
 2026-09-18 on the 218-session tables of that date.
 The reference therefore describes where the observed held-out gain falls
