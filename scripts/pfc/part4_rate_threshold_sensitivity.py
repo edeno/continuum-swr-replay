@@ -45,6 +45,7 @@ from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_H
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_FIT_COLUMN,
+    at_or_above_rate,
     load_population_data,
     significant_fraction,
 )
@@ -158,7 +159,8 @@ def funnel(raw: pd.DataFrame, gate: float, n_kept: int) -> dict[str, float]:
         From :func:`raw_units`.
     gate : float
         Minimum ``immobility_avg_firing_rate`` (Hz); a unit exactly at it
-        passes.
+        passes
+        (:func:`~continuum_swr_replay.analysis.pfc.load_population.at_or_above_rate`).
     n_kept : int
         Units of the loaded population (a usable fit and finite curves) at or
         above this gate.
@@ -173,7 +175,7 @@ def funnel(raw: pd.DataFrame, gate: float, n_kept: int) -> dict[str, float]:
         remainder, since that is the loader's only other rule) and
         ``funnel_units_kept``.
     """
-    rate_pass = (raw["immobility_avg_firing_rate"] >= gate).to_numpy()
+    rate_pass = at_or_above_rate(raw, gate)
     fitted = rate_pass & raw["has_fit"].to_numpy()
     return {
         "funnel_units_in_bundles": len(raw),

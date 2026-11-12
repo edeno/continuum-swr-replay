@@ -63,6 +63,7 @@ from numpy.typing import NDArray
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
     MIN_FIRING_RATE_HZ,
+    at_or_above_rate,
     load_population_data,
 )
 from continuum_swr_replay.analysis.pfc.modulation import curve_peaks
@@ -472,7 +473,9 @@ def gate_counts(
 ) -> dict:
     """How many neurons survive the loader, and the firing-rate gate.
 
-    The gate is applied to whichever rate column the bundle carries under
+    The gate is the loader's
+    (:func:`~continuum_swr_replay.analysis.pfc.load_population.at_or_above_rate`),
+    applied to whichever rate column the bundle carries under
     ``immobility_avg_firing_rate``. For a cohort-restricted bundle that is the
     mean rate over the bins fit; the pre-cohort bundles carry the same name for
     the rate over every immobile bin. Both are counted here when the bundle has
@@ -487,9 +490,7 @@ def gate_counts(
     )
     counts = {
         "n_neurons_with_fit": int(len(frame)),
-        "n_passing_fit_bin_rate": int(
-            (frame[FIT_RATE_COLUMN] >= min_firing_rate).sum()
-        ),
+        "n_passing_fit_bin_rate": int(at_or_above_rate(frame, min_firing_rate).sum()),
     }
     if ALL_IMMOBILE_RATE_COLUMN in frame.columns:
         counts["n_passing_all_immobile_rate"] = int(
