@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stop-level context of the mPFC replay response, pooled across sessions (Part 4).
 
-Two steps (``analysis/pfc/stop_context.py``; design
-``.claude/docs/plans/pfc-response-followups/design-stop-level-context.md``):
+Two steps (the model and its estimators are described in
+``analysis/pfc/stop_context.py``):
 
 ``assemble`` builds, per epoch of the PFC cohort (the analysed epochs less the
 ones ``pfc_cohort_mPFC.json`` leaves out; each must have a canonical mPFC

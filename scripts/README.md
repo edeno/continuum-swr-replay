@@ -410,8 +410,8 @@ them importable.
   sign × unit set (called / all) and writes `results.csv`: Poisson model with
   per-unit intercepts, the stop baseline estimated jointly (conditional) or
   plugged in, session-clustered CIs, per-animal and leave-one-animal-out fits
-  (`analysis/pfc/stop_context.py`; design
-  `.claude/docs/plans/pfc-response-followups/design-stop-level-context.md`).
+  (`analysis/pfc/stop_context.py`, whose docstring states the model and the two
+  estimators).
 - `compare_pfc_cohorts.py` — writes the mPFC unit-GLM before/after audit: per-session
   bins and events on either side of the stop cohort (from the bundles' own provenance
   sidecars), the decode/position alignment trim, the leading-edge coverage diagnostic,

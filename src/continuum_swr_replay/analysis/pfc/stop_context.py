@@ -4,8 +4,7 @@ Does the mPFC response to a replay event differ with the stop's reward outcome,
 or before a trip that leaves the patch? Both are properties of the *stop*, and
 replay is concentrated after reward and away from switches, so a slope within
 one session is rarely estimable. This module estimates the context effect once,
-from all sessions together (design:
-``.claude/docs/plans/pfc-response-followups/design-stop-level-context.md``).
+from all sessions together.
 
 The response
 ------------

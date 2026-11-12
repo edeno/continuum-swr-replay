@@ -1713,7 +1713,7 @@ def bounded_design_batch_size(
 #: than the base-only model, so there is no interior optimum: 0.5 is the
 #: operating point that restores the canonical base kernels within 2 %, ends
 #: the blow-ups, and still admits a per-SD modulation of roughly ×0.7 to ×1.4
-#: (``.claude/docs/reviews/2026-09-18-pfc-marked-family-smoke.md``).
+#: (``docs/design/pfc_marked_model_family.md``, "What the first smoke showed").
 DEFAULT_MARK_PENALTY_SIGMA: float | None = 0.5
 
 
