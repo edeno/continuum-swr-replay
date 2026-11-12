@@ -7,6 +7,9 @@
 - :func:`session_median_statistics`: the animal-balanced summary of one number
   per session: the median over sessions with the sessions' signs, and the
   median over animals of each animal's own median with the animals' signs.
+- :func:`animal_session_values`: each animal's value of a per-row number (an
+  event's, a unit's), row -> session -> animal: a median of session medians or
+  a mean of session means.
 - :func:`nested_bootstrap_draw`: one replicate of the nested bootstrap
   (animals, then sessions within each drawn animal, then the units or events
   within each drawn session), the resampling behind every interval; with
@@ -119,6 +122,55 @@ def animal_medians(values: pd.Series, animal: pd.Series) -> pd.Series:
         raise ValueError("values and animal are not indexed alike")
     has_value = values.notna()
     return values[has_value].groupby(animal[has_value], observed=True).median()
+
+
+def animal_session_values(
+    values: pd.Series,
+    animal: pd.Series,
+    session: pd.Series | pd.DataFrame,
+    statistic: str,
+) -> pd.Series:
+    """Each animal's value of a per-row number, row -> session -> animal.
+
+    The ``statistic`` over each session's rows, then the same statistic over
+    each animal's sessions, so every session of an animal weighs the same
+    however many rows it holds.
+
+    Parameters
+    ----------
+    values : pd.Series, shape (n_rows,)
+        One number per row (an event, a unit). A missing value is left out; a
+        session with no value is not one of its animal's sessions.
+    animal : pd.Series, shape (n_rows,)
+        Each row's animal, indexed as ``values``.
+    session : pd.Series or pd.DataFrame, shape (n_rows,) or (n_rows, n_columns)
+        Each row's session, within its animal (a label, or the columns that
+        together name it), indexed as ``values``.
+    statistic : {"median", "mean"}
+        The reduction at both levels: a median of session medians, or a mean
+        of session means.
+
+    Returns
+    -------
+    per_animal : pd.Series, shape (n_animals,)
+        Indexed by animal in sorted order; an animal with no value is not in
+        it.
+
+    Raises
+    ------
+    ValueError
+        If ``statistic`` is neither ``"median"`` nor ``"mean"``, or ``animal``
+        or ``session`` is not indexed as ``values``.
+    """
+    if statistic not in ("median", "mean"):
+        raise ValueError(f"statistic {statistic!r} is neither 'median' nor 'mean'")
+    session = session.to_frame() if isinstance(session, pd.Series) else session
+    if not (values.index.equals(animal.index) and values.index.equals(session.index)):
+        raise ValueError("values, animal and session are not indexed alike")
+    has_value = values.notna()
+    keys = [animal[has_value], *(session.loc[has_value, c] for c in session.columns)]
+    per_session = values[has_value].groupby(keys, observed=True).agg(statistic)
+    return per_session.groupby(level=0, observed=True).agg(statistic)
 
 
 def session_median_statistics(values: pd.Series, animal: pd.Series) -> dict[str, float]:

@@ -41,7 +41,9 @@ current one, or recording none, makes the values read from it pending
 (:func:`event_table_staleness`).
 
 Pooled values sum events over sessions and animals; "animals in direction"
-counts the animals whose own value points the way the claim states.
+counts the animals whose own value points the way the claim states, an
+animal's value going event -> epoch -> animal (a median of its epochs'
+medians, a mean of its epochs' means).
 """
 
 from __future__ import annotations
@@ -275,14 +277,16 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             stats["non_swr_fraction_animal_min"],
             "fraction",
             "pctnum",
-            "lowest per-animal share of non-SWR events",
+            "lowest per-animal share of non-SWR events (an animal's share is the "
+            "mean over its epochs of the epoch's share)",
         ),
         make(
             "non_swr_fraction_animal_max",
             stats["non_swr_fraction_animal_max"],
             "fraction",
             "pct",
-            "highest per-animal share of non-SWR events",
+            "highest per-animal share of non-SWR events (the mean over the animal's "
+            "epochs)",
         ),
         make(
             "animals",
@@ -299,14 +303,16 @@ def event_cohort_values(events: pd.DataFrame, source: str) -> list[Value]:
             stats["n_animals_non_swr_plurality"],
             "count",
             "count",
-            "animals in which non-SWR is the largest of the three overlap classes",
+            "animals whose share of non-SWR events is the largest of their three "
+            "overlap-class shares (each the mean over the animal's epochs)",
         ),
         make(
             "animals_non_swr_majority",
             stats["n_animals_non_swr_majority"],
             "count",
             "count",
-            "animals in which more than half the events are non-SWR",
+            "animals whose share of non-SWR events (the mean over their epochs) is "
+            "above one half",
         ),
     ]
 
@@ -465,14 +471,17 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
                     stats["no_nonlocal_fraction_animal_min"],
                     "fraction",
                     "pctnum",
-                    f"lowest per-animal share of {detector} events overlapping no non-local event",
+                    f"lowest per-animal share of {detector} events overlapping no non-local "
+                    "event (an animal's share is the mean over its epochs of the epoch's "
+                    "share)",
                 ),
                 make(
                     f"{word}_no_nonlocal_fraction_animal_max",
                     stats["no_nonlocal_fraction_animal_max"],
                     "fraction",
                     "pct",
-                    f"highest per-animal share of {detector} events overlapping no non-local event",
+                    f"highest per-animal share of {detector} events overlapping no non-local "
+                    "event (the mean over the animal's epochs)",
                 ),
             ]
     return values
@@ -703,16 +712,18 @@ def _signal_values(
                     stats["n_animals_below_running"],
                     "count",
                     "count",
-                    f"animals whose median {name} event {label} is below the median, over "
-                    "the same events, of each event's own epoch's median running level",
+                    f"animals whose median {name} event {label} (the median over their "
+                    "epochs of each epoch's median) is below the median over the same "
+                    "epochs of the epoch's median running level",
                 ),
                 make(
                     f"{word}_animals_above_rest_{group}",
                     stats["n_animals_above_rest"],
                     "count",
                     "count",
-                    f"animals whose median {name} event {label} is above the median, over "
-                    "the same events, of each event's own epoch's median quiet-rest level",
+                    f"animals whose median {name} event {label} (the median over their "
+                    "epochs of each epoch's median) is above the median over the same "
+                    "epochs of the epoch's median quiet-rest level",
                 ),
             ]
             if word == "theta":
@@ -923,7 +934,8 @@ def spike_evidence_values(metrics: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"animals whose median {group} event scores above their median quiet "
-                "window, per spike",
+                "window, per spike, each the median over the animal's epochs of the "
+                "epoch's median",
                 tags=evidence_tags,
             ),
         ]
@@ -1318,7 +1330,7 @@ def _class_median_values(
     """One property's class medians and animals in direction, made by ``make``;
     ``prop`` is its row of :data:`_PROPERTIES`."""
     word, column, scale, unit, style, direction, _ = prop
-    stats = event_statistics.class_medians(events, column, direction)
+    stats = event_statistics.class_medians(events, column)
     name = _PROPERTY_NAMES[word]
     return [
         make(
@@ -1339,10 +1351,11 @@ def _class_median_values(
         ),
         make(
             f"{word}_animals_in_direction",
-            stats["n_animals_in_direction"],
+            event_statistics.n_animals_in_direction(events, column, direction),
             "count",
             "count",
-            f"animals whose non-SWR median {name} is {direction} than their SWR median",
+            f"animals whose non-SWR median {name} is {direction} than their SWR "
+            "median, each the median over the animal's epochs of the epoch's median",
         ),
     ]
 
@@ -1463,7 +1476,8 @@ def rest_theta_values(events: pd.DataFrame, source: str) -> list[Value]:
                 "count",
                 "count",
                 f"animals whose share of theta-like {name} events is above that of "
-                "their duration-matched quiet-rest windows",
+                "their duration-matched quiet-rest windows, each the mean over the "
+                "animal's epochs of the epoch's share",
             ),
         ]
     return values
@@ -1508,7 +1522,9 @@ def content_occupancy_values(occupancy: pd.DataFrame, source: str) -> list[Value
             event_statistics.n_animals_non_swr_more_at_well(occupancy),
             "count",
             "count",
-            "animals whose non-SWR content is at a well more often than their SWR content",
+            "animals whose non-SWR content is at a well more often than their SWR "
+            "content, each share the mean over the animal's sessions of the session's "
+            "share",
         )
     )
     return values

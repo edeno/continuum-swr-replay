@@ -21,41 +21,46 @@ NAN = np.nan
 
 
 def _events() -> pd.DataFrame:
-    """Kay events as (animal, matched, local, no-spike, non-local, uncertain).
+    """Kay events as (animal, epoch, matched, local, no-spike, non-local,
+    uncertain).
 
-    Animal a has 3 of 5 events overlapping no non-local event, animal b 4 of 8.
+    Animal a has 3 of 5 events overlapping no non-local event: all 3 of epoch
+    e1's and none of e2's 2. Animal b has 4 of 8: 4 of e1's 5 and none of e2's
+    3.
     """
     rows = [
         # overlapping no non-local event: three mostly Local, one mostly
         # No-Spike, two neither (one of them exactly half Local), one unknown
-        ("a", False, 0.8, 0.1, 0.0, 0.1),
-        ("a", False, 0.9, 0.0, 0.0, 0.1),
-        ("a", False, 0.2, 0.6, 0.0, 0.2),
-        ("b", False, 0.6, 0.2, 0.0, 0.2),
-        ("b", False, 0.4, 0.4, 0.0, 0.2),
-        ("b", False, 0.5, 0.5, 0.0, 0.0),
-        ("b", False, NAN, NAN, NAN, NAN),
+        ("a", "e1", False, 0.8, 0.1, 0.0, 0.1),
+        ("a", "e1", False, 0.9, 0.0, 0.0, 0.1),
+        ("a", "e1", False, 0.2, 0.6, 0.0, 0.2),
+        ("b", "e1", False, 0.6, 0.2, 0.0, 0.2),
+        ("b", "e1", False, 0.4, 0.4, 0.0, 0.2),
+        ("b", "e1", False, 0.5, 0.5, 0.0, 0.0),
+        ("b", "e1", False, NAN, NAN, NAN, NAN),
         # overlapping a non-local event: five with state shares, one without
-        ("a", True, 0.0, 0.1, 0.9, 0.0),
-        ("a", True, 0.2, 0.1, 0.5, 0.2),
-        ("b", True, 0.05, 0.4, 0.35, 0.2),
-        ("b", True, 0.0, 0.0, 1.0, 0.0),
-        ("b", True, 0.1, 0.3, 0.3, 0.3),
-        ("b", True, NAN, NAN, NAN, NAN),
+        ("a", "e2", True, 0.0, 0.1, 0.9, 0.0),
+        ("a", "e2", True, 0.2, 0.1, 0.5, 0.2),
+        ("b", "e1", True, 0.05, 0.4, 0.35, 0.2),
+        ("b", "e2", True, 0.0, 0.0, 1.0, 0.0),
+        ("b", "e2", True, 0.1, 0.3, 0.3, 0.3),
+        ("b", "e2", True, NAN, NAN, NAN, NAN),
     ]
     frame = pd.DataFrame(
-        rows, columns=["animal", "matched", LOCAL, NO_SPIKE, NON_LOCAL, UNCERTAIN]
+        rows,
+        columns=["animal", "epoch", "matched", LOCAL, NO_SPIKE, NON_LOCAL, UNCERTAIN],
     )
-    return frame.assign(detector="kay")
+    return frame.assign(detector="kay", day="d1")
 
 
 def test_other_detector_statistics_split_events_by_overlap_and_state():
     result = comparison.other_detector_statistics(_events()).loc["kay"]
     assert result["n_events"] == 13
     assert result["no_nonlocal_fraction"] == pytest.approx(7 / 13)
-    # a: 3 of 5; b: 4 of 8
-    assert result["no_nonlocal_fraction_animal_min"] == pytest.approx(0.5)
-    assert result["no_nonlocal_fraction_animal_max"] == pytest.approx(0.6)
+    # each animal's share is the mean of its epochs': a, 1 and 0; b, 0.8 and 0
+    # (pooled, a's 3 of 5 and b's 4 of 8 would give 0.6 and 0.5)
+    assert result["no_nonlocal_fraction_animal_min"] == pytest.approx(0.4)
+    assert result["no_nonlocal_fraction_animal_max"] == pytest.approx(0.5)
     # of the six events with state shares that overlap no non-local event (the
     # seventh has none and is left out)
     assert result["no_nonlocal_mostly_local_fraction"] == pytest.approx(3 / 6)

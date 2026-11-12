@@ -2812,10 +2812,10 @@ without being called, is not listed.
 | `events.left_out_values` | `reported/events.py` | `analysis.inventory_comparison.nonlocal_comparison.left_out_statistics` |  |
 | `events.other_detector_values` | `reported/events.py` | `analysis.inventory_comparison.nonlocal_comparison.other_detector_statistics` |  |
 | `events.property_interval_values` | `reported/events.py` | none |  |
-| `events.property_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians` |  |
+| `events.property_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians`, `analysis.hippocampus.event_statistics.n_animals_in_direction` |  |
 | `events.rest_theta_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.rest_matched_theta_statistics` |  |
 | `events.spike_evidence_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.spike_evidence_statistics` |  |
-| `events.start_distance_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians` |  |
+| `events.start_distance_values` | `reported/events.py` | `analysis.hippocampus.event_statistics.class_medians`, `analysis.hippocampus.event_statistics.n_animals_in_direction` |  |
 | `behavior.breadth_derived_values` | `reported/behavior/content.py` | `analysis.behavior.content.content_statistics.concentration_contrast_statistics`, `analysis.behavior.content.content_statistics.event_length_statistics` |  |
 | `behavior.choice_values` | `reported/behavior/choice.py` | `analysis.behavior.coefficient_statistics.gated_coefficient_statistics` |  |
 | `behavior.cohort_audit_values` | `reported/behavior/rate.py` | none |  |

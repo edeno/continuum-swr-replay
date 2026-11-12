@@ -198,7 +198,7 @@ def event_length_statistics(events: pd.DataFrame) -> dict[str, float]:
     Parameters
     ----------
     events : pd.DataFrame
-        The event table, with ``animal``, ``is_swr`` and ``n_nonlocal_bins``.
+        The event table, with ``is_swr`` and ``n_nonlocal_bins``.
 
     Returns
     -------
@@ -209,7 +209,7 @@ def event_length_statistics(events: pd.DataFrame) -> dict[str, float]:
         events; and ``swr_to_non_swr_ratio``, the SWR median over the non-SWR
         median.
     """
-    medians = class_medians(events, "n_nonlocal_bins", "lower")
+    medians = class_medians(events, "n_nonlocal_bins")
     return {
         "median_bins": events["n_nonlocal_bins"].median(),
         "median_bins_swr": medians["median_swr"],

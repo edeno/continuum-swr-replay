@@ -6,14 +6,19 @@ which takes one session's per-time-bin content distances. Most return named
 numbers: a dict,
 or a table with one row per group. :func:`boundary_offsets` returns one row per
 event (what a histogram draws), :func:`most_steps` a count with the properties
-that attain it, and :func:`n_animals_non_swr_more_at_well` one count. They are
-the statistics the events summary reports
-(``continuum_swr_replay.reported.events`` names and describes them) and a
-figure that shows one of them calls the same function.
+that attain it, and :func:`n_animals_in_direction` and
+:func:`n_animals_non_swr_more_at_well` one count. They are the statistics the
+events summary reports (``continuum_swr_replay.reported.events`` names and
+describes them) and a figure that shows one of them calls the same function.
 
 SWR status is the event table's ``is_swr``: strict positive-duration overlap
-with an SWR. "Animals" statistics count the animals whose own value meets the
-stated condition. Times are in seconds.
+with an SWR. A statistic of the events (a median, a share) pools them over
+epochs and animals. "Animals" statistics count the animals whose own value
+meets the stated condition, and an animal's own value goes event -> epoch ->
+animal
+(:func:`~continuum_swr_replay.analysis.shared_statistics.animal_session_values`):
+a median of its epochs' medians, or a mean of its epochs' means. Times are in
+seconds.
 """
 
 from __future__ import annotations
@@ -24,10 +29,13 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.shared_statistics import (
-    animal_medians,
+    animal_session_values,
     session_median_statistics,
 )
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS, n_sessions
+
+_WITHIN_ANIMAL = [column for column in SESSION_COLUMNS if column != "animal"]
+"""The session columns that name a session within its animal."""
 
 # --- how the events sit against SWRs ----------------------------------------------
 
@@ -98,13 +106,15 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
           each class.
         - ``non_swr_fraction``: the share overlapping no SWR, pooled over animals.
         - ``non_swr_fraction_animal_min``, ``non_swr_fraction_animal_max``: the
-          lowest and highest of the animals' own shares; an animal with no
-          event of a class has a share of 0 in it.
+          lowest and highest of the animals' own shares. An animal's share of
+          a class is the mean over its epochs of each epoch's share of its
+          events (event -> epoch -> animal); an epoch with no event of a class
+          has a share of 0 in it.
         - ``n_animals``, ``n_epochs``: animals and epochs with an event.
-        - ``n_animals_non_swr_plurality``: animals in which non-SWR is the
-          largest of the three classes.
-        - ``n_animals_non_swr_majority``: animals in which more than half the
-          events are non-SWR.
+        - ``n_animals_non_swr_plurality``: animals whose non-SWR share is the
+          largest of their three.
+        - ``n_animals_non_swr_majority``: animals whose non-SWR share is above
+          one half.
 
     Raises
     ------
@@ -123,10 +133,16 @@ def overlap_class_statistics(events: pd.DataFrame) -> dict[str, float]:
             f"{counts['total'] - n_classed} events have an overlap_class that is "
             "none of non_swr, swr_contained and swr_partial"
         )
-    shares = (
-        events.groupby("animal")["overlap_class"]
-        .value_counts(normalize=True)
-        .unstack(fill_value=0.0)
+    shares = pd.DataFrame(
+        {
+            overlap_class: animal_session_values(
+                (events["overlap_class"] == overlap_class).astype(float),
+                events["animal"],
+                events[_WITHIN_ANIMAL],
+                "mean",
+            )
+            for overlap_class in ("non_swr", "swr_contained", "swr_partial")
+        }
     )
     non_swr = shares["non_swr"]
     return {
@@ -239,11 +255,11 @@ def event_signal_statistics(
     """Each signal during events, against the same epochs' running and rest levels.
 
     An event's value of a signal is its mean over the event's bins of the
-    epoch's z-scored signal. Each event is compared with the reference of the
-    epoch it occurred in: an animal's running (quiet-rest) level is the median,
-    over its events of the class, of each event's own epoch's level, so an
-    epoch counts once for each event in it, and an epoch with no such event
-    does not count.
+    epoch's z-scored signal. An animal's value for a class is event -> epoch
+    -> animal: the median over its epochs with an event of the class of each
+    epoch's median event value. It is compared with the median over the same
+    epochs of each epoch's running (quiet-rest) level, so every epoch counts
+    once, and an epoch with no event of the class does not count.
 
     Parameters
     ----------
@@ -263,11 +279,11 @@ def event_signal_statistics(
 
         - ``median``: the median event value, z, over the class's events.
         - ``n_animals_below_running``: animals, of those with an event of the
-          class, whose median event value is below the median over the same
-          events of each event's own epoch's running level.
+          class, whose value is below the median running level of the same
+          epochs.
         - ``n_animals_above_rest``: animals, of those with an event of the
-          class, whose median event value is above the median over the same
-          events of each event's own epoch's quiet-rest level.
+          class, whose value is above the median quiet-rest level of the same
+          epochs.
         - ``reaches_running_fraction``: the share of the class's events whose
           value reaches their own epoch's median running level.
 
@@ -294,10 +310,17 @@ def event_signal_statistics(
             )
         for is_swr in (False, True):
             group = joined[joined["is_swr"] == is_swr]
-            per_animal = group.groupby("animal").agg(
-                event=(column, "median"),
-                running=(f"{signal}_running_median", "median"),
-                rest=(f"{signal}_rest_median", "median"),
+            per_animal = pd.DataFrame(
+                {
+                    name: animal_session_values(
+                        group[source], group["animal"], group[_WITHIN_ANIMAL], "median"
+                    )
+                    for name, source in (
+                        ("event", column),
+                        ("running", f"{signal}_running_median"),
+                        ("rest", f"{signal}_rest_median"),
+                    )
+                }
             )
             rows[(signal, is_swr)] = {
                 "median": group[column].median(),
@@ -368,9 +391,11 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``is_swr``, ``animal``, ``theta_z``,
-        ``theta_running_median``, ``rest_windows`` (how many windows it has)
-        and ``rest_theta_like_share`` (the share of them that are theta-like).
+        One row per event, with ``is_swr``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`),
+        ``theta_z``, ``theta_running_median``, ``rest_windows`` (how many
+        windows it has) and ``rest_theta_like_share`` (the share of them that
+        are theta-like).
 
     Returns
     -------
@@ -378,8 +403,11 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
         Indexed by ``is_swr``: ``rest_theta_like_fraction``, the mean over the
         class's events of ``rest_theta_like_share``, and
         ``n_animals_above_rest``, the animals, of those with an event of the
-        class, whose share of theta-like events is above the mean of their
-        events' ``rest_theta_like_share``.
+        class, whose share of theta-like events is above their reference
+        share. Both are event -> epoch -> animal: the mean over the animal's
+        epochs with an event of the class of each epoch's share of theta-like
+        events, against the same mean of each epoch's mean
+        ``rest_theta_like_share``.
 
     Raises
     ------
@@ -406,8 +434,19 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
     rows = {}
     for is_swr in (False, True):
         group = usable[usable.is_swr == is_swr]
-        per_animal = group.groupby("animal").agg(
-            events=("theta_like", "mean"), rest=("rest_theta_like_share", "mean")
+        per_animal = pd.DataFrame(
+            {
+                name: animal_session_values(
+                    group[source].astype(float),
+                    group["animal"],
+                    group[_WITHIN_ANIMAL],
+                    "mean",
+                )
+                for name, source in (
+                    ("events", "theta_like"),
+                    ("rest", "rest_theta_like_share"),
+                )
+            }
         )
         rows[is_swr] = {
             "rest_theta_like_fraction": group.rest_theta_like_share.mean(),
@@ -422,7 +461,8 @@ def rest_matched_theta_statistics(events: pd.DataFrame) -> pd.DataFrame:
 def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFrame:
     """Each group's spike evidence, against matched quiet windows.
 
-    Event-level medians, pooled over epochs.
+    Event-level medians, pooled over epochs; the animals' medians go through
+    their epochs.
 
     Parameters
     ----------
@@ -448,7 +488,10 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         - ``n_epochs_above_baseline``, ``n_animals_above_baseline``: of the
           epochs (animals) with a row of the group, those whose median
           ``dll_per_spike`` is above that of their own quiet windows. NaN for
-          the baseline itself.
+          the baseline itself. An animal's median is row -> epoch -> animal,
+          the median over its epochs of each epoch's median, for the group
+          over the epochs with a row of it and for the quiet windows over all
+          the animal's epochs.
 
     Raises
     ------
@@ -456,9 +499,15 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
         If an epoch with a scored row has no ``dll_per_spike`` of a quiet
         window to be compared with.
     """
+
+    def per_animal(rows: pd.DataFrame) -> pd.Series:
+        return animal_session_values(
+            rows["dll_per_spike"], rows["animal"], rows["epoch_id"], "median"
+        )
+
     base = metrics[metrics["group"] == baseline]
     epoch_base = base.groupby("epoch_id")["dll_per_spike"].median()
-    animal_base = animal_medians(base["dll_per_spike"], base["animal"])
+    animal_base = per_animal(base)
     without = epoch_base.reindex(metrics["epoch_id"].unique()).isna()
     if without.any():
         raise ValueError(
@@ -468,9 +517,7 @@ def spike_evidence_statistics(metrics: pd.DataFrame, baseline: str) -> pd.DataFr
     rows = {}
     for group, group_rows in metrics.groupby("group"):
         epoch_median = group_rows.groupby("epoch_id")["dll_per_spike"].median()
-        animal_median = animal_medians(
-            group_rows["dll_per_spike"], group_rows["animal"]
-        )
+        animal_median = per_animal(group_rows)
         is_baseline = group == baseline
         rows[group] = {
             "n_scored": len(group_rows),
@@ -614,28 +661,50 @@ def most_steps(
 # --- properties -------------------------------------------------------------------
 
 
-def class_medians(
-    events: pd.DataFrame, column: str, direction: str
-) -> dict[str, float]:
+def class_medians(events: pd.DataFrame, column: str) -> dict[str, float]:
     """A per-event property's median in non-SWR and in SWR events.
 
-    Plain medians of all events with a value; not duration-controlled.
+    Plain medians of all events with a value, pooled over epochs and animals;
+    not duration-controlled.
 
     Parameters
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
-        One row per event, with ``is_swr``, ``animal`` and ``column``.
+        One row per event, with ``is_swr`` and ``column``.
     column : str
         The property.
-    direction : {"lower", "higher"}
-        The direction of the non-SWR median against the SWR median to count
-        animals for.
 
     Returns
     -------
     statistics : dict
-        ``median_non_swr``, ``median_swr``, and ``n_animals_in_direction``: the
-        animals whose own non-SWR median is ``direction`` than their SWR median.
+        ``median_non_swr`` and ``median_swr``.
+    """
+    median = events.dropna(subset=[column]).groupby("is_swr")[column].median()
+    return {"median_non_swr": median[False], "median_swr": median[True]}
+
+
+def n_animals_in_direction(events: pd.DataFrame, column: str, direction: str) -> int:
+    """The animals whose own non-SWR median of a per-event property is
+    ``direction`` than their SWR median.
+
+    An animal's median of a class is event -> epoch -> animal: the median over
+    its epochs with an event of the class (with a value) of each epoch's
+    median. An animal without one of the classes is in neither direction.
+
+    Parameters
+    ----------
+    events : pd.DataFrame, shape (n_events, n_columns)
+        One row per event, with ``is_swr``, the session columns
+        (:data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and
+        ``column``.
+    column : str
+        The property.
+    direction : {"lower", "higher"}
+        The direction of the non-SWR median against the SWR median.
+
+    Returns
+    -------
+    int
 
     Raises
     ------
@@ -644,15 +713,16 @@ def class_medians(
     """
     if direction not in ("lower", "higher"):
         raise ValueError(f"direction {direction!r} is neither 'lower' nor 'higher'")
-    known = events[[column, "is_swr", "animal"]].dropna(subset=[column])
-    median = known.groupby("is_swr")[column].median()
-    by_animal = known.groupby(["animal", "is_swr"])[column].median().unstack()
+    by_animal = pd.DataFrame(
+        {
+            is_swr: animal_session_values(
+                group[column], group["animal"], group[_WITHIN_ANIMAL], "median"
+            )
+            for is_swr, group in events.groupby("is_swr")
+        }
+    )
     compare = pd.Series.lt if direction == "lower" else pd.Series.gt
-    return {
-        "median_non_swr": median[False],
-        "median_swr": median[True],
-        "n_animals_in_direction": compare(by_animal[False], by_animal[True]).sum(),
-    }
+    return int(compare(by_animal[False], by_animal[True]).sum())
 
 
 # --- where content sits -----------------------------------------------------------
@@ -755,21 +825,59 @@ def content_occupancy_shares(occupancy: pd.DataFrame) -> pd.DataFrame:
 
 def n_animals_non_swr_more_at_well(occupancy: pd.DataFrame) -> int:
     """The animals whose non-SWR content is at a well more often than their SWR
-    content: each animal's time-bin-weighted share at a well
-    (:func:`content_occupancy_shares`, with ``animal``), by group."""
-    at_well = _weighted_shares(occupancy, ["animal", "group"])["at_well"].unstack()
+    content.
+
+    An animal's share at a well of a group is session -> animal: the mean over
+    its sessions with time bins of the group of each session's share (the
+    table's ``remote_well`` plus ``own_well``), each session weighing the same
+    however many time bins it holds.
+
+    Parameters
+    ----------
+    occupancy : pd.DataFrame, shape (n_sessions * n_groups, n_columns)
+        The content-occupancy table (:func:`content_occupancy_shares`), with
+        ``animal`` and ``epoch_id``.
+
+    Returns
+    -------
+    int
+        An animal without one of the groups is not counted.
+
+    Raises
+    ------
+    ValueError
+        If a session with time bins has no share at a place.
+    """
+    with_bins = _sessions_with_bins(occupancy)
+    at_well = pd.DataFrame(
+        {
+            group: animal_session_values(
+                rows["remote_well"] + rows["own_well"],
+                rows["animal"],
+                rows["epoch_id"],
+                "mean",
+            )
+            for group, rows in with_bins.groupby("group")
+        }
+    )
     return int((at_well["nonSWR"] > at_well["SWR"]).sum())
 
 
-def _weighted_shares(occupancy: pd.DataFrame, by: list[str]) -> pd.DataFrame:
-    """The share of time bins at each place, weighted by time bins, per ``by``."""
-    without = (
-        occupancy.loc[occupancy["n"] > 0, list(OCCUPANCY_QUADRANTS)].isna().any(axis=1)
-    )
+def _sessions_with_bins(occupancy: pd.DataFrame) -> pd.DataFrame:
+    """The rows of ``occupancy`` with time bins; raise if one has no share at a
+    place."""
+    with_bins = occupancy[occupancy["n"] > 0]
+    without = with_bins[list(OCCUPANCY_QUADRANTS)].isna().any(axis=1)
     if without.any():
         raise ValueError(
             f"{int(without.sum())} sessions with time bins have no share at a place"
         )
+    return with_bins
+
+
+def _weighted_shares(occupancy: pd.DataFrame, by: list[str]) -> pd.DataFrame:
+    """The share of time bins at each place, weighted by time bins, per ``by``."""
+    _sessions_with_bins(occupancy)
     occupancy = occupancy.assign(
         at_well=occupancy["remote_well"] + occupancy["own_well"]
     )

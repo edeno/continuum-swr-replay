@@ -287,7 +287,7 @@ def event_panels(
     """
     ripple = event_signal_statistics(events, reference, {"ripple": "ripple_power_z"})
     levels = reference_medians(reference, ["ripple"])
-    speed = class_medians(events, "replay_speed_median_cm_s", "lower")
+    speed = class_medians(events, "replay_speed_median_cm_s")
     return {
         "events": events,
         "ripple_medians": {

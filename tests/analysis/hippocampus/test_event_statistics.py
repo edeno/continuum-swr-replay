@@ -68,6 +68,30 @@ def test_overlap_class_statistics_count_events_animals_and_epochs():
     assert result["n_animals_non_swr_majority"] == 1
 
 
+def test_overlap_class_statistics_take_an_animal_s_share_over_its_epochs():
+    events = _events(
+        [
+            # a, e1: one event, non-SWR (share 1); e2: one non-SWR of five (0.2)
+            ("a", "e1", "non_swr", 0.0, 0.1, np.nan, np.nan),
+            ("a", "e2", "non_swr", 0.0, 0.1, np.nan, np.nan),
+            *[("a", "e2", "swr_partial", t, t + 0.2, t, t + 0.1) for t in (1, 2, 3, 4)],
+            # b, one epoch: one non-SWR of three
+            ("b", "e1", "non_swr", 0.0, 0.1, np.nan, np.nan),
+            ("b", "e1", "swr_contained", 1.02, 1.08, 1.0, 1.1),
+            ("b", "e1", "swr_contained", 2.02, 2.08, 2.0, 2.1),
+        ]
+    )
+    result = stats.overlap_class_statistics(events)
+    assert result["non_swr_fraction"] == pytest.approx(3 / 9)
+    # a: the mean of 1 and 0.2 is 0.6 (pooled, 2 of 6 would be 1/3); b: 1/3
+    assert result["non_swr_fraction_animal_min"] == pytest.approx(1 / 3)
+    assert result["non_swr_fraction_animal_max"] == pytest.approx(0.6)
+    # a's shares: non-SWR 0.6, partial 0.4, contained 0 (pooled, its 4 partial
+    # events would outnumber its 2 non-SWR ones)
+    assert result["n_animals_non_swr_plurality"] == 1
+    assert result["n_animals_non_swr_majority"] == 1
+
+
 def test_overlap_class_statistics_count_an_absent_class_as_a_share_of_zero():
     # animal c has SWR-contained events only: its non-SWR share is 0, the lowest
     only_swr = _events(
@@ -124,9 +148,8 @@ def test_boundary_offsets_refuse_an_overlapping_event_without_its_swr():
 
 def _signal_tables() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Animal a has three events of each class in epoch e1 and one in e2, so the
-    median over its events of the epoch levels (e1's) is neither their mean nor
-    the median of its two epochs' levels, and its median event value lies
-    between the three."""
+    median over its two epochs' levels is not the median over its events of
+    their epochs' levels (e1's)."""
     reference = pd.DataFrame(
         {
             "animal": ["a", "a", "b"],
@@ -161,18 +184,18 @@ def test_reference_medians_are_medians_over_epochs():
     assert levels.loc["theta", "rest"] == -0.5
 
 
-def test_event_signal_statistics_compare_each_event_with_its_own_epoch():
+def test_event_signal_statistics_compare_each_animal_s_epochs_with_their_levels():
     events, reference = _signal_tables()
     result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
     non_swr = result.loc[("theta", False)]
     # -1, 0.8, 1, 1.1, 1.2, 1.3, 5: the median is 1.1 (the mean is 1.34)
     assert non_swr["median"] == pytest.approx(1.1)
-    # a: event median 1.15 against the running levels 1, 1, 1, 2 of its events'
-    # epochs, median 1.0: not below (it is below their mean, 1.25, and below
-    # 1.5, the median of a's two epochs). b: 1.0 against 1.0: equal, which is
-    # not below.
-    assert non_swr["n_animals_below_running"] == 0
-    # a: 1.15 against rest -1.0; b: 1.0 against -0.5
+    # a: the median of its epochs' medians 1.1 and 1.2 is 1.15, against 1.5,
+    # the median of its two epochs' running levels: below (against the levels
+    # 1, 1, 1, 2 of its events' epochs, median 1.0, it would not be). b: 1.0
+    # against 1.0: equal, which is not below.
+    assert non_swr["n_animals_below_running"] == 1
+    # a: 1.15 against rest -0.5; b: 1.0 against -0.5
     assert non_swr["n_animals_above_rest"] == 2
     # 1.1, 1.3 and 5.0 reach their epoch's 1.0, and b's 1.0 equals it, which
     # reaches it; 0.8 and -1.0 do not, and 1.2 does not reach e2's 2.0
@@ -181,11 +204,42 @@ def test_event_signal_statistics_compare_each_event_with_its_own_epoch():
     # -0.9, -0.85, -0.8, -0.7, 0.0
     assert swr["median"] == pytest.approx(-0.8)
     assert swr["n_animals_below_running"] == 2
-    # a: event median -0.825 against the rest levels -1, -1, -1, 0 of its events'
-    # epochs, median -1.0: above (it is not above their mean, -0.75, nor -0.5,
-    # the median of a's two epochs). b: 0.0 against -0.5: above.
-    assert swr["n_animals_above_rest"] == 2
+    # a: the median of -0.8 (e1) and -0.85 (e2) is -0.825, against -0.5, the
+    # median of its epochs' rest levels -1 and 0: not above (against its
+    # events' epochs' levels -1, -1, -1, 0, median -1.0, it would be). b: 0.0
+    # against -0.5: above.
+    assert swr["n_animals_above_rest"] == 1
     assert swr["reaches_running_fraction"] == 0.0
+
+
+def test_event_signal_statistics_weigh_an_animal_s_epochs_not_its_events():
+    # Both epochs of a have running level 0 and rest level -1. e1 has one
+    # event, at -2; e2 three, at 0.5.
+    reference = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d1",
+            "epoch": ["e1", "e2"],
+            "theta_running_median": 0.0,
+            "theta_rest_median": -1.0,
+        }
+    )
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d1",
+            "epoch": ["e1", "e2", "e2", "e2", "e1"],
+            "is_swr": [False, False, False, False, True],
+            "theta_z": [-2.0, 0.5, 0.5, 0.5, 0.0],
+        }
+    )
+    result = stats.event_signal_statistics(events, reference, {"theta": "theta_z"})
+    non_swr = result.loc[("theta", False)]
+    # pooled, the median event is 0.5; a's value is the mean of its two epochs'
+    # medians, -0.75: below running (0), above rest (-1)
+    assert non_swr["median"] == pytest.approx(0.5)
+    assert non_swr["n_animals_below_running"] == 1
+    assert non_swr["n_animals_above_rest"] == 1
 
 
 def test_event_signal_statistics_refuse_an_epoch_without_a_reference():
@@ -238,6 +292,8 @@ def test_rest_matched_theta_statistics_average_events_not_windows():
     events = pd.DataFrame(
         {
             "animal": ["a", "a", "b", "b"],
+            "session_date": "d1",
+            "epoch": "e1",
             "is_swr": [False, False, False, True],
             # a's first event equals the running level, which is theta-like
             "theta_z": [1.0, 0.0, 0.0, 5.0],
@@ -266,6 +322,31 @@ def test_rest_matched_theta_statistics_average_events_not_windows():
         broken.loc[1, column] = np.nan
         with pytest.raises(ValueError, match=rf"{column} +1"):
             stats.rest_matched_theta_statistics(broken)
+
+
+def test_rest_matched_theta_statistics_take_an_animal_s_shares_over_its_epochs():
+    # a, e1: one theta-like event, its windows' share 0.5; e2: three events,
+    # none theta-like, their windows' share 0.3
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d1",
+            "epoch": ["e1", "e2", "e2", "e2"],
+            "is_swr": False,
+            "theta_z": [2.0, 0.0, 0.0, 0.0],
+            "theta_running_median": 1.0,
+            "rest_windows": 10,
+            "rest_theta_like_share": [0.5, 0.3, 0.3, 0.3],
+        }
+    )
+    result = stats.rest_matched_theta_statistics(
+        pd.concat([events, events.iloc[[0]].assign(is_swr=True)], ignore_index=True)
+    )
+    # pooled over the events: 0.35
+    assert result.loc[False, "rest_theta_like_fraction"] == pytest.approx(0.35)
+    # a: the mean of its epochs' shares, 0.5 (1 and 0), against 0.4 (0.5 and
+    # 0.3): above. Pooled, 1 of 4 against 0.35 would not be.
+    assert result.loc[False, "n_animals_above_rest"] == 1
 
 
 def _spike_metrics() -> pd.DataFrame:
@@ -324,6 +405,28 @@ def test_spike_evidence_statistics_compare_each_epoch_and_animal_with_its_baseli
     assert baseline["n_epochs_scored"] == 5
     assert np.isnan(baseline["n_epochs_above_baseline"])
     assert np.isnan(baseline["n_animals_above_baseline"])
+
+
+def test_spike_evidence_statistics_take_an_animal_s_median_over_its_epochs():
+    # a1: one quiet window at 0, three remote events at 1; a2: one quiet window
+    # at 0, one remote event at -3
+    metrics = pd.DataFrame(
+        {
+            "group": ["baseline", "remote", "remote", "remote", "baseline", "remote"],
+            "animal": "a",
+            "epoch_id": ["a1"] * 4 + ["a2"] * 2,
+            "n_spikes": 5,
+            "n_tetrodes": 2,
+            "dll_per_spike": [0.0, 1.0, 1.0, 1.0, 0.0, -3.0],
+            "dist_to_gpi_peak": 10.0,
+        }
+    )
+    remote = stats.spike_evidence_statistics(metrics, "baseline").loc["remote"]
+    assert remote["dll_per_spike_median"] == 1.0
+    assert remote["n_epochs_above_baseline"] == 1
+    # a: the median of its epochs' medians 1 and -3 is -1, against 0: not
+    # above (pooled, its events' median 1 would be)
+    assert remote["n_animals_above_baseline"] == 0
 
 
 STEP_COLUMNS = [
@@ -415,30 +518,63 @@ def test_peak_ripple_mode_statistics_refuse_a_missing_or_repeated_animal_or_p():
             stats.peak_ripple_mode_statistics(missing, n_animals=3)
 
 
-def test_class_medians_count_animals_in_the_stated_direction():
-    events = pd.DataFrame(
+def _property_events() -> pd.DataFrame:
+    """Four animals of one epoch each."""
+    return pd.DataFrame(
         {
             "animal": ["a", "a", "a", "b", "b", "b", "c", "c", "d", "d"],
+            "session_date": "d1",
+            "epoch": "e1",
             "is_swr": [False, False, True, False, True, True, False, True, False, True],
             "extent": [1.0, 3.0, 5.0, 8.0, 4.0, np.nan, 1.0, 9.0, 7.0, 7.0],
         }
     )
-    lower = stats.class_medians(events, "extent", "lower")
+
+
+def test_class_medians_pool_the_events_with_a_value():
+    medians = stats.class_medians(_property_events(), "extent")
     # non-SWR: 1, 1, 3, 7, 8; SWR: 4, 5, 7, 9
-    assert lower["median_non_swr"] == 3.0
-    assert lower["median_swr"] == 6.0
+    assert medians == {"median_non_swr": 3.0, "median_swr": 6.0}
+
+
+def test_n_animals_in_direction_counts_animals_in_the_stated_direction():
+    events = _property_events()
     # a: 2 < 5; b: 8 > 4; c: 1 < 9; d: 7 against 7, in neither direction
-    assert lower["n_animals_in_direction"] == 2
-    higher = stats.class_medians(events, "extent", "higher")
-    assert higher["n_animals_in_direction"] == 1
+    assert stats.n_animals_in_direction(events, "extent", "lower") == 2
+    assert stats.n_animals_in_direction(events, "extent", "higher") == 1
     with pytest.raises(ValueError, match="direction 'above'"):
-        stats.class_medians(events, "extent", "above")
+        stats.n_animals_in_direction(events, "extent", "above")
+    # an animal without an SWR event with a value is in neither direction
+    no_swr = events[~((events.animal == "c") & events.is_swr)]
+    assert stats.n_animals_in_direction(no_swr, "extent", "lower") == 1
+
+
+def test_n_animals_in_direction_takes_each_class_median_over_the_epochs():
+    # e1: non-SWR 1, 1, 1 and SWR 2; e2: non-SWR 10 and SWR 3. Pooled, the
+    # non-SWR median 1 is below the SWR median 2.5; over the epochs it is 5.5,
+    # the median of e1's 1 and e2's 10, which is above 2.5.
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d1",
+            "epoch": ["e1", "e1", "e1", "e1", "e2", "e2"],
+            "is_swr": [False, False, False, True, False, True],
+            "extent": [1.0, 1.0, 1.0, 2.0, 10.0, 3.0],
+        }
+    )
+    assert stats.class_medians(events, "extent") == {
+        "median_non_swr": 1.0,
+        "median_swr": 2.5,
+    }
+    assert stats.n_animals_in_direction(events, "extent", "lower") == 0
+    assert stats.n_animals_in_direction(events, "extent", "higher") == 1
 
 
 def test_content_occupancy_shares_weigh_sessions_by_their_time_bins():
     occupancy = pd.DataFrame(
         {
             "animal": ["a", "a", "a", "b", "b", "c", "c"],
+            "epoch_id": ["a1", "a2", "a1", "b1", "b1", "c1", "c1"],
             "group": ["SWR", "SWR", "nonSWR", "SWR", "nonSWR", "SWR", "nonSWR"],
             "n": [10, 30, 20, 10, 10, 10, 10],
             "remote_well": [0.5, 0.1, 0.4, 0.2, 0.1, 0.1, 0.5],
@@ -452,9 +588,34 @@ def test_content_occupancy_shares_weigh_sessions_by_their_time_bins():
     assert shares.loc["SWR", "at_well"] == pytest.approx((6 + 6 + 5 + 2) / 60)
     assert shares.loc["nonSWR", "near_off"] == pytest.approx((4 + 4 + 1) / 40)
     assert list(shares.columns) == list(stats.OCCUPANCY_PLACES)
-    # a: non-SWR 0.6 at a well against SWR 0.3; b: 0.2 against 0.5; c: 0.7
-    # against 0.2
+    # a: non-SWR 0.6 at a well against SWR 0.4 (the mean of its sessions' 0.6
+    # and 0.2); b: 0.2 against 0.5; c: 0.7 against 0.2
     assert stats.n_animals_non_swr_more_at_well(occupancy) == 2
+
+
+def test_n_animals_non_swr_more_at_well_weighs_an_animal_s_sessions_alike():
+    # a's SWR content is at a well in 0.9 of a1's 10 bins and 0.1 of a2's 90:
+    # 0.18 weighted by bins, 0.5 over the sessions, against 0.3 non-SWR
+    occupancy = pd.DataFrame(
+        {
+            "animal": "a",
+            "epoch_id": ["a1", "a2", "a1"],
+            "group": ["SWR", "SWR", "nonSWR"],
+            "n": [10, 90, 10],
+            "remote_well": [0.9, 0.1, 0.3],
+            "own_well": 0.0,
+            "remote_path": [0.1, 0.9, 0.7],
+            "near_off": 0.0,
+        }
+    )
+    assert stats.content_occupancy_shares(occupancy).loc[
+        "SWR", "at_well"
+    ] == pytest.approx(0.18)
+    assert stats.n_animals_non_swr_more_at_well(occupancy) == 0
+    # a session with no share at a place is refused here too
+    occupancy.loc[0, "near_off"] = np.nan
+    with pytest.raises(ValueError, match="1 sessions with time bins have no share"):
+        stats.n_animals_non_swr_more_at_well(occupancy)
 
 
 def test_content_occupancy_shares_refuse_a_session_with_time_bins_and_no_share():

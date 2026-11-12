@@ -234,6 +234,57 @@ def test_animal_medians_need_the_animals_indexed_as_the_values():
 # --- the nested bootstrap -------------------------------------------------------------
 
 
+def _two_animals() -> pd.DataFrame:
+    """Animal a: session s1 holds 1, 2, 9 (median 2, mean 4), s2 holds 10 and
+    a missing value; animal b: one session, 5 and 6. Session s1 of b shares
+    a's label but is b's own."""
+    return pd.DataFrame(
+        {
+            "value": [1.0, 2.0, 9.0, 10.0, NAN, 5.0, 6.0],
+            "animal": ["a", "a", "a", "a", "a", "b", "b"],
+            "day": "d1",
+            "epoch": ["s1", "s1", "s1", "s2", "s2", "s1", "s1"],
+        }
+    )
+
+
+def test_animal_session_values_go_row_then_session_then_animal():
+    rows = _two_animals()
+    medians = stats.animal_session_values(
+        rows["value"], rows["animal"], rows["epoch"], "median"
+    )
+    # a: the median of 2 and 10 is 6 (its rows' median is 5.5); b: 5.5
+    assert medians.to_dict() == {"a": 6.0, "b": 5.5}
+    means = stats.animal_session_values(
+        rows["value"], rows["animal"], rows[["day", "epoch"]], "mean"
+    )
+    # a: the mean of 4 and 10 is 7 (its rows' mean is 5.5); b: 5.5
+    assert means.to_dict() == {"a": pytest.approx(7.0), "b": pytest.approx(5.5)}
+
+
+def test_animal_session_values_leave_out_a_session_without_a_value():
+    rows = _two_animals()
+    rows.loc[3, "value"] = NAN  # s2 of a has no value left
+    medians = stats.animal_session_values(
+        rows["value"], rows["animal"], rows["epoch"], "median"
+    )
+    assert medians["a"] == 2.0
+
+
+def test_animal_session_values_refuse_another_statistic_or_index():
+    rows = _two_animals()
+    with pytest.raises(ValueError, match="statistic 'max'"):
+        stats.animal_session_values(rows["value"], rows["animal"], rows["epoch"], "max")
+    with pytest.raises(ValueError, match="not indexed alike"):
+        stats.animal_session_values(
+            rows["value"], rows["animal"].iloc[:3], rows["epoch"], "mean"
+        )
+    with pytest.raises(ValueError, match="not indexed alike"):
+        stats.animal_session_values(
+            rows["value"], rows["animal"], rows["epoch"].iloc[::-1], "mean"
+        )
+
+
 def test_weighted_median_equals_median_of_repeated_sample():
     rng = np.random.default_rng(0)
     for _ in range(50):

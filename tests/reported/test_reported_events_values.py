@@ -121,7 +121,7 @@ def _other_detector_events() -> pd.DataFrame:
     others.append(("memoryless", "a", False, 0.8, 0.1, 0.0, 0.1))
     return pd.DataFrame(
         kay + others, columns=["detector", "animal", "matched", *STATE_SHARE_COLUMNS]
-    )
+    ).assign(day="d1", epoch="e1")
 
 
 def test_other_detector_values_name_each_detector_and_each_state():
@@ -445,7 +445,14 @@ def test_class_step_values_name_the_properties_with_the_most_steps():
 def _property_events() -> pd.DataFrame:
     """One animal, two non-SWR events and one SWR event. Property number i has
     non-SWR values i + 1 and i + 3 and the SWR value i + 10."""
-    events = pd.DataFrame({"animal": "a", "is_swr": [False, False, True]})
+    events = pd.DataFrame(
+        {
+            "animal": "a",
+            "session_date": "d1",
+            "epoch": "e1",
+            "is_swr": [False, False, True],
+        }
+    )
     for i, (_, column, *_) in enumerate(builder._PROPERTIES):
         events[column] = i + np.array([1.0, 3.0, 10.0])
     return events
@@ -505,6 +512,8 @@ def test_rest_theta_values_name_each_class():
     events = pd.DataFrame(
         {
             "animal": ["a", "a", "b", "a", "b"],
+            "session_date": "d1",
+            "epoch": "e1",
             "is_swr": [False, False, False, True, True],
             "theta_z": [2.0, 0.0, 0.0, 5.0, 5.0],
             "theta_running_median": 1.0,
@@ -546,8 +555,8 @@ def test_content_occupancy_values_name_each_group_and_place():
         "non_swr_content_at_well_fraction": pytest.approx(21 / 40),
         "non_swr_content_remote_path_fraction": pytest.approx(10 / 40),
         "non_swr_content_near_off_fraction": pytest.approx(9 / 40),
-        # a: non-SWR 0.6 at a well against SWR 0.3; b: 0.2 against 0.5; c: 0.7
-        # against 0.2
+        # a: non-SWR 0.6 at a well against SWR 0.4 (the mean of e1's 0.6 and
+        # e2's 0.2); b: 0.2 against 0.5; c: 0.7 against 0.2
         "animals_non_swr_more_at_well": 2,
     }
 

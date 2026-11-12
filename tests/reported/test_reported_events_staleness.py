@@ -147,6 +147,8 @@ def _rest_events(rest_windows) -> pd.DataFrame:
     return pd.DataFrame(
         {
             "animal": ["a", "b"] * (n // 2),
+            "session_date": "d1",
+            "epoch": "e1",
             "is_swr": [False, False, True, True] * (n // 4),
             "theta_z": np.linspace(-1, 1, n),
             "theta_running_median": 0.0,

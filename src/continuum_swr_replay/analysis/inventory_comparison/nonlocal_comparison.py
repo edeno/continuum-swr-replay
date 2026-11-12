@@ -41,6 +41,7 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (
     STATE_SPACE,
     typed_table,
 )
+from continuum_swr_replay.analysis.shared_statistics import animal_session_values
 from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
 from continuum_swr_replay.tables.io import read_table
 
@@ -123,8 +124,9 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
     ----------
     events : pd.DataFrame, shape (n_events, n_columns)
         Each other detector's compared events (:func:`other_detector_events`),
-        with ``detector``, ``animal``, ``matched`` and the four state shares.
-        An event with no state shares is left out of the state statistics.
+        with ``detector``, ``animal``, ``day``, ``epoch``, ``matched`` and the
+        four state shares. An event with no state shares is left out of the
+        state statistics.
 
     Returns
     -------
@@ -134,8 +136,10 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
 
         - ``n_events``: its compared events.
         - ``no_nonlocal_fraction``: the share overlapping no non-local event,
-          and ``no_nonlocal_fraction_animal_min`` and ``..._animal_max``, the
-          lowest and highest of the animals' own shares.
+          pooled, and ``no_nonlocal_fraction_animal_min`` and
+          ``..._animal_max``, the lowest and highest of the animals' own
+          shares, each event -> epoch -> animal: the mean over the animal's
+          epochs of each epoch's share.
         - Of the events overlapping no non-local event:
           ``no_nonlocal_mostly_local_fraction``,
           ``no_nonlocal_mostly_no_spike_fraction`` and
@@ -155,7 +159,12 @@ def other_detector_statistics(events: pd.DataFrame) -> pd.DataFrame:
         overlapping = mine[mine["matched"]].dropna(subset=list(STATE_SHARE_COLUMNS))
         mostly_local = alone[local] > 0.5
         mostly_no_spike = alone[no_spike] > 0.5
-        matched_by_animal = mine.groupby("animal")["matched"].mean()
+        matched_by_animal = animal_session_values(
+            mine["matched"].astype(float),
+            mine["animal"],
+            mine[["day", "epoch"]],
+            "mean",
+        )
         rows[detector] = {
             "n_events": len(mine),
             "no_nonlocal_fraction": (~mine["matched"]).sum() / len(mine),
