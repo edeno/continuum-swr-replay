@@ -531,7 +531,6 @@ def test_the_replay_tables_are_published_with_the_sources_stamp(
     from continuum_swr_replay.analysis.behavior.tables import prepare_data
 
     published: dict = {}
-    monkeypatch.setattr(prepare_data, "OUTPUT_DIR", tmp_path)
     monkeypatch.setattr(
         prepare_data,
         "publish_swr_table",
@@ -541,7 +540,11 @@ def test_the_replay_tables_are_published_with_the_sources_stamp(
     )
 
     prepare_data._publish_canonical_tables(
-        (("stop_table", "stop", _stop_frame()), ("event_table", "event", _stop_frame()))
+        (
+            ("stop_table", "stop", _stop_frame()),
+            ("event_table", "event", _stop_frame()),
+        ),
+        tmp_path,
     )
 
     assert {name: attrs["swr_source"] for name, attrs in published.items()} == {
@@ -620,8 +623,7 @@ def test_the_stop_table_rebuild_refuses_an_event_table_from_another_source(
 def test_the_stop_shard_assembly_needs_every_shard_from_the_source(
     source, monkeypatch, tmp_path, stale_shard
 ):
-    monkeypatch.syspath_prepend(str(REPO / "scripts" / "tables"))
-    from scripts.tables.assemble_replay_content_shards import (
+    from continuum_swr_replay.analysis.behavior.tables.prepare_data import (
         assemble_replay_stop_shards,
     )
 

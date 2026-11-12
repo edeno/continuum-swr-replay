@@ -19,6 +19,7 @@ import argparse
 import logging
 import pickle
 import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -44,6 +45,10 @@ from continuum_swr_replay.analysis.behavior.covariates import (
 from continuum_swr_replay.analysis.behavior.tables._tables_common import (
     EVENT_ARM_STANDARDIZED_COLS,
 )
+from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
+    validate_event_arm_table,
+    validate_event_patch_table,
+)
 from continuum_swr_replay.analysis.behavior.tables.tables_arm_patch import (
     build_event_arm_table,
     build_event_patch_table,
@@ -59,6 +64,7 @@ from continuum_swr_replay.analysis.behavior.tables.tables_stop import (
 from continuum_swr_replay.analysis.events.analysed_time import (
     publish_swr_table,
     read_dot_with_swr_source,
+    require_swr_source,
     stamp_swr_source,
 )
 from continuum_swr_replay.analysis.events.swr_source import swr_epoch_id
@@ -77,17 +83,21 @@ from continuum_swr_replay.data_types import SessionDataKeys
 from continuum_swr_replay.decoding.files import decode_paths
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import (
+    BASENAME_TO_TABLE,
     STANDARDIZATION_REFERENCE,
     processed_data_dir,
     replay_content_dir,
     table_path,
 )
+from continuum_swr_replay.tables.covariate_registry import stamp_covariate_schema
 from continuum_swr_replay.tables.io import (
+    read_table,
     write_atomically,
 )
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
     present_session_columns,
+    session_key_set,
 )
 from continuum_swr_replay.tables.standardization import (
     assert_standardized_present,
@@ -862,9 +872,11 @@ def _assemble_canonical_tables(
 
 
 def _standardize_event_arm(
-    event_arm_table_all: pd.DataFrame, contingency: pd.DataFrame | None
+    event_arm_table_all: pd.DataFrame,
+    contingency: pd.DataFrame | None,
+    reference_path: Path,
 ) -> pd.DataFrame:
-    """Attach the pooled-global ``_z`` columns and persist the reference.
+    """Attach the pooled-global ``_z`` columns and save the reference to `reference_path`.
 
     The pooled standardization runs over the full concatenated table (a
     per-session z would use the wrong mean/SD) and only on the six reward-site
@@ -890,7 +902,7 @@ def _standardize_event_arm(
         support_mask=leaf_support,
         support_label="leaf_arms",
     )
-    save_reference(z_reference, output_dir() / STANDARDIZATION_REFERENCE)
+    save_reference(z_reference, reference_path)
     # Rebuild-completeness guard: a future refactor must not silently drop the _z
     # columns (the exact regression this phase fixes).
     assert_standardized_present(
@@ -906,8 +918,8 @@ def _standardize_event_arm(
     return event_arm_table_all
 
 
-def _publish_canonical_tables(frames: tuple) -> None:
-    """Atomically publish each (basename, table_key, frame) via publish_canonical.
+def _publish_canonical_tables(frames: tuple, output_dir: Path) -> None:
+    """Atomically publish each (basename, table_key, frame) to `output_dir`.
 
     ``publish_canonical`` stamps the covariate schema and writes atomically, so
     the tables cannot land unstamped; the per-table key selects the row-key
@@ -921,7 +933,7 @@ def _publish_canonical_tables(frames: tuple) -> None:
         stamp_swr_source(frame)
         path = publish_swr_table(
             frame,
-            output_dir(),
+            output_dir,
             table=table_key,
             basename=basename,
         )
@@ -1050,7 +1062,9 @@ def run_prepare_data(args: argparse.Namespace) -> None:
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    event_arm_table_all = _standardize_event_arm(event_arm_table_all, contingency)
+    event_arm_table_all = _standardize_event_arm(
+        event_arm_table_all, contingency, OUTPUT_DIR / STANDARDIZATION_REFERENCE
+    )
     _publish_canonical_tables(
         (
             ("event_table", "event", event_table_all),
@@ -1058,7 +1072,255 @@ def run_prepare_data(args: argparse.Namespace) -> None:
             ("event_patch_table", "event_patch", event_patch_table_all),
             ("stop_table", "stop", stop_table_all),
             ("event_sequence_table", "event_sequence", event_sequence_table_all),
-        )
+        ),
+        OUTPUT_DIR,
     )
 
     logging.info("total time: %ds", int(time.time() - t0))
+
+
+def read_disjoint_shards(
+    shard_dirs: Sequence[Path],
+    basenames: Mapping[str, str],
+    *,
+    what: str,
+    expected_sessions: int,
+) -> list[dict[str, pd.DataFrame]]:
+    """Read per-animal table shards that together make one bundle.
+
+    A full build can run as disjoint per-animal builds (``--animal``), each into
+    its own folder; the shards are then joined into one bundle. A shard's
+    sessions are those of its ``stop_table``.
+
+    Parameters
+    ----------
+    shard_dirs : sequence of Path
+        The shard folders.
+    basenames : mapping of str to str
+        Each table to read, by its name in the returned dicts, to its basename
+        in a shard folder. Must include ``"stop_table"``.
+    what : str
+        What the shards are, for the messages (``"Replay"``, ``"ContFrag"``).
+    expected_sessions : int
+        The number of sessions the shards must hold together.
+
+    Returns
+    -------
+    list of dict of str to pd.DataFrame
+        Each shard's tables, keyed as in `basenames`, in the order of
+        `shard_dirs`.
+
+    Raises
+    ------
+    ValueError
+        If there is no shard, if two shards hold a session in common, or if the
+        shards together hold other than `expected_sessions` sessions.
+    SwrSourceError
+        If a table was not built from the configured SWR source.
+    """
+    if not shard_dirs:
+        raise ValueError("at least one shard directory is required")
+    shards: list[dict[str, pd.DataFrame]] = []
+    observed_sessions: set[tuple[object, ...]] = set()
+    for shard_dir in shard_dirs:
+        frames = {
+            name: read_table(shard_dir / basename)
+            for name, basename in basenames.items()
+        }
+        # Every shard must come from the SWR source the bundle is stamped with.
+        for name, frame in frames.items():
+            require_swr_source(frame, what=f"{shard_dir / basenames[name]}")
+        shard_sessions = session_key_set(frames["stop_table"])
+        overlap = observed_sessions & shard_sessions
+        if overlap:
+            raise ValueError(
+                f"{what} shards overlap on {len(overlap)} session(s), e.g. "
+                f"{next(iter(overlap))}"
+            )
+        observed_sessions |= shard_sessions
+        shards.append(frames)
+    if len(observed_sessions) != expected_sessions:
+        raise ValueError(
+            f"assembled {what} scope has {len(observed_sessions)} sessions; "
+            f"expected {expected_sessions}"
+        )
+    return shards
+
+
+_SHARD_TABLES = (
+    "event_table",
+    "event_arm_table",
+    "stop_table",
+    "event_sequence_table",
+)
+
+
+def assemble_replay_content_shards(
+    shard_dirs: Sequence[Path],
+    *,
+    output_dir: Path,
+    contingency_dir: Path,
+    expected_sessions: int,
+) -> dict[str, pd.DataFrame]:
+    """Join per-animal shards of the replay tables into one published bundle.
+
+    The bundle is the one :func:`run_prepare_data` builds over every session at
+    once: the shards' tables are concatenated in shard order, and the
+    assembly-level columns (the non-local SWR split, the event-patch table) and
+    the leaf-arm standardization of the event-arm table are computed over the
+    whole corpus. Each shard's own ``_z`` columns, standardized over its animal
+    alone, are dropped first.
+
+    Parameters
+    ----------
+    shard_dirs : sequence of Path
+        The shard folders, each written by ``run_prepare_data`` for one animal.
+    output_dir : Path
+        Where the five tables and the standardization reference are published.
+    contingency_dir : Path
+        The folder of the ``qvals_table`` the event-arm value block must match.
+    expected_sessions : int
+        The number of sessions the shards must hold together.
+
+    Returns
+    -------
+    dict of str to pd.DataFrame
+        The published tables, keyed by basename.
+
+    Raises
+    ------
+    ValueError
+        If the shards overlap or miss sessions, a shard or the bundle breaks
+        stop/event count conservation, an ``event_id`` or ``stop_id`` repeats, an
+        ``event_sequence_table`` row repeats or names an event the bundle lacks,
+        or the value block disagrees with the ``qvals_table``.
+    """
+    shards = read_disjoint_shards(
+        shard_dirs,
+        {name: name for name in _SHARD_TABLES},
+        what="Replay",
+        expected_sessions=expected_sessions,
+    )
+    for shard_dir, frames in zip(shard_dirs, shards, strict=True):
+        validate_event_arm_table(
+            frames["event_arm_table"], event_table=frames["event_table"]
+        )
+        if int(frames["stop_table"]["n_selected_events"].sum()) != len(
+            frames["event_table"]
+        ):
+            raise ValueError(f"{shard_dir} violates stop/event count conservation")
+
+    standardized_columns = [f"{column}_z" for column in EVENT_ARM_STANDARDIZED_COLS]
+    (
+        event_table,
+        event_arm_table,
+        event_patch_table,
+        stop_table,
+        event_sequence_table,
+    ) = _assemble_canonical_tables(
+        [frames["event_table"] for frames in shards],
+        [
+            frames["event_arm_table"].drop(columns=standardized_columns, errors="raise")
+            for frames in shards
+        ],
+        [frames["stop_table"] for frames in shards],
+        [frames["event_sequence_table"] for frames in shards],
+    )
+    if event_table["event_id"].duplicated().any():
+        raise ValueError("assembled event_table contains duplicate event_id values")
+    if stop_table["stop_id"].duplicated().any():
+        raise ValueError("assembled stop_table contains duplicate stop_id values")
+    # event_sequence_table has many rows per event_id, so it needs a referential
+    # check rather than a uniqueness one: every sequence event_id must resolve to
+    # an assembled event (no orphan from a shard mismatch, the silent event_id
+    # mis-join), and no whole row may be duplicated (a shard double-count).
+    sequence_orphans = set(event_sequence_table["event_id"].unique()) - set(
+        event_table["event_id"]
+    )
+    if sequence_orphans:
+        raise ValueError(
+            f"event_sequence_table references {len(sequence_orphans)} event_id(s) "
+            "absent from the assembled event_table"
+        )
+    if event_sequence_table.duplicated().any():
+        raise ValueError(
+            "assembled event_sequence_table contains fully duplicated rows "
+            "(shard double-count)"
+        )
+    validate_event_arm_table(event_arm_table, event_table=event_table)
+    validate_event_patch_table(event_patch_table, event_table=event_table)
+    if int(stop_table["n_selected_events"].sum()) != len(event_table):
+        raise ValueError("assembled stop/event count conservation failed")
+
+    contingency = load_contingency(table_path("qvals_table", contingency_dir))
+    output_dir.mkdir(parents=True, exist_ok=True)
+    event_arm_table = _standardize_event_arm(
+        event_arm_table, contingency, output_dir / STANDARDIZATION_REFERENCE
+    )
+    tables = {
+        "event_table": event_table,
+        "event_arm_table": event_arm_table,
+        "event_patch_table": event_patch_table,
+        "stop_table": stop_table,
+        "event_sequence_table": event_sequence_table,
+    }
+    # The concatenated shards carry the shards' stamps, which would let the
+    # publish skip its checks: stamp (and so check) the bundle itself.
+    for name, frame in tables.items():
+        stamp_covariate_schema(frame, table=BASENAME_TO_TABLE[name])
+    _publish_canonical_tables(
+        tuple((name, BASENAME_TO_TABLE[name], frame) for name, frame in tables.items()),
+        output_dir,
+    )
+    return tables
+
+
+def assemble_replay_stop_shards(
+    shard_dirs: Sequence[Path], *, output_dir: Path, expected_sessions: int
+) -> pd.DataFrame:
+    """Join per-animal shards of the stop-only table and publish it.
+
+    The stop-only table (:func:`build_stop_table_scope`) is the input of the
+    qvals bootstrap; this joins the shards of a per-animal stop-only build.
+
+    Parameters
+    ----------
+    shard_dirs : sequence of Path
+        The shard folders, each holding one ``stop_table``.
+    output_dir : Path
+        Where the joined ``stop_table`` is published.
+    expected_sessions : int
+        The number of sessions the shards must hold together.
+
+    Returns
+    -------
+    pd.DataFrame
+        The published stop table.
+
+    Raises
+    ------
+    ValueError
+        If the shards overlap or miss sessions, or a ``stop_id`` is missing or
+        repeats.
+    """
+    shards = read_disjoint_shards(
+        shard_dirs,
+        {"stop_table": "stop_table"},
+        what="stop",
+        expected_sessions=expected_sessions,
+    )
+    stop_table = pd.concat(
+        [frames["stop_table"] for frames in shards], ignore_index=True
+    )
+    if stop_table["stop_id"].isna().any() or stop_table["stop_id"].duplicated().any():
+        raise ValueError("assembled stop table requires unique nonmissing stop_id")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stamp_swr_source(stop_table)
+    path = publish_swr_table(
+        stop_table,
+        output_dir,
+        table="stop",
+        basename="stop_table",
+    )
+    logging.info("saved stop_table -> %s (%d rows)", path, len(stop_table))
+    return stop_table

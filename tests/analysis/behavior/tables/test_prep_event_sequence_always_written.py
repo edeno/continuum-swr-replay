@@ -83,7 +83,9 @@ def published(monkeypatch, tmp_path):
         lambda sessions, contingency, *, from_cache, t0: _session_tables(),
     )
     monkeypatch.setattr(
-        prepare_data, "_standardize_event_arm", lambda table, contingency: table
+        prepare_data,
+        "_standardize_event_arm",
+        lambda table, contingency, reference_path: table,
     )
     monkeypatch.setattr(
         prepare_data,
