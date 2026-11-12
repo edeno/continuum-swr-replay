@@ -48,20 +48,16 @@ for _cat in (UserWarning, FutureWarning, DeprecationWarning):
     warnings.filterwarnings("ignore", category=_cat)
 
 from continuum_swr_replay.analysis.constants import (  # noqa: E402
-    DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC,
     DEFAULT_NON_LOCAL_THRESHOLD,
 )
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
-    analysed_bins,
     read_dot_with_swr_source,
     require_swr_source,
 )
 from continuum_swr_replay.analysis.events.immobility import (  # noqa: E402
     EventDefinitionError,
 )
-from continuum_swr_replay.analysis.events.nonlocal_detection import (  # noqa: E402
-    event_strict_overlap_mask,
-)
+from continuum_swr_replay.analysis.hippocampus import content_occupancy  # noqa: E402
 from continuum_swr_replay.analysis.hippocampus.data_aggregation import (  # noqa: E402
     validate_dot_event_contract,
 )
@@ -98,9 +94,6 @@ from continuum_swr_replay.tables.io import read_table, table_exists  # noqa: E40
 # --- Parameters ---------------------------------------------------------------
 # the data_over_time file the threshold names (``_80_``)
 THRESHOLD_PERCENT = non_local_threshold_percent(DEFAULT_NON_LOCAL_THRESHOLD)
-IMMOBILITY_CM_PER_S = DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
-MIN_WELLS = 4  # require this many wells localizable in a session
-MIN_IMMOBILE_BINS = 50  # per leaf arm, to estimate the well position
 
 XE = np.arange(0, 401, 2)  # 2D histogram edges: content->animal (cm)
 YE = np.arange(0, 201, 2)  # content->nearest well (cm)
@@ -135,32 +128,15 @@ def find_sessions(animal: str | None) -> list[str]:
     return out
 
 
-def _well_positions(dot: pd.DataFrame) -> list[float]:
-    """Reward-well linear positions: the animal's median immobile position per leaf arm.
-
-    Over the immobile bins outside excluded time (``in_excluded_time``).
-    """
-    analysed = analysed_bins(dot)
-    immobile = (dot["head_speed"].to_numpy() < IMMOBILITY_CM_PER_S) & analysed
-    segment = dot["track_segment_id"].to_numpy()
-    linear = dot["linear_position"].to_numpy()
-    wells = []
-    for arm in range(N_LEAF_ARMS):
-        m = immobile & (segment == arm) & np.isfinite(linear)
-        if m.sum() > MIN_IMMOBILE_BINS:
-            wells.append(float(np.median(linear[m])))
-    return wells
-
-
 def session_content_distances(
     epoch_id: str,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
     """Track distances for non-local event timebins in one session.
 
-    Returns ``(d_animal, d_well, is_swr)`` over non-local immobile timebins, where
-    ``d_animal`` is the track distance from the decoded content to the animal
-    (``ahead_behind_distance``) and ``d_well`` is the track distance to the
-    nearest reward well. Returns ``None`` if too few wells are localizable.
+    Reads the session's decode frame and environment and returns
+    :func:`content_occupancy.content_distances`: ``(d_animal, d_well, is_swr)``
+    over the non-local event timebins, or ``None`` if fewer than
+    ``content_occupancy.MIN_WELLS`` wells are localizable.
     """
     paths = decode_paths(
         epoch_id, processed_data_dir(), threshold_percent=THRESHOLD_PERCENT
@@ -176,35 +152,7 @@ def session_content_distances(
     env = joblib.load(paths.environment)
     # The fit flag is not persisted, but the grid + track graph are intact.
     env._is_fitted = True
-    interior = np.asarray(env.is_track_interior_).reshape(-1)
-    pos = np.asarray(env.place_bin_centers_).reshape(-1)[interior]  # (n_interior,)
-
-    well_lin = _well_positions(dot)
-    if len(well_lin) < MIN_WELLS:
-        return None
-
-    # Per-interior-bin track distance to the nearest reward well.
-    dist_matrix = np.asarray(
-        env.get_distances_to_interior_bins(pos[:, None])
-    )  # (n_int, n_int)
-    well_bins = [int(np.argmin(np.abs(pos - wl))) for wl in well_lin]
-    nearest_well_dist = dist_matrix[:, well_bins].min(1)  # (n_interior,)
-
-    event = dot["non_local_event"].to_numpy() > 0
-    # Assign every bin of a Non-Local event to one group using the canonical
-    # strict event-level overlap rule. A raw per-bin SWR mask would split a
-    # partially overlapping event between both groups.
-    is_swr = event_strict_overlap_mask(dot, "non_local_event", "SWR_event").to_numpy()
-    map_estimate = dot["map_estimate"].to_numpy()
-    d_animal = np.abs(dot["ahead_behind_distance"].to_numpy())
-    content_bin = np.argmin(np.abs(pos[None, :] - map_estimate[:, None]), axis=1)
-    d_well = nearest_well_dist[content_bin]
-
-    # Guard against non-finite d_well (e.g. Inf from a disconnected graph component).
-    valid = (
-        event & np.isfinite(map_estimate) & np.isfinite(d_animal) & np.isfinite(d_well)
-    )
-    return d_animal[valid], d_well[valid], is_swr[valid]
+    return content_occupancy.content_distances(dot, env)
 
 
 # --- Arm occupancy (from canonical event tables) ------------------------------
@@ -247,7 +195,7 @@ def analyze(
             print(f"  {epoch_id}: FAILED ({type(exc).__name__}: {exc})")
             continue
         if result is None:
-            # Fewer than MIN_WELLS leaf arms localizable; well distances would be
+            # Too few leaf arms localizable; well distances would be
             # relative to an incomplete well set, so the session is dropped.
             n_dropped += 1
             continue
@@ -268,7 +216,8 @@ def analyze(
             rows.append(row)
     if n_dropped:
         print(
-            f"  dropped {n_dropped} session(s): <{MIN_WELLS} reward wells localizable"
+            f"  dropped {n_dropped} session(s): "
+            f"<{content_occupancy.MIN_WELLS} reward wells localizable"
         )
     return pd.DataFrame(rows), hist2d, dwell_hist
 

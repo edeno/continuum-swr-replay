@@ -16,8 +16,8 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import pytest  # noqa: E402
 
+from continuum_swr_replay.analysis.hippocampus import content_occupancy  # noqa: E402
 from continuum_swr_replay.visualization import figure_panels  # noqa: E402
-from scripts.behavior.content import analyze_content_occupancy  # noqa: E402
 from scripts.figures import generate_event_gallery as gallery  # noqa: E402
 from scripts.figures import generate_supp_decoder_validation as supp  # noqa: E402
 from tests.support._excluded_time_frames import (  # noqa: E402
@@ -110,9 +110,7 @@ def test_the_immobile_bar_leaves_out_bins_at_the_speed_threshold():
 
 STRICT = {
     **PANELS,
-    "B8 well positions": lambda frame, ax: (
-        analyze_content_occupancy._well_positions(frame)
-    ),
+    "B8 well positions": lambda frame, ax: content_occupancy.well_positions(frame),
 }
 
 
@@ -126,41 +124,6 @@ def test_a_filter_refuses_a_column_that_is_not_boolean(name):
 
     with pytest.raises(TypeError, match="in_excluded_time"):
         _drawn(STRICT[name], frame)
-
-
-# --------------------------------------------------------------------------
-# B8: the reward-well positions of the content-occupancy scan
-# --------------------------------------------------------------------------
-
-
-def test_the_well_positions_leave_excluded_time_out():
-    """Each leaf arm's well is the median immobile position on it. On arm 0,
-    100 excluded immobile bins at 50 cm would move it from 10 cm."""
-    arms = np.repeat(np.arange(6), 60)
-    linear = 10.0 + 20.0 * arms
-    analysed = pd.DataFrame(
-        {
-            "head_speed": 1.0,
-            "track_segment_id": arms,
-            "linear_position": linear,
-            "in_excluded_time": False,
-        }
-    )
-    excluded = pd.DataFrame(
-        {
-            "head_speed": 1.0,
-            "track_segment_id": 0,
-            "linear_position": np.full(100, 50.0),
-            "in_excluded_time": True,
-        }
-    )
-    frame = pd.concat([analysed, excluded], ignore_index=True)
-
-    wells = analyze_content_occupancy._well_positions(frame)
-
-    assert wells == [10.0, 30.0, 50.0, 70.0, 90.0, 110.0]
-    assert wells == analyze_content_occupancy._well_positions(analysed)
-    assert analyze_content_occupancy._well_positions(unfiltered(frame))[0] == 50.0
 
 
 # --------------------------------------------------------------------------
