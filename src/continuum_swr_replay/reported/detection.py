@@ -14,7 +14,7 @@ summaries, of the labeled recording and of the pilot's events are computed in
   ``scripts/detection/run_state_evidence.py``): its pooled ``bout_stats.csv``
   and the per-epoch status in ``manifest.json``;
 - the three simulation sweeps of the two replay detectors
-  (``docs/design/replay_detection_comparison/detection_{sweep,controls,heldout}_summary.csv``,
+  (``paper/reported/inputs/detection/detection_{sweep,controls,heldout}_summary.csv``,
   from ``scripts/detection/sweep_memoryless_{detection,controls,heldout}.py``),
   for the memoryless-comparison caption's panels (g-q);
 - the one labeled recording of that caption's panels (a-f)

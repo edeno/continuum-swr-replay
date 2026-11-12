@@ -166,7 +166,7 @@ them importable.
 - `sweep_memoryless_controls.py`, `sweep_memoryless_heldout.py` — what each detector
   does with activity that is not one clean replay (no replay, place-less bursts,
   jumps and chains), and whether its content reproduces in held-out cells; they write
-  `docs/design/replay_detection_comparison/detection_{controls,heldout}_summary.csv`.
+  `paper/reported/inputs/detection/detection_{controls,heldout}_summary.csv`.
 
 ## `tables/` — the event, stop and time-bin tables
 - `prepare_replay_content_data.py` — build the canonical replay-content tables
