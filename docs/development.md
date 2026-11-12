@@ -449,9 +449,10 @@ A builder names and describes values; it does not compute them. The statistics a
 tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
 number comes from. The statistics that know nothing of the task are in `analysis/shared_statistics.py`: the
 signed-rank p (NaN below six non-zero differences), the Benjamini-Hochberg correction (a missing p is
-left out of the family), the animal-balanced summary over sessions and the nested bootstrap (animals, then
-their sessions, then the units or events of each session) behind every interval; every other module calls
-those.
+left out of the family), the animal-balanced summary over sessions, the nested bootstrap (animals, then
+their sessions, then the units or events of each session) behind every interval, and the interval itself:
+the estimate plus or minus t(0.975, A - 1) sqrt(A / (A - 1)) times the draws' standard deviation over the A
+animals, because the draws' percentiles under-cover with five animals; every other module calls those.
 Each builder's statistics:
 
 - survey: `analysis/literature_survey.py` (the builder reads the survey's cells into numbers and trigger
