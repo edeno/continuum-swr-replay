@@ -890,7 +890,7 @@ Measure each epoch's theta, ripple and MUA levels during running and during quie
 
 Measure slow- and fast-gamma power during each non-local event, and during running and quiet rest.
 
-`out_dir`, `epoch_gamma`, `main`
+`out_dir`, `epoch_gamma`, `epochs_to_measure`, `main`
 
 ### `scripts/detection/measure_event_start_and_rest_theta.py`
 
