@@ -122,10 +122,17 @@ def test_restrict_takes_the_sessions_from_the_slice_register(tmp_path):
     cand.mkdir()
     pd.DataFrame(
         [
-            ["chimi20200212_.nwb", "02_r1", "analysed", "", ""],
-            ["j1620210706_.nwb", "02_r1", "excluded", "MISSING_INPUT", "slice"],
+            ["chimi20200212_.nwb", "02_r1", "analysed", "", "", "True"],
+            ["j1620210706_.nwb", "02_r1", "excluded", "MISSING_INPUT", "slice", "True"],
         ],
-        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+        columns=[
+            "nwb_file_name",
+            "epoch",
+            "status",
+            "reason",
+            "evidence",
+            "first_exposure",
+        ],
     ).to_csv(cand / "epoch_register.csv", index=False)
     # The candidate's own stop table is never read: it lost every row.
     (cand / tp.RC).mkdir()

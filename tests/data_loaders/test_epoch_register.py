@@ -37,6 +37,7 @@ from continuum_swr_replay.data_loaders.epoch_register import (
     analysed_epoch_ids,
     analysed_epochs,
     epochs_to_run,
+    first_exposure_epochs,
     pending_epochs,
     read_register,
     reason_status,
@@ -57,18 +58,18 @@ AUDIT_KEYS = (
     / "epoch_register"
     / "exclusions_table_keys.csv"
 )
-COLUMNS = ["nwb_file_name", "epoch", "status", "reason", "evidence"]
+COLUMNS = ["nwb_file_name", "epoch", "status", "reason", "evidence", "first_exposure"]
 
 ROWS = [
-    ["a20200101_.nwb", "02_r1", "analysed", "", ""],
-    ["a20200101_.nwb", "04_r2", "analysed", "", ""],
-    ["a20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM row"],
-    ["b20200102_.nwb", "02_r1", "pending", "PENDING_POPULATE", "no LFPV1"],
-    ["b20200102_.nwb", "04_r2", "excluded", "DEPLETION_TASK", "decay 80"],
-    ["c20200103_.nwb", "*", "excluded", "NO_NWB", "no NWB file anywhere"],
+    ["a20200101_.nwb", "02_r1", "analysed", "", "", "False"],
+    ["a20200101_.nwb", "04_r2", "analysed", "", "", "False"],
+    ["a20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM row", "False"],
+    ["b20200102_.nwb", "02_r1", "pending", "PENDING_POPULATE", "no LFPV1", "False"],
+    ["b20200102_.nwb", "04_r2", "excluded", "DEPLETION_TASK", "decay 80", "False"],
+    ["c20200103_.nwb", "*", "excluded", "NO_NWB", "no NWB file anywhere", "False"],
 ]
 """A small register: two analysed, two pending, an excluded epoch, a
-session-wide entry."""
+session-wide entry; no first-exposure epoch."""
 ANALYSED = [("a20200101_.nwb", "02_r1"), ("a20200101_.nwb", "04_r2")]
 PENDING = [("a20200101_.nwb", "06_r3"), ("b20200102_.nwb", "02_r1")]
 
@@ -194,9 +195,9 @@ def test_the_committed_cohort_is_whatever_the_register_analyses(monkeypatch):
 
 
 GOOD_ROWS = [
-    ["a20200101_.nwb", "02_r1", "analysed", "", ""],
-    ["a20200101_.nwb", "04_r2", "pending", "PENDING_POPULATE", "no PIM row"],
-    ["b20200101_.nwb", "*", "excluded", "NO_NWB", "no NWB file anywhere"],
+    ["a20200101_.nwb", "02_r1", "analysed", "", "", "True"],
+    ["a20200101_.nwb", "04_r2", "pending", "PENDING_POPULATE", "no PIM row", "False"],
+    ["b20200101_.nwb", "*", "excluded", "NO_NWB", "no NWB file anywhere", "False"],
 ]
 
 
@@ -205,25 +206,51 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
 
     assert list(register.index.names) == ["nwb_file_name", "epoch"]
     assert register.loc[("a20200101_.nwb", "04_r2"), "status"] == "pending"
+    assert register["first_exposure"].tolist() == [True, False, False]
 
 
 @pytest.mark.parametrize(
     ("bad_row", "message"),
     [
-        (["a20200101_.nwb", "02_r1", "excluded", "NO_NWB", "x"], "more than once"),
-        (["b20200101_.nwb", "02_r1", "analysed", "", ""], "session-wide"),
-        (["c20200101_.nwb", "02_r1", "kept", "", ""], "status"),
-        (["c20200101_.nwb", "02_r1", "excluded", "NO_REASON", "x"], "reason"),
-        (["c20200101_.nwb", "02_r1", "excluded", "NO_NWB", " "], "evidence"),
-        (["c20200101_.nwb", "02_r1", "analysed", "NO_NWB", "x"], "reason"),
-        (["c20200101_.nwb", "02_r1", "pending", "NO_NWB", "x"], "PENDING_POPULATE"),
         (
-            ["c20200101_.nwb", "02_r1", "pending", "SUSTAINED_NOISE", "x"],
+            ["a20200101_.nwb", "02_r1", "excluded", "NO_NWB", "x", "False"],
+            "more than once",
+        ),
+        (["b20200101_.nwb", "02_r1", "analysed", "", "", "False"], "session-wide"),
+        (["c20200101_.nwb", "02_r1", "kept", "", "", "False"], "status"),
+        (
+            ["c20200101_.nwb", "02_r1", "excluded", "NO_REASON", "x", "False"],
+            "reason",
+        ),
+        (["c20200101_.nwb", "02_r1", "excluded", "NO_NWB", " ", "False"], "evidence"),
+        (["c20200101_.nwb", "02_r1", "analysed", "NO_NWB", "x", "False"], "reason"),
+        (
+            ["c20200101_.nwb", "02_r1", "pending", "NO_NWB", "x", "False"],
             "PENDING_POPULATE",
         ),
-        (["c20200101_.nwb", "02_r1", "excluded", "PENDING_POPULATE", "x"], "pending"),
-        (["c20200101_.nwb", "2_s1", "excluded", "NO_NWB", "x"], "run epoch"),
-        (["c20200101_.nwb", "*", "pending", "PENDING_POPULATE", "x"], "session-wide"),
+        (
+            ["c20200101_.nwb", "02_r1", "pending", "SUSTAINED_NOISE", "x", "False"],
+            "PENDING_POPULATE",
+        ),
+        (
+            ["c20200101_.nwb", "02_r1", "excluded", "PENDING_POPULATE", "x", "False"],
+            "pending",
+        ),
+        (["c20200101_.nwb", "2_s1", "excluded", "NO_NWB", "x", "False"], "run epoch"),
+        (
+            ["c20200101_.nwb", "*", "pending", "PENDING_POPULATE", "x", "False"],
+            "session-wide",
+        ),
+        (["c20200101_.nwb", "02_r1", "analysed", "", "", "true"], "first_exposure"),
+        (["c20200101_.nwb", "02_r1", "analysed", "", "", ""], "first_exposure"),
+        (
+            ["c20200101_.nwb", "*", "excluded", "NO_NWB", "x", "True"],
+            "not first exposure",
+        ),
+        (
+            ["a20200105_.nwb", "02_r1", "analysed", "", "", "True"],
+            "a has more than one first-exposure epoch",
+        ),
     ],
     ids=[
         "duplicate",
@@ -237,6 +264,10 @@ def test_a_well_formed_register_is_read_by_epoch(tmp_path):
         "excluded-pending-reason",
         "not-a-run-epoch",
         "star-not-excluded",
+        "first-exposure-not-a-flag",
+        "first-exposure-blank",
+        "star-first-exposure",
+        "two-first-exposures-of-one-animal",
     ],
 )
 def test_a_malformed_register_is_refused(tmp_path, bad_row, message):
@@ -343,7 +374,7 @@ def test_pending_epochs_refuse_a_register_with_none(tmp_path, monkeypatch):
 
 
 NOISY = ("a20200101_.nwb", "08_r4")
-NOISY_ROW = [*NOISY, "excluded", "SUSTAINED_NOISE", "S block 84.0-112.0 s"]
+NOISY_ROW = [*NOISY, "excluded", "SUSTAINED_NOISE", "S block 84.0-112.0 s", "False"]
 
 
 def test_a_sustained_noise_entry_is_excluded():
@@ -501,6 +532,40 @@ def test_the_analysed_animals_are_the_cohorts_in_register_order():
 def test_an_animal_with_no_analysed_epoch_is_not_listed(small_register):
     """``b`` has only pending and excluded epochs, ``c`` a session-wide exclusion."""
     assert analysed_animals() == ("a",)
+
+
+# --------------------------------------------------------------------------
+# first_exposure_epochs
+# --------------------------------------------------------------------------
+
+
+def test_first_exposure_epochs_are_the_flagged_ones_whatever_their_status(
+    tmp_path, monkeypatch
+):
+    """An excluded epoch is flagged like an analysed one (peanut's is excluded),
+    and an animal may have none."""
+    rows = [
+        ["b20200102_.nwb", "02_r1", "excluded", "NO_TRIAL_INTERVALS", "x", "True"],
+        ["b20200103_.nwb", "02_r1", "analysed", "", "", "False"],
+        ["a20200101_.nwb", "04_r2", "analysed", "", "", "True"],
+        ["a20200101_.nwb", "02_r1", "analysed", "", "", "False"],
+        ["c20200101_.nwb", "02_r1", "analysed", "", "", "False"],
+    ]
+    path = _write_register(tmp_path / "epoch_register.csv", rows)
+    monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
+
+    assert first_exposure_epochs() == [
+        ("a20200101_.nwb", "04_r2"),
+        ("b20200102_.nwb", "02_r1"),
+    ]
+    assert first_exposure_epochs(read_register(path)) == first_exposure_epochs()
+
+
+def test_the_committed_register_flags_one_first_exposure_epoch_per_animal():
+    epochs = first_exposure_epochs()
+    animals = [parse_nwb_filename(name)[0] for name, _ in epochs]
+
+    assert sorted(animals) == sorted(analysed_animals())
 
 
 @pytest.mark.parametrize("brain_area", ["HPC", "mPFC", "OFC"])

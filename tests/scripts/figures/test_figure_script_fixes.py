@@ -265,8 +265,18 @@ def test_the_figure02_cache_is_keyed_on_a_version_token(offline, tmp_path):
 
 def _register(path: Path, epochs: list[str]) -> Path:
     pd.DataFrame(
-        [["wilbur20210329_.nwb", epoch, "analysed", "", ""] for epoch in epochs],
-        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+        [
+            ["wilbur20210329_.nwb", epoch, "analysed", "", "", "False"]
+            for epoch in epochs
+        ],
+        columns=[
+            "nwb_file_name",
+            "epoch",
+            "status",
+            "reason",
+            "evidence",
+            "first_exposure",
+        ],
     ).to_csv(path, index=False)
     return path
 

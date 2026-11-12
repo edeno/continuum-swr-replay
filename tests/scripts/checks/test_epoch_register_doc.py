@@ -129,6 +129,9 @@ def test_the_doc_lists_every_excluded_and_pending_entry_with_its_evidence():
         for epoch in epochs.split(","):
             listed.add((session, epoch.strip(), status, _code(reason), evidence))
     register = read_register().reset_index()
-    unanalysed = register[register["status"] != Status.ANALYSED]
+    unanalysed = register.loc[
+        register["status"] != Status.ANALYSED,
+        ["nwb_file_name", "epoch", "status", "reason", "evidence"],
+    ]
 
     assert listed == set(unanalysed.itertuples(index=False, name=None))

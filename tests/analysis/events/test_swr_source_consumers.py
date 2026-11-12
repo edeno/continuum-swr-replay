@@ -91,8 +91,8 @@ def source(tmp_path, monkeypatch):
 def register(tmp_path, monkeypatch):
     path = tmp_path / "epoch_register.csv"
     pd.DataFrame(
-        [[NWB, EPOCH, "analysed", "", ""]],
-        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+        [[NWB, EPOCH, "analysed", "", "", "False"]],
+        columns=list(epoch_register.COLUMNS),
     ).to_csv(path, index=False)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
 

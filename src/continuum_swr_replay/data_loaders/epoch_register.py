@@ -13,13 +13,21 @@ The rule:
 
 The register is ``epoch_register.csv`` beside this module, one row per
 ``(nwb_file_name, epoch)``: its ``status`` (:class:`Status`), its ``reason``
-(:class:`Reason`, empty for an analysed epoch) and its ``evidence``. An
+(:class:`Reason`, empty for an analysed epoch), its ``evidence`` and whether it
+is the animal's first-exposure session (``first_exposure``, read by
+:func:`first_exposure_epochs`). An
 ``epoch`` of ``*`` covers every epoch of a session none of whose run epochs is
 known (no NWB file, or no run epoch in it). The register was generated once, on
 2026-10-05, from the exclusion audit (553 run epochs and 4 sessions with none,
 557 rows) and the populate plan; it is hand-maintained from then on. ``docs/epoch_register.md`` is generated from
 it (``scripts/checks/write_epoch_register_doc.py``), and a unit test holds the two
 together.
+
+An animal's first-exposure session is its first spatial-bandit run session:
+p(R) of 1 at all six ports for 100 trials, then 0.5 at all six for the next 100
+(Comrie et al. 2024, bioRxiv, doi:10.1101/2024.09.23.613567, Methods). The
+register flags it on one epoch per animal, whatever that epoch's status: peanut's,
+``peanut20201124_.nwb 02_r1``, is excluded for ``NO_TRIAL_INTERVALS``.
 
 When several reasons hold for one epoch, the register records the first in the
 rule's order: no data (``NO_NWB``, ``NO_RUN_EPOCH``), then the task
@@ -63,7 +71,7 @@ from .utils import get_epoch_info
 REGISTER_PATH = Path(__file__).with_name("epoch_register.csv")
 """The committed register, one row per (nwb_file_name, epoch)."""
 
-COLUMNS = ("nwb_file_name", "epoch", "status", "reason", "evidence")
+COLUMNS = ("nwb_file_name", "epoch", "status", "reason", "evidence", "first_exposure")
 SESSION_WIDE = "*"
 """The ``epoch`` of an entry that covers every epoch of its session."""
 
@@ -81,6 +89,8 @@ RULE = (
 on 2026-10-10."""
 
 _RUN_EPOCH = re.compile(r"^[0-9]+_r[0-9]+$")
+_FLAGS = {"True": True, "False": False}
+"""How ``first_exposure`` is written in the CSV, and what it reads as."""
 
 
 class Status(StrEnum):
@@ -167,10 +177,20 @@ def _problems(frame: pd.DataFrame) -> list[str]:
     )
     for name in sorted(overlap):
         problems.append(f"{name} has a session-wide '*' entry and epoch entries")
+    flagged = frame.loc[frame["first_exposure"] == "True", "nwb_file_name"]
+    animals = flagged.map(lambda name: parse_nwb_filename(name)[0])
+    for animal in sorted(set(animals[animals.duplicated()])):
+        problems.append(f"{animal} has more than one first-exposure epoch")
     for row in frame.itertuples(index=False):
         key = f"{row.nwb_file_name} {row.epoch}"
         if row.epoch != SESSION_WIDE and not _RUN_EPOCH.match(row.epoch):
             problems.append(f"{key}: epoch is neither '*' nor a run epoch name")
+        if row.first_exposure not in _FLAGS:
+            problems.append(
+                f"{key}: first_exposure is True or False, not {row.first_exposure!r}"
+            )
+        elif row.first_exposure == "True" and row.epoch == SESSION_WIDE:
+            problems.append(f"{key}: a session-wide '*' entry is not first exposure")
         if row.status not in set(Status):
             problems.append(
                 f"{key}: status {row.status!r} is not one of "
@@ -218,15 +238,17 @@ def read_register(path: Path | None = None) -> pd.DataFrame:
     -------
     pd.DataFrame
         Indexed by ``(nwb_file_name, epoch)``, with columns ``status``,
-        ``reason`` (``""`` for an analysed epoch) and ``evidence``.
+        ``reason`` (``""`` for an analysed epoch), ``evidence`` and
+        ``first_exposure`` (bool).
 
     Raises
     ------
     ValueError
         If the file breaks the register's contract: an epoch registered twice,
         a session-wide entry beside epoch entries, an unknown status or reason,
-        a reason that does not match the status, or an unanalysed entry with no
-        evidence.
+        a reason that does not match the status, an unanalysed entry with no
+        evidence, a ``first_exposure`` other than ``True`` or ``False`` (or set
+        on a session-wide entry), or an animal with two first-exposure epochs.
     """
     if path is None:
         path = REGISTER_PATH
@@ -238,6 +260,7 @@ def read_register(path: Path | None = None) -> pd.DataFrame:
         raise ValueError(
             f"{path} is not a valid epoch register: " + "; ".join(problems[:10])
         )
+    frame["first_exposure"] = frame["first_exposure"].map(_FLAGS)
     return frame.set_index(["nwb_file_name", "epoch"]).sort_index()
 
 
@@ -469,6 +492,31 @@ def analysed_animals(register: pd.DataFrame | None = None) -> tuple[str, ...]:
     analysed = register.index[register["status"] == Status.ANALYSED]
     animals = (parse_nwb_filename(name)[0] for name, _ in analysed)
     return tuple(dict.fromkeys(animals))
+
+
+def first_exposure_epochs(
+    register: pd.DataFrame | None = None,
+) -> list[tuple[str, str]]:
+    """Each animal's first-exposure epoch, whatever its status.
+
+    Read from the register's ``first_exposure`` column alone, like
+    :func:`analysed_epoch_ids`, so a reader needs no database.
+
+    Parameters
+    ----------
+    register : pd.DataFrame, optional
+        ``read_register``'s frame; the committed register by default.
+
+    Returns
+    -------
+    list of (str, str)
+        ``(nwb_file_name, epoch)``, sorted. The committed register gives one
+        per animal, peanut's excluded ``("peanut20201124_.nwb", "02_r1")``
+        among them.
+    """
+    if register is None:
+        register = read_register()
+    return list(register.index[register["first_exposure"].to_numpy()])
 
 
 def analysed_decode_files(

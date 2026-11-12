@@ -69,11 +69,26 @@ def test_the_default_expected_sessions_is_the_registers_analysed_count(
     script, tmp_path, monkeypatch
 ):
     rows = [
-        ["a20200101_.nwb", epoch, "analysed", "", ""] for epoch in ("02_r1", "04_r2")
+        ["a20200101_.nwb", epoch, "analysed", "", "", "False"]
+        for epoch in ("02_r1", "04_r2")
     ]
     rows += [
-        ["a20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM row"],
-        ["a20200101_.nwb", "08_r4", "excluded", "SUSTAINED_NOISE", "an S block"],
+        [
+            "a20200101_.nwb",
+            "06_r3",
+            "pending",
+            "PENDING_POPULATE",
+            "no PIM row",
+            "False",
+        ],
+        [
+            "a20200101_.nwb",
+            "08_r4",
+            "excluded",
+            "SUSTAINED_NOISE",
+            "an S block",
+            "False",
+        ],
     ]
     register = tmp_path / "epoch_register.csv"
     pd.DataFrame(rows, columns=list(epoch_register.COLUMNS)).to_csv(

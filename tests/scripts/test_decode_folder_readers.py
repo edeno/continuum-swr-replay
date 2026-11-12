@@ -44,11 +44,18 @@ def register(tmp_path, monkeypatch):
     path = tmp_path / "epoch_register.csv"
     pd.DataFrame(
         [
-            ["a20200101_.nwb", "02_r1", "analysed", "", ""],
-            ["b20200102_.nwb", "04_r2", "analysed", "", ""],
-            ["a20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM"],
+            ["a20200101_.nwb", "02_r1", "analysed", "", "", "False"],
+            ["b20200102_.nwb", "04_r2", "analysed", "", "", "False"],
+            [
+                "a20200101_.nwb",
+                "06_r3",
+                "pending",
+                "PENDING_POPULATE",
+                "no PIM",
+                "False",
+            ],
         ],
-        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+        columns=list(epoch_register.COLUMNS),
     ).to_csv(path, index=False)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
 

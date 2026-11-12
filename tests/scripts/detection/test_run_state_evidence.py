@@ -692,11 +692,18 @@ def test_every_analysed_hpc_decode_is_listed_even_an_incomplete_one(
     register = tmp_path / "epoch_register.csv"
     pd.DataFrame(
         [
-            ["aa20200101_.nwb", "02_r1", "analysed", "", ""],
-            ["bb20200101_.nwb", "04_r2", "analysed", "", ""],
-            ["bb20200101_.nwb", "06_r3", "pending", "PENDING_POPULATE", "no PIM"],
+            ["aa20200101_.nwb", "02_r1", "analysed", "", "", "False"],
+            ["bb20200101_.nwb", "04_r2", "analysed", "", "", "False"],
+            [
+                "bb20200101_.nwb",
+                "06_r3",
+                "pending",
+                "PENDING_POPULATE",
+                "no PIM",
+                "False",
+            ],
         ],
-        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+        columns=list(epoch_register.COLUMNS),
     ).to_csv(register, index=False)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", register)
     decodes = tmp_path / "decodes"
@@ -796,8 +803,8 @@ def _register_analysing(tmp_path: Path, monkeypatch, *keys: tuple[str, str]) -> 
 
     path = tmp_path / "epoch_register.csv"
     pd.DataFrame(
-        [[name, epoch, "analysed", "", ""] for name, epoch in keys],
-        columns=["nwb_file_name", "epoch", "status", "reason", "evidence"],
+        [[name, epoch, "analysed", "", "", "False"] for name, epoch in keys],
+        columns=list(epoch_register.COLUMNS),
     ).to_csv(path, index=False)
     monkeypatch.setattr(epoch_register, "REGISTER_PATH", path)
 
