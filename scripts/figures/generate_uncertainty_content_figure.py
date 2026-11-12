@@ -90,10 +90,16 @@ def _load_results(results_dir: Path) -> dict[str, pd.DataFrame | dict]:
             "Uncertainty-content results predate leaf-support standardization. "
             "Regenerate the canonical event-arm table, Mu fit, and analysis bundle."
         )
+    contrasts = pd.read_csv(paths["contrasts"])
+    if "n_animals_positive" not in contrasts.columns:
+        raise ValueError(
+            f"{paths['contrasts']} predates the animals-positive count the figure "
+            "annotates; rerun scripts/content/analyze_uncertainty_content.py."
+        )
     return {
         "trial": pd.read_pickle(paths["trial"]),
         "profiles": pd.read_csv(paths["profiles"]),
-        "contrasts": pd.read_csv(paths["contrasts"]),
+        "contrasts": contrasts,
         "mu_sessions": pd.read_csv(paths["mu_sessions"]),
         "mu_animals": pd.read_csv(paths["mu_animals"]),
         "mu_overall": pd.read_csv(paths["mu_overall"]),
@@ -288,12 +294,31 @@ def _plot_animal_profile(
     ax.spines[["top", "right"]].set_visible(False)
 
 
-def _plot_response_robustness(ax: plt.Axes, contrasts: pd.DataFrame) -> None:
-    data = contrasts[
-        contrasts["metric"].eq("conditional_event_share")
-        & contrasts["scope"].eq("unchosen")
-        & contrasts["level"].eq("animal")
+def _contrast(
+    contrasts: pd.DataFrame, *, metric: str, scope: str, level: str
+) -> pd.DataFrame:
+    return contrasts[
+        contrasts["metric"].eq(metric)
+        & contrasts["scope"].eq(scope)
+        & contrasts["level"].eq(level)
     ]
+
+
+def _positive_animals_note(contrasts: pd.DataFrame, metric: str) -> str:
+    """The animals whose Q4 - Q1 contrast is above zero, as the analysis counts
+    them (``paired_quartile_contrasts``)."""
+    overall = _contrast(contrasts, metric=metric, scope="unchosen", level="overall")
+    row = overall[overall["response"].eq("posterior")].iloc[0]
+    return (
+        f"Q4 − Q1 > 0 in {int(row['n_animals_positive'])}/{int(row['n_animals'])} "
+        "animals"
+    )
+
+
+def _plot_response_robustness(ax: plt.Axes, contrasts: pd.DataFrame) -> None:
+    data = _contrast(
+        contrasts, metric="conditional_event_share", scope="unchosen", level="animal"
+    )
     responses = ["hard", "soft", "posterior"]
     x = np.arange(len(responses))
     for animal in ANIMAL_ORDER:
@@ -309,7 +334,16 @@ def _plot_response_robustness(ax: plt.Axes, contrasts: pd.DataFrame) -> None:
             markerfacecolor="white",
             markeredgewidth=0.8,
         )
-    overall = data.groupby("response")["contrast"].mean().reindex(responses)
+    overall = (
+        _contrast(
+            contrasts,
+            metric="conditional_event_share",
+            scope="unchosen",
+            level="overall",
+        )
+        .set_index("response")["contrast"]
+        .reindex(responses)
+    )
     ax.plot(x, 100 * overall, color="black", marker="o", linewidth=1.8, markersize=3.5)
     ax.axhline(0, color="#888888", linewidth=0.7, linestyle="--")
     ax.set_xticks(x, ["hard MAP", "soft MAP", "posterior"])
@@ -603,7 +637,9 @@ def make_main_figure(results: dict, output_dir: Path) -> plt.Figure:
         scale=100,
         ylabel="allocation to well\n(% of all replay content)",
         title="Conditional allocation to unchosen wells",
-        annotation="Q4 − Q1 > 0 in 5/5 animals",
+        annotation=_positive_animals_note(
+            results["contrasts"], "conditional_event_share"
+        ),
     )
     _plot_animal_profile(
         axes["D"],
@@ -612,7 +648,7 @@ def make_main_figure(results: dict, output_dir: Path) -> plt.Figure:
         scale=1,
         ylabel="posterior-weighted\ndecoder bins s$^{-1}$",
         title="Absolute content rate at unchosen wells",
-        annotation="Q4 − Q1 > 0 in 4/5 animals",
+        annotation=_positive_animals_note(results["contrasts"], "absolute_rate"),
     )
     _plot_response_robustness(axes["E"], results["contrasts"])
     _plot_mu_coefficients(

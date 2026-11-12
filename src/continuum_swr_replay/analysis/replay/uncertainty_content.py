@@ -579,7 +579,13 @@ def paired_quartile_contrasts(
     high: int = 4,
     quartile_col: str = "uncertainty_quartile",
 ) -> dict[str, pd.DataFrame]:
-    """Compute high-minus-low contrasts, paired within physical well."""
+    """Compute high-minus-low contrasts, paired within physical well.
+
+    The contrast is averaged over a session's wells, then over an animal's
+    sessions; ``overall`` is the mean over animals (``contrast``), its standard
+    error (``sem``), the animals (``n_animals``) and the animals whose own
+    contrast is above zero (``n_animals_positive``).
+    """
     _require_columns(
         arm_profile,
         {"animal", "session_id", "candidate_arm", quartile_col, "value"},
@@ -612,6 +618,7 @@ def paired_quartile_contrasts(
             "contrast": [animal["contrast"].mean()],
             "sem": [animal["contrast"].std(ddof=1) / np.sqrt(len(animal))],
             "n_animals": [animal["animal"].nunique()],
+            "n_animals_positive": [int((animal["contrast"] > 0).sum())],
         }
     )
     return {

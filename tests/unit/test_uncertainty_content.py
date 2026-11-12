@@ -356,6 +356,30 @@ def test_hierarchical_profile_balances_animals_not_sessions():
     assert contrasts["overall"]["contrast"].item() == pytest.approx(4.0)
 
 
+def test_the_overall_contrast_counts_the_animals_above_zero():
+    # Q4 - Q1 by animal: a +2 (two wells, +1 and +3), b 0, c -1.
+    contrast = {("a", 0): 1.0, ("a", 1): 3.0, ("b", 0): 0.0, ("c", 0): -1.0}
+    arm_profile = pd.DataFrame(
+        [
+            {
+                "animal": animal,
+                "session_id": f"{animal}1",
+                "candidate_arm": arm,
+                "uncertainty_quartile": quartile,
+                "value": value if quartile == 4 else 0.0,
+            }
+            for (animal, arm), value in contrast.items()
+            for quartile in (1, 4)
+        ]
+    )
+
+    overall = paired_quartile_contrasts(arm_profile)["overall"].iloc[0]
+
+    assert overall["contrast"] == pytest.approx(1 / 3)
+    assert overall["n_animals"] == 3
+    assert overall["n_animals_positive"] == 1  # zero is not above zero
+
+
 def test_rate_profile_uses_ratio_of_sums_not_mean_of_trial_rates():
     frame = pd.DataFrame(
         {

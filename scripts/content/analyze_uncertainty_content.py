@@ -237,24 +237,30 @@ def _write_summary(
             & profiles["level"].eq("overall")
         ]
 
-    def select_animal_contrast(metric: str, response: str, scope: str) -> pd.DataFrame:
+    def select_overall_contrast(metric: str, response: str, scope: str) -> pd.Series:
+        """The ``overall`` row of :func:`paired_quartile_contrasts`."""
         return contrasts[
             contrasts["metric"].eq(metric)
             & contrasts["response"].eq(response)
             & contrasts["scope"].eq(scope)
-            & contrasts["level"].eq("animal")
-        ]
+            & contrasts["level"].eq("overall")
+        ].iloc[0]
+
+    def positive_animals(contrast: pd.Series) -> str:
+        return f"{int(contrast['n_animals_positive'])}/{int(contrast['n_animals'])}"
 
     conditional = select_profile("conditional_event_share", "posterior", "unchosen")
     leaf_conditional = select_profile("conditional_leaf_share", "posterior", "unchosen")
     absolute = select_profile("absolute_rate", "posterior", "unchosen")
-    conditional_animals = select_animal_contrast(
+    conditional_contrast = select_overall_contrast(
         "conditional_event_share", "posterior", "unchosen"
     )
-    leaf_conditional_animals = select_animal_contrast(
+    leaf_conditional_contrast = select_overall_contrast(
         "conditional_leaf_share", "posterior", "unchosen"
     )
-    absolute_animals = select_animal_contrast("absolute_rate", "posterior", "unchosen")
+    absolute_contrast = select_overall_contrast(
+        "absolute_rate", "posterior", "unchosen"
+    )
     mu_clean = mu_summary["overall"].query("cohort == 'clean'").iloc[0]
 
     lines = [
@@ -275,18 +281,16 @@ def _write_summary(
         "within-well uncertainty quartiles "
         f"(unchosen wells): {_format_profile(conditional)}.",
         "- Conditional Q4-Q1 was positive in "
-        f"{int((conditional_animals['contrast'] > 0).sum())}/{len(conditional_animals)} "
-        "animals; equal-animal mean "
-        f"{conditional_animals['contrast'].mean():.4f}.",
+        f"{positive_animals(conditional_contrast)} animals; equal-animal mean "
+        f"{conditional_contrast['contrast']:.4f}.",
         "- Leaf-normalized sensitivity across the same quartiles: "
         f"{_format_profile(leaf_conditional)}; Q4-Q1 positive in "
-        f"{int((leaf_conditional_animals['contrast'] > 0).sum())}/"
-        f"{len(leaf_conditional_animals)} animals.",
+        f"{positive_animals(leaf_conditional_contrast)} animals.",
         "- Absolute posterior-weighted decoder bins/s across the same quartiles, with "
         f"zero-replay trials retained: {_format_profile(absolute)}.",
         "- Absolute-rate Q4-Q1 was positive in "
-        f"{int((absolute_animals['contrast'] > 0).sum())}/{len(absolute_animals)} "
-        f"animals; equal-animal mean {absolute_animals['contrast'].mean():.4f}.",
+        f"{positive_animals(absolute_contrast)} animals; equal-animal mean "
+        f"{absolute_contrast['contrast']:.4f}.",
         "",
         "## Existing adjusted model",
         "",
