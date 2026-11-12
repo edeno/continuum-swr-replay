@@ -29,8 +29,13 @@ with per-detector denominators.
   matched against the canonical Spyglass ones.
 - ``inventory_run``: the inventory comparison run's roster, comparisons, decode
   grid and table layout, which the runner and every reader of its runs share.
+- ``epoch_comparison``: one epoch's inventories compared, every table the
+  inventory comparison run writes for it.
 - ``feature_run``: the event features run's tables, and the comparison's and
   memoryless run's tables its readers read beside it.
 - ``pooling``: sessions pooled within an animal, the rule of every per-animal
-  table of the comparison's reports, and the counts and cells tables built by it.
+  table of the comparison's reports, and the counts, cells and directional
+  agreement tables built by it.
+- ``heldout``: held-out evidence for an event, scored on evaluation cells, and
+  its summary on simulated data; ``heldout_sweep`` runs that simulation.
 """
