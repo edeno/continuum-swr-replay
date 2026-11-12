@@ -59,10 +59,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
-from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import load_population_data
+from continuum_swr_replay.analysis.statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -969,34 +969,25 @@ def matched_control_arrays(data_dir: Path, artifact_suffix: str = "") -> pd.Data
     return pd.DataFrame(rows)
 
 
-def _fdr_q(frame: pd.DataFrame, test: str) -> NDArray:
-    """BH-corrected q-values for ``test``, from the frame's own p-values.
-
-    ``load_population_data`` corrects only the six tests it ships, so the two
-    matched-control tests are corrected here, over the same population and by
-    the same method, and only over the finite p-values.
-    """
-    column = f"{test}: pval"
-    if column not in frame.columns:
-        return np.full(len(frame), np.nan)
-    raw = frame[column].to_numpy(dtype=float)
-    q = np.full_like(raw, np.nan)
-    ok = np.isfinite(raw)
-    if ok.any():
-        q[ok] = false_discovery_control(np.clip(raw[ok], 1e-300, 1.0), method="bh")
-    return q
-
-
 def matched_control_significance(frame: pd.DataFrame, alpha: float) -> pd.DataFrame:
     """FDR-significant fraction of the two matched-control tests, per animal.
 
+    ``load_population_data`` corrects only the six tests it ships, so the two
+    matched-control tests are corrected here, over the same population and by
+    the same function
+    (:func:`~continuum_swr_replay.analysis.statistics.benjamini_hochberg`).
     BH is applied within the pooled population, which is where the two tests
     are read; the per-animal rows are that same correction sliced by animal,
     so they are comparable with the pooled row rather than separate families.
     """
     frame = frame.copy()
     for test in MATCHED_CONTROL_TESTS:
-        frame[f"{test}: fdr_q"] = _fdr_q(frame, test)
+        column = f"{test}: pval"
+        frame[f"{test}: fdr_q"] = (
+            benjamini_hochberg(frame[column])
+            if column in frame.columns
+            else np.full(len(frame), np.nan)
+        )
     rows = []
     groups = [("all", frame)] + [
         (animal, sub) for animal, sub in frame.groupby("animal", sort=True)
