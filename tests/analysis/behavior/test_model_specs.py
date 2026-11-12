@@ -16,6 +16,7 @@ import re
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from continuum_swr_replay.analysis.behavior import model_specs as ms
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
@@ -357,3 +358,35 @@ def test_base_minus_the_controls_is_the_uncontrolled_base() -> None:
     assert ms.BASEc == [*ms.BASEc_NT, *_ARM_CONTROLS]
     assert [p for p in ms.BASEc_PATCH if p not in _PATCH_CONTROLS] == ms.BASEc_PATCH_NT
     assert ms.BASEc_PATCH == [*ms.BASEc_PATCH_NT, *_PATCH_CONTROLS]
+
+
+def test_a_comparison_rung_pulls_in_the_parent_it_is_differenced_against() -> None:
+    selected = ms.resolve_comparison_rungs(["CS5_armvalue"])
+    names = [rung.name for rung in selected]
+    assert names == ["C2_base_swr_leaf", "CS5_armvalue"]
+    # The parent carries everything but the two value terms, so the rung's
+    # delta_aic prices only those.
+    parent, rung = selected
+    assert set(rung.predictors) - set(parent.predictors) == {
+        "reward_belief_mean_candidate_arm_preoutcome",
+        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
+    }
+    assert set(parent.predictors) <= set(rung.predictors)
+    # A leaf-only rung must be differenced against a leaf-only parent: a
+    # six-category likelihood and a nine-arm one are not comparable.
+    assert all(rung.leaf_only for rung in selected)
+    assert selected[-1].n_categories == 6
+
+
+def test_an_unknown_comparison_rung_is_refused() -> None:
+    with pytest.raises(ValueError, match="unknown rung"):
+        ms.resolve_comparison_rungs(["not_a_rung"])
+
+
+def test_every_comparison_rung_names_a_parent_on_its_own_candidate_set() -> None:
+    catalog = {rung.name: rung for rung in ms.CONTENT_ESTIMATOR_COMPARISON_RUNGS}
+    for rung in ms.CONTENT_ESTIMATOR_COMPARISON_RUNGS:
+        if rung.parent is None:
+            continue
+        assert catalog[rung.parent].leaf_only == rung.leaf_only
+        assert set(catalog[rung.parent].predictors) <= set(rung.predictors)

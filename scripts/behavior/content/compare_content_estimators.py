@@ -114,18 +114,10 @@ from continuum_swr_replay.analysis.behavior.fitting import (  # noqa: E402
     fit_conditional_poisson,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    LEAF_ONLY_CONTRAST_RUNGS,
-    LEAF_ONLY_N_CATEGORIES,
-    MODEL_HIERARCHY,
-    BASEc_SWR,
+    CONTENT_ESTIMATOR_COMPARISON_RUNGS,
+    ComparisonRung,
     leaf_only_cohort,
-    leaf_only_predictors,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    SWR_CONTRAST_CONTENT_ARM_KEY_TERM as ARM_KEY_TERM,
-)
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
-    SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
+    resolve_comparison_rungs,
 )
 from continuum_swr_replay.paths import figure_dir, replay_content_dir
 from continuum_swr_replay.tables.io import write_table  # noqa: E402
@@ -151,111 +143,12 @@ PROVENANCE_ESTIMATOR = "three_estimator_comparison"
 
 FRACTION_RESPONSE = "arm_fraction"
 COUNT_RESPONSE = "arm_count_hard"
-N_ARM_CATEGORIES = 9
-
-#: Key term the agreement figure plots for each ``MODEL_HIERARCHY`` rung: the
-#: LAST predictor the rung adds to its parent. ``M2`` and ``M3`` add exactly one
-#: (``is_prev_arm``, the arm reward fraction); ``M4`` adds four -- the three
-#: recency-spline columns and ``is_candidate_arm_never_visited`` -- and the
-#: novelty indicator is the interpretable one of those. Every added term is
-#: still in the parquet and the summary; this map only chooses figure panels.
-#: The contrast rungs take theirs from the runner's own key-term map.
-_HIERARCHY_KEY_TERMS = {
-    "M2": "is_prev_arm",
-    "M3": "reward_fraction_candidate_arm_last10_visits",
-    "M4": "is_candidate_arm_never_visited",
-}
-
-
-@dataclass(frozen=True)
-class RungSpec:
-    """One model to fit with all three estimators.
-
-    Attributes
-    ----------
-    name : str
-        Row label in every output.
-    predictors : tuple of str
-        Category-varying predictor columns, already reduced by
-        :func:`leaf_only_predictors` where ``leaf_only`` is set.
-    parent : str or None
-        Rung whose ``aic_equalized`` this one is differenced against, per
-        session and per estimator. ``None`` for a rung fit only as a parent.
-    leaf_only : bool
-        Fit over the six leaf arms only (trunks carry structural zeros for the
-        belief covariates). The fraction response is renormalized to unit mass
-        over the retained leaves; the counts keep their timebin weighting.
-    key_term : str or None
-        The coefficient the agreement figure plots for this rung.
-    """
-
-    name: str
-    predictors: tuple[str, ...]
-    parent: str | None = None
-    leaf_only: bool = False
-    key_term: str | None = None
-
-    @property
-    def n_categories(self) -> int:
-        """Candidate categories per event under this rung's likelihood."""
-        return LEAF_ONLY_N_CATEGORIES if self.leaf_only else N_ARM_CATEGORIES
-
-
-def _hierarchy_rung(name: str, parent: str | None) -> RungSpec:
-    """A ``MODEL_HIERARCHY`` rung as a comparison spec (never leaf-only)."""
-    return RungSpec(
-        name=name,
-        predictors=tuple(MODEL_HIERARCHY[name].predictors),
-        parent=parent,
-        leaf_only=False,
-        key_term=_HIERARCHY_KEY_TERMS.get(name),
-    )
-
-
-def _contrast_rung(
-    name: str, parent: str | None, *, spec_name: str | None = None
-) -> RungSpec:
-    """An is_swr-contrast rung as a comparison spec, honouring leaf-only scope."""
-    source = spec_name or name
-    predictors, _scope = ARM_LADDER[source]
-    leaf_only = source in LEAF_ONLY_CONTRAST_RUNGS or name.endswith("_leaf")
-    resolved = leaf_only_predictors(predictors) if leaf_only else list(predictors)
-    return RungSpec(
-        name=name,
-        predictors=tuple(resolved),
-        parent=parent,
-        leaf_only=leaf_only,
-        key_term=ARM_KEY_TERM.get(source),
-    )
-
-
-# M2 and the three C2_base fits carry no ``delta_aic`` row of their own.
-# ``C2_base_leaf`` is the six-leaf refit of the same base -- a leaf-only rung's
-# AIC lives on a six-category likelihood and cannot be differenced against a
-# nine-arm one. ``CS5_armvalue``'s parent, ``C2_base_swr_leaf``, is that refit
-# plus the SWR-specific arm baselines the rung carries, so its ``delta_aic``
-# prices only the two value terms.
-COMPARISON_RUNGS: tuple[RungSpec, ...] = (
-    _hierarchy_rung("M2", None),
-    _hierarchy_rung("M3", "M2"),
-    _hierarchy_rung("M4", "M3"),
-    _contrast_rung("C2_base", None),
-    _contrast_rung("C2_base_leaf", None, spec_name="C2_base"),
-    RungSpec(
-        name="C2_base_swr_leaf",
-        predictors=tuple(leaf_only_predictors(BASEc_SWR)),
-        leaf_only=True,
-    ),
-    _contrast_rung("CS1_current", "C2_base"),
-    _contrast_rung("CS4_armreward", "C2_base"),
-    _contrast_rung("CS5_armvalue", "C2_base_swr_leaf"),
-)
 
 #: Rung whose Dirichlet-multinomial concentration the log-phi figure shows.
 DEFAULT_LOG_PHI_RUNG = "C2_base"
 
 
-def log_phi_figure_rung(rungs: Sequence[RungSpec]) -> str | None:
+def log_phi_figure_rung(rungs: Sequence[ComparisonRung]) -> str | None:
     """The rung the concentration figure is drawn for, or ``None`` if unselected.
 
     ``--rungs`` can legitimately select a set that excludes
@@ -270,34 +163,6 @@ def log_phi_figure_rung(rungs: Sequence[RungSpec]) -> str | None:
         if DEFAULT_LOG_PHI_RUNG in {rung.name for rung in rungs}
         else None
     )
-
-
-def resolve_rungs(names: Sequence[str] | None) -> tuple[RungSpec, ...]:
-    """Select comparison rungs by name, pulling in every parent they need.
-
-    Parameters
-    ----------
-    names : sequence of str, optional
-        Rung names. ``None`` selects :data:`COMPARISON_RUNGS` whole.
-
-    Returns
-    -------
-    tuple of RungSpec
-        In :data:`COMPARISON_RUNGS` order, so a parent is always fit before the
-        rung that differences against it.
-    """
-    catalog = {rung.name: rung for rung in COMPARISON_RUNGS}
-    if names is None:
-        return COMPARISON_RUNGS
-    unknown = [name for name in names if name not in catalog]
-    if unknown:
-        raise ValueError(f"unknown rung(s) {unknown}; available: {sorted(catalog)}")
-    wanted = set(names)
-    for name in list(wanted):
-        parent = catalog[name].parent
-        if parent is not None:
-            wanted.add(parent)
-    return tuple(rung for rung in COMPARISON_RUNGS if rung.name in wanted)
 
 
 @dataclass(frozen=True)
@@ -327,7 +192,7 @@ class ComparisonResult:
 
 
 def _rung_frame(
-    cohort: pd.DataFrame, rung: RungSpec, *, fraction_col: str
+    cohort: pd.DataFrame, rung: ComparisonRung, *, fraction_col: str
 ) -> pd.DataFrame:
     """Restrict and rescale the cohort to what one rung is fit on.
 
@@ -414,7 +279,7 @@ def _drop_undefined_concentration(
 
 def _fit_rung(
     cohort: pd.DataFrame,
-    rung: RungSpec,
+    rung: ComparisonRung,
     *,
     fraction_col: str,
     count_col: str,
@@ -550,7 +415,7 @@ def _fit_rung(
     return rows_out, skips
 
 
-def _skip_record(key: tuple, rung: RungSpec, info: dict, reason: str) -> dict:
+def _skip_record(key: tuple, rung: ComparisonRung, info: dict, reason: str) -> dict:
     """One audited (session, rung) that produced no comparable estimator triple."""
     return {
         **dict(zip(SC, key, strict=True)),
@@ -565,7 +430,7 @@ def _skip_record(key: tuple, rung: RungSpec, info: dict, reason: str) -> dict:
 
 def run_comparison(
     cohort: pd.DataFrame,
-    rungs: Sequence[RungSpec],
+    rungs: Sequence[ComparisonRung],
     *,
     fraction_col: str = FRACTION_RESPONSE,
     count_col: str = COUNT_RESPONSE,
@@ -582,7 +447,7 @@ def run_comparison(
         Event-grain arm cohort, one row per (event x candidate arm), carrying
         the session key columns, ``event_id``, ``candidate_arm``, ``is_swr``,
         both response columns, and every rung's predictors.
-    rungs : sequence of RungSpec
+    rungs : sequence of ComparisonRung
         Models to fit, parents first.
     fraction_col, count_col : str, optional
         The per-event allocation fraction and the timebin counts.
@@ -637,7 +502,7 @@ def _animal_colors(animals: Sequence[str]) -> dict:
 
 
 def plot_coefficient_agreement(
-    coefficients: pd.DataFrame, rungs: Sequence[RungSpec], path: Path
+    coefficients: pd.DataFrame, rungs: Sequence[ComparisonRung], path: Path
 ) -> Path:
     """Per key term, per-session count-vs-fraction and count-vs-DM scatters."""
     identified = identified_rows(coefficients)
@@ -846,7 +711,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--rungs",
         default=None,
         help="comma-separated rung names (default: every comparison rung); "
-        f"available: {','.join(rung.name for rung in COMPARISON_RUNGS)}",
+        f"available: {','.join(rung.name for rung in CONTENT_ESTIMATOR_COMPARISON_RUNGS)}",
     )
     parser.add_argument(
         "--max-per-animal",
@@ -883,7 +748,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Assemble the shipped at-well cohort, compare the estimators, write outputs."""
     argv = sys.argv[1:] if argv is None else list(argv)
     args = _parse_args(argv)
-    rungs = resolve_rungs(
+    rungs = resolve_comparison_rungs(
         [name.strip() for name in args.rungs.split(",") if name.strip()]
         if args.rungs
         else None

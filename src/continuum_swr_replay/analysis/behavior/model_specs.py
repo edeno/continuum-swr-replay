@@ -16,7 +16,9 @@ Single source of truth for every model family, each a dict of
 - ``MODEL_CHOICE`` — conditional logit on the animal's next-arm
   choice (different estimator again).
 
-The ``is_swr``-contrast ladders (``SWR_CONTRAST_*``) are defined here too.
+The ``is_swr``-contrast ladders (``SWR_CONTRAST_*``) are defined here too, and so
+are the rungs the three content estimators are compared on
+(``CONTENT_ESTIMATOR_COMPARISON_RUNGS``).
 
 Defining constraint for the conditional-Poisson **arm and patch**
 hierarchies: only arm-varying predictors are identifiable — event-level
@@ -76,6 +78,8 @@ __all__ = [
     "ARRIVAL_SPLINE_KNOTS",
     "BIN_S",
     "BELIEF_DEPENDENT_CONTENT_MODELS",
+    "CONTENT_ESTIMATOR_COMPARISON_RUNGS",
+    "ComparisonRung",
     "MODEL_CHOICE",
     "MODEL_CROSS_HISTORY_DURATION_RATE",
     "MODEL_CROSS_HISTORY_LONG_RATE",
@@ -95,6 +99,7 @@ __all__ = [
     "MU_UNCERTAINTY_MODEL_VALUE_COVARIATES",
     "MU_UNCERTAINTY_RL_COVARIATES",
     "ModelSpec",
+    "N_ARM_CATEGORIES",
     "N_HISTORY_BASIS",
     "N_HISTORY_LAGS",
     "N_REWARD_LAGS",
@@ -131,6 +136,7 @@ __all__ = [
     "TMAX_ARRIVAL",
     "default_content_model_names",
     "longest_history_window_s",
+    "resolve_comparison_rungs",
     "time_course_spline",
 ]
 
@@ -1916,3 +1922,150 @@ DESCRIPTIVE_RATE_RUNGS = frozenset(
         "S3_periswitch",  # FUTURE_REFERENCING peri-switch
     }
 )
+
+
+# ── Content estimator comparison ──
+#
+# The rungs the three content estimators (conditional Poisson on counts, on
+# fractions, and the Dirichlet-multinomial) are compared on, each with the parent
+# its AIC is differenced against.
+
+#: Candidate categories of a nine-arm content fit (six leaves and three trunks).
+N_ARM_CATEGORIES = 9
+
+#: Key term the estimator-agreement figure plots for each ``MODEL_HIERARCHY``
+#: rung: the LAST predictor the rung adds to its parent. ``M2`` and ``M3`` add
+#: exactly one (``is_prev_arm``, the arm reward fraction); ``M4`` adds four -- the
+#: three recency-spline columns and ``is_candidate_arm_never_visited`` -- and the
+#: novelty indicator is the interpretable one of those. Every added term is still
+#: in the comparison's tables; this map only chooses figure panels. The contrast
+#: rungs take theirs from :data:`SWR_CONTRAST_CONTENT_ARM_KEY_TERM`.
+_HIERARCHY_KEY_TERMS = {
+    "M2": "is_prev_arm",
+    "M3": "reward_fraction_candidate_arm_last10_visits",
+    "M4": "is_candidate_arm_never_visited",
+}
+
+
+@dataclass(frozen=True)
+class ComparisonRung:
+    """One model to fit with all three content estimators.
+
+    Attributes
+    ----------
+    name : str
+        Row label in every output.
+    predictors : tuple of str
+        Category-varying predictor columns, already reduced by
+        :func:`leaf_only_predictors` where ``leaf_only`` is set.
+    parent : str or None
+        Rung whose ``aic_equalized`` this one is differenced against, per
+        session and per estimator. ``None`` for a rung fit only as a parent.
+    leaf_only : bool
+        Fit over the six leaf arms only (trunks carry structural zeros for the
+        belief covariates). The fraction response is renormalized to unit mass
+        over the retained leaves; the counts keep their timebin weighting.
+    key_term : str or None
+        The coefficient the agreement figure plots for this rung.
+    """
+
+    name: str
+    predictors: tuple[str, ...]
+    parent: str | None = None
+    leaf_only: bool = False
+    key_term: str | None = None
+
+    @property
+    def n_categories(self) -> int:
+        """Candidate categories per event under this rung's likelihood."""
+        return LEAF_ONLY_N_CATEGORIES if self.leaf_only else N_ARM_CATEGORIES
+
+
+def _hierarchy_comparison_rung(name: str, parent: str | None) -> ComparisonRung:
+    """A ``MODEL_HIERARCHY`` rung as a comparison rung (never leaf-only)."""
+    return ComparisonRung(
+        name=name,
+        predictors=tuple(MODEL_HIERARCHY[name].predictors),
+        parent=parent,
+        leaf_only=False,
+        key_term=_HIERARCHY_KEY_TERMS.get(name),
+    )
+
+
+def _contrast_comparison_rung(
+    name: str, parent: str | None, *, spec_name: str | None = None
+) -> ComparisonRung:
+    """An is_swr-contrast rung as a comparison rung, honouring leaf-only scope."""
+    source = spec_name or name
+    predictors, _scope = SWR_CONTRAST_CONTENT_ARM_LADDER[source]
+    leaf_only = source in LEAF_ONLY_CONTRAST_RUNGS or name.endswith("_leaf")
+    resolved = leaf_only_predictors(predictors) if leaf_only else list(predictors)
+    return ComparisonRung(
+        name=name,
+        predictors=tuple(resolved),
+        parent=parent,
+        leaf_only=leaf_only,
+        key_term=SWR_CONTRAST_CONTENT_ARM_KEY_TERM.get(source),
+    )
+
+
+# M2 and the three C2_base fits carry no ``delta_aic`` row of their own.
+# ``C2_base_leaf`` is the six-leaf refit of the same base -- a leaf-only rung's
+# AIC lives on a six-category likelihood and cannot be differenced against a
+# nine-arm one. ``CS5_armvalue``'s parent, ``C2_base_swr_leaf``, is that refit
+# plus the SWR-specific arm baselines the rung carries, so its ``delta_aic``
+# prices only the two value terms.
+CONTENT_ESTIMATOR_COMPARISON_RUNGS: tuple[ComparisonRung, ...] = (
+    _hierarchy_comparison_rung("M2", None),
+    _hierarchy_comparison_rung("M3", "M2"),
+    _hierarchy_comparison_rung("M4", "M3"),
+    _contrast_comparison_rung("C2_base", None),
+    _contrast_comparison_rung("C2_base_leaf", None, spec_name="C2_base"),
+    ComparisonRung(
+        name="C2_base_swr_leaf",
+        predictors=tuple(leaf_only_predictors(BASEc_SWR)),
+        leaf_only=True,
+    ),
+    _contrast_comparison_rung("CS1_current", "C2_base"),
+    _contrast_comparison_rung("CS4_armreward", "C2_base"),
+    _contrast_comparison_rung("CS5_armvalue", "C2_base_swr_leaf"),
+)
+
+
+def resolve_comparison_rungs(
+    names: Iterable[str] | None,
+) -> tuple[ComparisonRung, ...]:
+    """Select comparison rungs by name, pulling in every parent they need.
+
+    Parameters
+    ----------
+    names : iterable of str, optional
+        Rung names. ``None`` selects :data:`CONTENT_ESTIMATOR_COMPARISON_RUNGS`
+        whole.
+
+    Returns
+    -------
+    tuple of ComparisonRung
+        In :data:`CONTENT_ESTIMATOR_COMPARISON_RUNGS` order, so a parent is
+        always fit before the rung that differences against it.
+
+    Raises
+    ------
+    ValueError
+        If a name is not a comparison rung.
+    """
+    catalog = {rung.name: rung for rung in CONTENT_ESTIMATOR_COMPARISON_RUNGS}
+    if names is None:
+        return CONTENT_ESTIMATOR_COMPARISON_RUNGS
+    names = list(names)
+    unknown = [name for name in names if name not in catalog]
+    if unknown:
+        raise ValueError(f"unknown rung(s) {unknown}; available: {sorted(catalog)}")
+    wanted = set(names)
+    for name in list(wanted):
+        parent = catalog[name].parent
+        if parent is not None:
+            wanted.add(parent)
+    return tuple(
+        rung for rung in CONTENT_ESTIMATOR_COMPARISON_RUNGS if rung.name in wanted
+    )

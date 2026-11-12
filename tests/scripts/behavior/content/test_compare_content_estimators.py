@@ -36,6 +36,11 @@ from continuum_swr_replay.analysis.behavior.fitting import (
     CONDITIONAL_POISSON_FRACTION,
     fit_conditional_poisson,
 )
+from continuum_swr_replay.analysis.behavior.model_specs import (
+    N_ARM_CATEGORIES,
+    ComparisonRung,
+    resolve_comparison_rungs,
+)
 from continuum_swr_replay.tables.io import read_table, write_table
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from scripts.behavior.content import compare_content_estimators as mod
@@ -56,14 +61,14 @@ BETA_TRUE = {
     "reward_fraction_candidate_arm_last10_visits": 0.4,
 }
 
-BASE_RUNG = mod.RungSpec(
+BASE_RUNG = ComparisonRung(
     name="B_spatial",
     predictors=("is_current_arm", "is_prev_arm"),
     parent=None,
     leaf_only=False,
     key_term="is_current_arm",
 )
-REWARD_RUNG = mod.RungSpec(
+REWARD_RUNG = ComparisonRung(
     name="B_reward",
     predictors=(
         "is_current_arm",
@@ -181,7 +186,7 @@ def test_the_conditional_fits_carry_the_multinomial_constant_into_their_likeliho
         predictors=list(BASE_RUNG.predictors),
         response_col=mod.COUNT_RESPONSE,
         event_col="event_id",
-        n_categories=mod.N_ARM_CATEGORIES,
+        n_categories=N_ARM_CATEGORIES,
     )
     constant = multinomial_log_constant(rows[mod.COUNT_RESPONSE], rows["event_id"])
     stored = one_rung.coefficients[
@@ -345,38 +350,6 @@ def test_figures_and_caption_are_written(two_rungs, tmp_path):
     assert "seed 0" in caption.read_text()
 
 
-def test_resolve_rungs_pulls_in_the_parent_a_rung_is_differenced_against():
-    selected = mod.resolve_rungs(["CS5_armvalue"])
-    names = [rung.name for rung in selected]
-    assert names == ["C2_base_swr_leaf", "CS5_armvalue"]
-    # The parent carries everything but the two value terms, so the rung's
-    # delta_aic prices only those.
-    parent, rung = selected
-    assert set(rung.predictors) - set(parent.predictors) == {
-        "reward_belief_mean_candidate_arm_preoutcome",
-        "swr_x_reward_belief_mean_candidate_arm_preoutcome",
-    }
-    assert set(parent.predictors) <= set(rung.predictors)
-    # A leaf-only rung must be differenced against a leaf-only parent: a
-    # six-category likelihood and a nine-arm one are not comparable.
-    assert all(rung.leaf_only for rung in selected)
-    assert selected[-1].n_categories == 6
-
-
-def test_resolve_rungs_refuses_an_unknown_name():
-    with pytest.raises(ValueError, match="unknown rung"):
-        mod.resolve_rungs(["not_a_rung"])
-
-
-def test_every_comparison_rung_names_a_parent_on_its_own_candidate_set():
-    catalog = {rung.name: rung for rung in mod.COMPARISON_RUNGS}
-    for rung in mod.COMPARISON_RUNGS:
-        if rung.parent is None:
-            continue
-        assert catalog[rung.parent].leaf_only == rung.leaf_only
-        assert set(catalog[rung.parent].predictors) <= set(rung.predictors)
-
-
 def test_the_persisted_rows_carry_the_scale_the_rule_is_read_on(one_rung):
     """``sd`` and ``separated_terms`` travel with the coefficients."""
     coefficients = one_rung.coefficients
@@ -447,4 +420,4 @@ def test_the_concentration_figure_is_optional_but_the_provenance_is_not(
     [(["C2_base"], mod.DEFAULT_LOG_PHI_RUNG), (["M3"], None)],
 )
 def test_the_figure_rung_is_reported_only_when_it_was_selected(names, expected):
-    assert mod.log_phi_figure_rung(mod.resolve_rungs(names)) == expected
+    assert mod.log_phi_figure_rung(resolve_comparison_rungs(names)) == expected
