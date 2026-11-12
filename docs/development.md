@@ -459,8 +459,9 @@ Each builder's statistics:
   and `event_table.py`;
 - behavior: `analysis/behavior/coefficient_statistics.py` (a per-session fit summarized over sessions and
   animals; the other modules build on it), `rate/rate_fit_statistics.py`, `rate/stop_statistics.py`,
-  `content/content_statistics.py`, `rate/history_kernel_statistics.py`, and the stay/leave summaries in
-  `choice/learning.py`.
+  `content/content_statistics.py`, `content/estimator_comparison.py` (the three content estimators
+  compared), `coupling/swr_power.py` (the per-event ripple-power fit and its statistics),
+  `rate/history_kernel_statistics.py`, and the stay/leave summaries in `choice/learning.py`.
 
 A builder may count the size of an input it reads (its epochs, its animals) and copy a statistic a file
 already holds. Figure 4 and the `scripts/pfc/` reports call these functions; the scripts and figures that
