@@ -21,7 +21,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
@@ -37,6 +36,7 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
 )
 from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
+from continuum_swr_replay.analysis.statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 logger = logging.getLogger(__name__)
@@ -540,12 +540,7 @@ def load_population_data(
             # firing-rate columns). Surface NaN rather than KeyError.
             df[q_col] = np.full(len(df), np.nan)
             continue
-        raw = df[source_col].to_numpy(dtype=float)
-        ok = np.isfinite(raw)
-        q = np.full_like(raw, np.nan)
-        if ok.any():
-            q[ok] = false_discovery_control(np.clip(raw[ok], 1e-300, 1.0), method="bh")
-        df[q_col] = q
+        df[q_col] = benjamini_hochberg(df[source_col])
 
     modulations = {
         **{

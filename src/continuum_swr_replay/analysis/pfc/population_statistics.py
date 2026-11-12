@@ -32,7 +32,6 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 from scipy import stats
-from scipy.stats import false_discovery_control
 
 from continuum_swr_replay.analysis.pfc.load_population import (
     HELDOUT_P_COLUMNS,
@@ -46,6 +45,7 @@ from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_rise_timing,
 )
+from continuum_swr_replay.analysis.statistics import benjamini_hochberg
 
 # --- the cohort and its fits ---------------------------------------------------------
 
@@ -302,7 +302,8 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
     """The share of tested units with a Benjamini-Hochberg q below ``alpha``.
 
     BH is applied once, over the pooled p-values of every unit tested for
-    ``name`` (:func:`scipy.stats.false_discovery_control`).
+    ``name``
+    (:func:`~continuum_swr_replay.analysis.statistics.benjamini_hochberg`).
 
     Parameters
     ----------
@@ -320,9 +321,8 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
         Units with q below ``alpha``, as a share of the tested units. NaN, with
         a NumPy warning, when no unit is tested.
     """
-    pvalues = population[HELDOUT_P_COLUMNS[name]].to_numpy(dtype=float)
-    pvalues = pvalues[np.isfinite(pvalues)]
-    return (false_discovery_control(pvalues, method="bh") < alpha).mean()
+    q = benjamini_hochberg(population[HELDOUT_P_COLUMNS[name]])
+    return (q[np.isfinite(q)] < alpha).mean()
 
 
 def best_model_fractions(
