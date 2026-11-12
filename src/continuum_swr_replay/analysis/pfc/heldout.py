@@ -106,13 +106,13 @@ CONTROL_NULL_EVENT_POLICY = "fixed_jointly_matchable_subset"
 
 #: The engagement comparison: does non-SWR replay predict held-out spikes
 #: beyond a duration-matched non-event baseline drawn from the same bouts?
-#: The session scoring that reads it (``score_session``) lives in
-#: ``scripts/pfc/run_pfc_analysis_bandit.py``.
+#: The session scoring that reads it is
+#: :func:`~continuum_swr_replay.analysis.pfc.scoring.score_session`.
 ENGAGEMENT_PAIR = ("matched_control + non_local_no_SWR", "matched_control")
 
 #: Best model per unit, by held-out deviance, within each decomposition. Only
-#: comparable models compete, as they did under AIC. Read by ``score_session``
-#: in ``scripts/pfc/run_pfc_analysis_bandit.py``.
+#: comparable models compete, as they did under AIC. Read by
+#: :func:`~continuum_swr_replay.analysis.pfc.scoring.score_session`.
 BEST_MODEL_CANDIDATES = {
     "min_heldout_model": (
         "constant",

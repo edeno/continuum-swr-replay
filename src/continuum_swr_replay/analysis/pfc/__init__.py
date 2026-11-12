@@ -34,8 +34,10 @@ Held-out scoring (``heldout``)
 ``assign_blocked_folds``, ``control_draw_null`` and ``empirical_pvalue`` are
 the blocked folds, the matched-control null and its plus-one Monte Carlo
 p-value; ``ENGAGEMENT_PAIR`` and ``BEST_MODEL_CANDIDATES`` name the engagement
-comparison and the best-model candidate sets. The runner's ``score_session``
-assembles them into a session's held-out statistics.
+comparison and the best-model candidate sets. ``scoring.score_session``
+assembles them into a session's held-out statistics, and
+``scoring.maximum_likelihood_comparison`` reads the prior's effect on each
+curve's peak against the same curve fit unpenalised.
 
 Population (``load_population``)
 --------------------------------
@@ -58,6 +60,7 @@ continuum_swr_replay.analysis.pfc.design : Event bases and design matrices
 continuum_swr_replay.analysis.pfc.fit : Fitters, penalties and fit diagnostics
 continuum_swr_replay.analysis.pfc.batched_glm : The batched penalised IRLS
 continuum_swr_replay.analysis.pfc.heldout : Held-out deviance and its null
+continuum_swr_replay.analysis.pfc.scoring : A session's held-out statistics
 continuum_swr_replay.analysis.pfc.modulation : Deviance and modulation statistics
 continuum_swr_replay.analysis.pfc.event_sets : Fit masks and event sets
 continuum_swr_replay.analysis.pfc.matched_control : Matched non-event controls
