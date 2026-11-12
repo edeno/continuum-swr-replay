@@ -123,6 +123,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
 from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
     STOP_COHORT,
+    fails_convergence_gate,
     filter_epoch_info,
     is_nonempty_file,
     json_safe,
@@ -571,7 +572,7 @@ def _audit_diagnostics(
                 nan_counts[comparison],
                 n_units,
             )
-    if n_failed > MAX_NONCONVERGED_UNIT_FRACTION * n_units:
+    if fails_convergence_gate(n_failed, n_units):
         logger.error(
             "%d of %d units exceed the %.0f%% full-fit convergence gate",
             n_failed,

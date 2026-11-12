@@ -30,6 +30,7 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance
 __all__ = [
     "MAX_NONCONVERGED_UNIT_FRACTION",
     "STOP_COHORT",
+    "fails_convergence_gate",
     "filter_epoch_info",
     "is_nonempty_file",
     "json_safe",
@@ -45,6 +46,25 @@ STOP_COHORT = "at_well"
 # of units is not certified: its held-out deltas and curves would be a mixture
 # of converged and unconverged units with no way to tell them apart.
 MAX_NONCONVERGED_UNIT_FRACTION = 0.1
+
+
+def fails_convergence_gate(n_not_converged: int, n_units: int) -> bool:
+    """Whether a fit has too many units whose full-data fit did not converge.
+
+    Parameters
+    ----------
+    n_not_converged : int
+        Units whose full-data fit did not converge.
+    n_units : int
+        Units fit.
+
+    Returns
+    -------
+    bool
+        True when more than :data:`MAX_NONCONVERGED_UNIT_FRACTION` of the units
+        did not converge; the fit is then not certified.
+    """
+    return n_not_converged > MAX_NONCONVERGED_UNIT_FRACTION * n_units
 
 
 def session_seed(stream: str, nwb_file_name: str, epoch_name: str) -> int:

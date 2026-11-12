@@ -10,6 +10,7 @@ import pytest
 
 from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance_path
 from continuum_swr_replay.analysis.pfc.runner_support import (
+    fails_convergence_gate,
     filter_epoch_info,
     is_nonempty_file,
     json_safe,
@@ -213,3 +214,22 @@ def test_remove_bundle_unlinks_sidecar_table_and_companions(tmp_path):
     remove_bundle(artifact, companions)  # one companion was never written
 
     assert sorted(path.name for path in tmp_path.iterdir()) == ["other.pkl"]
+
+
+@pytest.mark.parametrize(
+    ("n_not_converged", "n_units", "fails"),
+    [
+        (0, 0, False),
+        (0, 7, False),
+        (1, 10, False),  # exactly a tenth is still certified
+        (2, 10, True),
+        (10, 100, False),
+        (11, 100, True),
+        (1, 9, True),  # a ninth is more than a tenth
+        (3, 3, True),
+    ],
+)
+def test_more_than_a_tenth_of_units_not_converged_fails_the_gate(
+    n_not_converged, n_units, fails
+):
+    assert fails_convergence_gate(n_not_converged, n_units) is fails
