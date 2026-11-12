@@ -2,7 +2,6 @@
 
 Units aggregate unit -> session -> animal, never pooled across sessions as if
 they were independent: a fraction or a curve is taken per session, averaged
-(or, for the share of units whose held-out deviance improves, the median taken)
 over each animal's sessions, then over animals.
 ``scripts/pfc/summarize_pfc_marked_family.py`` reads the bundles, calls these
 and writes the summary the mpfc summary builder reads.
@@ -36,10 +35,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.pfc.population_statistics import (
     animal_balanced_curve,
     animal_curve_sem,
-)
-from continuum_swr_replay.analysis.shared_statistics import (
-    animal_medians,
-    session_median_statistics,
+    session_mean_curve,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
@@ -164,12 +160,13 @@ def animal_balanced_fraction_positive(
     pandas.DataFrame
         One row per (model, event_class, target) with ``n_units``,
         ``n_usable``, ``n_excluded_blowup``, ``n_sessions``, ``n_animals``,
-        ``frac_pos`` (median over animals of the within-animal median over
+        ``frac_pos`` (the mean over animals of each animal's mean over its
         sessions of each session's share of usable units whose delta is
-        positive: the ``animal_median`` of
-        :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`),
-        ``frac_pos_min``/``frac_pos_max`` across animals,
-        ``delta_median`` and ``delta_p95`` over usable units.
+        positive: the reduction of
+        :func:`~continuum_swr_replay.analysis.pfc.population_statistics.animal_balanced_curve`,
+        which the population curves use), ``frac_pos_min``/``frac_pos_max``
+        across those animal means, ``delta_median`` and ``delta_p95`` over
+        usable units, pooled for the deltas' scale.
     """
     table = units.copy()
     table["usable"] = usable_delta(table["delta"], blowup)
@@ -178,28 +175,26 @@ def animal_balanced_fraction_positive(
     out = []
     for key, group in table.groupby(keys, sort=False):
         usable = group.dropna(subset=["usable"])
-        per_session = (
-            usable.assign(pos=usable["usable"] > 0)
-            .groupby(["animal", "session"])["pos"]
-            .mean()
-        )
-        animal = pd.Series(
-            per_session.index.get_level_values("animal"), index=per_session.index
-        )
-        balanced = session_median_statistics(per_session, animal)
-        # The range across animals of the animal medians balanced is the median of.
-        per_animal = animal_medians(per_session, animal)
+        positive = (usable["usable"] > 0).to_numpy(dtype=float)
+        sessions = usable["session"].to_numpy()
+        by_session = {
+            session: session_mean_curve(positive[None, sessions == session])
+            for session in np.unique(sessions)
+        }
+        animal_of = dict(zip(sessions, usable["animal"], strict=True))
+        frac_pos, per_animal = animal_balanced_curve(by_session, animal_of)
+        animal_means = [float(value[0]) for value in per_animal.values()]
         out.append(
             {
                 **dict(zip(keys, key, strict=True)),
                 "n_units": int(len(group)),
                 "n_usable": int(len(usable)),
                 "n_excluded_blowup": int(group["blowup"].sum()),
-                "n_sessions": int(balanced["n_sessions"]),
-                "n_animals": int(balanced["n_animals"]),
-                "frac_pos": float(balanced["animal_median"]),
-                "frac_pos_min": float(per_animal.min()),
-                "frac_pos_max": float(per_animal.max()),
+                "n_sessions": len(by_session),
+                "n_animals": len(per_animal),
+                "frac_pos": float(frac_pos[0]),
+                "frac_pos_min": min(animal_means),
+                "frac_pos_max": max(animal_means),
                 "delta_median": float(usable["usable"].median()),
                 "delta_p95": float(usable["usable"].quantile(0.95)),
             }

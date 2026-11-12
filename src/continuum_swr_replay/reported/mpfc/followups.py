@@ -246,8 +246,8 @@ def marked_family_values(
                     "fraction",
                     "pct",
                     f"share of units whose held-out deviance improves when the mark's "
-                    f"kernel is in the model, {what} (per session, median over sessions "
-                    "within animal, median over animals; over "
+                    f"kernel is in the model, {what} (per session, mean over sessions "
+                    "within animal, mean over animals; over "
                     f"{row['n_usable']:.0f} usable of {row['n_units']:.0f} unit fits, "
                     f"{row['n_excluded_blowup']:.0f} left out as blow-ups, in "
                     f"{row['n_sessions']:.0f} sessions of {row['n_animals']:.0f} "

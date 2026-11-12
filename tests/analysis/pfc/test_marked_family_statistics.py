@@ -33,10 +33,10 @@ def _units() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_fraction_positive_is_the_median_of_animal_medians_not_a_mean():
-    """Session shares: a 0, 1/4, 1 (median 1/4, mean 5/12); b 1/2; c 1, 0
-    (a zero delta is not positive). Animal medians 1/4, 1/2, 1/2: their median
-    is 1/2, their mean 5/12, and the median over the six sessions 3/8."""
+def test_fraction_positive_is_the_mean_of_animal_means_not_a_median():
+    """Session shares: a 0, 1/4, 1 (mean 5/12, median 1/4); b 1/2; c 1, 0
+    (a zero delta is not positive). Animal means 5/12, 1/2, 1/2: their mean is
+    17/36, their median 1/2; the pooled share of the 12 units is 1/3."""
     rows = [
         {"animal": animal, "session": session, "delta": delta}
         for animal, session, deltas in (
@@ -54,8 +54,8 @@ def test_fraction_positive_is_the_median_of_animal_medians_not_a_mean():
     row = stats.animal_balanced_fraction_positive(units, blowup=1000.0).iloc[0]
 
     assert (row.n_sessions, row.n_animals) == (6, 3)
-    assert row.frac_pos == pytest.approx(0.5)
-    assert (row.frac_pos_min, row.frac_pos_max) == (0.25, 0.5)
+    assert row.frac_pos == pytest.approx(17 / 36)
+    assert (row.frac_pos_min, row.frac_pos_max) == (pytest.approx(5 / 12), 0.5)
 
 
 def test_fraction_positive_is_animal_balanced_and_excludes_nan_and_blowups():
@@ -65,9 +65,9 @@ def test_fraction_positive_is_animal_balanced_and_excludes_nan_and_blowups():
     assert row.n_usable == 10
     assert row.n_excluded_blowup == 1
     assert row.n_sessions == 3 and row.n_animals == 2
-    # animal a: median(2/3, 1/4) = 11/24; animal b: 2/3; animal-balanced median
-    expected_a = np.median([2 / 3, 1 / 4])
-    assert row.frac_pos == np.median([expected_a, 2 / 3])
+    # animal a: mean(2/3, 1/4) = 11/24; animal b: 2/3; their mean
+    expected_a = np.mean([2 / 3, 1 / 4])
+    assert row.frac_pos == pytest.approx(np.mean([expected_a, 2 / 3]))
     assert row.frac_pos_min == expected_a and row.frac_pos_max == 2 / 3
 
 
