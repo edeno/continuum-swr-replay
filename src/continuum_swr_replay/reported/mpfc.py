@@ -43,7 +43,6 @@ they are not population inference.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -79,6 +78,7 @@ from continuum_swr_replay.reported.values import (
     rel,
     value_factory,
 )
+from continuum_swr_replay.runs.io import sha256_file
 
 TAGS = {
     "modulation": Tags(("4.1",)),
@@ -248,10 +248,6 @@ def default_inputs() -> MpfcInputs:
     )
 
 
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def read_sidecars(bundle_dir: Path) -> list[dict[str, Any]]:
     """Every canonical bundle's provenance sidecar, in session order.
 
@@ -290,8 +286,8 @@ def table_hashes(event_table: Path, stop_table: Path) -> dict[str, str]:
     """The SHA-256 of the current canonical event and stop tables, under the
     names the bundles' provenance records them by."""
     return {
-        "canonical_event_table_sha256": _sha256(event_table),
-        "stop_table_sha256": _sha256(stop_table),
+        "canonical_event_table_sha256": sha256_file(event_table),
+        "stop_table_sha256": sha256_file(stop_table),
     }
 
 
@@ -337,7 +333,7 @@ def stop_context_staleness(
     ]
 
     def differs(path: Path, sha: str) -> bool:
-        return not path.exists() or _sha256(path) != sha
+        return not path.exists() or sha256_file(path) != sha
 
     stale = {
         "bundle_sha256": sum(
