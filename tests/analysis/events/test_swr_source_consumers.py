@@ -806,7 +806,7 @@ DECODE_FRAME_READERS = {
         "decode_marks: the grid's first and last time, the span the marks are "
         "loaded over"
     ),
-    "src/continuum_swr_replay/visualization/inventory_examples.py": (
+    "src/continuum_swr_replay/analysis/inventory_comparison/example_windows.py": (
         "grid, speed, posterior and position; its events are the comparison's tables"
     ),
     "scripts/detection/run_event_features.py": (
