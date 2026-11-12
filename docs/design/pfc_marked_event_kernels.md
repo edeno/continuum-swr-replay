@@ -74,15 +74,16 @@ conditional p-value. Free permutation assumes that content labels are
 exchangeable over the nuisance and contextual variables that stay attached to
 each event. That strong assumption is not generally satisfied here: content
 is associated to varying degrees with duration, occupied arm, stop context,
-and session time. In the current canonical table, content/log-duration
-correlation has median `-0.129` across 436 session × class groups (138 have
-`|r| > 0.2`), and content/session-time correlation exceeds `|r| = 0.2` in 71
-groups. Occupied-arm identity explains a median 6.8% of content-mark variance.
-These are computed by `scripts/pfc/measure_pfc_mark_context.py` over the
+and session time. Measured on 2026-11-12 by
+`scripts/pfc/measure_pfc_mark_context.py` on the canonical `event_arm_table` of
+that date (242 sessions): the content/log-duration correlation has median
+`-0.138` across 484 session × class groups (171 have `|r| > 0.2`), and the
+content/session-time correlation exceeds `|r| = 0.2` in 92 groups. Occupied-arm
+identity explains a median 6.9% of content-mark variance. The script reads the
 at-well events (event `occupancy_state` of `at_well`, the events whose content
-mark the kernels fit) of all canonical sessions, not only the mPFC
-sessions; "session time" is the event midpoint. The numbers above were measured
-2026-09-18 on the 218-session tables of that date.
+mark the kernels fit) of all canonical sessions, not only the mPFC sessions;
+"session time" is the event midpoint. These are measurements, not reported
+values: no summary holds them, and they change when the tables are rebuilt.
 The reference therefore describes where the observed held-out gain falls
 relative to freely reassigned labels; it does not test a context-independent
 content effect.
@@ -103,17 +104,18 @@ model.
 
 The canonical well-anchored stop cohort includes both `at_well` and `mixed`
 stops. Some events in mixed stops have no defined occupancy arm, so a
-current-arm content value does not exist. Across the current tables there are
-60,308 events in well-anchored stops, of which 59,699 have a current-arm mark
-and 609 do not. The 609 unavailable events are principally event-level
-`in_transit` or `mixed` states within mixed stops.
+current-arm content value does not exist. Measured on 2026-09-18, on the
+218-session tables of that date, there were 60,308 events in well-anchored
+stops, of which 59,699 had a current-arm mark and 609 did not; the 609 were
+principally event-level `in_transit` or `mixed` states within mixed stops. No
+script in the repository re-derives these counts.
 
 These events are not dropped. They remain in the ordinary replay kernel and
 the duration nuisance kernel. Their content-mark regressor is zero, and mark
 permutations operate only among events with a defined mark. Every sidecar
-records total and marked event counts by class. All 436 session × replay-class
-groups currently have at least 33 marked events and nonzero mark SD, so every
-group can identify a content slope. A class is required to carry at least
+records total and marked event counts by class. In the same 2026-09-18
+measurement, all 436 session × replay-class groups had at least 33 marked
+events and nonzero mark SD, so every group could identify a content slope. A class is required to carry at least
 `MIN_MARKED_EVENTS_PER_CLASS` = 10 marked events (defined in `marked_glm.py`);
 below that the session refuses to fit rather than reporting a slope no group
 size can support.
