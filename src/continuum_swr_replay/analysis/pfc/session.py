@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     get_frac_null_deviance,
     in_report_window,
 )
+from continuum_swr_replay.analysis.pfc.scoring import pair_name
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
@@ -564,7 +565,7 @@ def _deviance_fractions(
     # stated number of parameters. What the models are compared by is the
     # held-out deviance the runner scores them on.
     for model1, model2 in NESTED_MODEL_PAIRS:
-        test_name = f"{model1} vs. {model2}"
+        test_name = pair_name(model1, model2)
         if (
             model1 in non_estimable_models
             or model2 in non_estimable_models

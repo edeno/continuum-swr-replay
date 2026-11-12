@@ -1180,25 +1180,6 @@ ESTIMATOR_SIDECAR_KEYS = [
     "n_basis_per_class",
 ]
 
-#: The nested ``full vs. reduced`` comparisons the bundles carry a held-out
-#: difference for, as the statistics table spells them. Mirrors the runner's
-#: list: the audit reads the columns by name, so it has to know them.
-NESTED_MODEL_PAIRS = (
-    "SWR vs. constant",
-    "non_local vs. constant",
-    "non_local_no_SWR vs. constant",
-    "non_local_SWR vs. constant",
-    "SWR + non_local_no_SWR vs. constant",
-    "SWR + non_local_no_SWR vs. SWR",
-    "SWR + non_local_no_SWR vs. non_local_no_SWR",
-    "non_local_SWR + non_local_no_SWR vs. constant",
-    "non_local_SWR + non_local_no_SWR vs. non_local_SWR",
-    "non_local_SWR + non_local_no_SWR vs. non_local_no_SWR",
-    "non_local_SWR + non_local_no_SWR vs. non_local",
-    "matched_control + non_local_no_SWR vs. matched_control",
-    "matched_control vs. constant",
-)
-
 #: Date the replay-split curve swap was fixed. A bundle written before it has
 #: ``non_local_SWR_modulation`` and ``non_local_no_SWR_modulation`` -- and the
 #: statistics ``non_local_SWR_max_mod`` and ``non_local_no_SWR_split_max_mod``

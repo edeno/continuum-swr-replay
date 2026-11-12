@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from continuum_swr_replay.analysis.pfc import modulation
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -32,10 +33,10 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_PLACEMENT_METHOD,
 )
+from continuum_swr_replay.analysis.pfc.scoring import pair_name
 from scripts.pfc.compare_pfc_cohorts import (
     FDR_TESTS,
     MATCHED_CONTROL_TESTS,
-    NESTED_MODEL_PAIRS,
     RERUN_PARAM_TOL,
     _md,
     _short_hash,
@@ -74,6 +75,10 @@ from scripts.pfc.compare_pfc_cohorts import (
 )
 
 N_LAG_TIMES = 201
+
+#: The nested comparisons a bundle carries a held-out difference for, as the
+#: statistics table spells them.
+NESTED_MODEL_PAIRS = tuple(pair_name(*pair) for pair in modulation.NESTED_MODEL_PAIRS)
 
 #: Repository root, for loading a sibling QA script by path.
 _REPO = Path(__file__).resolve().parents[3]
