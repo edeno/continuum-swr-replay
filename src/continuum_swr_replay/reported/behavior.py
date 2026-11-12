@@ -48,7 +48,7 @@ coefficient over the sessions where that term does; the counts left out, and
 the kept fits that did not converge, are reported beside them. The reward
 effect is the reconstructed kernel; a single basis coefficient is reported only
 as itself (:data:`BASIS_COEFFICIENT_NOTE`). The time courses drop fits flagged
-separated, as ``compare_fits`` does. The
+separated. The
 self-history kernel is many sessions' separated term, so its values carry a
 pending note and a gated reading beside them. "Animals positive" counts the
 animals whose own median is above zero.
@@ -1318,7 +1318,7 @@ def stop_table_values(
     well-anchored cohort (the analysed immobility: the stop's span less the
     excluded time inside it), survival past 2 s and 4 s (from the stop's
     start, excluded time not taken out), the outcome-boundary shift
-    (``compare_fits.outcome_boundary_shift_cohort``), and the share of onsets
+    (:func:`~continuum_swr_replay.analysis.replay.stop_statistics.outcome_boundary_statistics`), and the share of onsets
     inside the ``TMAX`` truncation."""
     make = value_factory(stop_table_values, source, TAGS["rate"])
     anchored, _ = select_stop_cohort(stops, cohort="at_well")
@@ -1827,7 +1827,7 @@ def cohort_audit_values(inputs: BehaviorInputs) -> list[Value]:
 
 def per_stop_values(fits: pd.DataFrame, source: str) -> list[Value]:
     """Question 3.3: the per-stop reward step ``R1 - R0`` on the well-anchored
-    cohort (``compare_fits.cohort_per_stop_delta_aic_table``): a session counts
+    cohort (:func:`~continuum_swr_replay.analysis.replay.coefficient_statistics.aic_difference_statistics`): a session counts
     only when both rungs saw the same stops; negative = child better."""
     make = value_factory(per_stop_values, source, TAGS["rate"])
     _require(

@@ -484,20 +484,15 @@ def test_every_rate_fit_drops_the_excluded_bins():
     """Each runner that builds a per-bin design gives it its ladder's history
     window, as a keyword or through a ``**`` dict literal assigned in the same
     function, and leaves excluded time to the design, which reads it from the
-    source. ``qa/compare_fits.py`` builds the same design to count stops whose
-    retained bins cross a boundary, so it is held to the same rule."""
+    source."""
     import ast
     from pathlib import Path
 
     wanted = {"history_window_s"}
     scripts = Path(__file__).resolve().parents[2] / "scripts"
     rate = scripts / "rate"
-    offenders, n_calls, n_compare_fits = [], 0, 0
-    runners = [
-        *rate.glob("fit_*.py"),
-        rate / "plot_model_checking.py",
-        scripts / "qa" / "compare_fits.py",
-    ]
+    offenders, n_calls = [], 0
+    runners = [*rate.glob("fit_*.py"), rate / "plot_model_checking.py"]
     for path in sorted(runners):
         tree = ast.parse(path.read_text())
         for function in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
@@ -519,15 +514,13 @@ def test_every_rate_fit_drops_the_excluded_bins():
                 ):
                     continue
                 n_calls += 1
-                n_compare_fits += path.name == "compare_fits.py"
                 given = {k.arg for k in node.keywords if k.arg is not None}
                 for spread in (k for k in node.keywords if k.arg is None):
                     if isinstance(spread.value, ast.Name):
                         given |= literals.get(spread.value.id, set())
                 if not wanted <= given or "excluded_intervals" in given:
                     offenders.append(f"{path.name}:{node.lineno}")
-    assert n_calls >= 7
-    assert n_compare_fits >= 1
+    assert n_calls >= 6
     assert offenders == []
 
 

@@ -58,9 +58,7 @@ Work that is deferred on purpose. Each item says when it should be done.
     duration, the paired part changes, the carving mean, the held-out rate, the
     jump-pass shares and the three refusals), against
     `memoryless_sequence/sweep_statistics.py`.
-  - behavior: `scripts/qa/compare_fits.py` (AIC differences, the lag-1 kernel and
-    its paired test, the clock shapes, separation shares, arrival-window shares,
-    the animal-balanced summaries), `scripts/rate/plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`,
+  - behavior: `scripts/rate/plot_per_bin_rate_models.py`, `plot_per_bin_rate_summary.py`,
     `plot_model_checking.py` and `fit_per_bin_rate_models.py` (the arrival-window
     shares), `scripts/behavior/run_stay_leave.py` (the pooled GEE's correction),
     `scripts/coupling/fit_swr_power_model.py` and

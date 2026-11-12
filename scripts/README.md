@@ -282,13 +282,6 @@ them importable.
   every sweep cell; writes
   `docs/design/replay_detection_comparison/reference_check_summary.csv` (about ten
   minutes; `--n-seeds 1` for a one-minute check).
-- `compare_fits.py` — compares old vs new fitted rate artifacts (Family B, Family A
-  and the `is_swr`-contrast ladder) on the quantities that survive a respecification
-  — joint reward step, reward-free goodness of fit, frozen-cohort size, per-rung
-  session counts, per-term separation shares — and writes the markdown comparison
-  under `.claude/docs/reviews/`. `--content` reads the content `is_swr`-contrast fits
-  from each root's `models_swr_contrast/` only, and stops, naming that directory, when a
-  fit is missing.
 - `check_fit_provenance.py` — sweeps the whole `models*/` tree and reports which
   fitted artifacts are stale for the tables they read, from the SHA-256 sidecars
   each runner writes.
