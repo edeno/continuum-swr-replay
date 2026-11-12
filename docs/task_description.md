@@ -45,7 +45,7 @@ them. It combines spatial memory with probabilistic decision-making.
   (0.5, 0.8)" means the *highest-average* patch, not the only 0.8-bearing one.
   (Verified from the rig-side per-session Python control files that set `leafProbs`,
   `/stelmo/alison/<animal>/<animal>_py_done/*.py`: across 352 contingencies, `(0.2,0.8)`
-  patches occur 188× and `(0.8,0.8)` occurs 0×. The shipped `qvals_table` agrees:
+  patches occur 188× and `(0.8,0.8)` occurs 0×. The `qvals_table` of 2026-09-06 agrees:
   no `(0.8,0.8)` patch on any of its 105 359 stops.)
 - **Dataset caveat (matters for value/contingency covariates).** The recorded and
   ingested epochs are **not** all canonical-protocol sessions. Two different
@@ -66,9 +66,12 @@ them. It combines spatial memory with probabilistic decision-making.
 
   So the non-canonical mass is overwhelmingly **structural** — early-training
   configurations built from canonical values but without the best-patch structure —
-  not exotic probabilities. Both figures were measured on the shipped
-  `Processed-Data/replay_content/qvals_table.parquet`
-  (105 359 stops; `task_reward_probability_port_{0..5}`).
+  not exotic probabilities. Both figures were measured on 2026-09-06 on the
+  `Processed-Data/replay_content/qvals_table.parquet` of that date
+  (105 359 stops; `task_reward_probability_port_{0..5}`). Every count and share in
+  this caveat is that dated measurement, not computed by a summary; the tables have
+  been rebuilt since (the full re-decode of 2026-10), so today's
+  counts differ.
 
   The rig-side control files (`/stelmo/alison/<animal>/<animal>_py_done/*.py`) gave the
   original ~37 % figure (chimi + peanut ground truth) and agree, but they are a
