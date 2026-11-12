@@ -40,7 +40,7 @@ The markers are registered in `pyproject.toml` (`[tool.pytest.ini_options]`).
     `processed_data_root` fixture (an empty `Processed-Data` under its
     `tmp_path`, via `monkeypatch.setenv`) or `replay_content_root` (its
     `replay_content/`), and lays its inputs out as `Processed-Data` is; the
-    SWR-source fixtures in `unit/_swr_inventory_fixtures.py` write their run
+    SWR-source fixtures in `support/_swr_inventory_fixtures.py` write their run
     folders where `paths` puts them under a root and point the variable at it.
     That one variable is the patch point: no test patches a module's root.
     And `continuum_swr_replay.analysis.events.swr_source.ARTIFACT_INTERVALS_RUN_ID`
@@ -139,7 +139,7 @@ uv run pytest --cov=src/continuum_swr_replay --cov-report=html
 
 Note: 0–14% coverage on most visualization modules is *expected*.
 `bandit_task.py` imports Spyglass only inside its loaders; its orchestration
-is tested with faked loaders (`unit/test_position.py`), and its Spyglass reads
+is tested with faked loaders (`data_loaders/test_position.py`), and its Spyglass reads
 need `-m real_data`. Visualization modules are a deliberate non-target — plotting code is
 low-ROI to test, and scientific correctness is verified through analysis
 tests upstream of the plotting layer.
