@@ -6,6 +6,11 @@ for unregularized fits only.
 Provides functions for comparing consecutive models in the hierarchy
 (M0 vs M1, M1 vs M2, etc.) both at the per-session level and aggregated
 across sessions.
+
+An AIC or BIC difference is the child rung's minus the parent rung's, within
+session, as in
+:func:`~continuum_swr_replay.analysis.behavior.coefficient_statistics.aic_difference_statistics`:
+negative means the child rung is better.
 """
 
 from __future__ import annotations
@@ -89,6 +94,9 @@ def compare_nested_models(
     -------
     pd.DataFrame
         One row per session with delta_aic, delta_bic, lr_stat, lr_pvalue.
+        ``delta_aic`` is ``AIC(child) - AIC(parent)`` and ``delta_bic`` the
+        same for BIC: negative means the child is better. ``lr_stat`` is
+        ``2 * (llf_child - llf_parent)``.
         ``delta_aic`` / ``delta_bic`` / ``lr_stat`` / ``lr_pvalue`` are NaN for
         any session whose parent and child report different ``n_events``,
         ``n_bins``, or ``n_stops`` — rungs fit to different rows are not
@@ -140,8 +148,8 @@ def compare_nested_models(
     # Delta AIC/BIC and LRT require parent and child to be fit on
     # the same observations. Callers must ensure this by pre-filtering
     # to a common complete-case event set before fitting.
-    merged["delta_aic"] = merged["aic_parent"] - merged["aic_child"]
-    merged["delta_bic"] = merged["bic_parent"] - merged["bic_child"]
+    merged["delta_aic"] = merged["aic_child"] - merged["aic_parent"]
+    merged["delta_bic"] = merged["bic_child"] - merged["bic_parent"]
 
     merged["lr_stat"] = -2 * (merged[ll_parent] - merged[ll_child])
     merged["df_diff"] = merged["n_params_child"] - merged["n_params_parent"]
@@ -245,8 +253,16 @@ def summarize_comparison(
     Returns
     -------
     dict
-        Summary statistics including median delta-AIC, fraction of sessions
-        preferring each model, the Wilcoxon test on delta-AIC, and the
+        Summary statistics of the per-session ``delta_aic``
+        (``AIC(child) - AIC(parent)``; negative means the child is better):
+        its median and quartiles (``delta_aic_median``, ``delta_aic_q25``,
+        ``delta_aic_q75``), the median ``delta_bic``, the sessions in which
+        the child's AIC is lower than the parent's by more than 2
+        (``child_better_aic``), higher by more than 2 (``parent_better_aic``),
+        and the same for BIC (``child_better_bic``), the Wilcoxon test on
+        ``delta_aic``, the median over animals of each animal's median
+        ``delta_aic`` (``delta_aic_animal_median``), the animals whose median
+        is negative (``n_animals_child_better``), and the
         ``estimator`` / ``response_col`` the two rungs were fit with. The
         estimator is what says at which grain ``delta_aic_*``, ``child_better_aic``
         and ``lrt_significant`` are stated -- per event on a fraction or
@@ -283,9 +299,9 @@ def summarize_comparison(
         "delta_aic_q25": float(daic.quantile(0.25)),
         "delta_aic_q75": float(daic.quantile(0.75)),
         "delta_bic_median": float(dbic.median()),
-        "child_better_aic": int((daic > 2).sum()),
-        "parent_better_aic": int((daic < -2).sum()),
-        "child_better_bic": int((dbic > 2).sum()),
+        "child_better_aic": int((daic < -2).sum()),
+        "parent_better_aic": int((daic > 2).sum()),
+        "child_better_bic": int((dbic < -2).sum()),
         "lrt_significant": int(lr_sig),
     }
 
@@ -305,7 +321,7 @@ def summarize_comparison(
         )
         result["delta_aic_animal_median"] = animals["animal_median"]
         result["n_animals"] = animals["n_animals"]
-        result["n_animals_child_better"] = animals["n_animals_positive"]
+        result["n_animals_child_better"] = animals["n_animals_negative"]
     else:
         result["delta_aic_animal_median"] = np.nan
         result["n_animals"] = 0

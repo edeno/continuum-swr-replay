@@ -57,17 +57,29 @@ def _make_fit_results(*, ll, aic, bic, n_params, n_events=100, n_sessions=1):
 
 class TestCompareNestedModels:
     def test_delta_aic_and_lr_stat_arithmetic(self):
-        """Parent AIC=100, child AIC=90 → delta_aic = 10 (child wins).
+        """Parent AIC=100, child AIC=90 → delta_aic = 90 - 100 = -10: the
+        child's AIC is lower, so the child wins and the difference is negative.
+        Parent BIC=110, child BIC=105 → delta_bic = -5.
         Parent ll=-50, child ll=-44 → lr_stat = -2*(-50-(-44)) = 12.
         df_diff = 4-2 = 2."""
         parent = _make_fit_results(ll=-50, aic=100, bic=110, n_params=2)
         child = _make_fit_results(ll=-44, aic=90, bic=105, n_params=4)
         cmp = compare_nested_models(parent, child)
         row = cmp.iloc[0]
-        assert row["delta_aic"] == 10.0
-        assert row["delta_bic"] == 5.0
+        assert row["delta_aic"] == -10.0
+        assert row["delta_bic"] == -5.0
         assert row["lr_stat"] == 12.0
         assert row["df_diff"] == 2
+
+    def test_a_worse_child_has_a_positive_delta_aic(self):
+        """Parent AIC=90, child AIC=104 → delta_aic = 104 - 90 = +14: the
+        parent's AIC is lower, so the parent wins and the difference is
+        positive. BIC 105 → 119 gives +14 too."""
+        parent = _make_fit_results(ll=-44, aic=90, bic=105, n_params=2)
+        child = _make_fit_results(ll=-48, aic=104, bic=119, n_params=4)
+        row = compare_nested_models(parent, child).iloc[0]
+        assert row["delta_aic"] == 14.0
+        assert row["delta_bic"] == 14.0
 
     def test_negative_lr_stat_is_clipped_for_pvalue(self):
         """If the child fits WORSE than the parent (numerical
@@ -169,21 +181,65 @@ class TestSummarizeComparison:
 
     def test_the_animal_view_is_the_median_of_each_animal_s_median(self):
         """Animal b has only a NaN session, so it is not an animal of the
-        summary: a's median is 2, c's is -1, their median 0.5."""
-        comparisons = _make_comparison_df([3.0, 1.0, np.nan, 4.0, -6.0]).assign(
-            animal=["a", "a", "b", "c", "c"]
+        summary: a's median is -2, c's is -1, d's is 5, their median -1. A
+        negative median favours the child, so a and c (two animals) favour
+        it; counting the positive ones would give one."""
+        comparisons = _make_comparison_df([-3.0, -1.0, np.nan, 4.0, -6.0, 5.0]).assign(
+            animal=["a", "a", "b", "c", "c", "d"]
         )
         result = summarize_comparison(comparisons, "M0", "M1")
-        assert result["delta_aic_animal_median"] == pytest.approx(0.5)
-        assert result["n_animals"] == 2
-        assert result["n_animals_child_better"] == 1
+        assert result["delta_aic_animal_median"] == pytest.approx(-1.0)
+        assert result["n_animals"] == 3
+        assert result["n_animals_child_better"] == 2
 
     def test_counts_child_better_aic_threshold(self):
-        """child_better_aic counts sessions with delta_aic > 2."""
-        comparisons = _make_comparison_df([5.0, 3.0, 1.0, -1.0, -5.0])
+        """child_better_aic counts sessions whose child AIC is lower by more
+        than 2 (delta_aic < -2), parent_better_aic those whose child AIC is
+        higher by more than 2 (delta_aic > 2); a difference of exactly 2 is
+        neither."""
+        comparisons = _make_comparison_df([-5.0, -3.0, -2.0, -1.0, 1.0, 2.0, 5.0])
         result = summarize_comparison(comparisons, "M0", "M1")
-        assert result["child_better_aic"] == 2  # 5.0 and 3.0 are > 2
-        assert result["parent_better_aic"] == 1  # only -5.0 is < -2
+        assert result["child_better_aic"] == 2  # -5.0 and -3.0
+        assert result["parent_better_aic"] == 1  # only 5.0
+        assert result["child_better_bic"] == 2  # delta_bic equals delta_aic here
+        assert result["delta_aic_median"] == -1.0
+
+    def test_a_better_child_from_the_fits(self):
+        """Hand-checkable from the AICs. Three sessions; the child's AIC is
+        100 - 10, 100 - 5 and 100 + 1 against the parent's 100, so the
+        differences are -10, -5, +1: median -5, quartiles -7.5 and -2, and two
+        sessions in which the child is better by more than 2."""
+        parent = _make_fit_results(ll=-48, aic=100, bic=104, n_params=2, n_sessions=3)
+        child = parent.assign(
+            aic=[90.0, 95.0, 101.0], bic=[96.0, 101.0, 107.0], n_params=3
+        )
+        result = summarize_comparison(compare_nested_models(parent, child), "M0", "M1")
+        assert result["delta_aic_median"] == -5.0
+        assert result["delta_aic_q25"] == -7.5
+        assert result["delta_aic_q75"] == -2.0
+        assert result["delta_bic_median"] == -3.0
+        assert result["child_better_aic"] == 2
+        assert result["parent_better_aic"] == 0
+        assert result["child_better_bic"] == 2
+        assert result["delta_aic_animal_median"] == -5.0
+        assert result["n_animals_child_better"] == 1
+
+    def test_a_better_parent_from_the_fits(self):
+        """The mirror case: the child's AIC is 100 + 10, 100 + 5 and 100 - 1
+        against the parent's 100, so the differences are +10, +5, -1: median
+        +5, the parent better by more than 2 in two sessions, the child in
+        none, and the one animal's median favours the parent."""
+        parent = _make_fit_results(ll=-48, aic=100, bic=104, n_params=2, n_sessions=3)
+        child = parent.assign(aic=[110.0, 105.0, 99.0], bic=[116.0, 111.0, 105.0])
+        result = summarize_comparison(compare_nested_models(parent, child), "M0", "M1")
+        assert result["delta_aic_median"] == 5.0
+        assert result["delta_aic_q25"] == 2.0
+        assert result["delta_aic_q75"] == 7.5
+        assert result["child_better_aic"] == 0
+        assert result["parent_better_aic"] == 2
+        assert result["child_better_bic"] == 0
+        assert result["delta_aic_animal_median"] == 5.0
+        assert result["n_animals_child_better"] == 0
 
     def test_lrt_significant_count_at_5_percent(self):
         """lrt_significant counts sessions with lr_pvalue < 0.05."""
@@ -247,8 +303,8 @@ def test_mismatched_n_bins_invalidates():
     # Matched bins and stops leave the arithmetic intact.
     child_ok = rows(aic=90, bic=105, ll=-44, n_params=4, n_bins=7387816, n_stops=1000)
     valid = compare_nested_models(parent, child_ok).iloc[0]
-    assert valid["delta_aic"] == 10.0
-    assert valid["delta_bic"] == 5.0
+    assert valid["delta_aic"] == -10.0
+    assert valid["delta_bic"] == -5.0
     assert valid["lr_stat"] == 12.0
 
 
@@ -281,7 +337,7 @@ class TestEstimatorTravelsWithTheComparison:
 
         assert result["estimator"] == "conditional_poisson_fraction"
         assert result["response_col"] == "arm_fraction"
-        assert result["delta_aic_median"] == 4.0
+        assert result["delta_aic_median"] == -4.0  # child 20 - parent 24
 
     def test_summary_of_a_count_ladder_reports_the_count_estimator(self):
         parent, child = self._rungs("conditional_poisson_count", "arm_count_hard")
@@ -379,7 +435,7 @@ def test_agreeing_likelihood_constants_leave_the_comparison_alone():
 
     comparison = compare_nested_models(parent, child)
 
-    assert comparison["delta_aic"].iloc[0] == 10.0
+    assert comparison["delta_aic"].iloc[0] == -10.0  # child 90 - parent 100
     assert comparison["lr_stat"].iloc[0] == 12.0
     summary = summarize_comparison(comparison, "M0", "M1")
     assert bool(summary["llf_includes_constants"]) is True
@@ -393,7 +449,7 @@ def test_a_rung_that_records_nothing_is_unknown_not_different():
 
     comparison = compare_nested_models(parent, child)
 
-    assert comparison["delta_aic"].iloc[0] == 10.0
+    assert comparison["delta_aic"].iloc[0] == -10.0  # child 90 - parent 100
     assert (
         summarize_comparison(comparison, "M0", "M1")["llf_includes_constants"] is None
     )
@@ -471,7 +527,7 @@ def test_same_clock_comparison_is_untouched():
 
     row = compare_nested_models(parent, child).iloc[0]
 
-    assert row["delta_aic"] == 10
+    assert row["delta_aic"] == -10  # child 90 - parent 100
     assert np.isfinite(row["lr_stat"])
 
 
@@ -511,5 +567,5 @@ def test_same_cohort_comparison_is_untouched():
 
     row = compare_nested_models(parent, child).iloc[0]
 
-    assert row["delta_aic"] == 10
+    assert row["delta_aic"] == -10  # child 90 - parent 100
     assert np.isfinite(row["lr_stat"])
