@@ -19,6 +19,9 @@ import pytest
 from continuum_swr_replay.analysis.behavior import model_specs
 from continuum_swr_replay.analysis.behavior.cohort_audit import event_drop_buckets
 from continuum_swr_replay.analysis.behavior.content import fit_outputs
+from continuum_swr_replay.analysis.behavior.content.cohort import (
+    zero_response_event_ids,
+)
 from continuum_swr_replay.analysis.behavior.content.simulation import (
     simulate_dirichlet_multinomial_counts,
     simulate_with_event_covariates,
@@ -31,13 +34,10 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     ModelSpec,
     default_content_model_names,
 )
-from continuum_swr_replay.data_loaders.constants import (
-    ALL_ARMS,
-    TRACK_SEGMENT_TO_PATCH,
-    WELL_ARMS,
-)
+from continuum_swr_replay.data_loaders.constants import ALL_ARMS, WELL_ARMS
 from continuum_swr_replay.tables.io import write_table
 from scripts.behavior.content import fit_replay_content_models as mod
+from tests.support._content_tables import canonical_arm_table
 
 # the runner resolves its directories, and /tmp is itself a symlink on macOS
 CONTENT_IN = Path("/tmp/content-in").resolve()
@@ -162,177 +162,12 @@ def test_swr_subset_run_keeps_its_own_suffixed_bundle() -> None:
 # ── Response selection ──
 
 
-def _canonical_arm_table(
-    *,
-    n_events: int = 4,
-    fraction_scale: float = 1.0,
-    undecoded_event: str | None = None,
-    partial_event: str | None = None,
-) -> pd.DataFrame:
-    """A minimal table satisfying the canonical arm contract.
-
-    ``fraction_scale`` rescales every event's fractions (1.0 is the contract).
-    ``undecoded_event`` leaves one event's fraction missing on every candidate,
-    as an event with no real-arm bins; ``partial_event`` leaves it missing on
-    one candidate only, which the contract forbids.
-    """
-    rows = []
-    for index in range(n_events):
-        event = f"e{index}"
-        current = index % len(WELL_ARMS)
-        other = (current + 1) % len(WELL_ARMS)
-        counts = np.zeros(len(ALL_ARMS))
-        counts[current] = 6.0
-        counts[other] = 2.0
-        fractions = counts / counts.sum() * fraction_scale
-        for arm in ALL_ARMS:
-            fraction = fractions[arm]
-            if event == undecoded_event or (
-                event == partial_event and arm == len(ALL_ARMS) - 1
-            ):
-                fraction = np.nan
-            rows.append(
-                {
-                    "animal": "chimi",
-                    "session_date": "20200212",
-                    "epoch": "02_r1",
-                    "event_id": event,
-                    "candidate_arm": arm,
-                    "arm_count_hard": counts[arm],
-                    "arm_fraction": fraction,
-                    "occupancy_state": "at_well",
-                    "at_well": True,
-                    "occupancy_well_id": current,
-                    "occupancy_well_arm": current,
-                    "is_current_arm": float(arm == current),
-                    "visit_recency_trials_event_leaf_centered": float(arm),
-                    "is_candidate_arm_never_visited": 0.0,
-                }
-            )
-    return pd.DataFrame(rows)
-
-
-def _canonical_patch_table(*, n_events: int = 4) -> pd.DataFrame:
-    """A minimal table satisfying the canonical patch contract."""
-    patches = sorted(set(TRACK_SEGMENT_TO_PATCH.values()))
-    rows = []
-    for index in range(n_events):
-        current_arm = index % len(WELL_ARMS)
-        current_patch = TRACK_SEGMENT_TO_PATCH[current_arm]
-        counts = dict.fromkeys(patches, 0.0)
-        counts[current_patch] = 5.0
-        counts[patches[(patches.index(current_patch) + 1) % len(patches)]] = 3.0
-        total = sum(counts.values())
-        for patch in patches:
-            rows.append(
-                {
-                    "animal": "chimi",
-                    "session_date": "20200212",
-                    "epoch": "02_r1",
-                    "event_id": f"e{index}",
-                    "patch": patch,
-                    "patch_count_hard": counts[patch],
-                    "patch_fraction": counts[patch] / total,
-                    "occupancy_state": "at_well",
-                    "at_well": True,
-                    "occupancy_well_id": current_arm,
-                    "occupancy_well_arm": current_arm,
-                    "is_current_patch": float(patch == current_patch),
-                    "visit_recency_trials_patch": float(patch),
-                    "is_patch_never_visited": 0.0,
-                }
-            )
-    return pd.DataFrame(rows)
-
-
 _ARM_LADDER = {"X": ModelSpec("X", ("is_current_arm",), "current-arm bias", None)}
-_PATCH_LADDER = {"X": ModelSpec("X", ("is_current_patch",), "current patch", None)}
-
-
-def _prepare_arm(table: pd.DataFrame, **kwargs):
-    return mod.prepare_canonical_fit_request(
-        table,
-        hierarchy=_ARM_LADDER,
-        model_names=["X"],
-        hierarchy_kind="arm",
-        table_label="synthetic-arm-table",
-        **kwargs,
-    )
-
-
-def test_default_response_is_the_per_event_arm_fraction() -> None:
-    _prepared, _models, _preds, response_col, event_col = _prepare_arm(
-        _canonical_arm_table()
-    )
-    assert response_col == "arm_fraction"
-    assert event_col == "event_id"
-
-
-def test_hard_count_response_resolves_to_the_arm_counts() -> None:
-    _prepared, _models, _preds, response_col, _event = _prepare_arm(
-        _canonical_arm_table(), response="hard_count"
-    )
-    assert response_col == "arm_count_hard"
-
-
-def test_patch_hierarchy_resolves_to_the_patch_fraction_and_counts() -> None:
-    for response, expected in (
-        ("fraction", "patch_fraction"),
-        ("hard_count", "patch_count_hard"),
-    ):
-        _prepared, _models, _preds, response_col, _event = (
-            mod.prepare_canonical_fit_request(
-                _canonical_patch_table(),
-                hierarchy=_PATCH_LADDER,
-                model_names=["X"],
-                hierarchy_kind="patch",
-                table_label="synthetic-patch-table",
-                response=response,
-            )
-        )
-        assert response_col == expected
-
-
-def test_fraction_that_does_not_sum_to_one_is_refused() -> None:
-    table = _canonical_arm_table(fraction_scale=0.9)
-    with pytest.raises(ValueError, match="does not sum to 1.0"):
-        _prepare_arm(table)
-    # The same table is fine on the counts, which are untouched.
-    assert _prepare_arm(table, response="hard_count")[3] == "arm_count_hard"
-
-
-def test_fraction_off_by_more_than_the_tolerance_is_refused() -> None:
-    table = _canonical_arm_table()
-    table.loc[0, "arm_fraction"] += 1e-8
-    with pytest.raises(ValueError, match="does not sum to 1.0"):
-        _prepare_arm(table)
-
-
-def test_fraction_within_the_tolerance_is_accepted() -> None:
-    table = _canonical_arm_table()
-    table.loc[0, "arm_fraction"] += 1e-12
-    assert _prepare_arm(table)[3] == "arm_fraction"
-
-
-def test_missing_fraction_column_names_the_column_and_the_way_out() -> None:
-    table = _canonical_arm_table().drop(columns=["arm_fraction"])
-    with pytest.raises(ValueError, match="arm_fraction.*--response hard_count"):
-        _prepare_arm(table)
-
-
-def test_event_with_no_real_arm_bins_is_allowed_as_all_missing() -> None:
-    """An all-junction event carries no fraction anywhere; the cohort drops it."""
-    assert _prepare_arm(_canonical_arm_table(undecoded_event="e2"))[3] == "arm_fraction"
-
-
-def test_fraction_defined_on_only_some_candidates_is_refused() -> None:
-    with pytest.raises(ValueError, match="only some candidates"):
-        _prepare_arm(_canonical_arm_table(partial_event="e1"))
 
 
 def test_undecoded_events_are_reported_as_zero_response_drops() -> None:
     """The audit must name the mechanism: no response, not a missing predictor."""
-    table = _canonical_arm_table(n_events=5, undecoded_event="e3")
+    table = canonical_arm_table(n_events=5, undecoded_event="e3")
     buckets = event_drop_buckets(
         table,
         event_col="event_id",
@@ -561,7 +396,7 @@ def test_fit_inputs_name_the_table_the_ladder_reads() -> None:
 
 def test_bundle_writes_a_provenance_sidecar_beside_every_pickle(tmp_path) -> None:
     table = tmp_path / "event_arm_table.parquet"
-    write_table(_canonical_arm_table(), table)
+    write_table(canonical_arm_table(), table)
     fit_inputs = record_inputs({"event_arm_table": table})
     frame = pd.DataFrame({"model": ["X"], "coef_is_current_arm": [0.5]})
     output_dir = tmp_path / "models"
@@ -586,20 +421,6 @@ def test_bundle_writes_a_provenance_sidecar_beside_every_pickle(tmp_path) -> Non
     record = json.loads((output_dir / "all_models.provenance.json").read_text())
     assert record["estimator"] == "conditional_poisson_fraction"
     assert record["cli"][-1] == "fraction"
-
-
-def test_zero_response_events_cover_undefined_and_empty_allocations() -> None:
-    """Both mechanisms are the same drop: the event has no allocation to fit."""
-    frame = pd.DataFrame(
-        {
-            "event_id": ["a", "a", "b", "b", "c", "c"],
-            "arm_fraction": [0.5, 0.5, np.nan, np.nan, 0.0, 0.0],
-        }
-    )
-
-    assert mod._zero_response_event_ids(
-        frame, event_col="event_id", response_col="arm_fraction"
-    ) == {"b", "c"}
 
 
 # ── Leaf-only candidate set ──
@@ -647,7 +468,7 @@ def test_leaf_only_drops_the_trunk_arm_fixed_effects_from_every_rung() -> None:
 
 
 def test_leaf_only_cohort_keeps_the_six_leaf_rows_of_every_event() -> None:
-    table = _canonical_arm_table(n_events=3)
+    table = canonical_arm_table(n_events=3)
     leaves = model_specs.restrict_to_leaf_arms(table)
 
     assert sorted(leaves["candidate_arm"].unique()) == [0, 1, 2, 3, 4, 5]
@@ -664,7 +485,7 @@ def test_leaf_only_cohort_keeps_the_six_leaf_rows_of_every_event() -> None:
 def test_leaf_only_cohort_needs_the_candidate_arm_column() -> None:
     with pytest.raises(ValueError, match="candidate_arm"):
         model_specs.restrict_to_leaf_arms(
-            _canonical_arm_table().drop(columns=["candidate_arm"])
+            canonical_arm_table().drop(columns=["candidate_arm"])
         )
 
 
@@ -780,7 +601,7 @@ def test_event_with_only_trunk_mass_becomes_a_zero_response_drop() -> None:
 
     e1 = leaves[leaves["event_id"].eq("e1")]["arm_fraction"]
     assert e1.isna().all()
-    assert mod._zero_response_event_ids(
+    assert zero_response_event_ids(
         leaves, event_col="event_id", response_col="arm_fraction"
     ) == {"e1"}
 
@@ -812,7 +633,7 @@ def test_partially_defined_event_has_no_total_to_rescale_by() -> None:
 
 def test_renormalized_leaf_bundles_say_so_in_their_provenance(tmp_path) -> None:
     table = tmp_path / "event_arm_table.parquet"
-    write_table(_canonical_arm_table(), table)
+    write_table(canonical_arm_table(), table)
     frame = pd.DataFrame({"model": ["X"], "coef_is_current_arm": [0.5]})
     output_dir = tmp_path / "models_leaf"
 

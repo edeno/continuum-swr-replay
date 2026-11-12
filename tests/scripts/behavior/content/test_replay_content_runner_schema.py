@@ -9,18 +9,15 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior.fit_provenance import check_fit_provenance
-from continuum_swr_replay.analysis.events.analysed_time import stamp_swr_source
 from continuum_swr_replay.analysis.events.swr_source import SwrSourceError
 from continuum_swr_replay.paths import PROCESSED_DATA_DIR_ENV
-from continuum_swr_replay.tables.covariate_registry import (
-    stamp_covariate_schema,
-)
 from continuum_swr_replay.tables.io import write_table
 from continuum_swr_replay.tables.standardization import (
     attach_standardized,
     save_reference,
 )
 from scripts.behavior.content import fit_replay_content_models as runner
+from tests.support._content_tables import default_ladder_arm_table
 
 
 def _use_data_root(monkeypatch, root):
@@ -37,70 +34,6 @@ def _partial_ladder_dir(input_dir, *rungs: str):
     bundle.
     """
     return input_dir / f"models_{'-'.join(rungs)}"
-
-
-def _canonical_arm_table(n_events: int = 2) -> pd.DataFrame:
-    """Small canonical arm table with every default-ladder predictor."""
-    arms = np.tile(np.arange(9), n_events)
-    event_ids = np.repeat(np.arange(n_events), 9)
-    frame = pd.DataFrame(
-        {
-            "animal": "a",
-            "session_date": 1,
-            "epoch": "02_r1",
-            "event_id": event_ids,
-            "candidate_arm": arms,
-            "arm_count_hard": (arms == (event_ids % 9)).astype(float),
-            # One decoded bin per event, so the allocation fraction is the
-            # count: each event puts all of its mass on one arm.
-            "arm_fraction": (arms == (event_ids % 9)).astype(float),
-            "occupancy_state": "at_well",
-            "at_well": True,
-            "occupancy_well_id": 0.0,
-            "occupancy_well_arm": 0.0,
-            "is_current_arm": (arms == 0).astype(float),
-            "visit_recency_trials_event_leaf_centered": 0.0,
-            "is_candidate_arm_never_visited": 0.0,
-        }
-    )
-    requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
-    for model_name in requested:
-        for predictor in runner.MODEL_HIERARCHY[model_name].predictors:
-            if predictor.startswith("arm_fe_") or predictor in frame:
-                continue
-            frame[predictor] = 0.0
-    return stamp_swr_source(stamp_covariate_schema(frame, table="event_arm"))
-
-
-def _canonical_patch_table(n_events: int = 2) -> pd.DataFrame:
-    """Small canonical patch table with every default-ladder predictor."""
-    patches = np.tile([1, 2, 3], n_events)
-    event_ids = np.repeat(np.arange(n_events), 3)
-    frame = pd.DataFrame(
-        {
-            "animal": "a",
-            "session_date": 1,
-            "epoch": "02_r1",
-            "event_id": event_ids,
-            "patch": patches,
-            "patch_count_hard": (patches == ((event_ids % 3) + 1)).astype(float),
-            "patch_fraction": (patches == ((event_ids % 3) + 1)).astype(float),
-            "occupancy_state": "at_well",
-            "at_well": True,
-            "occupancy_well_id": 0.0,
-            "occupancy_well_arm": 0.0,
-            "is_current_patch": (patches == 1).astype(float),
-            "visit_recency_trials_patch": 0.0,
-            "is_patch_never_visited": 0.0,
-        }
-    )
-    requested = runner.default_content_model_names(runner.MODEL_PATCH)
-    for model_name in requested:
-        for predictor in runner.MODEL_PATCH[model_name].predictors:
-            if predictor in frame:
-                continue
-            frame[predictor] = 0.0
-    return stamp_swr_source(stamp_covariate_schema(frame, table="event_patch"))
 
 
 def test_complete_bundle_creates_explicit_output_parent(tmp_path):
@@ -127,7 +60,7 @@ def test_stale_canonical_table_aborts_before_fit_or_output(tmp_path, monkeypatch
     """An old table cannot silently fit only the rungs it happens to satisfy."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    stale = _canonical_arm_table().drop(
+    stale = default_ladder_arm_table().drop(
         columns=[
             "occupancy_state",
             "at_well",
@@ -165,32 +98,11 @@ def test_legacy_file_is_not_an_implicit_canonical_fallback(tmp_path, monkeypatch
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
-def test_complete_default_ladder_passes_preflight_without_dropping_rungs():
-    """Every requested rung survives preflight when its real columns are present."""
-    requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
-
-    prepared, model_names, predictors, response_col, event_col = (
-        runner.prepare_canonical_fit_request(
-            _canonical_arm_table(),
-            hierarchy=runner.MODEL_HIERARCHY,
-            model_names=requested,
-            hierarchy_kind="arm",
-            table_label="synthetic event_arm_table.pkl",
-        )
-    )
-
-    assert model_names == requested
-    assert "is_candidate_arm_never_visited" in predictors
-    assert "is_candidate_arm_0" in prepared
-    assert response_col == "arm_fraction"
-    assert event_col == "event_id"
-
-
 def test_a_table_from_another_swr_source_is_refused(tmp_path, monkeypatch):
     """Its events and is_swr would be another source's: nothing is fit."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    frame = _canonical_arm_table()
+    frame = default_ladder_arm_table()
     frame.attrs["swr_source"] = "kay@another_run+artifacts@none"
     write_table(frame, input_dir / "event_arm_table.parquet")
 
@@ -210,7 +122,7 @@ def test_complete_requested_run_writes_every_requested_result(tmp_path, monkeypa
     """A complete canonical request reaches the real fitter and canonical outputs."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
 
     runner.main(["--models", "M0"])
@@ -229,7 +141,7 @@ def test_complete_default_ladder_is_dispatched_without_dropping_rungs(
     """The runner dispatches and persists the complete validated default ladder."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    frame = _canonical_arm_table()
+    frame = default_ladder_arm_table()
     write_table(frame, input_dir / "event_arm_table.parquet")
     requested = runner.default_content_model_names(runner.MODEL_HIERARCHY)
     calls = []
@@ -269,7 +181,7 @@ def test_missing_requested_predictor_rejects_the_whole_ladder(tmp_path, monkeypa
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     write_table(
-        _canonical_arm_table().drop(columns="swr_x_is_current_arm"),
+        default_ladder_arm_table().drop(columns="swr_x_is_current_arm"),
         input_dir / "event_arm_table.parquet",
     )
 
@@ -291,7 +203,7 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
     """A named ``arm_uncertainty_z`` cannot bypass its leaf-support contract."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    frame = _canonical_arm_table()
+    frame = default_ladder_arm_table()
     frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(
         frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0
     )
@@ -328,7 +240,7 @@ def test_uncertainty_model_rejects_legacy_all_arm_standardization(
 
 
 def test_uncertainty_model_accepts_matching_leaf_support_reference(tmp_path):
-    frame = _canonical_arm_table()
+    frame = default_ladder_arm_table()
     frame["reward_belief_variance_candidate_arm_preoutcome"] = np.where(
         frame["candidate_arm"].lt(6), frame["candidate_arm"] + 1.0, 0.0
     )
@@ -352,7 +264,7 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     """Off-well zeros cannot silently admit undefined-current events to a fit."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    frame = _canonical_arm_table()
+    frame = default_ladder_arm_table()
     event_mask = frame["event_id"].eq(0)
     frame.loc[event_mask, "occupancy_state"] = "in_transit"
     frame.loc[event_mask, "at_well"] = False
@@ -372,150 +284,10 @@ def test_numeric_current_indicator_off_well_fails_closed(tmp_path, monkeypatch):
     assert not (_partial_ladder_dir(input_dir, "M0")).exists()
 
 
-def test_arm_current_indicator_must_match_occupancy_well_arm():
-    frame = _canonical_arm_table()
-    event_mask = frame["event_id"].eq(0)
-    frame.loc[event_mask, "is_current_arm"] = (
-        frame.loc[event_mask, "candidate_arm"].eq(1).astype(float)
-    )
-
-    with pytest.raises(ValueError, match="must match occupancy_well_arm"):
-        runner.prepare_canonical_fit_request(
-            frame,
-            hierarchy=runner.MODEL_HIERARCHY,
-            model_names=("M0",),
-            hierarchy_kind="arm",
-            table_label="corrupt arm table",
-        )
-
-
-def test_unknown_location_events_are_accepted_with_null_at_well():
-    """``unknown`` carries ``at_well = NA`` by construction, not by corruption.
-
-    Events before the first completed trip have no observed location, so
-    ``at_well`` is null while transit/mixed windows are explicitly False.
-    A canonical table is entitled to contain them; rejecting the null would
-    abort a whole session for a state this validator lists as valid.
-    """
-    frame = _canonical_arm_table()
-    event_mask = frame["event_id"].eq(0)
-    frame["at_well"] = frame["at_well"].astype("boolean")
-    frame.loc[event_mask, "occupancy_state"] = "unknown"
-    frame.loc[event_mask, "at_well"] = pd.NA
-    for column in ("occupancy_well_id", "occupancy_well_arm", "is_current_arm"):
-        frame.loc[event_mask, column] = np.nan
-
-    request = runner.prepare_canonical_fit_request(
-        frame,
-        hierarchy=runner.MODEL_HIERARCHY,
-        model_names=("M0",),
-        hierarchy_kind="arm",
-        table_label="table with an unknown-location event",
-    )
-
-    assert request is not None
-
-
-@pytest.mark.parametrize(
-    ("state", "at_well_value"),
-    [("at_well", pd.NA), ("in_transit", pd.NA), ("unknown", False)],
-)
-def test_at_well_null_pattern_must_track_location_state(state, at_well_value):
-    """Null-ness is only permitted for ``unknown``, and required there."""
-    frame = _canonical_arm_table()
-    event_mask = frame["event_id"].eq(0)
-    frame["at_well"] = frame["at_well"].astype("boolean")
-    frame.loc[event_mask, "occupancy_state"] = state
-    frame.loc[event_mask, "at_well"] = at_well_value
-    if state != "at_well":
-        for column in (
-            "occupancy_well_id",
-            "occupancy_well_arm",
-            "is_current_arm",
-        ):
-            frame.loc[event_mask, column] = np.nan
-
-    with pytest.raises(ValueError, match="inconsistent with location_state"):
-        runner.prepare_canonical_fit_request(
-            frame,
-            hierarchy=runner.MODEL_HIERARCHY,
-            model_names=("M0",),
-            hierarchy_kind="arm",
-            table_label="corrupt arm table",
-        )
-
-
-def test_patch_current_indicator_must_match_mapped_occupancy_well_arm():
-    frame = _canonical_patch_table()
-    event_mask = frame["event_id"].eq(0)
-    frame.loc[event_mask, "is_current_patch"] = (
-        frame.loc[event_mask, "patch"].eq(2).astype(float)
-    )
-
-    with pytest.raises(ValueError, match="mapped occupancy_well_arm"):
-        runner.prepare_canonical_fit_request(
-            frame,
-            hierarchy=runner.MODEL_PATCH,
-            model_names=("P0",),
-            hierarchy_kind="patch",
-            table_label="corrupt patch table",
-        )
-
-
-def test_location_reference_must_be_constant_across_candidate_rows():
-    """Row-varying references cannot make a corrupt one-hot look valid."""
-    frame = _canonical_arm_table()
-    corrupt_row = frame["event_id"].eq(0) & frame["candidate_arm"].eq(1)
-    # This row still has is_current=0 and arm=1, so the later row-wise
-    # indicator check would pass (1 != 2) unless the event-level reference is
-    # first required to be constant.
-    frame.loc[corrupt_row, "occupancy_well_arm"] = 2.0
-
-    with pytest.raises(ValueError, match="event context.*changes"):
-        runner.prepare_canonical_fit_request(
-            frame,
-            hierarchy=runner.MODEL_HIERARCHY,
-            model_names=("M0",),
-            hierarchy_kind="arm",
-            table_label="row-varying location table",
-        )
-
-
-@pytest.mark.parametrize("bad_count", [np.nan, np.inf, -1.0, 0.5])
-def test_response_counts_must_be_finite_nonnegative_integers(bad_count):
-    frame = _canonical_arm_table()
-    frame.loc[0, "arm_count_hard"] = bad_count
-
-    with pytest.raises(ValueError, match="finite nonnegative integer counts"):
-        runner.prepare_canonical_fit_request(
-            frame,
-            hierarchy=runner.MODEL_HIERARCHY,
-            model_names=("M0",),
-            hierarchy_kind="arm",
-            table_label="corrupt response table",
-        )
-
-
-def test_each_session_event_requires_the_exact_candidate_set():
-    frame = _canonical_arm_table()
-    frame.loc[frame.index[0], "candidate_arm"] = 1
-
-    with pytest.raises(
-        ValueError, match="exactly the expected candidate_arm candidates"
-    ):
-        runner.prepare_canonical_fit_request(
-            frame,
-            hierarchy=runner.MODEL_HIERARCHY,
-            model_names=("M0",),
-            hierarchy_kind="arm",
-            table_label="corrupt candidate table",
-        )
-
-
 def test_late_empty_rung_aborts_without_publishing_any_output(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _fit_with_empty_late_rung(long_df, model_name, predictors, **kwargs):
         if model_name == "M1":
@@ -547,7 +319,7 @@ def test_late_fit_exception_leaves_existing_output_unchanged(tmp_path, monkeypat
     output_dir.mkdir(parents=True)
     sentinel = output_dir / "previous_complete_run.txt"
     sentinel.write_text("unchanged")
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _fit_then_raise(long_df, model_name, predictors, **kwargs):
         if model_name == "M1":
@@ -579,7 +351,7 @@ def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatc
     output_dir = _partial_ladder_dir(input_dir, "M0")
     output_dir.mkdir(parents=True)
     (output_dir / "M7.pkl").write_bytes(b"stale later rung")
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
 
     runner.main(["--models", "M0"])
@@ -592,7 +364,7 @@ def test_successful_publish_replaces_stale_output_directory(tmp_path, monkeypatc
 def test_fit_result_must_report_exact_frozen_cohort_size(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _wrong_cohort_size(long_df, model_name, predictors, **kwargs):
         return pd.DataFrame(
@@ -621,7 +393,7 @@ def test_published_ladder_uses_intersection_of_successful_sessions(
 ):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    frame = _canonical_arm_table(n_events=4)
+    frame = default_ladder_arm_table(n_events=4)
     frame.loc[frame["event_id"].ge(2), "animal"] = "b"
     write_table(frame, input_dir / "event_arm_table.parquet")
 
@@ -668,7 +440,7 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     # Two events are enough for the null primary fit but not 5-fold CV.
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
 
     # The primary fit now survives a failed CV, so the abort comes from CV
@@ -682,7 +454,7 @@ def test_requested_cv_failure_aborts_without_publishing(tmp_path, monkeypatch):
 def test_requested_cv_metadata_is_required_at_publication(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
 
     def _primary_without_cv(long_df, model_name, predictors, **kwargs):
         assert kwargs["run_cv"] is True
@@ -713,7 +485,7 @@ def test_complete_requested_cv_is_published_with_primary_fit(tmp_path, monkeypat
     # Five-fold CV requires at least ten events; exercise the real null-model
     # fit and CV path rather than only a mocked result dictionary.
     write_table(
-        _canonical_arm_table(n_events=10), input_dir / "event_arm_table.parquet"
+        default_ladder_arm_table(n_events=10), input_dir / "event_arm_table.parquet"
     )
     _use_data_root(monkeypatch, tmp_path)
 
@@ -745,7 +517,7 @@ def test_a_logit_rung_with_no_fitted_session_aborts_without_publishing(
     """A failed session is skipped, but a rung left with none still aborts."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -770,7 +542,7 @@ def test_a_logit_rung_with_no_fitted_session_aborts_without_publishing(
 def test_complete_requested_logit_is_staged_with_primary_fit(tmp_path, monkeypatch):
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
 
     _use_data_root(monkeypatch, tmp_path)
     monkeypatch.setattr(
@@ -808,7 +580,7 @@ def test_published_bundle_carries_the_hash_of_the_table_it_was_fit_on(
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
     table = input_dir / "event_arm_table.parquet"
-    write_table(_canonical_arm_table(), table)
+    write_table(default_ladder_arm_table(), table)
     _use_data_root(monkeypatch, tmp_path)
 
     runner.main(["--models", "M0"])
@@ -830,7 +602,7 @@ def test_count_run_publishes_beside_the_fraction_bundle(tmp_path, monkeypatch):
     """A count fit is on a different scale, so it gets a different directory."""
     input_dir = tmp_path / "replay_content"
     input_dir.mkdir()
-    write_table(_canonical_arm_table(), input_dir / "event_arm_table.parquet")
+    write_table(default_ladder_arm_table(), input_dir / "event_arm_table.parquet")
     _use_data_root(monkeypatch, tmp_path)
 
     runner.main(["--models", "M0", "--response", "hard_count"])

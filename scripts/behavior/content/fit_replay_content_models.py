@@ -78,23 +78,20 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior._fit_diagnostics import fit_flag_counts
-from continuum_swr_replay.analysis.behavior._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     coefficient_family_statistics,
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (
-    attach_has_qvals_row,
-    cohort_record,
-    drop_profile,
-    estimator_skip_note,
-    event_drop_buckets,
-    is_qvals_sourced_column,
     write_cohort_audit,
+)
+from continuum_swr_replay.analysis.behavior.content.cohort import (
+    content_cohort_record,
+    prepare_canonical_fit_request,
+    select_content_cohort,
 )
 from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
-    ESTIMATOR_SKIP_CLASSES,
     concentration_cols_for_cohort,
     fit_sessions_dirichlet_multinomial,
 )
@@ -121,10 +118,6 @@ from continuum_swr_replay.analysis.behavior.content_response import (
     ESTIMATOR_CHOICES,
     RESPONSE_CHOICES,
     resolve_response_choice,
-    resolve_response_column,
-)
-from continuum_swr_replay.analysis.behavior.covariate_timing import (
-    assert_predictor_timing,
 )
 from continuum_swr_replay.analysis.behavior.fit_provenance import (
     record_inputs,
@@ -146,20 +139,14 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
     MODEL_PATCH_SWR,
     ModelSpec,
     default_content_model_names,
-    leaf_only_cohort,
     rung_predictors,
 )
 from continuum_swr_replay.analysis.behavior.tables.table_contracts import (
     CV_RESULT_COLUMNS,
     validate_and_match_fit_results,
-    validate_canonical_table_contract,
     validate_requested_standardization,
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
-from continuum_swr_replay.analysis.events.cohort_selection import (
-    freeze_common_cohort,
-    select_event_cohort,
-)
 from continuum_swr_replay.paths import contfrag_replay_content_dir, replay_content_dir
 from continuum_swr_replay.tables.covariate_registry import (
     require_covariate_schema,
@@ -210,40 +197,6 @@ logging.basicConfig(
 )
 
 
-# A canonical content table carries more than whichever columns one requested
-# model happens to use. These fields distinguish the current location-aware,
-# future-invariant history schema from older pickles that can otherwise satisfy
-# M0-M3 and silently produce a truncated ladder.
-_CANONICAL_SCHEMA_COLUMNS = {
-    "arm": (
-        *SESSION_COLUMNS,
-        "event_id",
-        "candidate_arm",
-        "arm_count_hard",
-        "occupancy_state",
-        "at_well",
-        "occupancy_well_id",
-        "occupancy_well_arm",
-        "is_current_arm",
-        "visit_recency_trials_event_leaf_centered",
-        "is_candidate_arm_never_visited",
-    ),
-    "patch": (
-        *SESSION_COLUMNS,
-        "event_id",
-        "patch",
-        "patch_count_hard",
-        "occupancy_state",
-        "at_well",
-        "occupancy_well_id",
-        "occupancy_well_arm",
-        "is_current_patch",
-        "visit_recency_trials_patch",
-        "is_patch_never_visited",
-    ),
-}
-
-
 def fit_n_categories(hierarchy_kind: str, leaf_only: bool) -> int:
     """Number of candidate categories the conditional likelihood conditions on.
 
@@ -290,116 +243,6 @@ def content_fit_inputs(input_dir: Path, table_name: str) -> dict[str, Path]:
         ``{table_name: <input_dir>/<table_name>.parquet}``.
     """
     return {table_name: Path(input_dir) / f"{table_name}.parquet"}
-
-
-def prepare_canonical_fit_request(
-    long_df: pd.DataFrame,
-    *,
-    hierarchy: Mapping,
-    model_names: Sequence[str],
-    hierarchy_kind: str,
-    table_label: object,
-    response: str = "fraction",
-) -> tuple[pd.DataFrame, tuple[str, ...], tuple[str, ...], str, str]:
-    """Validate one complete canonical fit request before fitting or writing.
-
-    This is the runner's fail-closed boundary. It first requires the current
-    location/novelty table schema, then derives arm fixed effects, and finally
-    verifies *every* requested model and predictor as one atomic request. A
-    stale table therefore cannot fit the subset of an otherwise nested ladder
-    that it happens to satisfy.
-
-    ``response`` selects the allocation the ladder is fit on: the shipped
-    per-event ``"fraction"`` or the timebin ``"hard_count"``. The resolved
-    column is validated here, on the whole loaded table, so a table that cannot
-    express the requested response fails before the first fit rather than
-    halfway through the ladder.
-
-    Returns a prepared copy of the table, the unchanged requested model names,
-    their predictor union, and the resolved response/event column names.
-    """
-    try:
-        required_schema = _CANONICAL_SCHEMA_COLUMNS[hierarchy_kind]
-    except KeyError as exc:
-        raise ValueError(
-            f"hierarchy_kind must be 'candidate_arm' or 'patch', got {hierarchy_kind!r}"
-        ) from exc
-
-    missing_schema = [column for column in required_schema if column not in long_df]
-    if missing_schema:
-        raise ValueError(
-            f"Canonical {hierarchy_kind} content table {table_label} is missing "
-            "current-location/novelty schema column(s) "
-            f"{missing_schema}. Regenerate it with the current prepare script."
-        )
-    response_col = resolve_response_column(hierarchy_kind, response)
-    validate_canonical_table_contract(
-        long_df,
-        hierarchy_kind=hierarchy_kind,
-        table_label=table_label,
-        response_col=response_col,
-    )
-
-    requested = tuple(model_names)
-    if not requested:
-        raise ValueError("At least one content model must be requested")
-    if len(set(requested)) != len(requested):
-        raise ValueError(
-            f"Requested content model names must be unique, got {list(requested)}"
-        )
-    unknown = [model_name for model_name in requested if model_name not in hierarchy]
-    if unknown:
-        raise ValueError(
-            f"Unknown requested content model(s) {unknown}; valid names are "
-            f"{list(hierarchy)}. Refusing to fit a partial ladder."
-        )
-
-    prepared = long_df.copy()
-    if hierarchy_kind == "arm":
-        # Fixed effects are intentionally derived at fit time, so their absence
-        # from the persisted canonical table is not a schema error.
-        add_arm_fixed_effects(prepared)
-
-    missing_by_model = {
-        model_name: [
-            predictor
-            for predictor in hierarchy[model_name].predictors
-            if predictor not in prepared
-        ]
-        for model_name in requested
-    }
-    missing_by_model = {
-        model_name: missing
-        for model_name, missing in missing_by_model.items()
-        if missing
-    }
-    if missing_by_model:
-        details = ", ".join(
-            f"{model_name}={missing}"
-            for model_name, missing in missing_by_model.items()
-        )
-        raise ValueError(
-            f"Canonical content table {table_label} cannot satisfy the complete "
-            f"requested ladder: {details}. Regenerate the table; no requested "
-            "model will be skipped."
-        )
-
-    # Apply the causal-hygiene gate to the whole request before the first fit
-    # or output, rather than discovering a disallowed predictor midway through
-    # a ladder after earlier rungs have already been persisted.
-    for model_name in requested:
-        assert_predictor_timing(hierarchy[model_name].predictors)
-
-    predictors = tuple(
-        sorted(
-            {
-                predictor
-                for model_name in requested
-                for predictor in hierarchy[model_name].predictors
-            }
-        )
-    )
-    return prepared, requested, predictors, response_col, "event_id"
 
 
 def _fit_dirichlet_multinomial_per_session(
@@ -1224,20 +1067,13 @@ def _resolve_run_config(args: argparse.Namespace) -> _RunConfig:
     )
 
 
-# Per hierarchy, the row-gated column whose NaN marks an event on a stop with no
-# qvals row (exactly those rows on the live tables: 8,676 event-arm and 2,892
-# event-patch rows, checked 2026-10-24).
-_QVALS_ROW_GATED_SOURCE = {
-    "arm": "task_reward_probability_candidate_arm",
-    "patch": "task_reward_probability_candidate_arm_patch",
-}
-
-
 def _load_and_filter_cohort(
     args: argparse.Namespace, config: _RunConfig
 ) -> _ContentCohort:
-    """Load the canonical table, apply the SWR subset and at-well cohort, and
-    freeze the common complete-case event set."""
+    """Load and check the canonical table, then select the fitting cohort.
+
+    The selection is :func:`~continuum_swr_replay.analysis.behavior.content.cohort.select_content_cohort`.
+    """
     hierarchy = config.hierarchy
     input_dir = config.input_dir
     table_name = config.table_name
@@ -1301,165 +1137,27 @@ def _load_and_filter_cohort(
         long_df.groupby(list(SESSION_COLUMNS)).ngroups,
     )
 
-    # Apply the SWR subset filter (--swr-subset T/F). is_swr is
-    # event-level on the event_arm_table and patch table. Drop whole
-    # events / patch-rows where is_swr doesn't match.
-    if args.swr_subset != "all":
-        if "is_swr" not in long_df.columns:
-            raise ValueError(
-                "--swr-subset requires canonical column 'is_swr'; not found in "
-                f"{canonical_path}. Regenerate the table."
-            )
-        keep = long_df["is_swr"] if args.swr_subset == "T" else ~long_df["is_swr"]
-        n_before_rows = len(long_df)
-        long_df = long_df.loc[keep].reset_index(drop=True)
-        logging.info(
-            "SWR subset filter (%s): %d -> %d rows",
-            args.swr_subset,
-            n_before_rows,
-            len(long_df),
-        )
-
-    # Cohort: at-well events only, stated rather than inferred.
-    #
-    # Every location-derived predictor (`is_current` and everything built from
-    # it) is NaN when the event window is not wholly at one well, so the
-    # complete-case filter below would remove these events anyway -- the two
-    # sets are identical, verified at 59,374 events with zero disagreements. But
-    # arriving there via `dropna` makes a scope decision look like missing data:
-    # it appears in the audit as "predictor NaN" rather than as a cohort, it
-    # would silently not apply to a rung that happens to omit `is_current`, and
-    # it cannot be varied to ask what in-transit events would show under a
-    # different predictor set. Applying it here states the restriction, and the
-    # complete-case filter remains as a safety net that should now find nothing
-    # location-related to drop.
-    #
-    # The restriction is not balanced across the SWR contrast (3.3% of SWR
-    # events are off-well against 13.0% of non-SWR) -- expected, since SWR
-    # events concentrate at wells -- so the cohort belongs in Methods.
-    #
-    # The rule itself lives in `select_event_cohort`, the event-grain half of the
-    # rule the rate runners apply to their stop table, so "at-well" means one
-    # thing across both families rather than two filters that happen to agree
-    # today. It is called unconditionally: a table without `occupancy_state`
-    # cannot state a cohort, and raising there is the point -- the schema gate in
-    # `prepare_canonical_fit_request` already refuses such a table, and a
-    # `column in frame` guard here would silently fit the whole corpus if it ever
-    # stopped doing so.
-    long_df, cohort_report = select_event_cohort(
-        long_df, cohort="at_well", event_col=event_col
-    )
-    logging.info(
-        "cohort = at-well events (%s): %d -> %d events (%.1f%% retained)",
-        cohort_report["rule"],
-        cohort_report["n_events_before"],
-        cohort_report["n_events_after"],
-        100
-        * cohort_report["n_events_after"]
-        / max(cohort_report["n_events_before"], 1),
-    )
-
-    # Candidate set: the six leaf arms, when asked for. Applied before the
-    # complete-case freeze so the cohort is the set of events the leaf-only
-    # likelihood can actually use -- an event with no leaf mass left has a zero
-    # response and is dropped there, and named as such in the audit.
-    response_renormalized = False
-    if args.leaf_only:
-        n_before_rows = len(long_df)
-        long_df, response_renormalized = leaf_only_cohort(
-            long_df,
-            response_col=response_col,
-            response=config.response,
-            event_col=event_col,
-        )
-        logging.info(
-            "candidate set = %d leaf arms: %d -> %d rows (%s rescaled to unit "
-            "mass per event: %s)",
-            LEAF_ONLY_N_CATEGORIES,
-            n_before_rows,
-            len(long_df),
-            response_col,
-            response_renormalized,
-        )
-
-    # The cohort audit books a value rung's drop to the qvals gap only when the
-    # event's stop has no qvals row. The candidate table carries no qvals join,
-    # so the flag is read off a row-gated column (NaN exactly on those stops).
-    if any(is_qvals_sourced_column(c) for c in union_predictors):
-        long_df = attach_has_qvals_row(
-            long_df,
-            from_column=_QVALS_ROW_GATED_SOURCE[args.hierarchy],
-            event_col=event_col,
-        )
-
-    # Pre-filter to common complete-case event set: drop entire events
-    # (all 9 arm rows) if ANY predictor in the union is NaN for ANY row.
-    # Keep the pre-filter frame for the cohort audit (per-model drop attribution).
-    long_df_prefilter = long_df
-    required_cols = [response_col, event_col, *union_predictors]
-    long_df, cohort_selection = freeze_common_cohort(
+    selection = select_content_cohort(
         long_df,
-        unit_col=event_col,
-        required_cols=required_cols,
+        hierarchy_kind=args.hierarchy,
+        union_predictors=union_predictors,
         response_col=response_col,
-        drop_zero_response=True,
+        response=config.response,
+        table_label=canonical_path,
+        event_col=event_col,
+        swr_subset=args.swr_subset,
+        leaf_only=args.leaf_only,
     )
-    n_before = cohort_selection["n_units_before"]
-    n_complete_case = (
-        n_before
-        - cohort_selection["n_missing_units"]
-        - cohort_selection["n_nonfinite_units"]
-    )
-    if n_before != n_complete_case:
-        logging.info(
-            "Filtered to common complete-case events: %d → %d events "
-            "(%d missing, %d nonfinite in %s)",
-            n_before,
-            n_complete_case,
-            cohort_selection["n_missing_units"],
-            cohort_selection["n_nonfinite_units"],
-            list(union_predictors),
-        )
-    if cohort_selection["n_zero_response_units"]:
-        logging.info(
-            "Removed %d complete-case events with zero total response",
-            cohort_selection["n_zero_response_units"],
-        )
-    if n_complete_case == 0:
-        # A predictor that is structurally NaN on some arm of every
-        # event (e.g. a stale ``recent_reward_rate`` column predating
-        # the trunk-arm 0.0 fix) wipes out the whole event set under
-        # event-wise complete-case filtering. Fail loudly rather than
-        # fitting M0 on zero events.
-        raise RuntimeError(
-            f"Complete-case filtering removed all {n_before} events because a "
-            f"predictor in {list(union_predictors)} is missing or nonfinite "
-            "on some candidate "
-            "row of every event. Regenerate the canonical table."
-        )
-    if cohort_selection["n_units_after"] == 0:
-        raise RuntimeError(
-            f"Common-cohort filtering removed all {n_before} events because "
-            "every complete-case event had zero total response."
-        )
-
-    logging.info(
-        "Fitting on %d rows, %d sessions, %d events",
-        len(long_df),
-        long_df.groupby(list(SESSION_COLUMNS)).ngroups,
-        long_df[event_col].nunique(),
-    )
-
     return _ContentCohort(
-        long_df=long_df,
-        long_df_prefilter=long_df_prefilter,
+        long_df=selection.long_df,
+        long_df_prefilter=selection.long_df_prefilter,
         valid_model_names=valid_model_names,
         union_predictors=union_predictors,
         response_col=response_col,
         event_col=event_col,
-        n_events_before_complete_case=n_before,
+        n_events_before_complete_case=selection.n_events_before_complete_case,
         fit_inputs=fit_inputs,
-        response_renormalized=response_renormalized,
+        response_renormalized=selection.response_renormalized,
     )
 
 
@@ -1669,22 +1367,6 @@ def _fit_conditional_logit_robustness(
     return logit_outputs, pd.DataFrame(logit_skips, columns=LOGIT_SKIP_COLUMNS)
 
 
-def _zero_response_event_ids(
-    long_df: pd.DataFrame, *, event_col: str, response_col: str
-) -> set:
-    """Events whose response is undefined on every row, or sums to nothing.
-
-    ``min_count=1`` keeps an all-missing event's total missing rather than
-    letting pandas report it as 0.0, so "the response could not be computed for
-    this event" and "the response is zero everywhere" both land here and neither
-    is mistaken for a fitted event.
-    """
-    totals = long_df.groupby(event_col, observed=True, sort=False)[response_col].sum(
-        min_count=1
-    )
-    return set(totals.index[~(totals > 0)])
-
-
 def _audit_compare_and_publish(
     args: argparse.Namespace,
     config: _RunConfig,
@@ -1699,97 +1381,28 @@ def _audit_compare_and_publish(
     ``cli`` is the command line recorded in the provenance sidecars."""
     hierarchy = config.hierarchy
     output_dir = config.output_dir
-    long_df_prefilter = cohort.long_df_prefilter
     valid_model_names = cohort.valid_model_names
-    union_predictors = cohort.union_predictors
-    response_col = cohort.response_col
-    event_col = cohort.event_col
-    n_before = cohort.n_events_before_complete_case
     estimator_skips = estimator_skips or {}
 
     # Build every audit record only after the model frames have been restricted
     # to the exact same successfully fitted session cohort.
     cohort_audits: list[dict] = []
     population = getattr(args, "swr_subset", None) or "all"
-    sessions_in = long_df_prefilter.groupby(list(SESSION_COLUMNS)).ngroups
-    # Events whose response is undefined or sums to nothing: on the fraction
-    # response these are the all-junction events, which carry NaN on every
-    # candidate. The cohort freeze removes them; the audit must also SAY so,
-    # under n_drop_zero_response, or a reader cannot tell an event the response
-    # could not describe from one no model wanted.
-    zero_response_events = _zero_response_event_ids(
-        long_df_prefilter, event_col=event_col, response_col=response_col
-    )
     for model_name, mdf in model_results.items():
         predictors = rung_predictors(hierarchy[model_name], args.leaf_only)
-
-        # Cohort-audit record (grain=event, common complete-case cohort). Attribute
-        # the union-filter drops to this rung's own vs the other rungs' predictors.
-        buckets = event_drop_buckets(
-            long_df_prefilter,
-            event_col=event_col,
-            response_col=response_col,
-            own_predictors=predictors,
-            union_predictors=union_predictors,
-        )
-        n_modeled = int(mdf["n_events"].sum()) if len(mdf) else 0
-        n_drops = sum(
-            buckets[k]
-            for k in (
-                "n_drop_qvals_gap",
-                "n_drop_own_predictor_missing",
-                "n_drop_nonfinite",
-                "n_drop_common_cohort_other",
-                "n_drop_zero_response",
-            )
-        )
-        unaccounted = zero_response_events - buckets["dropped_event_ids"]
-        if unaccounted or buckets["n_drop_zero_response"] > len(zero_response_events):
-            raise RuntimeError(
-                f"Cohort audit for {model_name} does not account for the "
-                f"{len(zero_response_events)} event(s) whose {response_col} is "
-                f"undefined or sums to zero ({len(unaccounted)} unaccounted, "
-                f"n_drop_zero_response={buckets['n_drop_zero_response']}); no "
-                "output will be published"
-            )
-        dropped = long_df_prefilter[
-            long_df_prefilter[event_col].isin(buckets["dropped_event_ids"])
-        ].drop_duplicates(event_col)
-        # A session the estimator itself refused (a rank-deficient within-event
-        # design, or too few events for its parameters) is not a dropped event
-        # and does not belong in a drop bucket -- its events are already
-        # counted under n_excluded_session. It IS a fitted-cohort fact, so it is
-        # named here rather than only in the run log.
-        skipped = estimator_skips.get(model_name, [])
-        notes = drop_profile(dropped)
-        # The routine classes are summarized; only an estimator REFUSAL names
-        # the session it happened to. Same helper (and so the same policy) as
-        # the is_swr-contrast runner's cohort audit.
-        skip_note = estimator_skip_note(
-            [(skip["session"], skip["reason"]) for skip in skipped],
-            ESTIMATOR_SKIP_CLASSES,
-        )
-        if skip_note:
-            notes = "; ".join(filter(None, [notes, skip_note]))
         cohort_audits.append(
-            cohort_record(
+            content_cohort_record(
                 model_name,
-                population,
-                "event",
-                cohort_mode="common",
-                n_in=n_before,
-                n_modeled=n_modeled,
-                sessions_in=sessions_in,
-                sessions_modeled=len(mdf),
-                animals_modeled=int(mdf["animal"].nunique()) if len(mdf) else 0,
-                drop_notes=notes,
-                n_drop_qvals_gap=buckets["n_drop_qvals_gap"],
-                n_drop_own_predictor_missing=buckets["n_drop_own_predictor_missing"],
-                n_drop_nonfinite=buckets["n_drop_nonfinite"],
-                n_drop_common_cohort_other=buckets["n_drop_common_cohort_other"],
-                n_drop_zero_response=buckets["n_drop_zero_response"],
-                n_excluded_session=n_before - n_drops - n_modeled,
-                **fit_flag_counts(mdf),
+                mdf,
+                long_df_prefilter=cohort.long_df_prefilter,
+                predictors=predictors,
+                union_predictors=cohort.union_predictors,
+                response_col=cohort.response_col,
+                event_col=cohort.event_col,
+                n_events_in=cohort.n_events_before_complete_case,
+                population=population,
+                flag_counts=fit_flag_counts(mdf),
+                estimator_skips=estimator_skips.get(model_name, []),
             )
         )
 

@@ -18,6 +18,8 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior import contrast_aggregation
+from continuum_swr_replay.analysis.behavior.content import cohort as content_cohort
+from continuum_swr_replay.analysis.behavior.model_specs import MODEL_HIERARCHY
 from continuum_swr_replay.analysis.events.cohort_selection import (
     STOP_COHORT_RULES,
     STOP_COHORTS,
@@ -25,7 +27,6 @@ from continuum_swr_replay.analysis.events.cohort_selection import (
     select_stop_cohort,
     stop_cohort_suffix,
 )
-from scripts.behavior.content import fit_replay_content_models as content_mod
 from scripts.behavior.rate import fit_per_bin_rate_models as per_bin_mod
 from scripts.behavior.rate import fit_per_stop_rate_models as per_stop_mod
 from scripts.behavior.rate import fit_swr_contrast_rate as contrast_rate_mod
@@ -185,28 +186,28 @@ def test_at_well_events_are_the_location_predictor_complete_case():
 
 
 def test_content_runners_route_through_the_shared_rule():
-    """Both content runners hold the shared function, not a private copy."""
-    assert content_mod.select_event_cohort is select_event_cohort
+    """Both content cohorts hold the shared function, not a private copy."""
+    assert content_cohort.select_event_cohort is select_event_cohort
     assert contrast_aggregation.select_event_cohort is select_event_cohort
 
 
 def test_content_runner_cohort_step_refuses_a_table_without_the_column():
     """A stale table cannot quietly fit the whole corpus.
 
-    The runner calls its cohort step unconditionally, so a frame missing
+    The content cohort calls its cohort step unconditionally, so a frame missing
     ``occupancy_state`` raises there. The canonical-schema gate upstream refuses
     such a table first; this is the second line of defence, and the reason the
-    runner carries no ``column in frame`` guard.
+    selection carries no ``column in frame`` guard.
     """
     frame = pd.DataFrame({"event_id": ["e0"], "candidate_arm": [0]})
 
     with pytest.raises(KeyError, match="occupancy_state"):
-        content_mod.select_event_cohort(frame, cohort="at_well")
+        content_cohort.select_event_cohort(frame, cohort="at_well")
 
     with pytest.raises(ValueError, match="occupancy_state"):
-        content_mod.prepare_canonical_fit_request(
+        content_cohort.prepare_canonical_fit_request(
             frame,
-            hierarchy=content_mod.MODEL_HIERARCHY,
+            hierarchy=MODEL_HIERARCHY,
             model_names=["M0"],
             hierarchy_kind="arm",
             table_label="synthetic",
