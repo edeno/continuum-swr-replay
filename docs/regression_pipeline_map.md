@@ -232,6 +232,12 @@ Rule R-T: per epoch, keep the CA1 band tetrodes that ripple with the rest.
 
 `TetrodeSelection`, `TetrodeSelectionError`, `check_one_channel_per_tetrode`, `select_ripple_tetrodes`
 
+### `src/continuum_swr_replay/analysis/hippocampus/start_and_rest_theta.py`
+
+Each non-local event's start distance, and the theta of duration-matched quiet rest.
+
+`start_and_rest_theta`
+
 ### `src/continuum_swr_replay/analysis/hippocampus/triggered_analysis.py`
 
 Event-triggered analysis utilities for extracting signal windows around events.
@@ -866,7 +872,7 @@ Generate the symbol-anchored regression pipeline code map.
 
 What the two detection-comparison reports share.
 
-`caption_with_pending`, `session_names`, `read_run`, `with_pending`, `ratio`, `pool_sessions`, `per_session`, `summed`
+`caption_with_pending`, `read_run`, `with_pending`, `per_session`
 
 ### `scripts/detection/add_state_shares.py`
 
@@ -920,7 +926,7 @@ Report one event features run: its features per session and per animal.
 
 Report one inventory comparison run: its counts per session and per animal.
 
-`epoch_status`, `detector_availability`, `counts_by_session`, `counts_by_animal`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `cells_by_session`, `cells_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
+`epoch_status`, `directional_by_animal`, `oriented_pairs`, `match_strength_by_session`, `match_strength_by_animal`, `swr_matrix_by_animal`, `matrix_population`, `paired_labels_by_session`, `definition_disagreement_by_session`, `labels_by_animal`, `report_tables`, `draw_figures`, `write_report`, `main`
 
 ### `scripts/detection/run_event_features.py`
 
@@ -950,13 +956,13 @@ Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
 What each detector does with activity that is not one clean replay.
 
-`detector_events`, `score_trial`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `summarize`, `main`
+`detector_events`, `score_trial`, `run_detectors`, `part_alone_spikes`, `condition_rng`, `run_trials`, `run_no_replay`, `main`
 
 ### `scripts/detection/sweep_memoryless_heldout.py`
 
 Does each detector's content reproduce in cells it never saw?
 
-`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `summarize`, `main`
+`folds`, `fold_models`, `trials`, `event_truth`, `matches_injection`, `permutations_for`, `score_events`, `run_fold`, `run_no_replay_fold`, `main`
 
 ### `scripts/pfc/calibrate_pfc_kernel_timing.py`
 
