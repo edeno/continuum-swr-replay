@@ -24,13 +24,14 @@ import pandas as pd
 import pytest
 
 import scripts.figures.generate_event_feature_examples as examples
+from continuum_swr_replay.analysis.inventory_comparison import selection
 from continuum_swr_replay.analysis.inventory_comparison.populations import (
     POPULATION_DTYPES,
 )
 
 SEED = 7
 DAY = 20200101
-HIGH, LOW = examples.HIGH, examples.LOW
+HIGH, LOW = selection.HIGH, selection.LOW
 
 # evidence_dll by subset: in a group holding as many of each of the first
 # three, the 75th percentile is 2.0 and the 25th -1.0
@@ -96,24 +97,6 @@ def drawn(
 ) -> pd.DataFrame:
     events = examples.sampler_events(features, populations)
     return examples.draw_population_examples(events, seed=seed)
-
-
-def test_the_evidence_subsets_are_quartiles_of_each_group() -> None:
-    values = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, np.nan]
-    events = pd.DataFrame(
-        {
-            "cell": "comparator_only",
-            "detector": ["kay"] * 9 + ["kay"] * 9 + ["mua"],
-            "animal": ["a"] * 9 + ["b"] * 9 + ["a"],
-            # animal b's values are shifted: its own quartiles apply
-            "evidence_dll": values + [v + 100.0 for v in values] + [5.0],
-        }
-    )
-    subsets = examples.evidence_subsets(events).tolist()
-    # quartiles 1.75 and 5.25 of the eight finite values; a missing value is in
-    # neither, as is a group of one event, whose quartiles coincide
-    expected = [LOW, LOW, None, None, None, None, HIGH, HIGH, None]
-    assert subsets == expected + expected + [None]
 
 
 def test_the_subsets_are_descriptive_and_named_so() -> None:

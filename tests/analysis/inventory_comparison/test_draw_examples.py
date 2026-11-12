@@ -1,4 +1,5 @@
-"""The examples' sampler: which events of each cell are drawn for a figure.
+"""The examples' sampler: which events of each cell are drawn for a figure, and
+the event-feature examples' evidence subsets.
 
 For each cell, source detector and animal the sampler draws up to two
 ``unmatched`` events, and as counterexamples up to two ``matched`` events of
@@ -105,3 +106,31 @@ def test_one_units_draw_does_not_depend_on_the_others() -> None:
     keys = set(LARGE[unit].event_key)
     assert set(full.event_key) & keys == set(part.event_key) & keys
     assert np.isin(part.event_key, LARGE.event_key).all()
+
+
+def test_the_evidence_subsets_are_quartiles_of_each_group() -> None:
+    values = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, np.nan]
+    events = pd.DataFrame(
+        {
+            "cell": "comparator_only",
+            "detector": ["kay"] * 9 + ["kay"] * 9 + ["mua"],
+            "animal": ["a"] * 9 + ["b"] * 9 + ["a"],
+            # animal b's values are shifted: its own quartiles apply
+            "evidence_dll": values + [v + 100.0 for v in values] + [5.0],
+        }
+    )
+    subsets = selection.evidence_subsets(events).tolist()
+    # quartiles 1.75 and 5.25 of the eight finite values; a missing value is in
+    # neither, as is a group of one event, whose quartiles coincide
+    expected = [
+        selection.LOW,
+        selection.LOW,
+        None,
+        None,
+        None,
+        None,
+        selection.HIGH,
+        selection.HIGH,
+        None,
+    ]
+    assert subsets == expected + expected + [None]

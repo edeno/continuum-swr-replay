@@ -62,6 +62,9 @@ from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (  
 from continuum_swr_replay.analysis.inventory_comparison.overlap import (  # noqa: E402
     UNMATCHED,
 )
+from continuum_swr_replay.analysis.inventory_comparison.pooling import (
+    ratio,  # noqa: E402
+)
 from continuum_swr_replay.analysis.inventory_comparison.populations import (  # noqa: E402
     event_populations,
     without_baseline_rows,
@@ -70,6 +73,8 @@ from continuum_swr_replay.analysis.inventory_comparison.schema import (  # noqa:
     STATE_SPACE,
 )
 from continuum_swr_replay.analysis.inventory_comparison.selection import (  # noqa: E402
+    HIGH,
+    LOW,
     REJECTION_COHORTS,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
@@ -103,12 +108,7 @@ EXAMPLE_SEED = 20261018
 animal."""
 N_PER_SIDE = selection.N_PER_SIDE
 
-HIGH = "high evidence"
-LOW = "low evidence"
 SUBSET_COLUMN = "evidence_subset"
-SUBSET_QUANTILES: Mapping[str, float] = MappingProxyType({HIGH: 0.75, LOW: 0.25})
-"""The quantile of each subset's bound, over the scorable events of the event's
-group (:data:`GROUP`)."""
 SUBSETS: Mapping[str, str] = MappingProxyType(
     {
         HIGH: "evidence_dll at or above the 75th percentile of the group's "
@@ -120,9 +120,6 @@ SUBSETS: Mapping[str, str] = MappingProxyType(
 """Each descriptive evidence subset and its rule. An event with no evidence is
 in neither; so is one meeting both, as every event of a group whose 25th and
 75th percentiles coincide does."""
-GROUP = ("cell", "detector", "animal")
-"""An event's group: its population, source detector and animal, the unit the
-examples are drawn by."""
 
 COMPARATOR_ONLY = "comparator_only"
 OURS_ONLY = "ours_only"
@@ -180,30 +177,6 @@ SAMPLING_RULE = (
 )
 
 
-def evidence_subsets(events: pd.DataFrame) -> pd.Series:
-    """Each event's evidence subset by :data:`SUBSETS`, or None in neither.
-
-    Parameters
-    ----------
-    events : DataFrame
-        With ``evidence_dll`` and the columns of :data:`GROUP`.
-
-    Returns
-    -------
-    Series of object
-        :data:`HIGH`, :data:`LOW` or None, on ``events``' index.
-    """
-    dll = events.evidence_dll.astype(np.float64)
-    groups = dll.groupby([events[column] for column in GROUP], sort=False)
-    # quantiles of each group's finite values; NaN is skipped
-    high = (dll >= groups.transform("quantile", SUBSET_QUANTILES[HIGH])).to_numpy()
-    low = (dll <= groups.transform("quantile", SUBSET_QUANTILES[LOW])).to_numpy()
-    labels = np.full(len(events), None, dtype=object)
-    labels[high & ~low] = HIGH
-    labels[low & ~high] = LOW
-    return pd.Series(labels, index=events.index, dtype=object)
-
-
 def sampler_events(features: pd.DataFrame, populations: pd.DataFrame) -> pd.DataFrame:
     """The comparator-only and ours-only events, with their evidence subsets.
 
@@ -247,12 +220,8 @@ def sampler_events(features: pd.DataFrame, populations: pd.DataFrame) -> pd.Data
         how="left",
         validate="one_to_one",
     ).assign(membership=UNMATCHED)
-    n_rows = events.n_rows.to_numpy(np.float64)
-    n_spikes = events.n_spikes.astype("Float64").to_numpy(np.float64, na_value=np.nan)
-    events["spikes_per_row"] = np.where(
-        n_rows > 0, n_spikes / np.maximum(n_rows, 1), np.nan
-    )
-    events[SUBSET_COLUMN] = evidence_subsets(events)
+    events["spikes_per_row"] = ratio(events.n_spikes, events.n_rows)
+    events[SUBSET_COLUMN] = selection.evidence_subsets(events)
     events["epoch_id"] = (
         events.animal
         + events.day.astype(str)

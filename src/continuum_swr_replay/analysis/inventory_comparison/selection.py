@@ -111,20 +111,25 @@ __all__ = [
     "BASELINE_DTYPES",
     "BASELINE_SEED",
     "DURATION_ONLY",
+    "EVIDENCE_GROUP",
     "EXAMPLE_SEED",
     "FAILED",
+    "HIGH",
     "LOCATION",
     "LOCATION_TOLERANCE_CM",
+    "LOW",
     "MIN_MATCHED",
     "N_BASELINES",
     "N_PER_SIDE",
     "REJECTION_COHORTS",
     "REJECTION_DTYPES",
     "REJECTION_STAGES",
+    "SUBSET_QUANTILES",
     "WINDOW_DTYPES",
     "baseline_draws",
     "baseline_pool",
     "draw_examples",
+    "evidence_subsets",
     "matched_baselines",
     "rejection_stages",
     "window_room",
@@ -946,3 +951,43 @@ def draw_examples(
     if not out:
         return pd.DataFrame(columns=columns)
     return pd.concat(out, ignore_index=True)[columns]
+
+
+HIGH = "high evidence"
+LOW = "low evidence"
+SUBSET_QUANTILES: Mapping[str, float] = MappingProxyType({HIGH: 0.75, LOW: 0.25})
+"""The quantile of each subset's bound, over the scorable events of the event's
+group (:data:`EVIDENCE_GROUP`)."""
+EVIDENCE_GROUP = ("cell", "detector", "animal")
+"""An event's group: its population, source detector and animal, the unit the
+examples are drawn by."""
+
+
+def evidence_subsets(events: pd.DataFrame) -> pd.Series:
+    """Each event's descriptive evidence subset, or None in neither.
+
+    :data:`HIGH` when its ``evidence_dll`` is at or above its group's
+    :data:`SUBSET_QUANTILES` ``HIGH`` quantile, :data:`LOW` when at or below the
+    ``LOW`` one, over the finite values of its :data:`EVIDENCE_GROUP`; an event
+    with no evidence, or meeting both (a group whose two quantiles coincide), is
+    in neither.
+
+    Parameters
+    ----------
+    events : DataFrame
+        With ``evidence_dll`` and the columns of :data:`EVIDENCE_GROUP`.
+
+    Returns
+    -------
+    Series of object
+        :data:`HIGH`, :data:`LOW` or None, on ``events``' index.
+    """
+    dll = events.evidence_dll.astype(np.float64)
+    groups = dll.groupby([events[column] for column in EVIDENCE_GROUP], sort=False)
+    # quantiles of each group's finite values; NaN is skipped
+    high = (dll >= groups.transform("quantile", SUBSET_QUANTILES[HIGH])).to_numpy()
+    low = (dll <= groups.transform("quantile", SUBSET_QUANTILES[LOW])).to_numpy()
+    labels = np.full(len(events), None, dtype=object)
+    labels[high & ~low] = HIGH
+    labels[low & ~high] = LOW
+    return pd.Series(labels, index=events.index, dtype=object)
