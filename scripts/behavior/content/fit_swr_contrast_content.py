@@ -100,13 +100,16 @@ from continuum_swr_replay.analysis.behavior.content_response import (
 )
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     LOG_EVENT_LENGTH,
+    LOG_PHI_EVENT_LENGTH,
+    LOG_PHI_IS_SWR,
     OUTCOME_STRATA,
-    aggregate_contrast,
     assemble_arm,
     assemble_patch,
+    audited_content_contrast,
     contrast_fit_inputs,
     gated_term_statistics,
     prepare_cohorts,
+    renormalized_rungs,
     specs_from_ladder,
 )
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
@@ -152,13 +155,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 logger = logging.getLogger(__name__)
 
 SC = list(SESSION_COLUMNS)
-
-#: Concentration contrast the Dirichlet-multinomial adds to every rung.
-LOG_PHI_IS_SWR = "log_phi_is_swr"
-
-#: Event-length term of the length-adjusted concentration design
-#: (``--concentration-length``). Reported per SD of ``log n_nonlocal_bins``.
-LOG_PHI_EVENT_LENGTH = "log_phi_log_n_nonlocal_bins_z"
 
 
 def _artifact_suffix(args: argparse.Namespace, response: str) -> str:
@@ -212,75 +208,6 @@ def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
                 f"{stats['median']:+9.3f}{100 * stats['positive_fraction']:5.0f}%"
                 f"{animals:>6}{p:14.2e} {star}"
             )
-
-
-def _aggregate(
-    res: pd.DataFrame, ladder: dict, key_term: dict, level: str, sd: dict | None = None
-) -> pd.DataFrame:
-    """Audited across-session aggregation (shared engine); one row per rung x pop.
-
-    See :mod:`continuum_swr_replay.analysis.behavior.contrast_aggregation` for the
-    column semantics (animal-level primary, session signed-rank descriptive, BH-FDR,
-    standardized per-SD columns). This wrapper just expands the content ladder into
-    (model, population, term) specs so the content and rate ladders mirror.
-    """
-    return aggregate_contrast(res, specs_from_ladder(ladder, key_term), level, sd)
-
-
-#: Concentration terms aggregated on every rung. ``log_phi_log_n_nonlocal_bins_z``
-#: is only fitted under ``--concentration-length``; on a run without it the
-#: coefficient column is simply absent and ``aggregate_contrast`` emits no row.
-_CONCENTRATION_TERMS = (LOG_PHI_IS_SWR, LOG_PHI_EVENT_LENGTH)
-
-
-def _concentration_specs(ladder: dict) -> list[tuple[str, str, str]]:
-    """Aggregation specs for the concentration contrast, one per rung x population.
-
-    ``log_phi_is_swr`` is not any rung's key term -- it is the same quantity on
-    every rung, the difference in how tightly an SWR event's mass is
-    concentrated -- so it is aggregated as its own family rather than folded
-    into the beta contrast's BH-FDR. The same holds for the event-length term of
-    the length-adjusted design, which is what the ``is_swr`` contrast is being
-    adjusted for and must be readable next to it. Specs are emitted for every
-    rung, population and concentration term; the ones whose fits carry no such
-    coefficient (the conditional Poisson everywhere, the within-SWR splits where
-    the flag is constant, and the length term on a run that did not fit it)
-    produce no row.
-    """
-    return [
-        (name, pop, term)
-        for name in ladder
-        for pop in (
-            ["all"] if ladder[name][1] == "pooled" else ["all", "SWR", "nonSWR"]
-        )
-        for term in _CONCENTRATION_TERMS
-    ]
-
-
-def _renormalized_rungs(*results: pd.DataFrame) -> list[str]:
-    """Rung names whose fitted rows were produced on a rescaled response.
-
-    Read off the rows that were actually fitted rather than off the leaf-only
-    rung set, so a run that skipped or never requested a rung cannot claim it.
-
-    Parameters
-    ----------
-    *results : pd.DataFrame
-        Per-session result frames carrying ``model`` and, where the fit rescaled
-        its response to the fitted candidate set, ``response_renormalized``.
-
-    Returns
-    -------
-    list of str
-        Sorted rung names, empty when no fitted row was rescaled.
-    """
-    names: set[str] = set()
-    for res in results:
-        if res.empty or "response_renormalized" not in res.columns:
-            continue
-        rescaled = res["response_renormalized"].fillna(False).astype(bool)
-        names |= set(res.loc[rescaled, "model"])
-    return sorted(names)
 
 
 def _provenance(
@@ -591,31 +518,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     # p, BH-FDR across the rung family, and standardized (per-SD) effect sizes — plus a
     # provenance sidecar. The per-SD units are the pooled SDs frozen over the full
     # cohort by prepare_cohorts, so a stratified refit is on the pooled unit.
-    agg = pd.concat(
-        [
-            _aggregate(
-                arm,
-                ARM_LADDER,
-                ARM_KEY_TERM,
-                "candidate_arm",
-                per_sd_scale["arm_cohort"],
-            ),
-            _aggregate(
-                patch,
-                PATCH_LADDER,
-                PATCH_KEY_TERM,
-                "patch",
-                per_sd_scale["patch_cohort"],
-            ),
-            # The concentration contrast, next to the beta contrast it modifies:
-            # under the Dirichlet-multinomial every rung also estimates how much
-            # more (or less) an SWR event's mass is spread out, which is the
-            # "SWR broadens" claim tested directly rather than read off a
-            # coefficient on the mean structure.
-            aggregate_contrast(arm, _concentration_specs(ARM_LADDER), "candidate_arm"),
-            aggregate_contrast(patch, _concentration_specs(PATCH_LADDER), "patch"),
-        ],
-        ignore_index=True,
+    agg = audited_content_contrast(
+        arm,
+        patch,
+        arm_ladder=ARM_LADDER,
+        arm_key_term=ARM_KEY_TERM,
+        patch_ladder=PATCH_LADDER,
+        patch_key_term=PATCH_KEY_TERM,
+        per_sd_scale=per_sd_scale,
     )
     audited_path = model_dir("swr_contrast") / f"swr_contrast_content_audited{sfx}.pkl"
     agg.to_pickle(audited_path)
@@ -626,7 +536,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         fit_z_reference,
         stratum_audit,
         per_sd_scale,
-        _renormalized_rungs(arm, patch),
+        renormalized_rungs(arm, patch),
         concentration_cols,
     )
     (

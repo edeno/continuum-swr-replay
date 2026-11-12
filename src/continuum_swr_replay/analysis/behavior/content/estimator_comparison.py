@@ -35,7 +35,7 @@ from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 from ...shared_statistics import session_median_statistics
 from .._fit_diagnostics import SEPARATION_COEF_ABS
 from ..coefficient_statistics import animal_median_bootstrap
-from ..contrast_aggregation import MIN_EVENTS, prepare_session
+from ..contrast_aggregation import LOG_PHI_IS_SWR, MIN_EVENTS, prepare_session
 from ..fit_comparability import COMPARABILITY_COLUMNS, why_not_comparable
 from ..fitting import (
     CONDITIONAL_POISSON_COUNT,
@@ -88,8 +88,6 @@ SE_TYPE_LABELS = {
 N_BOOTSTRAP = 2000
 BOOTSTRAP_SEED = 0
 BOOTSTRAP_PERCENTILES = (2.5, 50.0, 97.5)
-
-LOG_PHI_IS_SWR = "log_phi_is_swr"
 
 
 def se_ratio_column(label: str) -> str:

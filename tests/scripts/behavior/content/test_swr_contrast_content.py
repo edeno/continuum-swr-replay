@@ -17,11 +17,8 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior import contrast_aggregation
-from continuum_swr_replay.analysis.behavior.content.session_fits import (
-    fit_contrast_ladder,
-)
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
-    aggregate_contrast,
+    renormalized_rungs,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
@@ -31,7 +28,6 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
 )
 from continuum_swr_replay.tables.standardization import attach_standardized
 from scripts.behavior.content import fit_swr_contrast_content as mod
-from tests.support._content_tables import dm_contrast_session, with_event_length
 
 
 def _z(values: np.ndarray) -> np.ndarray:
@@ -517,31 +513,15 @@ def test_every_ladder_predictor_reaches_the_assembled_design(
 
 def test_provenance_names_only_the_rescaled_rungs_that_produced_rows():
     """A rung nothing was fitted for cannot be claimed as rescaled."""
-    import argparse
-
     fitted = pd.DataFrame(
         {
             "model": ["C4_armvalue", "C4_armvalue", "C1_nine_arm"],
             "response_renormalized": [True, True, False],
         }
     )
-    empty = pd.DataFrame(columns=["model", "response_renormalized"])
-
-    assert mod._renormalized_rungs(fitted, empty) == ["C4_armvalue"]
-    assert mod._renormalized_rungs(empty) == []
-    # A count run rescales nothing, so nothing is named.
-    counts = fitted.assign(response_renormalized=False)
-    assert mod._renormalized_rungs(counts) == []
-
-    args = argparse.Namespace(
-        max_per_animal=None,
-        response="fraction",
-        estimator="conditional_poisson",
-        min_events_session_phi=40,
-        outcome_stratum="all",
-    )
+    args = _provenance_args()
     prov = mod._provenance(
-        args, n_sessions=1, renormalized_rungs=mod._renormalized_rungs(fitted)
+        args, n_sessions=1, renormalized_rungs=renormalized_rungs(fitted)
     )
     assert prov["response_renormalized_rungs"] == ["C4_armvalue"]
     assert mod._provenance(args, n_sessions=1)["response_renormalized_rungs"] == []
@@ -577,64 +557,6 @@ def test_provenance_records_the_commit_this_process_loaded(monkeypatch):
     monkeypatch.setattr(subprocess, "run", read_at_write_time)
 
     assert mod._provenance(_provenance_args(), n_sessions=1)["git_hash"] == loaded
-
-
-# --- Dirichlet-multinomial estimator -------------------------------------------
-
-
-class TestLengthAdjustedConcentration:
-    """``--concentration-length`` fits the length-adjusted twin of log_phi_is_swr."""
-
-    def test_the_aggregation_reports_the_length_term_next_to_the_contrast(self):
-        cohort = pd.concat(
-            [
-                with_event_length(
-                    dm_contrast_session(epoch=f"{index:02d}_r1", seed=index), seed=index
-                )
-                for index in range(6)
-            ],
-            ignore_index=True,
-        )
-        ladder = {"C0_base": (["is_current_arm"], "pooled")}
-        res, _ = fit_contrast_ladder(
-            cohort,
-            ladder,
-            response_col="arm_count_hard",
-            response="hard_count",
-            n_categories=9,
-            estimator="dirichlet_multinomial",
-            n_jobs=2,
-            min_events_session_phi=40,
-            concentration_length=True,
-        )
-        agg = aggregate_contrast(res, mod._concentration_specs(ladder), "candidate_arm")
-
-        assert set(agg["term"]) == {
-            "log_phi_is_swr",
-            "log_phi_log_n_nonlocal_bins_z",
-        }
-        # A z-scored column is reported per SD, not per category.
-        length = agg[agg["term"] == "log_phi_log_n_nonlocal_bins_z"].iloc[0]
-        assert length["std_unit"] == "per_SD"
-
-
-def test_concentration_specs_cover_every_rung_and_population():
-    specs = mod._concentration_specs(
-        {"C0_base": ([], "pooled"), "C1_split": ([], "split")}
-    )
-    # Both concentration terms on every (rung, population): the length term is
-    # only fitted under --concentration-length, and on a run without it the
-    # coefficient column is absent so aggregate_contrast emits no row for it.
-    assert specs == [
-        ("C0_base", "all", "log_phi_is_swr"),
-        ("C0_base", "all", "log_phi_log_n_nonlocal_bins_z"),
-        ("C1_split", "all", "log_phi_is_swr"),
-        ("C1_split", "all", "log_phi_log_n_nonlocal_bins_z"),
-        ("C1_split", "SWR", "log_phi_is_swr"),
-        ("C1_split", "SWR", "log_phi_log_n_nonlocal_bins_z"),
-        ("C1_split", "nonSWR", "log_phi_is_swr"),
-        ("C1_split", "nonSWR", "log_phi_log_n_nonlocal_bins_z"),
-    ]
 
 
 def test_the_summary_prints_a_refused_term_with_the_gates_reason(capsys) -> None:

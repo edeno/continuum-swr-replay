@@ -749,6 +749,130 @@ def specs_from_ladder(ladder: dict, key_term: dict) -> list[tuple[str, str, str]
     return specs
 
 
+#: Concentration contrast the Dirichlet-multinomial adds to every content rung.
+LOG_PHI_IS_SWR = "log_phi_is_swr"
+
+#: Event-length term of the length-adjusted concentration design, per SD of
+#: ``log n_nonlocal_bins``. Fitted only when the length term is requested; on
+#: other fits the coefficient column is absent and :func:`aggregate_contrast`
+#: emits no row for it.
+LOG_PHI_EVENT_LENGTH = "log_phi_log_n_nonlocal_bins_z"
+
+#: Concentration terms aggregated on every rung.
+CONCENTRATION_TERMS = (LOG_PHI_IS_SWR, LOG_PHI_EVENT_LENGTH)
+
+
+def concentration_specs(ladder: dict) -> list[tuple[str, str, str]]:
+    """Aggregation specs for the concentration contrast, one per rung x population.
+
+    ``log_phi_is_swr`` is not any rung's key term -- it is the same quantity on
+    every rung, the difference in how tightly an SWR event's mass is
+    concentrated -- so it is aggregated as its own family rather than folded
+    into the beta contrast's BH-FDR. The same holds for the event-length term of
+    the length-adjusted design, which is what the ``is_swr`` contrast is being
+    adjusted for and must be readable next to it. Specs are emitted for every
+    rung, population and concentration term; the ones whose fits carry no such
+    coefficient (the conditional Poisson everywhere, the within-SWR splits where
+    the flag is constant, and the length term on a run that did not fit it)
+    produce no row.
+    """
+    return [
+        (name, pop, term)
+        for name in ladder
+        for pop in (
+            ["all"] if ladder[name][1] == "pooled" else ["all", "SWR", "nonSWR"]
+        )
+        for term in CONCENTRATION_TERMS
+    ]
+
+
+def audited_content_contrast(
+    arm: pd.DataFrame,
+    patch: pd.DataFrame,
+    *,
+    arm_ladder: dict,
+    arm_key_term: dict,
+    patch_ladder: dict,
+    patch_key_term: dict,
+    per_sd_scale: Mapping[str, Mapping],
+) -> pd.DataFrame:
+    """The content contrast ladder's audited table, arm and patch.
+
+    The key-term contrast of every rung (:func:`specs_from_ladder`) at each
+    grain, with its per-SD effects in the units ``per_sd_scale`` froze over the
+    full cohort (``arm_cohort`` / ``patch_cohort``), then the concentration
+    contrast of every rung (:func:`concentration_specs`), each aggregated by
+    :func:`aggregate_contrast`.
+
+    Parameters
+    ----------
+    arm, patch : pd.DataFrame
+        Per-session fits of the arm and patch ladders.
+    arm_ladder, patch_ladder : dict
+        The ladders (rung -> (predictors, scope)).
+    arm_key_term, patch_key_term : dict
+        Each ladder's key term per rung.
+    per_sd_scale : mapping
+        ``prepare_cohorts``' per-SD scales, keyed ``arm_cohort`` and
+        ``patch_cohort``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per (level, rung, population, term).
+    """
+    return pd.concat(
+        [
+            aggregate_contrast(
+                arm,
+                specs_from_ladder(arm_ladder, arm_key_term),
+                "candidate_arm",
+                per_sd_scale["arm_cohort"],
+            ),
+            aggregate_contrast(
+                patch,
+                specs_from_ladder(patch_ladder, patch_key_term),
+                "patch",
+                per_sd_scale["patch_cohort"],
+            ),
+            # The concentration contrast, next to the beta contrast it modifies:
+            # under the Dirichlet-multinomial every rung also estimates how much
+            # more (or less) an SWR event's mass is spread out, which is the
+            # "SWR broadens" claim tested directly rather than read off a
+            # coefficient on the mean structure.
+            aggregate_contrast(arm, concentration_specs(arm_ladder), "candidate_arm"),
+            aggregate_contrast(patch, concentration_specs(patch_ladder), "patch"),
+        ],
+        ignore_index=True,
+    )
+
+
+def renormalized_rungs(*results: pd.DataFrame) -> list[str]:
+    """Rung names whose fitted rows were produced on a rescaled response.
+
+    Read off the rows that were actually fitted rather than off the leaf-only
+    rung set, so a run that skipped or never requested a rung cannot claim it.
+
+    Parameters
+    ----------
+    *results : pd.DataFrame
+        Per-session result frames carrying ``model`` and, where the fit rescaled
+        its response to the fitted candidate set, ``response_renormalized``.
+
+    Returns
+    -------
+    list of str
+        Sorted rung names, empty when no fitted row was rescaled.
+    """
+    names: set[str] = set()
+    for res in results:
+        if res.empty or "response_renormalized" not in res.columns:
+            continue
+        rescaled = res["response_renormalized"].fillna(False).astype(bool)
+        names |= set(res.loc[rescaled, "model"])
+    return sorted(names)
+
+
 # ── Content contrast cohort assembly ──
 
 #: Fewest surviving events a session needs before the content contrast fits it.
