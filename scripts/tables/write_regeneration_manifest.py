@@ -224,9 +224,12 @@ def _validate_model_bundle(
             f"{directory} model results lack a 'converged' column; a dropped or "
             "renamed column must not silently bypass the convergence gate"
         )
-    failed = results["converged"].notna() & ~results["converged"].eq(True)  # noqa: E712
-    if failed.any():
-        raise ValueError(f"{directory} contains non-converged published fits")
+    if (~results["converged"].eq(True)).any():
+        raise ValueError(
+            f"{directory} contains published fits that did not converge or have no "
+            "convergence flag; a bundle fitted before the conditional-Poisson null "
+            "rung recorded its flags (commit 745204e8) needs a refit"
+        )
 
     audit = pd.read_csv(required_paths["cohort_audit"])
     if set(audit["model"].astype(str)) != set(models):

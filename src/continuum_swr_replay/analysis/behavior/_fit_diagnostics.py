@@ -301,6 +301,23 @@ def count_fit_quality_warnings(caught) -> int:
     return sum(1 for w in caught if issubclass(w.category, FIT_QUALITY_WARNINGS))
 
 
+def flagged_separated(fits: pd.DataFrame) -> pd.Series:
+    """Which fits are flagged separated; a missing flag is not separated.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_fits, n_columns)
+        Per-session fits with the fit-level ``separated`` flag.
+
+    Returns
+    -------
+    separated : pd.Series, shape (n_fits,)
+        Boolean, on the index of ``fits``; ``True`` only where the flag is
+        ``True``, so a NaN or an absent value is not separated.
+    """
+    return fits["separated"].eq(True)
+
+
 def fit_flag_counts(fits: pd.DataFrame) -> dict[str, int]:
     """The fits flagged as not converged and as separated: the :data:`FLAG_FIELDS`.
 
@@ -315,16 +332,18 @@ def fit_flag_counts(fits: pd.DataFrame) -> dict[str, int]:
         - ``n_sessions_flagged_nonconverged``: fits whose ``converged`` is not
           True; a missing flag has not converged.
         - ``n_sessions_flagged_separated``: fits whose ``separated`` is True; a
-          missing flag is not separated.
+          missing flag is not separated (:func:`flagged_separated`).
 
-        A column the fits do not carry counts 0: the analytic null rung of
-        the conditional-Poisson content ladder
-        (``fitting.fit_null_model_conditional``) records neither flag.
+        A column the fits do not carry counts 0. The analytic null rung of the
+        conditional-Poisson content ladder
+        (``fitting.fit_null_model_conditional``) records ``converged=True`` and
+        ``separated=False``; a null rung fitted before that was recorded has no
+        flags and counts as not converged.
     """
     nonconverged, separated = FLAG_FIELDS
     return {
         nonconverged: (
             int((~fits["converged"].eq(True)).sum()) if "converged" in fits else 0
         ),
-        separated: int(fits["separated"].eq(True).sum()) if "separated" in fits else 0,
+        separated: int(flagged_separated(fits).sum()) if "separated" in fits else 0,
     }

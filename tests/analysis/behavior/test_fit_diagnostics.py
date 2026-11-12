@@ -22,6 +22,7 @@ from continuum_swr_replay.analysis.behavior._fit_diagnostics import (
     count_fit_quality_warnings,
     fit_flag_counts,
     fit_status,
+    flagged_separated,
 )
 
 
@@ -318,3 +319,12 @@ def test_a_missing_convergence_flag_has_not_converged_and_a_missing_separation_f
         "n_sessions_flagged_nonconverged": 3,
         "n_sessions_flagged_separated": 0,
     }
+
+
+def test_flagged_separated_is_true_only_where_the_flag_is_true():
+    fits = pd.DataFrame(
+        {"separated": [True, False, np.nan, None]}, index=[10, 11, 12, 13]
+    )
+    flagged = flagged_separated(fits)
+    assert list(flagged) == [True, False, False, False]
+    assert list(flagged.index) == [10, 11, 12, 13]

@@ -30,7 +30,10 @@ import numpy as np
 import pandas as pd
 from patsy import dmatrix
 
-from continuum_swr_replay.analysis.behavior._fit_diagnostics import fit_flag_counts
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import (
+    fit_flag_counts,
+    flagged_separated,
+)
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     paired_coefficient_statistics,
     require_one_fit_per_session,
@@ -570,7 +573,7 @@ def fitted_time_course(
     )
     intercept = fits["coef_Intercept"].to_numpy(dtype=float)
     ok = np.isfinite(beta).all(axis=1) & np.isfinite(intercept)
-    ok &= ~(fits["separated"] == True).to_numpy()  # noqa: E712 (NaN must not count)
+    ok &= ~flagged_separated(fits).to_numpy()
     with np.errstate(over="ignore"):
         curves = np.exp(intercept[ok, None] + beta[ok] @ basis.T)
     curves = curves[np.isfinite(curves).all(axis=1)]

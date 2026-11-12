@@ -27,6 +27,7 @@ from collections.abc import Mapping, Sequence
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import flagged_separated
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     gate_term_sessions,
     gated_term_statistics,
@@ -528,9 +529,10 @@ def separated_fraction(fits: pd.DataFrame) -> float:
     Returns
     -------
     fraction : float
-        In [0, 1]. A missing flag counts as not separated.
+        In [0, 1]. A missing flag counts as not separated
+        (:func:`~continuum_swr_replay.analysis.behavior._fit_diagnostics.flagged_separated`).
     """
-    return float((fits["separated"] == True).mean())  # noqa: E712 (NaN must not count)
+    return float(flagged_separated(fits).mean())
 
 
 def known_fraction(fits: pd.DataFrame, column: str) -> float:
@@ -628,7 +630,7 @@ def rung_separation_range(fits: pd.DataFrame, term: str) -> dict[str, int]:
     per_rung = pd.DataFrame(
         {
             "n_fits": rungs.groupby(by_rung).size(),
-            "n_separated": (rungs["separated"] == True).groupby(by_rung).sum(),  # noqa: E712
+            "n_separated": flagged_separated(rungs).groupby(by_rung).sum(),
             "n_flagged": separated_for_term(rungs, term).groupby(by_rung).sum(),
         }
     )

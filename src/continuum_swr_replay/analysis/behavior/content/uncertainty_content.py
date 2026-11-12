@@ -30,6 +30,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import flagged_separated
 from continuum_swr_replay.analysis.shared_statistics import (
     session_median_statistics,
     signed_rank_p,
@@ -646,8 +647,9 @@ def summarize_mu_coefficients(mu_results: pd.DataFrame) -> dict[str, pd.DataFram
     sessions = mu_results.copy()
     sessions["session_id"] = _session_id(sessions)
     sessions["fit_quality"] = np.where(
-        # A fit with no convergence flag has not converged.
-        sessions["converged"].eq(True) & ~sessions["separated"].astype(bool),
+        # A fit with no convergence flag has not converged; one with no
+        # separation flag is not separated.
+        sessions["converged"].eq(True) & ~flagged_separated(sessions),
         "clean",
         "flagged",
     )

@@ -105,6 +105,26 @@ def test_validate_model_bundle_rejects_rung_specific_session_loss(
         )
 
 
+@pytest.mark.parametrize("flag", [False, np.nan])
+def test_validate_model_bundle_rejects_a_fit_that_did_not_converge_or_has_no_flag(
+    tmp_path: Path, flag: object
+) -> None:
+    results = _fit_rows()
+    results["converged"] = results["converged"].astype(object)
+    results.loc[0, "converged"] = flag
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, results)
+
+    with pytest.raises(ValueError, match="745204e8"):
+        _validate_model_bundle(
+            bundle,
+            expected_session_keys={
+                ("a", 20200101, "02_r1"),
+                ("b", 20200102, "02_r1"),
+            },
+        )
+
+
 @pytest.mark.parametrize("bad_value", [np.nan, np.inf])
 def test_validate_model_bundle_rejects_nonfinite_fit_statistics(
     tmp_path: Path, bad_value: float
