@@ -56,6 +56,9 @@ import pandas as pd
 from continuum_swr_replay.analysis.pfc import population_statistics, timing
 from continuum_swr_replay.analysis.pfc.heldout import empirical_pvalue_floor
 from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA as ALPHA,
+)
+from continuum_swr_replay.analysis.pfc.load_population import (
     MIN_FIRING_RATE_HZ,
     load_population_data,
 )
@@ -88,9 +91,6 @@ differ in the panels of Figure 4 that show them."""
 STEM = "_mPFC_modulation"
 """The canonical (at-well, sigma 3) bundle name; other cohorts and priors carry
 a suffix after it."""
-
-ALPHA = 0.05
-"""Figure 4's raw empirical-p threshold."""
 
 CHECK_FIRING_RATE_HZ = 1.0
 """The cutoff the main values used before 2026-10-29, kept as a check; the full

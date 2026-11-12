@@ -57,7 +57,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
+from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA,
+    HELDOUT_P_COLUMNS,
+)
 from continuum_swr_replay.analysis.pfc.population_statistics import called_units
 from continuum_swr_replay.analysis.pfc.stop_context import (
     ESTIMATORS,
@@ -77,8 +80,6 @@ from continuum_swr_replay.tables.io import read_table, write_table
 
 REPO = Path(__file__).resolve().parents[2]
 BRAIN_AREA = "mPFC"
-#: Called units: raw held-out empirical p below this for the class.
-CALLED_P = 0.05
 SIGNS = ("increase", "decrease")
 UNIT_SETS = ("called", "all")
 
@@ -288,7 +289,7 @@ def select_units(
 ) -> np.ndarray:
     """Which units one fit uses: their peak for ``event_class`` has ``sign``
     and, for ``unit_set == "called"``, they are called for ``event_class`` at
-    :data:`CALLED_P`
+    :data:`~continuum_swr_replay.analysis.pfc.load_population.CALLED_ALPHA`
     (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_units`).
     Another class's peak or p never enters.
 
@@ -300,7 +301,7 @@ def select_units(
     has_sign = peak > 0 if sign == "increase" else peak < 0
     if unit_set == "all":
         return has_sign
-    return has_sign & called_units(units, event_class, CALLED_P)
+    return has_sign & called_units(units, event_class, CALLED_ALPHA)
 
 
 def fit(args: Namespace) -> None:
@@ -385,7 +386,7 @@ def fit(args: Namespace) -> None:
                 "dirty": git_dirty(REPO),
                 "results": str(results_path),
                 "results_sha256": sha256_file(results_path),
-                "called_p": CALLED_P,
+                "called_p": CALLED_ALPHA,
                 "se_cluster": "recording day (nwb_file_name); CR1 factor, t "
                 "intervals with G - 1 degrees of freedom",
                 "input_tables": current,

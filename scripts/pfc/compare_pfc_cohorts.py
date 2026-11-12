@@ -62,6 +62,7 @@ from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA,
     MIN_FIRING_RATE_HZ,
     at_or_above_rate,
     load_population_data,
@@ -2505,7 +2506,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             "the summary's and Figure 4's (none)."
         ),
     )
-    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument("--alpha", type=float, default=CALLED_ALPHA)
     parser.add_argument(
         "--note",
         action="append",

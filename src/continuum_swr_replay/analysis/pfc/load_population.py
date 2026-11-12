@@ -111,6 +111,12 @@ and drops out in the loader. The mpfc summary, Figure 4 and the
 ``scripts/pfc/`` reports read this one value."""
 
 
+CALLED_ALPHA = 0.05
+"""Figure 4's raw empirical-p threshold: a unit is called for a test when its
+held-out p-value is below it (:func:`tested_and_called`). The mpfc summary and
+the ``scripts/pfc/`` reports read this one value."""
+
+
 #: Tests the superseded bundles were FDR-corrected on. Kept so an audit can
 #: read those bundles as they were read then; nothing current produces them.
 LEGACY_FDR_TESTS = (
@@ -607,7 +613,7 @@ def tested_and_called(pvalue: pd.Series, alpha: float) -> tuple[np.ndarray, np.n
 
 def significant_fraction(
     df: pd.DataFrame,
-    alpha: float = 0.05,
+    alpha: float = CALLED_ALPHA,
     columns: dict[str, str] = HELDOUT_P_COLUMNS,
 ) -> dict[str, tuple[int, int]]:
     """Descriptive raw-p fraction per class and engagement.

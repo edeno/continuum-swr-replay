@@ -44,6 +44,7 @@ import pandas as pd
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc import population_statistics
 from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA,
     HELDOUT_FIT_COLUMN,
     at_or_above_rate,
     load_population_data,
@@ -51,7 +52,6 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 )
 from continuum_swr_replay.paths import ROOT_DIR
 from continuum_swr_replay.reported.mpfc import (
-    ALPHA,
     STEM,
     SWR_WITHOUT_REPLAY_CURVES,
     called_fraction_values,
@@ -224,13 +224,13 @@ def band_rows(
             "spikes_fit_min": float(spikes[keep].min()),
         }
         for name, fraction in population_statistics.called_fractions(
-            population[keep], ALPHA
+            population[keep], CALLED_ALPHA
         ).iterrows():
             values[f"{name}_units_tested"] = fraction["n_tested"]
             values[f"{name}_called_fraction"] = fraction["fraction"]
         n_called, n_tested = significant_fraction(
             extended[(ext_rate >= low) & (ext_rate < high)],
-            ALPHA,
+            CALLED_ALPHA,
             population_statistics.SWR_WITHOUT_REPLAY_P_COLUMNS,
         )[population_statistics.SWR_WITHOUT_REPLAY]
         values["SWR_no_non_local_units_tested"] = n_tested

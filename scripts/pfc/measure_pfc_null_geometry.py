@@ -57,6 +57,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     null_draw_seeds,
 )
 from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA,
     MIN_FIRING_RATE_HZ,
     load_population_data,
 )
@@ -539,7 +540,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         default=20,
         help="Null draws rebuilt per class per named session.",
     )
-    parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument("--alpha", type=float, default=CALLED_ALPHA)
     parser.add_argument(
         "--min-firing-rate",
         type=float,
