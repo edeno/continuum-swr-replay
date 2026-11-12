@@ -26,6 +26,7 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance
 from continuum_swr_replay.analysis.constants import DEFAULT_SAMPLING_FREQUENCY_HZ
 from continuum_swr_replay.analysis.pfc.batched_glm import DEFAULT_PENALTY_SIGMA
 from continuum_swr_replay.analysis.pfc.design import symmetric_lags
+from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
 from continuum_swr_replay.analysis.pfc.heldout import (
     CONTROL_NULL_EVENT_POLICY,
     DEFAULT_CONTROL_DRAWS,
@@ -35,7 +36,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
 from continuum_swr_replay.analysis.pfc.matched_control import (
     MATCHED_CONTROL_PLACEMENT_METHOD,
 )
-from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
+from continuum_swr_replay.analysis.pfc.modulation import in_report_window
 from continuum_swr_replay.analysis.shared_statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
@@ -367,10 +368,11 @@ def load_population_data(
         than ``inference`` names.
 
     """
-    lag_time = (
-        symmetric_lags(REPORT_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
+    fit_lag_time = (
+        symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
         / DEFAULT_SAMPLING_FREQUENCY_HZ
     )
+    lag_time = fit_lag_time[in_report_window(fit_lag_time)]
 
     stem = f"_mPFC_modulation{artifact_suffix}"
     pkls = sorted(data_dir.glob(f"*{stem}.pkl"))

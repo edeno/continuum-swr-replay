@@ -116,9 +116,12 @@ from continuum_swr_replay.analysis.pfc.marked_model_family import (
     load_session_stop_patch_switch_marks,
     model_set_of,
 )
+from continuum_swr_replay.analysis.pfc.modulation import (
+    REPORT_HALF_WINDOW_S,
+    in_report_window,
+)
 from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
-    REPORT_HALF_WINDOW_S,
     STOP_COHORT,
     filter_epoch_info,
     is_nonempty_file,
@@ -894,7 +897,7 @@ def run_analysis(
         )
         prepared_response = prepare_heldout_response(context.counts, folds)
         failures: list[tuple[str, str]] = []
-        report = np.abs(context.lag_time) <= REPORT_HALF_WINDOW_S + 1e-12
+        report = in_report_window(context.lag_time)
         for name in pending:
             spec = specs[name]
             artifact = artifacts[name]

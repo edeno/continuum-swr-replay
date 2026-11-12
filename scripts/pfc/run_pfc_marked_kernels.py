@@ -77,9 +77,12 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
     fit_marked_kernel_ladder,
     prepare_marked_session_context,
 )
+from continuum_swr_replay.analysis.pfc.modulation import (
+    REPORT_HALF_WINDOW_S,
+    in_report_window,
+)
 from continuum_swr_replay.analysis.pfc.runner_support import (
     MAX_NONCONVERGED_UNIT_FRACTION,
-    REPORT_HALF_WINDOW_S,
     STOP_COHORT,
     filter_epoch_info,
     is_nonempty_file,
@@ -603,7 +606,7 @@ def run_analysis(
             context.counts.mean(axis=0) * SAMPLING_FREQUENCY
         )
 
-        report = np.abs(context.lag_time) <= REPORT_HALF_WINDOW_S + 1e-12
+        report = in_report_window(context.lag_time)
         statistics.to_pickle(artifact)
         np.save(artifact.with_suffix(".lag_time.npy"), context.lag_time[report])
         for event_class in MARKED_EVENT_CLASSES:

@@ -106,8 +106,8 @@ from continuum_swr_replay.analysis.pfc.load_population import (
 )
 from continuum_swr_replay.analysis.pfc.matched_control import artifact_dropped_events
 from continuum_swr_replay.analysis.pfc.modulation import (
-    REPORT_HALF_WINDOW_S,
     curve_coefficients,
+    in_report_window,
 )
 from continuum_swr_replay.intervals import get_spikecount_per_time_bin
 from continuum_swr_replay.paths import processed_data_dir
@@ -519,12 +519,11 @@ def plot_best_model_selection(df, ax):
 # Main Figure Assembly
 # ---------------------------------------------------------------------------
 
-#: The lags the models are fit on (+/-250 ms at 500 Hz) and the ones the
-#: curves are reported on (+/-200 ms). The bundle is fit on the wider window so
-#: the spline's boundary behaviour falls outside the reported one; the example
-#: neuron is fit the same way and its curve trimmed to match.
+#: The lags the models are fit on (+/-250 ms at 500 Hz). The curves are
+#: reported on +/-200 ms (``in_report_window``): the bundle is fit on the wider
+#: window so the spline's boundary behaviour falls outside the reported one;
+#: the example neuron is fit the same way and its curve trimmed to match.
 FIT_LAGS = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
-REPORT_LAGS = symmetric_lags(REPORT_HALF_WINDOW_S, DEFAULT_SAMPLING_FREQUENCY_HZ)
 
 
 def generate_figure(
@@ -710,10 +709,7 @@ def generate_figure(
     # The models are fit over +/-250 ms and reported over +/-200 ms, as the
     # bundle's curves are: the spline's boundary behaviour stays outside the
     # window the panel draws.
-    report_mask = np.isin(
-        np.round(lag_time, 6),
-        np.round(REPORT_LAGS / DEFAULT_SAMPLING_FREQUENCY_HZ, 6),
-    )
+    report_mask = in_report_window(lag_time)
     spline_basis = spline_basis[report_mask]
     lag_time = lag_time[report_mask]
 

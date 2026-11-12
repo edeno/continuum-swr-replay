@@ -70,6 +70,29 @@ def get_frac_explained_deviance(
 REPORT_HALF_WINDOW_S = 0.200
 
 
+def in_report_window(
+    lag_time: NDArray, half_window_s: float = REPORT_HALF_WINDOW_S
+) -> NDArray:
+    """Which lags of a fit window's lag axis are reported.
+
+    The one rule for the reported lag set: ``|lag| <= half_window_s``, with a
+    1e-12 s tolerance so a lag computed as ``k / sampling_frequency`` that
+    lands on the edge is kept.
+
+    Parameters
+    ----------
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each row of the fit window's basis, in seconds.
+    half_window_s : float
+        Half-width of the reported window, in seconds.
+
+    Returns
+    -------
+    NDArray of bool, shape (n_lags,)
+    """
+    return np.abs(np.asarray(lag_time, dtype=float)) <= half_window_s + 1e-12
+
+
 #: A coefficient past this on the log-rate scale is a rate multiplier of 5e8:
 #: a basis column whose support holds no spikes, whose maximum-likelihood
 #: estimate is at -infinity, and whose fitted value says only where the solver
@@ -131,7 +154,7 @@ def peak_log_modulation(
     """
     coefficients = np.atleast_2d(np.asarray(params, dtype=float))
     lag_time = np.asarray(lag_time, dtype=float)
-    inside = np.flatnonzero(np.abs(lag_time) <= half_window_s + 1e-12)
+    inside = np.flatnonzero(in_report_window(lag_time, half_window_s))
     if inside.size == 0:
         raise ValueError(
             f"no lag inside +/-{half_window_s} s; the basis covers "

@@ -52,10 +52,10 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
 from continuum_swr_replay.analysis.pfc.modulation import (
     CURVE_SOURCES,
     NESTED_MODEL_PAIRS,
-    REPORT_HALF_WINDOW_S,
     curve_coefficients,
     get_frac_explained_deviance,
     get_frac_null_deviance,
+    in_report_window,
 )
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
 from continuum_swr_replay.intervals import (
@@ -990,7 +990,6 @@ def run_session(
     # fall outside the reported window (±200ms). The returned modulation
     # arrays are trimmed to the reporting window after fitting.
     fit_lags = symmetric_lags(DEFAULT_BASIS_HALF_WINDOW_S, sampling_frequency)
-    report_lags = symmetric_lags(REPORT_HALF_WINDOW_S, sampling_frequency)
 
     data, excluded, is_immobile, fit_mask, bin_counts = _session_fit_population(
         data,
@@ -1125,7 +1124,7 @@ def run_session(
         non_local_swr_modulation,
         non_local_no_swr_modulation,
         matched_control_modulation,
-    ) = _stack_session_outputs(result, lag_time, report_lags, sampling_frequency)
+    ) = _stack_session_outputs(result, lag_time)
 
     neuron_stats["nwb_file_name"] = nwb_file_name
     neuron_stats["epoch_name"] = epoch_name
@@ -1625,10 +1624,16 @@ def _fit_session_neurons(
 def _stack_session_outputs(
     result: Sequence[tuple],
     lag_time: NDArray,
-    report_lags: NDArray,
-    sampling_frequency: float,
 ) -> tuple[pd.DataFrame, NDArray, NDArray, NDArray, NDArray, NDArray]:
     """Stack the per-neuron outputs and trim the curves to the report window.
+
+    Parameters
+    ----------
+    result : sequence of tuple
+        Per neuron, ``process_neuron``'s statistics and its five curves, each
+        curve ``(n_lags,)`` over the fit window.
+    lag_time : NDArray, shape (n_lags,)
+        Lag of each fit-window row, in seconds.
 
     Returns
     -------
@@ -1656,9 +1661,7 @@ non_local_no_swr_modulation, matched_control_modulation : NDArray
 
     # Trim modulation arrays from fit window (±250ms) to report window (±200ms)
     # to remove spline boundary artifacts at the edges
-    report_mask = np.isin(
-        np.round(lag_time, 6), np.round(report_lags / sampling_frequency, 6)
-    )
+    report_mask = in_report_window(lag_time)
     swr_modulation = swr_modulation[report_mask]
     no_swr_modulation = no_swr_modulation[report_mask]
     non_local_swr_modulation = non_local_swr_modulation[report_mask]

@@ -140,9 +140,9 @@ def symmetric_lags(half_window_s: float, sampling_frequency: float) -> NDArray:
     half_window_s : float
         Half-width of the window in seconds, e.g.
         :data:`~continuum_swr_replay.analysis.pfc.event_sets.DEFAULT_BASIS_HALF_WINDOW_S`
-        (the fit window) or
-        :data:`~continuum_swr_replay.analysis.pfc.modulation.REPORT_HALF_WINDOW_S`
-        (the reported one).
+        (the fit window). The reported lags are a subset of the fit window's,
+        chosen by
+        :func:`~continuum_swr_replay.analysis.pfc.modulation.in_report_window`.
     sampling_frequency : float
         Sampling frequency in Hz.
 

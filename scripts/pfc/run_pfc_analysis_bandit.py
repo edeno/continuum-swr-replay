@@ -116,9 +116,9 @@ from continuum_swr_replay.analysis.pfc.matched_control import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.pfc.modulation import (  # noqa: E402
     EXTENDED_CURVE_SOURCES,
-    REPORT_HALF_WINDOW_S,
     THREE_CLASS_MODEL,
     curve_coefficients,
+    in_report_window,
 )
 from continuum_swr_replay.analysis.pfc.runner_support import (  # noqa: E402
     read_session_list,
@@ -366,7 +366,7 @@ def extended_curves(
     counts = np.asarray(context["counts"], dtype=float)[fit_rows]
     basis = np.asarray(context["spline_basis"])
     lag_time = np.asarray(context["lag_time"])
-    report = np.abs(lag_time) <= REPORT_HALF_WINDOW_S + 1e-12
+    report = in_report_window(lag_time)
     n_basis = basis.shape[1]
     curves: dict[str, NDArray] = {}
     if np.linalg.matrix_rank(design) < design.shape[1]:
@@ -693,7 +693,7 @@ def run_analysis(
             # lag is wider than sigma and the prior on a modulation held across
             # the window is narrower. Both are recorded, over the reported
             # window rather than the wider one the models are fit on.
-            reported = np.abs(context["lag_time"]) <= REPORT_HALF_WINDOW_S + 1e-12
+            reported = in_report_window(context["lag_time"])
             implied_prior = implied_prior_sd(
                 penalty_sigma, context["spline_basis"], reported
             )

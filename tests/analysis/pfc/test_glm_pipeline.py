@@ -21,6 +21,7 @@ from continuum_swr_replay.analysis.pfc.design import (
     convolve_event_basis,
     event_basis_functions,
     event_onset_counts,
+    symmetric_lags,
 )
 from continuum_swr_replay.analysis.pfc.fit import (
     _fit_diagnostics as fit_diagnostics_of,
@@ -40,6 +41,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
     curve_peaks,
     get_frac_explained_deviance,
     get_frac_null_deviance,
+    in_report_window,
     is_separated,
     peak_log_modulation,
     peak_modulation_se,
@@ -48,6 +50,7 @@ from continuum_swr_replay.analysis.pfc.modulation import (
 from continuum_swr_replay.analysis.pfc.session import (
     _failed_models,
     _prefit_session,
+    _stack_session_outputs,
     process_neuron,
     shipped_fit_counts,
 )
@@ -653,6 +656,45 @@ class TestPeakLogModulation:
                 lag_time,
                 half_window_s=-1.0,
             )
+
+
+class TestInReportWindow:
+    """The reported lags: ``|lag| <= 0.2 s`` of the fit window's lag axis."""
+
+    def test_the_shipped_axis_keeps_the_central_201_lags(self):
+        lags = symmetric_lags(0.25, 500.0)
+        keep = in_report_window(lags / 500.0)
+
+        np.testing.assert_array_equal(lags[keep], np.arange(-100, 101))
+
+    def test_a_lag_past_the_edge_is_dropped_when_the_window_is_not_whole_samples(
+        self,
+    ):
+        # At 503 Hz, 0.2 s is 100.6 samples: lag 101 is 0.2008 s, outside the
+        # window, although rounding 100.6 would reach it.
+        lag_time = symmetric_lags(0.25, 503.0) / 503.0
+
+        kept = lag_time[in_report_window(lag_time)]
+
+        assert kept.size == 201
+        assert np.abs(kept).max() <= 0.2
+
+    def test_the_edge_is_kept_within_float_error_and_not_beyond(self):
+        lag_time = np.array([-0.2 - 5e-13, 0.2 + 5e-13, 0.2 + 1e-9, 0.1])
+
+        np.testing.assert_array_equal(
+            in_report_window(lag_time), [True, True, False, True]
+        )
+
+    def test_the_session_curves_are_trimmed_by_the_same_rule(self):
+        lag_time = symmetric_lags(0.25, 503.0) / 503.0
+        curve = np.arange(lag_time.size, dtype=float)
+        result = [({"neuron": 0}, curve, curve, curve, curve, curve)]
+
+        _, swr, *_ = _stack_session_outputs(result, lag_time)
+
+        np.testing.assert_array_equal(swr[:, 0], curve[in_report_window(lag_time)])
+        assert swr.shape == (201, 1)
 
 
 class TestCurvePeaks:

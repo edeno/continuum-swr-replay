@@ -29,7 +29,6 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import fit_provenance
 
 __all__ = [
     "MAX_NONCONVERGED_UNIT_FRACTION",
-    "REPORT_HALF_WINDOW_S",
     "STOP_COHORT",
     "filter_epoch_info",
     "is_nonempty_file",
@@ -42,10 +41,6 @@ __all__ = [
 
 # The canonical well-anchored stop cohort every PFC marked analysis is fit on.
 STOP_COHORT = "at_well"
-# Curves are fit over a wider lag window than they are reported on, so the
-# spline kernel returns to baseline inside the fit window rather than at the
-# edge of the reported one.
-REPORT_HALF_WINDOW_S = 0.2
 # A session whose full-data fit fails to converge for more than this fraction
 # of units is not certified: its held-out deltas and curves would be a mixture
 # of converged and unconverged units with no way to tell them apart.
