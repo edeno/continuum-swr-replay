@@ -798,7 +798,7 @@ def called_fraction_values(
             "share of the tested units with a Benjamini-Hochberg q below "
             f"{ALPHA:g} for the engagement test, BH applied once over the pooled "
             "plus-one empirical p-values of every tested unit "
-            "(scipy.stats.false_discovery_control). For reference only: the units "
+            "(analysis.statistics.benjamini_hochberg). For reference only: the units "
             "are not independent, and the p-values sit on a 1/(R + 1) grid",
             tags=TAGS["modulation"],
         )
