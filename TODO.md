@@ -61,13 +61,18 @@ Work that is deferred on purpose. Each item says when it should be done.
 
   *When:* at each figure's or report's next regeneration.
 
-- [ ] **Figure 4c: pooled or animal-balanced.** `scripts/figures/generate_figure04.py`
-  (`plot_population_average`) draws the mean over all units of each curve less its
-  own value at -200 ms, with SEM over units. The mpfc summary reports no value for
-  this curve (its only 4c value is the unit count), so the figure copies no reported
-  number; but over half the units are one animal's (wilbur), and an animal-balanced
-  curve (unit -> session -> animal) peaks elsewhere. Decide which the panel draws.
-  *When:* before Figure 4 is finalized.
+- [x] **Figure 4c: pooled or animal-balanced.** *Decided 2026-11-12: animal-balanced*,
+  to match how the paper summarizes its other statistics. Panel c
+  (`scripts/figures/generate_figure04.py`, `plot_population_average`) takes each
+  unit's curve less its own value at -200 ms and reduces it unit -> session ->
+  animal, the mean over animals with the SEM over animals
+  (`analysis/pfc/population_statistics.animal_balanced_unit_curve`, the reduction the
+  marked-family population curves use). It drew the mean over all units with the SEM
+  over units before; over half the units are one animal's (wilbur), and the
+  animal-balanced curve peaks elsewhere. The mpfc summary reports no value for this
+  curve (its only 4c value is the unit count), so the figure copies no reported
+  number. The choice is open to a different method later: the panel's reduction is
+  that one call, so changing it means swapping the function.
 
 - [ ] **Decide the open choices in the reported statistics.**
   `docs/known_issues/reported_statistics_choices.md` lists them: where each is
