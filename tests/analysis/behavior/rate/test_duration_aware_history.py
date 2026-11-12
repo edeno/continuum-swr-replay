@@ -535,3 +535,33 @@ def test_pooled_fit_records_its_convergence_warnings(monkeypatch):
     assert fit["ok"]
     assert fit["n_convergence_warnings"] == 1
     assert fit["warnings"] == ["IRLS hit the iteration limit"]
+
+
+def test_stack_sessions_labels_each_session_and_leaves_out_the_sparse_ones(
+    monkeypatch,
+):
+    """Sessions with 3, 0 and 2 onsets: a gate of 2 keeps the first and last,
+    in order, each labelled by its keys; the default keeps all three."""
+    from continuum_swr_replay.analysis.behavior.rate import (
+        duration_aware_history as dah,
+    )
+
+    counts = {("a", 1, "02_r1"): [1, 2], ("a", 2, "02_r1"): [0], ("a", 3, "04_r2"): [2]}
+
+    def _design(keys, stops_g, onsets_g, outcome, *, duration_aware, ladder):
+        return pd.DataFrame({"count": counts[keys]}), ("Mself_dur",)
+
+    monkeypatch.setattr(dah, "build_design", _design)
+    sessions = [(keys, None, None) for keys in counts]
+
+    design, rungs, dropped = dah.stack_sessions(sessions, "non_local", min_events=2)
+
+    assert design["session"].tolist() == ["a_1_02_r1", "a_1_02_r1", "a_3_04_r2"]
+    assert design["count"].tolist() == [1, 2, 2]
+    assert design.index.tolist() == [0, 1, 2]
+    assert rungs == ("Mself_dur",)
+    assert dropped == ["a_2_02_r1"]
+
+    every, _, none_dropped = dah.stack_sessions(sessions, "non_local")
+    assert every["session"].nunique() == 3
+    assert none_dropped == []

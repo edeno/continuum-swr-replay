@@ -305,6 +305,58 @@ def build_design(
     return design, rungs
 
 
+def stack_sessions(
+    sessions: list[tuple[tuple, pd.DataFrame, pd.DataFrame]],
+    outcome: str,
+    *,
+    duration_aware: bool = True,
+    ladder: Mapping[str, PerBinRateModelSpec] | None = None,
+    min_events: int = 0,
+) -> tuple[pd.DataFrame, tuple[str, ...], list[str]]:
+    """Several sessions' designs (:func:`build_design`) stacked for a pooled fit.
+
+    Parameters
+    ----------
+    sessions : list of (keys, stops_g, onsets_g)
+        One animal's sessions, as :func:`build_design` takes them.
+    outcome : str
+        A key of :data:`POPULATION_PLAN`.
+    duration_aware, ladder
+        As in :func:`build_design`.
+    min_events : int
+        A session with fewer response onsets (``count`` summed over its bins)
+        is left out: its unpenalised session effect has no estimate in a
+        training set without events.
+
+    Returns
+    -------
+    design : pd.DataFrame
+        The kept sessions' designs, concatenated with a fresh index and a
+        ``session`` column (``"<animal>_<session_date>_<epoch>"``).
+    rungs : tuple of str
+        The rungs the last session's design carries (the same for every
+        session of one population).
+    dropped : list of str
+        The ``session`` labels of the sessions left out.
+    """
+    frames, rungs, dropped = [], (), []
+    for keys, stops_g, onsets_g in sessions:
+        design, rungs = build_design(
+            keys,
+            stops_g,
+            onsets_g,
+            outcome,
+            duration_aware=duration_aware,
+            ladder=ladder,
+        )
+        if design["count"].sum() < min_events:
+            dropped.append("_".join(map(str, keys)))
+            continue
+        design["session"] = "_".join(map(str, keys))
+        frames.append(design)
+    return pd.concat(frames, ignore_index=True), rungs, dropped
+
+
 def history_kernels(fit: dict) -> dict[str, np.ndarray]:
     """Per-lag log rate ratio of each fitted history block.
 

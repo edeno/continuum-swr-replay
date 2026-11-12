@@ -55,8 +55,8 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
 )
 from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
     attach_event_ends,
-    build_design,
     lag_support,
+    stack_sessions,
 )
 from continuum_swr_replay.analysis.behavior.rate.ridge_history_cv import (
     FOLD_SEED,
@@ -96,15 +96,9 @@ def _gpu_peak_bytes() -> int | None:
 def _stack_one(animal: str, outcome: str, sessions: list) -> dict:
     """One animal's stacked design for one stream. CPU; for workers."""
     t0 = time.perf_counter()
-    frames, dropped = [], []
-    for keys, stops_g, onsets_g in sessions:
-        design, _ = build_design(keys, stops_g, onsets_g, outcome, ladder=LADDER)
-        if design["count"].sum() < MIN_SESSION_EVENTS:
-            dropped.append("_".join(map(str, keys)))
-            continue
-        design["session"] = "_".join(map(str, keys))
-        frames.append(design)
-    design = pd.concat(frames, ignore_index=True)
+    design, _, dropped = stack_sessions(
+        sessions, outcome, ladder=LADDER, min_events=MIN_SESSION_EVENTS
+    )
     support = {k: v.tolist() for k, v in lag_support(design).items()}
     design = design.drop(
         columns=[c for c in design.columns if c.startswith(_LAG_PREFIXES)]

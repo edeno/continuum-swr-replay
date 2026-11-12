@@ -77,6 +77,7 @@ from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
     fit_pooled_history,
     lag_support,
     onset_offset_collinearity,
+    stack_sessions,
 )
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import (
@@ -134,24 +135,13 @@ def _fit_one_session(
     return keys, rows, time.perf_counter() - t0
 
 
-def _stacked(sessions: list, outcome: str, duration_aware: bool):
-    frames, rungs = [], ()
-    for keys, stops_g, onsets_g in sessions:
-        design, rungs = build_design(
-            keys, stops_g, onsets_g, outcome, duration_aware=duration_aware
-        )
-        design["session"] = "_".join(map(str, keys))
-        frames.append(design)
-    return pd.concat(frames, ignore_index=True), rungs
-
-
 def _fit_one_animal(
     animal: str, outcome: str, sessions: list
 ) -> tuple[tuple, dict, float]:
     """Fit one animal's stacked sessions for one population. For workers."""
     t0 = time.perf_counter()
     rec: dict = {"animal": animal, "outcome": outcome, "n_sessions": len(sessions)}
-    design, rungs = _stacked(sessions, outcome, duration_aware=True)
+    design, rungs, _ = stack_sessions(sessions, outcome, duration_aware=True)
     rec |= {
         "n_bins": int(len(design)),
         "n_events": int(design["count"].sum()),
@@ -161,7 +151,7 @@ def _fit_one_animal(
         },
     }
     del design
-    shipped, _ = _stacked(sessions, outcome, duration_aware=False)
+    shipped, _, _ = stack_sessions(sessions, outcome, duration_aware=False)
     names = ["Mself"] + (["Mselfcross"] if POPULATION_PLAN[outcome][1] else [])
     rec["shipped_support"] = {k: v.tolist() for k, v in lag_support(shipped).items()}
     rec["shipped"] = {
