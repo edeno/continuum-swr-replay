@@ -222,7 +222,9 @@ def build_stop_table(
 
     # ``_in_event_mask`` validates complete labels before any bout slicing,
     # so a Non-Local event is counted atomically and can never be clipped into
-    # multiple apparent events by a mobile interior sample.
+    # multiple apparent events by a mobile interior sample. Every sample of such
+    # an event is immobile, so all its rows lie in one bout: counting it in the
+    # bout it has rows in is the ContFrag stop table's count by event start.
     event_rows = bout_rows.loc[nonlocal_event_mask[in_bout]]
     n_events_per_bout = (
         event_rows.groupby("_bout_idx")["non_local_event"]

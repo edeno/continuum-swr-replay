@@ -815,7 +815,8 @@ def build_contfrag_stop_table(
     # (``stop_idx = assign_bout(event_start)``) and using the SAME
     # all-immobile inclusion mask, so the population matches the event
     # table and ``Σ stop.n_selected_events == len(event_table)`` holds by
-    # construction. (All-immobile events cannot straddle bouts, but
+    # construction. (All-immobile events cannot straddle bouts, so this is
+    # the NonLocal stop table's count by the bout an event has rows in;
     # counting by event_start keeps the two tables aligned regardless.)
     in_event = _in_contfrag_event_mask(dot, event_source)
     event_rows = dot.loc[in_event]
