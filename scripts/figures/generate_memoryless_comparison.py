@@ -1194,11 +1194,8 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
 
 def check_heldout_claims(heldout: pd.DataFrame) -> None:
     """The caption's claims about held-out evidence, checked against its summary."""
-    if "comparator_only" in sweep_statistics.heldout_event_classes(heldout):
-        raise RuntimeError(
-            "The caption says the sliding window reported no event our detector "
-            "missed; the held-out summary holds comparator-only events."
-        )
+    # refuses a summary holding an event only the sliding window reported
+    sweep_statistics.heldout_event_classes(heldout)
     # refuses a summary in which an informative place-less burst has support
     placeless = sweep_statistics.placeless_burst_statistics(heldout, tuple(FOLD_HATCH))
     by_class = heldout[heldout["summary"] == "by_class"]

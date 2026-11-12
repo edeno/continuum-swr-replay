@@ -876,11 +876,16 @@ def test_lowest_estimator_agreement_refuses_a_fold_without_one():
 
 def test_heldout_event_classes_are_those_of_the_by_class_rows():
     assert stats.heldout_event_classes(HELDOUT) == {"ours_only", "shared"}
+    # a class in another block is not one of them
+    other_block = _heldout(
+        [*HELDOUT_ROWS, ("error_rates", "n", "A", "x", "x", "comparator_only", "", 1.0)]
+    )
+    assert stats.heldout_event_classes(other_block) == {"ours_only", "shared"}
+
+
+def test_heldout_event_classes_refuse_an_event_only_the_sliding_window_reported():
     with_comparator = _heldout(
         HELDOUT_ROWS + _by_class("A", "comparator_only", REPLAY, {"n_events_all": 1})
     )
-    assert stats.heldout_event_classes(with_comparator) == {
-        "ours_only",
-        "shared",
-        "comparator_only",
-    }
+    with pytest.raises(ValueError, match="comparator-only events"):
+        stats.heldout_event_classes(with_comparator)

@@ -874,7 +874,8 @@ def lowest_estimator_agreement(heldout: pd.DataFrame) -> float:
 
 
 def heldout_event_classes(heldout: pd.DataFrame) -> set[str]:
-    """The classes of event the held-out summary holds.
+    """The classes of event the held-out summary holds: none that only the
+    sliding window reported, or the summary is refused.
 
     Parameters
     ----------
@@ -885,7 +886,19 @@ def heldout_event_classes(heldout: pd.DataFrame) -> set[str]:
     -------
     classes : set of str
         The ``event_class`` of its by-class rows: ``"shared"`` (both detectors
-        reported the event), ``"ours_only"`` or ``"comparator_only"``.
+        reported the event) or ``"ours_only"``.
+
+    Raises
+    ------
+    ValueError
+        If a by-class row's class is ``"comparator_only"``: an event the
+        sliding window reported and the state-space detector did not.
     """
     by_class = heldout[heldout["summary"] == "by_class"]
-    return set(by_class["event_class"])
+    classes = set(by_class["event_class"])
+    if "comparator_only" in classes:
+        raise ValueError(
+            "held-out summary: expected no event only the sliding window reported; "
+            "it holds comparator-only events"
+        )
+    return classes

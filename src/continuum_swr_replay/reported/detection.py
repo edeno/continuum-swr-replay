@@ -947,11 +947,8 @@ def heldout_values(heldout: pd.DataFrame, source: str) -> list[Value]:
             "folds differ, or one has no informative shared replay (from "
             f"{shared['rate_min']} to {shared['rate_max']})"
         )
-    if "comparator_only" in sweep_statistics.heldout_event_classes(heldout):
-        raise ValueError(
-            "the caption says the sliding window reported no event our detector "
-            "missed; the held-out summary holds comparator-only events"
-        )
+    # refuses a summary holding an event only the sliding window reported
+    sweep_statistics.heldout_event_classes(heldout)
     return [
         share(
             "heldout_ours_only_support_min",
