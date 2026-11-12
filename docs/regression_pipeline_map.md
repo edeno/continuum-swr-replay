@@ -392,7 +392,7 @@ Estimators and the per-session fit machinery each runner calls.
 
 Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
 
-`fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`, `fit_flag_counts`
+`fit_status`, `separated_terms`, `capture_fit_warnings`, `count_fit_quality_warnings`, `flagged_separated`, `fit_flag_counts`
 
 ### `src/continuum_swr_replay/analysis/behavior/_helpers.py`
 
@@ -730,7 +730,7 @@ Model checking utilities for the replay content model hierarchy.
 
 Compare nested models via AIC, BIC, and likelihood ratio tests.
 
-`why_not_comparable`, `compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
+`compare_nested_models`, `summarize_comparison`, `run_full_hierarchy_comparison`
 
 ### `src/continuum_swr_replay/analysis/behavior/contrast_aggregation.py`
 
@@ -944,7 +944,7 @@ Held-out spike evidence for each decoder state, on every canonical HPC decode.
 
 Held-out spike evidence of Non-Local bouts, split by SWR coupling.
 
-`ok_epochs`, `label_epoch`, `main`
+`label_epoch`, `main`
 
 ### `scripts/detection/sweep_memoryless_controls.py`
 
@@ -1153,6 +1153,12 @@ Summary statistics of what the non-local events represent.
 Fit one content rung on every session of a cohort.
 
 `fit_model_per_session`
+
+### `src/continuum_swr_replay/analysis/behavior/fit_comparability.py`
+
+Which sessions of a rung pair can be compared by an information criterion.
+
+`why_not_comparable`
 
 ### `src/continuum_swr_replay/analysis/behavior/rate/history_kernel_statistics.py`
 
