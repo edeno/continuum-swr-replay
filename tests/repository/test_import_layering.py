@@ -32,8 +32,8 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   hippocampus below them even if one stops importing it.
 - ``behavior_subpackages_import_one_way``: inside ``analysis.behavior`` the
   subpackages import in the order ``covariates``, ``choice``, ``tables``, then
-  ``rate`` and ``content`` (:data:`BEHAVIOR_SUBPACKAGE_RANK`): one imports only
-  subpackages before it, so ``rate`` and ``content`` never import each other.
+  ``rate``, ``content`` and ``coupling`` (:data:`BEHAVIOR_SUBPACKAGE_RANK`): one
+  imports only subpackages before it, so the last three never import one another.
 - ``behavior_top_level_imports_no_subpackage``: a module at the top level of
   ``analysis.behavior`` imports no subpackage, except that the modules of
   :data:`BEHAVIOR_TOP_LEVEL_MAY_IMPORT_COVARIATES` import ``covariates``. The
@@ -69,13 +69,15 @@ EVENTS_MAY_IMPORT = frozenset(
 )
 
 #: The ``analysis.behavior`` subpackages, ranked: one imports only those of a
-#: lower rank. ``rate`` and ``content`` share a rank, so neither imports the other.
+#: lower rank. ``rate``, ``content`` and ``coupling`` share a rank, so none imports
+#: another.
 BEHAVIOR_SUBPACKAGE_RANK = {
     "covariates": 0,
     "choice": 1,
     "tables": 2,
     "rate": 3,
     "content": 3,
+    "coupling": 3,
 }
 
 #: Top-level ``analysis.behavior`` modules that read the ``covariates`` subpackage.
