@@ -762,13 +762,13 @@ def _supported_scripts() -> list[Path]:
 
 
 def _fit_runners() -> list[Path]:
-    """The rate and content runners: ``rate/fit_*``, ``content/*fit*`` and
-    ``content/analyze_*content*``."""
+    """The rate and content runners: ``behavior/rate/fit_*``,
+    ``behavior/content/*fit*`` and ``behavior/content/analyze_*content*``."""
     return sorted(
         {
-            *SCRIPTS.glob("rate/fit_*.py"),
-            *SCRIPTS.glob("content/*fit*.py"),
-            *SCRIPTS.glob("content/analyze_*content*.py"),
+            *SCRIPTS.glob("behavior/rate/fit_*.py"),
+            *SCRIPTS.glob("behavior/content/*fit*.py"),
+            *SCRIPTS.glob("behavior/content/analyze_*content*.py"),
         }
     )
 

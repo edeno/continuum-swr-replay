@@ -14,7 +14,7 @@ enforces this for scripts, and
 [`tests/repository/test_import_layering.py`](../tests/repository/test_import_layering.py) for `src/`.
 The first test's `ALLOWED` table is the current exception list, and it only
 shrinks. One entry is left: `exploratory/_content_cohort_control.py`, which runs
-`content/fit_swr_contrast_content.py` with its cohort rule bypassed.
+`behavior/content/fit_swr_contrast_content.py` with its cohort rule bypassed.
 
 The detection-comparison and memoryless-sweep families once imported each other; their
 shared code is now in the package (2026-10-25): the inventory run's roster, grid and table
