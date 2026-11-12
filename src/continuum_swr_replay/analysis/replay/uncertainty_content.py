@@ -30,7 +30,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     session_median_statistics,
     signed_rank_p,
 )
@@ -853,10 +853,10 @@ def summarize_horserace(coefficients: pd.DataFrame) -> pd.DataFrame:
     For each (population, predictor): the across-session median coefficient, the
     number of animals whose own median matches the overall sign (sign consistency,
     of those present; both from
-    :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`),
+    :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`),
     the median per-session design condition number, and the
     Wilcoxon signed-rank p
-    (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`, NaN below
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`, NaN below
     six non-zero coefficients). The Wilcoxon is **descriptive** —
     sessions within an animal are not independent — so read the animal
     sign-consistency as the population evidence.

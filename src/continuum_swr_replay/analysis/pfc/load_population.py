@@ -36,7 +36,7 @@ from continuum_swr_replay.analysis.pfc.matched_control import (
 )
 from continuum_swr_replay.analysis.pfc.modulation import REPORT_HALF_WINDOW_S
 from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_path
-from continuum_swr_replay.analysis.statistics import benjamini_hochberg
+from continuum_swr_replay.analysis.shared_statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 logger = logging.getLogger(__name__)

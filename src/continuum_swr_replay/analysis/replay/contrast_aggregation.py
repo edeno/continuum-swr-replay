@@ -44,7 +44,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
-from continuum_swr_replay.analysis.statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     benjamini_hochberg,
     session_median_statistics,
     signed_rank_p,
@@ -597,12 +597,12 @@ def gated_term_statistics(
         Which sessions are kept, and how many were left out and why.
     statistics : dict
         Over the kept sessions: the names of
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`,
+        :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`,
         and
 
         - ``signed_rank_p``: the Wilcoxon signed-rank p of the coefficients
           against zero
-          (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`).
+          (:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`).
         - ``session_se_median``: the median of :func:`session_se`; NaN when the
           fits carry no standard error.
         - ``se_source``: which standard error that is (:func:`session_se`).

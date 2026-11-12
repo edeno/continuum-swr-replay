@@ -56,7 +56,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (
     MODEL_CROSS_HISTORY_RATE,
     longest_history_window_s,
 )
-from continuum_swr_replay.analysis.statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     benjamini_hochberg,
     session_median_statistics,
     signed_rank_p,

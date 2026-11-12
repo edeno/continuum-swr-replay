@@ -33,7 +33,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.statistics import benjamini_hochberg, signed_rank_p
+from continuum_swr_replay.analysis.shared_statistics import (
+    benjamini_hochberg,
+    signed_rank_p,
+)
 from continuum_swr_replay.data_loaders.constants import TRACK_SEGMENT_TO_PATCH
 from continuum_swr_replay.tables.session_keys import (
     SESSION_COLUMNS,
@@ -689,7 +692,7 @@ def cross_session_role_summary(coefs: pd.DataFrame) -> pd.DataFrame:
         ``p_fdr``, and ``status`` (``"ok"`` or ``"too_few_sessions"``). A role
         whose sessions give no signed-rank p (fewer than six with a non-zero
         ``beta_inter``,
-        :func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`) is
+        :func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`) is
         ``"too_few_sessions"``, has no median, and is left out of the
         correction as well as the test.
     """

@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2
 
-from continuum_swr_replay.analysis.statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     session_median_statistics,
     signed_rank_p,
 )

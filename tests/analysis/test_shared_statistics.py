@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis import statistics as stats
+from continuum_swr_replay.analysis import shared_statistics as stats
 
 NAN = np.nan
 

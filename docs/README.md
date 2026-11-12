@@ -205,7 +205,7 @@ layers below it, never from a layer above:
    other foundation modules.
 2. **`analysis/events/`**, the analysed-time rule and the event substrate. It imports
    only the foundation, `analysis/constants.py` (which itself imports only the
-   foundation), `analysis/statistics.py` and itself. `analysis/statistics.py` holds
+   foundation), `analysis/shared_statistics.py` and itself. `analysis/shared_statistics.py` holds
    the statistics that know nothing of the task, for every `analysis/` package: the
    signed-rank test, the Benjamini-Hochberg correction and the animal-balanced
    summary over sessions. It imports nothing from the package.

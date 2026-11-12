@@ -16,7 +16,7 @@ pass the per-term gate
 a single basis coefficient is not the effect of a reward at any lag. Rates are
 events per at-risk second, kernels are rate ratios, times are in seconds.
 Every signed-rank p is
-:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p` (NaN below six
+:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p` (NaN below six
 non-zero differences). Summaries of one coefficient, of one coefficient of two
 populations within session, and of one rung against another, are in
 :mod:`~continuum_swr_replay.analysis.replay.coefficient_statistics`.
@@ -52,7 +52,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (
     reconstruct_reward_kernels,
     reconstruct_self_history_kernels,
 )
-from continuum_swr_replay.analysis.statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     session_median_statistics,
     signed_rank_p,
 )

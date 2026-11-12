@@ -118,7 +118,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     SWR_CONTRAST_CONTENT_ARM_LADDER as ARM_LADDER,
 )
-from continuum_swr_replay.analysis.statistics import (  # noqa: E402
+from continuum_swr_replay.analysis.shared_statistics import (  # noqa: E402
     session_median_statistics,
 )
 from continuum_swr_replay.paths import figure_dir, replay_content_dir

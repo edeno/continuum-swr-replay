@@ -432,7 +432,7 @@ records those files, so `make release-check` can say when one has changed since.
 A builder names and describes values; it does not compute them. The statistics are functions in
 `analysis/`, each returning named numbers (a dict, or a table with one row per group), tested there on
 tables small enough to check by hand, so that a figure showing a statistic calls the function the text's
-number comes from. The statistics that know nothing of the task are in `analysis/statistics.py`: the
+number comes from. The statistics that know nothing of the task are in `analysis/shared_statistics.py`: the
 signed-rank p (NaN below six non-zero differences), the Benjamini-Hochberg correction (a missing p is
 left out of the family) and the animal-balanced summary over sessions; every other module calls those.
 Each builder's statistics:

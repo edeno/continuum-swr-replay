@@ -69,7 +69,7 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     significant_fraction,
 )
 from continuum_swr_replay.analysis.pfc.modulation import curve_peaks
-from continuum_swr_replay.analysis.statistics import benjamini_hochberg
+from continuum_swr_replay.analysis.shared_statistics import benjamini_hochberg
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
 
@@ -984,7 +984,7 @@ def matched_control_significance(frame: pd.DataFrame, alpha: float) -> pd.DataFr
     ``load_population_data`` corrects only the six tests it ships, so the two
     matched-control tests are corrected here, over the same population and by
     the same function
-    (:func:`~continuum_swr_replay.analysis.statistics.benjamini_hochberg`).
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.benjamini_hochberg`).
     BH is applied within the pooled population, which is where the two tests
     are read; the per-animal rows are that same correction sliced by animal,
     so they are comparable with the pooled row rather than separate families.

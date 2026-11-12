@@ -46,7 +46,7 @@ from continuum_swr_replay.analysis.pfc.timing import (
     peak_and_onset,
     population_rise_timing,
 )
-from continuum_swr_replay.analysis.statistics import benjamini_hochberg
+from continuum_swr_replay.analysis.shared_statistics import benjamini_hochberg
 
 # --- the cohort and its fits ---------------------------------------------------------
 
@@ -336,7 +336,7 @@ def bh_called_fraction(population: pd.DataFrame, name: str, alpha: float) -> flo
 
     BH is applied once, over the pooled p-values of every unit tested for
     ``name``
-    (:func:`~continuum_swr_replay.analysis.statistics.benjamini_hochberg`).
+    (:func:`~continuum_swr_replay.analysis.shared_statistics.benjamini_hochberg`).
 
     Parameters
     ----------

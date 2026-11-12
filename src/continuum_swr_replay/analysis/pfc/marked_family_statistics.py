@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from continuum_swr_replay.analysis.statistics import session_median_statistics
+from continuum_swr_replay.analysis.shared_statistics import session_median_statistics
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 
 #: The max-statistic call: outside the reference when the plus-one p is at
@@ -128,7 +128,7 @@ def animal_balanced_fraction_positive(
         ``frac_pos`` (median over animals of the within-animal median over
         sessions of each session's share of usable units whose delta is
         positive: the ``animal_median`` of
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`),
+        :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`),
         ``frac_pos_min``/``frac_pos_max`` across animals,
         ``delta_median`` and ``delta_p95`` over usable units.
     """

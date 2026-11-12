@@ -8,7 +8,7 @@ row per session, with the session columns of
 :data:`~continuum_swr_replay.tables.session_keys.SESSION_COLUMNS`) and return
 named numbers.
 
-:func:`~continuum_swr_replay.analysis.statistics.session_median_statistics` is
+:func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics` is
 the one summary every other function is built on: the median over sessions
 with the sessions' signs, and the median over animals of each animal's own
 median with the animals' signs. "Animals positive" counts the animals whose own
@@ -33,7 +33,7 @@ from continuum_swr_replay.analysis.replay.contrast_aggregation import (
     separated_for_term,
     unidentified_for_term,
 )
-from continuum_swr_replay.analysis.statistics import (
+from continuum_swr_replay.analysis.shared_statistics import (
     benjamini_hochberg,
     session_median_statistics,
     signed_rank_p,
@@ -143,7 +143,7 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
     -------
     statistics : dict
         The names of
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`,
+        :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`,
         and:
 
         - ``exp_median``: ``exp`` of the median over sessions (a rate ratio for
@@ -151,7 +151,7 @@ def coefficient_statistics(fits: pd.DataFrame, column: str) -> dict[str, float]:
         - ``exp_animal_median``: ``exp`` of the median over animals.
         - ``signed_rank_p``: the Wilcoxon signed-rank p of the sessions'
           coefficients against zero
-          (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`: a
+          (:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`: a
           coefficient of exactly zero is left out of the test, and the p is NaN
           below six sessions with a non-zero coefficient).
     """
@@ -207,7 +207,7 @@ def coefficient_family_statistics(
           record it.
         - ``signed_rank_p_adjusted``: ``signed_rank_p`` Benjamini-Hochberg
           corrected over the terms that have one
-          (:func:`~continuum_swr_replay.analysis.statistics.benjamini_hochberg`);
+          (:func:`~continuum_swr_replay.analysis.shared_statistics.benjamini_hochberg`);
           NaN where ``signed_rank_p`` is.
     """
     rows = {}
@@ -272,7 +272,7 @@ def animal_median_bootstrap(
         - ``animal_medians``: each animal's median, a ``pd.Series`` indexed by
           animal in sorted order.
         - ``animal_median``: the median over animals of those medians
-          (:func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`).
+          (:func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`).
         - ``percentiles``: the resampled statistic's ``percentiles``, a
           ``numpy.ndarray`` of shape ``(len(percentiles),)``; NaN when no
           animal has a value. With one animal every draw is that animal, so
@@ -405,11 +405,11 @@ def paired_coefficient_statistics(
     Returns
     -------
     statistics : dict
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
+        :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`
         of the sessions' ``a - b`` differences (``n_sessions``, ``median``,
         ``positive_fraction``, ``n_animals``, ``n_animals_positive``, ...), and
         ``signed_rank_p``, their Wilcoxon signed-rank p
-        (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`: NaN
+        (:func:`~continuum_swr_replay.analysis.shared_statistics.signed_rank_p`: NaN
         below six non-zero differences).
 
     Raises
@@ -487,7 +487,7 @@ def aic_difference_statistics(
     Returns
     -------
     statistics : dict
-        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
+        :func:`~continuum_swr_replay.analysis.shared_statistics.session_median_statistics`
         of ``AIC(child) - AIC(parent)`` over the sessions with both fits and a difference that is not missing. An
         infinite AIC is not missing: its session is kept, with an infinite
         difference, unless both AICs are infinite. Negative means the child is
