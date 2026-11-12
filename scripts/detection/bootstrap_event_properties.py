@@ -5,9 +5,10 @@ two added ones, start distance and arms visited), over the immobile non-local
 events of the canonical event table: the median of each class, the SWR minus
 non-SWR difference, and the duration-matched difference (within ten quantile
 strata of the pooled event durations in whole decode samples, averaged by
-stratum size; ``analysis.hippocampus.property_contrast``), each with a 95 % percentile
+stratum size; ``analysis.hippocampus.property_contrast``), each with a 95 %
 interval from a nested bootstrap (animals, then epochs within animal, then
-events within epoch; fixed seed). Values are on the scale Part 2 reports
+events within epoch; fixed seed): the estimate plus or minus a small-sample t
+correction over the animals times the replicates' standard deviation. Values are on the scale Part 2 reports
 (duration in ms).
 
 Writes ``Processed-Data/event_property_bootstrap/``: ``replicates.parquet``
@@ -36,7 +37,7 @@ from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     DECODE_SAMPLE_S,
     MAX_NAN_REPLICATE_SHARE,
     bootstrap_contrasts,
-    percentile_intervals,
+    bootstrap_intervals,
 )
 from continuum_swr_replay.paths import (
     processed_data_dir,
@@ -107,7 +108,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         min_per_class=MIN_PER_CLASS,
     )
     cpu_s = time.process_time() - began
-    intervals = percentile_intervals(replicates)
+    intervals = bootstrap_intervals(replicates, events.animal.nunique())
     folder = processed_data_dir() / args.out_name
     folder.mkdir(parents=True, exist_ok=True)
     replicates.to_parquet(folder / "replicates.parquet", index=False)
@@ -138,7 +139,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "replicate drawing no event of a class in a stratum leaves it out "
                 "(counted in intervals.csv)",
                 "max_nan_replicate_share": MAX_NAN_REPLICATE_SHARE,
-                "interval": "95 % percentile",
+                "interval": "95 %: the estimate +/- t(0.975, n_animals - 1) "
+                "sqrt(n_animals / (n_animals - 1)) SD(replicates)",
+                "n_animals": int(events.animal.nunique()),
                 "properties": {w: list(PROPERTIES[w]) for w in args.properties},
                 "cpu_seconds": cpu_s,
             },

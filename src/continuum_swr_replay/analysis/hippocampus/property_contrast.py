@@ -8,7 +8,10 @@ that resamples at each level in turn
 the animals with replacement, then each drawn animal's sessions with
 replacement, then each drawn session's events with replacement. A replicate is
 a vector of counts, how many times each event was drawn, so every property and
-both classes are read from the same resample.
+both classes are read from the same resample. The 95 % interval
+(:func:`bootstrap_intervals`) is the estimate plus or minus a small-sample t
+correction over the animals times the replicates' standard deviation
+(:func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`).
 
 Non-SWR events are shorter than SWR events, so a raw contrast mixes any class
 difference with a duration difference. :func:`matched_difference`
@@ -34,6 +37,7 @@ import pandas as pd
 from numpy.typing import NDArray
 
 from continuum_swr_replay.analysis.shared_statistics import (
+    bootstrap_interval,
     nested_bootstrap_draw,
     nested_codes,
     weighted_median,
@@ -218,26 +222,39 @@ def bootstrap_contrasts(
     return pd.DataFrame(rows)
 
 
-def percentile_intervals(
+def bootstrap_intervals(
     replicates: pd.DataFrame,
-    level: float = 0.95,
+    n_animals: int,
     *,
     max_nan_share: float = MAX_NAN_REPLICATE_SHARE,
 ) -> pd.DataFrame:
-    """Each property's estimate (replicate -1) and percentile interval of each
-    column of :func:`bootstrap_contrasts`, with the replicates behind it counted.
+    """Each property's estimate (replicate -1) and 95 % interval of each column
+    of :func:`bootstrap_contrasts`, with the replicates behind it counted.
 
-    A replicate with no estimate (NaN) is left out of the percentiles, so the
+    The interval is
+    :func:`~continuum_swr_replay.analysis.shared_statistics.bootstrap_interval`
+    of the estimate and the replicates: symmetric about the estimate, a
+    small-sample t correction over the ``n_animals`` animals the replicates
+    resample. A replicate with no estimate (NaN) is left out of it, so the
     count of such replicates is kept, and more than ``max_nan_share`` of them
     raises.
+
+    Parameters
+    ----------
+    replicates : pd.DataFrame
+        :func:`bootstrap_contrasts`.
+    n_animals : int
+        The animals the replicates resample.
+    max_nan_share : float, optional
+        The largest share of replicates allowed to have no estimate.
 
     Returns
     -------
     pd.DataFrame
         Indexed by property: for each column ``c``, ``c``, ``c_low``,
-        ``c_high`` and ``c_nan_replicates``; then ``n_replicates`` and
+        ``c_high`` and ``c_nan_replicates``; then ``n_replicates``,
         ``matched_replicates_skipping_strata`` (replicates whose matched
-        difference left out an eligible stratum).
+        difference left out an eligible stratum) and ``n_animals``.
 
     Raises
     ------
@@ -245,15 +262,11 @@ def percentile_intervals(
         If a property's share of NaN replicates in any column exceeds
         ``max_nan_share``.
     """
-    tail = (1.0 - level) / 2.0
     columns = ["median_non_swr", "median_swr", "difference", "matched_difference"]
     point = replicates[replicates.replicate < 0].set_index("property")[columns]
     boot_rows = replicates[replicates.replicate >= 0]
-    boot = boot_rows.groupby("property")[columns]
-    low = boot.quantile(tail).add_suffix("_low")
-    high = boot.quantile(1.0 - tail).add_suffix("_high")
     nan = boot_rows[columns].isna().groupby(boot_rows["property"]).sum()
-    n_replicates = boot.size()
+    n_replicates = boot_rows.groupby("property").size()
     share = nan.div(n_replicates, axis=0)
     if (share > max_nan_share).any(axis=None):
         bad = share[(share > max_nan_share).any(axis=1)]
@@ -261,7 +274,13 @@ def percentile_intervals(
             f"more than {max_nan_share:.0%} of the replicates have no estimate:\n"
             f"{bad.to_string()}"
         )
-    out = point.join(low).join(high).join(nan.add_suffix("_nan_replicates"))
+    out = point.copy()
+    for name, draws in boot_rows.groupby("property"):
+        for c in columns:
+            interval = bootstrap_interval(point.loc[name, c], draws[c], n_animals)
+            out.loc[name, f"{c}_low"] = interval.low
+            out.loc[name, f"{c}_high"] = interval.high
+    out = out.join(nan.add_suffix("_nan_replicates"))
     out = out[
         [f"{c}{s}" for c in columns for s in ("", "_low", "_high", "_nan_replicates")]
     ]
@@ -269,4 +288,5 @@ def percentile_intervals(
     out["matched_replicates_skipping_strata"] = (
         boot_rows["matched_strata_skipped"].gt(0).groupby(boot_rows["property"]).sum()
     )
+    out["n_animals"] = n_animals
     return out

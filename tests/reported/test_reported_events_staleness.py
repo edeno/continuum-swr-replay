@@ -174,6 +174,7 @@ def _intervals(nan_matched: int = 0) -> pd.DataFrame:
         row["matched_difference_nan_replicates"] = nan_matched
         row["n_replicates"] = 1000
         row["matched_replicates_skipping_strata"] = 3
+        row["n_animals"] = 5
         rows[word] = row
     return pd.DataFrame.from_dict(rows, orient="index")
 
@@ -183,6 +184,7 @@ def test_property_intervals_name_their_skipped_strata_and_refuse_many_nans():
     low = values["extent_matched_difference_low"].description
     assert "3 of 1000 replicates left out a stratum" in low
     assert "0 had no estimate" in low
+    assert "small-sample t correction over the 5 animals" in low
     with pytest.raises(ValueError, match="too many bootstrap replicates"):
         property_interval_values(_intervals(nan_matched=50), "s")
     old = _intervals().drop(
@@ -190,6 +192,8 @@ def test_property_intervals_name_their_skipped_strata_and_refuse_many_nans():
     )
     with pytest.raises(ValueError, match="does not count"):
         property_interval_values(old, "s")
+    with pytest.raises(ValueError, match="percentile intervals"):
+        property_interval_values(_intervals().drop(columns="n_animals"), "s")
 
 
 _EVIDENCE_KEYS = {

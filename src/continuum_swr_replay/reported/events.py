@@ -1368,8 +1368,10 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
     epoch; 1000 replicates, fixed seed) of the SWR minus non-SWR difference of
     class medians, and of the duration-matched difference: within ten quantile
     strata of the pooled event durations, averaged by stratum size
-    (``analysis.hippocampus.property_contrast``). 95 % percentile intervals. The
-    class medians' own intervals stay in the bootstrap's ``intervals.csv``.
+    (``analysis.hippocampus.property_contrast``). 95 % intervals: the estimate
+    plus or minus a small-sample t correction over the animals times the
+    replicates' standard deviation. The class medians' own intervals stay in
+    the bootstrap's ``intervals.csv``.
     """
     if set(intervals.index) != {p[0] for p in _PROPERTIES}:
         raise ValueError(
@@ -1378,6 +1380,11 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
     nan_columns = [c for c in intervals.columns if c.endswith("_nan_replicates")]
     if not nan_columns:
         raise ValueError("the bootstrap does not count its replicates without estimate")
+    if "n_animals" not in intervals.columns:
+        raise ValueError(
+            "the bootstrap does not record its animals: its intervals are percentile "
+            "intervals, not the small-sample t rule"
+        )
     share = intervals[nan_columns].div(intervals["n_replicates"], axis=0)
     if (share > MAX_NAN_REPLICATE_SHARE).any(axis=None):
         raise ValueError(f"too many bootstrap replicates without estimate:\n{share}")
@@ -1386,6 +1393,10 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
         make = value_factory(property_interval_values, source, tags)
         row = intervals.loc[word]
         name = _PROPERTY_NAMES[word]
+        interval = (
+            "95 % interval (nested bootstrap, small-sample t correction over the "
+            f"{row.n_animals:.0f} animals)"
+        )
         skipped = (
             f"; {row.matched_replicates_skipping_strata:.0f} of "
             f"{row.n_replicates:.0f} replicates left out a stratum that drew no "
@@ -1398,8 +1409,8 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 row.difference_low,
                 "quantity",
                 "sig2s",
-                f"lower bound of the 95 % nested-bootstrap interval of the SWR minus "
-                f"non-SWR difference of median {name}",
+                f"lower bound of the {interval} of the SWR minus non-SWR difference "
+                f"of median {name}",
                 unit,
             ),
             make(
@@ -1428,7 +1439,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 row.matched_difference_low,
                 "quantity",
                 "sig2s",
-                f"lower bound of its 95 % nested-bootstrap interval{skipped}",
+                f"lower bound of its {interval}{skipped}",
                 unit,
             ),
             make(
@@ -1436,7 +1447,7 @@ def property_interval_values(intervals: pd.DataFrame, source: str) -> list[Value
                 row.matched_difference_high,
                 "quantity",
                 "sig2s",
-                "upper bound of its 95 % nested-bootstrap interval",
+                f"upper bound of its {interval}",
                 unit,
             ),
         ]

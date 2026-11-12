@@ -490,6 +490,7 @@ def test_property_interval_values_name_each_bound():
             "matched_difference_nan_replicates": 0,
             "n_replicates": 1000,
             "matched_replicates_skipping_strata": 0,
+            "n_animals": 5,
         }
     intervals = pd.DataFrame.from_dict(rows, orient="index")
     numbers = _numbers(builder.property_interval_values(intervals, "s"))

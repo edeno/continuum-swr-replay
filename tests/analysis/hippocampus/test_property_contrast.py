@@ -56,7 +56,7 @@ def test_bootstrap_contrasts_and_intervals():
     data = out[out.replicate < 0].set_index("property")
     assert data.loc["y", "median_swr"] == pytest.approx(np.median(y[is_swr]))
     assert data.loc["y", "median_non_swr"] == pytest.approx(np.median(y[~is_swr]))
-    intervals = pc.percentile_intervals(out)
+    intervals = pc.bootstrap_intervals(out, 5)
     row = intervals.loc["y"]
     assert row.difference_low <= row.difference <= row.difference_high
     assert row.matched_difference_low < 0.5 < row.matched_difference_high
@@ -71,6 +71,39 @@ def test_bootstrap_contrasts_and_intervals():
         seed=7,
     )
     pd.testing.assert_frame_equal(out, again)
+
+
+def test_each_interval_is_the_corrected_t_interval_about_the_estimate():
+    # One property; the data's difference 10, four replicates' differences
+    # 1, 2, NaN, 4 (the NaN left out: SD of 1, 2, 4 is sqrt(7/3)); five
+    # animals: t(0.975, 4) = 2.7764451, the correction sqrt(5/4).
+    replicates = pd.DataFrame(
+        {
+            "replicate": [-1, 0, 1, 2, 3],
+            "property": "y",
+            "median_non_swr": [1.0, 1.0, 1.0, 1.0, 1.0],
+            "median_swr": [11.0, 2.0, 3.0, 4.0, 5.0],
+            "difference": [10.0, 1.0, 2.0, np.nan, 4.0],
+            "matched_difference": [3.0, 3.0, 3.0, 3.0, 3.0],
+            "matched_strata_skipped": [0, 0, 1, 0, 0],
+        }
+    )
+    row = pc.bootstrap_intervals(replicates, 5, max_nan_share=0.5).loc["y"]
+    half = 2.7764451052 * np.sqrt(5 / 4) * np.sqrt(7 / 3)
+    assert row.difference_low == pytest.approx(10.0 - half)
+    assert row.difference_high == pytest.approx(10.0 + half)
+    assert row.difference_nan_replicates == 1
+    # identical replicates: no width, centred on the data's value
+    assert (row.median_non_swr_low, row.median_non_swr_high) == (1.0, 1.0)
+    assert row.matched_difference_low == row.matched_difference_high == 3.0
+    assert row.n_replicates == 4
+    assert row.matched_replicates_skipping_strata == 1
+    assert row.n_animals == 5
+    # two animals widen it by t(0.975, 1) sqrt(2) over t(0.975, 4) sqrt(5/4)
+    two = pc.bootstrap_intervals(replicates, 2, max_nan_share=0.5).loc["y"]
+    assert two.difference_high - 10.0 == pytest.approx(
+        12.7062047362 * np.sqrt(2) * np.sqrt(7 / 3)
+    )
 
 
 def test_a_session_in_two_animals_is_refused():
@@ -107,7 +140,7 @@ def test_skipped_strata_and_nan_replicates_are_counted():
         {"y": y}, is_swr, animal, session, duration, n_replicates=40, seed=3
     )
     assert (out.loc[out.replicate < 0, "matched_strata_skipped"] == 0).all()
-    intervals = pc.percentile_intervals(out)
+    intervals = pc.bootstrap_intervals(out, 5)
     row = intervals.loc["y"]
     assert row.n_replicates == 40
     assert row.matched_difference_nan_replicates == 0
@@ -117,13 +150,13 @@ def test_skipped_strata_and_nan_replicates_are_counted():
     # a replicate with no estimate is counted, and too many of them raise
     out.loc[out.replicate == 0, "matched_difference"] = np.nan
     assert (
-        pc.percentile_intervals(out, max_nan_share=0.05).loc[
+        pc.bootstrap_intervals(out, 5, max_nan_share=0.05).loc[
             "y", "matched_difference_nan_replicates"
         ]
         == 1
     )
     with pytest.raises(ValueError, match="no estimate"):
-        pc.percentile_intervals(out, max_nan_share=0.01)
+        pc.bootstrap_intervals(out, 5, max_nan_share=0.01)
 
 
 def test_a_replicate_drawing_no_event_of_a_class_skips_the_stratum():

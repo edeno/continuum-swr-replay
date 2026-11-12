@@ -652,7 +652,7 @@ def _figure03_intervals() -> pd.DataFrame:
     ]
     intervals = pd.DataFrame(
         0.0, index=[p[0] for p in _PROPERTIES], columns=columns
-    ).assign(n_replicates=1000.0, matched_replicates_skipping_strata=0.0)
+    ).assign(n_replicates=1000.0, matched_replicates_skipping_strata=0.0, n_animals=5.0)
     intervals.loc["speed", ["difference", "difference_low", "difference_high"]] = [
         300.0,
         120.0,
