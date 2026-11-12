@@ -56,6 +56,22 @@ class TestSessionSeed:
         assert all(0 <= seed < 2**64 for seed in seeds)
         assert len(set(seeds)) == len(seeds)
 
+    def test_it_reproduces_the_seeds_a_stored_fit_records(self):
+        # ``fold_seed`` and ``control_draw_seed`` as recorded in the sidecar of
+        # the stored canonical fit
+        # Processed-Data/chimi20200223_02_r1_mPFC_modulation.provenance.json
+        # (written by scripts/pfc/run_pfc_analysis_bandit.py at 110c9ae4). A
+        # change to the key, the digest or the byte order would make a refit
+        # draw other folds and another null than the bundles were scored on.
+        assert (
+            session_seed("folds", "chimi20200223_.nwb", "02_r1")
+            == 13_651_600_409_216_308_528
+        )
+        assert (
+            session_seed("control_draws", "chimi20200223_.nwb", "02_r1")
+            == 12_003_865_441_139_279_814
+        )
+
 
 class TestReadSessionList:
     def test_it_keeps_file_order_and_drops_repeats_and_comments(self, tmp_path):
