@@ -707,9 +707,10 @@ def plot_state_fractions_by_movement(
     moving_fracs = [moving_df[col].median() for col in moving_frac_cols]
 
     # Compute per-session state fractions during immobility (same aggregation),
-    # over the immobile bins outside excluded time
+    # over the immobile bins (speed strictly below the threshold, the project's
+    # immobility rule) outside excluded time
     is_immobile = (
-        data_over_time["head_speed"] <= DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
+        data_over_time["head_speed"] < DEFAULT_IMMOBILITY_THRESHOLD_CM_PER_SEC
     ) & analysed_bins(data_over_time)
     immobile_session = (
         data_over_time.loc[is_immobile]

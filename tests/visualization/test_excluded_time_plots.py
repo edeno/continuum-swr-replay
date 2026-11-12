@@ -86,6 +86,28 @@ def test_a_panel_refuses_a_frame_not_read_through_the_source(plot):
         _drawn(plot, frame)
 
 
+def test_the_immobile_bar_leaves_out_bins_at_the_speed_threshold():
+    """Immobile is speed strictly below 4 cm/s, and moving is above it, so a
+    bin at exactly 4 cm/s is in neither bar: the panel draws what it draws with
+    those rows removed. Bins 950-969 of session ``b`` are immobile and local."""
+    frame = two_sessions()
+    at_threshold = (
+        (frame["animal"] == "b").to_numpy()
+        & (np.tile(np.arange(1000), 2) >= 950)
+        & (np.tile(np.arange(1000), 2) < 970)
+    )
+    frame.loc[at_threshold, "head_speed"] = 4.0
+    frame.loc[at_threshold, "Local_prob"] = 0.0
+    frame.loc[at_threshold, "Non-Local_Continuous_prob"] = 1.0
+
+    drawn = _drawn(figure_panels.plot_state_fractions_by_movement, frame)
+
+    assert _same(
+        drawn,
+        _drawn(figure_panels.plot_state_fractions_by_movement, frame[~at_threshold]),
+    )
+
+
 STRICT = {
     **PANELS,
     "B8 well positions": lambda frame, ax: (
