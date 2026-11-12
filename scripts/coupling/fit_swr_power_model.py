@@ -47,11 +47,14 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import skew, wilcoxon
+from scipy.stats import skew
 
 from continuum_swr_replay.analysis.constants import OUTCOME_TIME_SEMANTICS
 from continuum_swr_replay.analysis.events.analysed_time import require_swr_source
 from continuum_swr_replay.analysis.events.swr_source import swr_source_name
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (
+    coefficient_statistics,
+)
 from continuum_swr_replay.analysis.replay.cohort_audit import (
     cohort_record,
     write_cohort_audit,
@@ -535,11 +538,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     print(f"  {'covariate':<22}{'med coef':>10}{'%pos':>7}{'animals':>9}{'p':>10}")
     for c in PREDICTORS:
-        s = coefs[c].dropna()
-        n_an = (coefs.groupby("animal")[c].median() > 0).sum()
+        stats = coefficient_statistics(coefs, c)
+        animals = f"{stats['n_animals_positive']}/{stats['n_animals']}"
         print(
-            f"  {c:<22}{s.median():>+10.3f}{(s > 0).mean() * 100:>6.0f}%"
-            f"{f'{n_an}/5':>9}{wilcoxon(s)[1]:>10.1e}"
+            f"  {c:<22}{stats['median']:>+10.3f}"
+            f"{stats['positive_fraction'] * 100:>6.0f}%"
+            f"{animals:>9}{stats['signed_rank_p']:>10.1e}"
         )
 
 
