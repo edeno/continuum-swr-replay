@@ -1,12 +1,11 @@
 """The duration-aware per-bin history design on real events, and its readouts.
 
-Events have duration and one detector's events never overlap. The shipped
+Events have duration and one detector's events never overlap. The onset-only
 per-bin design counts every bin as at risk and reads history from onsets
 only; the duration-aware design (``aggregate_to_timebins(at_risk_events=...,
 offset_history=True)``, the ``MODEL_CROSS_HISTORY_DURATION_RATE`` rungs) drops
 the bins inside an ongoing event and reads history from onsets, ends or both.
-Simulation behind it: :mod:`.duration_history_simulation`; review
-``.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md``.
+Simulation behind it: :mod:`.duration_history_simulation`.
 
 This module holds what the runners and the Part 3 summary share:
 

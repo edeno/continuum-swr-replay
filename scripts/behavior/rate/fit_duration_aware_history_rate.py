@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """Duration-aware self- and cross-history of the per-bin event rate.
 
-The shipped per-bin design treats each event as an instant onset: every 15 ms
+The onset-only per-bin design treats each event as an instant onset: every 15 ms
 bin of a stop is at risk, including the bins inside an ongoing event, and
 self-/cross-history count past onsets. On simulated data that alone produces a
-short-lag "refractory" dip, a self-history burst and two-way cross coupling (``.claude/docs/reviews/2026-10-26-duration-aware-history-
-simulation.md``). This runner refits the history on the at-risk design
+short-lag "refractory" dip, a self-history burst and two-way cross coupling
+(:mod:`continuum_swr_replay.analysis.behavior.rate.duration_history_simulation`).
+This runner refits the history on the at-risk design
 (``analysis/behavior/rate/duration_aware_history.py:build_design``):
 
 - a bin's exposure is the time no event of the response's detector covers (bins

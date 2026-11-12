@@ -60,6 +60,10 @@ Rule of thumb: **published/scientific → `docs/`; agent-process/scratch → `.c
     *design spec*: the covariate causal-hygiene rules every fit runner enforces
     and the `<run>_cohort_audit.csv` schema (drop buckets + reconciliation
     invariant).
+  - [design/duration_aware_history_simulation.md](design/duration_aware_history_simulation.md)
+    — the simulation behind the per-bin rate models' at-risk bins and end-anchored
+    history: what the onset-only design gets wrong, what the at-risk design recovers,
+    and the limits of the history kernels.
   - [design/builder_test_floor.md](design/builder_test_floor.md) — *reference*: the
     measured value-level test coverage of the covariate builders and the target,
     kept honest by `scripts/checks/mutation_check.py`.

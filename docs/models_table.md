@@ -305,8 +305,9 @@ Mselfcross  count ~ BS_TC + REWBASIS + HISTCOS + CROSSCOS
 `models_per_bin_rate/duration_aware_history_models.pkl` (per session, `--mode session`) and
 `duration_aware_history_pooled.pkl` (each animal's sessions stacked with a session fixed effect,
 `--mode pooled`), each with its `.provenance.json`.
-Simulation behind it: `analysis/behavior/rate/duration_history_simulation.py`, review
-`.claude/docs/reviews/2026-10-26-duration-aware-history-simulation.md`.
+Simulation behind it: `analysis/behavior/rate/duration_history_simulation.py`, described with
+its findings and limits in
+[design/duration_aware_history_simulation.md](design/duration_aware_history_simulation.md).
 
 `MODEL_CROSS_HISTORY_DURATION_RATE` in `model_specs.py`. Events have duration
 and one detector's events never overlap, so these rungs are fit on the at-risk

@@ -130,7 +130,9 @@ offset. Its limitation is exactly that offset — see below.
   all-bins design the onset block's short-lag coefficient ran to −∞ (the bin
   after an onset never holds one), which is why many of those fits
   were flagged not converged; their reward kernels agree with the at-risk fits
-  session by session.
+  session by session. The simulation behind this choice, and the limits of what the
+  history kernels can show, are in
+  [design/duration_aware_history_simulation.md](design/duration_aware_history_simulation.md).
 - **The ladder** toggles three blocks independently, all at one bin width
   (`BIN_S = 0.015`) so the models are nested and AIC / CV / GOF are comparable:
 
