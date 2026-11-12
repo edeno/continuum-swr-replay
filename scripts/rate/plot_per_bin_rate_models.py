@@ -38,13 +38,16 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
     fit_rows,
+    gated_coefficient_statistics,
+)
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
+    gate_term_sessions,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
@@ -61,6 +64,7 @@ from continuum_swr_replay.analysis.replay.per_bin_design import (  # noqa: E402
     reconstruct_self_history_kernels,
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    paired_coefficient_statistics,
     reward_kernel_animal_medians,
     reward_kernel_by_lag,
 )
@@ -70,7 +74,6 @@ from continuum_swr_replay.paths import (
     replay_content_dir,
     table_path,
 )
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 
 def all_models_path() -> Path:
@@ -92,7 +95,6 @@ def all_models_input_paths() -> dict[str, Path]:
     }
 
 
-SC = list(SESSION_COLUMNS)
 MODEL = "M7r_time_histcos_rew"
 
 # outcome key -> (display label, colour)
@@ -131,7 +133,8 @@ def _self_history_kernel(
 # The first raised-cosine reward-history basis coefficient. Its feature is a
 # reward fraction weighted toward the newest outcomes (about 0.33 / 0.26 / 0.17 /
 # 0.11 on lags 1-4), not the lag-1 outcome alone; the "IMMEDIATE" name is legacy.
-IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
+IMMEDIATE_TERM = REWARD_HISTORY_COLUMNS[0]
+IMMEDIATE_COEF = f"coef_{IMMEDIATE_TERM}"
 
 
 def plot_reward_kernel(m7: pd.DataFrame) -> None:
@@ -191,7 +194,13 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
 
     ax = axes[1]
     order = ["swr", "non_local_swr", "non_local_no_swr"]
-    data = [np.exp(m7[m7.outcome == oc][IMMEDIATE_COEF].dropna()) for oc in order]
+    # the sessions the per-term gate keeps, as the summary reads the coefficient
+    gated = {
+        oc: fits[gate_term_sessions(fits, IMMEDIATE_TERM).kept]
+        for oc in order
+        for fits in [fit_rows(m7, outcome=oc)]
+    }
+    data = [np.exp(gated[oc][IMMEDIATE_COEF]) for oc in order]
     bp = ax.boxplot(
         data,
         labels=["SWR", "NL\nw/SWR", "NL\nNO SWR"],
@@ -210,22 +219,21 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     # magnitude; a linear axis truncates the upper boxes.
     ax.set_yscale("log")
 
-    # paired dissociation annotation: non_local_swr vs non_local_no_swr
-    a = m7[m7.outcome == "non_local_swr"][SC + [IMMEDIATE_COEF]]
-    b = m7[m7.outcome == "non_local_no_swr"][SC + [IMMEDIATE_COEF]]
-    mrg = a.merge(b, on=SC, suffixes=("_s", "_n")).dropna()
-    if len(mrg) < 2:
+    # paired dissociation annotation: non_local_swr vs non_local_no_swr, over
+    # the sessions in which the gate keeps the coefficient in both
+    paired = paired_coefficient_statistics(
+        gated["non_local_swr"], gated["non_local_no_swr"], IMMEDIATE_COEF
+    )
+    if paired["n_sessions"] < 2:
         raise SystemExit(
-            f"Only {len(mrg)} paired sessions for the SWR/no-SWR dissociation; "
-            "run fit_per_bin_rate_models.py over more sessions first."
+            f"Only {paired['n_sessions']} paired sessions for the SWR/no-SWR "
+            "dissociation; run fit_per_bin_rate_models.py over more sessions first."
         )
-    diff = mrg[f"{IMMEDIATE_COEF}_s"] - mrg[f"{IMMEDIATE_COEF}_n"]
-    pa = mrg.assign(d=diff).groupby("animal")["d"].median()
-    pval = wilcoxon(mrg[f"{IMMEDIATE_COEF}_s"], mrg[f"{IMMEDIATE_COEF}_n"]).pvalue
     ax.set_title(
         f"Recent-reward effect (first history basis) by population\n"
-        f"NL-SWR > NL-no-SWR: {(diff > 0).mean():.0%} of {len(mrg)}, "
-        f"{(pa > 0).sum()}/{mrg.animal.nunique()} animals, p={pval:.1e}"
+        f"NL-SWR > NL-no-SWR: {paired['positive_fraction']:.0%} of "
+        f"{paired['n_sessions']}, {paired['n_animals_positive']}/"
+        f"{paired['n_animals']} animals, p={paired['signed_rank_p']:.1e}"
     )
 
     fig.tight_layout()
@@ -234,9 +242,12 @@ def plot_reward_kernel(m7: pd.DataFrame) -> None:
     plt.close(fig)
     print(f"saved {out}")
     for oc in order:
-        v = m7[m7.outcome == oc][IMMEDIATE_COEF].dropna()
+        coefficient = gated_coefficient_statistics(
+            fit_rows(m7, outcome=oc), IMMEDIATE_TERM
+        )
         print(
-            f"  {POP_STYLE[oc][0]:18s}: first-basis RR={np.exp(v.median()):.2f} (n={len(v)})"
+            f"  {POP_STYLE[oc][0]:18s}: first-basis RR="
+            f"{coefficient['exp_median']:.2f} (n={coefficient['n_sessions']})"
         )
 
 

@@ -148,13 +148,48 @@ def baseline_rate_ratio_statistics(
         ``exp`` of the median difference of the log rates (a over b); and
         ``signed_rank_p``, the paired Wilcoxon signed-rank p of the log rates.
     """
-    known_a, known_b = (
-        null.dropna(subset=["coef_Intercept"]) for null in (null_a, null_b)
-    )
-    difference, _ = _paired_difference(known_a, known_b, "coef_Intercept")
+    paired = paired_coefficient_statistics(null_a, null_b, "coef_Intercept")
     return {
-        "n_sessions": len(difference),
-        "median_ratio": float(np.exp(difference.median())),
+        "n_sessions": paired["n_sessions"],
+        "median_ratio": float(np.exp(paired["median"])),
+        "signed_rank_p": paired["signed_rank_p"],
+    }
+
+
+def paired_coefficient_statistics(
+    fits_a: pd.DataFrame, fits_b: pd.DataFrame, column: str
+) -> dict[str, float]:
+    """One coefficient of two populations' fits, a minus b within session.
+
+    Parameters
+    ----------
+    fits_a, fits_b : pd.DataFrame
+        Per-session fits of one rung, each of one population, with the session
+        columns and ``column``; at most one row per session. A session whose
+        ``column`` is missing in either is left out. Pass the gated fits where
+        the coefficient is read over a gate's sessions.
+    column : str
+        The coefficient's column.
+
+    Returns
+    -------
+    statistics : dict
+        :func:`~continuum_swr_replay.analysis.statistics.session_median_statistics`
+        of the sessions' ``a - b`` differences (``n_sessions``, ``median``,
+        ``positive_fraction``, ``n_animals``, ``n_animals_positive``, ...), and
+        ``signed_rank_p``, their Wilcoxon signed-rank p
+        (:func:`~continuum_swr_replay.analysis.statistics.signed_rank_p`: NaN
+        below six non-zero differences).
+
+    Raises
+    ------
+    pandas.errors.MergeError
+        If either set of fits holds two rows for one session.
+    """
+    known_a, known_b = (fits.dropna(subset=[column]) for fits in (fits_a, fits_b))
+    difference, animal = _paired_difference(known_a, known_b, column)
+    return {
+        **session_median_statistics(difference, animal),
         "signed_rank_p": signed_rank_p(difference),
     }
 
