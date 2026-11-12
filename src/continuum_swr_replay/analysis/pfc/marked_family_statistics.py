@@ -9,8 +9,10 @@ and writes the summary the mpfc summary builder reads.
 
 - :func:`animal_balanced_fraction_positive`: the share of units whose held-out
   deviance improves with a target's kernel, and the deltas' scale.
-- :func:`animal_balanced_curve`: the population curve of per-session curves,
-  and :func:`animal_curve_sem` its standard error over animals.
+- The population curve of per-session curves and its standard error over
+  animals are :mod:`~continuum_swr_replay.analysis.pfc.population_statistics`'
+  :func:`animal_balanced_curve` and :func:`animal_curve_sem`, which Figure 4c
+  also uses.
 - :func:`population_curve_summary`: its peak, its pre- and post-onset means
   and how many sessions and animals share their signs.
 - :func:`shuffled_band`: the same curve over shuffled-mark refits, and its
@@ -31,6 +33,10 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.pfc.population_statistics import (
+    animal_balanced_curve,
+    animal_curve_sem,
+)
 from continuum_swr_replay.analysis.shared_statistics import (
     animal_medians,
     session_median_statistics,
@@ -282,56 +288,6 @@ def population_curve_summary(
             }
         )
     return pd.DataFrame(out)
-
-
-def animal_balanced_curve(
-    by_session: dict[str, np.ndarray], animal_of: dict[str, str]
-) -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    """Unit-mean session curves -> per-animal means -> mean over animals.
-
-    Parameters
-    ----------
-    by_session : dict
-        ``session -> array``; the last axis is lag (a curve, or draws x lags).
-    animal_of : dict
-        ``session -> animal``.
-
-    Returns
-    -------
-    population : NDArray
-        Mean over animals of each animal's mean over its sessions.
-    per_animal : dict
-        ``animal -> that animal's mean over its sessions``.
-    """
-    grouped: dict[str, list[np.ndarray]] = defaultdict(list)
-    for session, curve in by_session.items():
-        grouped[animal_of[session]].append(np.asarray(curve, dtype=float))
-    per_animal = {
-        animal: np.mean(np.stack(group), axis=0)
-        for animal, group in sorted(grouped.items())
-    }
-    return np.mean(np.stack(list(per_animal.values())), axis=0), per_animal
-
-
-def animal_curve_sem(per_animal: dict[str, np.ndarray]) -> np.ndarray:
-    """Standard error over animals of the animals' mean curves, at each lag.
-
-    Parameters
-    ----------
-    per_animal : dict
-        ``animal -> curve``, shape (n_lags,), as :func:`animal_balanced_curve`
-        returns them.
-
-    Returns
-    -------
-    NDArray, shape (n_lags,)
-        The sample standard deviation over animals (``ddof=1``) over the
-        square root of the number of animals; NaN with one animal.
-    """
-    stack = np.stack(list(per_animal.values()))  # (n_animals, n_lags)
-    if len(stack) < 2:
-        return np.full(stack.shape[1], np.nan)
-    return stack.std(axis=0, ddof=1) / np.sqrt(len(stack))
 
 
 class ShuffledBand(NamedTuple):

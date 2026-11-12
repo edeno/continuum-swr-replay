@@ -864,3 +864,65 @@ def test_swr_without_replay_timing_statistics_of_one_unit_and_of_none():
     nobody = timing(31)
     np.testing.assert_array_equal(nobody["n_units"], [0, 0])
     assert nobody.drop(columns="n_units").isna().all(axis=None)
+
+
+# --- population curves -----------------------------------------------------------------
+
+
+def test_session_mean_curve_leaves_out_a_unit_with_a_non_finite_lag():
+    # lags x units; the middle unit is NaN at lag 0 and is left out whole.
+    unit_curves = np.array([[1.0, NAN, 3.0], [2.0, 5.0, 4.0]])
+
+    np.testing.assert_allclose(stats.session_mean_curve(unit_curves), [2.0, 3.0])
+    with pytest.raises(ValueError, match="finite"):
+        stats.session_mean_curve(np.array([[NAN], [1.0]]))
+
+
+def test_animal_curve_sem_is_over_animals_at_each_lag():
+    # Animal means at lag 0: 1, 2, 4 (mean 7/3, sample SD sqrt(7/3)); at lag 1
+    # all equal.
+    per_animal = {
+        "a": np.array([1.0, 5.0]),
+        "b": np.array([2.0, 5.0]),
+        "c": np.array([4.0, 5.0]),
+    }
+
+    sem = stats.animal_curve_sem(per_animal)
+
+    np.testing.assert_allclose(sem, [np.sqrt(7 / 3) / np.sqrt(3), 0.0])
+    assert np.isnan(stats.animal_curve_sem({"a": np.array([1.0, 5.0])})).all()
+
+
+def test_animal_balanced_unit_curve_weights_animals_equally():
+    # Columns are units, in no session order. Animal a: session a1 holds three
+    # units (mean [3, 0]), a2 one ([1, 2]), so a is [2, 1]. Animal b: b1 holds
+    # [4, 4] and a unit with a NaN, left out, so b is [4, 4]. Animal c's only
+    # unit has a NaN, so its session and c drop out.
+    unit_curves = np.array(
+        [
+            # a1   b1    a2   a1   c1   b1   a1
+            [1.0, 4.0, 1.0, 2.0, NAN, NAN, 6.0],
+            [0.0, 4.0, 2.0, 0.0, 1.0, 100.0, 0.0],
+        ]
+    )
+    sessions = np.array(["a1", "b1", "a2", "a1", "c1", "b1", "a1"])
+    animals = np.array(["a", "b", "a", "a", "c", "b", "a"])
+
+    population, sem = stats.animal_balanced_unit_curve(unit_curves, sessions, animals)
+
+    # The mean over animals a and b; pooling the five finite units would give
+    # [2.8, 1.2], and weighting the three sessions equally [8/3, 2].
+    np.testing.assert_allclose(population, [3.0, 2.5])
+    # Over two animals: |a - b| / 2 at each lag.
+    np.testing.assert_allclose(sem, [1.0, 1.5])
+
+
+def test_animal_balanced_unit_curve_has_no_band_with_one_animal():
+    unit_curves = np.array([[1.0, 3.0], [0.0, 2.0]])
+
+    population, sem = stats.animal_balanced_unit_curve(
+        unit_curves, np.array(["s1", "s2"]), np.array(["a", "a"])
+    )
+
+    np.testing.assert_allclose(population, [2.0, 1.0])
+    assert np.isnan(sem).all()

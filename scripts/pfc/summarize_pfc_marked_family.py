@@ -26,8 +26,12 @@ Per model, replay class and target mark the summary reports
 - beside each joint-model target, the same target's marginal-tier result.
 
 The statistics are
-:mod:`~continuum_swr_replay.analysis.pfc.marked_family_statistics`'s; this
-script reads the bundles, writes the tables and draws the figures.
+:mod:`~continuum_swr_replay.analysis.pfc.marked_family_statistics`'s, and the
+population curve's reduction (a session's unit mean, the animals' means and
+their standard error) is
+:mod:`~continuum_swr_replay.analysis.pfc.population_statistics`'s, the one
+Figure 4c draws with; this script reads the bundles, writes the tables and
+draws the figures.
 
 Bundles of one directory must share one fit contract version and one event
 set; a directory that mixes them is refused. Besides the markdown report the
@@ -58,7 +62,7 @@ The follow-up corpus (contract 3, ``well_unknown`` baseline; writes
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import matplotlib
@@ -70,9 +74,7 @@ import pandas as pd
 
 from continuum_swr_replay.analysis.pfc.marked_family_statistics import (
     MAX_P_THRESHOLD,
-    animal_balanced_curve,
     animal_balanced_fraction_positive,
-    animal_curve_sem,
     complete_bundle_records,
     mark_correlations,
     null_band_summary,
@@ -86,6 +88,11 @@ from continuum_swr_replay.analysis.pfc.marked_glm import (
 from continuum_swr_replay.analysis.pfc.marked_model_family import (
     POOLED_CLASS,
     model_set_of,
+)
+from continuum_swr_replay.analysis.pfc.population_statistics import (
+    animal_balanced_curve,
+    animal_curve_sem,
+    session_mean_curve,
 )
 from continuum_swr_replay.decoding.identifiers import parse_nwb_filename
 from continuum_swr_replay.paths import processed_data_dir
@@ -190,7 +197,7 @@ def load_bundles(
                 finite_curve = np.isfinite(slope).all(axis=0)
                 key = (model, event_class, target)
                 if finite_curve.any():
-                    curves[key][session] = slope[:, finite_curve].mean(axis=1)
+                    curves[key][session] = session_mean_curve(slope)
                     null_path = base.with_suffix(
                         f".{event_class}.{target}.slope_null.npy"
                     )
@@ -336,17 +343,16 @@ def plot_model(
             if not by_session:
                 ax.set_visible(False)
                 continue
-            per_animal = defaultdict(list)
-            for session, curve in by_session.items():
-                per_animal[animal_of[session]].append(curve)
-            for animal, group in per_animal.items():
+            mean, animal_curves = animal_balanced_curve(by_session, animal_of)
+            n_sessions = Counter(animal_of[session] for session in by_session)
+            for animal, curve in animal_curves.items():
                 ax.plot(
                     lag_time * 1000,
-                    np.mean(group, axis=0),
+                    curve,
                     color=colour[animal],
                     lw=0.8,
                     alpha=0.8,
-                    label=f"{animal} (n={len(group)})",
+                    label=f"{animal} (n={n_sessions[animal]})",
                 )
             band = shuffled_band(
                 by_session, nulls.get((model, event_class, target), {}), animal_of
@@ -360,7 +366,6 @@ def plot_model(
                     lw=0,
                     label="shuffled 95 %",
                 )
-            mean, animal_curves = animal_balanced_curve(by_session, animal_of)
             sem = animal_curve_sem(animal_curves)
             ax.fill_between(
                 lag_time * 1000, mean - sem, mean + sem, color="k", alpha=0.15, lw=0
