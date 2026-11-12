@@ -56,9 +56,6 @@ Work that is deferred on purpose. Each item says when it should be done.
   audit-only tables are still computed in the scripts.
   These still hold their own copy; make each call the function, comparing its
   output before and after on the cluster:
-  - mpfc: `scripts/figures/generate_figure04.py`
-    (`plot_population_average`: a pooled unit mean and SEM, not the summary's
-    animal-balanced mean).
   - behavior: `scripts/behavior/coupling/fit_swr_power_model.py` (percentiles, mean
     and SD of ripple power by class, the duration correlation it prints);
     `scripts/behavior/content/fit_replay_content_models.py` and
@@ -68,6 +65,14 @@ Work that is deferred on purpose. Each item says when it should be done.
     per-animal medians written to CSVs nothing reads).
 
   *When:* at each figure's or report's next regeneration.
+
+- [ ] **Figure 4c: pooled or animal-balanced.** `scripts/figures/generate_figure04.py`
+  (`plot_population_average`) draws the mean over all units of each curve less its
+  own value at -200 ms, with SEM over units. The mpfc summary reports no value for
+  this curve (its only 4c value is the unit count), so the figure copies no reported
+  number; but over half the units are one animal's (wilbur), and an animal-balanced
+  curve (unit -> session -> animal) peaks elsewhere. Decide which the panel draws.
+  *When:* before Figure 4 is finalized.
 
 - [ ] **Decide the open choices in the reported statistics.**
   `docs/known_issues/reported_statistics_choices.md` lists them: where each is
