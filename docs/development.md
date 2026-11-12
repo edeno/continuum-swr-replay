@@ -442,8 +442,9 @@ Each builder's statistics:
 - detection: `analysis/hippocampus/memoryless_sequence/sweep_statistics.py`, `recording_statistics.py`
   and `event_table.py`;
 - behavior: `analysis/behavior/coefficient_statistics.py` (a per-session fit summarized over sessions and
-  animals; the other modules build on it), `rate_fit_statistics.py`, `stop_statistics.py`,
-  `content_statistics.py`, `history_kernel_statistics.py`, and the stay/leave summaries in `learning.py`.
+  animals; the other modules build on it), `rate/rate_fit_statistics.py`, `rate/stop_statistics.py`,
+  `content/content_statistics.py`, `rate/history_kernel_statistics.py`, and the stay/leave summaries in
+  `choice/learning.py`.
 
 A builder may count the size of an input it reads (its epochs, its animals) and copy a statistic a file
 already holds. Figure 4 and the `scripts/pfc/` reports call these functions; the scripts and figures that
