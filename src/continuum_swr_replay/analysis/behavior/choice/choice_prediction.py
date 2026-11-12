@@ -282,6 +282,9 @@ def build_choice_dataset(
         )
 
     replay_stops = stop_table["has_replay"]
+    # Strictly at-well stops, not ``select_stop_cohort``'s well-anchored
+    # {at_well, mixed}: the choice set leaves out the current arm, which only a
+    # strictly at-well stop has (``occupancy_well_arm`` is NaN for a mixed stop).
     # ``at_well`` is NA where the stop's location is unobserved, so the
     # fillna keeps those out rather than letting NA read as True.
     at_well_stops = stop_table["at_well"].eq(True).fillna(False)
