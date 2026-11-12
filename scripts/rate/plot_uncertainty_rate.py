@@ -8,8 +8,9 @@ uncertainty/value covariate showing the three populations' per-session
 coefficient distributions on the rate-ratio scale, with the pre-registered
 paired dissociation tests annotated:
 
-* ``non_local_no_swr`` vs ``swr`` and vs ``non_local_swr`` (paired Wilcoxon over
-  sessions present in both).
+* ``non_local_no_swr`` vs ``swr`` and vs ``non_local_swr`` (paired signed-rank
+  test over the sessions present in both,
+  ``rate_fit_statistics.paired_coefficient_statistics``).
 
 Results are *reported*, not asserted to a magnitude -- a null is a valid result.
 Also plots the peri-block-change latency anchor: per-population mean coefficient
@@ -33,19 +34,24 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
+    coefficient_statistics,
+    fit_rows,
+)
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
 )
 from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     MU_UNCERTAINTY_CURATED_COVARIATES,
 )
+from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    paired_coefficient_statistics,
+)
 from continuum_swr_replay.paths import figure_dir, model_dir
-from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 # Single source of truth: the curated covariate set is part of the MU_uncertainty
 # spec in model_specs and the populations are defined in the fitter; import them
@@ -64,26 +70,25 @@ logger = logging.getLogger(__name__)
 COVARIATES = MU_UNCERTAINTY_CURATED_COVARIATES
 
 
-def _paired_wilcoxon(
+def _paired_test(
     models: pd.DataFrame, covariate: str, pop_a: str, pop_b: str
 ) -> tuple[float, int]:
-    """Paired Wilcoxon of ``coef_{covariate}`` between two populations.
+    """Paired signed-rank test of ``coef_{covariate}`` between two populations.
 
-    Pairs on the sessions present in both populations. Returns ``(p, n_pairs)``;
-    ``(nan, n)`` if fewer than 6 pairs or all differences are zero.
+    Over the sessions both populations' fits have the coefficient
+    (``rate_fit_statistics.paired_coefficient_statistics``). Returns ``(p,
+    n_pairs)``; the p is NaN below six non-zero differences.
     """
-    col = f"coef_{covariate}"
-    a = models[models["outcome"] == pop_a][[*SESSION_COLUMNS, col]]
-    b = models[models["outcome"] == pop_b][[*SESSION_COLUMNS, col]]
-    merged = a.merge(b, on=list(SESSION_COLUMNS), suffixes=("_a", "_b")).dropna()
-    if len(merged) < 6 or np.allclose(merged[f"{col}_a"], merged[f"{col}_b"]):
-        return np.nan, len(merged)
-    stat, p = wilcoxon(merged[f"{col}_a"], merged[f"{col}_b"])
-    return float(p), len(merged)
+    paired = paired_coefficient_statistics(
+        fit_rows(models, outcome=pop_a),
+        fit_rows(models, outcome=pop_b),
+        f"coef_{covariate}",
+    )
+    return paired["signed_rank_p"], paired["n_sessions"]
 
 
 def report(models: pd.DataFrame) -> None:
-    """Log per-covariate per-population RR summary + dissociation Wilcoxon."""
+    """Log per-covariate per-population RR summary + dissociation signed-rank p."""
     for cov in COVARIATES:
         rr = f"rr_{cov}"
         coef = f"coef_{cov}"
@@ -91,23 +96,20 @@ def report(models: pd.DataFrame) -> None:
             continue
         logger.info("\n=== %s ===", cov)
         for pop in POPULATIONS:
-            sub = models[models["outcome"] == pop][coef].dropna()
-            if sub.empty:
+            fits = fit_rows(models, outcome=pop)
+            if fits[coef].isna().all():
                 continue
-            pos = float((sub > 0).mean())
-            n_animal = models[(models["outcome"] == pop) & models[coef].notna()][
-                "animal"
-            ].nunique()
+            stats = coefficient_statistics(fits, coef)
             logger.info(
-                "  %-18s median RR=%.3f  %%pos=%.0f%%  n=%d  animals=%d/5",
+                "  %-18s median RR=%.3f  %%pos=%.0f%%  n=%d  animals=%d",
                 pop,
-                float(np.exp(sub.median())),
-                100 * pos,
-                len(sub),
-                n_animal,
+                stats["exp_median"],
+                100 * stats["positive_fraction"],
+                stats["n_sessions"],
+                stats["n_animals"],
             )
         for other in ("swr", "non_local_swr"):
-            p, n = _paired_wilcoxon(models, cov, "non_local_no_swr", other)
+            p, n = _paired_test(models, cov, "non_local_no_swr", other)
             logger.info(
                 "  paired non_local_no_swr vs %-14s p=%s (n=%d)",
                 other,
@@ -144,7 +146,7 @@ def plot(models: pd.DataFrame, out_path) -> None:
         ax.set_ylabel("rate ratio")
         ax.tick_params(axis="x", labelrotation=30, labelsize=7)
         # annotate the headline dissociation p (NL-no-SWR vs SWR)
-        p, npair = _paired_wilcoxon(models, cov, "non_local_no_swr", "swr")
+        p, npair = _paired_test(models, cov, "non_local_no_swr", "swr")
         ax.text(
             0.5,
             0.97,
