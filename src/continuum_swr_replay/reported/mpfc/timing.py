@@ -102,7 +102,8 @@ def timing_values(
             "int",
             f"lower bound of its 95 % interval from {TIMING_BOOTSTRAP_DRAWS:,} "
             f"{TIMING_RESAMPLES} (seed {TIMING_BOOTSTRAP_SEED}), with a "
-            "small-sample t correction over the animals",
+            "small-sample t correction over the animals, clipped to the window "
+            "of lags",
             "ms",
         )
         add(
@@ -110,7 +111,7 @@ def timing_values(
             stats[f"{statistic}_ci_high"],
             "quantity",
             "int",
-            "upper bound of that interval",
+            "upper bound of that interval, clipped to the window of lags",
             "ms",
         )
 

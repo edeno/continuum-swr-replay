@@ -835,11 +835,12 @@ def test_swr_without_replay_timing_statistics_of_the_called_units_mean_curve():
     # The replicates resample the animals (chimi and wilbur), their days and
     # the days' units: a mean of these lines is half way up between the
     # earliest line's crossing (unit 8 alone, 10 ms) and the latest's (unit 0
-    # alone, 50 ms). With two animals the interval about 20 ms is wide; every
-    # replicate's rise size is 1.0, so its interval has no width.
+    # alone, 50 ms). With two animals (t(0.975, 1) = 12.7) the interval about
+    # 20 ms is wider than the window on both sides (the lower end alone needs a
+    # half-width of 220 ms), so both ends are clipped to the window's lags;
+    # every replicate's rise size is 1.0, so its interval has no width.
     low, high = enhanced["rise_onset_ms_ci_low"], enhanced["rise_onset_ms_ci_high"]
-    assert (low + high) / 2 == pytest.approx(20)
-    assert low < 10 and high > 50
+    assert (low, high) == (pytest.approx(LAG_MS[0]), pytest.approx(LAG_MS[-1]))
     assert enhanced["rise_size_ci_low"] == pytest.approx(1.0)
     assert enhanced["rise_size_ci_high"] == pytest.approx(1.0)
     # Sessions with enough events, increases: units 5 and 8, of one day of one

@@ -394,7 +394,10 @@ class BootstrapInterval(NamedTuple):
 
 
 def bootstrap_interval(
-    estimate: float, draws: ArrayLike, n_top: int
+    estimate: float,
+    draws: ArrayLike,
+    n_top: int,
+    bounds: tuple[float, float] | None = None,
 ) -> BootstrapInterval:
     """The 95 % interval of a statistic from its nested bootstrap draws.
 
@@ -422,6 +425,10 @@ def bootstrap_interval(
         (:func:`nested_bootstrap_draw`). A non-finite draw is left out.
     n_top : int
         The number of animals the draws resample.
+    bounds : tuple of float, optional
+        The range the statistic can take (for a lag, the first and last lag).
+        A bound beyond it is clipped to it: the symmetric interval can run
+        past a range the statistic cannot leave.
 
     Returns
     -------
@@ -436,7 +443,10 @@ def bootstrap_interval(
     if n_top < 2 or not np.isfinite(estimate) or not np.isfinite(sd):
         return BootstrapInterval(float("nan"), float("nan"), sd)
     half = float(student_t.ppf(0.975, n_top - 1)) * np.sqrt(n_top / (n_top - 1)) * sd
-    return BootstrapInterval(float(estimate - half), float(estimate + half), sd)
+    low, high = float(estimate - half), float(estimate + half)
+    if bounds is not None:
+        low, high = max(low, bounds[0]), min(high, bounds[1])
+    return BootstrapInterval(low, high, sd)
 
 
 def weighted_median(values_sorted: NDArray, weights: NDArray) -> float:

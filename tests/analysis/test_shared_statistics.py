@@ -392,6 +392,19 @@ def test_bootstrap_interval_is_the_estimate_plus_minus_the_corrected_t_half_widt
     assert two.high == pytest.approx(12.7062047362 * np.sqrt(2) * np.sqrt(5 / 3))
 
 
+def test_bootstrap_interval_clips_each_bound_to_the_statistics_range():
+    # Same draws as above: half-width 2.7764451 * sqrt(5/4) * sqrt(5/3) = 4.008.
+    half = 2.7764451052 * np.sqrt(5 / 4) * np.sqrt(5 / 3)
+    clipped = stats.bootstrap_interval(1.0, [1.0, 2.0, 3.0, 4.0], 5, (-2.0, 3.0))
+    assert clipped.low == -2.0 and clipped.high == 3.0
+    assert clipped.sd == pytest.approx(np.sqrt(5 / 3))
+    inside = stats.bootstrap_interval(1.0, [1.0, 2.0, 3.0, 4.0], 5, (-10.0, 10.0))
+    assert inside.low == pytest.approx(1.0 - half)
+    assert inside.high == pytest.approx(1.0 + half)
+    missing = stats.bootstrap_interval(1.0, [1.0], 5, (-2.0, 3.0))
+    assert np.isnan(missing.low) and np.isnan(missing.high)
+
+
 def test_bootstrap_interval_of_a_mean_over_five_animals_is_their_t_interval():
     # Every one of the 5**5 resamples of five animal values, once each: the
     # exact bootstrap distribution of their mean. Its SD (ddof=0) is

@@ -313,14 +313,16 @@ def swr_without_replay_values(
                     "ms",
                     "int",
                     f"lower bound of the 95 % interval from {TIMING_RESAMPLES} "
-                    "(small-sample t correction over the animals) of the rise onset",
+                    "(small-sample t correction over the animals) of the rise onset, "
+                    "clipped to the window of lags",
                 ),
                 (
                     "rise_onset_ms_ci_high",
                     "ms",
                     "int",
                     f"upper bound of the 95 % interval from {TIMING_RESAMPLES} "
-                    "(small-sample t correction over the animals) of the rise onset",
+                    "(small-sample t correction over the animals) of the rise onset, "
+                    "clipped to the window of lags",
                 ),
                 (
                     "rise_size",

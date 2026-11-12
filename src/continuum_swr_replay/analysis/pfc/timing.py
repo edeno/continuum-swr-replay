@@ -428,8 +428,12 @@ def _mean_curve_timing(
     observed_size = response_size(curve, lag_time, baseline=baseline)
     boot_size = response_size(boot_curves.T, lag_time, baseline=baseline)
 
-    def interval(estimate: float, draws: NDArray) -> tuple[float, float]:
-        low, high, _ = bootstrap_interval(estimate, draws, n_animals)
+    lag_bounds = (float(lag_time[0]), float(lag_time[-1]))
+
+    def interval(
+        estimate: float, draws: NDArray, bounds: tuple[float, float] | None = None
+    ) -> tuple[float, float]:
+        low, high, _ = bootstrap_interval(estimate, draws, n_animals, bounds)
         return low, high
 
     peak_lag = float(observed.peak_lag[0])
@@ -440,10 +444,10 @@ def _mean_curve_timing(
         curve=curve,
         peak_lag=peak_lag,
         onset_lag=onset_lag,
-        peak_lag_interval=interval(peak_lag, boot.peak_lag),
-        onset_lag_interval=interval(onset_lag, boot.onset_lag),
+        peak_lag_interval=interval(peak_lag, boot.peak_lag, lag_bounds),
+        onset_lag_interval=interval(onset_lag, boot.onset_lag, lag_bounds),
         steepest_lag=steepest_lag,
-        steepest_lag_interval=interval(steepest_lag, boot_steepest),
+        steepest_lag_interval=interval(steepest_lag, boot_steepest, lag_bounds),
         size=size,
         size_interval=interval(size, boot_size),
         n_units=n_units,

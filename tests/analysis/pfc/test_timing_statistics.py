@@ -184,11 +184,16 @@ def test_called_response_timing_intervals_come_from_the_nested_bootstrap(
         "population_size": read.peak,
     }
     enhanced = statistics.loc["enhanced"]
+    window_ms = (LAG_TIME[0] * 1e3, LAG_TIME[-1] * 1e3)
     for name, values in expected.items():
-        # two animals (a, b): the value +/- t(0.975, 1) sqrt(2) SD(replicates)
+        # two animals (a, b): the value +/- t(0.975, 1) sqrt(2) SD(replicates);
+        # a lag's interval is clipped to the window of lags, the size's is not
         half = 12.7062047362 * np.sqrt(2) * np.std(values, ddof=1)
-        assert enhanced[f"{name}_ci_low"] == pytest.approx(enhanced[name] - half), name
-        assert enhanced[f"{name}_ci_high"] == pytest.approx(enhanced[name] + half), name
+        low, high = enhanced[name] - half, enhanced[name] + half
+        if name != "population_size":
+            low, high = max(low, window_ms[0]), min(high, window_ms[1])
+        assert enhanced[f"{name}_ci_low"] == pytest.approx(low), name
+        assert enhanced[f"{name}_ci_high"] == pytest.approx(high), name
     # the decreases are one unit of one animal: no t quantile, no interval
     suppressed = statistics.loc["suppressed"]
     for name in expected:

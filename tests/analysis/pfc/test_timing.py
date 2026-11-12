@@ -108,10 +108,20 @@ def test_population_timing_bootstrap_is_seeded_and_brackets_the_estimate():
     )
     assert n_animals == 3 and first.n_animals == 3
     draws = peak_and_onset(boot.T, LAG_TIME).peak_lag
-    expected = bootstrap_interval(first.peak_lag, draws, 3)
+    window = (LAG_TIME[0], LAG_TIME[-1])
+    expected = bootstrap_interval(first.peak_lag, draws, 3, window)
     assert first.peak_lag_interval == pytest.approx((expected.low, expected.high))
     half = 4.30265273 * np.sqrt(3 / 2) * np.std(draws, ddof=1)
-    assert first.peak_lag_interval[1] == pytest.approx(first.peak_lag + half)
+    assert first.peak_lag_interval[1] == pytest.approx(
+        min(first.peak_lag + half, LAG_TIME[-1])
+    )
+    # A lag interval never leaves the window of lags; the size has no range.
+    for low, high in (
+        first.peak_lag_interval,
+        first.onset_lag_interval,
+        first.steepest_lag_interval,
+    ):
+        assert LAG_TIME[0] <= low <= high <= LAG_TIME[-1]
 
 
 def test_population_timing_with_no_units_is_nan():
@@ -151,11 +161,12 @@ def test_population_timing_weights_units_not_sessions():
 
     assert result.peak_lag == pytest.approx(0.020)
     assert result.n_groups == 2
-    # The interval is about the unit-weighted peak, and wide enough to hold
-    # the resamples drawing only animal y (session b), which peak at +100 ms.
+    # The interval is about the unit-weighted peak and wide enough to hold the
+    # resamples drawing only animal y (session b), which peak at +100 ms: with
+    # two animals (t(0.975, 1) = 12.7) it reaches both ends of the lag window,
+    # where it is clipped.
     low, high = result.peak_lag_interval
-    assert (low + high) / 2 == pytest.approx(0.020)
-    assert high > 0.100
+    assert (low, high) == (LAG_TIME[0], LAG_TIME[-1])
 
 
 def test_population_timing_resamples_the_units_within_a_session():
