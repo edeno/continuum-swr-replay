@@ -162,14 +162,17 @@ def fit_status(population: pd.DataFrame, curve: str) -> pd.Series:
     status : pd.Series of str, shape (n_units,)
         On ``population``'s index: ``"nonconverged"`` when the unpenalised fit
         did not converge, else ``"separated"`` when it has a separated column,
-        else ``"well posed"``. A missing flag, or a missing column, counts as
-        False: a unit with no convergence flag has not converged.
+        else ``"well posed"``. A missing flag counts as False: a unit with no
+        convergence flag has not converged.
+
+    Raises
+    ------
+    KeyError
+        If ``population`` lacks either column, naming it.
     """
 
     def flag(column: str) -> NDArray:
         """The flag, True only where it is recorded True."""
-        if column not in population:
-            return np.zeros(len(population), dtype=bool)
         # ``== True`` reads a missing flag as False.
         return population[column].eq(True).to_numpy()
 

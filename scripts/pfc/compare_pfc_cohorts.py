@@ -1225,6 +1225,38 @@ CURVE_NAMES = (
 )
 
 
+def _shrinkage_columns(curve: str) -> dict[str, str]:
+    """The peak columns :func:`peak_shrinkage` reads for one curve, by role."""
+    return {
+        "peak_penalised": f"{curve}: peak_log_modulation",
+        "peak_mle": f"{curve}: peak_log_modulation_mle",
+        "peak_mle_se": f"{curve}: peak_log_modulation_mle_se",
+        "prior_binds": f"{curve}: prior_binds",
+    }
+
+
+def curves_lacking_shrinkage_columns(after: pd.DataFrame) -> dict[str, list[str]]:
+    """The curves :func:`peak_shrinkage` leaves out, with the columns they lack.
+
+    The peak columns and the two flags
+    :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`
+    reads. A population lacks a column when none of its bundles was written
+    with it; such a curve has no shrinkage to read, and its units are counted
+    neither converged nor not converged.
+    """
+    lacking = {}
+    for curve in CURVE_NAMES:
+        needed = [
+            *_shrinkage_columns(curve).values(),
+            f"{curve}: mle_converged",
+            f"{curve}: mle_separated",
+        ]
+        missing = [column for column in needed if column not in after.columns]
+        if missing:
+            lacking[curve] = missing
+    return lacking
+
+
 def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
     """Per unit and curve, what the prior did to the peak modulation.
 
@@ -1241,18 +1273,15 @@ def peak_shrinkage(after: pd.DataFrame) -> pd.DataFrame:
         status,
         :func:`~continuum_swr_replay.analysis.pfc.population_statistics.fit_status`:
         a unit with no convergence flag has not converged) and the unit's
-        animal. Empty when the bundles carry none of those columns.
+        animal. A curve whose columns the bundles lack is left out
+        (:func:`curves_lacking_shrinkage_columns`); empty when every curve is.
     """
     rows = []
+    lacking = curves_lacking_shrinkage_columns(after)
     for curve in CURVE_NAMES:
-        columns = {
-            "peak_penalised": f"{curve}: peak_log_modulation",
-            "peak_mle": f"{curve}: peak_log_modulation_mle",
-            "peak_mle_se": f"{curve}: peak_log_modulation_mle_se",
-            "prior_binds": f"{curve}: prior_binds",
-        }
-        if not {*columns.values(), f"{curve}: mle_separated"} <= set(after.columns):
+        if curve in lacking:
             continue
+        columns = _shrinkage_columns(curve)
         frame = after[list(columns.values())].rename(
             columns={value: key for key, value in columns.items()}
         )
@@ -2286,6 +2315,17 @@ def build_estimator_report(
     )
     shrinkage = peak_shrinkage(after)
     add(_md(shrinkage_table(shrinkage)))
+    lacking = curves_lacking_shrinkage_columns(after)
+    if lacking:
+        add(
+            "Left out of this table and the next, because the bundles lack "
+            "their columns: "
+            + "; ".join(
+                f"`{curve}` ({', '.join(f'`{column}`' for column in columns)})"
+                for curve, columns in lacking.items()
+            )
+            + ".\n"
+        )
 
     add("### The prior the corpus's own spread would have chosen\n")
     add(

@@ -101,8 +101,23 @@ def test_fit_status_reads_a_missing_flag_as_false():
         "nonconverged",
         "well posed",
     ]
-    # no convergence column at all: no unit has converged
-    assert (stats.fit_status(population, "no_SWR") == "nonconverged").all()
+
+
+def test_fit_status_refuses_a_missing_column():
+    population = pd.DataFrame(
+        {"SWR: mle_converged": [True, False], "SWR: mle_separated": [False, False]}
+    )
+    with pytest.raises(KeyError, match="no_SWR: mle_converged"):
+        stats.fit_status(population, "no_SWR")
+    with pytest.raises(KeyError, match="SWR: mle_separated"):
+        stats.fit_status(population.drop(columns="SWR: mle_separated"), "SWR")
+    with pytest.raises(KeyError, match="SWR: mle_converged"):
+        stats.prior_binding_percent(
+            population.drop(columns="SWR: mle_converged").assign(
+                **{"SWR: prior_binds": False}
+            ),
+            ["SWR"],
+        )
 
 
 def test_prior_binding_percent_is_over_the_well_posed_units():

@@ -43,6 +43,7 @@ from scripts.pfc.compare_pfc_cohorts import (
     build_report,
     bundle_sessions,
     coverage_summary,
+    curves_lacking_shrinkage_columns,
     empirical_bayes_sigma,
     engagement_overlap_table,
     estimator_provenance_table,
@@ -1284,13 +1285,33 @@ class TestPeakShrinkage:
             object
         )
         population.loc[0, "SWR: mle_converged"] = np.nan
-        population = population.drop(columns="no_SWR: mle_converged")
 
         frame = peak_shrinkage(population)
 
         swr = frame.loc[frame["curve"] == "SWR", "units"].tolist()
         assert swr == ["nonconverged", "well posed", "well posed", "well posed"]
-        assert (frame.loc[frame["curve"] == "no_SWR", "units"] == "nonconverged").all()
+
+    def test_a_curve_whose_flag_column_is_absent_is_left_out_and_named(
+        self, estimator_trees
+    ):
+        """No ``mle_converged`` column for one curve, no ``mle_separated`` for
+        another: neither curve is counted all converged or all not converged."""
+        _, after = estimator_trees
+        population, _, _ = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data(after, min_firing_rate=0.0)
+        population = population.drop(
+            columns=["no_SWR: mle_converged", "non_local_SWR: mle_separated"]
+        )
+
+        frame = peak_shrinkage(population)
+
+        assert set(frame["curve"]) == {"SWR", "non_local_no_SWR", "matched_control"}
+        assert curves_lacking_shrinkage_columns(population) == {
+            "no_SWR": ["no_SWR: mle_converged"],
+            "non_local_SWR": ["non_local_SWR: mle_separated"],
+        }
 
     def test_the_summary_separates_the_units_whose_mle_does_not_exist(
         self, estimator_trees, recwarn
@@ -1482,6 +1503,40 @@ class TestEstimatorReport:
         # than printing an empty table.
         assert "No sensitivity bundle at another prior is on disk" in report
         assert "ridge_poisson_glm" in report
+        # every curve carries its columns, so none is said to be left out
+        assert "Left out of this table" not in report
+
+    def test_the_report_names_a_curve_left_out_for_a_missing_column(
+        self, estimator_trees
+    ):
+        before, after = estimator_trees
+        loader = __import__(
+            "continuum_swr_replay.analysis.pfc.load_population",
+            fromlist=["load_population_data"],
+        ).load_population_data
+        population_before, _, _ = loader(
+            before, min_firing_rate=0.0, inference="legacy"
+        )
+        population_after, _, _ = loader(after, min_firing_rate=0.0)
+
+        report = build_estimator_report(
+            sidecars=read_sidecars(after),
+            before=population_before,
+            after=population_after.drop(columns="no_SWR: mle_converged"),
+            before_gate=gate_counts(before, 1.0),
+            after_gate=gate_counts(after, 1.0, inference="heldout"),
+            before_dir=before,
+            after_dir=after,
+            min_firing_rate=1.0,
+            alpha=0.05,
+            notes=[],
+            command="",
+        )
+
+        assert (
+            "Left out of this table and the next, because the bundles lack their "
+            "columns: `no_SWR` (`no_SWR: mle_converged`)."
+        ) in report
 
 
 class TestEmpiricalBayesSigma:
