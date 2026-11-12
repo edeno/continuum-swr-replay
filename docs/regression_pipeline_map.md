@@ -224,13 +224,13 @@ Analysis of decoded posterior distributions.
 
 Uncertainty of the SWR against non-SWR property contrasts: a nested bootstrap.
 
-`duration_strata`, `matched_difference`, `bootstrap_contrasts`, `percentile_intervals`
+`duration_strata`, `matched_difference`, `bootstrap_contrasts`, `bootstrap_intervals`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/quality_metrics.py`
 
 Quality metrics for hippocampal decoding analysis.
 
-`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `state_fractions_by_movement`, `compute_session_quality_summary`
+`compute_local_decoding_error`, `local_decoding_error_statistics`, `compute_state_fraction_during_movement`, `compute_non_local_during_movement`, `compute_behavior_state_breakdown`, `compute_bout_nonlocal_dominance`, `compute_running_error_tail`, `compute_error_by_track_segment`, `compute_no_spike_firing_correspondence`, `compute_non_local_event_context`, `compute_local_state_collapse_details`, `compute_calibration_curve`, `calibration_curve_statistics`, `session_state_fractions`, `state_fraction_statistics`, `session_decoder_quality`, `compute_session_quality_summary`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/result_loading.py`
 
@@ -625,6 +625,12 @@ Plot replay rate vs uncertainty/value by population from the tidy fit output.
 The flow both decode runners share, and the record of what differs.
 
 `DecodeRunner`, `algorithm_params`, `create_detector`, `perform_decoding`, `save_results_and_model`, `organize_results`, `run_decode`, `parse_decode_args`
+
+### `scripts/decoding/measure_decoder_quality.py`
+
+Measure each analysed epoch's decoder quality: Local-state error, state fractions, calibration.
+
+`measure_epoch`, `main`
 
 ### `scripts/decoding/run_decoding_bandit.py`
 
@@ -1088,7 +1094,7 @@ Code versions and the decode's stamp, shared by the state-evidence runners.
 
 Summary statistics of the per-window table, over epochs nested in animals.
 
-`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `hierarchical_bootstrap_ci`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`
+`sign_flip_p`, `stratified_bootstrap_ci`, `ols_slope_ci`, `epoch_summaries`, `epoch_summary_kind`, `epoch_slopes`, `nested_mean_intervals`, `AnimalTTest`, `animal_t_test`, `paired_bouts`, `bout_animal_summaries`, `bout_statistics`, `calibration_statistics`, `rate_calibration`, `coordinated_silence`, `summarize_state_evidence`, `split_non_local_by_swr`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/state_evidence/terms.py`
 
