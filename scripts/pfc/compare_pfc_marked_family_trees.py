@@ -6,7 +6,8 @@ units that converged without it. For every (session, model) present in both
 trees it pairs units by their recorded index (the second tree may leave out
 units with no spike; its sidecar lists ``kept_unit_indices``), keeps units at
 or above ``--min-rate`` Hz in the canonical Figure 4 bundle of the session
-(``immobility_avg_firing_rate``; the comparison only), and reports per model,
+(``immobility_avg_firing_rate``; by default the population's cutoff,
+``load_population.MIN_FIRING_RATE_HZ``, none), and reports per model,
 class and target the largest absolute difference of the slope curves (log-rate
 per SD), of the typical curves, and of the held-out deltas, plus the median
 absolute difference of the slope curves.
@@ -28,6 +29,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+
+from continuum_swr_replay.analysis.pfc.load_population import MIN_FIRING_RATE_HZ
 
 SUFFIX = "_marked_family"
 
@@ -151,7 +154,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
-    parser.add_argument("--min-rate", type=float, default=1.0)
+    parser.add_argument("--min-rate", type=float, default=MIN_FIRING_RATE_HZ)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
     rows: list[dict] = []
