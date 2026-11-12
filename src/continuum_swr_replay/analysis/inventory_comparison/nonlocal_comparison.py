@@ -24,9 +24,7 @@ import pandas as pd
 
 from continuum_swr_replay import intervals
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
-    ok_epochs,
-    output_path,
-    read_manifest,
+    ok_table_paths,
 )
 from continuum_swr_replay.analysis.inventory_comparison.features import (
     STATE_SHARE_COLUMNS,
@@ -61,10 +59,10 @@ def _epoch_paths(run_dir: Path, name: str) -> list[Path]:
     ValueError
         If the run has no readable manifest, or it marks no epoch ``ok``.
     """
-    ok = ok_epochs(read_manifest(run_dir))
-    if not ok:
+    paths = ok_table_paths(run_dir, name)
+    if not paths:
         raise ValueError(f"the manifest of {run_dir} marks no epoch ok")
-    return [output_path(identifier, run_dir, name) for identifier in ok]
+    return paths
 
 
 def _read_epochs(run_dir: Path, name: str, **kwargs) -> pd.DataFrame:

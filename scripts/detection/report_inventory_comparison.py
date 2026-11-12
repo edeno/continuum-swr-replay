@@ -1234,9 +1234,7 @@ def write_report(run_dir: Path, figure_root: Path) -> dict[str, list[Path]]:
     dict
         ``tables`` and ``figures``: the paths written.
     """
-    manifest, tables = read_run(
-        run_dir, inventory_run.TABLE_DTYPES, inventory_run.output_path
-    )
+    manifest, tables = read_run(run_dir, inventory_run.TABLE_DTYPES)
     out = report_tables(manifest, tables)
     run_id = run_dir.name
     figure_dir = figure_root / run_id

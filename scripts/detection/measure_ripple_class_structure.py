@@ -216,7 +216,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     """The canonical events with their ripple power, spike counts and spike evidence.
 
     The spike counts are read from the features tables of the epochs the event
-    features run's manifest marks ``ok`` (``feature_run.ok_epochs``)."""
+    features run's manifest marks ``ok`` (``feature_run.ok_table_paths``)."""
     event_table = table_path("event_table", replay_content_dir())
     events = pd.read_parquet(event_table)
     n_events = len(events)
@@ -228,10 +228,7 @@ def load_events() -> tuple[pd.DataFrame, dict[str, Any]]:
     criterion_paths = sorted((out_dir() / "criterion").glob("*.parquet"))
     criterion = pd.concat(map(pd.read_parquet, criterion_paths), ignore_index=True)
     run = event_features_root() / EVENT_FEATURES_RUN
-    feature_paths = [
-        feature_run.output_path(identifier, run, "features")
-        for identifier in feature_run.ok_epochs(feature_run.read_manifest(run))
-    ]
+    feature_paths = feature_run.ok_table_paths(run, "features")
     features = pd.concat(
         (
             pd.read_parquet(

@@ -1529,9 +1529,7 @@ def write_report(
     if memoryless_root is None:
         memoryless_root = memoryless_runs_root()
     analysed = analysed_epoch_ids() if analysed is None else analysed
-    manifest, tables = read_run(
-        run_dir, feature_run.TABLE_DTYPES, feature_run.output_path
-    )
+    manifest, tables = read_run(run_dir, feature_run.TABLE_DTYPES)
     tables |= read_inputs(manifest, inventory_root, memoryless_root)
     out = report_tables(manifest, tables)
     run_id = run_dir.name

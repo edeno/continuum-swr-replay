@@ -1672,14 +1672,11 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             "cells_by_animal.csv)",
         )
     )
-    # the run's tables are read, and so recorded, for the epochs its manifest marks ok
-    ok_epochs = feature_run.ok_epochs(feature_run.read_manifest(run))
 
+    # the run's tables are read, and so recorded, for the epochs its manifest marks ok
     def run_tables(name: str) -> dict[str, object]:
         return files_record(
-            f"*_{name}.parquet",
-            (feature_run.output_path(epoch, run, name) for epoch in ok_epochs),
-            ROOT_DIR,
+            f"*_{name}.parquet", feature_run.ok_table_paths(run, name), ROOT_DIR
         )
 
     summary.inputs += [

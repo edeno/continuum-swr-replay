@@ -407,9 +407,7 @@ def write_examples(
         inventory_root = inventory_comparison_root()
     if memoryless_root is None:
         memoryless_root = memoryless_runs_root()
-    manifest, tables = read_run(
-        run_dir, feature_run.TABLE_DTYPES, feature_run.output_path
-    )
+    manifest, tables = read_run(run_dir, feature_run.TABLE_DTYPES)
     tables |= read_inputs(manifest, inventory_root, memoryless_root)
     tables["features"] = without_baseline_rows(tables["features"])
     populations = event_populations(

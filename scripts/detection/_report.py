@@ -10,7 +10,7 @@ putting the repo root on ``sys.path``.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from pathlib import Path
 from types import MappingProxyType
 
@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.inventory_comparison.feature_run import (
-    ok_epochs,
+    ok_table_paths,
     read_manifest,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
@@ -60,15 +60,14 @@ def session_names(frame: pd.DataFrame) -> pd.Series:
 
 
 def read_run(
-    run_dir: Path,
-    table_dtypes: Mapping[str, Mapping[str, object]],
-    output_path: Callable[[str, Path, str], Path],
+    run_dir: Path, table_dtypes: Mapping[str, Mapping[str, object]]
 ) -> tuple[dict, dict[str, pd.DataFrame]]:
     """The run's manifest and every table of its ``ok`` epochs, concatenated.
 
-    The manifest and its ``ok`` epochs are read by ``feature_run.read_manifest``
-    and ``feature_run.ok_epochs``: an inventory comparison run's manifest has
-    the same epoch records as an event features run's.
+    The manifest and its ``ok`` epochs' tables are read by
+    ``feature_run.read_manifest`` and ``feature_run.ok_table_paths``: an
+    inventory comparison run's manifest has the same epoch records as an event
+    features run's, and its tables the same file names.
 
     Parameters
     ----------
@@ -76,9 +75,6 @@ def read_run(
     table_dtypes : mapping
         Each table's columns and dtypes, as the runner that wrote the run
         declares them (``run_inventory_comparison.TABLE_DTYPES``, say).
-    output_path : callable
-        ``(epoch id, run folder, table name) -> path`` of the runner that
-        wrote the run.
 
     Returns
     -------
@@ -87,12 +83,8 @@ def read_run(
         By name, with the runner's columns and dtypes.
     """
     manifest = read_manifest(run_dir)
-    ok = ok_epochs(manifest)
     tables = {
-        name: typed_table(
-            (read_table(output_path(identifier, run_dir, name)) for identifier in ok),
-            dtypes,
-        )
+        name: typed_table(map(read_table, ok_table_paths(run_dir, name)), dtypes)
         for name, dtypes in table_dtypes.items()
     }
     return manifest, tables

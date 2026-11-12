@@ -4,7 +4,8 @@ What ``scripts/detection/run_event_features.py`` writes for each epoch
 (:data:`TABLE_DTYPES`: ``features``, :data:`FEATURE_DTYPES`; ``pair_membership``;
 ``rejection``) and where (:func:`output_path`), which the event features report
 and its example figures read; the run's manifest and the epochs it marks
-``ok``, the only ones read (:func:`read_manifest`, :func:`ok_epochs`); and the
+``ok``, the only ones read (:func:`read_manifest`, :func:`ok_epochs`), and a
+table of each of them (:func:`ok_table_paths`); and the
 inventory comparison's and the memoryless run's tables those two read beside a
 run (:func:`read_inputs`).
 Design: ``docs/design/replay_detection_comparison/04-event-features.md``.
@@ -41,6 +42,7 @@ __all__ = [
     "MS_DTYPES",
     "TABLE_DTYPES",
     "ok_epochs",
+    "ok_table_paths",
     "output_path",
     "output_paths",
     "read_inputs",
@@ -168,6 +170,21 @@ def ok_epochs(manifest: Mapping) -> list[str]:
     run that are read. A failed epoch's tables, or tables a manifest does not
     know, may still be in the run folder."""
     return sorted(i for i, r in manifest["epochs"].items() if r["status"] == "ok")
+
+
+def ok_table_paths(run_dir: Path, name: str) -> list[Path]:
+    """Table ``name`` of each epoch the run's manifest marks ``ok``, in the
+    order of :func:`ok_epochs`; an empty list when it marks none.
+
+    Raises
+    ------
+    ValueError
+        If the run has no readable manifest (:func:`read_manifest`).
+    """
+    return [
+        output_path(identifier, run_dir, name)
+        for identifier in ok_epochs(read_manifest(run_dir))
+    ]
 
 
 def read_inputs(
