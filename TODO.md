@@ -66,8 +66,6 @@ Work that is deferred on purpose. Each item says when it should be done.
     `scripts/content/fit_swr_contrast_content.py` (animals positive, signed-rank
     p), against `analysis/replay/coefficient_statistics.py`,
     `rate_fit_statistics.py`, `stop_statistics.py` and `learning.py`.
-    `contrast_aggregation.aggregate_contrast` repeats the animal-median and
-    sign-count pattern of `session_median_statistics`.
 
   *When:* at each figure's or report's next regeneration.
 
@@ -82,10 +80,6 @@ Work that is deferred on purpose. Each item says when it should be done.
 - [ ] **Correctness review of three disagreements found by the cleanup review.**
   Each may make a reported number, a figure or an audited table disagree with
   another; none was changed, because settling it changes numbers.
-  - `analysis/replay/coefficient_statistics.py`: `coefficient_statistics` (used by
-    `gated_coefficient_statistics`) computes the signed-rank p for any number of
-    sessions; `contrast_aggregation.aggregate_contrast` gives NaN at 5 sessions or
-    fewer. A reported value and the audited CSV row of the same term can differ.
   - `scripts/rate/plot_per_bin_rate_summary.py` (`_spline_basis`,
     `_panel_fitted_timecourse`) rebuilds the fitted time course with its own knots
     and grid and keeps separated sessions, unlike
