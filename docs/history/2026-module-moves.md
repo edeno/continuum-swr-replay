@@ -94,6 +94,25 @@ The sweep results the detection summary reads moved beside the summaries:
 | `docs/design/replay_detection_comparison/memoryless_comparison_recording.json` (removed: moved) | `paper/reported/inputs/detection/memoryless_comparison_recording.json` |
 | `docs/design/replay_detection_comparison/reference_check_summary.csv` (removed: moved) | `paper/reported/inputs/detection/reference_check_summary.csv` |
 
+## Calculations moved out of scripts, 2026-11
+
+Later in November the calculations a script did itself moved into the package; the
+scripts still exist and call them. Paths are under `src/continuum_swr_replay/analysis/`
+unless they start with `scripts/`.
+
+| Where the code was | Where it is |
+|---|---|
+| `behavior/content/model_comparison.py`: `why_not_comparable` and its column lists | `behavior/fit_comparability.py` (new) |
+| `scripts/behavior/coupling/fit_swr_power_model.py`: the per-session fit, the post-outcome gate, the cohort record and the printed statistics | `behavior/coupling/swr_power.py` (new subpackage) |
+| `scripts/behavior/rate/fit_swr_contrast_rate.py` (the post-outcome covariate mask) and `fit_uncertainty_rate.py` (the bin gate after the outcome) | `behavior/rate/post_outcome.py` (new): `mask_post_outcome_covariates`, `gate_bins_after_outcome`, `retained_time_course_support` |
+| `scripts/behavior/content/fit_swr_contrast_content.py`: each rung's cohort and the per-session fit loop | `behavior/content/cohort.py` (`contrast_fit_cohort`) and `behavior/content/session_fits.py` (`fit_contrast_ladder`, `fit_contrast_session`, `resolve_concentration_cols`) |
+| `scripts/behavior/content/fit_replay_content_models.py`: `_fit_conditional_logit_robustness` | `behavior/content/session_fits.py` (`fit_conditional_logit_robustness`, `LOGIT_SKIP_COLUMNS`) |
+| `scripts/behavior/content/compare_content_estimators.py`: the per-fit rows, the AIC difference, the identifiability rule, the summary and the animal bootstrap | `behavior/content/estimator_comparison.py` (new) |
+| `scripts/detection/_report.py` and `report_inventory_comparison.py`: `pool_sessions`, `summed`, `ratio`, `session_names` and the counts and cells tables | `inventory_comparison/pooling.py` (new) |
+| `scripts/detection/measure_event_start_and_rest_theta.py`: `measure_epoch`'s computation | `hippocampus/start_and_rest_theta.py` (new): `start_and_rest_theta` |
+| `scripts/detection/sweep_memoryless_detection.py` and `sweep_memoryless_controls.py`: their `summarize` functions | `hippocampus/memoryless_sequence/sweep_summaries.py` (new): `replay_sweep_summary`, `controls_summary` |
+| `scripts/detection/sweep_memoryless_heldout.py`: its `summarize` function | `inventory_comparison/heldout.py` (`heldout_summary`) |
+
 ## Package modules, 2026-10
 
 The code-organization branch (`470a393..2e55b21b`) moved, renamed or split the
