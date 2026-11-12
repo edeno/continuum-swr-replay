@@ -1161,9 +1161,7 @@ def _plot_decoding_stack(
         data, time_slice, ax_mua, plot_multiunit_zscore=True, plot_thresholds=True
     )
     plot_spike_times(data, time_slice, detector, env, results, ax_raster)
-    plot_conditional_non_local_posterior(
-        data, time_slice, results, env, detector, ax_post
-    )
+    plot_conditional_non_local_posterior(data, time_slice, results, env, ax_post)
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
     plot_speed(data, time_slice, ax_speed)
     ax_speed.axhline(

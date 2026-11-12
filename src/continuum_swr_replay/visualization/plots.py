@@ -131,6 +131,9 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from numpy.typing import NDArray
 
+from continuum_swr_replay.analysis.hippocampus.posterior_analysis import (
+    get_conditional_non_local_posterior,
+)
 from continuum_swr_replay.parameters import DEFAULT_NON_LOCAL_THRESHOLD
 from continuum_swr_replay.visualization.palettes import COLORS
 
@@ -602,11 +605,15 @@ def plot_conditional_non_local_posterior(
     time_slice: slice,
     results: xr.Dataset,
     env: Any,
-    detector: Any,
     ax: Axes,
     posterior_max: float = 0.25,
 ) -> None:
     """Plot conditional non-local posterior with animal position.
+
+    The posterior is the package's
+    (:func:`~continuum_swr_replay.analysis.hippocampus.posterior_analysis.get_conditional_non_local_posterior`)
+    over the window: a time bin with no non-local mass takes the nearest
+    earlier bin's. Bins off the track interior are drawn grey.
 
     Parameters
     ----------
@@ -618,8 +625,6 @@ def plot_conditional_non_local_posterior(
         Decoding results
     env : Environment
         Environment object
-    detector : Detector
-        Fitted detector object
     ax : matplotlib.axes.Axes
         Axes to plot on
     posterior_max : float, optional
@@ -629,29 +634,15 @@ def plot_conditional_non_local_posterior(
     cmap = copy.copy(plt.get_cmap("bone_r"))
     cmap.set_bad(color="lightgrey", alpha=1.0)
 
-    state_ind = detector.state_ind_
-    acausal_posterior = results.sel(time=time_slice).acausal_posterior.values
-
-    t, x = np.meshgrid(results.sel(time=time_slice).time.values, env.place_bin_centers_)
-    non_local_inds = np.nonzero(
-        ["Non-Local" in state for state in detector.state_names]
-    )[0]
-    conditional_non_local_acausal_posterior = np.zeros(
-        (len(results.sel(time=time_slice).time.values), len(env.place_bin_centers_))
-    )
-    for non_local_ind in non_local_inds:
-        conditional_non_local_acausal_posterior += acausal_posterior[
-            :, state_ind == non_local_ind
-        ]
-    conditional_non_local_acausal_posterior /= np.nansum(
-        conditional_non_local_acausal_posterior, axis=1
-    )[:, np.newaxis]
-    conditional_non_local_acausal_posterior[:, ~env.is_track_interior_] = np.nan
+    window = results.sel(time=time_slice)
+    t, x = np.meshgrid(window.time.values, env.place_bin_centers_)
+    conditional_posterior = get_conditional_non_local_posterior(window).values
+    conditional_posterior[:, ~env.is_track_interior_] = np.nan
 
     ax.pcolormesh(
         t,
         x,
-        conditional_non_local_acausal_posterior.T,
+        conditional_posterior.T,
         vmin=0.0,
         vmax=posterior_max,
         cmap=cmap,
@@ -973,7 +964,6 @@ def plot_detector(
         time_slice,
         results,
         env,
-        detector,
         axes[subplot_offset + 4],
         posterior_max,
     )

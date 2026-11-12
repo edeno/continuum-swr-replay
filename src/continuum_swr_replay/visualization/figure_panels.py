@@ -983,7 +983,6 @@ def plot_event_example_stack(
         time_slice,
         results,
         env,
-        detector,
         ax_post,
     )
     plot_acausal_probabilities(

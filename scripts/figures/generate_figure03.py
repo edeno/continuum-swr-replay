@@ -394,9 +394,7 @@ def generate_figure(
 
     plot_ripple_consensus_trace_zscore(data, time_slice, ax_swr)
     plot_spike_times(data, time_slice, detector, env, results, ax_raster)
-    plot_conditional_non_local_posterior(
-        data, time_slice, results, env, detector, ax_posterior
-    )
+    plot_conditional_non_local_posterior(data, time_slice, results, env, ax_posterior)
     plot_acausal_probabilities(results, time_slice, ax_probs, plot_local=True)
 
     # Convert absolute timestamps to relative time (seconds from the window

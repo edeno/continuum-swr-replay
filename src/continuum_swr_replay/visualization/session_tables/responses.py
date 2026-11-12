@@ -72,7 +72,7 @@ def _plot_state_probs(ax: Axes, ctx: _PanelContext) -> None:
 
 def _plot_conditional_posterior(ax: Axes, ctx: _PanelContext) -> None:
     plot_conditional_non_local_posterior(
-        ctx.data, ctx.time_slice, ctx.results, ctx.env, ctx.detector, ax
+        ctx.data, ctx.time_slice, ctx.results, ctx.env, ax
     )
     # Arm-label overlay — annotate the y-axis with arm IDs at the
     # mean linear position of each arm's place bins so the reader
