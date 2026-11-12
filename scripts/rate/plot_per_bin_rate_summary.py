@@ -30,6 +30,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
+from continuum_swr_replay.analysis.events.cohort_selection import (  # noqa: E402
+    select_stop_cohort,
+)
 from continuum_swr_replay.analysis.replay import (  # noqa: E402
     POPULATIONS,
     attach_is_swr_to_onsets,
@@ -167,14 +170,16 @@ def _panel_timecourse(ax, stop, onsets):
         )
     ax.set_xlabel("time since stop onset (s)")
     ax.set_ylabel("onset rate (events / s)")
-    ax.set_title("A0. Within-stop time course (descriptive)")
+    ax.set_title("A0. Within-stop time course (descriptive, well-anchored stops)")
     ax.set_xlim(0, 4)
     ax.legend(frameon=False, fontsize=7, loc="lower right")
     _shade_low_support(ax, stop)
     ax2 = ax.twinx()
     stc, surv = _survival(stop)
     ax2.plot(stc, surv, color="0.5", ls="--", lw=1.0)
-    ax2.set_ylabel("fraction of stops still immobile", color="0.5", fontsize=8)
+    ax2.set_ylabel(
+        "fraction of well-anchored stops still immobile", color="0.5", fontsize=8
+    )
     ax2.set_ylim(0, 1)
     ax2.tick_params(axis="y", colors="0.5")
 
@@ -378,8 +383,12 @@ def main(argv: Sequence[str] | None = None) -> None:
         [["time", "rate", "rew1", "ladder"], ["timefit", "rewk", "hist", "covar"]],
         figsize=(21, 9),
     )
-    _panel_timecourse(ax["time"], stop, onsets)
-    _panel_fitted_timecourse(ax["timefit"], df, stop)
+    # The time courses and their support are read on the well-anchored stops,
+    # the cohort the ladder is fit on and the summary reads the survival over.
+    anchored, _ = select_stop_cohort(stop, cohort="at_well")
+    anchored_onsets = onsets[onsets["stop_id"].isin(anchored["stop_id"])]
+    _panel_timecourse(ax["time"], anchored, anchored_onsets)
+    _panel_fitted_timecourse(ax["timefit"], df, anchored)
     _panel_baseline(ax["rate"], df)
     _panel_reward1(ax["rew1"], df)
     _panel_reward_kernel(ax["rewk"], df)
