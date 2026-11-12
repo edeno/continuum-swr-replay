@@ -56,6 +56,7 @@ import pandas as pd
 matplotlib.use("Agg")
 
 from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
+    feature_run,
     inventory_run,
 )
 from continuum_swr_replay.parameters import FIGURE_DIR  # noqa: E402
@@ -119,9 +120,10 @@ def write_examples(run_dir: Path, figure_dir: Path) -> list[dict[str, Any]]:
         Each draw's record, as the manifest holds it: ``status`` ``written``
         or ``not_written``.
     """
-    manifest = json.loads((run_dir / "manifest.json").read_text())
+    # an inventory run's manifest has the same epoch records as a feature run's
+    manifest = feature_run.read_manifest(run_dir)
     settings = manifest["settings"]
-    ok = sorted(e for e, r in manifest["epochs"].items() if r["status"] == "ok")
+    ok = feature_run.ok_epochs(manifest)
     cells = pd.concat(
         [
             read_table(inventory_run.output_path(e, run_dir, "cells")).assign(
