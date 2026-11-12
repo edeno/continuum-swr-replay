@@ -475,7 +475,7 @@ still compute a reported statistic themselves are listed in `TODO.md`.
   refuses to build when an input cannot give the value at all: it does not cover the cohort (an epoch,
   an event or a unit has no row), it is an older design, or its record cannot be read. Not every input
   records the tables it was made from; those have no staleness check
-  (`.claude/docs/reviews/2026-11-11-reported-numbers-review.md`, finding K-5).
+  (`docs/known_issues/reported_statistics_choices.md`, entry A3).
 - A number quoted from a cited paper (for example, another study's share of replays) is not a result
   of this project and has no summary key: write it as text beside its citation. A number this project
   computes, even from published sources (the survey summary's literature numbers), is a reported number.

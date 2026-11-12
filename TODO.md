@@ -86,8 +86,7 @@ Work that is deferred on purpose. Each item says when it should be done.
   `docs/known_issues/reported_statistics_choices.md` lists them: where each is
   made, what the code does, what is open, and what was measured on the current
   data. They were found while the statistics moved into `analysis/` and in the
-  review of that code (`.claude/docs/reviews/2026-11-11-reported-numbers-review.md`).
-  Write each decision in that file.
+  review of that code. Write each decision in that file.
   *When:* before the Results that cite the value are drafted.
 
 - [ ] **Open decisions from the retired figure plan** (`paper/figure_claims_plan.md`,
