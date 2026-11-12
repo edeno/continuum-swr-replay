@@ -713,9 +713,7 @@ EVIDENCE_COLUMNS = ("evidence_dll", "evidence_unscorable", "spikes_per_row")
 def with_spikes_per_row(features: pd.DataFrame) -> pd.DataFrame:
     """``features`` with ``spikes_per_row`` (``n_spikes / n_rows``, NaN with
     no row) and its bin of :data:`SPIKES_PER_ROW_BINS`."""
-    n_rows = features.n_rows.to_numpy(np.float64)
-    n_spikes = features.n_spikes.astype("Float64").to_numpy(np.float64, na_value=np.nan)
-    per_row = np.where(n_rows > 0, n_spikes / np.maximum(n_rows, 1), np.nan)
+    per_row = ratio(features.n_spikes, features.n_rows).to_numpy()
     return features.assign(
         spikes_per_row=per_row,
         spikes_per_row_bin=pd.cut(
