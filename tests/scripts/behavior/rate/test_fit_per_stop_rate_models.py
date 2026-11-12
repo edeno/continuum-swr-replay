@@ -174,3 +174,28 @@ def test_in_transit_cohort_publishes_its_own_bundle(stubbed_run):
 
     assert seen["stop_ids"] == ["s2", "s3"]
     assert (tmp_path / "models_per_stop_rate" / "all_models_intransit.pkl").exists()
+
+
+@pytest.mark.parametrize(
+    ("converged", "n_flagged"), [(True, 0), (False, 1), (None, 1), ("absent", 1)]
+)
+def test_a_fit_without_a_true_convergence_flag_counts_as_not_converged(
+    monkeypatch, converged, n_flagged
+):
+    """The cohort audit counts a fit as converged only when its flag is True:
+    a flag that is missing or None has not shown convergence."""
+
+    def _fit(cohort, predictors, *, response_col):
+        fit = {"n_stops": len(cohort), "converged": converged, "separated": False}
+        if converged == "absent":
+            del fit["converged"]
+        return fit
+
+    monkeypatch.setattr(fpsr, "fit_per_stop_rate_model", _fit)
+
+    _rows, records = fpsr.fit_per_stop_rate_hierarchy(
+        _cohort_stop_table(), run_cv=False
+    )
+
+    assert len(records) == len(fpsr.MODEL_PER_STOP_RATE) * len(fpsr.RESPONSE_COLS)
+    assert {r["n_sessions_flagged_nonconverged"] for r in records} == {n_flagged}

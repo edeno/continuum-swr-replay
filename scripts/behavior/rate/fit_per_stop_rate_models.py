@@ -208,7 +208,7 @@ def fit_per_stop_rate_hierarchy(
                 a["n_modeled"] += int(res["n_stops"])
                 a["sessions_modeled"] += 1
                 a["animals"].add(keys[0])
-                a["n_nonconv"] += res.get("converged") is False
+                a["n_nonconv"] += res.get("converged") is not True
                 a["n_sep"] += bool(res.get("separated"))
                 row = {
                     "outcome": outcome,

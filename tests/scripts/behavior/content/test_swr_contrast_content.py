@@ -587,6 +587,36 @@ def test_fit_rows_carry_the_optimizer_diagnostics(monkeypatch):
     assert bool(row["converged"]) is True
 
 
+@pytest.mark.parametrize(
+    ("converged", "n_flagged"), [(True, 0), (False, 1), (None, 1), ("absent", 1)]
+)
+def test_a_fit_without_a_true_convergence_flag_counts_as_not_converged(
+    monkeypatch, converged, n_flagged
+):
+    """The audit counts a fit as converged only when its flag is True: a flag
+    that is missing or None has not shown convergence."""
+
+    def _fit(g, predictors, *, response_col, n_categories):
+        fit = _fit_row()
+        if converged == "absent":
+            del fit["converged"]
+        else:
+            fit["converged"] = converged
+        return fit, mod._audit(2, 0, 0, 0, 0, 2, "", g.iloc[0:0])
+
+    monkeypatch.setattr(mod, "_fit_session", _fit)
+    term = "reward_belief_mean_candidate_arm_preoutcome_z"
+
+    _res, audits = mod._run(
+        _nine_arm_cohort(),
+        {"C1_nine_arm": ([term], "pooled")},
+        response_col="arm_fraction",
+        n_categories=9,
+    )
+
+    assert [a["n_sessions_flagged_nonconverged"] for a in audits] == [n_flagged]
+
+
 def test_leaf_only_rungs_are_fit_on_leaf_renormalized_fractions(monkeypatch):
     """The trunk share is not balanced across the contrast, so it cannot set the
     weight an event carries: leaf-only rungs get unit mass over the six leaves,

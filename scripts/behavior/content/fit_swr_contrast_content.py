@@ -457,7 +457,7 @@ def _run(
                     continue
                 sessions_modeled += 1
                 animals_modeled.add(keys[SC.index("animal")])
-                n_nonconv += r.get("converged") is False
+                n_nonconv += r.get("converged") is not True
                 n_sep += bool(r.get("separated"))
                 rows.append(
                     {
