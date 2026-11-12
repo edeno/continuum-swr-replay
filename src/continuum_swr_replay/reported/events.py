@@ -1673,7 +1673,14 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
         )
     )
     summary.inputs += [
-        files_record("*_features.parquet", run.glob("*_features.parquet"), ROOT_DIR),
+        files_record(
+            "*_features.parquet",
+            (
+                feature_run.output_path(identifier, run, "features")
+                for identifier in feature_run.ok_epochs(feature_run.read_manifest(run))
+            ),
+            ROOT_DIR,
+        ),
         file_record(report_dir / "counts_by_animal.csv", ROOT_DIR),
         file_record(report_dir / "cells_by_animal.csv", ROOT_DIR),
     ]
