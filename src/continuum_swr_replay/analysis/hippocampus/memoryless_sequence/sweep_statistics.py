@@ -6,7 +6,7 @@ long-format summary, one value per row: the injected-replay sweep
 (``sweep_memoryless_controls.py``) and the held-out check
 (``sweep_memoryless_heldout.py``). Each function here takes one of those
 summaries and returns named numbers: one value, a dict, a series with one
-value per measure, or a table with one row per true duration
+value per measure or level, or a table with one row per true duration
 (:func:`heldout_event_classes` returns the names of the classes of event
 instead). They are the statistics the detection summary reports
 (``continuum_swr_replay.reported.detection`` names and describes them) and the
@@ -32,6 +32,7 @@ __all__ = [
     "lowest_estimator_agreement",
     "no_replay_statistics",
     "part_recovery_statistics",
+    "parts_by_level",
     "pooled_heldout_rate",
     "sweep_by_duration",
     "sweep_grid_statistics",
@@ -475,6 +476,57 @@ def burst_share_range(
     return {"min": float(shares.min()), "max": float(shares.max())}
 
 
+def parts_by_level(
+    controls: pd.DataFrame, conditions: Sequence[str], measure: str, detector: str
+) -> pd.Series:
+    """A measure of two-part trials at each level, pooled over conditions.
+
+    At each level (a jump size in cm or a gap in seconds) the value is the
+    mean, over ``conditions``, of each condition's value there.
+
+    Parameters
+    ----------
+    controls : pd.DataFrame, shape (n_rows, n_columns)
+        The controls summary (:func:`controls_value`).
+    conditions : sequence of str
+        The two-part conditions pooled; all run at the first one's levels.
+    measure : str
+        A measure of the ``parts`` block given at each level, such as
+        ``"segmentation_spanning"`` (the share of trials the detector's events
+        carve as one event over both parts) or ``"part_recovery"``.
+    detector : str
+        The detector output.
+
+    Returns
+    -------
+    values : pd.Series, shape (n_levels,)
+        Indexed by level, lowest first.
+
+    Raises
+    ------
+    ValueError
+        If a condition does not hold exactly one row of the measure at one of
+        the first condition's levels.
+    """
+    levels = _levels(controls, conditions[0])
+    return pd.Series(
+        [
+            np.mean(
+                [
+                    controls_value(
+                        controls, "parts", measure, condition, level, detector
+                    )
+                    for condition in conditions
+                ]
+            )
+            for level in levels
+        ],
+        index=pd.Index(levels, name="level"),
+        name=measure,
+        dtype=float,
+    )
+
+
 def carving_statistics(
     controls: pd.DataFrame, conditions: Sequence[str], label: str, detector: str
 ) -> dict[str, float]:
@@ -482,7 +534,7 @@ def carving_statistics(
 
     At each level (a jump size or a gap) the share is the mean, over
     ``conditions``, of the share of trials the detector's events carve as
-    ``label``.
+    ``label`` (:func:`parts_by_level`).
 
     Parameters
     ----------
@@ -503,24 +555,9 @@ def carving_statistics(
         - ``at_lowest_level``, ``at_highest_level``: the share at the lowest
           and at the highest level.
     """
-    shares = np.array(
-        [
-            np.mean(
-                [
-                    controls_value(
-                        controls,
-                        "parts",
-                        f"segmentation_{label}",
-                        condition,
-                        level,
-                        detector,
-                    )
-                    for condition in conditions
-                ]
-            )
-            for level in _levels(controls, conditions[0])
-        ]
-    )
+    shares = parts_by_level(
+        controls, conditions, f"segmentation_{label}", detector
+    ).to_numpy()
     return {
         "min": float(shares.min()),
         "max": float(shares.max()),

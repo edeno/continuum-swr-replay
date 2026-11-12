@@ -373,6 +373,22 @@ def test_burst_share_range_refuses_a_condition_with_no_share():
         stats.burst_share_range(CONTROLS, "no_such_burst", "fragmented_share", OURS)
 
 
+def test_parts_by_level_is_the_mean_over_conditions_at_each_level():
+    result = stats.parts_by_level(CONTROLS, ("j1", "j2"), "segmentation_spanning", OURS)
+    # j1 and j2 at 0, 20, 40, 80 cm: (0.5, 0.7), (0.9, 0.7), (0.2, 0.0), (0.4, 0.2)
+    assert list(result.index) == [0, 20, 40, 80]
+    assert result.to_numpy() == pytest.approx([0.6, 0.8, 0.1, 0.3])
+    # one condition: its own values, here a chain's at gaps of 10 and 100 ms
+    recovery = stats.parts_by_level(CONTROLS, ("c1",), "part_recovery", OURS)
+    assert recovery.to_dict() == {0.01: 0.2, 0.1: 0.6}
+
+
+def test_parts_by_level_refuses_a_condition_without_a_row_at_a_level():
+    # c1 was not run at the jump sizes
+    with pytest.raises(ValueError, match="0 rows"):
+        stats.parts_by_level(CONTROLS, ("j1", "c1"), "part_recovery", OURS)
+
+
 def test_carving_statistics_pool_conditions_at_each_level():
     result = stats.carving_statistics(CONTROLS, ("j1", "j2"), "spanning", OURS)
     # means of j1 and j2 at 0, 20, 40, 80 cm: 0.6, 0.8, 0.1, 0.3

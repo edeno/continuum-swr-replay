@@ -1039,28 +1039,25 @@ def plot_carving(
     show_y: bool = True,
 ) -> None:
     """How each detector carved multi-part events, pooled over ``conditions``."""
-    levels = controls_levels(controls, conditions[0])
+    detectors = ("sliding_published", "state_space_canonical")
+    by_level = {
+        (detector, measure): sweep_statistics.parts_by_level(
+            controls, conditions, measure, detector
+        )
+        for detector in detectors
+        for measure in (
+            *(f"segmentation_{label}" for label, _, _ in SEGMENTATION_STYLE),
+            "part_recovery",
+        )
+    }
+    levels = by_level[detectors[0], "part_recovery"].index
     width = 0.36
-    for group, level in enumerate(levels):
-        for offset, detector in enumerate(
-            ("sliding_published", "state_space_canonical")
-        ):
+    for group in range(len(levels)):
+        for offset, detector in enumerate(detectors):
             x = group + (offset - 0.5) * width
             bottom = 0.0
             for label, shade, name in SEGMENTATION_STYLE:
-                share = np.mean(
-                    [
-                        sweep_statistics.controls_value(
-                            controls,
-                            "parts",
-                            f"segmentation_{label}",
-                            c,
-                            level,
-                            detector,
-                        )
-                        for c in conditions
-                    ]
-                )
+                share = by_level[detector, f"segmentation_{label}"].iloc[group]
                 ax.bar(
                     x,
                     100 * share,
@@ -1072,14 +1069,7 @@ def plot_carving(
                     label=name if legend and group == 0 and offset == 0 else None,
                 )
                 bottom += share
-            recovery = np.mean(
-                [
-                    sweep_statistics.controls_value(
-                        controls, "parts", "part_recovery", c, level, detector
-                    )
-                    for c in conditions
-                ]
-            )
+            recovery = by_level[detector, "part_recovery"].iloc[group]
             # the two detectors' numbers at two heights, so neighbours do not run
             # together
             ax.text(
@@ -1494,35 +1484,22 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
                 "The caption says the sliding window never reports one event across "
                 "an 80 cm jump; the controls summary disagrees."
             )
-        for level in controls_levels(controls, condition):
-            if (
-                sweep_statistics.controls_value(
-                    controls,
-                    "parts",
-                    "segmentation_spanning",
-                    condition,
-                    level,
-                    "state_space_canonical",
-                )
-                < 0.5
-            ):
-                raise RuntimeError(
-                    "The caption says the state-space detector reports one event over "
-                    "both parts of most jumps at every size; the summary disagrees."
-                )
-    shortest = controls_levels(controls, "chain_continuing")[0]
-    for detector in ("sliding_published", "state_space_canonical"):
-        if (
-            sweep_statistics.controls_value(
-                controls,
-                "parts",
-                "segmentation_spanning",
-                "chain_continuing",
-                shortest,
-                detector,
+        spanning = sweep_statistics.parts_by_level(
+            controls, (condition,), "segmentation_spanning", "state_space_canonical"
+        )
+        if (spanning < 0.5).any():
+            raise RuntimeError(
+                "The caption says the state-space detector reports one event over "
+                "both parts of most jumps at every size; the summary disagrees."
             )
-            < 0.5
-        ):
+    continuing = {
+        detector: sweep_statistics.carving_statistics(
+            controls, ("chain_continuing",), "spanning", detector
+        )
+        for detector in ("sliding_published", "state_space_canonical")
+    }
+    for detector in ("sliding_published", "state_space_canonical"):
+        if continuing[detector]["at_lowest_level"] < 0.5:
             raise RuntimeError(
                 "The caption says both detectors report one event over a chain at "
                 "the shortest gap; the controls summary disagrees."
@@ -1551,33 +1528,21 @@ def check_controls_claims(controls: pd.DataFrame) -> None:
                 "The caption says more trials gain parts inside the event than "
                 "lose them; the controls summary disagrees."
             )
-    longest = controls_levels(controls, "chain_continuing")[-1]
     for detector in ("sliding_published", "state_space_canonical"):
-        if sweep_statistics.controls_value(
-            controls,
-            "parts",
-            "segmentation_spanning",
-            "chain_continuing",
-            longest,
-            detector,
-        ):
+        if continuing[detector]["at_highest_level"]:
             raise RuntimeError(
                 "The caption says neither detector reports one event over a chain "
                 "at the longest gap; the controls summary disagrees."
             )
-    for level in controls_levels(controls, "chain_elsewhere"):
-        if sweep_statistics.controls_value(
-            controls,
-            "parts",
-            "segmentation_spanning",
-            "chain_elsewhere",
-            level,
-            "sliding_published",
-        ):
-            raise RuntimeError(
-                "The caption says the sliding window never reports one event over a "
-                "chain whose parts are far apart; the controls summary disagrees."
-            )
+    elsewhere = sweep_statistics.parts_by_level(
+        controls, ("chain_elsewhere",), "segmentation_spanning", "sliding_published"
+    )
+    # a missing share is not zero
+    if (elsewhere != 0).any():
+        raise RuntimeError(
+            "The caption says the sliding window never reports one event over a "
+            "chain whose parts are far apart; the controls summary disagrees."
+        )
 
 
 def check_heldout_claims(heldout: pd.DataFrame) -> None:
