@@ -110,7 +110,7 @@ Theta, ripple and MUA levels of running and of quiet rest, the references for an
 
 One class or two: do SWR-coupled and non-SWR non-local events differ by kind or by degree of ripple power?
 
-`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`
+`sarle_bimodality`, `dip_test`, `kde_modes`, `matched_unimodal_sample`, `matched_lognormal_sample`, `two_class_mixture_sample`, `common_support`, `StepFit`, `fit_step`, `overall_step_share`, `simulate_step_data`, `sustained_level`, `kay_like_intervals`, `kay_criterion`, `simulate_ripple_events`
 
 ### `src/continuum_swr_replay/analysis/hippocampus/data_aggregation.py`
 
