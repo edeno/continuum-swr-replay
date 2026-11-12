@@ -58,6 +58,8 @@ from numpy.typing import NDArray
 from scipy import stats
 
 from continuum_swr_replay.analysis.pfc.event_sets import DEFAULT_BASIS_HALF_WINDOW_S
+from continuum_swr_replay.analysis.pfc.load_population import CALLED_ALPHA
+from continuum_swr_replay.analysis.pfc.population_statistics import called_units
 from continuum_swr_replay.intervals import (
     get_spikecount_per_time_bin,
     merge_intervals,
@@ -71,7 +73,9 @@ __all__ = [
     "ESTIMATORS",
     "OVERLAP_TERM",
     "POST_WINDOW_S",
+    "SIGNS",
     "STOP_CONTEXT_CLASSES",
+    "UNIT_SETS",
     "StopContextFit",
     "assemble_stop_context_table",
     "count_other_onsets",
@@ -80,6 +84,7 @@ __all__ = [
     "near_onset_mask",
     "onset_bin_index",
     "prepare_session_stop_context",
+    "select_units",
     "stop_context_design",
     "summarize_stop_context",
 ]
@@ -100,6 +105,11 @@ OVERLAP_TERM = "overlap"
 MAX_ABS_COEF = 10.0
 #: The two estimators of :func:`fit_stop_context_glm`.
 ESTIMATORS = ("conditional", "plugin")
+#: The response signs a fit's units are chosen by (:func:`select_units`).
+SIGNS = ("increase", "decrease")
+#: The unit sets of :func:`select_units`: the units called for the class at
+#: ``CALLED_ALPHA``, or every unit of the sign.
+UNIT_SETS = ("called", "all")
 
 #: Columns of the per-session event-level table, in order.
 TABLE_COLUMNS = (
@@ -666,6 +676,38 @@ def prepare_session_stop_context(
 # ---------------------------------------------------------------------------
 # Model data
 # ---------------------------------------------------------------------------
+
+
+def select_units(
+    units: pd.DataFrame, event_class: str, sign: str, unit_set: str
+) -> np.ndarray:
+    """Which units one fit uses: their peak for ``event_class`` has ``sign``
+    and, for ``unit_set == "called"``, they are called for ``event_class`` at
+    :data:`~continuum_swr_replay.analysis.pfc.load_population.CALLED_ALPHA`
+    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_units`).
+    Another class's peak or p never enters.
+
+    Parameters
+    ----------
+    units : pandas.DataFrame
+        One row per unit, with ``<event_class>: peak_log_modulation`` and the
+        class's held-out p column.
+    event_class : str
+        One of :data:`STOP_CONTEXT_CLASSES`.
+    sign : str
+        One of :data:`SIGNS`; a NaN or zero peak has neither sign.
+    unit_set : str
+        One of :data:`UNIT_SETS`.
+
+    Returns
+    -------
+    np.ndarray of bool, shape (n_units,)
+    """
+    peak = units[f"{event_class}: peak_log_modulation"].to_numpy(dtype=float)
+    has_sign = peak > 0 if sign == "increase" else peak < 0
+    if unit_set == "all":
+        return has_sign
+    return has_sign & called_units(units, event_class, CALLED_ALPHA)
 
 
 def model_frame(

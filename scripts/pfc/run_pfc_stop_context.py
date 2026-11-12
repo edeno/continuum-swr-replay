@@ -20,7 +20,7 @@ pooled Poisson model with per-unit intercepts and the two stop context terms
 plus overlap, by both estimators (conditional: the stop baseline estimated
 jointly; plugin: plugged in as an offset), with standard errors clustered by
 recording day. A class's units are chosen by that class's own peak sign and
-held-out p-value (:func:`select_units`). Writes ``<out>/results.csv`` and
+held-out p-value (``stop_context.select_units``). Writes ``<out>/results.csv`` and
 ``<out>/results.provenance.json``.
 
 Examples
@@ -61,11 +61,13 @@ from continuum_swr_replay.analysis.pfc.load_population import (
     CALLED_ALPHA,
     HELDOUT_P_COLUMNS,
 )
-from continuum_swr_replay.analysis.pfc.population_statistics import called_units
 from continuum_swr_replay.analysis.pfc.stop_context import (
     ESTIMATORS,
+    SIGNS,
     STOP_CONTEXT_CLASSES,
+    UNIT_SETS,
     model_frame,
+    select_units,
     summarize_stop_context,
 )
 from continuum_swr_replay.decoding.identifiers import format_epoch_identifier
@@ -80,8 +82,6 @@ from continuum_swr_replay.tables.io import read_table, write_table
 
 REPO = Path(__file__).resolve().parents[2]
 BRAIN_AREA = "mPFC"
-SIGNS = ("increase", "decrease")
-UNIT_SETS = ("called", "all")
 
 
 def default_output_dir() -> Path:
@@ -282,26 +282,6 @@ def unit_table(sessions: list[tuple[str, str]]) -> pd.DataFrame:
             )
         )
     return pd.concat(frames, ignore_index=True)
-
-
-def select_units(
-    units: pd.DataFrame, event_class: str, sign: str, unit_set: str
-) -> np.ndarray:
-    """Which units one fit uses: their peak for ``event_class`` has ``sign``
-    and, for ``unit_set == "called"``, they are called for ``event_class`` at
-    :data:`~continuum_swr_replay.analysis.pfc.load_population.CALLED_ALPHA`
-    (:func:`~continuum_swr_replay.analysis.pfc.population_statistics.called_units`).
-    Another class's peak or p never enters.
-
-    Returns
-    -------
-    np.ndarray of bool, shape (n_units,)
-    """
-    peak = units[f"{event_class}: peak_log_modulation"].to_numpy(dtype=float)
-    has_sign = peak > 0 if sign == "increase" else peak < 0
-    if unit_set == "all":
-        return has_sign
-    return has_sign & called_units(units, event_class, CALLED_ALPHA)
 
 
 def fit(args: Namespace) -> None:

@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 from scipy import stats
 
+from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
 from continuum_swr_replay.analysis.pfc.stop_context import (
     CONTEXT_TERMS,
     STOP_CONTEXT_CLASSES,
@@ -22,6 +23,7 @@ from continuum_swr_replay.analysis.pfc.stop_context import (
     model_frame,
     near_onset_mask,
     onset_bin_index,
+    select_units,
     stop_context_design,
     summarize_stop_context,
 )
@@ -630,3 +632,58 @@ def test_real_session_matches_canonical_assembly():
     unit = table["unit"].to_numpy()
     expected = cumulative[first + 100, unit] - cumulative[first, unit]
     np.testing.assert_array_equal(table["y"].to_numpy(), expected)
+
+
+SWR, NON = "non_local_SWR", "non_local_no_SWR"
+
+
+def _units() -> pd.DataFrame:
+    """Six units whose signs and p-values differ between the two classes."""
+    return pd.DataFrame(
+        {
+            f"{SWR}: peak_log_modulation": [0.5, 0.5, -0.4, -0.4, 0.3, np.nan],
+            HELDOUT_P_COLUMNS[SWR]: [0.01, 0.20, 0.01, 0.30, 0.04, 0.01],
+            f"{NON}: peak_log_modulation": [-0.2, 0.6, 0.6, -0.1, 0.0, 0.2],
+            HELDOUT_P_COLUMNS[NON]: [0.50, 0.01, 0.02, 0.01, 0.01, 0.90],
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    ("event_class", "sign", "unit_set", "expected"),
+    [
+        # sign from that class's own peak; NaN and 0 have no sign
+        (SWR, "increase", "all", [0, 1, 4]),
+        (SWR, "decrease", "all", [2, 3]),
+        (NON, "increase", "all", [1, 2, 5]),
+        (NON, "decrease", "all", [0, 3]),
+        # called = that class's own p below 0.05
+        (SWR, "increase", "called", [0, 4]),
+        (SWR, "decrease", "called", [2]),
+        (NON, "increase", "called", [1, 2]),
+        (NON, "decrease", "called", [3]),
+    ],
+)
+def test_units_are_chosen_by_their_own_class_peak_and_p(
+    event_class, sign, unit_set, expected
+):
+    chosen = select_units(_units(), event_class, sign, unit_set)
+    np.testing.assert_array_equal(np.flatnonzero(chosen), expected)
+
+
+def test_one_class_p_never_selects_another_class_units():
+    units = _units()
+    before = select_units(units, NON, "increase", "called")
+    # Making every unit significant for the SWR-coupled class changes nothing
+    # for the non-SWR class, and the reverse.
+    units[HELDOUT_P_COLUMNS[SWR]] = 0.0
+    units[f"{SWR}: peak_log_modulation"] = 1.0
+    np.testing.assert_array_equal(
+        select_units(units, NON, "increase", "called"), before
+    )
+    units = _units()
+    before = select_units(units, SWR, "decrease", "called")
+    units[HELDOUT_P_COLUMNS[NON]] = 1.0
+    np.testing.assert_array_equal(
+        select_units(units, SWR, "decrease", "called"), before
+    )
