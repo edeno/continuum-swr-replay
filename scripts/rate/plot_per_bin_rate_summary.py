@@ -38,6 +38,10 @@ from continuum_swr_replay.analysis.replay import (  # noqa: E402
 from continuum_swr_replay.analysis.replay.coefficient_statistics import (  # noqa: E402
     aic_difference_statistics,
     fit_rows,
+    gated_coefficient_statistics,
+)
+from continuum_swr_replay.analysis.replay.contrast_aggregation import (  # noqa: E402
+    gate_term_sessions,
 )
 from continuum_swr_replay.analysis.replay.fit_provenance import (  # noqa: E402
     require_fresh_inputs,
@@ -49,6 +53,7 @@ from continuum_swr_replay.analysis.replay.model_specs import (  # noqa: E402
     REWARD_HISTORY_N_LAGS,
 )
 from continuum_swr_replay.analysis.replay.rate_fit_statistics import (  # noqa: E402
+    baseline_rate_statistics,
     fitted_time_course,
     ladder_fit_statistics,
     reward_kernel_by_lag,
@@ -107,15 +112,18 @@ FULL = "M7r_time_histcos_rew"
 TIME_RUNG = "M5_time"
 # First reward-history basis coefficient (a recent-reward fraction weighted
 # toward the newest outcomes, not lag 1 alone); the "IMMEDIATE" name is legacy.
-IMMEDIATE_COEF = f"coef_{REWARD_HISTORY_COLUMNS[0]}"
-SLOW_COEF = f"coef_{REWARD_HISTORY_COLUMNS[-1]}"
+IMMEDIATE_TERM = REWARD_HISTORY_COLUMNS[0]
+SLOW_TERM = REWARD_HISTORY_COLUMNS[-1]
 # Panel B's margin beyond the lowest and highest whisker: a factor in RR, applied
 # as its log on the beta axis.
 RR_MARGIN_FACTOR = 1.15
 
 
-def _coef(df, model, oc, coef):
-    return df[(df.model == model) & (df.outcome == oc)][coef].dropna()
+def _gated_coefficient(df, oc, term):
+    """``coef_<term>`` of the full rung over the sessions the per-term gate keeps,
+    the sessions the summary reads the coefficient over."""
+    fits = fit_rows(df, model=FULL, outcome=oc)
+    return fits.loc[gate_term_sessions(fits, term).kept, f"coef_{term}"]
 
 
 def _lag_exposure(stop, edges):
@@ -229,9 +237,10 @@ def _panel_fitted_timecourse(ax, df, stop):
 
 def _panel_baseline(ax, df):
     for i, oc in enumerate(POPS4):
-        v = np.exp(_coef(df, "M0_const", oc, "coef_Intercept"))
-        err = [[v.median() - v.quantile(0.25)], [v.quantile(0.75) - v.median()]]
-        ax.bar(i, v.median(), color=STYLE[oc][1], alpha=0.7, yerr=err, capsize=4)
+        rate = baseline_rate_statistics(fit_rows(df, model="M0_const", outcome=oc))
+        median = rate["median"]
+        err = [[median - rate["lower_quartile"]], [rate["upper_quartile"] - median]]
+        ax.bar(i, median, color=STYLE[oc][1], alpha=0.7, yerr=err, capsize=4)
     ax.set_xticks(range(4))
     ax.set_xticklabels(
         [STYLE[o][0] for o in POPS4], rotation=20, ha="right", fontsize=8
@@ -247,7 +256,7 @@ def _panel_reward1(ax, df):
     # stretched the axis over five decades. The axis is linear in beta, with
     # ticks at the log of plain RR values and labelled with the RR; RR = 1 is
     # beta = 0.
-    data = [_coef(df, FULL, oc, IMMEDIATE_COEF) for oc in POPS3]
+    data = [_gated_coefficient(df, oc, IMMEDIATE_TERM) for oc in POPS3]
     bp = ax.boxplot(data, labels=SHORT, showfliers=False, patch_artist=True)
     for patch, oc in zip(bp["boxes"], POPS3, strict=True):
         patch.set_facecolor(STYLE[oc][1])
@@ -348,10 +357,12 @@ def _panel_ladder(ax, df):
 
 def _panel_covar(ax, df):
     w = 0.35
-    blocks = [(FULL, SLOW_COEF)]
-    for j, (model, coef) in enumerate(blocks):
+    blocks = [(FULL, SLOW_TERM)]
+    for j, (model, term) in enumerate(blocks):
         for i, oc in enumerate(POPS3):
-            rr = np.exp(_coef(df, model, oc, coef).median())
+            rr = gated_coefficient_statistics(
+                fit_rows(df, model=model, outcome=oc), term
+            )["exp_median"]
             ax.bar(
                 i + j * (w + 0.05) - 0.2,
                 rr,

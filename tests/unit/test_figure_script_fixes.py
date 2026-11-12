@@ -718,7 +718,7 @@ def test_the_rate_summary_panel_b_takes_its_box_statistics_in_log_space():
             {
                 "model": summary.FULL,
                 "outcome": outcome,
-                summary.IMMEDIATE_COEF: np.log(values),
+                f"coef_{summary.IMMEDIATE_TERM}": np.log(values),
             }
         )
         for outcome, values in rate_ratios.items()
@@ -949,6 +949,9 @@ def _fits_with_arrival_cohort(swr: tuple[int, int], no_swr: tuple[int, int]):
         {
             "outcome": ["swr", "non_local_no_swr"],
             "model": "M0_const",
+            "coef_Intercept": 0.0,
+            "aic": 10.0,
+            "separated": False,
             "ks_within_band": 0.5,
             "ks_statistic": 0.1,
             "dispersion": 1.0,
@@ -959,6 +962,9 @@ def _fits_with_arrival_cohort(swr: tuple[int, int], no_swr: tuple[int, int]):
         population: {
             "n_event_bins_arrival_window": kept,
             "n_event_bins_frozen": frozen,
+            "n_bins_frozen": 1000,
+            "n_bins_dropped_arrival_clock": 0,
+            "n_bins_arrival_window": 900,
         }
         for population, (kept, frozen) in (
             ("swr", swr),
