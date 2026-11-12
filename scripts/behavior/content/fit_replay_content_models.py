@@ -77,6 +77,7 @@ from typing import NamedTuple
 import numpy as np
 import pandas as pd
 
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import fit_flag_counts
 from continuum_swr_replay.analysis.behavior._helpers import add_arm_fixed_effects
 from continuum_swr_replay.analysis.behavior.coefficient_statistics import (
     coefficient_family_statistics,
@@ -87,7 +88,6 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import (
     drop_profile,
     estimator_skip_note,
     event_drop_buckets,
-    fit_flag_counts,
     is_qvals_sourced_column,
     write_cohort_audit,
 )

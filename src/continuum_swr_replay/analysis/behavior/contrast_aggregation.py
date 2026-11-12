@@ -67,9 +67,9 @@ from continuum_swr_replay.tables.standardization import (
     load_reference,
 )
 
-from ._fit_diagnostics import SEPARATION_COEF_ABS
+from ._fit_diagnostics import SEPARATION_COEF_ABS, fit_flag_counts
 from ._helpers import add_arm_fixed_effects
-from .cohort_audit import HAS_QVALS_ROW, fit_flag_counts, qvals_gap_event_ids
+from .cohort_audit import HAS_QVALS_ROW, qvals_gap_event_ids
 from .covariates.history.value_uncertainty import validate_uncertainty_inputs
 from .covariates.interactions import (
     LOG1P_STOP_TIME,

@@ -20,6 +20,7 @@ from continuum_swr_replay.analysis.behavior._fit_diagnostics import (
     SEPARATION_EFFECT_SE,
     capture_fit_warnings,
     count_fit_quality_warnings,
+    fit_flag_counts,
     fit_status,
 )
 
@@ -293,3 +294,27 @@ def test_term_names_default_to_the_params_index():
     assert fit_status(res, "glm", predictor_sd=np.array([0.0, 1e9]))[
         "separated_terms"
     ] == ("x",)
+
+
+def test_a_missing_convergence_flag_has_not_converged_and_a_missing_separation_flag_is_not_separated():
+    # converged: True, False, NaN, None, True -> 3 not converged (a `== False`
+    # count would give 1); separated: True, False, NaN, None, True -> 2.
+    fits = pd.DataFrame(
+        {
+            "converged": pd.Series([True, False, np.nan, None, True], dtype=object),
+            "separated": pd.Series([True, False, np.nan, None, True], dtype=object),
+        }
+    )
+    assert fit_flag_counts(fits) == {
+        "n_sessions_flagged_nonconverged": 3,
+        "n_sessions_flagged_separated": 2,
+    }
+    # a column the fits do not carry counts nothing
+    assert fit_flag_counts(fits[["separated"]]) == {
+        "n_sessions_flagged_nonconverged": 0,
+        "n_sessions_flagged_separated": 2,
+    }
+    assert fit_flag_counts(fits[["converged"]]) == {
+        "n_sessions_flagged_nonconverged": 3,
+        "n_sessions_flagged_separated": 0,
+    }

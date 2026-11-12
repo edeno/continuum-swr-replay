@@ -106,9 +106,11 @@ from continuum_swr_replay.analysis.behavior import (  # noqa: E402
     freeze_per_bin_cohort,
     per_bin_rate_gof,
 )
+from continuum_swr_replay.analysis.behavior._fit_diagnostics import (  # noqa: E402
+    fit_flag_counts,
+)
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
     cohort_record,
-    fit_flag_counts,
     stop_own_missing,
     write_cohort_audit,
 )

@@ -89,11 +89,11 @@ from continuum_swr_replay.analysis.behavior._fit_diagnostics import (  # noqa: E
     NUISANCE_TERMS,
     capture_fit_warnings,
     count_fit_quality_warnings,
+    fit_flag_counts,
     fit_status,
 )
 from continuum_swr_replay.analysis.behavior.cohort_audit import (  # noqa: E402
     cohort_record,
-    fit_flag_counts,
     stop_own_missing,
     term_diagnostics,
     write_cohort_audit,

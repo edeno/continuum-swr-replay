@@ -1,4 +1,4 @@
-"""Shared fit-diagnostics helpers: convergence, separation, warning capture.
+"""Shared fit-diagnostics helpers: convergence, separation, warning capture, flag counts.
 
 These make convergence and quasi-separation first-class, *flagged* outputs of every
 fitter (conditional Poisson/logit, per-stop GLM, per-bin GLM, choice logit) without
@@ -25,6 +25,7 @@ import warnings
 from collections.abc import Collection, Sequence
 
 import numpy as np
+import pandas as pd
 from patsy import PatsyError
 from statsmodels.tools.sm_exceptions import (
     ConvergenceWarning,
@@ -80,6 +81,10 @@ NUISANCE_TERMS = frozenset({"Intercept", "reward_history_incomplete"})
 # Warning categories that report a fit-quality problem (as opposed to benign numeric
 # noise). Counted per fit and surfaced as ``n_convergence_warnings``.
 FIT_QUALITY_WARNINGS = (ConvergenceWarning, PerfectSeparationWarning)
+
+# The counts of flagged fits, by the names a cohort-audit record and an aggregated
+# contrast row carry them under (:func:`fit_flag_counts`).
+FLAG_FIELDS = ("n_sessions_flagged_nonconverged", "n_sessions_flagged_separated")
 
 
 def _resolve_term_names(result, term_names, n_terms: int) -> list[str]:
@@ -294,3 +299,32 @@ def capture_fit_warnings():
 def count_fit_quality_warnings(caught) -> int:
     """Number of convergence/perfect-separation warnings in a captured-warnings list."""
     return sum(1 for w in caught if issubclass(w.category, FIT_QUALITY_WARNINGS))
+
+
+def fit_flag_counts(fits: pd.DataFrame) -> dict[str, int]:
+    """The fits flagged as not converged and as separated: the :data:`FLAG_FIELDS`.
+
+    Parameters
+    ----------
+    fits : pd.DataFrame, shape (n_fits, n_columns)
+        Per-session fits, optionally with ``converged`` and ``separated``.
+
+    Returns
+    -------
+    counts : dict
+        - ``n_sessions_flagged_nonconverged``: fits whose ``converged`` is not
+          True; a missing flag has not converged.
+        - ``n_sessions_flagged_separated``: fits whose ``separated`` is True; a
+          missing flag is not separated.
+
+        A column the fits do not carry counts 0: the analytic null rung of
+        the conditional-Poisson content ladder
+        (``fitting.fit_null_model_conditional``) records neither flag.
+    """
+    nonconverged, separated = FLAG_FIELDS
+    return {
+        nonconverged: (
+            int((~fits["converged"].eq(True)).sum()) if "converged" in fits else 0
+        ),
+        separated: int(fits["separated"].eq(True).sum()) if "separated" in fits else 0,
+    }
