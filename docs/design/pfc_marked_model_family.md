@@ -345,7 +345,8 @@ model under `Processed-Data/pfc_marked_model_family/`:
 
 The provenance file is written last and is the bundle commit marker. A stale,
 partial, or mismatched bundle is removed before refitting. **The 71-session
-corpus was fit 2026-09-19** at git `4d69b83` (816 bundles, 36 ineligible
+corpus was fit 2026-09-19** at git `4d69b83` (on `feature/pfc-marked-event-kernels`;
+its code reached this branch in `cc04527d`) (816 bundles, 36 ineligible
 markers): [2026-09-19-pfc-marked-family-corpus.md](../../.claude/docs/reviews/2026-09-19-pfc-marked-family-corpus.md).
 That corpus predates the analysed-time rule: its sessions were assembled
 without excluded time and without the artifact-dropped events, on the
