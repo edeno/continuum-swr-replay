@@ -34,6 +34,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -41,6 +42,11 @@ import pandas as pd
 
 from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.tables.io import read_table
+
+# Sibling-script import: run as a script, only this file's directory is on
+# sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.qa._report import _md  # noqa: E402
 
 #: Columns that identify one shuffle group: the shuffle permutes the mark
 #: among the events of one session and one replay class.
@@ -52,36 +58,6 @@ CORRELATION_THRESHOLD = 0.2
 #: Event-grain occupancy states of the well-anchored cohort the marked kernels
 #: fit; events elsewhere carry a current-arm row but are never fit.
 WELL_ANCHORED_STATES = ("at_well", "mixed")
-
-
-def _cell(value: object, float_format: str) -> str:
-    """One markdown cell: missing renders blank, a count renders as a count."""
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    if pd.isna(value):
-        return ""
-    if isinstance(value, float):
-        return float_format.format(value)
-    return str(value)
-
-
-def _md(frame: pd.DataFrame, float_format: str = "{:.4g}") -> str:
-    """A markdown table, with missing values rendered as an empty cell."""
-    if frame.empty:
-        return "_(no rows)_\n"
-    columns = {
-        name: [_cell(value, float_format) for value in frame[name]]
-        for name in frame.columns
-    }
-    header = "| " + " | ".join(str(name) for name in columns) + " |"
-    rule = "| " + " | ".join("---" for _ in columns) + " |"
-    body = [
-        "| " + " | ".join(cells[i] for cells in columns.values()) + " |"
-        for i in range(len(frame))
-    ]
-    return "\n".join([header, rule, *body]) + "\n"
 
 
 def load_current_arm_marks(path: Path) -> pd.DataFrame:

@@ -61,7 +61,7 @@ from continuum_swr_replay.analysis.replay.fit_provenance import fit_provenance_p
 # Sibling-script import: run as a script, only this file's directory is on
 # sys.path.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.qa._report import _invocation  # noqa: E402
+from scripts.qa._report import _cell, _invocation  # noqa: E402
 
 #: Gate tolerances. Parameters and anything derived from them linearly (the
 #: modulation curves, the peak modulations, the theta statistics) are compared
@@ -434,19 +434,6 @@ def parse_time_file(path: Path) -> dict[str, Any]:
             float(rss_match.group(1)) / (1024**2) if rss_match else float("nan")
         ),
     }
-
-
-def _cell(value: object, float_format: str) -> str:
-    """One markdown cell: missing renders blank, a count renders as a count."""
-    if value is None:
-        return ""
-    if isinstance(value, str | bool):
-        return str(value)
-    if pd.isna(value):
-        return ""
-    if isinstance(value, float):
-        return float_format.format(value)
-    return str(value)
 
 
 def _timing_table(rows: list[dict[str, Any]]) -> pd.DataFrame:
