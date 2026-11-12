@@ -22,6 +22,8 @@ get_hpc_marks
     Load clusterless marks (spike times + waveform features) for hippocampus.
 get_pfc_spike_times
     Load sorted unit spike times for prefrontal cortex areas.
+pfc_sorted_nwb_file_names
+    The NWB files that have curated cortical spike sorting.
 get_spike_data
     Main function to load spike data from all available brain regions.
 filter_spike_times
@@ -364,6 +366,35 @@ def get_hpc_marks(
     return spike_times, spike_waveform_features
 
 
+#: The cortical spike sorting the PFC units are read from (``CuratedSpikeSorting``,
+#: MountainSort4 over the sleep and run epochs). A session with no rows under it
+#: has no sorted PFC units.
+PFC_SORTING_RESTRICTION = {
+    "preproc_params_name": "default",
+    "sort_interval_name": "sleeps_runs_noPrePostTrialTimes raw data valid times",
+    "sorter_params_name": "franklab_probe_ctx_30KHz_115rad_new_mountainsort2",
+    "team_name": "ac_em_xs",
+    "sorter": "mountainsort4",
+}
+
+
+def pfc_sorted_nwb_file_names() -> NDArray[np.str_]:
+    """NWB files with curated cortical spike sorting under :data:`PFC_SORTING_RESTRICTION`.
+
+    Returns
+    -------
+    NDArray of str, shape (n_files,)
+        The distinct ``nwb_file_name`` values, sorted.
+    """
+    from spyglass.spikesorting.v0 import CuratedSpikeSorting
+
+    quiet_spyglass()
+
+    return np.unique(
+        (CuratedSpikeSorting & PFC_SORTING_RESTRICTION).fetch("nwb_file_name")
+    )
+
+
 def get_pfc_spike_times(
     nwb_file_name: str, brain_area: str
 ) -> list[NDArray[np.float64]]:
@@ -392,14 +423,7 @@ def get_pfc_spike_times(
 
     quiet_spyglass()
 
-    restriction = {
-        "nwb_file_name": nwb_file_name,
-        "preproc_params_name": "default",
-        "sort_interval_name": "sleeps_runs_noPrePostTrialTimes raw data valid times",
-        "sorter_params_name": "franklab_probe_ctx_30KHz_115rad_new_mountainsort2",
-        "team_name": "ac_em_xs",
-        "sorter": "mountainsort4",
-    }
+    restriction = {"nwb_file_name": nwb_file_name, **PFC_SORTING_RESTRICTION}
 
     curation_ids = (CuratedSpikeSorting & restriction).fetch("curation_id")
     if len(curation_ids) == 0:

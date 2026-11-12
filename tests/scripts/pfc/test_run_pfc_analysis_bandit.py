@@ -1032,7 +1032,9 @@ def test_main_raises_the_limit_first_and_closes_each_sessions_files(
 
     monkeypatch.setattr(runner, "raise_open_file_limit", raise_open_file_limit)
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
-    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
+    monkeypatch.setattr(
+        runner, "pfc_sorted_nwb_file_names", lambda: [name for name, _ in keys]
+    )
     monkeypatch.setattr(runner, "run_analysis", run_analysis)
     monkeypatch.setattr(runner, "release_nwb_files", release_nwb_files)
     monkeypatch.setattr(runner, "LocalCluster", local_cluster)
@@ -1080,7 +1082,9 @@ def test_main_hands_every_session_the_commit_it_loaded(
     monkeypatch.setattr(runner, "loaded_commit", lambda: "parent-commit-dirty")
     monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
-    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", lambda info: info)
+    monkeypatch.setattr(
+        runner, "pfc_sorted_nwb_file_names", lambda: [name for name, _ in keys]
+    )
     monkeypatch.setattr(runner, "run_analysis", run_analysis)
     monkeypatch.setattr(runner, "release_nwb_files", lambda: True)
     monkeypatch.setattr(runner, "LocalCluster", lambda **kwargs: object())
@@ -1129,13 +1133,11 @@ def test_main_takes_the_registers_analysed_epochs_less_those_without_sorting(
     def run_analysis(nwb_file_name, epoch_name, **kwargs):
         ran.append((nwb_file_name, epoch_name))
 
-    def sorted_sessions_only(epoch_info):
-        names = epoch_info.index.get_level_values("nwb_file_name")
-        return epoch_info[names == "chimi20200223_.nwb"]
-
     monkeypatch.setattr(runner, "raise_open_file_limit", lambda: (1024, 65536))
     monkeypatch.setattr(runner, "analysed_epochs", lambda: _epoch_info(keys))
-    monkeypatch.setattr(runner, "_filter_to_sorted_sessions", sorted_sessions_only)
+    monkeypatch.setattr(
+        runner, "pfc_sorted_nwb_file_names", lambda: ["chimi20200223_.nwb"]
+    )
     monkeypatch.setattr(runner, "run_analysis", run_analysis)
     monkeypatch.setattr(runner, "release_nwb_files", lambda: True)
 

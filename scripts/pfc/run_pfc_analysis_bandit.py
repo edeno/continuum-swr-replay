@@ -93,6 +93,7 @@ from continuum_swr_replay.analysis.pfc.canonical_events import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.pfc.cohort import (  # noqa: E402
     load_session_stop_cohort,
+    split_sorted_epochs,
 )
 from continuum_swr_replay.analysis.pfc.event_sets import (  # noqa: E402
     EVENT_CLASSES,
@@ -127,6 +128,9 @@ from continuum_swr_replay.analysis.pfc.runner_support import (  # noqa: E402
 from continuum_swr_replay.analysis.pfc.scoring import score_session  # noqa: E402
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
     analysed_epochs,
+)
+from continuum_swr_replay.data_loaders.spikes import (  # noqa: E402
+    pfc_sorted_nwb_file_names,
 )
 from continuum_swr_replay.decoding.identifiers import (  # noqa: E402
     format_epoch_identifier,
@@ -1294,49 +1298,6 @@ def write_cohort_record(
     write_atomically(path, lambda temporary: temporary.write_text(text))
 
 
-def _filter_to_sorted_sessions(epoch_info: pd.DataFrame) -> pd.DataFrame:
-    """Filter to sessions that have curated spike sorting results.
-
-    Parameters
-    ----------
-    epoch_info : pd.DataFrame
-        Available epochs
-
-    Returns
-    -------
-    pd.DataFrame
-        Epochs with curated spike sorting
-    """
-    try:
-        from spyglass.spikesorting.v0 import CuratedSpikeSorting
-
-        restriction = {
-            "preproc_params_name": "default",
-            "sort_interval_name": (
-                "sleeps_runs_noPrePostTrialTimes raw data valid times"
-            ),
-            "sorter_params_name": ("franklab_probe_ctx_30KHz_115rad_new_mountainsort2"),
-            "team_name": "ac_em_xs",
-            "sorter": "mountainsort4",
-        }
-
-        sorted_nwb_file_names = np.unique(
-            (CuratedSpikeSorting & restriction).fetch("nwb_file_name")
-        )
-        epoch_info = epoch_info[
-            epoch_info.index.get_level_values("nwb_file_name").isin(
-                sorted_nwb_file_names
-            )
-        ]
-    except ImportError:
-        logging.getLogger(__name__).warning(
-            "Spyglass not available. Running on all sessions without filtering "
-            "by curated spike sorting."
-        )
-
-    return epoch_info
-
-
 def main(argv: Sequence[str] | None = None) -> None:
     """Main entry point for batch PFC GLM analysis."""
     argv = sys.argv[1:] if argv is None else list(argv)
@@ -1357,8 +1318,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     # units. An analysed epoch without them is left out here, with that reason,
     # which pfc_cohort_<area>.json records beside the bundles.
     analysed = analysed_epochs()
-    pfc_cohort = _filter_to_sorted_sessions(analysed)
-    unsorted = analysed.index.difference(pfc_cohort.index, sort=False)
+    pfc_cohort, unsorted = split_sorted_epochs(analysed, pfc_sorted_nwb_file_names())
     if len(unsorted):
         print(
             f"{len(unsorted)} analysed epoch(s) left out at the PFC level, "

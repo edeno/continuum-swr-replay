@@ -1,4 +1,7 @@
-"""The PFC analyses' entry point to the shared well-anchored stop cohort.
+"""The PFC analyses' cohorts: the epochs with sorted units, and the shared stops.
+
+:func:`split_sorted_epochs` is the PFC epoch cohort: the epoch register's
+analysed epochs whose session has curated cortical spike sorting.
 
 The hippocampal rate and content families are read on one population -- the
 stops the animal spends at a well (``analysis/events/cohort_selection.py``,
@@ -13,6 +16,7 @@ translation is done here once.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +28,35 @@ from continuum_swr_replay.paths import table_path
 from continuum_swr_replay.runs.io import sha256_file
 from continuum_swr_replay.tables.io import parquet_path, read_table
 
-__all__ = ["load_session_stop_cohort"]
+__all__ = ["load_session_stop_cohort", "split_sorted_epochs"]
+
+
+def split_sorted_epochs(
+    analysed: pd.DataFrame, sorted_nwb_file_names: Iterable[str]
+) -> tuple[pd.DataFrame, pd.Index]:
+    """The PFC epoch cohort: the analysed epochs whose session has sorted units.
+
+    Parameters
+    ----------
+    analysed : pandas.DataFrame
+        The epoch register's analysed epochs, indexed by
+        ``(nwb_file_name, interval_list_name)``.
+    sorted_nwb_file_names : iterable of str
+        The NWB files with curated cortical spike sorting
+        (``data_loaders.spikes.pfc_sorted_nwb_file_names``).
+
+    Returns
+    -------
+    cohort : pandas.DataFrame
+        The rows of ``analysed`` whose ``nwb_file_name`` has sorting, in order.
+    left_out : pandas.Index
+        The index entries of the other rows, in ``analysed``'s order.
+    """
+    has_sorting = analysed.index.get_level_values("nwb_file_name").isin(
+        list(sorted_nwb_file_names)
+    )
+    cohort = analysed[has_sorting]
+    return cohort, analysed.index.difference(cohort.index, sort=False)
 
 
 def load_session_stop_cohort(

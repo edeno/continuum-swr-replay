@@ -1,11 +1,14 @@
-"""Tests for the PFC path's entry point to the shared stop cohort."""
+"""Tests for the PFC cohorts: the epochs with sorted units, and the shared stops."""
 
 from __future__ import annotations
 
 import pandas as pd
 import pytest
 
-from continuum_swr_replay.analysis.pfc.cohort import load_session_stop_cohort
+from continuum_swr_replay.analysis.pfc.cohort import (
+    load_session_stop_cohort,
+    split_sorted_epochs,
+)
 from continuum_swr_replay.tables.io import write_table
 
 
@@ -83,3 +86,47 @@ def test_an_epoch_absent_from_the_stop_table_is_refused(stop_table_path):
         load_session_stop_cohort(
             "j1620210706_.nwb", "99_r9", stop_table_path=stop_table_path
         )
+
+
+def test_the_pfc_epoch_cohort_is_the_analysed_epochs_of_sorted_sessions():
+    """Two sorted files of three; the unsorted one's epochs are left out, and
+    both parts keep the register's order. A sorted file the register does not
+    analyse adds nothing."""
+    analysed = pd.DataFrame(
+        {"animal": ["chimi", "chimi", "chimi", "wilbur"]},
+        index=pd.MultiIndex.from_tuples(
+            [
+                ("chimi20200224_.nwb", "02_r1"),
+                ("chimi20200223_.nwb", "02_r1"),
+                ("chimi20200224_.nwb", "04_r2"),
+                ("wilbur20210329_.nwb", "02_r1"),
+            ],
+            names=["nwb_file_name", "interval_list_name"],
+        ),
+    )
+
+    cohort, left_out = split_sorted_epochs(
+        analysed, ["wilbur20210329_.nwb", "chimi20200224_.nwb", "j1620210706_.nwb"]
+    )
+
+    assert list(cohort.index) == [
+        ("chimi20200224_.nwb", "02_r1"),
+        ("chimi20200224_.nwb", "04_r2"),
+        ("wilbur20210329_.nwb", "02_r1"),
+    ]
+    assert list(cohort["animal"]) == ["chimi", "chimi", "wilbur"]
+    assert list(left_out) == [("chimi20200223_.nwb", "02_r1")]
+
+
+def test_no_sorted_session_leaves_every_epoch_out():
+    analysed = pd.DataFrame(
+        index=pd.MultiIndex.from_tuples(
+            [("chimi20200223_.nwb", "02_r1"), ("chimi20200223_.nwb", "04_r2")],
+            names=["nwb_file_name", "interval_list_name"],
+        )
+    )
+
+    cohort, left_out = split_sorted_epochs(analysed, [])
+
+    assert cohort.empty
+    assert list(left_out) == list(analysed.index)
