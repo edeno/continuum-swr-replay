@@ -134,6 +134,9 @@ from continuum_swr_replay.analysis.behavior.rate.duration_aware_history import (
     at_risk_events,
     attach_event_ends,
 )
+from continuum_swr_replay.analysis.behavior.rate.post_outcome import (  # noqa: E402
+    mask_post_outcome_covariates,
+)
 from continuum_swr_replay.analysis.events.analysed_time import (  # noqa: E402
     require_swr_source,
 )
@@ -348,7 +351,7 @@ def _fit_post_outcome_cohort(
     """Fit a ladder's post-outcome rungs and its null on one re-frozen cohort.
 
     The post-outcome covariates are undefined on stops that begin before the
-    outcome is known (see :func:`_mask_post_outcome_covariates`), so the rungs
+    outcome is known (see :func:`~continuum_swr_replay.analysis.behavior.rate.post_outcome.mask_post_outcome_covariates`), so the rungs
     that carry them cannot be fit on the ladder's primary cohort. They get a
     second cohort: the primary design re-frozen on their own columns, shared by
     every post-outcome rung of the ladder (both covariates are NaN on the same
@@ -540,55 +543,6 @@ def _fit_one_session(keys, stops_g, onsets_g) -> tuple[tuple, list[dict], dict, 
     return keys, rows, skips, cohort_drops
 
 
-def _mask_post_outcome_covariates(
-    stop: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.Series]:
-    """NaN the post-outcome covariates on stops that begin before the outcome.
-
-    ``rpe_postoutcome`` and ``reward_belief_mean_update_l1_all_ports_postoutcome``
-    are defined only once the trial's outcome is known (``outcome_known_time``).
-    A stop whose ``stop_start`` precedes that instant spans the pre-outcome
-    interval, so attaching the trial's post-outcome value to it would let the
-    model condition on information the animal did not yet have. Those values are
-    set to NaN here, before any freeze, so the cohort freezes -- not a silent
-    per-rung drop inside the fitter -- decide which rows each rung is fit on.
-
-    Parameters
-    ----------
-    stop : pd.DataFrame
-        Post-qvals-join stop table; must carry ``stop_start``,
-        ``outcome_known_time``, ``occupancy_state``, and both post-outcome
-        covariates.
-
-    Returns
-    -------
-    gated : pd.DataFrame
-        Copy of ``stop`` with the post-outcome covariates set to NaN on
-        pre-outcome stops.
-    n_masked_by_state : pd.Series
-        Number of masked stops per ``occupancy_state`` category.
-    """
-    required = ("stop_start", "outcome_known_time", "occupancy_state")
-    missing = [
-        c for c in (*required, *POST_OUTCOME_COVARIATES) if c not in stop.columns
-    ]
-    if missing:
-        raise ValueError(
-            f"post-outcome gate needs {missing} on the joined stop table "
-            "(stop_start + occupancy_state from the stop table, "
-            "outcome_known_time from qvals_table)"
-        )
-    stop_start = stop["stop_start"].to_numpy(dtype=float)
-    outcome_known = stop["outcome_known_time"].to_numpy(dtype=float)
-    pre_outcome = stop_start < outcome_known
-    gated = stop.copy()
-    gated.loc[pre_outcome, list(POST_OUTCOME_COVARIATES)] = np.nan
-    n_masked_by_state = (
-        stop.loc[pre_outcome, "occupancy_state"].value_counts().astype(int)
-    )
-    return gated, n_masked_by_state
-
-
 def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
     inputs = fit_input_paths()
     stop = read_table(inputs["stop_table"])
@@ -655,7 +609,7 @@ def _load(cohort: str) -> tuple[pd.DataFrame, pd.DataFrame, int]:
         len(stop),
         100 * len(stop) / n0,
     )
-    stop, n_masked_by_state = _mask_post_outcome_covariates(stop)
+    stop, n_masked_by_state = mask_post_outcome_covariates(stop)
     n_masked = int(n_masked_by_state.sum())
     logger.info(
         "post-outcome gate: %d of %d stops (%.1f%%) start before the outcome is "
