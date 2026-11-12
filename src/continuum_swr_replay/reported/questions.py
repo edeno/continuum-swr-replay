@@ -184,8 +184,8 @@ QUESTIONS: tuple[Question, ...] = (
     Question(
         "2a.1",
         "Is the decoder accurate, in sample and on held-out data?",
-        status="not computed",
-        reason="no summary value; Figure 2e and the decoder-validation supplement plot the in-sample decoding error",
+        status="partly computed",
+        reason="in sample only: no script measures the held-out decoding error",
         figures=("2e", "decoder_validation"),
     ),
     Question(
@@ -210,6 +210,12 @@ QUESTIONS: tuple[Question, ...] = (
         "How do the non-SWR fraction and the close/remote split change across the non-local and SWR-z thresholds?",
         status="not computed",
         reason="no script (the threshold sweep)",
+    ),
+    Question(
+        "2a.6",
+        "How does the decoder divide time among its four states while the animal moves and while it is still?",
+        figures=("decoder_validation",),
+        note="Added with the decoder-validation figure's state-fraction values; check its wording and place.",
     ),
     Question(
         "2b.1",

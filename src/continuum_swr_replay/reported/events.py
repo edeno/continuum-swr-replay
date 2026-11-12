@@ -2,7 +2,8 @@
 
 Every value is read from an output an analysis already wrote; nothing is
 refitted here. This module names and describes the values. The statistics are
-computed in ``analysis.hippocampus.event_statistics`` and
+computed in ``analysis.hippocampus.event_statistics``,
+``analysis.hippocampus.quality_metrics`` and
 ``analysis.inventory_comparison.nonlocal_comparison``; here only the size of an
 input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
 
@@ -33,7 +34,11 @@ input (its epochs, its animals) is counted. The inputs (:class:`EventsInputs`):
   ``scripts/detection/measure_brain_state_reference.py``) and the two gamma
   passes of ``scripts/detection/measure_event_gamma.py``: the z-scored gamma per
   event and epoch (``Processed-Data/event_gamma``) and the band power's change
-  against quiet rest in dB (``Processed-Data/event_gamma_power``).
+  against quiet rest in dB (``Processed-Data/event_gamma_power``);
+- the decoder quality of each analysed epoch (``Processed-Data/decoder_quality``,
+  from ``scripts/decoding/measure_decoder_quality.py``): the Local-state
+  decoding error, the state fractions moving and immobile, and the calibration
+  curve, summarized by ``analysis.hippocampus.quality_metrics``.
 
 Each derived output above that reads the canonical event table records the
 table's SHA-256 in its manifest; an output made from another table than the
@@ -55,7 +60,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from continuum_swr_replay.analysis.hippocampus import event_statistics
+from continuum_swr_replay.analysis.hippocampus import event_statistics, quality_metrics
 from continuum_swr_replay.analysis.hippocampus.property_contrast import (
     MAX_NAN_REPLICATE_SHARE,
 )
@@ -89,6 +94,9 @@ from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
 from continuum_swr_replay.tables.session_keys import SESSION_COLUMNS
 
 TAGS = {
+    "decoding_error": Tags(("2a.1",), ("2e",)),
+    "calibration": Tags(("2a.1",), ("decoder_validation",)),
+    "state_fractions": Tags(("2a.6",), ("decoder_validation",)),
     "cohort": Tags(("2b.2",), ("2b",)),
     "left_out": Tags(("2b.2",), ("2",)),
     "other_detectors_main": Tags(("2b.3",), ("2",)),
@@ -153,6 +161,7 @@ class EventsInputs:
     event_start_rest_theta: Path
     property_bootstrap: Path
     event_gamma_power: Path
+    decoder_quality: Path
 
 
 def default_inputs() -> EventsInputs:
@@ -173,6 +182,7 @@ def default_inputs() -> EventsInputs:
         event_start_rest_theta=processed_data_dir() / "event_start_rest_theta",
         property_bootstrap=processed_data_dir() / "event_property_bootstrap",
         event_gamma_power=processed_data_dir() / "event_gamma_power",
+        decoder_quality=processed_data_dir() / "decoder_quality",
     )
 
 
@@ -227,6 +237,109 @@ def spike_evidence_staleness(
 
 def _manifest(folder: Path) -> dict:
     return json.loads((folder / "manifest.json").read_text())
+
+
+# --- the decoder --------------------------------------------------------------
+
+#: The ten equal Local-probability bins of the calibration curve, in order.
+CALIBRATION_BINS = (
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+)
+
+#: Each decoder state's word in a state-fraction key.
+_STATE_WORDS = {
+    "Local_prob": "local",
+    "No-Spike_prob": "no_spike",
+    "Non-Local_Continuous_prob": "continuous",
+    "Non-Local_Fragmented_prob": "fragmented",
+}
+
+
+def decoding_error_values(sessions: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2a.1: the Local-state decoding error over sessions (Figure 2e)."""
+    make = value_factory(decoding_error_values, source, TAGS["decoding_error"])
+    stats = quality_metrics.local_decoding_error_statistics(sessions)
+    return [
+        make(
+            "decoding_error_median_cm",
+            stats["median_error_cm"],
+            "quantity",
+            "sig2",
+            "median over sessions of each session's median Local-state decoding "
+            "error (the track-graph distance from the decoded to the actual "
+            "position, over time bins with Local probability above 0.5 outside "
+            "excluded time), sessions pooled",
+            "cm",
+        ),
+        make(
+            "decoding_error_sessions",
+            stats["n_sessions"],
+            "count",
+            "count",
+            "sessions with a Local-state decoding error",
+        ),
+    ]
+
+
+def calibration_values(calibration: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2a.1: the calibration curve, decoding error against the decoder's
+    Local probability (the decoder-validation figure's line): the median over
+    sessions of each session's median error in each of the ten Local-probability
+    bins. The interquartile band the figure also draws is not reported."""
+    make = value_factory(calibration_values, source, TAGS["calibration"])
+    curve = quality_metrics.calibration_curve_statistics(calibration)
+    if len(curve) != len(CALIBRATION_BINS):
+        raise ValueError(
+            f"the calibration curve has {len(curve)} bins, not {len(CALIBRATION_BINS)}"
+        )
+    return [
+        make(
+            f"calibration_error_bin_{word}",
+            median,
+            "quantity",
+            "sig2",
+            f"median over sessions of each session's median decoding error at time "
+            f"bins whose Local probability is in the 0.1-wide bin centred on "
+            f"{center:.2f} (bin {index} of {len(CALIBRATION_BINS)}), outside excluded "
+            "time, sessions pooled",
+            "cm",
+        )
+        for index, (word, (center, median)) in enumerate(
+            zip(CALIBRATION_BINS, curve["median"].items(), strict=True), start=1
+        )
+    ]
+
+
+def state_fraction_values(sessions: pd.DataFrame, source: str) -> list[Value]:
+    """Question 2a.6: the decoder's state fractions while the animal moves and
+    while it is still (the decoder-validation figure's bars)."""
+    make = value_factory(state_fraction_values, source, TAGS["state_fractions"])
+    fractions = quality_metrics.state_fraction_statistics(sessions)
+    where = {
+        "moving": "bins faster than 4 cm/s",
+        "immobile": "bins slower than 4 cm/s",
+    }
+    return [
+        make(
+            f"state_fraction_{movement}_{_STATE_WORDS[state]}",
+            fractions.loc[movement, state],
+            "fraction",
+            "pct",
+            f"median over sessions of each session's mean {state} over its "
+            f"{where[movement]} outside excluded time, sessions pooled",
+        )
+        for movement in quality_metrics.MOVEMENT_STATES
+        for state in quality_metrics.STATE_PROBABILITY_COLUMNS
+    ]
 
 
 # --- how common the events are, and how they sit against SWRs ----------------
@@ -1760,6 +1873,30 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
     occupancy = pd.read_csv(inputs.content_occupancy)
     summary.add(*content_occupancy_values(occupancy, rel(inputs.content_occupancy)))
     summary.inputs.append(file_record(inputs.content_occupancy, ROOT_DIR))
+
+    folder = inputs.decoder_quality
+    quality_sessions = pd.read_parquet(folder / "sessions.parquet")
+    calibration = pd.read_parquet(folder / "calibration.parquet")
+    for name, table in (
+        ("sessions.parquet", quality_sessions),
+        ("calibration.parquet", calibration),
+    ):
+        if set(table["epoch_id"]) != set(analysed_epoch_ids()):
+            raise ValueError(
+                f"{folder / name} holds {table['epoch_id'].nunique()} epochs, not "
+                f"the {n_epochs} analysed ones"
+            )
+    quality_source = (
+        f"{rel(folder)} (scripts/decoding/measure_decoder_quality.py: each analysed "
+        "epoch's decode)"
+    )
+    summary.add(*decoding_error_values(quality_sessions, quality_source))
+    summary.add(*calibration_values(calibration, quality_source))
+    summary.add(*state_fraction_values(quality_sessions, quality_source))
+    summary.inputs += [
+        file_record(folder / name, ROOT_DIR)
+        for name in ("sessions.parquet", "calibration.parquet", "manifest.json")
+    ]
 
     folder = inputs.class_structure
     names = ("distribution.csv", "step_fits.csv", "manifest.json")

@@ -457,7 +457,8 @@ Each builder's statistics:
 
 - survey: `analysis/literature_survey.py` (the builder reads the survey's cells into numbers and trigger
   sets; the modes, ranges and shares are computed there);
-- events: `analysis/hippocampus/event_statistics.py`, `analysis/inventory_comparison/nonlocal_comparison.py`;
+- events: `analysis/hippocampus/event_statistics.py`, `analysis/hippocampus/quality_metrics.py` (the
+  decoder's accuracy, state fractions and calibration), `analysis/inventory_comparison/nonlocal_comparison.py`;
 - mpfc: `analysis/pfc/population_statistics.py`, `analysis/pfc/timing.py`, and
   `analysis/pfc/marked_family_statistics.py` (through the marked-family summary
   `scripts/pfc/summarize_pfc_marked_family.py` writes);
