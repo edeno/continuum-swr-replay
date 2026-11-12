@@ -322,7 +322,11 @@ package simulates no such case.
 is also the integration test's fixture, the detector assembles 32 candidate sequences
 over 65 s of which three meet both replay criteria: the two continuous replays and the
 80 ms replay of panel c. The test pins which events are accepted and how each is
-mis-measured, not the candidate count. No
+mis-measured, not the candidate count. The numbers in this paragraph and under
+"Why", "What this is not" and "Hedges" below were measured on 2026-09-21 and 2026-09-22 on the recording as it then was,
+before it gained the stray-window event of 2026-10-02; no summary holds them, and those
+written as value markers come from the detection summary
+(`paper/reported/detection.json`), which the figure script recomputes. No
 silent, fragmented, local or remote stationary event is accepted. But the two accepted
 events run 1.58 s and 1.18 s for replays that are 0.27 s: 83% and 77% of each detected
 interval lies outside the labeled event, and about three quarters of their windows decode
@@ -332,7 +336,7 @@ the animal's own position rather than a replayed one.
 window, and carries no hypothesis that competes with a replay for a window. Local coding
 during immobility is smooth, narrow and slow, so it passes both criteria. The merge rule
 then does most of the work: with merging disabled the same data gives 1.4x and 2.1x
-inflation instead of 5.8x and 4.3x. Absorption needs a travelling event *spatially near*
+inflation instead of <!--v:detection.recording_outbound_duration_ratio-->5.8<!--/v-->x and 4.3x. Absorption needs a travelling event *spatially near*
 the stationary one — here the replay begins at the animal's own place, which is the usual
 geometry for awake replay. The added remote stationary event has no travelling neighbour,
 and is declined for going nowhere; that is the method working as designed, since extended
@@ -340,7 +344,7 @@ trajectories are its stated target.
 
 **What this is not.** It is not an artifact of the adaptations. The finding is unchanged
 under the original's running-only encoding convention, and for any spread cutoff from
-7.5 cm to the 20 cm the reference's own 1D branch uses (both measured before the port
+7.5 cm to the 20 cm the reference's own 1D branch uses (both measured on 2026-09-21, before the port
 decoded with the reference's rate-map floor; the durations above, merged and unmerged,
 are the same with it). The original contains no
 local/non-local comparison, no distance-from-animal criterion, no minimum spike or active
@@ -390,7 +394,7 @@ duration distribution this detector produces is truncated from below and inflate
 near the truncation**, and it must not be compared with our own event durations as
 though both measured the same thing. Accuracy is worst at both ends, for two
 independent reasons. Short events are padded by the window: the 80 ms replay in
-the figure holds no local coding at all, 0% of its windows decode the animal's own
+the figure holds no local coding at all, <!--v:detection.recording_short_replay_local_fraction-->0<!--/v-->% of its windows decode the animal's own
 place, and it is still reported too long. Slow events are padded by absorbed local
 coding instead. Removing either cause would not fix the other.
 
@@ -413,7 +417,7 @@ measurement, and worth checking on real data:
   splits the run in two.
 - Splitting. A gap longer than 50 ms, or a bridge longer than 20 cm, blocks the
   merge, and each piece must then clear 100 ms and 12 cm on its own. Measured on
-  a replay of 60 cm injected in two halves: with a 40 ms pause the halves merge
+  2026-09-21 (no script re-derives it) on a replay of 60 cm injected in two halves: with a 40 ms pause the halves merge
   and the event is accepted at 17 cm of dispersion, and with a 60 ms pause
   neither half travels far enough. This is not an independent failure mode. The
   merge only rescues pieces that would each fail dispersion, so it reduces to the
@@ -430,10 +434,13 @@ measurement, and worth checking on real data:
 spike trains of the simulated recording, one at a time, each with a path
 length, duration, firing rate and distance from the animal's own place that we
 choose. Because the right answer is known, what each detector reports can be
-scored against it. The text below calls these injected replays. 4536 cells, sorted
+scored against it. The text below calls these injected replays. <!--v:detection.sweep_replays-->4,536<!--/v--> cells, sorted
 spikes on a linear track. Every number below comes from
 [../../../paper/reported/inputs/detection/detection_sweep_summary.csv](../../../paper/reported/inputs/detection/detection_sweep_summary.csv), which that script
-writes; the full per-cell table goes to `Processed-Data` and is not tracked.
+wrote on 2026-09-25 (commit `4a5d5198`); the full per-cell table goes to `Processed-Data` and is not tracked.
+The numbers the detection summary holds are written as value markers; the rest, the
+tables included, are copied from that file, and no summary holds them. A number from
+an earlier version of the sweep is dated where it appears.
 The sweep takes about four minutes to reproduce, and
 `scripts/figures/generate_memoryless_comparison.py` draws the lower panels of
 the supplemental figure from the same file.
@@ -442,9 +449,10 @@ the supplemental figure from the same file.
 produced a wrong answer here first.
 
 Injections are spread over every immobile stretch of the recording, with the
-recording's own labeled events cut out of them. An earlier version discarded a
+recording's own labeled events cut out of them. An earlier version, corrected on
+2026-09-22, discarded a
 whole stretch whenever it held a labeled event, which discards all of them, and
-a silent fallback then kept the last one: all 4536 cells landed in a single
+a silent fallback then kept the last one: all <!--v:detection.sweep_replays-->4,536<!--/v--> cells landed in a single
 2.2 s window of one pause.
 
 A detector counts as finding an event only when what it reports **is** the
@@ -462,7 +470,7 @@ definition, non-local probability above 0.8 for at least 15 ms, as the sliding
 window's are the published one. Scoring temporal overlap alone credits the
 sliding-window detector for sequences built out of the local coding beside the
 injection: those reach 38 to 162 cm of decoded track for injections of 10 to
-30 cm.
+30 cm (the sweep of 2026-09-22; the current file does not hold it).
 
 The sliding window decodes the one fitted encoding model with the reference's
 `+1e-3` Hz floor under every place field (`with_reference_rate_floor`), and is held to
@@ -506,12 +514,12 @@ the data. Below about 45 cm the sliding window finds a few percent of
 injections at any duration and any firing rate.
 
 **Several rates, not one, because they answer different questions.** Over all
-4536 cells the sliding window built an overlapping candidate 81% of the time,
+<!--v:detection.sweep_replays-->4,536<!--/v--> cells the sliding window built an overlapping candidate 81% of the time,
 accepted one on duration and dispersion 27% of the time, and that sequence was
-the injected event 21% of the time. The significance test then removes few: 18%
-under the whole published definition, 20% with its spread half alone. The
+the injected event <!--v:detection.sweep_sliding_before_test_fraction-->21<!--/v-->% of the time. The significance test then removes few: <!--v:detection.sweep_sliding_fraction-->18<!--/v-->%
+under the whole published definition, <!--v:detection.sweep_sliding_spread_only_fraction-->20<!--/v-->% with its spread half alone. The
 state-space model reported non-local activity 91% of the time, and it was the
-injected event 91% of the time. Quoting 27% against 91% compares "replay,
+injected event <!--v:detection.sweep_state_space_fraction-->91<!--/v-->% of the time. Quoting 27% against 91% compares "replay,
 classified" with "non-local, detected"; 81% against 91% is the nearer comparison of
 whether anything was seen at all.
 
@@ -522,17 +530,18 @@ half, by duration:
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
 | spread half | 75% | 83% | 88% | 97% | 98% | 98% | 99% |
-| jump half | 31% | 50% | 57% | 79% | 93% | 95% | 98% |
+| jump half | <!--v:detection.sweep_jump_half_pass_shortest_fraction-->31<!--/v-->% | 50% | 57% | 79% | 93% | 95% | <!--v:detection.sweep_jump_half_pass_longest_fraction-->98<!--/v-->% |
 
 A short replay covers its path in few windows, so its own non-zero jumps are large,
 and the shuffled posteriors, hopping between swapped fields, do not jump further.
-Overall 97% pass the spread half and 87% the jump half (`shuffle_pass_rate_by_duration`,
+Overall <!--v:detection.sweep_spread_half_pass_fraction-->97<!--/v-->% pass the spread half and <!--v:detection.sweep_jump_half_pass_fraction-->87<!--/v-->% the jump half (`shuffle_pass_rate_by_duration`,
 and `sliding_shuffle_*_pass_rate` in `overall`).
 
-The reference's rate-map floor is what moved the spread half. Without it the spread
-half passed about two thirds of replays at every duration (65% overall; 82% the jump
+The reference's rate-map floor is what moved the spread half. Without it (the sweeps
+of 2026-09-22 and 2026-09-25 that preceded the floor; no summary holds their numbers)
+the spread half passed about two thirds of replays at every duration (65% overall; 82% the jump
 half), and the whole published definition reported 11% of injected replays rather
-than 18%. The likely reason, not separately measured: without a floor a spike from a
+than <!--v:detection.sweep_sliding_fraction-->18<!--/v-->%. The likely reason, not separately measured: without a floor a spike from a
 cell whose swapped field is nearly silent at a place rules that place out almost
 entirely, so a shuffled posterior stays sharp and its spread does not exceed the
 observed one; the floor bounds that. Without the floor, the jump-half trend did not
@@ -541,9 +550,10 @@ or left set aside it read 21% at 40 ms against 97% at 500 ms, keeping every zero
 21% against 98%, and setting aside every pair whose binned center stayed put 29%
 against 95%. Setting aside, in addition, a sorted cell's spike leaving as another of
 its spikes enters moved no value in the summary: on the Figure 1 simulation that rule
-sets aside 24 of 3313 window pairs, and no p-value there changed.
+set aside 24 of 3313 window pairs, and no p-value there changed (measured on
+2026-09-25, before the figure gained its stray-window event).
 
-**Nearly a quarter (23%) of the sliding window's accepted events are not the
+**Nearly a quarter (<!--v:detection.sweep_sliding_not_the_replay_fraction-->23<!--/v-->%) of the sliding window's accepted events are not the
 injected event.** They are absorbed local coding that overlaps it. This is the
 same over-call the figure shows, measured as a rate.
 
@@ -568,16 +578,16 @@ The state-space model runs on the library's default discrete transitions:
 EM M-step, and this sweep calls `fit`, so setting one would change nothing.
 Each reported event is scored on its own for both detectors, and the
 state-space detector's events carry the project's 15 ms minimum; an earlier
-version scored the union of every state-space stretch above threshold, which
-read 94% rather than 91%. About 4% of the state-space detector's reports come
+version, replaced on 2026-09-22, scored the union of every state-space stretch above threshold, which
+read 94% rather than <!--v:detection.sweep_state_space_fraction-->91<!--/v-->%. About 4% of the state-space detector's reports come
 as more than one interval, and the best of them answers for the cell, as the
-best of several accepted sliding-window sequences does (0.5% of cells).
+best of several accepted sliding-window sequences does (0.4% of cells).
 
-**No cell in 4536 was found by the sliding window and missed by the
-state-space model** under the published definition, and five before the significance
+**No cell in <!--v:detection.sweep_replays-->4,536<!--/v--> was found by the sliding window and missed by the
+state-space model** under the published definition, and <!--v:detection.sweep_sliding_only_before_test_replays-->5<!--/v--> before the significance
 test (`found_by_sliding_window_only` and its `_before_shuffle` partner in
-`overall`). 73% of cells went the other way. Of those, 65% built a
-candidate that then failed dispersion, 23% built no candidate at all, and 4% were
+`overall`). <!--v:detection.sweep_state_space_only_fraction-->73<!--/v-->% of cells went the other way. Of those, 65% built a
+candidate that then failed dispersion, 23% built no candidate at all, and <!--v:detection.sweep_failed_test_fraction-->4<!--/v-->% were
 the injected replay but failed the significance test, while the median share of
 windows passing the spread criterion inside the event was 1.00. The spread gate is
 not what loses these events; dispersion is, then building no candidate at all, and
@@ -598,10 +608,10 @@ a rate to quote against `sliding_matches`: the two procedures are compared as
 published, against the injected event.
 
 **Where the published criteria can accept an event at all** — path over about
-42 cm and duration over 100 ms, 25% of the grid — the sliding window reports 63%
-under the whole published definition (68% before its significance test, 67% with the
-spread half alone) and the state-space model 99% (`overall_in_domain`); held to the
-published duration and dispersion criteria, the state-space model reports 68%, the
+42 cm and duration over 100 ms, <!--v:detection.sweep_domain_fraction-->25<!--/v-->% of the grid — the sliding window reports <!--v:detection.sweep_domain_sliding_fraction-->63<!--/v-->%
+under the whole published definition (<!--v:detection.sweep_domain_sliding_before_test_fraction-->68<!--/v-->% before its significance test, 67% with the
+spread half alone) and the state-space model <!--v:detection.sweep_domain_state_space_fraction-->99<!--/v-->% (`overall_in_domain`); held to the
+published duration and dispersion criteria, the state-space model reports <!--v:detection.sweep_domain_state_space_published_fraction-->68<!--/v-->%, the
 same as the sliding window before its test. The remaining three
 quarters of the grid are events the published method is defined not to call
 replays. That is a property of the method worth measuring, and it is why the
@@ -613,13 +623,13 @@ before its significance test, which never moves a sequence's bounds):
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
 | sliding window | 3.3x | 2.2x | 1.7x | 1.5x | 1.2x | 1.2x | 1.1x |
-| state-space | 1.10x | 1.00x | 0.97x | 0.98x | 0.96x | 0.98x | 0.98x |
+| state-space | 1.10x | 1.00x | 0.98x | 0.98x | 0.96x | 0.98x | 0.98x |
 
 Medians over firing rate, path length and placement. A single event can do
 better than its row: the 80 ms replay in the figure, which fires strongly and
-travels 100 cm, comes in at 1.6x rather than 1.7x. An absorbed sequence whose
+travels 100 cm, comes in at <!--v:detection.recording_short_replay_duration_ratio-->1.6<!--/v-->x rather than 1.7x. An absorbed sequence whose
 local stretch sits more than 20 cm from the path fails the position test and is
-counted among the 23% above rather than here, so this table is the window floor
+counted among the <!--v:detection.sweep_sliding_not_the_replay_fraction-->23<!--/v-->% above rather than here, so this table is the window floor
 plus whatever absorption falls within the tolerance.
 
 **Where the extra length goes.** The same events' signed bound errors, reported minus
@@ -627,15 +637,15 @@ true, median (`timing_by_duration`):
 
 | true duration | 40 ms | 60 ms | 80 ms | 120 ms | 200 ms | 300 ms | 500 ms |
 |---|---|---|---|---|---|---|---|
-| sliding window, start (ms) | -28 | -28 | -23 | -22 | -22 | -22 | -18 |
-| sliding window, end (ms) | +65 | +57 | +33 | +30 | +21 | +26 | +25 |
+| sliding window, start (ms) | -<!--v:detection.sweep_shortest_start_early_ms-->28<!--/v--> | -28 | -23 | -22 | -22 | -22 | -18 |
+| sliding window, end (ms) | +<!--v:detection.sweep_shortest_end_late_ms-->65<!--/v--> | +57 | +33 | +30 | +21 | +26 | +25 |
 | state-space, start (ms) | -4 | -3 | -1 | 0 | +1 | +1 | +2 |
 | state-space, end (ms) | +1 | -2 | -2 | -1 | -5 | -3 | -5 |
 
 The sliding window starts early and ends late at every duration; its bounds are window
 midpoints, and its 80 ms windows reach 40 ms past each. Its late ends carry a long tail,
-the upper quartile reaching 231 ms at 80 ms. The state-space detector's medians sit
-within 5 ms of the truth throughout.
+the upper quartile reaching <!--v:detection.sweep_sliding_end_late_upper_quartile_max_ms-->231<!--/v--> ms at 80 ms. The state-space detector's medians sit
+within <!--v:detection.sweep_state_space_edge_error_max_ms-->5<!--/v--> ms of the truth throughout.
 
 **Absorption reaches about 80 cm.** Among events both reported, by the distance
 between the replay and the animal's own place:
@@ -662,7 +672,7 @@ is exercised.
 **On the encoding model.** Both procedures read one set of place fields. The
 state-space detector fits them, and the sliding-window likelihood is handed the
 same object, so the two differ in how they use the encoding model and not in
-what it is. An earlier version fitted the model twice, once for each side;
+what it is. An earlier version, replaced on 2026-09-22, fitted the model twice, once for each side;
 those two fits differed by about 4% of peak firing rate, and the sweep's
 answers were the same either way.
 
@@ -671,40 +681,43 @@ answers were the same either way.
 `scripts/detection/sweep_memoryless_controls.py` runs both detectors, through the sweep's own
 run steps, on activity designed in
 [memoryless_simulation_controls.md](memoryless_simulation_controls.md); every number is
-in `paper/reported/inputs/detection/detection_controls_summary.csv`. Our detector is read two ways: its non-local events
+in `paper/reported/inputs/detection/detection_controls_summary.csv`, which it wrote on
+2026-09-25 (commit `077bd1a1`). The numbers the detection summary holds are written as
+value markers; the per-condition trial counts in the last item are copied from that
+file, and no summary holds them. Our detector is read two ways: its non-local events
 (continuous and fragmented states together, the project's definition) and the
 continuous state alone.
 
-- **No replay.** Over 1.7 minutes of immobility with no replay, from eight simulated
-  recordings, no output reported any event: fewer than 1.8 per minute at 95%
+- **No replay.** Over <!--v:detection.controls_no_replay_minutes-->1.7<!--/v--> minutes of immobility with no replay, from <!--v:detection.controls_no_replay_recordings-->8<!--/v--> simulated
+  recordings, no output reported any event: fewer than <!--v:detection.controls_no_replay_rate_bound-->1.8<!--/v--> per minute at 95%
   confidence. The simulator's seed changes the spikes, not the trajectory, so all of
   it is local coding at the track's end, where the animal pauses.
 - **Place-less bursts** (every cell at one rate unrelated to its field; no spatial
   content), pooled over peak rates of 20, 60 and 160 Hz. Our non-local events cover
-  90% of them, the bursts spending 59-80% of their time in the fragmented state; 75%
+  <!--v:detection.controls_placeless_nonlocal_fraction-->90<!--/v-->% of them, the bursts spending <!--v:detection.controls_placeless_fragmented_share_min-->59<!--/v-->–<!--v:detection.controls_placeless_fragmented_share_max-->80<!--/v-->% of their time in the fragmented state; <!--v:detection.controls_placeless_nonlocal_lowest_rate_fraction-->75<!--/v-->%
   even at 20 Hz, where such a burst fires about as fast as the local coding it
-  replaces. The continuous state alone covers 1%; the sliding window 8% (15% before
+  replaces. The continuous state alone covers <!--v:detection.controls_placeless_continuous_fraction-->1<!--/v-->%; the sliding window <!--v:detection.controls_placeless_sliding_fraction-->8<!--/v-->% (<!--v:detection.controls_placeless_sliding_before_test_fraction-->15<!--/v-->% before
   its significance test). A burst with no place in it is therefore a non-local event
   under the project's definition, which counts the fragmented state; what in it the
   fragmented state takes up, incoherence or merely a departure from the local pattern,
   these simulations do not separate.
-- **Jumping bursts** (a random place every 15 ms). Our non-local events cover 97%,
-  which is right; the continuous state alone 50% and the sliding window 7% (12% before
+- **Jumping bursts** (a random place every 15 ms). Our non-local events cover <!--v:detection.controls_jumping_nonlocal_fraction-->97<!--/v-->%,
+  which is right; the continuous state alone <!--v:detection.controls_jumping_continuous_fraction-->50<!--/v-->% and the sliding window <!--v:detection.controls_jumping_sliding_fraction-->7<!--/v-->% (<!--v:detection.controls_jumping_sliding_before_test_fraction-->13<!--/v-->% before
   its test), each calling a sequence that is not there.
 - **Mid-event jumps**, their far end held 45 cm from where the animal rests. Our
-  detector reports one event over both parts in 73-85% of trials at every jump up to
+  detector reports one event over both parts in <!--v:detection.controls_jump_ours_spanning_min-->73<!--/v-->–<!--v:detection.controls_jump_ours_spanning_max-->85<!--/v-->% of trials at every jump up to
   80 cm; the sliding window does so for jumps up to 40 cm and never across 80 cm.
 - **Chains**, reaching no nearer the animal than 20 cm. With the second part
   continuing from the first, both report one event over both at a 10 ms gap and one
   per part at 200 ms. With it 140 cm away, the sliding window never bridges the gap
-  and misses a part in 38-58% of trials; our detector reports one event per part in
-  17% of trials at 10 ms and 83% at 200 ms.
+  and misses a part in <!--v:detection.controls_elsewhere_sliding_missing_min-->38<!--/v-->–<!--v:detection.controls_elsewhere_sliding_missing_max-->58<!--/v-->% of trials; our detector reports one event per part in
+  <!--v:detection.controls_elsewhere_ours_one_per_part_shortest_fraction-->17<!--/v-->% of trials at 10 ms and <!--v:detection.controls_elsewhere_ours_one_per_part_longest_fraction-->83<!--/v-->% at 200 ms.
 - **Each part alone**, decoded with exactly the spikes it had in its event and the
   recording's own spikes around it. Pooled over jumps and chains, recovery is higher
-  inside the event than alone: the sliding window 72% against 61%, ours 89% against
-  86%. The pooled gain hides losses. Paired by trial, the sliding window recovers fewer
-  parts inside the event than alone in 15 of 432 trials and more in 95; ours fewer in 2
-  and more in 22 (`n_trials_fewer_in_context`, `n_trials_more_in_context`). The sliding
+  inside the event than alone: the sliding window <!--v:detection.controls_sliding_recovery_in_event_fraction-->72<!--/v-->% against <!--v:detection.controls_sliding_recovery_alone_fraction-->61<!--/v-->%, ours <!--v:detection.controls_ours_recovery_in_event_fraction-->89<!--/v-->% against
+  <!--v:detection.controls_ours_recovery_alone_fraction-->86<!--/v-->%. The pooled gain hides losses. Paired by trial, the sliding window recovers fewer
+  parts inside the event than alone in <!--v:detection.controls_sliding_fewer_in_event_trials-->15<!--/v--> of <!--v:detection.controls_multipart_trials-->432<!--/v--> trials and more in <!--v:detection.controls_sliding_more_in_event_trials-->95<!--/v-->; ours fewer in <!--v:detection.controls_ours_fewer_in_event_trials-->2<!--/v-->
+  and more in <!--v:detection.controls_ours_more_in_event_trials-->22<!--/v--> (`n_trials_fewer_in_context`, `n_trials_more_in_context`). The sliding
   window's losses fall most in chains far apart (8 of 120 trials, against 1-3 of 96-120
   elsewhere), and its gains most at a 120 ms jump (32 of 96), where a merged event can
   clear the duration criterion a lone part misses. A part counts as recovered only where the
@@ -764,7 +777,9 @@ jumps, zero jumps set aside by value in the significance test, the merge of
 retained centers from their mean. `scripts/checks/compare_memoryless_to_reference.py` runs
 it beside the port on the same place fields, window spike counts, thresholds and cell
 permutations, once as published and once without its floor. Results are in
-`paper/reported/inputs/detection/reference_check_summary.csv`.
+`paper/reported/inputs/detection/reference_check_summary.csv`, as rerun on 2026-10-03
+(commit `c0455262`); no summary holds them, and the numbers below are copied from that
+file, apart from the value markers and the dated history at the end.
 
 - **The port decides as the reference does, apart from its binned center.** It decodes
   sorted cells with the reference's floor (`with_reference_rate_floor`), so the
@@ -772,17 +787,17 @@ permutations, once as published and once without its floor. Results are in
   set-aside pairs agree in every observed draw and all but one shuffled pair in 29.2
   million (see above); what remains is the binned
   center (V7). On the Figure 1 simulation every gate, candidate and verdict agrees. Over
-  every sweep cell (4536 cells, 17632 candidates, 2.4 million windows) 17512 candidates
+  every sweep cell (<!--v:detection.sweep_replays-->4,536<!--/v--> cells, 17632 candidates, 2.4 million windows) 17512 candidates
   have identical bounds, the reference calls 2198 of them replay against the port's
   2205, and 1945 pass its significance test against 1949; 34 cells (0.7%) differ in
   either count. Near-equal totals can hide changes in opposite directions: tested on
   the same candidate windows, 17 of the 2205 significance verdicts differ, all from
   the binned center, since the posteriors and the set-aside pairs are the reference's.
 - **The floor is not a detail.** Without it (V3) the posteriors of 5% of sweep windows
-  move by more than 0.001, the reference calls 2473 candidates replay and passes 1705,
-  and 465 cells (10%) differ from the reference as published. The port ran without
+  move by more than 0.001, the reference calls 2473 candidates replay and passes 1728,
+  and 459 cells (10%) differ from the reference as published. The port ran without
   the floor until 2026-09-25; its sweep then reported 11% of injected replays under
-  the whole published definition, against 18% with it.
+  the whole published definition, against <!--v:detection.sweep_sliding_fraction-->18<!--/v-->% with it.
 
 What this does not establish: it covers the sorted path on a simulated linear track,
 not the clusterless encoding-pair null used on recorded data (see "What the
@@ -798,7 +813,7 @@ parameter choice.
 `scripts/detection/sweep_memoryless_detection.py` and its summary CSV, or one of the
 `test_memoryless_*` files. *from the criteria* means it follows from the
 thresholds and is not demonstrated. Rows marked *measured elsewhere* were run
-during this work but by scratch scripts that were not kept, so they cannot be
+during this work, on 2026-09-21, but by scratch scripts that were not kept, so they cannot be
 reproduced from this repository and should be re-run before being cited.
 
 | direction | case | outcome | status |
@@ -806,19 +821,19 @@ reproduced from this repository and should be re-run before being cited.
 | miss | path shorter than about 42 cm | reported in a few percent of injections at any duration or firing rate, against 71-100% for the state-space model | measured |
 | miss | replay that changes arm without passing the junction | cut at the switch, and neither half then clears dispersion | measured |
 | miss | sparse ensembles, about one spike per window | erratic, 0-50% where dense spiking gives 100% | measured elsewhere |
-| over-call | any event shorter than about 150 ms | reported 1.5x to 3.3x too long in the sweep, and 1.6x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
+| over-call | any event shorter than about 150 ms | reported 1.5x to 3.3x too long in the sweep, and <!--v:detection.recording_short_replay_duration_ratio-->1.6<!--/v-->x for a strongly firing 80 ms replay; the detector cannot report a short event as short | measured |
 | miss | whole path inside one window | posterior smears, spread rejects. The sweep's fastest cell is 3250 cm/s and is still found sometimes, so the threshold is above that | measured elsewhere |
 | miss | replay overlapping the onset of movement | truncated one window *before* the first moving window | measured |
 | by design | remote place held still | decoded confidently, assembled, declined for going nowhere | measured |
 | miss | one unusable window inside a replay | removes its predecessor too and splits the run | from the criteria |
 | miss | gap over 50 ms, or bridge over 20 cm | merge blocked, each piece must clear 100 ms alone | from the criteria |
-| over-call | local coding beside a replay | absorbed, 5.8x and 4.3x duration inflation | measured |
+| over-call | local coding beside a replay | absorbed, <!--v:detection.recording_outbound_duration_ratio-->5.8<!--/v-->x and 4.3x duration inflation | measured |
 | neither | spurious events with no replay in them | none in 65 s of simulation | measured |
 
-**The state-space model finds every one of these.** Run on the same recording, with the same encoding settings, it reports all six labeled events at P(non-local) = 1.00 and stays silent through the silent stretch (peak 0.04). Its bounds sit within about 20 ms of the truth, and all of its intervals are real events. So these cases are limits of the sliding-window criteria, not limits of the data or of decoding in general. Note what this does and does not show: both procedures read the same encoding model, but the state-space model was given the labeled events as its held-out set, exactly as the sliding-window port was, and no threshold on either side was tuned for this comparison.
+**The state-space model finds every one of these.** Run on the same recording, with the same encoding settings, it reports all six labeled events at P(non-local) = 1.00 and stays silent through the silent stretch (peak 0.04). Its bounds sit within about 20 ms of the truth, and all of its intervals are real events (measured on 2026-09-21; no summary holds these numbers). So these cases are limits of the sliding-window criteria, not limits of the data or of decoding in general. Note what this does and does not show: both procedures read the same encoding model, but the state-space model was given the labeled events as its held-out set, exactly as the sliding-window port was, and no threshold on either side was tuned for this comparison.
 
 **The over-call is a boundary error, not a spurious event.** In the one
-simulation tested end to end the detector accepted two events and both were
+simulation tested end to end (on 2026-09-21) the detector accepted two events and both were
 real replays; nothing was invented. What is wrong is the extent: about three
 quarters of each accepted event is the animal's own place. Any per-event
 content summary computed over those bounds - represented distance, arm,
@@ -1081,7 +1096,7 @@ once, in `MEMORYLESS_EVENT_TABLE_DTYPES`, and held for an empty epoch too.
   NaN-masked trajectory, so a single window dropped before the merge still counts),
   `pieces_dispersion_cm` and `n_kept_windows_outside_pieces` (the same dispersion from
   the pieces' windows alone, and how many kept windows lie outside every piece: added
-  2026-10-02 after the first pilot, where 2 of 4 replay calls on chimi20200225_02_r1
+  2026-10-02 after the first pilot, where <!--v:detection.pilot_calls_decided_by_outside_window-->2<!--/v--> of <!--v:detection.pilot_replay_calls-->4<!--/v--> replay calls on chimi20200225_02_r1
   rested on one such window about a meter away; diagnostics, not criteria),
   `path_distance_cm` (summed track-graph distance along the retained
   centers, bridges included; the analogue of the original's `compute_sequenceDistance`,
