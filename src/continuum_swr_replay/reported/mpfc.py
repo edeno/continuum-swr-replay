@@ -739,7 +739,7 @@ def prior_binding_values(
 def called_fraction_values(
     population: pd.DataFrame, make: Callable[..., Value]
 ) -> list[Value]:
-    """Figure 4d: the share of units at raw empirical p < 0.05, per test.
+    """Figure 4d: the share of units at raw empirical p below ``ALPHA``, per test.
 
     The denominator is the units tested for that class
     (:func:`~continuum_swr_replay.analysis.pfc.load_population.significant_fraction`).
@@ -830,7 +830,7 @@ def null_geometry_values(
     """Three caveats on the empirical p-values, which
     ``scripts/pfc/measure_pfc_null_geometry.py`` reports per session.
 
-    - Units called at raw p < 0.05 whose own observed held-out improvement (on
+    - Units called at raw p below ``ALPHA`` whose own observed held-out improvement (on
       the matchable subset) is not positive.
     - How much of the engagement null's windows land on the shipped control:
       each session's median over draws, then the median and range over
@@ -953,7 +953,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
     """Do the same mPFC units respond to SWR-coupled and non-SWR replay, how much,
     and do they respond alike?
 
-    - **Overlap:** units called (raw empirical p < 0.05) for SWR-coupled replay
+    - **Overlap:** units called (raw empirical p below ``ALPHA``) for SWR-coupled replay
       (``non_local_SWR``), for non-SWR replay (``non_local_no_SWR``), for both or
       neither, among units tested for both; the count of both expected if the two
       calls were independent; their odds ratio, pooled and per animal.
@@ -982,7 +982,7 @@ def overlap_and_effect_values(population: pd.DataFrame, make) -> list[Value]:
             overlap["n_both"],
             "count",
             "count",
-            "of those, units called (raw p < 0.05) for both",
+            f"of those, units called (raw p < {ALPHA:g}) for both",
         ),
         make(
             "overlap_units_swr_replay_only",
@@ -1166,7 +1166,7 @@ def timing_values(
     """When does the response peak, and does it start before event onset?
 
     For SWR-coupled replay, non-SWR replay and all SWRs, over the units called
-    for that class (raw empirical p < 0.05 against its own matched null),
+    for that class (raw empirical p below ``ALPHA`` against its own matched null),
     split by the sign of each unit's peak (enhanced or suppressed):
 
     - per unit, the peak lag (largest ``|curve|`` on +/-200 ms) and the

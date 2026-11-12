@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import inspect
 from itertools import combinations
 from pathlib import Path
 from types import SimpleNamespace
@@ -14,7 +15,10 @@ import pytest
 from matplotlib.text import Text
 
 from continuum_swr_replay.analysis.pfc.heldout import DEFAULT_CONTROL_DRAWS
-from continuum_swr_replay.analysis.pfc.load_population import HELDOUT_P_COLUMNS
+from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA,
+    HELDOUT_P_COLUMNS,
+)
 from continuum_swr_replay.visualization import figure_utilities
 
 matplotlib.use("Agg")
@@ -41,6 +45,13 @@ def test_panel_d_uses_the_canonical_control_draw_count():
         assert "R=1000, min p=0.001" in ax.get_title(loc="left")
     finally:
         plt.close(fig)
+
+
+def test_panel_d_defaults_to_the_summarys_called_threshold():
+    # The same object, not an equal literal: the panel and the summary's called
+    # fractions read one threshold.
+    default = inspect.signature(figure04.plot_significance).parameters["alpha"].default
+    assert default is CALLED_ALPHA
 
 
 def test_panel_d_draws_the_threshold_and_the_draw_count_it_is_given():

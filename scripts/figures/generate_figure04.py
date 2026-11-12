@@ -99,6 +99,7 @@ from continuum_swr_replay.analysis.pfc.heldout import (
     empirical_pvalue_floor,
 )
 from continuum_swr_replay.analysis.pfc.load_population import (
+    CALLED_ALPHA,
     MIN_FIRING_RATE_HZ,
     load_population_data,
 )
@@ -412,7 +413,9 @@ SIGNIFICANCE_BARS = (
 )
 
 
-def plot_significance(df, ax, alpha=0.05, n_control_draws=DEFAULT_CONTROL_DRAWS):
+def plot_significance(
+    df, ax, alpha=CALLED_ALPHA, n_control_draws=DEFAULT_CONTROL_DRAWS
+):
     """Descriptive fraction of units whose regressor beats the control null.
 
     A unit counts when its plus-one Monte Carlo p-value is below ``alpha``.

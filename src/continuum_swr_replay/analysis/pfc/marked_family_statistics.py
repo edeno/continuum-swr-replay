@@ -304,13 +304,13 @@ def null_band_summary(
     max-statistic call accounts for that: each draw's largest ``|curve|``
     over the window forms the reference for the observed largest ``|curve|``,
     with the plus-one empirical p ``(1 + #draws >= observed) / (R + 1)``;
-    the call is ``p <= 0.05``. That call is the one to quote for "outside the
-    reference"; the per-lag band is descriptive. The call is not "observed
+    the call is ``p <= MAX_P_THRESHOLD``. That call is the one to quote for
+    "outside the reference"; the per-lag band is descriptive. The call is not "observed
     above the 95th percentile of the draws": with ``R = 30`` the interpolated
     percentile sits between the 29th and 30th largest draw, so an observed
     value exchangeable with the draws exceeds it about 8 % of the time, while
-    ``p <= 0.05`` (no draw at or above it, at R = 30) holds about 3 % of the
-    time.
+    the call (at a threshold of 0.05 and R = 30, no draw at or above it) holds
+    about 3 % of the time.
 
     Parameters
     ----------
@@ -329,7 +329,7 @@ def null_band_summary(
         observed peak lag), ``max_abs_value`` (observed largest ``|curve|``),
         ``max_abs_null_p95`` (95th percentile of the draws' largest
         ``|curve|``, descriptive), ``max_p_value`` and
-        ``max_outside_reference`` (``max_p_value <= 0.05``),
+        ``max_outside_reference`` (``max_p_value <= MAX_P_THRESHOLD``),
         ``window_mean`` (over every lag) and its band
         (``window_band_low``/``window_band_high``), ``window_outside_band``,
         ``n_draws``, ``n_null_sessions``, and ``animals_peak_outside_band``

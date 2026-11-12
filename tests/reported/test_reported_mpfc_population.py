@@ -358,3 +358,14 @@ def test_overlap_and_effect_values_keep_the_two_replay_classes_apart(population)
     assert values["effect_abs_peak_median_called_non_swr_replay"].value == (
         pytest.approx(0.75)
     )
+
+
+def test_the_overlap_descriptions_name_the_called_threshold(population, monkeypatch):
+    # The calls do not move between 0.01 and 0.5, so only the text says which
+    # threshold the counts are at.
+    monkeypatch.setattr("continuum_swr_replay.reported.mpfc.ALPHA", 0.02)
+    values = _values(overlap_and_effect_values, population)
+    assert values["overlap_units_both"].value == 4
+    assert values["overlap_units_both"].description == (
+        "of those, units called (raw p < 0.02) for both"
+    )
