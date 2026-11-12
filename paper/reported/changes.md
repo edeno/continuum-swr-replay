@@ -3575,3 +3575,25 @@ marker, and the computed value now there. Newest last.
 | `paper/reported/overview.md` | `part3.rate_kernel_nonconverged_non_local_swr` | 78 | 14 |
 | `paper/reported/overview.md` | `part3.rate_kernel_nonconverged_non_local_no_swr` | 62 | 24 |
 | `paper/reported/overview.md` | `part3.rate_kernel_lag_one_swr` | 1.38 | 1.39 |
+
+## 2026-11-12
+
+| Doc | Key | Was | Now |
+|---|---|---|---|
+| `docs/design/content_estimator_comparison.md` | `behavior.est_current_count_high` | +1.4 | +1.5 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_count_low` | −0.19 | −0.22 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_fraction_high` | +0.78 | +0.81 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_current_dm_high` | +0.56 | +0.64 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_fraction_low` | −0.41 | −0.43 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_fraction_high` | +0.61 | +0.62 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_dm_low` | −0.24 | −0.34 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armreward_dm_high` | +0.25 | +0.30 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_count_low` | −0.21 | −0.36 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_count_high` | +0.71 | +0.93 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_fraction_low` | −0.26 | −0.35 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_armvalue_dm_low` | −0.29 | −0.44 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_count_low` | −0.69 | −0.84 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_count_high` | +0.39 | +0.66 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_fraction_high` | +0.30 | +0.39 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_low` | −1.2 | −1.1 |
+| `docs/design/content_estimator_comparison.md` | `behavior.est_swr_armvalue_dm_high` | +0.30 | +0.34 |

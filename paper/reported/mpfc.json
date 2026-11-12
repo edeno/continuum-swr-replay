@@ -3,9 +3,9 @@
  "summary": "mpfc",
  "title": "how mPFC units respond to the events",
  "produced_by": "scripts/reported/summarize.py",
- "commit": "cb5c16baa03a",
+ "commit": "afa8dfd15e22",
  "code": {
-  "head": "cb5c16baa03a97317b689ab84946f8bfbec6a1cc",
+  "head": "afa8dfd15e221c06a5dd036b39f485bd6fc708ae",
   "python": "3.11",
   "uv_lock_sha256": "3aba25954472135b20769d6131ca2884212754855403d9394eb5f836af641cf4",
   "uncommitted": [],
@@ -35,8 +35,8 @@
     "code_sha256": "e91ca3884cbc5ca3151315663601318ed3307f44a304c39cf613a67c5544204c"
    },
    "src/continuum_swr_replay/analysis/behavior/coefficient_statistics.py": {
-    "sha256": "3cd059bd82ad8d86c736264ac802b61419c881d4fe8569de1e58d554eae5ce9c",
-    "code_sha256": "acfe7366d686b0933fa5c5314df15f7be5f997bd2e03c9148ba3ee867ac8aced"
+    "sha256": "40c8278a04fd9cd206969faf91cf5d5b89a7a3a29d8b733bb987bbd9895476f4",
+    "code_sha256": "8188f6a0845c0566c138fbc758b8035535bbf4413df6796104a33270cff9c3c6"
    },
    "src/continuum_swr_replay/analysis/behavior/cohort_audit.py": {
     "sha256": "f7367fd1347b2e0e5c5a1599a5ad9d3cad84c0b80a9765b74697d53201484bb4",
@@ -47,8 +47,8 @@
     "code_sha256": "d97816573cd8a53e780bb898a4e7e9b4d9ed9036a35edab19d1e4fa13e512b51"
    },
    "src/continuum_swr_replay/analysis/behavior/contrast_aggregation.py": {
-    "sha256": "08910fe5e7e6c0af1fa215892316c8a98191abbbd029d96ce33c912ed1ac5b42",
-    "code_sha256": "0f75712278cd431bdf1e8744cd5ab57a7da5b7c1103746f3ee5ab7c842a35d1a"
+    "sha256": "866af3394c8eacca92bf2ef70f9e3128b8fe596b0daf8a033db2c4d110625c54",
+    "code_sha256": "cc2e13fd41bd7c37718238883310569835e2d5edc7c27e56f962b3555f6b4f78"
    },
    "src/continuum_swr_replay/analysis/behavior/covariates/__init__.py": {
     "sha256": "d48cc318bd253e8be59cca3723a0e46de38ec86a62036c383aec722ba49cc61c",
@@ -119,8 +119,8 @@
     "code_sha256": "21a32bfa257976d029c5ebbcb9f0befe889df831cf5d92d5d550f77c9ce6ab62"
    },
    "src/continuum_swr_replay/analysis/behavior/fitting.py": {
-    "sha256": "252cb49576c4d67152386d4000d112d2f270ec168251ce5482ce4055b728d2a1",
-    "code_sha256": "45a3490e059e5af4f871e1b15210104afb6ce18d14c55428bfbf672d2f5ddc48"
+    "sha256": "20d1212054e86874945aff59bf13cd086cafe31e87181f793d9c21cef536f32e",
+    "code_sha256": "19df57089d5e0aa5554cd68257c4bce9643d339a2ffb06118c1296914cfef317"
    },
    "src/continuum_swr_replay/analysis/behavior/model_specs.py": {
     "sha256": "480a142497ee71f5fb794c64e1a7c260b26009f607c9a8c26ee59ce245a3bc7d",
@@ -183,7 +183,7 @@
     "code_sha256": "ff24081914e11ae91dc14976ffb0315baa9a5d20683970ca2faa843bf14f0eb9"
    },
    "src/continuum_swr_replay/analysis/pfc/design.py": {
-    "sha256": "2a2cba17bb00b789af7783c31420ac82cd1be9f711d0390971c13cca396f43d5",
+    "sha256": "e6d0eefd0d21c4729ae56802d17372e80f2f55c1f31aa5b152d4d640f1f71e11",
     "code_sha256": "700686ac2b1b248237fa6c579d88a52b25aab025a31544f9a1a3297f0eac30ef"
    },
    "src/continuum_swr_replay/analysis/pfc/event_sets.py": {
@@ -199,28 +199,28 @@
     "code_sha256": "13f07042304cc88cfc4ee105da9001b5f75db9c544b705d25ee9e29a3a01f603"
    },
    "src/continuum_swr_replay/analysis/pfc/load_population.py": {
-    "sha256": "8b41120216c2c209d6684f804683302a6e0f137b709d5c6c74afbba8b49dedb4",
-    "code_sha256": "b95153584d2cfff35015a645453a03ff7a96780d190af8aa1a704c1894914666"
+    "sha256": "265bde8b269b9f9ef31715d718b34601990b808a192dee5bb107018f93d0165b",
+    "code_sha256": "ec10eaa1dabc825f2e99aa7c7fdb5377997a294fbd816c5e1edcee6cc9b77bd3"
    },
    "src/continuum_swr_replay/analysis/pfc/matched_control.py": {
     "sha256": "7335ea02abb3e2b6f2e2dce4170c96983dabf703c79bc4bce051b5a02ac5705c",
     "code_sha256": "5bc750cbf40d7d7c453ddada179139924459ea02b38ce681a01361993b60582a"
    },
    "src/continuum_swr_replay/analysis/pfc/modulation.py": {
-    "sha256": "b463753c77c97b3abf078fcc0dac7c11d020f6f201cc7c0e72378950bbab8fa3",
-    "code_sha256": "ece319ee23ccc5f07e00290e90aadbbe42b9b10478100f8158768d9eca8218b9"
+    "sha256": "47f72f91c6297048135562ea81df2f0653ebc3a928cddd80fc30a65947a50015",
+    "code_sha256": "8f15dfee06ee01e81c9934e796c41095b18576f3de083691b1681a81a2e3d14a"
    },
    "src/continuum_swr_replay/analysis/pfc/population_statistics.py": {
-    "sha256": "16f4236dd72d908dca0fe2b5da0d7485a341c2792642772f85eaf499d80b937f",
-    "code_sha256": "08682009af60f343ba16e8a5338c1c4840c0f64e223176bd7b7c19493a1eaa47"
+    "sha256": "688bbeb8264e083019278d0f622f6753c58d4d00936889abe90cded1142c1596",
+    "code_sha256": "66283106ac8a3178f6d5a1e234379c2b1c44fcae985adcc7e84b303f05216ef2"
    },
    "src/continuum_swr_replay/analysis/pfc/timing.py": {
-    "sha256": "b8011ab6644bba2037e2667e0d370785233638bdfe4d0585bfc30406ba582dae",
-    "code_sha256": "648ce9ed097a30d8ceb1938f37fecdf9bf32420e95c0f1d8f7b4f6bd9ddb227a"
+    "sha256": "eddc0c11ff09d69a79cdebbf0789a3b22f54f2bdc84a5159bb91829077650d3a",
+    "code_sha256": "da3ccd22c2269ba6796ce4117562e0fb9afb5761f92aac38bf4602b278f1acfb"
    },
    "src/continuum_swr_replay/analysis/shared_statistics.py": {
-    "sha256": "98c4c5e52d91cd42d56f847833ceb1d1c6644ce654bb62606f1391eb8730ac8b",
-    "code_sha256": "d87ca2c7db81e7a87a59c9cdb8af06ba80289acb64786df79dff0ea2379b8c7b"
+    "sha256": "27874d79792b5048c8a50d073add2829833f81c27c0d6388b1e8c5658d22d97c",
+    "code_sha256": "ce850dba558ba3bf6f957e6447e611e160183641aff847c264a9c1954515a359"
    },
    "src/continuum_swr_replay/data_loaders/__init__.py": {
     "sha256": "5cab95c4ae3bdc8ed0ae23bd91ca9bb9d1457b81b46d07f7371364d003198f50",
@@ -271,32 +271,32 @@
     "code_sha256": "6b90f0d5aa3f8babcdfff0d2d6e6276d5cd2a5601e58fc8238b963103ce31ac9"
    },
    "src/continuum_swr_replay/reported/mpfc/common.py": {
-    "sha256": "32397240f94c0c022d8ed79686e4a80ceb58202b0c337d01865e528d4c921270",
-    "code_sha256": "27f0fb72d24df0005041f93233c334dc77a28d0f99bc9e2bdfc977e3a471887a"
+    "sha256": "dfe0ff78961c5730ed70b95b45811847e5b9246b7295059f26bf2e879934bdce",
+    "code_sha256": "5127ff9f27d7083292b2a6578af0581487accc4118480237323b14970c4e233c"
    },
    "src/continuum_swr_replay/reported/mpfc/followups.py": {
-    "sha256": "8a601df58ef726a72767a2f2fac4df00133d1b043fdf4282733b7f77188458ca",
-    "code_sha256": "56cbb19c438d69f2553f293c2b0c29719a982f37fc486387b461875d0b768b45"
+    "sha256": "ea6680f42dbc2528efd25fcfb8a70caa015a8411cf86ce1195dcc2775ccfe8fb",
+    "code_sha256": "ceb94de8631f1fa95866321454a836f6758c177db56e59efa668ba91442b1ef5"
    },
    "src/continuum_swr_replay/reported/mpfc/inputs.py": {
     "sha256": "e772a0d65431de7b7998962c4a767b4be302d1b9f02b08a610d252920d95d15e",
     "code_sha256": "2b1af9c4d66274391cdc788419792450b05772d8687de31b480a15db0bb7bb5c"
    },
    "src/continuum_swr_replay/reported/mpfc/population.py": {
-    "sha256": "576caa9dfdfdba26500626ca7ec79f9d37a6c4d0073fb5a8c79667003589cae0",
-    "code_sha256": "0c19d338f50bb3503c6ddf11b1f09ce1dc912403fbee059c5ec62743d2bdc858"
+    "sha256": "b3d0bb54c98c3ca6e43d6be2e10fe7578c7ddb03c0a04ce2cf69432638354bc7",
+    "code_sha256": "9e74280aa634f1cdaf80f0f35cb2e3c8579e3829e95d738f717462fc2bf6c9f4"
    },
    "src/continuum_swr_replay/reported/mpfc/rate_cutoff.py": {
     "sha256": "ef5d8d33dd6b1f9d83b4a13b11d6ba50069e4541080d8a2842590b0f39322deb",
     "code_sha256": "00c57db7ad79deec94d516ff953652b10627ff601313ee0545c9ad41d664e110"
    },
    "src/continuum_swr_replay/reported/mpfc/swr_without_replay.py": {
-    "sha256": "e11a07dbadd5c148e0bd89e6044a043034e24ed6690406259e85da622e72cf0c",
-    "code_sha256": "c5722821753fe5a4eaa3ecee4d7f55a23de4e63b3b45d0e1d979ffe5d427f014"
+    "sha256": "5f03d47d192fe3801db42b4872f119c29be332b0d87f4234c7a6ce78b0241392",
+    "code_sha256": "eb433f24e02a7d84c3e9a9a4ffa23ecbf4c5b69ed961a7fcf76b1a0d87d223f3"
    },
    "src/continuum_swr_replay/reported/mpfc/timing.py": {
-    "sha256": "f114254bb99d75350c4ecb18a2edb18aa3a6c6c4f6788655e24824ef483fed86",
-    "code_sha256": "fc798bf3f291a5f8c00255e9712d611a702a6b8825b0db1150f2d7ff54a7f18c"
+    "sha256": "88758656c76655da9b53e0dce1277d2f63c22f1495f55fc2d088121e6c32bfaa",
+    "code_sha256": "4eebaf058dd3e19442292f7923e917ea3360e57dbac2d80b0984f161557835e7"
    },
    "src/continuum_swr_replay/reported/values.py": {
     "sha256": "ac38ca536c16eb9686c6868837e6144ccec635914f0f54369180778954409625",
@@ -343,7 +343,7 @@
  "inputs": [
   {
    "path": "Processed-Data/pfc_response_followups/marked_family_well_unknown/summary.parquet",
-   "sha256": "f6e47f6374398edc5ff70f909fcacc423b2d7d5f528d56db8dd66490c8c9f671"
+   "sha256": "15ebc6251c793f1ec637e98ad894ec0c36f7b195bd355af02e7dd595a6b56664"
   },
   {
    "path": "Processed-Data/pfc_response_followups/stop_context/results.csv",
@@ -907,11 +907,11 @@
    "pending": null
   },
   "engagement_called_fraction_chimi": {
-   "value": 0.31825037707390647,
+   "value": 0.31824571011318,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of chimi's tested units at raw empirical p < 0.05 for the engagement test",
+   "description": "share of chimi's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -923,11 +923,11 @@
    "pending": null
   },
   "engagement_called_fraction_jsixteen": {
-   "value": 0.16551406177962194,
+   "value": 0.16572906698402015,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of j16's tested units at raw empirical p < 0.05 for the engagement test",
+   "description": "share of j16's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -939,11 +939,11 @@
    "pending": null
   },
   "engagement_called_fraction_peanut": {
-   "value": 0.22404635441815549,
+   "value": 0.22403965709050455,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of peanut's tested units at raw empirical p < 0.05 for the engagement test",
+   "description": "share of peanut's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -955,11 +955,11 @@
    "pending": null
   },
   "engagement_called_fraction_senor": {
-   "value": 0.20421221007731272,
+   "value": 0.2036540980187324,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of senor's tested units at raw empirical p < 0.05 for the engagement test",
+   "description": "share of senor's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -971,11 +971,11 @@
    "pending": null
   },
   "engagement_called_fraction_wilbur": {
-   "value": 0.17742927429274294,
+   "value": 0.1796701063132761,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of wilbur's tested units at raw empirical p < 0.05 for the engagement test",
+   "description": "share of wilbur's tested units at raw empirical p < 0.05 for the engagement test: the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -1089,11 +1089,11 @@
    "pending": null
   },
   "marked_content_current_arm_non_swr_replay_heldout_gain_fraction": {
-   "value": 0.33950715421303657,
+   "value": 0.33996843483087874,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_no_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -1159,11 +1159,11 @@
    "pending": null
   },
   "marked_content_current_arm_swr_replay_heldout_gain_fraction": {
-   "value": 0.3510848126232742,
+   "value": 0.33938939590186895,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, current_arm_fraction in model replay_content, non_local_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -1229,11 +1229,11 @@
    "pending": null
   },
   "marked_content_recent_reward_non_swr_replay_heldout_gain_fraction": {
-   "value": 0.30067567567567566,
+   "value": 0.29973858830094857,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_no_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -1299,11 +1299,11 @@
    "pending": null
   },
   "marked_content_recent_reward_swr_replay_heldout_gain_fraction": {
-   "value": 0.31456953642384106,
+   "value": 0.3085030338662026,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, content_weighted_recent_reward in model replay_content, non_local_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -1845,11 +1845,11 @@
    "pending": null
   },
   "marked_strength_mua_rate_non_swr_replay_heldout_gain_fraction": {
-   "value": 0.2909090909090909,
+   "value": 0.2899073032915196,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_no_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -1915,11 +1915,11 @@
    "pending": null
   },
   "marked_strength_mua_rate_swr_replay_heldout_gain_fraction": {
-   "value": 0.2833333333333333,
+   "value": 0.280162448986982,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, mua_rate_z in model event_strength, non_local_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -1985,11 +1985,11 @@
    "pending": null
   },
   "marked_strength_ripple_power_non_swr_replay_heldout_gain_fraction": {
-   "value": 0.26158940397350994,
+   "value": 0.2617158742867093,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_no_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -2055,11 +2055,11 @@
    "pending": null
   },
   "marked_strength_ripple_power_swr_replay_heldout_gain_fraction": {
-   "value": 0.26245847176079734,
+   "value": 0.27577916746380315,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, median over sessions within animal, median over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
+   "description": "share of units whose held-out deviance improves when the mark's kernel is in the model, ripple_power_z in model event_strength, non_local_SWR (per session, mean over sessions within animal, mean over animals; over 18413 usable of 18504 unit fits, 0 left out as blow-ups, in 75 sessions of 5 animals). No chance reference was computed, so the share expected by chance is unknown: this is not a test",
    "questions": [
     "4.1"
    ],
@@ -3469,11 +3469,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_all_chimi": {
-   "value": 0.23529411764705882,
+   "value": 0.2351040525739321,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for chimi's tested units (every session)",
+   "description": "the same for chimi's tested units (every session): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3483,11 +3483,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_all_jsixteen": {
-   "value": 0.10142923005993545,
+   "value": 0.10195376081747934,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for j16's tested units (every session)",
+   "description": "the same for j16's tested units (every session): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3497,11 +3497,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_all_peanut": {
-   "value": 0.064891846921797,
+   "value": 0.0718961064431477,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for peanut's tested units (every session)",
+   "description": "the same for peanut's tested units (every session): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3511,11 +3511,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_all_senor": {
-   "value": 0.05908835115362971,
+   "value": 0.056385720210336686,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for senor's tested units (every session)",
+   "description": "the same for senor's tested units (every session): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3525,11 +3525,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_all_wilbur": {
-   "value": 0.0636596617119426,
+   "value": 0.06345170443724578,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for wilbur's tested units (every session)",
+   "description": "the same for wilbur's tested units (every session): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3553,11 +3553,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_min_events_chimi": {
-   "value": 0.23529411764705882,
+   "value": 0.2351040525739321,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for chimi's tested units (sessions with at least 10 SWRs without replay)",
+   "description": "the same for chimi's tested units (sessions with at least 10 SWRs without replay): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3567,11 +3567,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_min_events_jsixteen": {
-   "value": 0.10142923005993545,
+   "value": 0.10195376081747934,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for j16's tested units (sessions with at least 10 SWRs without replay)",
+   "description": "the same for j16's tested units (sessions with at least 10 SWRs without replay): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3585,7 +3585,7 @@
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for peanut's tested units (sessions with at least 10 SWRs without replay)",
+   "description": "the same for peanut's tested units (sessions with at least 10 SWRs without replay): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3595,11 +3595,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_min_events_senor": {
-   "value": 0.041189931350114416,
+   "value": 0.0405382600890807,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for senor's tested units (sessions with at least 10 SWRs without replay)",
+   "description": "the same for senor's tested units (sessions with at least 10 SWRs without replay): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -3609,11 +3609,11 @@
    "pending": null
   },
   "swr_no_replay_called_fraction_min_events_wilbur": {
-   "value": 0.0636596617119426,
+   "value": 0.06345170443724578,
    "kind": "fraction",
    "style": "pct",
    "unit": "",
-   "description": "the same for wilbur's tested units (sessions with at least 10 SWRs without replay)",
+   "description": "the same for wilbur's tested units (sessions with at least 10 SWRs without replay): the mean over its sessions of each session's share",
    "questions": [
     "4.1"
    ],
@@ -4183,11 +4183,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_enhanced_all": {
-   "value": 62.0,
+   "value": 156.04999999999995,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
    "questions": [
     "4.1"
    ],
@@ -4197,11 +4197,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_enhanced_min_events": {
-   "value": 22.0,
+   "value": 66.04999999999995,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -4211,11 +4211,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_suppressed_all": {
-   "value": 24.049999999999955,
+   "value": 52.0999999999999,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
    "questions": [
     "4.1"
    ],
@@ -4225,11 +4225,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_high_suppressed_min_events": {
-   "value": 42.0,
+   "value": 68.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "97.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "description": "97.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -4239,11 +4239,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_enhanced_all": {
-   "value": -108.0,
+   "value": -194.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
+   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (every session)",
    "questions": [
     "4.1"
    ],
@@ -4253,11 +4253,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_enhanced_min_events": {
-   "value": -192.0,
+   "value": -196.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
+   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is an increase (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -4271,7 +4271,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
+   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (every session)",
    "questions": [
     "4.1"
    ],
@@ -4281,11 +4281,11 @@
    "pending": null
   },
   "swr_no_replay_timing_rise_onset_ms_ci_low_suppressed_min_events": {
-   "value": -112.0,
+   "value": -144.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile over recording-day resamples of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
+   "description": "2.5th percentile over nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) of the rise onset of the sign-aligned mean curve of the units called for SWRs without replay whose peak is a decrease (sessions with at least 10 SWRs without replay)",
    "questions": [
     "4.1"
    ],
@@ -6143,7 +6143,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6157,7 +6157,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6171,7 +6171,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6185,7 +6185,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6199,7 +6199,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6213,7 +6213,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the half-maximum onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6307,7 +6307,7 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_non_swr_replay_enhanced": {
-   "value": -24.0,
+   "value": -11.950000000000045,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6321,7 +6321,7 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_non_swr_replay_suppressed": {
-   "value": -145.95000000000002,
+   "value": -82.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6335,7 +6335,7 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_enhanced": {
-   "value": 0.0,
+   "value": 20.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6349,7 +6349,7 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_replay_enhanced": {
-   "value": 0.0,
+   "value": 20.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6363,7 +6363,7 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_replay_suppressed": {
-   "value": -133.95000000000005,
+   "value": -70.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6377,7 +6377,7 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_high_swr_suppressed": {
-   "value": -126.0,
+   "value": -34.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6391,11 +6391,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_non_swr_replay_enhanced": {
-   "value": -56.0,
+   "value": -60.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6409,7 +6409,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6419,11 +6419,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_swr_enhanced": {
-   "value": -52.0,
+   "value": -54.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6433,11 +6433,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_swr_replay_enhanced": {
-   "value": -44.0,
+   "value": -46.05,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6447,11 +6447,11 @@
    "pending": null
   },
   "timing_population_onset_ms_ci_low_swr_replay_suppressed": {
-   "value": -188.04999999999998,
+   "value": -200.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6465,7 +6465,7 @@
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6559,48 +6559,6 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_non_swr_replay_enhanced": {
-   "value": 100.0,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
-   "questions": [
-    "4.1"
-   ],
-   "figures": [],
-   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
-   "function": "timing_values",
-   "pending": null
-  },
-  "timing_population_peak_ms_ci_high_non_swr_replay_suppressed": {
-   "value": 42.0,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
-   "questions": [
-    "4.1"
-   ],
-   "figures": [],
-   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
-   "function": "timing_values",
-   "pending": null
-  },
-  "timing_population_peak_ms_ci_high_swr_enhanced": {
-   "value": 114.0,
-   "kind": "quantity",
-   "style": "int",
-   "unit": "ms",
-   "description": "97.5th percentile of that over the same resamples",
-   "questions": [
-    "4.1"
-   ],
-   "figures": [],
-   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
-   "function": "timing_values",
-   "pending": null
-  },
-  "timing_population_peak_ms_ci_high_swr_replay_enhanced": {
    "value": 104.0,
    "kind": "quantity",
    "style": "int",
@@ -6614,8 +6572,50 @@
    "function": "timing_values",
    "pending": null
   },
+  "timing_population_peak_ms_ci_high_non_swr_replay_suppressed": {
+   "value": 48.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over the same resamples",
+   "questions": [
+    "4.1"
+   ],
+   "figures": [],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
+   "function": "timing_values",
+   "pending": null
+  },
+  "timing_population_peak_ms_ci_high_swr_enhanced": {
+   "value": 120.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over the same resamples",
+   "questions": [
+    "4.1"
+   ],
+   "figures": [],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
+   "function": "timing_values",
+   "pending": null
+  },
+  "timing_population_peak_ms_ci_high_swr_replay_enhanced": {
+   "value": 112.0,
+   "kind": "quantity",
+   "style": "int",
+   "unit": "ms",
+   "description": "97.5th percentile of that over the same resamples",
+   "questions": [
+    "4.1"
+   ],
+   "figures": [],
+   "source": "Processed-Data/*_mPFC_modulation.pkl and their provenance sidecars (scripts/pfc/run_pfc_analysis_bandit.py), 75 bundles, read by Figure 4's loader (analysis/pfc/load_population.py, no firing-rate cutoff)",
+   "function": "timing_values",
+   "pending": null
+  },
   "timing_population_peak_ms_ci_high_swr_replay_suppressed": {
-   "value": 62.0,
+   "value": 100.04999999999995,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6629,7 +6629,7 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_high_swr_suppressed": {
-   "value": 84.0,
+   "value": 94.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6643,11 +6643,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_non_swr_replay_enhanced": {
-   "value": 73.95,
+   "value": 44.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6657,11 +6657,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_non_swr_replay_suppressed": {
-   "value": 18.0,
+   "value": 14.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6671,11 +6671,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_enhanced": {
-   "value": 78.0,
+   "value": 72.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6685,11 +6685,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_replay_enhanced": {
-   "value": 78.0,
+   "value": 76.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6699,11 +6699,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_replay_suppressed": {
-   "value": 45.95,
+   "value": 33.95000000000001,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6713,11 +6713,11 @@
    "pending": null
   },
   "timing_population_peak_ms_ci_low_swr_suppressed": {
-   "value": 52.0,
+   "value": 44.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -6899,7 +6899,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6909,11 +6909,11 @@
    "pending": null
   },
   "timing_population_rise_onset_animals_negative_non_swr_replay_suppressed": {
-   "value": 4,
+   "value": 5,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the rise onset of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6927,7 +6927,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6941,7 +6941,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6955,7 +6955,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6969,7 +6969,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the rise onset of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -6979,7 +6979,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_non_swr_replay_enhanced": {
-   "value": -18.0,
+   "value": 2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -6993,7 +6993,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_non_swr_replay_suppressed": {
-   "value": -30.0,
+   "value": -10.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7007,7 +7007,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_enhanced": {
-   "value": 16.0,
+   "value": 32.049999999999955,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7021,7 +7021,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_replay_enhanced": {
-   "value": 8.049999999999955,
+   "value": 28.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7035,7 +7035,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_replay_suppressed": {
-   "value": -24.0,
+   "value": -14.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7049,7 +7049,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_high_swr_suppressed": {
-   "value": -6.0,
+   "value": -2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7063,11 +7063,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_non_swr_replay_enhanced": {
-   "value": -50.0,
+   "value": -52.04999999999999,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7077,11 +7077,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_non_swr_replay_suppressed": {
-   "value": -62.0,
+   "value": -86.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7091,11 +7091,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_enhanced": {
-   "value": -32.0,
+   "value": -36.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7105,11 +7105,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_replay_enhanced": {
-   "value": -34.0,
+   "value": -38.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7119,11 +7119,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_replay_suppressed": {
-   "value": -42.0,
+   "value": -48.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7133,11 +7133,11 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_ci_low_swr_suppressed": {
-   "value": -26.0,
+   "value": -34.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -7175,7 +7175,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_non_swr_replay_enhanced_jsixteen": {
-   "value": -18.0,
+   "value": -22.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7203,7 +7203,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_non_swr_replay_enhanced_senor": {
-   "value": -38.0,
+   "value": -40.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7259,7 +7259,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_non_swr_replay_suppressed_jsixteen": {
-   "value": 4.0,
+   "value": -2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7287,7 +7287,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_non_swr_replay_suppressed_senor": {
-   "value": -116.0,
+   "value": -120.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7371,7 +7371,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_swr_enhanced_senor": {
-   "value": -42.0,
+   "value": -44.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7385,7 +7385,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_swr_enhanced_wilbur": {
-   "value": -28.0,
+   "value": -30.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7427,7 +7427,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_swr_replay_enhanced_jsixteen": {
-   "value": 12.0,
+   "value": 10.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7455,7 +7455,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_swr_replay_enhanced_senor": {
-   "value": -36.0,
+   "value": -40.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7539,7 +7539,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_swr_replay_suppressed_senor": {
-   "value": -28.0,
+   "value": -26.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7595,7 +7595,7 @@
    "pending": null
   },
   "timing_population_rise_onset_ms_swr_suppressed_jsixteen": {
-   "value": 0.0,
+   "value": 2.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -7651,11 +7651,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_non_swr_replay_enhanced": {
-   "value": 0.402105987530389,
+   "value": 0.4193288073578174,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7665,11 +7665,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_non_swr_replay_suppressed": {
-   "value": 0.32805436851544095,
+   "value": 0.35899482677603006,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7679,11 +7679,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_enhanced": {
-   "value": 0.45632581744819267,
+   "value": 0.47991302535992897,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7693,11 +7693,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_replay_enhanced": {
-   "value": 0.5747133595390144,
+   "value": 0.5825809895307361,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7707,11 +7707,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_replay_suppressed": {
-   "value": 0.3849510192601289,
+   "value": 0.412578142180528,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7721,11 +7721,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_high_swr_suppressed": {
-   "value": 0.3493725269341374,
+   "value": 0.40671787874816084,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7735,11 +7735,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_non_swr_replay_enhanced": {
-   "value": 0.28174610053515603,
+   "value": 0.2340997806015551,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7749,11 +7749,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_non_swr_replay_suppressed": {
-   "value": 0.2587912729189869,
+   "value": 0.23503500199991967,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7763,11 +7763,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_enhanced": {
-   "value": 0.30046526788944394,
+   "value": 0.25151159133439555,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7777,11 +7777,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_replay_enhanced": {
-   "value": 0.4163616371618583,
+   "value": 0.36352904448952067,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7791,11 +7791,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_replay_suppressed": {
-   "value": 0.30529366595642965,
+   "value": 0.296973603262195,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7805,11 +7805,11 @@
    "pending": null
   },
   "timing_population_rise_size_ci_low_swr_suppressed": {
-   "value": 0.2061003158245246,
+   "value": 0.1816750929863565,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7903,11 +7903,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_non_swr_replay_enhanced": {
-   "value": 0.4069441549217034,
+   "value": 0.4171731774268145,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7917,11 +7917,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_non_swr_replay_suppressed": {
-   "value": 0.6295039717426933,
+   "value": 0.6483364853484125,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7931,11 +7931,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_enhanced": {
-   "value": 0.5074000531443733,
+   "value": 0.5331005071810903,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7945,11 +7945,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_replay_enhanced": {
-   "value": 0.6193533637577779,
+   "value": 0.6306289805312761,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7959,11 +7959,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_replay_suppressed": {
-   "value": 0.6525997616858983,
+   "value": 0.6739502985061508,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7973,11 +7973,11 @@
    "pending": null
   },
   "timing_population_size_ci_high_swr_suppressed": {
-   "value": 0.5836418605938747,
+   "value": 0.6165224681706211,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "97.5th percentile of that over 1,000 recording-day resamples",
+   "description": "97.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -7987,11 +7987,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_non_swr_replay_enhanced": {
-   "value": 0.30604681822874064,
+   "value": 0.27731425316861047,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -8001,11 +8001,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_non_swr_replay_suppressed": {
-   "value": 0.5206808344809767,
+   "value": 0.4953593613086709,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -8015,11 +8015,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_enhanced": {
-   "value": 0.36705091128198297,
+   "value": 0.3155476765124131,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -8029,11 +8029,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_replay_enhanced": {
-   "value": 0.4589661556019083,
+   "value": 0.39596658795504214,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -8043,11 +8043,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_replay_suppressed": {
-   "value": 0.560374842034618,
+   "value": 0.5284591878735655,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -8057,11 +8057,11 @@
    "pending": null
   },
   "timing_population_size_ci_low_swr_suppressed": {
-   "value": 0.45139394774628516,
+   "value": 0.440464129518021,
    "kind": "quantity",
    "style": "dec2",
    "unit": "log rate",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units)",
    "questions": [
     "4.1"
    ],
@@ -8239,11 +8239,11 @@
    "pending": null
   },
   "timing_population_steepest_animals_negative_non_swr_replay_enhanced": {
-   "value": 3,
+   "value": 4,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -8257,7 +8257,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for non-SWR replay (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -8271,7 +8271,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -8285,7 +8285,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase before event onset",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is an increase (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -8295,11 +8295,11 @@
    "pending": null
   },
   "timing_population_steepest_animals_negative_swr_replay_suppressed": {
-   "value": 4,
+   "value": 3,
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR-coupled replay (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -8313,7 +8313,7 @@
    "kind": "count",
    "style": "count",
    "unit": "",
-   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease before event onset",
+   "description": "of those animals, how many have the steepest approach of their own mean curve of units called for SWR (raw p < 0.05) whose peak is a decrease (the mean over its recording days of each day's sign-aligned mean curve) before event onset",
    "questions": [
     "4.1"
    ],
@@ -8323,7 +8323,7 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_non_swr_replay_enhanced": {
-   "value": 59.0,
+   "value": 63.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -8337,7 +8337,7 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_non_swr_replay_suppressed": {
-   "value": 1.0,
+   "value": 11.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -8351,7 +8351,7 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_enhanced": {
-   "value": 37.0,
+   "value": 61.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -8365,7 +8365,7 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_replay_enhanced": {
-   "value": 28.999999999999996,
+   "value": 47.049999999999955,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -8379,7 +8379,7 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_replay_suppressed": {
-   "value": 9.000000000000002,
+   "value": 15.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -8393,7 +8393,7 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_high_swr_suppressed": {
-   "value": -3.0,
+   "value": 9.000000000000002,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
@@ -8407,11 +8407,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_non_swr_replay_enhanced": {
-   "value": -63.0,
+   "value": -71.00000000000001,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8421,11 +8421,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_non_swr_replay_suppressed": {
-   "value": -33.0,
+   "value": -59.04999999999999,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8435,11 +8435,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_enhanced": {
-   "value": -17.0,
+   "value": -25.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8449,11 +8449,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_replay_enhanced": {
-   "value": -23.0,
+   "value": -25.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8463,11 +8463,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_replay_suppressed": {
-   "value": -27.0,
+   "value": -167.05,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
@@ -8477,11 +8477,11 @@
    "pending": null
   },
   "timing_population_steepest_ms_ci_low_swr_suppressed": {
-   "value": -19.0,
+   "value": -27.0,
    "kind": "quantity",
    "style": "int",
    "unit": "ms",
-   "description": "2.5th percentile of that over 1,000 recording-day resamples (seed 0)",
+   "description": "2.5th percentile of that over 1,000 nested resamples (the animals, then each drawn animal's recording days, then each drawn day's units) (seed 0)",
    "questions": [
     "4.1"
    ],
