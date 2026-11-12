@@ -161,9 +161,9 @@ def test_other_detector_values_name_each_detector_and_each_state():
 
 
 def test_left_out_values_name_each_covering_and_each_rate(tmp_path):
-    _write_run(tmp_path / "run", tmp_path / "report")
+    _write_run(tmp_path / "run", tmp_path / "inventory")
     numbers = _numbers(
-        builder.left_out_values(tmp_path / "run", tmp_path / "report", "s")
+        builder.left_out_values(tmp_path / "run", tmp_path / "inventory", "s")
     )
     assert numbers == {
         "rest_hours": 2.0,

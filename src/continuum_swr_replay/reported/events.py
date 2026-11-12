@@ -481,13 +481,13 @@ def other_detector_values(events: pd.DataFrame, source: str) -> list[Value]:
 # --- what an analysis without the non-local detector leaves out -----------------
 
 
-def left_out_values(run_dir: Path, report_dir: Path, source: str) -> list[Value]:
+def left_out_values(run_dir: Path, inventory_dir: Path, source: str) -> list[Value]:
     """Question 2b.2: how many non-local events, and how much of their time, an
     analysis that starts from SWRs (or from any LFP- or rate-based trigger, or
     from the Widloski detector) does not include, in total and per hour of rest.
     """
     make = value_factory(left_out_values, source, TAGS["left_out"])
-    stats = nonlocal_comparison.left_out_statistics(run_dir, report_dir)
+    stats = nonlocal_comparison.left_out_statistics(run_dir, inventory_dir)
     values = [
         make(
             "rest_hours",
@@ -1645,12 +1645,8 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     run = inputs.event_features_run
     others = nonlocal_comparison.other_detector_events(run)
-    directional_path = (
-        inventory_comparison_root()
-        / _input_run(run, "inventory")
-        / "report"
-        / "directional_by_animal.csv"
-    )
+    inventory_dir = inventory_comparison_root() / _input_run(run, "inventory")
+    directional_path = inventory_dir / "report" / "directional_by_animal.csv"
     nonlocal_comparison.check_against_directional(others, pd.read_csv(directional_path))
     summary.add(
         *other_detector_values(
@@ -1659,14 +1655,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
             "state_shares (scripts/detection/add_state_shares.py)",
         )
     )
-    report_dir = directional_path.parent
     summary.add(
         *left_out_values(
             run,
-            report_dir,
-            f"event features run {run.name} (every inventory's compared events) and the "
-            f"detector comparison's report ({rel(report_dir)}: counts_by_animal.csv, "
-            "cells_by_animal.csv)",
+            inventory_dir,
+            f"event features run {run.name} (every inventory's compared events) and "
+            f"inventory comparison run {inventory_dir.name} (its observations, counts "
+            "and cells, pooled by animal)",
         )
     )
 
@@ -1676,8 +1671,13 @@ def summarize(inputs: EventsInputs, produced_by: str) -> Summary:
 
     summary.inputs += [
         run_tables("features"),
-        file_record(report_dir / "counts_by_animal.csv", ROOT_DIR),
-        file_record(report_dir / "cells_by_animal.csv", ROOT_DIR),
+        file_record(inventory_dir / "manifest.json", ROOT_DIR),
+        *(
+            files_record(
+                f"*_{name}.parquet", ok_table_paths(inventory_dir, name), ROOT_DIR
+            )
+            for name in nonlocal_comparison.INVENTORY_TABLES
+        ),
     ]
     summary.inputs += [
         run_tables("state_shares"),

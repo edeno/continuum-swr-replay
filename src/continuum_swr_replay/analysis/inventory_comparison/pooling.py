@@ -8,10 +8,10 @@ where the comparison was unavailable is not summed; it is listed instead
 Every per-animal table of the inventory comparison's report
 (``scripts/detection/report_inventory_comparison.py``) and of the event
 features report (``scripts/detection/report_event_features.py``) is pooled by
-:func:`pool_sessions`. Two of them are built here whole, because
-``nonlocal_comparison.left_out_statistics`` reads them: each detector's counts
-(:func:`counts_by_animal`, the non-local detector's exposure) and the cells
-(:func:`cells_by_animal`).
+:func:`pool_sessions`. Two of them are built here whole, from the run's tables
+(:func:`session_tables`), because ``nonlocal_comparison.left_out_statistics``
+computes them too: each detector's counts (:func:`counts_by_animal`, the
+non-local detector's exposure) and the cells (:func:`cells_by_animal`).
 """
 
 from __future__ import annotations
@@ -223,6 +223,37 @@ def cells_by_session(
     return out.drop(columns="_merge")[[*keys, "available", *counts]].sort_values(
         keys, ignore_index=True
     )
+
+
+def session_tables(
+    manifest: Mapping, tables: Mapping[str, pd.DataFrame]
+) -> dict[str, pd.DataFrame]:
+    """The per-session tables the animal tables pool, from an inventory run.
+
+    Parameters
+    ----------
+    manifest : mapping
+        The inventory run's manifest; its ``settings["cells"]`` name each
+        cell's source detectors.
+    tables : mapping of str to DataFrame
+        The run's ``observations``, ``counts`` and ``cells`` tables over its
+        ``ok`` epochs.
+
+    Returns
+    -------
+    dict of str to DataFrame
+        ``availability`` (:func:`detector_availability`), ``counts``
+        (:func:`counts_by_session`) and ``cells`` (:func:`cells_by_session`).
+    """
+    sources = {
+        name: cell["sources"] for name, cell in manifest["settings"]["cells"].items()
+    }
+    availability = detector_availability(tables["observations"])
+    return {
+        "availability": availability,
+        "counts": counts_by_session(tables["counts"], availability),
+        "cells": cells_by_session(tables["cells"], availability, sources),
+    }
 
 
 def cells_by_animal(by_session: pd.DataFrame) -> pd.DataFrame:

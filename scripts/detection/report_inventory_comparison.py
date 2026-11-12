@@ -54,13 +54,11 @@ from continuum_swr_replay.analysis.inventory_comparison import (  # noqa: E402
 )
 from continuum_swr_replay.analysis.inventory_comparison.pooling import (  # noqa: E402
     cells_by_animal,
-    cells_by_session,
     counts_by_animal,
-    counts_by_session,
-    detector_availability,
     pool_sessions,
     ratio,
     session_names,
+    session_tables,
     summed,
 )
 from continuum_swr_replay.data_loaders.epoch_register import (  # noqa: E402
@@ -684,11 +682,11 @@ def report_tables(
 ) -> dict[str, pd.DataFrame]:
     """Every report table, by name, in the order of :data:`TABLE_CAPTIONS`."""
     settings = manifest["settings"]
-    cell_sources = {name: cell["sources"] for name, cell in settings["cells"].items()}
     cell_against = {name: cell["against"] for name, cell in settings["cells"].items()}
     pairs_of = ["detector_a", "detector_b"]
     ordered = ["source_detector", "target_detector"]
-    availability = detector_availability(tables["observations"])
+    by_session = session_tables(manifest, tables)
+    availability = by_session["availability"]
     out: dict[str, pd.DataFrame] = {
         "epochs": epoch_status(manifest),
         "unavailable_detectors": with_pending(
@@ -702,7 +700,7 @@ def report_tables(
         out[f"native_durations_{level}"] = _distribution(
             compared, [*keys, "detector"], durations, "n_events"
         )
-    counts = counts_by_session(tables["counts"], availability)
+    counts = by_session["counts"]
     out["counts_by_session"] = per_session(counts)
     out["counts_by_animal"] = counts_by_animal(counts)
 
@@ -785,7 +783,7 @@ def report_tables(
     out["recount_by_session"] = per_session(both)
     out["recount_by_animal"] = directional_by_animal(both, by=["segmentation"])
 
-    cells = cells_by_session(tables["cells"], availability, cell_sources)
+    cells = by_session["cells"]
     out["cells_by_session"] = per_session(cells)
     out["cells_by_animal"] = cells_by_animal(cells)
 

@@ -194,13 +194,111 @@ def test_check_against_directional_refuses_other_counts(tmp_path):
         )
 
 
-def _write_run(run_dir, report_dir) -> None:
+def _inventory_rows(
+    epoch: str, state_space_available: bool, exposure_s: float
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """One epoch's observations and counts in the inventory run: the non-local
+    detector's and Kay's (100 s of exposure)."""
+    session = {"animal": "a", "day": 1, "epoch": epoch}
+    observations = pd.DataFrame(
+        {
+            **session,
+            "brain_area": "HPC",
+            "detector": ["state_space", "kay"],
+            "run_id": "r",
+            "start_s": 0.0,
+            "end_s": 100.0,
+            "available": [state_space_available, True],
+            "reason": "",
+        }
+    )
+    counts = pd.DataFrame(
+        {
+            **session,
+            "detector": ["state_space", "kay"],
+            "run_id": "r",
+            "n_native": 1,
+            "n_set_aside": 0,
+            "n_moving": 0,
+            "n_eligible": 1,
+            "exposure_s": [exposure_s, 100.0],
+            "n_in_exposure": 1,
+            "rate_per_s": 0.0,
+            "native_note": "",
+        }
+    )
+    return observations, counts
+
+
+def _write_inventory_run(inventory_dir) -> None:
+    """Two ok epochs. In ``a`` the non-local detector has 7200 s of exposure and
+    its no-trigger cell 10 events: 4 unmatched, 2 unknown, 4 matched; another
+    cell has 3 unmatched events. In ``d`` it was unavailable, so its 3600 s and
+    its unmatched event are not summed. A failed epoch and one the manifest does
+    not know hold 1800 s and an unmatched event each."""
+    inventory_dir.mkdir()
+    (inventory_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "epochs": {
+                    "a": {"status": "ok"},
+                    "d": {"status": "ok"},
+                    "b": {"status": "failed"},
+                },
+                "settings": {
+                    "cells": {
+                        "sequence_matched_by_no_trigger": {"sources": ["state_space"]},
+                        "another_cell": {"sources": ["state_space"]},
+                    }
+                },
+            }
+        )
+    )
+
+    def cells(epoch: str, memberships: dict[str, list[str]]) -> pd.DataFrame:
+        rows = [
+            {"cell": cell, "membership": m}
+            for cell, listed in memberships.items()
+            for m in listed
+        ]
+        return pd.DataFrame(rows).assign(
+            animal="a",
+            day=1,
+            epoch=epoch,
+            detector="state_space",
+            event_key=[f"{epoch}{i}" for i in range(len(rows))],
+            n_against=3,
+        )
+
+    no_trigger = "sequence_matched_by_no_trigger"
+    for epoch, available, exposure, memberships in (
+        (
+            "a",
+            True,
+            7200.0,
+            {
+                no_trigger: ["unmatched"] * 4 + ["unknown"] * 2 + ["matched"] * 4,
+                "another_cell": ["unmatched"] * 3,
+            },
+        ),
+        ("d", False, 3600.0, {no_trigger: ["unmatched"]}),
+        ("b", True, 1800.0, {no_trigger: ["unmatched"]}),
+        ("c", True, 1800.0, {no_trigger: ["unmatched"]}),
+    ):
+        observations, counts = _inventory_rows(epoch, available, exposure)
+        observations.to_parquet(inventory_dir / f"{epoch}_observations.parquet")
+        counts.to_parquet(inventory_dir / f"{epoch}_counts.parquet")
+        cells(epoch, memberships).to_parquet(inventory_dir / f"{epoch}_cells.parquet")
+
+
+def _write_run(run_dir, inventory_dir) -> None:
     """One ok epoch: non-local events [0, 1] and [2, 3]; Kay covers [0.5, 1] and
     [10, 11]; Yu covers [0, 0.25]; MUA covers [2, 2.25]; the Widloski detector
     covers [2.75, 3]. Two epochs that are not ok each hold a non-local event of
-    5 s that no Kay SWR overlaps."""
+    5 s that no Kay SWR overlaps. The inventory comparison run it read is
+    :func:`_write_inventory_run`'s."""
     run_dir.mkdir()
-    report_dir.mkdir()
+    _write_inventory_run(inventory_dir)
     _write_manifest(run_dir)
     _write_unread_epochs(
         run_dir,
@@ -248,22 +346,10 @@ def _write_run(run_dir, report_dir) -> None:
         }
     )
     membership.to_parquet(run_dir / "a_pair_membership.parquet")
-    pd.DataFrame(
-        {"detector": ["state_space", "kay"], "exposure_s": [7200.0, 100.0]}
-    ).to_csv(report_dir / "counts_by_animal.csv", index=False)
-    pd.DataFrame(
-        {
-            "cell": ["sequence_matched_by_no_trigger", "another_cell"],
-            "detector": "state_space",
-            "n_events": [10, 99],
-            "n_unmatched": [4, 99],
-            "n_unknown": [2, 99],
-        }
-    ).to_csv(report_dir / "cells_by_animal.csv", index=False)
 
 
 def test_left_out_seconds_subtract_each_covering_from_the_nonlocal_time(tmp_path):
-    _write_run(tmp_path / "run", tmp_path / "report")
+    _write_run(tmp_path / "run", tmp_path / "inventory")
     seconds = comparison.left_out_seconds(tmp_path / "run")
     assert seconds == {
         "nonlocal": 2.0,
@@ -276,15 +362,15 @@ def test_left_out_seconds_subtract_each_covering_from_the_nonlocal_time(tmp_path
 
 
 def test_left_out_seconds_refuse_an_ok_epoch_without_its_features_table(tmp_path):
-    _write_run(tmp_path / "run", tmp_path / "report")
+    _write_run(tmp_path / "run", tmp_path / "inventory")
     (tmp_path / "run" / "a_features.parquet").unlink()
     with pytest.raises(FileNotFoundError, match="a_features.parquet"):
         comparison.left_out_seconds(tmp_path / "run")
 
 
 def test_left_out_statistics_count_events_time_and_rates(tmp_path):
-    _write_run(tmp_path / "run", tmp_path / "report")
-    result = comparison.left_out_statistics(tmp_path / "run", tmp_path / "report")
+    _write_run(tmp_path / "run", tmp_path / "inventory")
+    result = comparison.left_out_statistics(tmp_path / "run", tmp_path / "inventory")
     # the non-local detector's exposure, not Kay's
     assert result["rest_hours"] == 2.0
     assert result["nonlocal_time_s"] == 2.0
@@ -309,3 +395,31 @@ def test_left_out_statistics_count_events_time_and_rates(tmp_path):
     assert result["nonlocal_events_outside_trigger"] == 4
     assert result["nonlocal_events_outside_trigger_fraction"] == 0.5
     assert result["nonlocal_events_outside_trigger_per_hour"] == 2.0
+
+
+def test_the_inventory_tables_pool_the_ok_epochs_where_a_detector_was_available(
+    tmp_path,
+):
+    _write_inventory_run(tmp_path / "inventory")
+    pooled = comparison.inventory_animal_tables(tmp_path / "inventory")
+    counts = pooled["counts_by_animal"].set_index("detector")
+    # epoch d's 3600 s are left out (the detector was unavailable); b and c are
+    # not ok epochs. Kay was available in a and d.
+    assert counts.loc["state_space", "exposure_s"] == 7200.0
+    assert counts.loc["state_space", "n_sessions"] == 1
+    assert counts.loc["state_space", "unavailable_sessions"] == "a1_d"
+    assert counts.loc["kay", "exposure_s"] == 200.0
+    cells = pooled["cells_by_animal"].set_index("cell")
+    no_trigger = cells.loc["sequence_matched_by_no_trigger"]
+    assert no_trigger[["n_events", "n_unmatched", "n_unknown"]].tolist() == [10, 4, 2]
+    assert cells.loc["another_cell", "n_unmatched"] == 3
+
+
+def test_an_inventory_run_with_no_ok_epoch_is_refused(tmp_path):
+    _write_inventory_run(tmp_path / "inventory")
+    manifest = tmp_path / "inventory" / "manifest.json"
+    record = json.loads(manifest.read_text())
+    record["epochs"] = {"a": {"status": "failed"}}
+    manifest.write_text(json.dumps(record))
+    with pytest.raises(ValueError, match="marks no epoch ok"):
+        comparison.inventory_animal_tables(tmp_path / "inventory")

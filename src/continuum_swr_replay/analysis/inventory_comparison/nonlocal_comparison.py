@@ -28,13 +28,21 @@ from continuum_swr_replay.analysis.inventory_comparison.features import (
 )
 from continuum_swr_replay.analysis.inventory_comparison.inventory_run import (
     SWR_DEFINITIONS,
+    TABLE_DTYPES,
     TRIGGERED,
+)
+from continuum_swr_replay.analysis.inventory_comparison.pooling import (
+    cells_by_animal,
+    counts_by_animal,
+    session_tables,
 )
 from continuum_swr_replay.analysis.inventory_comparison.schema import (
     MEMORYLESS,
     STATE_SPACE,
+    typed_table,
 )
-from continuum_swr_replay.runs.io import ok_table_paths
+from continuum_swr_replay.runs.io import ok_table_paths, read_manifest
+from continuum_swr_replay.tables.io import read_table
 
 COVERINGS = {
     "kay": ("kay",),
@@ -47,6 +55,9 @@ Kay's SWRs, the five SWR definitions together, those and MUA together, and the
 Widloski detector's events."""
 
 _KNOWN = ["matched", "unmatched"]
+
+INVENTORY_TABLES = ("observations", "counts", "cells")
+"""The inventory run's tables :func:`left_out_statistics` pools by animal."""
 
 
 def _epoch_paths(run_dir: Path, name: str) -> list[Path]:
@@ -200,7 +211,39 @@ def left_out_seconds(run_dir: Path) -> dict[str, float]:
     return totals
 
 
-def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
+def inventory_animal_tables(inventory_dir: Path) -> dict[str, pd.DataFrame]:
+    """The inventory run's counts and cells pooled by animal, from its tables.
+
+    The run's ``observations``, ``counts`` and ``cells`` tables of the epochs its
+    manifest marks ``ok`` (:data:`INVENTORY_TABLES`), pooled as the comparison's
+    report pools them (``pooling.session_tables``, ``pooling.counts_by_animal``,
+    ``pooling.cells_by_animal``).
+
+    Returns
+    -------
+    dict of str to DataFrame
+        ``counts_by_animal`` and ``cells_by_animal``.
+
+    Raises
+    ------
+    ValueError
+        If the run has no readable manifest, or it marks no epoch ``ok``.
+    """
+    manifest = read_manifest(inventory_dir)
+    tables = {
+        name: typed_table(
+            map(read_table, _epoch_paths(inventory_dir, name)), TABLE_DTYPES[name]
+        )
+        for name in INVENTORY_TABLES
+    }
+    by_session = session_tables(manifest, tables)
+    return {
+        "counts_by_animal": counts_by_animal(by_session["counts"]),
+        "cells_by_animal": cells_by_animal(by_session["cells"]),
+    }
+
+
+def left_out_statistics(run_dir: Path, inventory_dir: Path) -> dict[str, float]:
     """What an analysis that starts from another inventory leaves out of the
     non-local events, in events, in event time and per hour of rest.
 
@@ -208,10 +251,10 @@ def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
     ----------
     run_dir : Path
         The event features run.
-    report_dir : Path
-        The report of the inventory comparison the run read, with
-        ``counts_by_animal.csv`` (each inventory's exposure) and
-        ``cells_by_animal.csv`` (the comparison's cells).
+    inventory_dir : Path
+        The inventory comparison run the event features run read; its
+        exposures and cells are pooled from its tables
+        (:func:`inventory_animal_tables`).
 
     Returns
     -------
@@ -230,7 +273,8 @@ def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
           their share of the non-local events with a known membership; and
           ``..._per_hour``, per hour of ``rest_hours``.
     """
-    counts = pd.read_csv(report_dir / "counts_by_animal.csv")
+    pooled = inventory_animal_tables(inventory_dir)
+    counts = pooled["counts_by_animal"]
     exposure_s = float(
         counts.loc[counts["detector"] == STATE_SPACE, "exposure_s"].sum()
     )
@@ -257,7 +301,7 @@ def left_out_statistics(run_dir: Path, report_dir: Path) -> dict[str, float]:
         .groupby("other_detector")["alone"]
         .agg(["sum", "size"])
     )
-    cells = pd.read_csv(report_dir / "cells_by_animal.csv")
+    cells = pooled["cells_by_animal"]
     no_trigger = cells[
         (cells["cell"] == "sequence_matched_by_no_trigger")
         & (cells["detector"] == STATE_SPACE)
