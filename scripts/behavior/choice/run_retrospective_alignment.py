@@ -24,9 +24,9 @@ counts.
 
 Usage::
 
-    uv run python scripts/behavior/run_retrospective_alignment.py
-    uv run python scripts/behavior/run_retrospective_alignment.py --n-shuffles 200
-    uv run python scripts/behavior/run_retrospective_alignment.py --swr-only
+    uv run python scripts/behavior/choice/run_retrospective_alignment.py
+    uv run python scripts/behavior/choice/run_retrospective_alignment.py --n-shuffles 200
+    uv run python scripts/behavior/choice/run_retrospective_alignment.py --swr-only
 """
 
 from __future__ import annotations

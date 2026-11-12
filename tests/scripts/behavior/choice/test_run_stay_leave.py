@@ -27,7 +27,7 @@ from continuum_swr_replay.tables.covariate_registry import (
     stamp_covariate_schema,
 )
 from continuum_swr_replay.tables.io import read_table, write_table
-from scripts.behavior import run_stay_leave as runner
+from scripts.behavior.choice import run_stay_leave as runner
 
 SESSION = {"animal": "a", "session_date": 1, "epoch": "02_r1"}
 

@@ -85,6 +85,8 @@ them importable.
 ## `behavior/`
 - `fetch_spatial_bandit_behavior.sh` — pull the canonical SpatialBanditTask behavior CSVs.
 - `build_qvals_table.py` — build the per-stop behavioral-model covariate table (`qvals_table`).
+
+## `behavior/choice/` — content and the choice that follows
 - `run_retrospective_alignment.py` ("Stage 5B") — does content during a stop match the arm visited next.
 - `run_stay_leave.py` ("Stage 6") — content × reward outcome → stay or leave.
 

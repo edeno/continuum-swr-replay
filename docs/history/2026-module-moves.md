@@ -195,10 +195,15 @@ The detection-comparison and memoryless-sweep scripts stopped importing one anot
 
 `rate/`, `content/` and `coupling/` moved under `behavior/`, and `qa/` split
 into `workflows/` (runners that run other scripts) and `checks/` (audits,
-parity checks and doc writers). Nothing is left at the old paths.
+parity checks and doc writers). The two choice runners then moved from the top
+of `behavior/` into `behavior/choice/`, beside `analysis/behavior/choice/`; the
+fit sidecars they wrote before the move record the old path in `cli`. Nothing
+is left at the old paths.
 
 | Old path | New path |
 |---|---|
+| `scripts/behavior/run_retrospective_alignment.py` (removed: moved) | `scripts/behavior/choice/run_retrospective_alignment.py` |
+| `scripts/behavior/run_stay_leave.py` (removed: moved) | `scripts/behavior/choice/run_stay_leave.py` |
 | `scripts/content/analyze_content_occupancy.py` (removed: moved) | `scripts/behavior/content/analyze_content_occupancy.py` |
 | `scripts/content/analyze_uncertainty_content.py` (removed: moved) | `scripts/behavior/content/analyze_uncertainty_content.py` |
 | `scripts/content/compare_content_estimators.py` (removed: moved) | `scripts/behavior/content/compare_content_estimators.py` |
@@ -284,8 +289,8 @@ output files keep the stage names.
 
 | Old path | New path |
 |---|---|
-| `scripts/pfc/run_stage5b_retrospective.py` (removed: renamed) | `scripts/behavior/run_retrospective_alignment.py` ("Stage 5B") |
-| `scripts/pfc/run_stage6_learning.py` (removed: renamed) | `scripts/behavior/run_stay_leave.py` ("Stage 6") |
+| `scripts/pfc/run_stage5b_retrospective.py` (removed: renamed) | `scripts/behavior/choice/run_retrospective_alignment.py` ("Stage 5B"; at the top of `scripts/behavior/` until 2026-11) |
+| `scripts/pfc/run_stage6_learning.py` (removed: renamed) | `scripts/behavior/choice/run_stay_leave.py` ("Stage 6"; at the top of `scripts/behavior/` until 2026-11) |
 
 ## Data files moved, 2026-10-23
 

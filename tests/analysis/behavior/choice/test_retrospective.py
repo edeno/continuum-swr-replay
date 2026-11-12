@@ -47,7 +47,7 @@ from continuum_swr_replay.analysis.behavior.choice.shuffles import (
 )
 from continuum_swr_replay.analysis.events.cohort_selection import select_event_cohort
 from continuum_swr_replay.data_loaders.constants import WELL_PATCH_MAPPING
-from scripts.behavior.run_retrospective_alignment import (
+from scripts.behavior.choice.run_retrospective_alignment import (
     _family_unit_counts,
     _retrospective_status,
 )

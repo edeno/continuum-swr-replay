@@ -168,8 +168,8 @@ Three tiers:
    | `models_swr_{T,F}/`, `models_patch_swr_{T,F}/` | same, `--swr-subset T\|F` | content split by SWR (T) / non-SWR (F) |
    | `models_dm/` | same, `--estimator dirichlet_multinomial` | the M0–M6 arm ladder refit as a Dirichlet-multinomial; the matching contrast bundles `swr_contrast_content_{arm,patch,audited}_dm{,_rewarded,_omitted,_len}.pkl` sit in `models_swr_contrast/` beside their conditional twins |
    | `content_estimator_comparison/` | `scripts/behavior/content/compare_content_estimators.py` | the three-estimator comparison ([design/content_estimator_comparison.md](design/content_estimator_comparison.md)) |
-   | `stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/run_stay_leave.py` | the per-stop replay summary and the stay/leave models |
-   | `stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/behavior/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
+   | `stop_replay_summary.pkl`, `stage6_is_stay_{logistic,pooled_gee}{,_swr,_non_swr,_mua}.pkl` | `scripts/behavior/choice/run_stay_leave.py` | the per-stop replay summary and the stay/leave models |
+   | `stage5b_retrospective{,_swr_only,_non_swr_only}.pkl` | `scripts/behavior/choice/run_retrospective_alignment.py` | the retrospective/prospective event-grain metrics against their visit-context shuffle |
 
    Every rate, content and PFC fit is on the **well-anchored stop cohort**; a
    `*_allstops` or `*_intransit` suffix marks a sensitivity bundle
