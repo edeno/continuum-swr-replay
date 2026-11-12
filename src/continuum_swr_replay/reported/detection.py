@@ -669,12 +669,8 @@ def controls_values(controls: pd.DataFrame, source: str) -> list[Value]:
             controls, conditions, label, detector
         )
 
+    # refuses a summary in which an output reported an event with no replay
     no_replay = sweep_statistics.no_replay_statistics(controls)
-    if not no_replay["n_outputs"] or no_replay["n_outputs_with_events"]:
-        raise ValueError(
-            "the caption says no output reported an event where there was no replay; "
-            "the controls summary disagrees"
-        )
     fragmented = sweep_statistics.burst_share_range(
         controls, "placeless_burst", "fragmented_share", _OURS
     )

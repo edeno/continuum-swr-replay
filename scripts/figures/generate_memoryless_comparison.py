@@ -958,13 +958,6 @@ def output_color(detector: str) -> str:
     return VERMILION if detector.startswith("sliding") else BLUE
 
 
-def no_replay_minutes(controls: pd.DataFrame) -> float:
-    rows = controls[
-        (controls["summary"] == "no_replay") & (controls.measure == "immobile_minutes")
-    ]
-    return float(rows.value.iloc[0])
-
-
 def plot_bursts(ax, controls: pd.DataFrame) -> None:
     """Share of bursts with an event reported on them, for each output."""
     width = 0.2
@@ -988,7 +981,7 @@ def plot_bursts(ax, controls: pd.DataFrame) -> None:
     ax.set_yticks([0, 25, 50, 75, 100])
     ax.set_ylabel("bursts called (%)")
     ax.set_title("bursts", fontsize=6)
-    minutes = no_replay_minutes(controls)
+    minutes = sweep_statistics.no_replay_statistics(controls)["minutes"]
     ax.text(
         0.5,
         118,
@@ -1399,14 +1392,8 @@ def check_summary_claims(summary: pd.DataFrame) -> None:
 
 def check_controls_claims(controls: pd.DataFrame) -> None:
     """The caption's claims about the controls, checked against their summary."""
-    no_replay = controls[
-        (controls["summary"] == "no_replay") & (controls.measure == "n_events")
-    ]
-    if len(no_replay) != len(OUTPUTS) or (no_replay.value != 0).any():
-        raise RuntimeError(
-            "The caption says no output reported an event where there was no "
-            "replay; the controls summary disagrees."
-        )
+    # refuses a summary in which an output reported an event with no replay
+    sweep_statistics.no_replay_statistics(controls)
     for condition in ("jump_120ms", "jump_200ms"):
         if sweep_statistics.controls_value(
             controls,

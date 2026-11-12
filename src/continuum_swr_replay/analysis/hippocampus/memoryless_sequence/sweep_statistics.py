@@ -379,7 +379,8 @@ def _levels(
 
 
 def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
-    """What the detectors' outputs reported in stretches of rest with no replay.
+    """What the detectors' outputs reported in stretches of rest with no replay:
+    nothing, or the summary is refused.
 
     Parameters
     ----------
@@ -392,18 +393,18 @@ def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
         - ``minutes``: the simulated immobility with no replay, in minutes.
         - ``n_recordings``: the simulated recordings it comes from.
         - ``n_outputs``: the detector outputs run on it (the rows of its event
-          counts, one per output).
-        - ``n_outputs_with_events``: of those, the outputs whose event count
-          there is not zero.
+          counts, one per output), none of which reported an event.
         - ``rate_bound_per_minute``: the 95 % upper bound on an output's false
-          event rate when it reported none, by the rule of three (3 over the
-          minutes), in events per minute.
+          event rate, by the rule of three (3 over the minutes), in events per
+          minute.
 
     Raises
     ------
     ValueError
-        If the summary holds two event counts for one output, or not exactly
-        one row of the minutes or of the recordings.
+        If no output was run there or an output reported an event there (the
+        rule of three bounds a rate only when no event was seen), the summary
+        holds two event counts for one output, or not exactly one row of the
+        minutes or of the recordings.
     """
     no_replay = controls[controls["summary"] == "no_replay"]
     n_events = no_replay[no_replay["measure"] == "n_events"]
@@ -411,6 +412,13 @@ def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
         raise ValueError(
             "controls summary: no_replay, n_events has several rows for one "
             "detector output"
+        )
+    n_with_events = int((n_events["value"] != 0).sum())
+    if n_events.empty or n_with_events:
+        raise ValueError(
+            "controls summary: no_replay, n_events: expected outputs run there and "
+            f"no output reported an event; {len(n_events)} outputs were run, "
+            f"{n_with_events} reported events"
         )
     minutes = _only_value(
         no_replay[no_replay["measure"] == "immobile_minutes"],
@@ -427,7 +435,6 @@ def no_replay_statistics(controls: pd.DataFrame) -> dict[str, float]:
         "minutes": minutes,
         "n_recordings": n_recordings,
         "n_outputs": len(n_events),
-        "n_outputs_with_events": int((n_events["value"] != 0).sum()),
         "rate_bound_per_minute": 3 / minutes,
     }
 

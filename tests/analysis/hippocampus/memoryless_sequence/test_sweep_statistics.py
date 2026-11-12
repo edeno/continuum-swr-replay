@@ -316,18 +316,25 @@ def test_no_replay_statistics_bound_the_rate_by_the_rule_of_three():
     assert result["minutes"] == 1.5
     assert result["n_recordings"] == 8
     assert result["n_outputs"] == 3
-    assert result["n_outputs_with_events"] == 0
     # 3 events over 1.5 minutes
     assert result["rate_bound_per_minute"] == pytest.approx(2.0)
 
 
-def test_no_replay_statistics_count_the_outputs_that_reported_an_event():
+@pytest.mark.parametrize("count", [2.0, np.nan])
+def test_no_replay_statistics_refuse_an_output_that_reported_an_event(count):
+    # a missing count is not a count of none
     rows = [
-        (*row[:5], 2.0) if row[1] == "n_events" and row[4] == SLIDING else row
+        (*row[:5], count) if row[1] == "n_events" and row[4] == SLIDING else row
         for row in CONTROLS_ROWS
     ]
-    result = stats.no_replay_statistics(_controls(rows))
-    assert (result["n_outputs"], result["n_outputs_with_events"]) == (3, 1)
+    with pytest.raises(ValueError, match="3 outputs were run, 1 reported events"):
+        stats.no_replay_statistics(_controls(rows))
+
+
+def test_no_replay_statistics_refuse_a_summary_where_no_output_was_run():
+    counts = (CONTROLS["summary"] == "no_replay") & (CONTROLS["measure"] == "n_events")
+    with pytest.raises(ValueError, match="0 outputs were run"):
+        stats.no_replay_statistics(CONTROLS[~counts])
 
 
 def test_no_replay_statistics_refuse_two_counts_for_one_output():
