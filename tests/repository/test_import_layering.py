@@ -25,7 +25,7 @@ reported as a plain edge rather than as an ``ImportError`` from a cycle:
   (``analysis.events``) imports, from within the package, only foundation
   modules, ``analysis.constants``, ``analysis.shared_statistics`` and itself, and
   nothing from ``scripts``.
-- ``hippocampus_imports_no_replay`` and
+- ``hippocampus_imports_no_behavior`` and
   ``hippocampus_imports_no_pfc_or_inventory_comparison``: the hippocampus
   package does not reach into those analysis packages. Today each of them
   imports hippocampus, so a back edge is also a cycle; these rules hold
@@ -126,7 +126,7 @@ def rule_violations(root: Path = SRC) -> dict[str, set[tuple[str, str]]]:
             if package_of(a) == "analysis.events"
             and outside(b, FOUNDATION | EVENTS_MAY_IMPORT)
         },
-        "hippocampus_imports_no_replay": {
+        "hippocampus_imports_no_behavior": {
             (a, b)
             for a, b in edges
             if _starts_with(a, "analysis.hippocampus")
