@@ -17,6 +17,9 @@ import pandas as pd
 import pytest
 
 from continuum_swr_replay.analysis.behavior import contrast_aggregation
+from continuum_swr_replay.analysis.behavior.content.session_fits import (
+    fit_contrast_ladder,
+)
 from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     aggregate_contrast,
 )
@@ -28,6 +31,7 @@ from continuum_swr_replay.analysis.behavior.model_specs import (
 )
 from continuum_swr_replay.tables.standardization import attach_standardized
 from scripts.behavior.content import fit_swr_contrast_content as mod
+from tests.support._content_tables import dm_contrast_session, with_event_length
 
 
 def _z(values: np.ndarray) -> np.ndarray:
@@ -511,181 +515,6 @@ def test_every_ladder_predictor_reaches_the_assembled_design(
     assert not missing, f"ladder predictors absent from the design: {sorted(missing)}"
 
 
-# --- Leaf-only rungs: response support ----------------------------------------
-
-
-def _nine_arm_cohort() -> pd.DataFrame:
-    """Two events x nine arms; each spends a third of its mass on a trunk arm."""
-    rows = []
-    for index, event in enumerate(("a", "b")):
-        counts = np.zeros(9)
-        counts[index] = 6.0
-        counts[index + 1] = 2.0
-        counts[6] = 4.0
-        for arm in range(9):
-            rows.append(
-                {
-                    "animal": "chimi",
-                    "session_date": "20200212",
-                    "epoch": "02_r1",
-                    "event_id": event,
-                    "candidate_arm": arm,
-                    "arm_fraction": counts[arm] / counts.sum(),
-                    "is_swr": index == 0,
-                    "reward_belief_mean_candidate_arm_preoutcome_z": float(arm),
-                }
-            )
-    return pd.DataFrame(rows)
-
-
-def _fit_row() -> dict:
-    return {
-        "coef_reward_belief_mean_candidate_arm_preoutcome_z": 0.1,
-        "bse_reward_belief_mean_candidate_arm_preoutcome_z": 0.05,
-        "sd_reward_belief_mean_candidate_arm_preoutcome_z": 1.0,
-        "pval_reward_belief_mean_candidate_arm_preoutcome_z": 0.5,
-        "separated_terms": "",
-        "n_events": 2,
-        "n_params": 1,
-        "estimator": "conditional_poisson_fraction",
-        "converged": True,
-        "separated": False,
-        "n_convergence_warnings": 0,
-    }
-
-
-def test_fit_rows_carry_the_optimizer_diagnostics(monkeypatch):
-    """The refit bundle records whether each fit reached its optimum, and which
-    terms its session could not inform, so its gates can check them."""
-    diagnostics = {
-        "llf": -12.5,
-        "newton_decrement": 3e-12,
-        "max_abs_grad": 1e-7,
-        "n_newton_steps": 1,
-        "unidentified_terms": "is_candidate_arm_0:separated_to_minus_inf",
-    }
-
-    def _fit(g, predictors, *, response_col, n_categories):
-        fit = {**_fit_row(), **diagnostics}
-        return fit, mod._audit(2, 0, 0, 0, 0, 2, "", g.iloc[0:0])
-
-    monkeypatch.setattr(mod, "_fit_session", _fit)
-    term = "reward_belief_mean_candidate_arm_preoutcome_z"
-
-    res, _audits = mod._run(
-        _nine_arm_cohort(),
-        {"C1_nine_arm": ([term], "pooled")},
-        response_col="arm_fraction",
-        n_categories=9,
-    )
-
-    row = res.iloc[0]
-    for column, value in diagnostics.items():
-        assert row[column] == value
-    # The existing columns are kept.
-    assert row[f"coef_{term}"] == pytest.approx(0.1)
-    assert bool(row["converged"]) is True
-
-
-@pytest.mark.parametrize(
-    ("converged", "n_flagged"), [(True, 0), (False, 1), (None, 1), ("absent", 1)]
-)
-def test_a_fit_without_a_true_convergence_flag_counts_as_not_converged(
-    monkeypatch, converged, n_flagged
-):
-    """The audit counts a fit as converged only when its flag is True: a flag
-    that is missing or None has not shown convergence."""
-
-    def _fit(g, predictors, *, response_col, n_categories):
-        fit = _fit_row()
-        if converged == "absent":
-            del fit["converged"]
-        else:
-            fit["converged"] = converged
-        return fit, mod._audit(2, 0, 0, 0, 0, 2, "", g.iloc[0:0])
-
-    monkeypatch.setattr(mod, "_fit_session", _fit)
-    term = "reward_belief_mean_candidate_arm_preoutcome_z"
-
-    _res, audits = mod._run(
-        _nine_arm_cohort(),
-        {"C1_nine_arm": ([term], "pooled")},
-        response_col="arm_fraction",
-        n_categories=9,
-    )
-
-    assert [a["n_sessions_flagged_nonconverged"] for a in audits] == [n_flagged]
-
-
-def test_leaf_only_rungs_are_fit_on_leaf_renormalized_fractions(monkeypatch):
-    """The trunk share is not balanced across the contrast, so it cannot set the
-    weight an event carries: leaf-only rungs get unit mass over the six leaves,
-    while the nine-arm rungs in the same run keep the table's own fractions."""
-    seen = []
-
-    def _capture(g, predictors, *, response_col, n_categories):
-        seen.append((n_categories, g.copy()))
-        return _fit_row(), mod._audit(2, 0, 0, 0, 0, 2, "", g.iloc[0:0])
-
-    monkeypatch.setattr(mod, "_fit_session", _capture)
-    term = "reward_belief_mean_candidate_arm_preoutcome_z"
-    ladder = {
-        "C4_armvalue": ([term], "pooled"),
-        "C1_nine_arm": ([term], "pooled"),
-    }
-
-    res, _audits = mod._run(
-        _nine_arm_cohort(), ladder, response_col="arm_fraction", n_categories=9
-    )
-
-    fitted = dict(seen)
-    assert set(fitted) == {6, 9}
-    leaf = fitted[6]
-    assert sorted(leaf["candidate_arm"].unique()) == [0, 1, 2, 3, 4, 5]
-    assert np.allclose(
-        leaf.groupby("event_id")["arm_fraction"].sum().to_numpy(), 1.0, atol=1e-12
-    )
-    # Event "a" held 6/12 and 2/12 on leaves and 4/12 on a trunk.
-    a_leaf = leaf[leaf["event_id"].eq("a")].set_index("candidate_arm")["arm_fraction"]
-    assert a_leaf[0] == pytest.approx(0.75)
-    assert a_leaf[1] == pytest.approx(0.25)
-
-    nine = fitted[9]
-    assert sorted(nine["candidate_arm"].unique()) == list(range(9))
-    a_nine = nine[nine["event_id"].eq("a")].set_index("candidate_arm")["arm_fraction"]
-    assert a_nine[0] == pytest.approx(0.5)
-    assert a_nine[6] == pytest.approx(1 / 3)
-
-    renormalized = res.set_index("model")["response_renormalized"]
-    assert bool(renormalized["C4_armvalue"]) is True
-    assert bool(renormalized["C1_nine_arm"]) is False
-
-
-def test_leaf_only_count_rungs_keep_their_timebin_counts(monkeypatch):
-    """A count response is already weighted by decoded timebins; leave it alone."""
-    seen = []
-
-    def _capture(g, predictors, *, response_col, n_categories):
-        seen.append(g.copy())
-        return None, mod._audit(2, 0, 0, 0, 2, 0, "too_few", g.iloc[0:0])
-
-    monkeypatch.setattr(mod, "_fit_session", _capture)
-    cohort = _nine_arm_cohort()
-    cohort["arm_count_hard"] = cohort["arm_fraction"] * 12.0
-    term = "reward_belief_mean_candidate_arm_preoutcome_z"
-
-    mod._run(
-        cohort,
-        {"C4_armvalue": ([term], "pooled")},
-        response_col="arm_count_hard",
-        n_categories=9,
-    )
-
-    leaf = seen[0]
-    expected = cohort[cohort["candidate_arm"] < 6]["arm_count_hard"].to_numpy()
-    assert np.array_equal(leaf["arm_count_hard"].to_numpy(), expected)
-
-
 def test_provenance_names_only_the_rescaled_rungs_that_produced_rows():
     """A rung nothing was fitted for cannot be claimed as rescaled."""
     import argparse
@@ -750,223 +579,28 @@ def test_provenance_records_the_commit_this_process_loaded(monkeypatch):
     assert mod._provenance(_provenance_args(), n_sessions=1)["git_hash"] == loaded
 
 
-def _leaf_session_with_a_trunk_only_event(n_events: int = 20) -> pd.DataFrame:
-    """One session; event ``e0`` spends its whole allocation on the trunks."""
-    rows = []
-    for index in range(n_events):
-        event = f"e{index}"
-        current = index % 6
-        counts = np.zeros(9)
-        if index == 0:
-            counts[6] = 8.0
-        else:
-            counts[current] = 6.0
-            counts[(current + 1) % 6] = 2.0
-        for arm in range(9):
-            rows.append(
-                {
-                    "animal": "chimi",
-                    "session_date": "20200212",
-                    "epoch": "02_r1",
-                    "event_id": event,
-                    "candidate_arm": arm,
-                    "arm_fraction": counts[arm] / counts.sum(),
-                    "is_current_arm": float(arm == current),
-                }
-            )
-    return pd.DataFrame(rows)
-
-
-def test_event_left_without_leaf_mass_is_audited_as_a_response_drop():
-    """Its response is undefined, not its predictors; the mechanism must say so."""
-    session = _leaf_session_with_a_trunk_only_event()
-    leaves = mod.renormalize_fraction_over_candidates(
-        session[session["candidate_arm"] < 6], response_col="arm_fraction"
-    )
-
-    result, audit = mod._fit_session(
-        leaves, ["is_current_arm"], response_col="arm_fraction", n_categories=6
-    )
-
-    assert audit["n_drop_zero_response"] == 1
-    assert audit["n_drop_own_predictor_missing"] == 0
-    assert audit["n_drop_qvals_gap"] == 0
-    assert audit["n_modeled"] == 19
-    assert result is not None
-    drops = (
-        audit["n_drop_qvals_gap"]
-        + audit["n_drop_own_predictor_missing"]
-        + audit["n_drop_zero_response"]
-        + audit["n_excluded_session"]
-    )
-    assert audit["n_in"] - drops == audit["n_modeled"]
-
-
 # --- Dirichlet-multinomial estimator -------------------------------------------
-
-
-def _dm_contrast_cohort(n_events: int = 60, *, epoch: str, seed: int) -> pd.DataFrame:
-    """One session of nine-arm counts drawn at a known within-event concentration."""
-    from continuum_swr_replay.analysis.behavior.content.simulation import (
-        simulate_dirichlet_multinomial_counts,
-    )
-
-    df = simulate_dirichlet_multinomial_counts(
-        {"is_current_arm": 0.8},
-        log_phi_intercept=1.2,
-        log_phi_is_swr=-0.8,
-        n_events=n_events,
-        L_e=20,
-        seed=seed,
-    )
-    df["animal"] = "chimi"
-    df["session_date"] = "20200212"
-    df["epoch"] = epoch
-    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
-    df["is_swr"] = df["is_swr"].astype(bool)
-    df.attrs.clear()
-    return df
-
-
-def test_dm_run_reports_a_concentration_contrast_on_every_rung():
-    """Every rung also answers "does an SWR event spread its mass more widely"."""
-    cohort = pd.concat(
-        [
-            _dm_contrast_cohort(epoch="02_r1", seed=0),
-            _dm_contrast_cohort(epoch="04_r2", seed=1),
-        ],
-        ignore_index=True,
-    )
-    ladder = {
-        "C0_base": (["is_current_arm"], "pooled"),
-        "C1_split": (["is_current_arm"], "split"),
-    }
-
-    res, audits = mod._run(
-        cohort,
-        ladder,
-        response_col="arm_count_hard",
-        n_categories=9,
-        estimator="dirichlet_multinomial",
-        n_jobs=2,
-        min_events_session_phi=40,
-    )
-
-    assert set(res["model"]) == {"C0_base", "C1_split"}
-    assert res["estimator"].unique().tolist() == ["dirichlet_multinomial"]
-    assert bool(res["llf_includes_constants"].all())
-    assert res["phi_source"].unique().tolist() == ["session"]
-
-    # The events behind the modifier travel with it: a contrast resting on one
-    # or two SWR events is finite and unflagged, and nothing else would show it.
-    pooled_counts = res[res["population"] == "all"]
-    assert (pooled_counts["n_events_swr"] > 0).all()
-    assert (
-        pooled_counts["n_events_swr"] + pooled_counts["n_events_nonswr"]
-        == pooled_counts["n_events"]
-    ).all()
-    assert res.loc[res["population"] == "SWR", "n_events_swr"].isna().all()
-
-    pooled = res[res["population"] == "all"]
-    # The pooled rows carry the contrast; both kinds of event are present there.
-    assert pooled["coef_log_phi_is_swr"].notna().all()
-    assert pooled["bse_log_phi_is_swr"].notna().all()
-    # Generated at log_phi_is_swr = -0.8: SWR events are the more concentrated.
-    assert pooled["coef_log_phi_is_swr"].median() < 0.0
-
-    # Within an SWR split the flag is constant, so there is no contrast to fit.
-    split = res[res["population"] == "SWR"]
-    assert len(split) == 2
-    assert split["coef_log_phi_is_swr"].isna().all()
-
-    assert {record["model"] for record in audits} == {"C0_base", "C1_split"}
-
-
-def _with_event_length(cohort: pd.DataFrame, *, seed: int) -> pd.DataFrame:
-    """Attach a z-scored log event length that is constant within each event."""
-    rng = np.random.default_rng(seed)
-    events = sorted(cohort["event_id"].unique())
-    # SWR events run longer, which is the whole reason the adjustment exists.
-    is_swr = (
-        cohort.drop_duplicates("event_id").set_index("event_id")["is_swr"].astype(bool)
-    )
-    values = pd.Series(
-        rng.normal(size=len(events)) + 0.6 * is_swr.loc[events].to_numpy(),
-        index=events,
-    )
-    values = (values - values.mean()) / values.std(ddof=0)
-    return cohort.assign(log_n_nonlocal_bins_z=cohort["event_id"].map(values))
 
 
 class TestLengthAdjustedConcentration:
     """``--concentration-length`` fits the length-adjusted twin of log_phi_is_swr."""
 
-    def test_the_length_term_joins_the_design_only_where_is_swr_is_identified(self):
-        cohort = _with_event_length(_dm_contrast_cohort(epoch="02_r1", seed=0), seed=0)
-
-        assert mod.resolve_concentration_cols(cohort, with_event_length=False) == (
-            "is_swr",
-        )
-        assert mod.resolve_concentration_cols(cohort, with_event_length=True) == (
-            "is_swr",
-            "log_n_nonlocal_bins_z",
-        )
-        # Inside an SWR split there is no concentration contrast to decompose.
-        swr_only = cohort[cohort["is_swr"]]
-        assert mod.resolve_concentration_cols(swr_only, with_event_length=True) == ()
-
-    def test_a_cohort_without_the_length_column_is_refused(self):
-        """A silently dropped term would publish ``_dm_len`` fits that are not."""
-        cohort = _dm_contrast_cohort(epoch="02_r1", seed=0)
-        with pytest.raises(ValueError, match="log_n_nonlocal_bins_z"):
-            mod.resolve_concentration_cols(cohort, with_event_length=True)
-
-    def test_the_run_reports_both_concentration_terms(self):
-        cohort = pd.concat(
-            [
-                _with_event_length(_dm_contrast_cohort(epoch="02_r1", seed=0), seed=0),
-                _with_event_length(_dm_contrast_cohort(epoch="04_r2", seed=1), seed=1),
-            ],
-            ignore_index=True,
-        )
-        ladder = {"C0_base": (["is_current_arm"], "pooled")}
-        kwargs = {
-            "response_col": "arm_count_hard",
-            "n_categories": 9,
-            "estimator": "dirichlet_multinomial",
-            "n_jobs": 2,
-            "min_events_session_phi": 40,
-        }
-
-        total, _ = mod._run(cohort, ladder, concentration_length=False, **kwargs)
-        adjusted, _ = mod._run(cohort, ladder, concentration_length=True, **kwargs)
-
-        assert "coef_log_phi_log_n_nonlocal_bins_z" not in total.columns
-        assert adjusted["coef_log_phi_log_n_nonlocal_bins_z"].notna().all()
-        assert adjusted["bse_log_phi_log_n_nonlocal_bins_z"].notna().all()
-        # The effect-scale unit travels with the coefficient (the column is
-        # already z-scored, so its SD is ~1).
-        assert (adjusted["sd_log_phi_log_n_nonlocal_bins_z"] > 0).all()
-        # One more free parameter than the unadjusted twin.
-        assert (
-            adjusted["n_params"].to_numpy() == total["n_params"].to_numpy() + 1
-        ).all()
-
     def test_the_aggregation_reports_the_length_term_next_to_the_contrast(self):
         cohort = pd.concat(
             [
-                _with_event_length(
-                    _dm_contrast_cohort(epoch=f"{index:02d}_r1", seed=index), seed=index
+                with_event_length(
+                    dm_contrast_session(epoch=f"{index:02d}_r1", seed=index), seed=index
                 )
                 for index in range(6)
             ],
             ignore_index=True,
         )
         ladder = {"C0_base": (["is_current_arm"], "pooled")}
-        res, _ = mod._run(
+        res, _ = fit_contrast_ladder(
             cohort,
             ladder,
             response_col="arm_count_hard",
+            response="hard_count",
             n_categories=9,
             estimator="dirichlet_multinomial",
             n_jobs=2,
@@ -1001,41 +635,6 @@ def test_concentration_specs_cover_every_rung_and_population():
         ("C1_split", "nonSWR", "log_phi_is_swr"),
         ("C1_split", "nonSWR", "log_phi_log_n_nonlocal_bins_z"),
     ]
-
-
-def test_a_refused_dm_session_is_named_in_the_run_audit():
-    """A session the estimator refuses is named in the record, not just counted.
-
-    Its events land in ``n_excluded_session`` like any unfitted session, so the
-    audit's ``drop_notes`` is the only place a reader learns which session went
-    missing from the rung and why.
-    """
-    good = _dm_contrast_cohort(epoch="02_r1", seed=0)
-    bad = _dm_contrast_cohort(epoch="04_r2", seed=1).assign(is_prev_arm=0.0)
-    cohort = pd.concat([good, bad], ignore_index=True)
-
-    res, audits = mod._run(
-        cohort,
-        {"C0_base": (["is_current_arm", "is_prev_arm"], "pooled")},
-        response_col="arm_count_hard",
-        n_categories=9,
-        estimator="dirichlet_multinomial",
-        n_jobs=2,
-        min_events_session_phi=40,
-    )
-
-    # The refused session contributes no row.
-    assert res["epoch"].tolist() == ["02_r1"]
-
-    assert len(audits) == 1
-    record = audits[0]
-    notes = record["drop_notes"]
-    assert "no fit: dm_design" in notes
-    assert "estimator skipped chimi/20200212/04_r2 (dm_design:" in notes
-    # Counted as a session-level exclusion, not as dropped events.
-    assert record["n_drop_own_predictor_missing"] == 0
-    assert record["n_excluded_session"] == 60
-    assert record["n_modeled"] == 60
 
 
 def test_the_summary_prints_a_refused_term_with_the_gates_reason(capsys) -> None:

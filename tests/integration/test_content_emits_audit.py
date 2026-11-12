@@ -1,6 +1,7 @@
 """Integration: the content contrast runner emits a reconciling cohort audit.
 
-Exercises the real ``_run`` → ``_fit_session`` → ``cohort_record`` → ``write_cohort_audit``
+Exercises the real ``fit_contrast_ladder`` → ``fit_contrast_session`` → ``cohort_record``
+→ ``write_cohort_audit``
 path on a synthetic multi-session arm frame (no re-decode). Asserts every emitted record
 satisfies the reconciliation invariant ``n_in − Σdrops == n_modeled`` and that the
 qvals-tail NaN lands in ``n_drop_qvals_gap`` (mechanism B), separate from own-predictor
@@ -18,7 +19,9 @@ from continuum_swr_replay.analysis.behavior.cohort_audit import (
     DROP_FIELDS,
     write_cohort_audit,
 )
-from scripts.behavior.content import fit_swr_contrast_content as mod
+from continuum_swr_replay.analysis.behavior.content.session_fits import (
+    fit_contrast_ladder,
+)
 
 pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
@@ -70,8 +73,12 @@ def test_run_emits_reconciling_cohort_audit(tmp_path, monkeypatch):
             "split",
         ),  # value rung -> qvals gap
     }
-    results, audits = mod._run(
-        ev, ladder, response_col="arm_count_hard", n_categories=N_ARMS
+    results, audits = fit_contrast_ladder(
+        ev,
+        ladder,
+        response_col="arm_count_hard",
+        response="hard_count",
+        n_categories=N_ARMS,
     )
     assert audits, "no cohort records emitted"
 

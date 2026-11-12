@@ -1,33 +1,29 @@
 """Factorial diagnostic: which change flips CS5 (swr x arm value)?
 Axes: response (count vs fraction) x base design (BASEc_NT, +TSC, BASEc full).
-Reuses the SWR-contrast runner's cohort assembly and _run, so leaf-only handling
-and cohort match the shipped fit."""
+Reuses the SWR-contrast runner's cohort assembly and its ladder fit
+(``session_fits.fit_contrast_ladder``), so leaf-only handling and cohort match
+the shipped fit."""
 
-import importlib.util
-import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-spec = importlib.util.spec_from_file_location(
-    "swrc", "scripts/behavior/content/fit_swr_contrast_content.py"
+from continuum_swr_replay.analysis.behavior.content.session_fits import (
+    fit_contrast_ladder,
 )
-m = importlib.util.module_from_spec(spec)
-sys.modules["swrc"] = m
-spec.loader.exec_module(m)
-from continuum_swr_replay.analysis.behavior.contrast_aggregation import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     assemble_arm,
     assemble_patch,
     contrast_fit_inputs,
     prepare_cohorts,
 )
-from continuum_swr_replay.analysis.behavior.model_specs import (  # noqa: E402
+from continuum_swr_replay.analysis.behavior.model_specs import (
     _TSC,
     BASEc,
     BASEc_NT,
 )
-from continuum_swr_replay.paths import replay_content_dir  # noqa: E402
+from continuum_swr_replay.paths import replay_content_dir
 
 inputs = contrast_fit_inputs()
 ev, _ = assemble_arm(inputs, replay_content_dir() / "standardization_reference.json")
@@ -41,7 +37,13 @@ out = []
 for resp in ("arm_count_hard", "arm_fraction"):
     for dname, base in designs.items():
         ladder = {"CS5_armvalue": ([*base, VAL, KEY], "pooled")}
-        res, _ = m._run(ev, ladder, response_col=resp, n_categories=9)
+        res, _ = fit_contrast_ladder(
+            ev,
+            ladder,
+            response_col=resp,
+            response="fraction" if resp == "arm_fraction" else "hard_count",
+            n_categories=9,
+        )
         res = res[res.model == "CS5_armvalue"].copy()
         sd = res[f"sd_{KEY}"] if f"sd_{KEY}" in res else np.nan
         ok = res[f"coef_{KEY}"].notna()

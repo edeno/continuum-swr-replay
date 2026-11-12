@@ -210,3 +210,43 @@ def dm_session(
     # element-wise (and so raises on) when concatenating two sessions.
     df.attrs.clear()
     return df
+
+
+def dm_contrast_session(n_events: int = 60, *, epoch: str, seed: int) -> pd.DataFrame:
+    """One session of nine-arm counts drawn at a known within-event concentration.
+
+    SWR events are the more concentrated ones (``log_phi_is_swr = -0.8``).
+    """
+    df = simulate_dirichlet_multinomial_counts(
+        {"is_current_arm": 0.8},
+        log_phi_intercept=1.2,
+        log_phi_is_swr=-0.8,
+        n_events=n_events,
+        L_e=20,
+        seed=seed,
+    )
+    df["animal"] = "chimi"
+    df["session_date"] = "20200212"
+    df["epoch"] = epoch
+    df["event_id"] = [f"{epoch}-{index}" for index in df["event_id"]]
+    df["is_swr"] = df["is_swr"].astype(bool)
+    df.attrs.clear()
+    return df
+
+
+def with_event_length(cohort: pd.DataFrame, *, seed: int) -> pd.DataFrame:
+    """Attach a z-scored log event length that is constant within each event.
+
+    SWR events run longer, which is the reason the length adjustment exists.
+    """
+    rng = np.random.default_rng(seed)
+    events = sorted(cohort["event_id"].unique())
+    is_swr = (
+        cohort.drop_duplicates("event_id").set_index("event_id")["is_swr"].astype(bool)
+    )
+    values = pd.Series(
+        rng.normal(size=len(events)) + 0.6 * is_swr.loc[events].to_numpy(),
+        index=events,
+    )
+    values = (values - values.mean()) / values.std(ddof=0)
+    return cohort.assign(log_n_nonlocal_bins_z=cohort["event_id"].map(values))

@@ -9,6 +9,7 @@ import pytest
 from continuum_swr_replay.analysis.behavior.cohort_audit import HAS_QVALS_ROW
 from continuum_swr_replay.analysis.behavior.content.cohort import (
     content_cohort_record,
+    contrast_fit_cohort,
     prepare_canonical_fit_request,
     select_content_cohort,
     zero_response_event_ids,
@@ -531,3 +532,100 @@ def test_a_response_that_sums_below_zero_cannot_be_booked() -> None:
 
     with pytest.raises(RuntimeError, match="does not account"):
         _record(prefilter, _ONE_FIT)
+
+
+# ── The is_swr-contrast cohort ──
+
+
+def _contrast_cohort() -> pd.DataFrame:
+    """Two events x nine arms. ``s`` is an SWR event with 2/8 of its mass on a
+    trunk; ``n`` is not, with 4/8 on a trunk."""
+    counts = {
+        "s": {0: 3.0, 1: 3.0, 6: 2.0},
+        "n": {2: 4.0, 7: 4.0},
+    }
+    rows = [
+        {
+            "event_id": event,
+            "is_swr": event == "s",
+            "candidate_arm": arm,
+            "arm_fraction": counts[event].get(arm, 0.0) / 8.0,
+            "arm_count_hard": counts[event].get(arm, 0.0),
+        }
+        for event in ("s", "n")
+        for arm in range(9)
+    ]
+    return pd.DataFrame(rows, index=range(100, 118))
+
+
+def test_a_contrast_population_is_its_events_by_is_swr() -> None:
+    cohort = _contrast_cohort()
+    for population, events in (("all", {"s", "n"}), ("SWR", {"s"}), ("nonSWR", {"n"})):
+        selected = contrast_fit_cohort(
+            cohort,
+            "C1_current",
+            ["is_current_arm"],
+            population,
+            response_col="arm_fraction",
+            response="fraction",
+            n_categories=9,
+        )
+        assert set(selected.frame["event_id"]) == events
+        assert len(selected.frame) == 9 * len(events)
+        # A nine-arm rung keeps the table's own fractions.
+        assert selected.frame["arm_fraction"].sum() == pytest.approx(len(events))
+        assert selected.predictors == ["is_current_arm"]
+        assert selected.n_categories == 9
+        assert selected.response_renormalized is False
+
+
+def test_an_unknown_contrast_population_is_refused() -> None:
+    with pytest.raises(ValueError, match="population"):
+        contrast_fit_cohort(
+            _contrast_cohort(),
+            "C1_current",
+            [],
+            "swr",
+            response_col="arm_fraction",
+            response="fraction",
+            n_categories=9,
+        )
+
+
+def test_a_leaf_only_contrast_rung_is_fit_on_the_leaves_at_unit_mass() -> None:
+    """``C4_armvalue`` is leaf-only: six candidates, the trunk arm fixed effects
+    gone, and each event's fraction rescaled over its leaves."""
+    selected = contrast_fit_cohort(
+        _contrast_cohort(),
+        "C4_armvalue",
+        ["is_candidate_arm_0", "is_candidate_arm_6", "is_current_arm"],
+        "all",
+        response_col="arm_fraction",
+        response="fraction",
+        n_categories=9,
+    )
+
+    assert sorted(selected.frame["candidate_arm"].unique()) == [0, 1, 2, 3, 4, 5]
+    assert selected.n_categories == 6
+    assert selected.predictors == ["is_candidate_arm_0", "is_current_arm"]
+    assert selected.response_renormalized is True
+    share = selected.frame.set_index(["event_id", "candidate_arm"])["arm_fraction"]
+    # s: 3/8 and 3/8 of 6/8 on the leaves -> 1/2 each; n: 4/8 of 4/8 -> 1.
+    assert share[("s", 0)] == pytest.approx(0.5)
+    assert share[("s", 1)] == pytest.approx(0.5)
+    assert share[("n", 2)] == pytest.approx(1.0)
+
+
+def test_a_leaf_only_contrast_count_rung_keeps_its_counts() -> None:
+    selected = contrast_fit_cohort(
+        _contrast_cohort(),
+        "C4_armvalue",
+        ["is_current_arm"],
+        "SWR",
+        response_col="arm_count_hard",
+        response="hard_count",
+        n_categories=9,
+    )
+
+    assert selected.response_renormalized is False
+    assert selected.frame["arm_count_hard"].tolist() == [3.0, 3.0, 0.0, 0.0, 0.0, 0.0]

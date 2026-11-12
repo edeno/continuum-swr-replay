@@ -11,6 +11,10 @@ the same events:
   events every rung of the ladder is fit on;
 - :func:`content_cohort_record` books, for one fitted rung, where every event
   that entered the common complete-case freeze went.
+
+The is_swr-contrast ladder selects per rung and population instead:
+:func:`contrast_fit_cohort` gives the rows, predictors and candidate count one
+(rung, population) is fit on.
 """
 
 from __future__ import annotations
@@ -38,7 +42,12 @@ from ..cohort_audit import (
 )
 from ..content_response import resolve_response_column
 from ..covariate_timing import assert_predictor_timing
-from ..model_specs import LEAF_ONLY_N_CATEGORIES, leaf_only_cohort
+from ..model_specs import (
+    LEAF_ONLY_CONTRAST_RUNGS,
+    LEAF_ONLY_N_CATEGORIES,
+    leaf_only_cohort,
+    leaf_only_predictors,
+)
 from ..tables.table_contracts import validate_canonical_table_contract
 from .dirichlet_multinomial import ESTIMATOR_SKIP_CLASSES
 
@@ -645,4 +654,93 @@ def content_cohort_record(
         n_drop_zero_response=buckets["n_drop_zero_response"],
         n_excluded_session=n_events_in - n_drops - n_modeled,
         **flag_counts,
+    )
+
+
+#: The is_swr-contrast populations: every event, the SWR events, the others.
+CONTRAST_POPULATIONS = ("all", "SWR", "nonSWR")
+
+
+class ContrastFitCohort(NamedTuple):
+    """What one (rung, population) of the is_swr-contrast ladder is fit on.
+
+    Attributes
+    ----------
+    frame : pd.DataFrame
+        The candidate rows of the population, leaf arms only on a leaf-only rung.
+    predictors : list of str
+        The rung's predictors, less the arm fixed effects a leaf-only fit cannot
+        carry.
+    n_categories : int
+        Candidates per event under the rung's likelihood.
+    response_renormalized : bool
+        Whether the fraction response was rescaled to unit mass over the leaf arms.
+    """
+
+    frame: pd.DataFrame
+    predictors: list[str]
+    n_categories: int
+    response_renormalized: bool
+
+
+def contrast_fit_cohort(
+    cohort: pd.DataFrame,
+    rung: str,
+    predictors: Sequence[str],
+    population: str,
+    *,
+    response_col: str,
+    response: str,
+    n_categories: int,
+) -> ContrastFitCohort:
+    """The rows, predictors and candidate count one contrast rung is fit on.
+
+    The population is every event (``"all"``), the SWR events (``"SWR"``) or the
+    others (``"nonSWR"``), by ``is_swr``. A rung of
+    :data:`~continuum_swr_replay.analysis.behavior.model_specs.LEAF_ONLY_CONTRAST_RUNGS`
+    is fit over the six leaf arms
+    (:func:`~continuum_swr_replay.analysis.behavior.model_specs.leaf_only_cohort`):
+    the trunks carry a structural zero for every leaf-derived belief covariate,
+    so they add nothing about those constructs, and a fraction response is
+    rescaled to unit mass over the leaves.
+
+    Parameters
+    ----------
+    cohort : pd.DataFrame
+        The assembled arm or patch cohort, one row per event x candidate, with
+        ``is_swr`` (and ``candidate_arm`` for a leaf-only rung).
+    rung : str
+        The rung's name.
+    predictors : sequence of str
+        The rung's predictors.
+    population : {"all", "SWR", "nonSWR"}
+        Which events.
+    response_col : str
+        The resolved response column.
+    response : {"fraction", "hard_count"}
+        The response the column came from; only a fraction is rescaled.
+    n_categories : int
+        Candidates per event in ``cohort``: 9 arms or 3 patches.
+
+    Returns
+    -------
+    ContrastFitCohort
+    """
+    if population == "all":
+        frame = cohort
+    elif population == "SWR":
+        frame = cohort[cohort.is_swr]
+    elif population == "nonSWR":
+        frame = cohort[~cohort.is_swr]
+    else:
+        raise ValueError(
+            f"population must be one of {CONTRAST_POPULATIONS}, got {population!r}"
+        )
+    if rung not in LEAF_ONLY_CONTRAST_RUNGS:
+        return ContrastFitCohort(frame, list(predictors), n_categories, False)
+    leaves, renormalized = leaf_only_cohort(
+        frame, response_col=response_col, response=response
+    )
+    return ContrastFitCohort(
+        leaves, leaf_only_predictors(predictors), LEAF_ONLY_N_CATEGORIES, renormalized
     )

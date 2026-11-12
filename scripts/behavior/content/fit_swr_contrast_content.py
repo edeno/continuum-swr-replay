@@ -74,31 +74,26 @@ import sys
 import warnings
 from collections.abc import Sequence
 
-import numpy as np
 import pandas as pd
 
 from continuum_swr_replay.analysis.behavior.cohort_audit import (
-    cohort_record,
-    drop_profile,
-    estimator_skip_note,
     term_diagnostics,
     write_cohort_audit,
 )
 from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
     DEFAULT_MIN_EVENTS_SESSION_PHI,
     DEFAULT_N_JOBS,
-    ESTIMATOR_SKIP_CLASSES,
-    concentration_cols_for_cohort,
-    fit_sessions_dirichlet_multinomial,
 )
 from continuum_swr_replay.analysis.behavior.content.dirichlet_multinomial import (
     ESTIMATOR as DIRICHLET_MULTINOMIAL,
+)
+from continuum_swr_replay.analysis.behavior.content.session_fits import (
+    fit_contrast_ladder,
 )
 from continuum_swr_replay.analysis.behavior.content_response import (
     ESTIMATOR_CHOICES,
     RESPONSE_CHOICES,
     default_response_for_estimator,
-    renormalize_fraction_over_candidates,
     resolve_response_choice,
     resolve_response_column,
     validate_fraction_response,
@@ -112,7 +107,6 @@ from continuum_swr_replay.analysis.behavior.contrast_aggregation import (
     contrast_fit_inputs,
     gated_term_statistics,
     prepare_cohorts,
-    prepare_session,
     specs_from_ladder,
 )
 from continuum_swr_replay.analysis.behavior.covariate_timing import (
@@ -125,15 +119,9 @@ from continuum_swr_replay.analysis.behavior.fit_provenance import (
     record_inputs,
     write_fit_provenance,
 )
-from continuum_swr_replay.analysis.behavior.fitting import (
-    fit_conditional_poisson,
-    poisson_estimator_name,
-)
+from continuum_swr_replay.analysis.behavior.fitting import poisson_estimator_name
 from continuum_swr_replay.analysis.behavior.model_specs import (
     DESCRIPTIVE_CONTENT_RUNGS,
-    LEAF_ONLY_CONTRAST_RUNGS,
-    LEAF_ONLY_N_CATEGORIES,
-    leaf_only_predictors,
 )
 from continuum_swr_replay.analysis.behavior.model_specs import (
     SWR_CONTRAST_CONTENT_ARM_KEY_TERM as ARM_KEY_TERM,
@@ -172,62 +160,6 @@ LOG_PHI_IS_SWR = "log_phi_is_swr"
 #: (``--concentration-length``). Reported per SD of ``log n_nonlocal_bins``.
 LOG_PHI_EVENT_LENGTH = "log_phi_log_n_nonlocal_bins_z"
 
-# Skip classes that are the ESTIMATOR refusing a session rather than the cohort
-# rules excluding it. These are rare and actionable, so the audit names the
-# session; ``too_few`` / ``missing`` are routine and are summarized by class.
-# Shared with the content runner so the two report skips the same way.
-_ESTIMATOR_SKIP_CLASSES = ESTIMATOR_SKIP_CLASSES
-
-
-def resolve_concentration_cols(
-    frame: pd.DataFrame, *, with_event_length: bool
-) -> tuple[str, ...]:
-    """Event-level columns entering ``log phi`` for one population's rows.
-
-    The Dirichlet-multinomial likelihood uses an event's length ``L_e`` only as
-    the multinomial index: ``log phi_e`` carries no length term, so the fitted
-    concentration is assumed to be the same for a 25-bin event and a 90-bin one.
-    SWR events run about 1.7x longer (median 45 vs 26 bins) than non-SWR events, so the shipped
-    ``log_phi_is_swr`` is the TOTAL concentration contrast -- whatever an SWR
-    event does to within-event redundancy, length included. Adding
-    ``log_n_nonlocal_bins_z`` to the concentration design gives the
-    length-adjusted twin, exactly parallel to the total/direct distinction the
-    ``nt`` rungs already draw on the mean structure.
-
-    The length term is added only where the cohort identifies ``is_swr`` at all:
-    inside an SWR (or non-SWR) split there is no concentration contrast to
-    decompose, and the fits there must keep the same design as before.
-
-    Parameters
-    ----------
-    frame : pd.DataFrame
-        The rows about to be fitted.
-    with_event_length : bool
-        Whether to append the z-scored log event length.
-
-    Returns
-    -------
-    tuple of str
-
-    Raises
-    ------
-    ValueError
-        When the length term is requested and the cohort does not carry it. A
-        silently dropped term would publish a ``_dm_len`` artifact identical to
-        the unadjusted one under a name that claims otherwise.
-    """
-    base = concentration_cols_for_cohort(frame)
-    if not with_event_length or base != ("is_swr",):
-        return base
-    column = f"{LOG_EVENT_LENGTH}_z"
-    if column not in frame.columns:
-        raise ValueError(
-            f"--concentration-length needs {column!r} on the cohort; the "
-            "assembled arm and patch frames standardize it in "
-            "contrast_aggregation.assemble_arm / assemble_patch"
-        )
-    return (*base, column)
-
 
 def _artifact_suffix(args: argparse.Namespace, response: str) -> str:
     """Artifact-name suffix: smoke subset, response, estimator, and stratum.
@@ -249,312 +181,6 @@ def _artifact_suffix(args: argparse.Namespace, response: str) -> str:
         dm += "_len"
     stratum = "" if args.outcome_stratum == "all" else f"_{args.outcome_stratum}"
     return smoke + response_suffix + dm + stratum
-
-
-def _session_audit(prep: dict, r: dict | None, *, reason: str = "") -> dict:
-    """Close one session's audit record around whatever the fitter returned.
-
-    Any survivor not modeled -- the fitter's ``n < 2 * n_params`` gate, a failed
-    fit, or a design the estimator refused -- is a session/fit-level exclusion,
-    which is what makes ``n_in - Σdrops == n_modeled`` reconcile exactly.
-    """
-    n_modeled = int(r["n_events"]) if r is not None else 0
-    if r is None:
-        reason = reason or prep["reason"] or "fit_none"
-    else:
-        reason = ""
-    return _audit(
-        prep["n_in"],
-        prep["n_qvals"],
-        prep["n_own"],
-        prep["n_zero"],
-        prep["n_surv"] - n_modeled,
-        n_modeled,
-        reason,
-        prep["dropped"],
-    )
-
-
-def _fit_session(
-    g: pd.DataFrame, predictors: list[str], *, response_col: str, n_categories: int
-) -> tuple[dict | None, dict]:
-    """Fit one session's conditional Poisson and return ``(row_or_None, audit)``."""
-    surv, prep = prepare_session(g, predictors, response_col=response_col)
-    if surv is None:
-        return None, _session_audit(prep, None)
-    r = fit_conditional_poisson(
-        surv,
-        predictors=predictors,
-        response_col=response_col,
-        event_col="event_id",
-        n_categories=n_categories,
-    )
-    return r, _session_audit(prep, r)
-
-
-def _audit(n_in, n_qvals, n_own, n_zero, n_excluded, n_modeled, reason, dropped):
-    return {
-        "n_in": n_in,
-        "n_drop_qvals_gap": n_qvals,
-        "n_drop_own_predictor_missing": n_own,
-        "n_drop_zero_response": n_zero,
-        "n_excluded_session": n_excluded,
-        "n_modeled": n_modeled,
-        "reason": reason,
-        "dropped": dropped,
-    }
-
-
-def _fit_population(
-    pop_frame: pd.DataFrame,
-    predictors: list[str],
-    *,
-    estimator: str,
-    response_col: str,
-    n_categories: int,
-    n_jobs: int,
-    min_events_session_phi: int,
-    concentration_length: bool = False,
-) -> list[tuple[tuple, dict | None, dict]]:
-    """Fit every session of one (rung, population), in groupby order.
-
-    Returns ``(session_key, row_or_None, audit)`` per session. Both estimators
-    see exactly the same prepared rows; only the fit differs. The
-    Dirichlet-multinomial fits are batched so they can share a process pool and
-    a pooled concentration intercept for the short sessions, and a session whose
-    within-event design it refuses becomes an audited skip
-    (``reason="dm_design:..."``) rather than an exception out of the ladder.
-    """
-    if estimator != "dirichlet_multinomial":
-        return [
-            (
-                tuple(keys),
-                *_fit_session(
-                    g,
-                    predictors,
-                    response_col=response_col,
-                    n_categories=n_categories,
-                ),
-            )
-            for keys, g in pop_frame.groupby(SC, sort=False)
-        ]
-
-    prepared: list[tuple[tuple, pd.DataFrame | None, dict]] = [
-        (tuple(keys), *prepare_session(g, predictors, response_col=response_col))
-        for keys, g in pop_frame.groupby(SC, sort=False)
-    ]
-    animal_position = SC.index("animal")
-    fits, skips = fit_sessions_dirichlet_multinomial(
-        [
-            (key, key[animal_position], surv)
-            for key, surv, _prep in prepared
-            if surv is not None
-        ],
-        predictors,
-        min_events=min_events_session_phi,
-        n_jobs=n_jobs,
-        response_col=response_col,
-        event_col="event_id",
-        concentration_cols=resolve_concentration_cols(
-            pop_frame, with_event_length=concentration_length
-        ),
-        n_categories=n_categories,
-    )
-    rows = dict(fits)
-    reasons = dict(skips)
-    return [
-        (
-            key,
-            rows.get(key),
-            _session_audit(prep, rows.get(key), reason=reasons.get(key, "")),
-        )
-        for key, _surv, prep in prepared
-    ]
-
-
-def _run(
-    ev: pd.DataFrame,
-    ladder: dict,
-    *,
-    response_col: str,
-    n_categories: int,
-    estimator: str = "conditional_poisson",
-    n_jobs: int = 1,
-    min_events_session_phi: int = DEFAULT_MIN_EVENTS_SESSION_PHI,
-    concentration_length: bool = False,
-) -> tuple[pd.DataFrame, list[dict]]:
-    """Fit the ladder per session and build one cohort-audit record per (model, pop).
-
-    Returns ``(results, cohort_records)``; the audit records reconcile
-    ``n_in - Σdrops == n_modeled`` (grain = event) via :func:`cohort_record`.
-    """
-    rows = []
-    audits = []
-    splits = {"all": ev, "SWR": ev[ev.is_swr], "nonSWR": ev[~ev.is_swr]}
-    for name, (preds, scope) in ladder.items():
-        pops = ["all"] if scope == "pooled" else ["all", "SWR", "nonSWR"]
-        for pop in pops:
-            acc = dict.fromkeys(
-                (
-                    "n_in",
-                    "n_drop_qvals_gap",
-                    "n_drop_own_predictor_missing",
-                    "n_drop_zero_response",
-                    "n_excluded_session",
-                    "n_modeled",
-                ),
-                0,
-            )
-            sessions_in = sessions_modeled = n_nonconv = n_sep = 0
-            animals_modeled: set = set()
-            session_skips: list[tuple[str, str]] = []
-            dropped_frames = []
-            # Belief rungs are fitted over the leaf arms only: the trunks carry a
-            # structural zero for every leaf-derived belief covariate, so they add
-            # no information about those constructs. Persisted z units are also
-            # defined on leaf support. See LEAF_ONLY_CONTRAST_RUNGS.
-            leaf_only = name in LEAF_ONLY_CONTRAST_RUNGS
-            pop_frame = splits[pop]
-            fit_categories = n_categories
-            fit_preds = preds
-            renormalized = False
-            if leaf_only:
-                pop_frame = pop_frame[
-                    pop_frame["candidate_arm"] < LEAF_ONLY_N_CATEGORIES
-                ]
-                fit_categories = LEAF_ONLY_N_CATEGORIES
-                fit_preds = leaf_only_predictors(preds)
-                # A fraction is a share of the event's whole nine-arm mass, and
-                # the conditional likelihood weights an event by the total it
-                # carries, so dropping the trunks unrescaled would weight an
-                # event by its leaf share -- and SWR events put far more of
-                # their bins on the trunks than non-SWR events do, which is the
-                # very contrast being estimated. Rescale to unit mass over the
-                # six leaves. Counts keep their timebin weighting by design.
-                renormalized = response_col.endswith("_fraction")
-                if renormalized:
-                    pop_frame = renormalize_fraction_over_candidates(
-                        pop_frame, response_col=response_col
-                    )
-            for keys, r, a in _fit_population(
-                pop_frame,
-                list(fit_preds),
-                estimator=estimator,
-                response_col=response_col,
-                n_categories=fit_categories,
-                n_jobs=n_jobs,
-                min_events_session_phi=min_events_session_phi,
-                concentration_length=concentration_length,
-            ):
-                sessions_in += 1
-                for k in acc:
-                    acc[k] += a[k]
-                if len(a["dropped"]):
-                    dropped_frames.append(a["dropped"])
-                if r is None:
-                    if a["reason"]:
-                        session_skips.append(("/".join(map(str, keys)), a["reason"]))
-                    continue
-                sessions_modeled += 1
-                animals_modeled.add(keys[SC.index("animal")])
-                n_nonconv += r.get("converged") is not True
-                n_sep += bool(r.get("separated"))
-                rows.append(
-                    {
-                        "model": name,
-                        "population": pop,
-                        **dict(zip(SC, keys, strict=True)),
-                        # ``sd_<term>`` travels with the coefficients because the
-                        # aggregation's identifiability backstop is read on the
-                        # effect scale (|coef| x sd). Without it a runaway fit is
-                        # judged by its raw coefficient, which drops identified
-                        # sessions whose predictor has a small SD and keeps
-                        # unidentified ones whose predictor has a large one.
-                        **{
-                            k: v
-                            for k, v in r.items()
-                            if k.startswith(("coef_", "bse_", "pval_", "sd_"))
-                        },
-                        # Per-term separation flags, so a fit whose self-history
-                        # coefficient ran away is not dropped for every term.
-                        "separated_terms": r.get("separated_terms"),
-                        "n_events": r["n_events"],
-                        # Events on each side of the is_swr concentration
-                        # modifier. A modifier resting on one or two SWR events
-                        # is finite, unflagged, and invisible to every
-                        # identifiability rule; only these counts expose it.
-                        # NaN under the conditional Poisson and in the within-SWR
-                        # splits, where there is no such modifier.
-                        "n_events_swr": r.get("n_events_swr", np.nan),
-                        "n_events_nonswr": r.get("n_events_nonswr", np.nan),
-                        "n_params": r["n_params"],
-                        # Which allocation the row was fit on, and therefore at
-                        # which grain its llf/AIC/SEs are stated.
-                        "estimator": r.get("estimator"),
-                        "response_col": response_col,
-                        # True where the trunk rows were dropped and the
-                        # remaining fractions rescaled to unit mass per event.
-                        "response_renormalized": renormalized,
-                        # Whether the row's llf carries the response's
-                        # normalizing constants, so a later comparison cannot
-                        # difference a full likelihood against a conditional one.
-                        "llf_includes_constants": r.get("llf_includes_constants"),
-                        # Where this fit's concentration intercept came from:
-                        # its own likelihood, or the animal-pooled median that a
-                        # session too short to estimate it is pinned to.
-                        "phi_source": r.get("phi_source"),
-                        # fit-diagnostics flags (additive; drive the aggregation's
-                        # session-level nonconverged/separated counts).
-                        "converged": r.get("converged"),
-                        "separated": r.get("separated"),
-                        "n_convergence_warnings": r.get("n_convergence_warnings"),
-                        # Whether the fit reached its optimum, for the bundle's
-                        # gates: the conditional-Poisson fitter's Newton finish
-                        # (NaN for an estimator without one). Terms the session
-                        # cannot inform are listed, "|"-joined, with NaN
-                        # coefficients.
-                        "llf": r.get("llf", np.nan),
-                        "newton_decrement": r.get("newton_decrement", np.nan),
-                        "max_abs_grad": r.get("max_abs_grad", np.nan),
-                        "n_newton_steps": r.get("n_newton_steps", np.nan),
-                        "unidentified_terms": r.get("unidentified_terms", ""),
-                    }
-                )
-            dropped = (
-                pd.concat(dropped_frames, ignore_index=True)
-                if dropped_frames
-                else pd.DataFrame()
-            )
-            notes = drop_profile(dropped)
-            # Sessions that produced no fit are already counted under
-            # n_excluded_session; naming why keeps a design the estimator
-            # refused distinguishable from a session that was merely too short.
-            # The routine classes are summarized; a refusal by the estimator
-            # itself names the session it happened to. Same helper (and so the
-            # same policy) as the content runner's cohort audit.
-            skip_note = estimator_skip_note(session_skips, _ESTIMATOR_SKIP_CLASSES)
-            if skip_note:
-                notes = "; ".join(filter(None, [notes, skip_note]))
-            audits.append(
-                cohort_record(
-                    name,
-                    pop,
-                    "event",
-                    n_in=acc["n_in"],
-                    n_modeled=acc["n_modeled"],
-                    sessions_in=sessions_in,
-                    sessions_modeled=sessions_modeled,
-                    animals_modeled=len(animals_modeled),
-                    drop_notes=notes,
-                    n_drop_qvals_gap=acc["n_drop_qvals_gap"],
-                    n_drop_own_predictor_missing=acc["n_drop_own_predictor_missing"],
-                    n_drop_zero_response=acc["n_drop_zero_response"],
-                    n_excluded_session=acc["n_excluded_session"],
-                    n_sessions_flagged_nonconverged=n_nonconv,
-                    n_sessions_flagged_separated=n_sep,
-                )
-            )
-    return pd.DataFrame(rows), audits
 
 
 def _summ(res: pd.DataFrame, ladder: dict, key_term: dict) -> None:
@@ -836,13 +462,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         else poisson_estimator_name(arm_response)
     )
     fit_kwargs = {
+        "response": response,
         "estimator": args.estimator,
         "n_jobs": args.n_jobs,
         "min_events_session_phi": args.min_events_session_phi,
         "concentration_length": args.concentration_length,
     }
     # The concentration design as requested. Within an SWR / non-SWR split the
-    # flag is constant and ``resolve_concentration_cols`` drops the whole design;
+    # flag is constant and ``session_fits.resolve_concentration_cols`` drops the
+    # whole design;
     # this records what the pooled populations were asked for.
     concentration_cols = (
         []
@@ -908,7 +536,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         ev["event_id"].nunique(),
         ev.groupby(SC).ngroups,
     )
-    arm, arm_audit = _run(
+    arm, arm_audit = fit_contrast_ladder(
         ev, ARM_LADDER, response_col=arm_response, n_categories=9, **fit_kwargs
     )
     arm_path = model_dir("swr_contrast") / f"swr_contrast_content_arm{sfx}.pkl"
@@ -922,7 +550,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         pt["event_id"].nunique(),
         pt.groupby(SC).ngroups,
     )
-    patch, patch_audit = _run(
+    patch, patch_audit = fit_contrast_ladder(
         pt, PATCH_LADDER, response_col=patch_response, n_categories=3, **fit_kwargs
     )
     patch_path = model_dir("swr_contrast") / f"swr_contrast_content_patch{sfx}.pkl"
