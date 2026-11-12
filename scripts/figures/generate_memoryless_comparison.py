@@ -9,9 +9,10 @@ procedures can be read against a handful of labeled events.
 Lower panels summarize the sweep in `scripts/detection/sweep_memoryless_detection.py`,
 which wrote replays of chosen path length, duration, firing rate and distance
 from the animal one at a time into a simulated recording and recorded what each
-detector reported. Those panels read the aggregates the sweep saves, so the
-figure and the numbers quoted from the sweep cannot disagree; re-run the sweep
-to change them.
+detector reported, and its controls and held-out sweeps. Those panels read the
+aggregates the sweeps save, through the functions the detection summary reports
+from (``memoryless_sequence.sweep_statistics``), so the figure and the numbers
+quoted from the sweeps cannot disagree; re-run the sweeps to change them.
 
 The figure's caption is prose this script does not write, and no draft of it is
 kept in the repository. Its numbers are reported values

@@ -70,7 +70,8 @@ No caption draft is kept in the repository. Three were, beside their figures, un
 `content_estimators` and `uncertainty_content`; they are in git history). The
 content-estimator and uncertainty-content scripts write theirs again when they run;
 the memoryless comparison's was hand-written prose, and its script still checks the
-verdicts that prose stated. A number in a caption is never typed by hand: in a
+verdicts that prose stated (those about the sweeps through
+`memoryless_sequence/sweep_statistics.py`, which the detection summary reads too). A number in a caption is never typed by hand: in a
 markdown draft it is an inline value marker, `<!--v:<summary>.key-->…<!--/v-->`,
 which `make reported-values` fills, and in `paper/main.tex` it is the matching macro
 ([paper/README.md](../paper/README.md#numbers)).
